@@ -8,11 +8,22 @@ import time
 from fastapi import APIRouter, Request
 
 from dotagent.core.errors import SignInError
+from dotagent.core.types import FrozenModel
 from dotagent.oauth.accounts import ProviderView
-from dotagent.oauth.providers import ProviderId
+from dotagent.oauth.providers import PROVIDERS, ProviderId
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import from_a_phone
 from dotagent.server.views import SignInLink
+
+
+class SignedOutView(FrozenModel):
+    """``DELETE /api/accounts/{provider}/{address}``: whether the provider ended the sign-in's grant, the sentence that
+    says where to end it when it did not, and the providers as they stand now."""
+
+    revoked: bool
+    notice: str | None
+    providers: list[ProviderView]
+
 
 # The names of this Mac's own loopback address, which a provider sends the browser back to.
 _LOOPBACK: frozenset[str] = frozenset({"127.0.0.1", "localhost", "[::1]"})
@@ -51,8 +62,17 @@ def accounts_router(ctx: ServerContext) -> APIRouter:
         return SignInLink(link=await ctx.runtime.accounts.start(provider, ctx.port, time.time()))
 
     @router.delete("/accounts/{provider}/{address}")
-    async def sign_out(provider: ProviderId, address: str) -> list[ProviderView]:
-        await ctx.runtime.accounts.forget(provider, address)
-        return list(await ctx.runtime.accounts.providers())
+    async def sign_out(provider: ProviderId, address: str) -> SignedOutView:
+        """Sign the account out (item 1312). It always succeeds here; ``revoked`` says whether the provider ended the
+        grant too, and ``notice`` says where the owner does it when it did not (retried by the daemon for a week)."""
+        revoked: bool = await ctx.runtime.accounts.forget(provider, address)
+        return SignedOutView(
+            revoked=revoked,
+            notice=None
+            if revoked
+            else f"Signed out here; {PROVIDERS[provider].name} may still list Dot: remove it at "
+            f"{PROVIDERS[provider].permissions}",
+            providers=list(await ctx.runtime.accounts.providers()),
+        )
 
     return router

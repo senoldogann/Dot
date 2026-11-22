@@ -74,7 +74,17 @@ code** takes its place. The same by hand:
    answers; subscriptions live in the store
    and go when their push service says they are gone; a service that is busy or failing (429, 5xx) is asked once
    more a second later. A subscription whose keys cannot encrypt a message is refused
-   (422), and one stored before that check is dropped with a warning while the others still get theirs. Settings ›
+   (422), and one stored before that check is dropped with a warning while the others still get theirs. A subscription
+   is taken only at a push service of a browser's maker (item 1311): `[notify] push_hosts` lists them, by default
+   Apple's (`web.push.apple.com`, `*.push.apple.com`), Google's (`fcm.googleapis.com` and `android.googleapis.com`, by name: a `*.googleapis.com` entry would take Cloud
+   Storage buckets, which the caller names),
+   Firefox's (`updates.push.services.mozilla.com`, `*.push.services.mozilla.com`) and Windows' (`*.notify.windows.com`);
+   an address anywhere else is refused (422) with the host and this setting named, for a phone's key as for the Mac's
+   token, because Dot posts each push, signed, to that address. A browser on a push service that is not listed is one
+   more line in `[notify] push_hosts` (your list replaces the packaged one, so keep the defaults you still use). A
+   subscription stored at a host that is not on the list (before this check, or a host taken off) is not sent to, and
+   is kept, with a warning in the log. A subscription made with a phone's own key belongs to that phone and goes when
+   the phone is removed, as its APNs device does; one made with the Mac's token belongs to none and stays. Settings ›
    General › Notifications off drops the subscription.
 
 4. Dot's iPhone app (item 997, `ios/`, installed from Xcode for now) is the same web UI in a native shell, which adds
@@ -318,7 +328,8 @@ tools can neither read nor change in every mode but `yolo` ([Safety](safety.md))
 A phone that is lost, or that should no longer reach Dot: **Settings › Phone › Paired phones** lists each phone that
 signed in with a code, with when it was paired and last used, and **Remove** signs it out at once (`DELETE
 /api/phone/phones/{id}`): its key is refused from its next request, the streams it has open end, and it is back at the
-sign-in screen, where a new code is needed. A phone paired before item 670 holds the installation's own token, which
+sign-in screen, where a new code is needed. Its APNs device and the web push subscriptions it registered are deleted
+with it (item 1311). A phone paired before item 670 holds the installation's own token, which
 does not expire, and is not in the list. Take such a phone off your tailnet in Tailscale's admin console, which cuts it
 off at once. To make the token it holds worthless too, delete `<home>/api-token` and run `dotx service restart`: the
 daemon makes a new token, every browser and phone signs in or pairs again (`dotx open` opens the web UI signed in), and

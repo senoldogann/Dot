@@ -170,7 +170,11 @@ body begins: a quiet one read as not connected until its first keepalive (item 7
 what is stored goes in one write, as WebKit took the first frames of a burst of writes and then nothing until the next
 keepalive: a chat at work opened without its steps (item 716). For the same reason a stream writes a keepalive a
 quarter of a second after its own last write (item 859; another run's events, which it hears too, do not put it off): a run that asks writes its policy line and its card a moment
-apart and then waits, and WebKit handed the page the line and held the card until the keepalive 15 s on.
+apart and then waits, and WebKit handed the page the line and held the card until the keepalive 15 s on. A run's
+stream that fell so far behind that the daemon dropped its events reads the store again for them, each run from the newest
+event it sent of that run (a few ids earlier, for events stored at once; not one id for all the runs, as a run a `dotx`
+command drives reaches the bus late), not from the id the page asked from, so that a long run's whole history is not read
+and passed over at each drop; a run that joined meanwhile, or has sent nothing yet, is read from the start (item 1313).
 Between tries the page waits half a second, then longer, up to 8 seconds, and from half a second again once a stream is
 made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
 again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,

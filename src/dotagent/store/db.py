@@ -254,7 +254,8 @@ CREATE TABLE IF NOT EXISTS correspondents (
     PRIMARY KEY (address, thread_id)
 );
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-    endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL
+    endpoint TEXT PRIMARY KEY, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at REAL NOT NULL,
+    phone_id TEXT
 );
 CREATE TABLE IF NOT EXISTS apns_devices (
     phone_id TEXT PRIMARY KEY, device_token TEXT NOT NULL, start_token TEXT, environment TEXT NOT NULL,
@@ -1435,6 +1436,9 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
     await _add_columns(connection, "queue_holds", (("reason", "TEXT NOT NULL DEFAULT 'owner'"),))
+    # The phone whose key registered a web push subscription (item 1311), so that removing the phone removes it; one
+    # registered with the installation's token, or before this column, belongs to no phone.
+    await _add_columns(connection, "push_subscriptions", (("phone_id", "TEXT"),))
     if "speed" in added_to_runs:
         # A store from before fast mode (item 223): the choices its chats kept are those of the standard speed. Only
         # then, as an UPDATE takes the write lock even when it changes nothing, and a store opens beside other writers.
@@ -5695,13 +5699,20 @@ class Store:
     # ----- push subscriptions ------------------------------------------------------------------
 
     @_writing
-    async def add_push_subscription(self, endpoint: str, p256dh: str, auth: str) -> PushSubscription:
-        """Keep a browser's subscription; the same endpoint again takes the new keys."""
-        record: PushSubscription = PushSubscription(endpoint=endpoint, p256dh=p256dh, auth=auth, created_at=time.time())
+    async def add_push_subscription(
+        self, endpoint: str, p256dh: str, auth: str, phone_id: str | None = None
+    ) -> PushSubscription:
+        """Keep a browser's subscription, for the phone whose key registered it (None: the installation's token); the
+        same endpoint again takes the new keys, and a phone's key takes it over, while the installation's token leaves
+        the phone it already belongs to."""
+        record: PushSubscription = PushSubscription(
+            endpoint=endpoint, p256dh=p256dh, auth=auth, created_at=time.time(), phone_id=phone_id
+        )
         await self._db.execute(
-            "INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth",
-            (record.endpoint, record.p256dh, record.auth, record.created_at),
+            "INSERT INTO push_subscriptions (endpoint, p256dh, auth, created_at, phone_id) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth, "
+            "phone_id = COALESCE(excluded.phone_id, push_subscriptions.phone_id)",
+            (record.endpoint, record.p256dh, record.auth, record.created_at, record.phone_id),
         )
         await self._db.commit()
         return record
@@ -5714,6 +5725,7 @@ class Store:
                 p256dh=str(row["p256dh"]),
                 auth=str(row["auth"]),
                 created_at=float(row["created_at"]),
+                phone_id=None if row["phone_id"] is None else str(row["phone_id"]),
             )
             for row in rows
         ]
@@ -5722,6 +5734,13 @@ class Store:
     async def delete_push_subscription(self, endpoint: str) -> None:
         await self._db.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
         await self._db.commit()
+
+    @_writing
+    async def delete_phone_push_subscriptions(self, phone_id: str) -> int:
+        """Delete the subscriptions the phone's key registered (item 1311), and return how many went."""
+        cursor = await self._db.execute("DELETE FROM push_subscriptions WHERE phone_id = ?", (phone_id,))
+        await self._db.commit()
+        return cursor.rowcount
 
     # ----- the iPhone app's APNs (item 997) ---------------------------------------------------
 
