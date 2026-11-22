@@ -53,6 +53,17 @@ def test_font_sizes_and_radii_are_tokens(name: str) -> None:
 
 
 @pytest.mark.parametrize("name", _DRAWN)
+def test_every_comment_of_a_sheet_closes_where_it_opens(name: str) -> None:
+    """Item 1335's review: a merge left a second line of a comment under a line that already closed it, so the
+    browser read the words as a selector and threw the whole rule after it away; nothing else sees it. Take every
+    comment out: no `/*` or `*/` may be left."""
+    text: str = (_CSS / name).read_text(encoding="utf-8")
+    bare: str = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    stray: list[str] = [part for part in ("/*", "*/") if part in bare]
+    assert stray == [], f"{name}: a comment that does not close, or words after one that did ({stray})"
+
+
+@pytest.mark.parametrize("name", _DRAWN)
 def test_no_font_size_multiplies_a_token_by_a_number(name: str) -> None:
     """Item 1327's review: `.side-badge` drew its letters at `calc(var(--text-xs) * 0.75)`, 9 px on a Mac and under the
     phone's floor of 13, a size no token names, which the literal-size rule did not see."""
@@ -457,6 +468,28 @@ def test_the_docs_name_the_easing_the_sheets_use_and_not_an_older_one() -> None:
         text: str = (docs / page).read_text(encoding="utf-8")
         assert ease.group(1) in text, page
         assert [found for found in re.findall(r"cubic-bezier\([^)]*\)", text) if found != ease.group(1)] == [], page
+
+
+def test_the_daemon_page_tells_the_conversation_once_and_with_no_bubble_on_a_phone() -> None:
+    """Item 1335's review: a rebase onto item 1324 left ``docs/daemon.md`` with two copies of the conversation
+    paragraph, main's and a stale one from before the look (an 18 px corner, a quiet ring, 7 by 12 px of room), and
+    main's still said Dot's words sit in "a soft bubble of its own" on a phone, which item 1335 took away. The page
+    says the conversation once, says no bubble round what Dot says, and tells none of the stale values; the sheet
+    agrees."""
+    docs: Path = Path(__file__).resolve().parents[2] / "docs"
+    text: str = (docs / "daemon.md").read_text(encoding="utf-8")
+    flat: str = " ".join(text.split())
+    assert "soft bubble of its own" not in flat
+    # The composer's frame is the one thing that is rightly on an 18 px corner.
+    corners: list[str] = [flat[max(0, m.start() - 40) : m.end()] for m in re.finditer(r"18 px corner", flat)]
+    assert [near for near in corners if "composer is one frame on an" not in near] == []
+    for stale in ("quiet ring", "7 by 12 px", "as iMessage draws them", "an ink bubble"):
+        assert stale not in flat, stale
+    assert flat.count("a chat is drawn as a messaging app draws one (item 832)") == 1
+    assert "item 1335 took it away again" in flat
+    run: str = (_CSS / "run.css").read_text(encoding="utf-8")
+    bubble_on_phone: str = r"@media[^{]*max-width: 720px\)\s*\{\s*\.run-thread :is\(\.answer, \.bubble\.say\)"
+    assert re.search(bubble_on_phone, run) is None
 
 
 def test_a_phone_draws_no_text_token_under_13_px() -> None:

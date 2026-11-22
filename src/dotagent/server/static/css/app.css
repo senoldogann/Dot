@@ -6076,7 +6076,7 @@ dialog.modal.versions-dialog {
    ellipsis rather than widen the chat (item 360) or take a second line (item 512): its row is one line, the words at
    most half of it, the tool's own name their title. */
 .tool-name {
-  font-weight: var(--weight-title);
+  font-weight: var(--weight-label);
   font-size: var(--text-sm);
   flex: 0 1 auto;
   min-width: 0;

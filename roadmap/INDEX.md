@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1335](1335.md) | done | 2026-11-22 | The conversation is as quiet as a developer tool's, on the phone too, and the docs say the run page |
 | [1334](1334.md) | done | 2026-11-22 | The Automations of a chat are a section of its side panel, each with a pencil, a play and a switch |
 | [1333](1333.md) | done | 2026-11-22 | A chat's schedules and loops are one list the side panel can read |
 | [1332](1332.md) | done | 2026-11-22 | The run's side panel is a quiet details panel with a Lineage of the task and its subagents |
