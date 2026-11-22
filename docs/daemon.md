@@ -744,26 +744,24 @@ it delegated and the web searches by engine, and a figure of none has no line (i
 ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
 of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
 finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
-danger colour with a square) and cancels it; a word typed turns it back into the send, and the line over the box then
-shows **Stop task** at its end, so the task stops from one place while the box holds words and the empty box's Stop is
-the only one (item 1174; the loops of the chat have
-**Stop repeating** of their own, below). What the send does is said before it is pressed: over the box, while the run
-works, a choice of two (a group of radio buttons, its arrows moving the choice) says **Add to task**, which steers the
-run now, or **After this task**, whose message waits in the chat's queue (see [How a run works](runs.md#how-a-run-works));
-the send, its tooltip and its name to a screen reader are the chosen one's words, the box's placeholder says the same,
-and on a keyboard's device the hint beside the choice says what ⌘⇧Enter does instead. The choice starts from Settings ›
-General › Messages and holds for the page; it is not shown where one way alone is open (a held run, a campaign's
-session, a run a Terminal command drives). A message queued waits above the box: a sheet whose head (Queued
+danger colour with a square) and cancels it; a word typed turns it back into the send, and while a queued message is edited the send saves it. That Stop is the only one (items
+1174 and 1320; the loops of the chat have **Stop repeating** of their own, below). The box shows no choice of what a
+send does (item 1320): while the run works a message waits in the chat's queue, **After this
+task**, where its **Steer** sends it into the run at once (see [How a run works](runs.md#how-a-run-works)), unless
+Settings › General › Messages has it steer the run now, **Add to task**; the send, its tooltip, its name to a screen
+reader and the box's placeholder say which. The run's choices (its model, reasoning and options) shown from the
+button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
+session, a run a Terminal command drives) the send names that way. A message queued waits above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
 its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
 gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
 picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
 **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter sends what the box holds the other way than
-the choice over the box says, or the queue's next message to the run when the box is empty. Settings › General ›
-Messages chooses where the choice starts (item 230). A held queue
+the send does, or the queue's next message to the run when the box is empty. Settings › General › Messages chooses the
+send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360) says in a few quiet words how long the run has worked, that it waits to start, that it waits
-for you or that it stops (once Stop was pressed, until it has), ends in **Stop task** while the box holds words,
+for you or that it stops (once Stop was pressed, until it has),
 how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the

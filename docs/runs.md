@@ -372,7 +372,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
   each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
   it made, where it read `cron 0 10 * * *` before item 590), when next, and a **Stop repeating** that deletes it (the
-  task at work goes on; the bar's **Stop task** stops that); the Stops stand in one column, on a phone the message
+  task at work goes on; the composer's Stop stops that); the Stops stand in one column, on a phone the message
   stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head
   that says, folded, how often the loop repeats ("Repeats every 30 minutes", or how many there are) and when the next one
   asks, the fold kept in the browser (item 591). Until the owner opens them the rows are folded, so that a loop at rest

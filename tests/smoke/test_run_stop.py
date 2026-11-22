@@ -136,33 +136,34 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 box: Locator = page.locator(".dock textarea")
                 await expect(send).to_have_attribute("aria-label", "Stop")
                 await expect(page.locator(".dock .composer[data-stop]")).to_have_count(1)
-                # One Stop at a time (item 1174): the empty box's send is it, so the bar over the box shows none.
-                line_stop: Locator = page.locator(".capsule").get_by_role("button", name="Stop task")
-                await expect(line_stop).to_be_hidden()
+                # One Stop: the empty box's send is it, and the line over the box has none (item 1174).
+                await expect(page.locator(".capsule").get_by_role("button", name="Stop task")).to_have_count(0)
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"))
                 await box.fill("Look at the other file too")
                 await expect(send).to_have_attribute("aria-label", "After this task")
                 await expect(page.locator(".dock .composer[data-stop]")).to_have_count(0)
-                # What the send does is said before it is pressed, by the choice over the box, which starts from
-                # Settings › General's; the task's Stop stays in the bar over the composer while the box holds words.
-                intent: Locator = page.get_by_role("radiogroup", name="What your message does")
-                await expect(intent.get_by_role("radio", name="After this task")).to_have_attribute(
-                    "aria-checked", "true"
-                )
-                await expect(intent.get_by_role("radio", name="Add to task")).to_have_attribute("aria-checked", "false")
-                await expect(line_stop).to_be_visible()
-                await intent.get_by_role("radio", name="After this task").focus()
-                await page.keyboard.press("ArrowLeft")
-                await expect(intent.get_by_role("radio", name="Add to task")).to_be_focused()
-                await expect(send).to_have_attribute("aria-label", "Add to task")
-                await page.keyboard.press("ArrowRight")
-                await expect(send).to_have_attribute("aria-label", "After this task")
+                # The box shows no choice of where a message goes: the send's name says it, and
+                # a queued message can still be sent into the task.
+                await expect(page.get_by_role("radiogroup", name="What your message does")).to_have_count(0)
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"queue-{width}-{scheme}.png"))
+                if width > 720:
+                    # The choices shown from the button beside the "+" stand at the right, by the send, on a page whose
+                    # box has no mode pill too (item 1320).
+                    toggle: Locator = page.locator(".dock .choices-toggle")
+                    await toggle.click()
+                    model: Locator = page.locator(".dock .composer-pill[data-pill='model']")
+                    await expect(model).to_be_visible()
+                    model_box = await model.bounding_box()
+                    bar_box = await page.locator(".dock .composer-bar").bounding_box()
+                    assert model_box is not None and bar_box is not None
+                    assert model_box["x"] > bar_box["x"] + bar_box["width"] / 2, (model_box, bar_box)
+                    await page.wait_for_timeout(_SETTLE_MS)
+                    await page.screenshot(path=str(tmp_path / f"choices-{width}-{scheme}.png"))
+                    await toggle.click()
                 await box.fill("")
                 await expect(send).to_have_attribute("aria-label", "Stop")
-                await expect(line_stop).to_be_hidden()
                 await send.click()
                 async with asyncio.timeout(_RUN_WAIT_S):
                     ended: RunRecord = await manager.wait(run.id)
