@@ -833,7 +833,7 @@ every mode but `yolo` (item 433).
   it, and Dot's own arrow goes to the element all the same, rippling for a press (item 869, after
   vercel-labs/agent-desktop's cursor); an element whose frame cannot be read is drawn nowhere, and the step is done
   as before. Beside the arrow a label says who does what, on one line of at most 56 characters: the owner's agent
-  the run runs as, or Dot, and the step, as "Trader clicks button 'Send'". Near the right edge of a screen it stands
+  the run runs as, or Dot, and the step, as "Reviewer clicks button 'Send'". Near the right edge of a screen it stands
   on the arrow's left. The label is never shown to the model: it is drawn in the same window, which every capture of
   Dot's leaves out. Dot's browser does not move it: its steps
   go to Chrome directly and move no pointer at all.

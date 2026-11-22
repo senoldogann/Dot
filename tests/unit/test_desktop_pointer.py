@@ -129,11 +129,11 @@ async def test_a_step_done_through_accessibility_shows_dots_pointer_where_it_wen
     try:
         _steps_go(session, monkeypatch, None, Point(300.0, 120.0))
         batch = await session._run_steps(
-            "chat", memory.fresh_thread(), env, [Step(action="press", ref="a3")], None, "Trader"
+            "chat", memory.fresh_thread(), env, [Step(action="press", ref="a3")], None, "Reviewer"
         )  # type: ignore[arg-type]
-        await session._run_steps("chat", memory.fresh_thread(), env, [Step(action="focus", ref="a4")], None, "Trader")  # type: ignore[arg-type]
+        await session._run_steps("chat", memory.fresh_thread(), env, [Step(action="focus", ref="a4")], None, "Reviewer")  # type: ignore[arg-type]
         assert told.told == [("move", "300", "120", "True"), ("move", "300", "120", "False")]
-        assert told.labels == ["Trader presses button 'Archive'", "Trader goes to button 'Archive'"]
+        assert told.labels == ["Reviewer presses button 'Archive'", "Reviewer goes to button 'Archive'"]
         # The Mac's pointer did not move: the batch still expects it where it was.
         assert batch.env.expected_pointer is None
         _steps_go(session, monkeypatch, None, None)

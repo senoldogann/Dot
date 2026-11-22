@@ -12,7 +12,9 @@ provider or of the judge that is not `http://` or `https://` with a host, a mode
 a provider Dot knows (`[models] search` an Anthropic one), a site under `[policy.spend]` that is not a bare host in
 lower case without `www.`, such as `example.com`. The error names each setting; for a key this version of Dot does not have it says
 that a newer Dot may add it, and for the table this version removed (`[trading]`, item 1286) it says to delete it (a daemon that runs an older checkout than the one that wrote the file refuses
-it). Two environment variables of the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
+it). Four environment variables of the process move the folders: `DOT_HOME` (the home directory), `DOT_LOG_DIR` (the
+logs), `DOT_CHROME_DIR` (where your own Chrome keeps its profiles, which Dot reads only when you ask) and
+`DOT_STAGING_DIR` (where Dot copies a picture it sends over iMessage, `~/Pictures/Dot` by default).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |
 | ------------------------------------------------ | -------------------------------------------------------------------- |

@@ -1,7 +1,7 @@
 """Dot's own pointer on the screen (item 706): a glowing arrow that glides to where a step of ``desktop_act`` went
 and ripples where it clicked, the way another coding agent shows its own, so that the owner sees what Dot does and
 where. A step done through accessibility, which leaves the Mac's pointer where it was, is shown there too, and a label
-beside the arrow says who does what (item 869, after vercel-labs/agent-desktop's cursor: "Trader clicks button
+beside the arrow says who does what (item 869, after vercel-labs/agent-desktop's cursor: "Reviewer clicks button
 'Send'"), on the side of the arrow the screen has room on.
 It only shows: the step itself is done as before, through the HID event tap or accessibility.
 
@@ -109,7 +109,7 @@ def label_flips(x: float, width: float, screen_right: float) -> bool:
 
 def label_of(who: str, action: str, about: str) -> str:
     """What the label beside the arrow says of a step (item 869): who does it, what, and to what, at most
-    :data:`LABEL_CHARS` characters on one line: "Trader clicks button 'Send'". An action it has no word for says
+    :data:`LABEL_CHARS` characters on one line: "Reviewer clicks button 'Send'". An action it has no word for says
     who alone."""
     does: str | None = _DOES.get(action)
     line: str = " ".join(" ".join(part for part in (who, does, about if does else "") if part).split())

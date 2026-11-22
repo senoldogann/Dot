@@ -48,8 +48,10 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
 - MCP: tools only, over stdio or the streamable HTTP and SSE transports (no resources, prompts or sampling); a server
   at a URL may sign in with OAuth (see [MCP servers](extending.md#mcp-servers)).
 - All conversation threads share one Chrome window.
-- Every model call carries the schemas of over forty tools, several thousand tokens. A model with a small context
-  window or a metered key feels it; `allow` lists keep the MCP part short.
+- Dot has over a hundred built-in tools (113 with the desktop on). With `tool_surface = "full"` every model call
+  carries the schemas of all of them, several thousand tokens; the default `grouped` surface starts with the core tools
+  and adds a group when a run turns it on ([Runs](runs.md)). A model with a small context window or a metered key feels
+  it; `allow` lists keep the MCP part short.
 - A run costs what its model costs: the loop makes many calls, and screenshots are expensive. A run has no step limit,
   so what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode,
   the concurrency limits (`max_concurrent_runs`; 0, the default, sets no limit) and the default ceilings of 120 minutes
