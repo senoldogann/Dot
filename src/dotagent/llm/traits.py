@@ -82,7 +82,9 @@ def effort_ladder(labels: Iterable[str]) -> tuple[Effort, ...]:
 def choose_effort(ladder: tuple[str, ...], effort: Effort) -> str | None:
     """The label of ``ladder`` closest to the neutral ``effort``; ``None`` when the model offers no choice.
 
-    ``off`` picks the lowest label, ``max`` the highest, and the others the nearest by meaning (ties go lower).
+    ``off`` picks the lowest label, ``max`` the highest, and the others the nearest by meaning; of two as near the
+    lower is taken, the cheaper (item 1307: the one rule for a run's calls, a standby model's level and a schedule's
+    firing). A plain switch (``off``, ``on``) is a ladder like another: ``medium`` is ``on``, ``minimal`` is ``off``.
     """
     if len(ladder) < 2:
         return None

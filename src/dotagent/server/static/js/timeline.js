@@ -1784,6 +1784,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       note(scope, record.ts, "refresh", t("timeline.modelBack", { model: data.model, took: duration(data.waited_s) }), "");
     },
 
+    // The schedule that started this run had a reasoning level (`asked`) its model does not offer, and keeps the one the
+    // model takes for it (`kept`) from now on (item 1307); said once, the firings after it find the level offered.
+    schedule_effort_changed(scope, record) {
+      const data = record.data;
+      note(scope, record.ts, "refresh", t("timeline.scheduleEffort", { asked: data.asked, kept: data.kept }), "");
+    },
+
     // A helper model ([models] helpers) could not answer a question of the run; `until` (seconds) is when it may be
     // asked again, null for a missing key.
     helper_unavailable(scope, record) {

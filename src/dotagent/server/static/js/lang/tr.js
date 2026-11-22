@@ -567,6 +567,7 @@ export const TR = {
   "timeline.waitAgain": "{why}; {count} kez denendi; Dot {at} saatinde yeniden soracak ve {until} saatine dek sormayı sürdürecek.",
   "timeline.reconnected": "{host} bağlantısı {took} sonra geri geldi; Dot {model} modeline yeniden soruyor.",
   "timeline.modelBack": "{model} {took} sonra yeniden yanıt verdi; Dot devam ediyor",
+  "timeline.scheduleEffort": "Bu zamanlama modelinin sunmadığı {asked} düşünme düzeyini istemişti; artık {kept} düzeyinde çalışıyor.",
   "timeline.helperDown": "Yardımcı model {model} yanıt veremiyor ({reason})",
   "timeline.helperDownUntil": "Yardımcı model {model} yanıt veremiyor ({reason}, {until} tarihine dek)",
   "timeline.judgeDown": "Ek denetçi (TypeSafe) {until} tarihine dek yanıt veremiyor ({reason}). O zamana dek Dot'un güvenlik kuralları ve hedef denetimi tek başına karar verir.",

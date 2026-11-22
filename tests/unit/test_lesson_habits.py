@@ -16,6 +16,7 @@ from dotagent.agent import lessons as lessons_module
 from dotagent.agent.lessons import LessonCase, draw_lessons, repeating_rules
 from dotagent.agent.review import LessonProposal, LessonRequest, _lessons_prompt
 from dotagent.config import AppConfig, load_config
+from dotagent.core.errors import ProviderHttpError
 from dotagent.harness.components import HarnessText, rules_of
 from dotagent.harness.service import adopt, create_version
 from dotagent.memory.ranking import Vector
@@ -156,3 +157,51 @@ async def test_with_no_habit_adopted_every_lesson_goes_on_as_before(
         monkeypatch.setattr(lessons_module, "lesson_writer_for", writer.factory)
         drawn: tuple[str, ...] = await draw_lessons(runtime, case, ("a call failed",))  # type: ignore[arg-type]
         assert drawn == (HABIT, FRESH) and writer.requests[0].habits == ()
+
+
+class _DownEmbedder:
+    """An embedding service whose model is not installed: every call is the 404 Ollama gives."""
+
+    calls: int = 0
+
+    @property
+    def model(self) -> str:
+        return "bge-m3"
+
+    async def embed(self, texts: Sequence[str]) -> list[Vector]:
+        self.calls += 1
+        raise ProviderHttpError("provider answered HTTP 404: model 'bge-m3' not found", 404, {})
+
+    async def aclose(self) -> None:
+        return None
+
+
+async def test_lessons_are_drawn_by_words_when_the_embedding_service_is_down(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    down: _DownEmbedder = _DownEmbedder()
+    text: HarnessText = HarnessText(habits=f"- {HABIT}\n", tool_guidance="")
+    async with _home(tmp_path, monkeypatch, down, text) as (runtime, case):  # type: ignore[arg-type]
+        saved: str = "Run pdftotext with -layout when a table must keep its columns, to keep them."
+        await runtime.store.add_memory_once(saved, ("lesson",), None, None, None, None, False)
+        writer: _Writer = _Writer([HABIT.rstrip("."), FRESH, "Open the report in Preview first."])
+        monkeypatch.setattr(lessons_module, "lesson_writer_for", writer.factory)
+        drawn: tuple[str, ...] = await draw_lessons(runtime, case, ("a call failed",))  # type: ignore[arg-type]
+        # The habit's words are dropped, the saved note's words are dropped by the words, the new one is kept.
+        assert drawn == ("Open the report in Preview first.",)
+        assert down.calls >= 1, "the embedding service was asked, and its failure did not end the lessons"
+        found: dict[str, str] = await repeating_rules(runtime, [HABIT.rstrip("."), FRESH], [HABIT])  # type: ignore[arg-type]
+        assert found == {HABIT.rstrip("."): HABIT}
+
+
+async def test_lessons_go_on_as_before_with_the_embedding_service_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    embedder: _Embedder = _Embedder({HABIT: _unit(0.0)})
+    async with _home(tmp_path, monkeypatch, embedder, HarnessText(habits=HABIT, tool_guidance="")) as (runtime, case):
+        await runtime.store.add_memory_once(
+            "The invoices of this client are in the Finance folder.", ("lesson",), None, None, None, None, False
+        )
+        writer: _Writer = _Writer([FRESH])
+        monkeypatch.setattr(lessons_module, "lesson_writer_for", writer.factory)
+        assert await draw_lessons(runtime, case, ("a call failed",)) == (FRESH,)  # type: ignore[arg-type]

@@ -6896,6 +6896,13 @@ class Store:
         await self._db.commit()
 
     @_writing
+    async def set_schedule_effort(self, schedule_id: str, effort: Effort) -> None:
+        """Put the reasoning level ``effort`` in the schedule ``schedule_id``: its model does not offer the one it
+        had, and its firings run at this one (item 1307). Nothing else of the schedule changes."""
+        await self._db.execute("UPDATE schedules SET effort = ? WHERE id = ?", (effort, schedule_id))
+        await self._db.commit()
+
+    @_writing
     async def set_schedule_enabled(self, schedule_id: str, enabled: bool, next_run_at: float | None) -> None:
         """Switch a schedule on or off; one switched on starts its row of failed runs afresh, and no longer says it was
         switched off for them (item 458)."""

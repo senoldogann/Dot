@@ -18,12 +18,13 @@ import re
 import stat
 import tempfile
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import TypedDict
 
 from dotagent.core.errors import ServiceError
 from dotagent.core.logs import get_logger
+from dotagent.core.runenv import RESTART_ASKER_MARKER
 from dotagent.core.types import FrozenModel
 from dotagent.dot_app import tools_path
 
@@ -281,15 +282,21 @@ def render_launch_agent(agent: LaunchAgent) -> bytes:
     return plistlib.dumps(agent_plist(agent), fmt=plistlib.FMT_XML, sort_keys=True)
 
 
-def build_restart_job(python: str, home: Path, logs: Path, environ: Mapping[str, str]) -> RestartJob:
+def build_restart_job(
+    python: str, home: Path, logs: Path, environ: Mapping[str, str], asked_by: str | None = None
+) -> RestartJob:
     """The job that runs :data:`RESTART_MODULE` with ``python``, from Dot's home ``home``. ``DOT_HOME`` and
-    ``DOT_LOG_DIR`` are handed on when set here."""
+    ``DOT_LOG_DIR`` are handed on when set here, and ``asked_by``, the id of the run whose command asked for the
+    restart, as :data:`~dotagent.core.runenv.RESTART_ASKER_MARKER` (item 1310)."""
+    environment: dict[str, str] = _job_environment(home, logs, environ)
+    if asked_by:
+        environment[RESTART_ASKER_MARKER] = asked_by
     return RestartJob(
         python=python,
         working_directory=str(home),
         stdout_path=str(logs / "restart-when-idle.out.log"),
         stderr_path=str(logs / "restart-when-idle.err.log"),
-        environment=_job_environment(home, logs, environ),
+        environment=environment,
     )
 
 
@@ -599,14 +606,48 @@ async def _put_back(
     log.warning("service_install_undone", label=label, plist=str(plist), reloaded=reload, error=str(failure))
 
 
+# How long the load of the daemon's job waits before it is tried a second time (item 1310).
+_BOOTSTRAP_RETRY_S: float = 2.0
+
+
+async def load_job(plist: Path, uid: int, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep) -> None:
+    """Load the job of the daemon from its property list ``plist``, which starts it. A load launchd refuses is tried a
+    second time after :data:`_BOOTSTRAP_RETRY_S` (it answers a busy label, "Input/output error", for a moment after
+    an unload), and when that fails too the job is started where it stands with ``launchctl kickstart -k`` (item 1310:
+    a refused load after the unload left no job and the daemon down). Raises :class:`ServiceError` naming each step
+    that failed when none of the three starts it."""
+    target: str = service_target(uid)
+    first: LaunchctlResult = await run_launchctl(["bootstrap", domain_target(uid), str(plist)])
+    if first.returncode == 0:
+        return
+    log.warning("service_bootstrap_failed", attempt=1, returncode=first.returncode, stderr=_clip(first.stderr, 300))
+    await sleep(_BOOTSTRAP_RETRY_S)
+    second: LaunchctlResult = await run_launchctl(["bootstrap", domain_target(uid), str(plist)])
+    if second.returncode == 0:
+        log.info("service_bootstrap_retried", target=target)
+        return
+    log.warning("service_bootstrap_failed", attempt=2, returncode=second.returncode, stderr=_clip(second.stderr, 300))
+    kick: LaunchctlResult = await run_launchctl(["kickstart", "-k", target])
+    if kick.returncode == 0:
+        log.warning("service_kickstarted", target=target)
+        return
+    raise ServiceError(
+        "launchctl cannot load the job again, in two tries, nor start it with kickstart",
+        {
+            "bootstrap": _failure(second, "launchctl cannot load the job again").context,
+            "kickstart": _failure(kick, "launchctl cannot start the job").context,
+        },
+    )
+
+
 async def restart_job(plist: Path, uid: int) -> None:
     """Start the job of the daemon again now from its property list ``plist``: unloaded first (``bootout`` sends the
     daemon SIGTERM, so it closes its browser and servers and records its runs, and waits until it has exited), then
-    loaded, which starts it. Raises :class:`ServiceError` when launchd refuses either step."""
+    loaded (:func:`load_job`), which starts it. Raises :class:`ServiceError` when launchd refuses a step."""
     target: str = service_target(uid)
     await _checked(["bootout", target], "launchctl cannot unload the job to restart it")
     await _wait_until_unloaded(target)
-    await _checked(["bootstrap", domain_target(uid), str(plist)], "launchctl cannot load the job again")
+    await load_job(plist, uid)
 
 
 async def cancel_restart_job(plist: Path, uid: int) -> bool:

@@ -21,8 +21,10 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.provider_errors import StatusClassifier, parse_retry_after, parse_wire_error
 
 _RETRYABLE_STATUS: frozenset[int] = frozenset({408, 409, 425, 429, 500, 502, 503, 504, 520, 521, 522, 524, 529})
-# A server asking for a longer pause than this is reported instead of silently stalling the agent.
-_MAX_AUTOMATIC_WAIT_S: float = 120.0
+# A server asking for a longer pause than this is not slept through inside the connector: the error goes to the run
+# loop, whose rate-limit wait pauses the model, tries a standby model and asks again when the provider said (item
+# 1306). Below it the connector waits, the hint held within the policy's delays.
+_MAX_AUTOMATIC_WAIT_S: float = 30.0
 # Every failure on the way to the provider and back: httpx's transport errors (connect, timeouts, a proxy, a protocol
 # broken on either side, a connection that fails to close) and a body that cannot be decoded (item 116), and a TLS read
 # that fails on the wire ("bad record mac"), which reaches the caller as the raw ssl error, not as a ReadError (item

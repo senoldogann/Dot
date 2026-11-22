@@ -53,7 +53,7 @@ from dotagent.desktop.types import Permissions
 from dotagent.dot_app import LAUNCHER_ENV, has_kept_launcher
 from dotagent.help.apps import APP_ROOTS
 from dotagent.llm.calls import log_model_call
-from dotagent.llm.ollama import OllamaProvider
+from dotagent.llm.ollama import RETIRED, OllamaProvider, Retirement
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
 from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider, listed_id
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
@@ -156,6 +156,40 @@ def _served_by(ref: ModelRef, listing: Served) -> bool:
     if ref.provider == "openrouter":
         return listed_id(listing.names, ref.model) is not None
     return ref.model in listing.names
+
+
+def _retired_rows(config: AppConfig) -> list[CheckResult]:
+    """One row for each cloud model Ollama's service retired that this process has learned of (item 1309: from the
+    model list the daemon read, or the answer a configured model got), with the model its words suggest instead and,
+    when a role in the configuration names it, which: the row then fails, as that role cannot run. Dot does not
+    rewrite the configuration."""
+    pins: list[tuple[str, str]] = [
+        ("main", config.models.main),
+        ("vision", config.models.vision),
+        ("fast", config.models.fast),
+        ("review", config.models.review),
+        *((f"helpers {index}", reference) for index, reference in enumerate(config.models.helpers, start=1)),
+        *((f"standby {index}", reference) for index, reference in enumerate(config.models.standby, start=1)),
+    ]
+    rows: list[CheckResult] = []
+    for retirement in RETIRED.all(config.providers.ollama.base_url):
+        roles: list[str] = [role for role, reference in pins if reference == f"ollama:{retirement.model}"]
+        rows.append(_retired_row(retirement, roles))
+    return rows
+
+
+def _retired_row(retirement: Retirement, roles: Sequence[str]) -> CheckResult:
+    use: str = f"; use {retirement.use}" if retirement.use else ""
+    name: str = f"ollama model {retirement.model}"
+    if roles:
+        return _result(
+            name,
+            False,
+            True,
+            f"retired by Ollama's service{use}; your configuration names it for {', '.join(roles)} "
+            "([models] in config.toml): change it there",
+        )
+    return _result(name, True, False, f"retired by Ollama's service and left out of the model list{use}")
 
 
 async def _check_model(
@@ -957,6 +991,9 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
             ("standby", "[models] standby", config.models.standby),
         ):
             results.append(await _models_row(name, setting, models, config.providers, router, served, down))
+        # Last of the model rows: a retirement is learned from the answer a model gets, so the rows of every role,
+        # helpers and standby too, are asked before it is read (item 1309).
+        results.extend(_retired_rows(config))
     finally:
         await router.aclose()
     judge_key: bool = await asyncio.to_thread(_has_secret, config.judge.api_key_env)

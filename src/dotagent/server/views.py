@@ -1586,6 +1586,17 @@ class ModelOption(FrozenModel):
 type ProviderProblem = Literal["no_key", "not_installed", "key_refused", "access_refused", "failed"]
 
 
+class RetiredModel(FrozenModel):
+    """A cloud model its service retired (item 1309): ``model`` as the server lists it, ``use`` the model the service's
+    own words suggest instead (``None`` when they name none), ``message`` those words and ``since`` when Dot learned of
+    it. Dot leaves the owner's choices as they are: a role or schedule that names the model is the owner's to change."""
+
+    model: str
+    use: str | None
+    message: str
+    since: float
+
+
 class ProviderModels(FrozenModel):
     """The models of one provider, or why it listed none: ``error`` is the message and ``problem`` what kind of failure
     it is (``no_key``: no key is set for it, ``not_installed``: the program it runs on is not installed, OpenCode for
@@ -1597,6 +1608,8 @@ class ProviderModels(FrozenModel):
     models: list[ModelOption]
     error: str | None
     problem: ProviderProblem | None
+    # The models the provider's service retired and left out of ``models`` (item 1309); empty for every other provider.
+    retired: list[RetiredModel] = Field(default_factory=list)
 
 
 class PaletteSkill(FrozenModel):
@@ -2058,6 +2071,18 @@ class KeysView(FrozenModel):
     keys: list[KeyView]
 
 
+class RestartPending(FrozenModel):
+    """A restart of the daemon that waits for Dot to be idle (item 1310): since when (``since``, seconds since the
+    epoch), the id of the run that asked for it (``asked_by``, empty when a person did), of the run it waits for now
+    (``waiting_for``, empty when it waits for the night's learning), and whether the two hours it waits for runs at
+    work are over (``gave_up``; it then waits for the next time Dot is idle)."""
+
+    since: float
+    asked_by: str
+    waiting_for: str
+    gave_up: bool
+
+
 class StatusView(FrozenModel):
     version: str
     # What the pages the daemon serves are (a digest of their files at its start): a page loaded from other pages is out
@@ -2097,6 +2122,8 @@ class StatusView(FrozenModel):
     model_labels: dict[str, str]
     # The phone watches (:class:`dotagent.notify.health.NotifyHealth`). ``down`` means HTTP is up and the phone is not.
     notifications: Literal["ok", "down", "off"] = "off"
+    # The restart of the daemon that waits for Dot to be idle, ``None`` when none does (item 1310).
+    restart_pending: RestartPending | None = None
 
 
 # The sections: what waits for the user, what works now, what ended today, what was learned today (item 72: the

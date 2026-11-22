@@ -175,6 +175,32 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
     return SkillCatalog(skills=tuple(skills.values()), problems=tuple(problems))
 
 
+# What :func:`unreported` has handed out: a skill that cannot be read is told once per process for as long as its file
+# and the reason stay as they are, not at every run that loads the skills again.
+_REPORTED: set[tuple[str, str, int]] = set()
+
+
+def _modified(path: Path) -> int:
+    """When ``path`` last changed, in nanoseconds; 0 when it cannot be read (a folder that is gone)."""
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
+def unreported(problems: Sequence[SkillProblem]) -> tuple[SkillProblem, ...]:
+    """The problems among ``problems`` this process has not handed out before: one is the same by its path, its
+    reason and the time its file changed (item 1305). The problems themselves stay in the catalog, which Doctor and
+    ``dotx skills list`` read."""
+    fresh: list[SkillProblem] = []
+    for problem in problems:
+        key: tuple[str, str, int] = (str(problem.path), problem.reason, _modified(problem.path))
+        if key not in _REPORTED:
+            _REPORTED.add(key)
+            fresh.append(problem)
+    return tuple(fresh)
+
+
 def load_skills(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path | None) -> SkillCatalog:
     """The skills of this installation, read fresh from disk, with the playbooks under ``playbooks`` when given."""
     return load_catalog(skill_roots(config, plugins, playbooks))

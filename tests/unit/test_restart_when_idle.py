@@ -111,7 +111,7 @@ def test_status_says_whether_a_restart_waits() -> None:
     waiting: str = _restart_line(JobState(state="running", pid=77, runs=1, last_exit="(never exited)"))
     assert "pid 77" in waiting
     assert "none of the night's learning is under way" in waiting
-    assert "gives up after 2 hours of runs at work or 3 hours of the night's learning" in waiting
+    assert "shows a banner after 2 hours of runs at work or 3 hours of the night's learning" in waiting
     assert (_duration(3600), _duration(1800)) == ("1 hour", "30 minutes")
 
 
@@ -164,7 +164,7 @@ async def test_the_wait_ends_when_the_last_run_ends_or_when_the_time_is_up(tmp_p
     store: Store = await Store.open(database, tmp_path / "images")
     try:
         run: RunRecord = await _run_in(store, "running", 1)
-        assert await wait_until_idle(database, 0.01, 0.05) == Busy(1, ())
+        assert await wait_until_idle(database, 0.01, 0.05) == Busy(1, (), run.id)
         waiting: asyncio.Task[Busy] = asyncio.create_task(wait_until_idle(database, 0.01, 30.0))
         await asyncio.sleep(0.05)
         assert not waiting.done()
@@ -555,6 +555,7 @@ async def test_the_program_gives_up_without_restarting_when_a_run_still_works_at
 ) -> None:
     store: Store = await _scratch_home(tmp_path, monkeypatch, 9)
     monkeypatch.setattr(restart_when_idle, "RESTART_WAIT_LIMIT_S", 0.05)
+    monkeypatch.setattr(restart_when_idle, "RESTART_SECOND_CHANCE_S", 0.05)
     try:
         await _run_in(store, "blocked", 1)
         _load_the_daemons_job(launchctl)
@@ -565,6 +566,7 @@ async def test_the_program_gives_up_without_restarting_when_a_run_still_works_at
         assert _events(logs) == [
             "restart_when_idle_waiting",
             "restart_when_idle_gave_up",
+            "restart_when_idle_second_chance_ended",
             "restart_when_idle_unloading",
         ]
         assert not any(call.startswith(f"bootout gui/{UID}/{LABEL}") for call in _calls(launchctl))
@@ -572,7 +574,8 @@ async def test_the_program_gives_up_without_restarting_when_a_run_still_works_at
         assert _read(plist) is None
         # The owner is told that the new code is not live: the wait that ran out was found out by chance before.
         assert len(_BANNERS) == 1
-        assert _BANNERS[0][0] == "Dot was not restarted" and "not live yet" in _BANNERS[0][1]
+        assert _BANNERS[0][0] == "Dot was not restarted yet" and "not live yet" in _BANNERS[0][1]
+        assert "restarts by itself the next time it is idle" in _BANNERS[0][1]
         assert _ENDING == ["banner", "release"], "the unload of the job ends the process: the banner comes first"
     finally:
         await store.close()

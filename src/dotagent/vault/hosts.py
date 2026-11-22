@@ -81,6 +81,30 @@ def _sites(websites: tuple[str, ...]) -> tuple[tuple[str, int | None], ...]:
     return tuple(sites)
 
 
+def site_key(website: str) -> tuple[str, int | None] | None:
+    """The site a login's ``website`` names, as its host (as :func:`website_hosts` reads it) and the port it names,
+    ``None`` for none or for its scheme's own (``github.com``, ``https://github.com`` and ``https://GitHub.com:443/``
+    are one site); ``None`` when the website cannot be read, or names no host or a port that is no number."""
+    parts: SplitResult | None = _parts_of(website.strip())
+    if parts is None:
+        return None
+    try:
+        port: int | None = parts.port
+    except ValueError:
+        return None
+    host: str = _host_of(parts)
+    if not host:
+        return None
+    return host, None if port == _SCHEME_PORTS.get(parts.scheme.lower()) else port
+
+
+def same_site(first: str, second: str) -> bool:
+    """Whether two websites name one site, by host and port (:func:`site_key`) and not by how they are written: a
+    login the owner saved as ``shop.example.com`` and the address ``https://shop.example.com`` of a page are one."""
+    key: tuple[str, int | None] | None = site_key(first)
+    return key is not None and key == site_key(second)
+
+
 def fills_on(url: str, websites: tuple[str, ...]) -> bool:
     """Whether a login of ``websites`` may be filled on the page at ``url``: its host is one of theirs or under one, on
     the port the website names (the page's scheme's own when it names none), over https, or over http on this Mac

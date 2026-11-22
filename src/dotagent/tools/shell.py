@@ -13,19 +13,19 @@ from pydantic import Field
 from dotagent.agent.held_secrets import held_values
 from dotagent.config import ShellConfig
 from dotagent.core.errors import ToolExecutionError
-from dotagent.core.runenv import RUN_SHELL_MARKER
+from dotagent.core.runenv import RUN_ID_MARKER, RUN_SHELL_MARKER
 from dotagent.core.text import truncate_middle
 from dotagent.policy.paths import classify_path, expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool
 from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.env_filter import hides_secret
 from dotagent.tools.third_party import mentions_third_party
 
 _HEAD_BYTES: int = 64 * 1024
 _TAIL_BYTES: int = 192 * 1024
 _DRAIN_GRACE_S: float = 0.4
-_SECRET_NAME_PARTS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH")
 _FIXED_ENV: dict[str, str] = {
     # Tells dotx that a run started the command, so that it does not restart the daemon under the run (item 441).
     RUN_SHELL_MARKER: "1",
@@ -41,11 +41,10 @@ _FIXED_ENV: dict[str, str] = {
 
 
 def child_env(login_env: dict[str, str], pass_env: list[str]) -> dict[str, str]:
-    """Environment for tool processes: the login environment minus anything that looks like a secret."""
+    """Environment for tool processes: the login environment minus what :func:`hides_secret` holds back (a name that
+    says it holds a secret, an address that carries a password), unless ``pass_env`` names it."""
     kept: dict[str, str] = {
-        name: value
-        for name, value in login_env.items()
-        if name in pass_env or not any(part in name.upper() for part in _SECRET_NAME_PARTS)
+        name: value for name, value in login_env.items() if name in pass_env or not hides_secret(name, value)
     }
     return {**kept, **_FIXED_ENV}
 
@@ -211,7 +210,11 @@ def build_shell_tool() -> RegisteredTool:
         # The secrets the owner gave this chat on a card (item 857) join its commands' environment, by their names.
         held: dict[str, str] = await asyncio.to_thread(held_values, ctx.thread_id)
         code, output, seconds, timed_out = await run_command(
-            args.command, run_sandbox(ctx).commands, cwd, {**ctx.runtime.shell_env, **held}, timeout_s
+            args.command,
+            run_sandbox(ctx).commands,
+            cwd,
+            {**ctx.runtime.shell_env, **held, RUN_ID_MARKER: ctx.run_id},
+            timeout_s,
         )
         header: str = (
             f"[timed out after {timeout_s}s and was killed]" if timed_out else f"[exit {code} in {seconds:.1f}s]"
