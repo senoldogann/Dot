@@ -21,9 +21,12 @@
   margin-top: var(--space-6);
 }
 
-.settings-pane > .set-section + .set-section,
-.settings-pane > .set-sections > .set-section + .set-section {
+.settings-pane > .set-section + .set-section {
   margin-top: 32px;
+}
+
+.settings-pane > .set-sections {
+  margin-top: var(--space-6);
 }
 
 /* The head: the line that says what the page is for and, at the right, what it holds and its buttons. The page's name is
@@ -3102,8 +3105,8 @@ a.crumb:hover {
   }
 }
 
-/* ---------- Schedules (item 373): the list is the page, and the form that adds one comes when it is asked for, in a
-   dialog (item 615). ---------- */
+/* ---------- Scheduled tasks (items 373, 615 and 1337): a page of the settings; the list is the page, and the form that
+   adds or changes one is a page of its own under it. ---------- */
 
 .schedule-list > .list-row {
   padding-block: var(--space-2);
@@ -3115,16 +3118,6 @@ a.crumb:hover {
 
 .schedule-list {
   padding-bottom: var(--space-2);
-}
-
-/* Past its third schedule the list scrolls inside (item 634): as tall as its first three rows and the top of the
-   fourth, which the page measures (`--shown-rows`, schedules.js), and never taller than most of the window, where a
-   phone's rows stand taller. */
-.schedule-list.cut {
-  max-height: min(var(--shown-rows), 60vh);
-  max-height: min(var(--shown-rows), 60dvh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .schedule-panel .row-title {
@@ -5534,4 +5527,71 @@ a.crumb:hover {
   .settings-pane .setting:has(> .row > :is(.input, .select, .segmented, .textarea)) > .hint {
     grid-row: 3;
   }
+}
+
+/* A schedule's row (item 1337): its name and badges over one line of when and how it went; at the right its buttons and its
+   switch. A phone gives the buttons a line under the words. */
+.sched-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.sched-title > .row-title {
+  font-size: var(--text-ui);
+  font-weight: var(--weight-label);
+}
+
+.sched-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.set-row[data-schedule] > .schedule-details {
+  margin-top: var(--space-3);
+}
+
+.set-row[data-schedule].asked {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+@media (max-width: 720px) {
+  .set-row[data-schedule] .set-row-control {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .sched-actions {
+    justify-content: flex-start;
+  }
+
+  .sched-actions > .switch {
+    margin-left: auto;
+  }
+}
+
+/* A row's own box under its text, over the row's whole width: a goal, the presets of a timing. */
+.set-row-body {
+  margin-top: var(--space-2);
+}
+
+.set-row-body > :is(.textarea, .input) {
+  width: 100%;
+}
+
+/* The foot of a form that is a page (item 1337): Cancel and the button that saves, at the right. */
+.set-savebar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.settings-pane .set-row .select,
+.settings-pane .set-row .input:not(.mono) {
+  max-width: 100%;
 }

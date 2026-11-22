@@ -247,11 +247,14 @@ async def test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and
                         "true",
                         "false",
                     ]
-                    # The pencil leads to the Schedules page's editor of that schedule, the head's button to all.
+                    # The pencil leads to the editor page of that schedule, the head's button to all (Settings ›
+                    # Scheduled tasks).
                     assert await rows.nth(0).locator("a.automation-edit").get_attribute("href") == (
-                        f"#/schedules?schedule={loop.id}&edit=1"
+                        f"#/settings/schedules/{loop.id}"
                     )
-                    await expect(section.locator("a.automation-manage")).to_have_attribute("href", "#/schedules")
+                    await expect(section.locator("a.automation-manage")).to_have_attribute(
+                        "href", "#/settings/schedules"
+                    )
                 await page.screenshot(path=str(tmp_path / f"automations-{index}.png"))
                 if index == 0:
                     # The list is read again after each switch and its order follows the next firings: rows are
@@ -309,22 +312,11 @@ async def test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and
                         base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}
                     ) as client:
                         assert (await client.post(f"/api/schedules/{loop.id}/enable")).status_code == 200
-                    # The pencil is followed: the address is a route (a pencil to an address nothing matches fell back
-                    # to New chat) and the schedule's own editor is open on it, once.
+                    # The pencil is followed: its address is the editor page of the schedule (Settings).
                     await by_name("check the build").locator("a.automation-edit").click()
-                    dialog: Locator = page.get_by_role("dialog")
-                    await expect(dialog).to_contain_text("Edit schedule")
-                    # Once: the address forgot `edit=1` as the editor opened.
-                    await expect(page).to_have_url(re.compile(rf"#/schedules\?schedule={loop.id}$"))
-                    await expect(dialog).to_contain_text("Loop: check the build")
-                    await expect(page.locator(f'[data-schedule="{loop.id}"]')).to_have_class(re.compile(r"\basked\b"))
-                    await dialog.get_by_role("button", name="Cancel").click()
-                    await expect(dialog).to_have_count(0)
+                    await expect(page).to_have_url(re.compile(rf"#/settings/schedules/{loop.id}$"))
+                    await expect(page.get_by_label("Name", exact=True)).to_have_value("Loop: check the build")
                     assert "/runs" not in page.url, page.url
-                    # A reload of that page does not open the editor again.
-                    await page.reload()
-                    await expect(page.locator(f'[data-schedule="{loop.id}"]')).to_be_visible()
-                    await expect(page.get_by_role("dialog")).to_have_count(0)
                 await page.close()
             finally:
                 await browser.close()

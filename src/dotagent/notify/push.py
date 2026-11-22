@@ -219,7 +219,7 @@ def notice_message(event: EventRecord) -> PushMessage | None:
         return PushMessage(
             title="A schedule did not run",
             body=_shorten(f"{missed.name}: {missed.status}"),
-            route="#/schedules",
+            route="#/settings/schedules",
             state="failed",
         )
     if event.kind == SCHEDULE_RUN_ENDED_EVENT:
@@ -230,7 +230,7 @@ def notice_message(event: EventRecord) -> PushMessage | None:
         return PushMessage(
             title="A schedule was switched off",
             body=_shorten(f"{stopped.name}: its last {stopped.failures} tasks failed"),
-            route="#/schedules",
+            route="#/settings/schedules",
             state="failed",
         )
     if event.kind == DAEMON_RESTARTED_EVENT:

@@ -126,7 +126,7 @@ quiet line each. The modules of the conversation and the panel, and what each ho
 | `capsule.js` | The bar over the composer, and above it the line "Waiting on 2 subagents" with Details and Stop. |
 | `inspector.js` | The side panel: one rounded card on a hairline, small quiet tabs, sections stacked on hairlines. |
 | `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its subagents) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |
-| `automations.js`, `automationwords.js` | The **Automations** of the chat in the Task tab: its schedules and loops, each with a pencil (`#/schedules?schedule=<id>&edit=1`, which opens the editor once), a play and a switch, from `GET /api/threads/{id}/automations`. |
+| `automations.js`, `automationwords.js` | The **Automations** of the chat in the Task tab: its schedules and loops, each with a pencil (`#/settings/schedules/<id>`, the schedule's editor page), a play and a switch, from `GET /api/threads/{id}/automations`. |
 
 Colours and radii of these are tokens (`var(--accent-strong)` for the colour of work, `--ok`, `--bad`, `--border`,
 `--surface`, `--radius`); no sheet draws a literal colour. The sizes of the marks, rows and the list's cut are plain

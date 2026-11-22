@@ -241,7 +241,7 @@ function templateCard(template, onUse, known) {
   const alsoWords = "Also add this schedule, switched off until you read its goal";
   const also = template.cron === "" ? null : el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords });
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add its schedule; you switch it on on the Schedules page after reading its goal")), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add its schedule; you switch it on in Settings › Scheduled tasks after reading its goal")), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
@@ -291,7 +291,7 @@ function teamCard(team, templates, onUse, owned, added) {
     ? el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords })
     : null;
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add their schedules; you switch them on on the Schedules page after reading their goals")), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Also add their schedules; you switch them on in Settings › Scheduled tasks after reading their goals")), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the team ${team.name}` },
@@ -899,7 +899,7 @@ function mountList(root, ctx) {
     const off =
       added.length === 0
         ? ""
-        : ` ${plural(added.length, "schedule was", "schedules were")} added, switched off: read ${added.length === 1 ? "its goal" : "their goals"} on the Schedules page, then switch ${added.length === 1 ? "it" : "them"} on.`;
+        : ` ${plural(added.length, "schedule was", "schedules were")} added, switched off: read ${added.length === 1 ? "its goal" : "their goals"} in Settings › Scheduled tasks, then switch ${added.length === 1 ? "it" : "them"} on.`;
     const already = scheduledAlready.length === 0 ? "" : ` ${AND_LIST.format(scheduledAlready)} had ${scheduledAlready.length === 1 ? "its schedule" : "their schedules"} already.`;
     if (missed.length > 0) {
       const ready = used.made.length === 0 ? " not" : ` ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not`;
@@ -1341,7 +1341,7 @@ function who(record, face) {
 }
 
 /** A schedule the agent's runs run as (item 464): its switch, its name, its goal in full (a template's is added
- * switched off, to be read before it runs), when it runs, and Edit, on the Schedules page. */
+ * switched off, to be read before it runs), when it runs, and Edit, in Settings › Scheduled tasks. */
 function agentScheduleRow(view, onToggle) {
   const { record } = view;
   // A one-time schedule that fired reads as one that ran, not as one switched off, and has nothing to switch (item 723).
@@ -1352,7 +1352,7 @@ function agentScheduleRow(view, onToggle) {
     role: "switch",
     "aria-checked": String(record.enabled),
     "aria-label": `${record.enabled ? "Switch off" : "Switch on"} ${record.name}`,
-    title: done ? "It ran once and has no run left: give it a new time on the Schedules page" : record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    title: done ? "It ran once and has no run left: give it a new time in Settings › Scheduled tasks" : record.enabled ? "Switch this schedule off" : "Switch this schedule on",
     disabled: done,
     onclick: () => onToggle(record),
   });
@@ -1372,7 +1372,7 @@ function agentScheduleRow(view, onToggle) {
       el("div", { class: "agent-schedule-goal" }, record.goal),
       el("div", { class: "row-meta" }, el("span", { class: "mono", title: "When it runs" }, view.when), state),
     ),
-    el("div", { class: "row-actions" }, el("a", { class: "btn ghost sm", href: "#/schedules", title: "Edit it on the Schedules page" }, "Edit")),
+    el("div", { class: "row-actions" }, el("a", { class: "btn ghost sm", href: `#/settings/schedules/${record.id}`, title: "Edit it in Settings › Scheduled tasks" }, "Edit")),
   );
 }
 

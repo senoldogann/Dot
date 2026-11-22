@@ -222,7 +222,7 @@ function tellAboutCampaign(event) {
 
 function tellAboutMissedFiring(event) {
   const { schedule_id: id, name, status } = event.data;
-  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/schedules", state: "failed" });
+  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed" });
 }
 
 /** The end of a schedule's run that its level tells (item 461), in the words of every run's end. */
@@ -240,7 +240,7 @@ function tellAboutStoppedSchedule(event) {
     title: "A schedule was switched off",
     body: shorten(`${name}: its last ${failures} tasks failed`),
     tag: `schedule-${id}`,
-    route: "#/schedules",
+    route: "#/settings/schedules",
     state: "failed",
   });
 }

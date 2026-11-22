@@ -1,12 +1,11 @@
-// Schedules: goals that Dot carries out by itself, once or on a cron schedule, while the daemon runs. A page of the
-// sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
-// time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
-// list its last runs, at its time and by hand (item 455). The owner's schedules lead the page (item 609); under them the
-// Morning brief (item 570), a schedule of its own labelled in the list, which its card sets, a line with a button for
-// its settings, and the Watchers (item 571), a head and a line while there are none. New schedule and a schedule's Edit
-// open the form in a dialog, so that the list keeps its place (item 615).
+// Scheduled tasks (Settings › Scheduled tasks, item 1337): goals that Dot carries out by itself, once or on a cron schedule,
+// while the daemon runs. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level, time
+// zone) and can be changed later. The list (`#/settings/schedules`) holds the owner's schedules, each with its switch, Run
+// now, Edit and Delete, and Firings under Details (item 455), then the loops of chats (item 281; `?thread=<id>` shows one
+// chat's), the Morning brief (item 570), the check-in, the Watchers (item 571) and Dot's own initiative (item 715). New
+// schedule and a schedule's Edit open the form as a page of its own, `#/settings/schedules/new` and `.../<id>`, in the
+// settings' rows and cards.
 
-import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { mountBrief } from "../briefcard.js";
 import { mountCheckin } from "../checkincard.js";
@@ -17,19 +16,18 @@ import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { moreButton } from "../menu.js";
 import { loopRhythm } from "../rhythm.js";
-import { emptyPanel, errorPanel, field, loadingPanel, markOpener, pageHead, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, loadingPanel, markOpener, segmented, setCard, setRow, setSection } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "../state.js";
-import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
+import { attempt, confirmDialog, toast } from "../ui.js";
+import { explain } from "../errors.js";
+import { stateOfControls } from "../formflow.js";
+import { t } from "../i18n.js";
 
 // A run starting or ending, and a schedule switched off after its runs failed in a row (item 458), paint the list again.
 const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "schedule_stopped"]);
 const RELOAD_DELAY_MS = 400;
 const GOAL_PREVIEW_CHARS = 220;
-// Past its third schedule the list scrolls inside (item 634): it shows three rows and the top of the fourth, which says
-// that more lie under them.
-const SHOWN_ROWS = 3;
-const NEXT_ROW_PX = 32;
 // A firing's answer is shown by its first line, cut to this.
 const FIRING_RESULT_CHARS = 120;
 const REPEATS = [
@@ -47,7 +45,6 @@ const MODES = [
   { id: "research", label: "Research — look things up, change nothing" },
 ];
 const ZONE_LIST_ID = "schedule-zones";
-let formCount = 0;
 
 /** The outcome of the last firing as a badge: green when it finished, red when it failed, amber when it was skipped. */
 function lastStatusBadge(status) {
@@ -268,23 +265,27 @@ function scheduleRow(view, handlers) {
     disabled: done,
     onclick: () => handlers.onToggle(record),
   });
-  // One action a row (item 848): its switch; its "…" holds Run now (whose words say it does real work, as at its time,
-  // under the approvals the row's chips name), Edit and Delete.
+  // Its actions at the right (item 1337): Run now (whose words say it does real work, as at its time, under the approvals
+  // the row's chips name), Edit, the switch, and "…" for Delete.
+  const runNow = el(
+    "button",
+    { class: "btn ghost sm", type: "button", title: runNowTitle(record, agent), "aria-label": `Run now ${record.name}`, onclick: () => handlers.onRunNow(record) },
+    icon("play"),
+    "Run now",
+  );
+  const edit = view.brief
+    ? el("button", { class: "btn ghost sm", type: "button", "aria-label": `Edit ${record.name}`, title: "Edit the brief's settings", onclick: () => handlers.onEdit(view) }, "Edit")
+    : el("a", { class: "btn ghost sm", href: `#/settings/schedules/${record.id}`, "aria-label": `Edit ${record.name}` }, "Edit");
   const more = moreButton({
     name: record.name,
-    items: () => [
-      { label: "Run now", icon: "play", title: runNowTitle(record, agent), run: () => handlers.onRunNow(record) },
-      { label: view.brief ? "Edit the brief's settings" : "Edit", icon: "pencil", run: () => handlers.onEdit(view) },
-      "separator",
-      { label: "Delete", icon: "trash", danger: true, run: () => handlers.onDelete(record) },
-    ],
+    items: () => [{ label: "Delete", icon: "trash", danger: true, run: () => handlers.onDelete(record) }],
   });
   let next = null;
   if (done) {
     // Grey, as it says nothing of how the run went: the badge of its last status beside it says that.
     next = el("span", { class: "badge b-muted", title: "A one-time schedule: it ran at its time, and waits for nothing more" }, "ran once");
   } else if (!record.enabled) {
-    next = el("span", { class: "badge b-muted" }, "switched off");
+    next = el("span", { class: "badge b-muted" }, "paused");
   } else if (view.next_local !== null) {
     // A time keeps one line: its date's hyphens let a phone break it as "2026-10-" over "28 05:15" (item 778).
     next = el("span", { class: "nowrap" }, `Next ${view.next_local}`);
@@ -295,70 +296,39 @@ function scheduleRow(view, handlers) {
     view.last_local === null
       ? el("span", null, record.last_status === "" ? "Never ran" : "Not run yet")
       : el("span", { class: "nowrap" }, `Last ${view.last_local}`);
-  return el(
-    "div",
-    { class: "list-row", dataset: { schedule: record.id } },
-    toggle,
-    // A schedule of one of the owner's agents wears the agent's face (item 462); Dot's wears its own.
-    agent === null ? actorFace(record.id, "idle", null) : actorFace(agent.id, "idle", agent.look),
-    el(
-      "div",
-      { class: "row-main" },
-      el(
-        "div",
-        { class: "row" },
-        el("span", { class: "row-title" }, record.name),
-        view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; the Morning brief under your schedules sets it" }, "Brief") : null,
-        // A task the owner taught and asked to repeat (item 666): its runs start with that skill.
-        (record.options.skills ?? []).length > 0
-          ? el("span", { class: "badge b-info", title: `Its runs start with the skill ${record.options.skills.join(", ")}` }, "Taught task")
-          : null,
-      ),
-      // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
-      el(
-        "div",
-        { class: "row-meta when-line" },
-        ...joined([
-          whenWords(view.when),
-          next,
-          last,
-          lastStatusBadge(record.last_status),
-          failedInRow(record),
-          pausedBadge(agent),
-          view.zone === localZone()
-            ? null
-            : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
-        ]),
-        detailsToggle,
-      ),
-      details,
+  const row = setRow({
+    title: el(
+      "span",
+      { class: "sched-title" },
+      el("span", { class: "row-title" }, record.name),
+      view.brief ? el("span", { class: "badge b-info", title: "Dot writes it each morning; the Morning brief under your schedules sets it" }, "Brief") : null,
+      record.thread_id === null ? null : el("span", { class: "badge b-muted", title: "Made in a chat: it asks the chat's message again" }, "Loop"),
+      // A task the owner taught and asked to repeat (item 666): its runs start with that skill.
+      (record.options.skills ?? []).length > 0
+        ? el("span", { class: "badge b-info", title: `Its runs start with the skill ${record.options.skills.join(", ")}` }, "Taught task")
+        : null,
+      agent === null ? null : el("span", { class: "badge b-muted", title: "Its tasks run as this agent" }, agent.name),
     ),
-    el("div", { class: "row-actions" }, more),
-  );
-}
-
-/**
- * Cut the list of schedules `list` under its third row and the top of its fourth (item 634), so that it scrolls inside:
- * measured where the rows stand, since a goal's lines and a schedule's opened Firings make rows of differing heights,
- * and measured again whenever one of the three changes size (the window, Firings). A list of three or fewer is not cut.
- * Returns `dispose()`.
- */
-function cutAfterThird(list) {
-  if (list.children.length <= SHOWN_ROWS) {
-    return () => {};
-  }
-  const shown = [...list.children].slice(0, SHOWN_ROWS);
-  const measure = () => {
-    const foot = shown[SHOWN_ROWS - 1].getBoundingClientRect().bottom - list.getBoundingClientRect().top + list.scrollTop;
-    list.style.setProperty("--shown-rows", `${Math.ceil(foot) + NEXT_ROW_PX}px`);
-  };
-  list.classList.add("cut");
-  const observer = new ResizeObserver(measure);
-  for (const row of shown) {
-    observer.observe(row);
-  }
-  measure();
-  return () => observer.disconnect();
+    // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
+    lead: el(
+      "div",
+      { class: "row-meta when-line" },
+      ...joined([
+        whenWords(view.when),
+        next,
+        last,
+        lastStatusBadge(record.last_status),
+        failedInRow(record),
+        pausedBadge(agent),
+        view.zone === localZone() ? null : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
+      ]),
+      detailsToggle,
+    ),
+    control: el("div", { class: "sched-actions" }, runNow, edit, toggle, more),
+    body: details,
+  });
+  row.dataset.schedule = record.id;
+  return row;
 }
 
 /** When a schedule runs, in words: "Every day at 08:00" for a repeating one the page can read, else what the daemon says
@@ -391,11 +361,15 @@ function zoneList() {
   return el("datalist", { id: ZONE_LIST_ID }, names.map((name) => el("option", { value: name })));
 }
 
+// The controls whose state says whether the editor's form was changed (formflow.js `stateOfControls`, as a dialog's form).
+const FORM_CONTROLS = "input, textarea, select, [role='switch'], [aria-pressed]";
+
 /**
- * The fields that create a schedule (`view` null) or change one, for the dialog that holds them (item 615). Returns the
- * element; `submit()`, which asks the daemon and resolves to `false` when a field the schedule needs is empty (the
- * field takes the focus) and throws when the daemon refuses; and `ready`, which settles once the agents and the models
- * the selects offer are read.
+ * The fields that create a schedule (`view` null) or change one, for the editor's page (items 615 and 1337). Returns
+ * `sections`, the rows of the form in their sections; `submit()`, which asks the daemon and resolves to `false` when a
+ * field the schedule needs is empty (the field takes the focus) and throws when the daemon refuses; `ready`, which settles
+ * once the agents and the models the selects offer are read; `zones`, the list the time zone field suggests; and `state()`,
+ * what the fields hold now, to tell a form that was changed.
  */
 function scheduleForm({ view }) {
   const record = view === null ? null : view.record;
@@ -416,7 +390,6 @@ function scheduleForm({ view }) {
         }
       : record.options;
   const now = defaultsNow();
-  const id = ++formCount;
 
   const name = el("input", { class: "input", type: "text", maxlength: "120", autocomplete: "off", placeholder: "Morning briefing", "aria-label": "Name" });
   const goal = el("textarea", {
@@ -521,8 +494,8 @@ function scheduleForm({ view }) {
   );
   model.value = options.model ?? "";
   const effort = el("select", { class: "select", "aria-label": "Reasoning level" }, el("option", { value: "" }, "Default"));
-  const effortField = field("Reasoning", effort, "");
-  effortField.hidden = true;
+  const effortRow = setRow({ title: "Reasoning", lead: "How much the model thinks before it answers.", control: effort });
+  effortRow.hidden = true;
   let models = [];
 
   function paintEffort() {
@@ -531,7 +504,7 @@ function scheduleForm({ view }) {
     if (info === null || info.efforts.length < 2) {
       effort.replaceChildren(el("option", { value: "" }, "Default"));
       effort.value = "";
-      effortField.hidden = true;
+      effortRow.hidden = true;
       return;
     }
     effort.replaceChildren(
@@ -539,7 +512,7 @@ function scheduleForm({ view }) {
       ...info.efforts.map((level) => el("option", { value: level }, levelLabel(level))),
     );
     effort.value = info.efforts.includes(keep) ? keep : "";
-    effortField.hidden = false;
+    effortRow.hidden = false;
   }
 
   model.addEventListener("change", paintEffort);
@@ -590,23 +563,21 @@ function scheduleForm({ view }) {
       ),
     ),
   );
-  const cronField = el(
-    "div",
-    { class: "stack tight wide" },
-    field("Custom timing", cron, "Five parts separated by spaces: minute, hour, day of the month, month, day of the week. Very frequent schedules are refused."),
-    presets,
-  );
+  const cronRow = setRow({
+    title: "Custom timing",
+    lead: "Five parts separated by spaces: minute, hour, day of the month, month, day of the week. Very frequent schedules are refused.",
+    control: cron,
+    body: el("div", { class: "set-row-body" }, presets),
+  });
   const at = el("input", { class: "input", type: "datetime-local", "aria-label": "Date and time" });
-  const atField = field("Date and time", at, "Read in the schedule's time zone.");
-  const goalField = field("Goal", goal, "");
-  goalField.classList.add("wide");
+  const atRow = setRow({ title: "Date and time", lead: "Read in the schedule's time zone.", control: at });
   const startsOnce = record !== null && record.cron === null;
   const repeats = segmented(REPEATS, startsOnce ? "once" : "cron", (choice) => {
-    cronField.hidden = choice !== "cron";
-    atField.hidden = choice !== "once";
+    cronRow.hidden = choice !== "cron";
+    atRow.hidden = choice !== "once";
   });
-  cronField.hidden = startsOnce;
-  atField.hidden = !startsOnce;
+  cronRow.hidden = startsOnce;
+  atRow.hidden = !startsOnce;
   const enabled = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(record === null || record.enabled), "aria-label": "Switched on" });
   // Whether the owner moved the form's switch: an edit that leaves it alone keeps the schedule on or off as it is then,
   // not as it was when the form opened (item 723).
@@ -673,66 +644,85 @@ function scheduleForm({ view }) {
     return true;
   }
 
-  const element = el(
-    "div",
-    { class: "stack", dataset: { scheduleForm: String(id) } },
-    el(
-      "div",
-      { class: "form-grid" },
-      field("Name", name, ""),
-      field("Mode", mode, "Scheduled tasks work on their own."),
-      field("Agent", agent, "Its tasks run as this agent: with its instructions and abilities, and its model, reasoning and approvals where these are left on Default."),
-      goalField,
-      field("Approvals", approvals, "Tasks that work by themselves cannot wait for you: with Ask, a question stops the task until you answer."),
-      field("Goal mode", goalMode, ""),
-      field("Model", model, "The model every step of the task uses, and the summaries of its older part, until it moves to a fallback model."),
-      effortField,
-      field("Time zone", zone, "A name such as Europe/Istanbul; empty uses Dot's own time zone."),
-      field("Earlier tasks it knows", history, "Each task starts with the dated answers of the last tasks, to build on them instead of doing the same work again."),
-      field("Chat", chat, "In the same chat each task reads the conversation of the tasks before it instead."),
-      field("Switch off after", stopAfter, "A repeating schedule whose tasks fail so many times in a row is switched off, and you are told; a task you stop counts neither way."),
-      field("Notifications", notify, "How the end of its tasks is told on your phone and desktop; a question, a draft and a switch-off are told always, and a task you start by hand too."),
-      record === null ? null : switchRow(el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled), enabled),
-      el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Repeat"), el("div", { class: "cluster" }, repeats.element)),
-      cronField,
-      atField,
-    ),
-  );
-  return { element, submit, ready: Promise.all([agentsRead, modelsRead]) };
+  // The fields stand as the settings' rows, in sections (item 1337): what it does, when, how its tasks run, and what they
+  // leave. A control with room to spare goes beside its title; the goal and the custom timing go under theirs.
+  const sections = [
+    setSection({
+      title: "Task",
+      body: setCard(
+        setRow({ title: "Name", lead: "What the schedule is called in lists and notices.", control: name }),
+        setRow({ title: "Goal", lead: "What Dot does each time. Be as specific as for a normal task.", body: el("div", { class: "set-row-body" }, goal) }),
+        setRow({ title: "Agent", lead: "Its tasks run as this agent: with its instructions and abilities, and its model, reasoning and approvals where these are left on Default.", control: agent }),
+      ),
+    }),
+    setSection({
+      title: "When",
+      body: setCard(
+        setRow({ title: "Repeat", lead: "A repeating schedule starts again and again; a single one starts once.", control: repeats.element }),
+        cronRow,
+        atRow,
+        setRow({ title: "Time zone", lead: "A name such as Europe/Istanbul; empty uses Dot's own time zone.", control: zone }),
+        record === null
+          ? null
+          : switchRow(setRow({ title: "Switched on", lead: "A schedule that is paused starts nothing until it is switched on.", control: enabled }), enabled),
+      ),
+    }),
+    setSection({
+      title: "How its tasks run",
+      body: setCard(
+        setRow({ title: "Mode", lead: "Scheduled tasks work on their own.", control: mode }),
+        setRow({ title: "Model", lead: "The model every step of the task uses, and the summaries of its older part, until it moves to a fallback model.", control: model }),
+        effortRow,
+        setRow({ title: "Approvals", lead: "Tasks that work by themselves cannot wait for you: with Ask, a question stops the task until you answer.", control: approvals }),
+        setRow({ title: "Goal mode", lead: "Dot checks its answer and keeps working until the goal is reached.", control: goalMode }),
+      ),
+    }),
+    setSection({
+      title: "What its tasks leave",
+      body: setCard(
+        setRow({ title: "Earlier tasks it knows", lead: "Each task starts with the dated answers of the last tasks, to build on them instead of doing the same work again.", control: history }),
+        setRow({ title: "Chat", lead: "In the same chat each task reads the conversation of the tasks before it instead.", control: chat }),
+        setRow({ title: "Notifications", lead: "How the end of its tasks is told on your phone and desktop; a question, a draft and a switch-off are told always, and a task you start by hand too.", control: notify }),
+        setRow({ title: "Switch off after", lead: "A repeating schedule whose tasks fail so many times in a row is switched off, and you are told; a task you stop counts neither way.", control: stopAfter }),
+      ),
+    }),
+  ];
+  const state = () => stateOfControls(sections.flatMap((section) => [...section.querySelectorAll(FORM_CONTROLS)]));
+  return { sections, submit, ready: Promise.all([agentsRead, modelsRead]), zones: zoneList(), state };
 }
 
-export function mount(root, ctx) {
+/** The schedules `views` that a chat's loops are (made in a chat, item 281) and the rest. */
+function splitLoops(views) {
+  return { loops: views.filter((view) => view.record.thread_id !== null), plain: views.filter((view) => view.record.thread_id === null) };
+}
+
+function mountList(root, ctx) {
   let disposed = false;
   // Grows with every load, so a slow answer never overwrites a newer one.
   let ticket = 0;
   let views = null;
   // The schedules whose Firings are open: they stay open, and are read again, as the list is painted again.
   const openFirings = new Set();
-  // The schedule a line of a conversation led here to (item 665, `#/schedules?schedule=ID`): marked and in sight once,
-  // when the list is first painted.
-  const asking = new URLSearchParams(location.hash.split("?")[1] ?? "");
-  let askedId = asking.get("schedule") ?? "";
-  // The same address with `&edit=1` (the pencil of a chat's Automations, item 1334) opens that schedule's editor, once:
-  // the address forgets it as the editor opens (`forgetEdit`), so a reload or a Back to this page does not open it again.
-  let askedEdit = asking.get("edit") === "1";
-  function forgetEdit() {
-    const path = location.hash.slice(1);
-    const target = path.replace(/([?&])edit=1(&|$)/, (_, lead, tail) => (tail === "&" ? lead : ""));
-    if (target === path) {
-      return;
-    }
-    // The router keeps `dotPath` without the query, so the entry's state stays as it is.
-    history.replaceState(history.state, "", `${location.pathname}${location.search}#${target}`);
-  }
-  // What stops measuring the list's cut after its third row (item 634), when it is painted again or the page goes.
-  let stopCut = () => {};
-  const holder = el("div", null, loadingPanel());
-  const count = el("span", { class: "hint" });
-  // The form that adds a schedule opens in a dialog when New schedule asks for it; the list is what this page is for.
-  const addButton = el("button", { class: "btn primary sm", type: "button" });
+  const params = new URLSearchParams(location.hash.split("?")[1] ?? "");
+  // The schedule a line of a conversation led here to (item 665, `#/settings/schedules?schedule=ID`): marked and in sight
+  // once, when the list is first painted; the chat whose tasks a panel's "open all" asks for (`?thread=ID`) is the only
+  // one shown.
+  let askedId = params.get("schedule") ?? "";
+  const thread = params.get("thread") ?? "";
+  const holder = el("div", { class: "set-sections" }, loadingPanel());
+  // The form that adds a schedule is a page of its own (item 1337); the list is what this page is for.
+  const addButton = el("a", { class: "btn primary sm", href: "#/settings/schedules/new" });
   markOpener(addButton, "New schedule");
-  addButton.addEventListener("click", () => openForm(null));
+  ctx.head.setLead("Goals that Dot works on by itself, once or on a repeating schedule. Schedules work only while Dot is running and this Mac is awake: a time that passes while Dot is off is skipped, not made up later.");
+  ctx.head.setActions(addButton);
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Schedules are paused, so nothing starts until Dot starts again."));
+  const filterNote = el(
+    "div",
+    { class: "note", hidden: thread === "" },
+    icon("refresh"),
+    el("span", null, "Showing the tasks that repeat in one chat."),
+    el("a", { class: "btn ghost sm", href: "#/settings/schedules" }, "Show all"),
+  );
   // The brief's card reads again whenever the list does: a switch in the list, a run's end, a failure that switched it off.
   const brief = mountBrief(ctx, () => reload());
   const checkin = mountCheckin(() => reload());
@@ -740,44 +730,56 @@ export function mount(root, ctx) {
   const watchers = mountWatchers();
   // Dot's own initiative (item 715), under the watchers: what Dot does for you on its own while the Mac is idle.
   const initiative = mountInitiative();
+  const others = thread === "" ? [brief.element, checkin.element, watchers.element, initiative.element] : [];
+
+  function listOf(shown, handlers) {
+    return setCard(...shown.map((view) => scheduleRow(view, handlers)));
+  }
 
   function paint() {
     if (views === null) {
       return;
     }
-    // A list painted again keeps where it was scrolled to inside (item 634): a run's start or end paints it.
-    const scrolled = holder.querySelector(".schedule-list")?.scrollTop ?? 0;
-    stopCut();
-    stopCut = () => {};
-    if (views.length === 0) {
-      holder.replaceChildren(emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will start it by itself."));
-      return;
-    }
+    const chosen = thread === "" ? views : views.filter((view) => view.record.thread_id === thread);
+    const { loops, plain } = splitLoops(chosen);
     const handlers = {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
-      onEdit: (view) => (view.brief ? brief.open() : openForm(view)),
+      onEdit: () => brief.open(),
       onRunNow: (record) => attempt(() => runNow(record)),
       onFirings: (record, button, list) => attempt(() => toggleFirings(record, button, list)),
       firingsOpen: (id) => openFirings.has(id),
     };
-    const list = el("div", { class: "schedule-list" }, views.map((view) => scheduleRow(view, handlers)));
-    holder.replaceChildren(list);
-    stopCut = cutAfterThird(list);
-    list.scrollTop = scrolled;
-    const asked = askedId === "" ? null : list.querySelector(`[data-schedule="${CSS.escape(askedId)}"]`);
-    const toEdit = askedEdit ? views.find((view) => view.record.id === askedId) : undefined;
+    const sections = [];
+    if (thread === "") {
+      sections.push(
+        setSection({
+          title: "Schedules",
+          lead: plain.length === 0 ? "" : plural(plain.length, "schedule", "schedules"),
+          body:
+            plain.length === 0
+              ? el("div", { class: "set-card" }, emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will start it by itself."))
+              : listOf(plain, handlers),
+        }),
+      );
+    }
+    if (loops.length > 0 || thread !== "") {
+      sections.push(
+        setSection({
+          title: thread === "" ? "Loops" : "Repeating in this chat",
+          lead: "Made in a chat with /loop: each asks the chat's message again and again until it is stopped.",
+          body: loops.length === 0 ? el("div", { class: "set-card" }, emptyPanel("refresh", "Nothing repeats in this chat", "Write /loop 30m <message> in the chat to make it ask again.")) : listOf(loops, handlers),
+        }),
+      );
+    }
+    holder.replaceChildren(...sections);
+    const asked = askedId === "" ? null : holder.querySelector(`[data-schedule="${CSS.escape(askedId)}"]`);
     askedId = "";
     askedEdit = false;
     if (asked !== null) {
       asked.classList.add("asked");
       asked.scrollIntoView({ block: "nearest" });
     }
-    if (toEdit !== undefined) {
-      forgetEdit();
-      handlers.onEdit(toEdit);
-    }
-    count.textContent = plural(views.length, "schedule", "schedules");
     for (const list of holder.querySelectorAll("[data-firings]")) {
       if (openFirings.has(list.dataset.firings)) {
         attempt(() => loadFirings(list.dataset.firings, list));
@@ -845,36 +847,6 @@ export function mount(root, ctx) {
     await reload();
   }
 
-  /** The form that adds a schedule (`view` null) or changes `view`'s, in a dialog; the list is read again once the daemon
-   * took it. The dialog holds the form, so a run starting or ending paints the list behind it without touching what is
-   * typed. A form is made anew each time, so the next schedule starts from the defaults, not from the last one's choices
-   * (its approvals and its agent among them), which a schedule that runs unattended would take unless the owner noticed
-   * them (item 559). */
-  function openForm(view) {
-    const form = scheduleForm({ view });
-    const record = view === null ? null : view.record;
-    formDialog({
-      title: record === null ? "New schedule" : "Edit schedule",
-      description:
-        record === null
-          ? "Dot works on the goal by itself, once or on a repeating schedule, while Dot is running."
-          : `Change “${clip(record.name, 60)}”. Its next task starts with the new choices.`,
-      body: form.element,
-      submitLabel: record === null ? "Add schedule" : "Save changes",
-      size: "wide",
-      ready: form.ready,
-      // A schedule's row is painted again once it is saved: its Edit button is found anew.
-      returnFocus: () => (record === null ? addButton : holder.querySelector(`[data-schedule="${record.id}"] .row-more`)),
-      onSubmit: async () => {
-        if ((await form.submit()) === false) {
-          return false;
-        }
-        await reload();
-        return true;
-      },
-    });
-  }
-
   async function toggle(record) {
     await api.post(`/schedules/${record.id}/${record.enabled ? "disable" : "enable"}`, null);
     await reload();
@@ -904,27 +876,8 @@ export function mount(root, ctx) {
 
   const status = getSnapshot().status;
   schedulerNote.hidden = status === null || status.scheduler_running;
-  ctx.setTitle("Schedules");
-  root.append(
-    // What the page is for, and when schedules work, behind the (i) of the bar (item 848).
-    pageHead(
-      "Schedules",
-      "Goals that Dot works on by itself, once or on a repeating schedule. Schedules work only while Dot is running and this Mac is awake: a time that passes while Dot is off is skipped, not made up later.",
-      null,
-    ),
-    schedulerNote,
-    el(
-      "section",
-      { class: "memory-panel notes-panel schedule-panel" },
-      el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Your schedules"), count, el("span", { class: "spacer" }), addButton),
-      holder,
-    ),
-    brief.element,
-    checkin.element,
-    watchers.element,
-    initiative.element,
-    zoneList(),
-  );
+  ctx.setTitle("Scheduled tasks · Settings");
+  root.append(schedulerNote, filterNote, holder, ...others, zoneList());
   const stopLifecycle = onLifecycle((event) => {
     if (LIFECYCLE_KINDS.has(event.kind)) {
       reloadSoon();
@@ -934,7 +887,6 @@ export function mount(root, ctx) {
   attempt(reload);
   return () => {
     disposed = true;
-    stopCut();
     brief.dispose();
     checkin.dispose();
     watchers.dispose();
@@ -942,4 +894,175 @@ export function mount(root, ctx) {
     stopLifecycle();
     stopBack();
   };
+}
+
+/** The editor of one schedule (`#/settings/schedules/<id>`) or of a new one (`#/settings/schedules/new`, `id` is "new"): the
+ * form's sections, and at their foot Cancel and the button that saves; saved, it goes back to the list. Run now and Delete
+ * of an existing one stand at the head. */
+function mountEditor(root, ctx, id) {
+  let disposed = false;
+  const list = "/settings/schedules";
+  const holder = el("div", { class: "set-sections" }, loadingPanel());
+  root.append(holder);
+  // Set once the form is drawn: whether the owner may leave with what the fields hold (a changed form asks). The router
+  // asks it before it swaps the page, whatever changed the address (`ctx.onBeforeLeave`, item 1337), the browser asks
+  // before the tab closes. `saved` is a form that was saved or a schedule that was deleted, `leaving` a way out the owner
+  // confirmed already (Run now).
+  let saved = false;
+  let leaving = false;
+  // True at once when nothing needs asking, else the owner's answer to the question on screen.
+  /** @type {() => boolean | Promise<boolean>} */
+  let asksBeforeLeaving = () => true;
+  let onClose = null;
+  const stopAsking = ctx.onBeforeLeave(() => asksBeforeLeaving());
+  ctx.setTitle(id === "new" ? "New schedule · Settings" : "Edit schedule · Settings");
+  ctx.setCrumb(id === "new" ? "New schedule" : "Edit schedule");
+
+  async function open() {
+    let view = null;
+    if (id !== "new") {
+      view = await api.get(`/schedules/${encodeURIComponent(id)}`);
+      if (disposed) {
+        return;
+      }
+      if (view.brief) {
+        // The morning brief is set by its card in the list, not by this form.
+        ctx.navigate(list);
+        return;
+      }
+      ctx.setCrumb(clip(view.record.name, 60));
+    }
+    const form = scheduleForm({ view });
+    const record = view === null ? null : view.record;
+    ctx.head.setLead(
+      record === null
+        ? "Dot works on the goal by itself, once or on a repeating schedule, while Dot is running."
+        : "Change it here: its next task starts with the new choices.",
+    );
+    const problem = el("div", { class: "note bad", role: "alert", hidden: true });
+    const save = el("button", { class: "btn primary", type: "button" }, record === null ? "Add schedule" : "Save changes");
+    const cancel = el("a", { class: "btn ghost", href: `#${list}` }, "Cancel");
+    // What the owner has typed or picked, against the fields as they stood when the page opened (and, once the agents and
+    // the models the selects offer are read, as they stood then, unless a field was touched by then).
+    let baseline = form.state();
+    let touched = false;
+    for (const kind of ["input", "change", "click"]) {
+      holder.addEventListener(kind, () => {
+        touched = true;
+      });
+    }
+    const changed = () => !saved && !leaving && form.state() !== baseline;
+    asksBeforeLeaving = () => {
+      if (!changed()) {
+        return true;
+      }
+      return confirmDialog({
+        title: t("dialog.discardTitle"),
+        message: t("dialog.discardMessage"),
+        confirmLabel: t("dialog.discard"),
+        cancelLabel: t("dialog.keepEditing"),
+        danger: true,
+        focusCancel: true,
+      });
+    };
+    // Whatever leaves the page with a changed field asks first, through the router: a link (the nav, the breadcrumb,
+    // Cancel), the bar's Back, Enter in the settings' search, Connect apps, a shortcut and the browser's own Back, which
+    // has changed the address already and is put back when the owner keeps editing. Closing or reloading the tab is
+    // asked by the browser; an address typed in the bar that loads the page anew cannot be held back.
+    onClose = (event) => {
+      if (changed()) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", onClose);
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      problem.hidden = true;
+      try {
+        if ((await form.submit()) !== false) {
+          saved = true;
+          ctx.navigate(list);
+          return;
+        }
+      } catch (error) {
+        problem.textContent = explain(error).text;
+        problem.hidden = false;
+      }
+      save.disabled = false;
+    });
+    if (record !== null) {
+      ctx.head.setActions(
+        el("button", { class: "btn ghost sm", type: "button", onclick: () => attempt(() => runNow(record)) }, icon("play"), "Run now"),
+        el("button", { class: "btn ghost sm danger", type: "button", onclick: () => attempt(() => remove(record)) }, icon("trash"), "Delete"),
+      );
+    }
+    holder.replaceChildren(...form.sections, problem, el("div", { class: "set-savebar" }, cancel, save), form.zones);
+    baseline = form.state();
+    touched = false;
+    const settled = () => {
+      if (!touched && !disposed) {
+        baseline = form.state();
+      }
+    };
+    await form.ready.then(settled, settled);
+  }
+
+  async function runNow(record) {
+    // Run now starts the schedule as it is saved: the page, and what was typed in it, is left for the run, so the
+    // question comes before the run starts, and the router does not ask it again on the way to the run's page.
+    if (!(await asksBeforeLeaving())) {
+      return;
+    }
+    leaving = true;
+    try {
+      const run = await api.post(`/schedules/${record.id}/run`, null);
+      toast("ok", `Started ${record.name}.`);
+      ctx.navigate(`/runs/${run.id}`);
+    } catch (error) {
+      leaving = false;
+      throw error;
+    }
+  }
+
+  async function remove(record) {
+    const confirmed = await confirmDialog({
+      title: "Delete this schedule?",
+      message: `“${clip(record.name, 80)}” will not run again. Tasks it started earlier stay in the history.`,
+      confirmLabel: "Delete",
+      danger: true,
+      focusCancel: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    await api.del(`/schedules/${record.id}`);
+    // The schedule is gone: there is nothing left to keep what was typed for.
+    saved = true;
+    toast("ok", "Schedule deleted.");
+    ctx.navigate(list);
+  }
+
+  attempt(async () => {
+    try {
+      await open();
+    } catch (error) {
+      if (!disposed) {
+        holder.replaceChildren(errorPanel(error, () => attempt(open)));
+      }
+    }
+  });
+  return () => {
+    disposed = true;
+    stopAsking();
+    if (onClose !== null) {
+      window.removeEventListener("beforeunload", onClose);
+    }
+  };
+}
+
+/** Scheduled tasks (`#/settings/schedules`), a schedule's editor (`#/settings/schedules/<id>`) and the form of a new one
+ * (`#/settings/schedules/new`). `ctx.params` is `["schedules", id]`. */
+export function mount(root, ctx) {
+  const id = ctx.params[1];
+  return id === undefined ? mountList(root, ctx) : mountEditor(root, ctx, id);
 }

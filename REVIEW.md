@@ -47,7 +47,15 @@ here points at a test that no longer exists.
 - `tests/unit/test_css_tokens.py::test_every_comment_of_a_sheet_closes_where_it_opens` — a merge left a line of a comment under one that had closed it, so the browser read the words as a selector and dropped the rule after it (item 1335).
 - `tests/smoke/test_panel_automations.py::test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and_runs_them` — the
   pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the
-  owner on New chat while the docs said the editor opened; the test follows the pencil to the open editor (item 1334).
+  owner on New chat while the docs said the editor opened; the test follows the pencil to the open editor (item 1334; the
+  address is a route since item 1337, and the test reads the editor's Name field).
+- `tests/smoke/test_schedule_agent.py::test_every_way_out_of_the_editor_asks_not_the_links_alone_and_the_browsers_back_is_put_back` — the
+  editor's "Discard your changes?" guard listened for clicks on links, so the nav search's Enter, the shortcuts and
+  the browser's own Back dropped what was typed silently; the router now asks the page before any page swap, and puts
+  a refused change back (item 1337).
+- `tests/smoke/test_schedule_agent.py::test_the_phones_back_button_and_connect_apps_ask_before_the_editor_drops_what_was_typed` — the same
+  guard missed the phone's Back button in the bar (`history.back()` and `location.replace`) and Connect apps, so a
+  phone dropped the form on almost every way out of the editor (item 1337).
 - `tests/smoke/test_oauth_accounts.py::test_a_refused_revoke_keeps_the_token_to_ask_again_and_the_sign_out_stands` — a
   sign-out forgot the tokens before the provider's revoke, and a refusal was only logged (its error dropped), so the
   provider kept listing Dot and the page said "signed out" (item 1312).

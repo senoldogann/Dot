@@ -190,7 +190,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             PushMessage(
                 title="A schedule did not run",
                 body="Morning digest: skipped: 125 minutes overdue (Dot was off or the Mac slept)",
-                route="#/schedules",
+                route="#/settings/schedules",
                 state="failed",
             ),
         ),
@@ -240,7 +240,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             PushMessage(
                 title="A schedule was switched off",
                 body="weekly report: its last 3 tasks failed",
-                route="#/schedules",
+                route="#/settings/schedules",
                 state="failed",
             ),
         ),

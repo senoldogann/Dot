@@ -11,6 +11,7 @@ No network and no model service is used.
 """
 
 import asyncio
+import re
 import json
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -300,22 +301,18 @@ async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
                     viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                 )
                 await page.goto(ui_url(host, port, TOKEN))
-                await page.goto(f"{served}/#/schedules")
+                await page.goto(f"{served}/#/settings/schedules")
                 # Each schedule's line of when and how it went is drawn, its parts kept by a dot (item 379).
                 await expect(page.locator(".when-line").first).to_contain_text(" · ")
-                await page.get_by_role("button", name="New schedule").click()
-                # The form opens in a dialog (item 615), shut by its own Cancel or cross, and the button stays a plus
-                # and New schedule (it said Close with a cross while the form stood in the page, item 437).
-                form: Locator = page.get_by_role("dialog", name="New schedule")
-                await expect(form).to_be_visible()
-                await expect(form.get_by_role("button", name="Close")).to_have_count(1)
-                await expect(page.get_by_role("button", name="New schedule").locator(".icon")).to_have_attribute(
+                await expect(page.get_by_role("link", name="New schedule").locator(".icon")).to_have_attribute(
                     "data-icon", "plus"
                 )
-                await form.get_by_role("button", name="Cancel").click()
-                await expect(form).to_have_count(0)
-                await page.get_by_role("button", name="New schedule").click()
-                form = page.locator("[data-schedule-form]").first
+                # The form is a page of its own (item 1337), left by its own Cancel.
+                await page.get_by_role("link", name="New schedule").click()
+                await page.get_by_role("link", name="Cancel").click()
+                await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+                await page.get_by_role("link", name="New schedule").click()
+                form: Locator = page.locator(".settings-pane")
                 known: Locator = form.get_by_role("combobox", name="Earlier tasks it knows")
                 await expect(known).to_have_value("")
                 await expect(known.locator("option").first).to_have_text("Default (The last 5 tasks)")

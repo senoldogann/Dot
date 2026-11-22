@@ -268,7 +268,7 @@ export function openTeachPanel({ threadId, onSaved }) {
       repeated.replaceChildren(
         icon("calendar"),
         el("span", null, `It repeats ${when}, in this chat. `),
-        el("a", { href: `#/schedules?schedule=${encodeURIComponent(made.id)}`, onclick: () => finish() }, "See it in Schedules"),
+        el("a", { href: `#/settings/schedules?schedule=${encodeURIComponent(made.id)}`, onclick: () => finish() }, "See it in Scheduled tasks"),
       );
       repeated.hidden = false;
     } catch (error) {

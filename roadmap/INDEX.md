@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1337](1337.md) | done | 2026-11-22 | Schedules are Settings › Scheduled tasks: a list in rows with a switch, Run now, Edit and Delete, and a page for the form |
 | [1336](1336.md) | done | 2026-11-22 | The settings are one plain shell: a search and groups of rows in the nav, a breadcrumb in the bar, and every page that configures Dot a row of it |
 | [1335](1335.md) | done | 2026-11-22 | The conversation is as quiet as a developer tool's, on the phone too, and the docs say the run page |
 | [1334](1334.md) | done | 2026-11-22 | The Automations of a chat are a section of its side panel, each with a pencil, a play and a switch |

@@ -4,6 +4,7 @@ stand-in model: once per run at "always", a first failure and an end that needs 
 The schedules page says a schedule's own level on its row and offers the levels in its form."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
@@ -13,7 +14,6 @@ import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
-from row_menu import choose
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -339,7 +339,7 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                     reduced_motion="reduce",
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
-                await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+                await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules")
                 row: Locator = page.locator(f'[data-schedule="{trouble.id}"]')
                 # How its tasks start stands under the row's Details (item 1136).
                 await row.get_by_role("button", name=f"Details of {trouble.name}").click()
@@ -354,7 +354,7 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                 await expect(single.locator(".chip", has_text="Switch off")).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"notify-{width}-{scheme}.png"), full_page=True)
-                await choose(page.locator("[data-schedule]", has_text="told on trouble").first, "Edit")
+                await page.locator("[data-schedule]", has_text="told on trouble").first.get_by_role("link", name=re.compile("^Edit ")).click()
                 level: Locator = page.get_by_role("combobox", name="Notifications")
                 await expect(level).to_have_value("problems")
                 await expect(level.locator("option")).to_have_text(

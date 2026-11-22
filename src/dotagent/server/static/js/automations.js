@@ -28,7 +28,7 @@ export function automationsPanel({ threadId }) {
   const count = el("span", { class: "automation-count", hidden: true });
   const manage = el(
     "a",
-    { class: "icon-btn automation-manage", href: "#/schedules", title: t("automations.manage"), "aria-label": t("automations.manage") },
+    { class: "icon-btn automation-manage", href: "#/settings/schedules", title: t("automations.manage"), "aria-label": t("automations.manage") },
     icon("sliders"),
   );
   const element = el(
@@ -52,7 +52,7 @@ export function automationsPanel({ threadId }) {
       "a",
       {
         class: "icon-btn automation-edit",
-        href: `#/schedules?schedule=${encodeURIComponent(record.id)}&edit=1`,
+        href: `#/settings/schedules/${encodeURIComponent(record.id)}`,
         title: t("automations.edit"),
         "aria-label": t("automations.editLabel", { name: words.title }),
       },

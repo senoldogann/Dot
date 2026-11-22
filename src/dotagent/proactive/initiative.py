@@ -71,7 +71,7 @@ _LATER_READ: int = 10
 # How long no run of its own is tried after one could not be started (a model or a setting that refuses it).
 _AFTER_A_FAILED_START_S: float = 600.0
 # The page whose card lists the things (item 715), which a tell of a thing no run tried opens.
-_LIST_ROUTE: str = "#/schedules"
+_LIST_ROUTE: str = "#/settings/schedules"
 _STATE_WORDS: dict[str, str] = {"open": "to do", "doing": "being done", "done": "done", "dropped": "let go"}
 
 

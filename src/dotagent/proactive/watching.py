@@ -264,7 +264,7 @@ async def _tell(
             ),
         )
     route: str | None = await _keep_line(runtime, manager, watcher, text)
-    await tell_owner(runtime.bus, watcher.name, text, "#/schedules" if route is None else route)
+    await tell_owner(runtime.bus, watcher.name, text, "#/settings/schedules" if route is None else route)
     await update_state(
         runtime.store,
         watcher.id,
@@ -292,7 +292,7 @@ async def _tell_the_rest(runtime: Runtime, manager: RunManager, watcher: Watcher
     """The items past the hour's limit, said in one line, and written down as handled."""
     text: str = f"and {len(rest)} more"
     route: str | None = await _keep_line(runtime, manager, watcher, text)
-    await tell_owner(runtime.bus, watcher.name, text, "#/schedules" if route is None else route)
+    await tell_owner(runtime.bus, watcher.name, text, "#/settings/schedules" if route is None else route)
     await _keep(runtime, watcher, [one.item.key for one in rest])
 
 

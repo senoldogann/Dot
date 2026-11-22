@@ -2,6 +2,7 @@
 through the real daemon's routes and a real scheduler, with a stand-in model whose runs end done or failed as asked."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
@@ -11,7 +12,6 @@ import httpx
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
-from row_menu import choose
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -270,14 +270,14 @@ async def test_the_row_says_how_many_runs_failed_in_a_row_and_the_form_offers_th
                     reduced_motion="reduce",
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
-                await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+                await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules")
                 row: Locator = page.locator(f'[data-schedule="{created.id}"]')
                 badge: Locator = row.locator(".badge", has_text="2 failed in a row")
                 await expect(badge).to_be_visible()
                 await expect(badge).to_have_attribute("title", "It switches itself off at 5 failed tasks in a row")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"stop-{width}-{scheme}.png"), full_page=True)
-                await choose(page.locator("[data-schedule]", has_text="watched").first, "Edit")
+                await page.locator("[data-schedule]", has_text="watched").first.get_by_role("link", name=re.compile("^Edit ")).click()
                 limit: Locator = page.get_by_role("combobox", name="Switch off after")
                 await expect(limit).to_have_value("5")
                 await expect(limit.locator("option")).to_contain_text(["Default (Never)", "Never"])
@@ -356,12 +356,12 @@ async def test_a_one_time_schedule_that_ran_reads_ran_once_not_switched_off(
         try:
             page: Page = await browser.new_page(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
-            await page.goto(f"http://127.0.0.1:{port}/#/schedules")
+            await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules")
             done: Locator = page.locator(f'[data-schedule="{ran.id}"]')
             await expect(done.locator(".badge", has_text="ran once")).to_be_visible()
             await expect(done.get_by_role("switch")).to_be_disabled()
             off: Locator = page.locator(f'[data-schedule="{held.id}"]')
-            await expect(off.locator(".badge", has_text="switched off")).to_be_visible()
+            await expect(off.locator(".badge", has_text="paused")).to_be_visible()
             await expect(off.get_by_role("switch")).to_be_enabled()
             await page.screenshot(path=str(tmp_path / "ran-once-390.png"), full_page=True)
         finally:

@@ -133,14 +133,14 @@ function madeWhen(made) {
 
 /** The line a schedule a run made leaves in the conversation (items 665, 1178 and 1179): one quiet line, as a change
  * of the memory is, the calendar, the schedule's name (cut with an ellipsis where the line is short) and when it runs;
- * it leads to the schedule on the Schedules page, and its tooltip and its name to a screen reader say "Schedule made".
+ * it leads to the schedule in Settings › Scheduled tasks, and its tooltip and its name to a screen reader say "Schedule made".
  * `made` is the `schedule_made` event's data. */
 export function scheduleLine(made) {
   const when = madeWhen(made);
   const label = when === "" ? t("messages.scheduleLabelBare", { name: made.name }) : t("messages.scheduleLabel", { name: made.name, when });
   return el(
     "a",
-    { class: "note schedule-line schedule-made-line", href: `#/schedules?schedule=${encodeURIComponent(made.schedule_id)}`, title: label, "aria-label": label },
+    { class: "note schedule-line schedule-made-line", href: `#/settings/schedules?schedule=${encodeURIComponent(made.schedule_id)}`, title: label, "aria-label": label },
     icon("calendar"),
     el(
       "span",
