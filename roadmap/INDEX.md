@@ -6,6 +6,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1326](1326.md) | done | 2026-11-22 | The docs and the appearance settings say the new look: 14 px messages, the design language page, the tests |
+| [1325](1325.md) | done | 2026-11-22 | The generic controls are one restrained set: 32 px, a hairline, a calm blue, no pills, no bounce |
 | [1324](1324.md) | done | 2026-11-22 | The look is plain and professional: true black and zinc greys, a calm blue, an 8 px scale and dense type |
 | [1323](1323.md) | done | 2026-11-22 | A deleted chat's runs leave their numbers in a run ledger, so that the statistics outlive the chats |
 | [1322](1322.md) | done | 2026-11-22 | The Screen tab of a run's panel shows the Mac's screen live, whether a task works or not |

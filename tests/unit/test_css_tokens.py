@@ -398,3 +398,88 @@ def test_the_ring_of_a_fingers_target_does_not_take_a_placed_button_out_of_its_p
     none, so that a button a rule of its own places (the key field's eye, the way down) keeps its place on a phone."""
     text: str = re.sub(r"/\*.*?\*/", "", (_CSS / name).read_text(encoding="utf-8"), flags=re.S)
     assert [match.group(0)[:80] for match in _POSITIONED_BUTTON.finditer(text)] == []
+
+
+def test_the_foundation_is_the_plain_look_in_its_tokens() -> None:
+    """Item 1324: the dark page is true black with the raised surfaces a hair lighter, the accent is a calm blue, the
+    radii are the 0.5 rem scale and the type has the 10 and 11 px metadata sizes; item 1325: the controls have a
+    height."""
+    pairs: dict[str, tuple[str, str]] = _pairs("neutral")
+    assert pairs["--bg"][1] == "#000000"
+    assert pairs["--surface"][1] == "#111111"
+    assert pairs["--surface"][0] == "#ffffff"
+    assert contrast(pairs["--on-accent"][1], pairs["--accent"][1]) >= 4.5
+    app: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    declared: dict[str, str] = {}
+    for name, value in re.findall(r"^\s+(--[a-z0-9-]+): ([^;]+);", app, re.M):
+        declared.setdefault(name, value)  # the first is the Mac's; the phone's block that follows changes a few
+    assert declared["--text-3xs"] == "calc(10px * var(--type-scale))"
+    assert declared["--text-2xs"] == "calc(11px * var(--type-scale))"
+    for token, value in (
+        ("--radius-control", "8px"),
+        ("--radius", "12px"),
+        ("--radius-menu", "10px"),
+        ("--radius-bubble", "10px"),
+        ("--radius-composer", "14px"),
+        ("--radius-lg", "16px"),
+        ("--control-h", "32px"),
+        ("--control-h-sm", "28px"),
+        ("--menu-row", "28px"),
+    ):
+        assert declared[token] == value, (token, declared[token])
+    assert declared["--weight-text"] == "400"
+    assert declared["--weight-label"] == "calc(var(--weight-text) + 100)"
+    assert declared["--weight-title"] == "calc(var(--weight-text) + 200)"
+
+
+def test_the_docs_name_the_easing_the_sheets_use_and_not_an_older_one() -> None:
+    """Item 1326: the page of the daemon told the springy easing of before item 1324 for a release after it, so the
+    docs hold the one ``--ease`` the sheets declare and say no other cubic-bezier."""
+    app: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    ease: re.Match[str] | None = re.search(r"^\s+--ease: (cubic-bezier\([^)]*\));", app, re.M)
+    assert ease is not None
+    docs: Path = Path(__file__).resolve().parents[2] / "docs"
+    for page in ("daemon.md", "dot-ui.md"):
+        text: str = (docs / page).read_text(encoding="utf-8")
+        assert ease.group(1) in text, page
+        assert [found for found in re.findall(r"cubic-bezier\([^)]*\)", text) if found != ease.group(1)] == [], page
+
+
+def test_a_phone_draws_no_text_token_under_13_px() -> None:
+    """Item 1324's review: the phone's two metadata sizes were 11 and 12 px while the sheet, the docs and the phone type
+    test said no text is drawn under 13 px there."""
+    app: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    start: int = app.index(
+        "@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {"
+    )
+    block: str = app[start : app.index("\n}\n", start)]
+    sizes: list[tuple[str, int]] = [
+        (name, int(px)) for name, px in re.findall(r"(--text-[a-z0-9]+): calc\((\d+)px \* var\(--type-scale\)\)", block)
+    ]
+    assert len(sizes) >= 8, sizes
+    assert [(name, px) for name, px in sizes if px < 13] == []
+
+
+# What is round is a fact of the rules that name `--radius-pill`; a sentence that lists it is a list that drifts.
+_ROUND_LIST: re.Pattern[str] = re.compile(
+    r"\bare (fully )?round\b|\bonly an? [^.;]*\b(round|pill)\b|\bstays only for\b", re.I
+)
+
+
+def test_no_sheet_comment_or_doc_lists_what_is_round() -> None:
+    """Item 1324's review, round 3: the token's comment, the design page, the daemon page and the item's record each
+    listed the round things and no two agreed (the composer's + and microphone are on the pill token too)."""
+    root: Path = Path(__file__).resolve().parents[2]
+    pages: list[Path] = [
+        _CSS / "app.css",
+        root / "docs" / "dot-ui.md",
+        root / "docs" / "daemon.md",
+        *(root / "roadmap" / f"{number}.md" for number in (1324, 1325, 1326)),
+    ]
+    hits: list[str] = [
+        f"{page.name}:{n}: {line.strip()[:100]}"
+        for page in pages
+        for n, line in enumerate(page.read_text(encoding="utf-8").splitlines(), 1)
+        if _ROUND_LIST.search(line)
+    ]
+    assert hits == [], hits

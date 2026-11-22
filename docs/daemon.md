@@ -529,7 +529,7 @@ while it works, an amber ring while it waits for you, a tick in the text's ink f
 right; the run's facts (its state,
 agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Task tab,
 closed the first time (items 452 and 544). Your goal is the
-first message, in the ink bubble of your messages (item 832). What you write reads there as markdown, as an
+first message, on the raised surface of your messages (items 832 and 1324). What you write reads there as markdown, as an
 answer does: its headings, lists (nested as far as their items are indented, with a block of code or a quote under an
 item, numbered on from the number they begin at, and task lists with their boxes), tables (their columns aligned as
 the rule line says), code (whatever follows the fence's language, `title="x.py"` or `python:x.py`, is read, so the
@@ -1079,8 +1079,9 @@ window drawn in the scheme it names: System (the default, split down the middle)
 them. **Themes** is one strip of cards that slides sideways (a mouse drags it, a touch and a trackpad scroll it, the
 arrow keys, Home and End move from card to card, and it opens on the theme in use), each with a light and a dark orb:
 the card takes its theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light
-can wear one theme and dark another. Dot's two looks are **Neutral** (neutral grey and ink after OpenMausBot's Midnight and Daylight, a white page that
-is not cream in light and a phone's own darker greys on a phone in dark while Neutral is the theme of both schemes, item 1205; round and quiet; the default)
+can wear one theme and dark another. Dot's two looks are **Neutral** (a plain, professional palette since item 1324: zinc greys, a true black page
+in dark with the raised surfaces a hair lighter, a near-white page in light with white cards, one calm blue accent, the
+same greys on a phone as on a Mac; the default)
 and **Paper** (warm paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it
 is picked for; Dot's thirteen palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and
 a raspberry accent), **Grove**, **Ocean**, **Ember**, **Iris**, **Midnight**, **Nord**, **Solarized**, **Sepia**,
@@ -1115,7 +1116,7 @@ glyph goes missing, and the answers and the message box may take the interface's
 item 1057): its size is the body's on this device, every text size scaled with it, on a phone 12 to 20 px around 16 (item
 347), as iOS's own, and elsewhere 13 to 17 px around 14; each device keeps its own. The **answers**, Dot's and your
 messages (its own family the theme's, a serif in Paper): 12 to 24 px, a message's size scaled with the interface's until
-set (a size kept stays when the interface's moves; set to the size it shows while it follows, it goes on following). The **message box** (its own the interface's): 12 to 20 px, 15 by default. The **code** (its own Geist Mono): the
+set (a size kept stays when the interface's moves; set to the size it shows while it follows, it goes on following). The **message box** (its own the interface's): 12 to 20 px, 14 by default (item 1324; 15 before). The **code** (its own Geist Mono): the
 code blocks, files and changes, 10 to 18 px, 13 by default, and long lines of code wrapped (off: how a block of code
 begins, its own switch wraps just that block). Then font smoothing (on), for every face. What a browser kept before item
 1062 reads as what it is now: the answers' "Theme" is their own and "Interface" the interface's, and the message box's "The
@@ -1129,30 +1130,32 @@ its light and its dark value in one place; colour is for what waits for you (the
 and what is unread (the dot), and a state that is fine (done, ready, connected, understood) wears the text's second
 ink on a soft fill (`--fine` and `--fine-weak`, item 839: they were green), while green stays where it is a
 convention of the data (a diff's additions, a string in code, a trade that rose); surfaces step up by lightness (page,
-sunken sidebar, raised cards) rather
-than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
+raised sidebar and cards, then the fills a hover and a selected row take) rather
+than by shadow in dark; borders are white at 8% in dark and black at 9% in light so they sit on every surface; the text tiers are
 measured against every surface by a unit test (4.5:1 for all four tiers, the muted and the faint ones too, item
-1205; the sidebar's group labels are set in the muted one); the yellow is
-the owner's bubbles. Type: the system's face for the interface and the answers (item 1057; Inter, served from Dot's own
+1205; the sidebar's group labels are set in the muted one); the amber of Dot's
+face stays on the face (`--brand`), and the owner's messages sit on a raised grey surface, not a yellow bubble. Type: the system's face for the interface and the answers (item 1057; Inter, served from Dot's own
 origin with Geist Mono, a choice), Geist Mono for code and identifiers (`static/fonts`, SIL Open Font License); on a
-phone an answer's text is 16 on 22 px (item 1057, 17 on 26 before); seven sizes each with its line-height (12/16 badges and
-chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles,
-24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit
+phone an answer's text is 16 on 22 px (item 1057, 17 on 26 before); a dense scale (item 1324): two sizes for
+metadata (10/14 and 11/14, `--text-3xs` and `--text-2xs`: an age, a count, a shortcut) and seven sizes each with its
+line-height (12/16 badges and chips, 13/18 meta and hints, 14/20 the interface, 14/22 prose and the composer, 16/24
+section titles, 18/26 page titles, 24/30 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit
 test refuses any size, weight, line-height or family in the sheets that is not one of these tokens. Surfaces: a box of the
-pages (a card, a settings' group, a tile) has no frame, a surface on a 16 px corner (18 on a phone) drawn by a ring of
-half a pixel of the text at a tenth (`--edge`, `--box-shadow`, item 1205) rather than a shadow, and the contrast
-setting frames it again; a box within a box is a soft fill; a card holds 20 px of room (item 838; the compact density
-keeps 12); only what floats casts a shadow (menus, on a 12 px corner, 22 on a phone, with rows 30 px tall on a 6 px
-corner and icons of a 1.5 stroke against the interface's 1.75; dialogs; sheets, on 28 px on a phone; the composer);
+pages (a card, a settings' group, a tile) has no frame of its own, a surface on a 12 px corner (the same on a phone: one
+design language, item 1324) drawn by a hairline ring of the border colour (`--box-shadow`) rather than a shadow, and the
+contrast setting frames it again; a box within a box is a soft fill; a card holds 16 px of room (the compact density
+keeps 12); only what floats casts a shadow (menus, dialogs, sheets and the composer; a menu's rows are 28 px tall and its
+icons of a 1.5 stroke against the interface's 1.75); the radii are a 0.5 rem scale, one token for each kind of box
+(`--radius-*` in `app.css`), and what is fully round takes `--radius-pill`, which is the one place that says what that is;
 the open row of the sidebar and the open tab of Settings are a flat tint of the ink, the row's name a step bolder; a
-chat's name and last line in the sidebar fade out over their last 28 px where they are cut; motion has one easing
-(`cubic-bezier(0.22, 1, 0.36, 1)`): a menu opens from 96 %, a sheet rises 32 px in 260 ms and a message you just sent
+chat's name and last line in the sidebar fade out over their last 28 px where they are cut; motion has one calm easing
+(`cubic-bezier(0.4, 0, 0.2, 1)`, no overshoot): a menu opens from 98 %, a sheet rises 16 px in 200 ms and a message you just sent
 180 ms, all still under reduced motion but for a fade; bold in an answer is 600 and its paragraphs wrap with no lone
 last word (`text-wrap: pretty`); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted
-string; an empty page or list stands a mark in a quiet ring, a title and one line that says what brings something there,
-in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages in an ink
-bubble (`--msg-me`: the text's colour in light, one surface raised in the dark) on an 18 px corner with 7 by 12 px
-of room (item 1205), two of yours in a row on a touch screen joined at a 6 px corner as iMessage draws them, and what Dot and its agents say, the
+string; an empty page or list stands a mark in a 36 px rounded square, a title and one line that says what brings something there,
+in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages on one raised
+surface (`--msg-me`, one step off the page: lighter in dark, a shade darker in light, item 1324) on a 10 px corner with 8 by 12 px
+of room, two of yours in a row on a touch screen joined at a 4 px corner, and what Dot and its agents say, the
 answer and the lines along the way, as plain text beside the face, on no fill (item 854: a soft bubble until then), and
 on a phone's width each in a soft bubble of its own (`--msg-agent`, item 1091, the owner's ask); the
 line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
@@ -1161,13 +1164,18 @@ and the rest in the sheet a hold of the message opens, item 1064), an answer tha
 ended well says no word for it ("Finished" went), a file a message names is a chip of its name (its path in the chip's
 title and in a copy of the message), and what a run changed is in the side panel's Changes tab, not under the answer
 (item 841). Controls:
-buttons, inputs and selects 36 px tall on a 10 px corner (32 for the small ones; item 837, 8 px before): a button is a
-soft fill with no frame, a step darker under the pointer (the first of a page in ink, a quiet one with no fill, and the
-contrast setting frames them), and an input or a select keeps its hairline, as what is typed in; the same 2 px focus
-ring on each, a select with its
+buttons, inputs and selects 32 px tall on an 8 px corner (28 for the small ones, 36 for the large:
+`--control-h`, `--control-h-sm`, `--control-h-lg`; on a phone what is tapped takes `--touch-target`, 36 px, and an icon
+button a ring that makes the 44 a finger hits; item 1325): a button is a hairline frame on a tint of the ink, a step
+darker under the pointer (the first of a page in the accent blue, a quiet one with no fill and no frame, a destructive
+one in red), and an input or a select keeps its hairline on a field ground a hair over its surface in dark; a field in
+focus takes the accent's border and a ring of 3 px at a quarter of it, a button the 2 px ring; a switch is a plain
+toggle, 32 by 18 px with a 14 px knob, on a phone too; checkboxes take the accent; scrollbars are thin (6 px), a thumb
+of the ink at a small alpha on no track, wherever a pointer scrolls; badges sit on a 6 px corner; a toast is a raised
+surface with a hairline, red on a tint when it is an error, no longer the inverted slab; a select with its
 own drawn chevron, a range on a hairline track filled with the accent up to its value under the switch's knob, field
-labels on the interface line and hints on the small one, the composer's menus as round pills of 32 px (an icon of 16 px,
-the value, a chevron of 12; no ground at rest, a tint under the pointer) that open a panel above them, the providers'
+labels on the interface line and hints on the small one, the composer's menus (an icon, the value, a chevron;
+no ground at rest, a tint under the pointer) that open a panel above them, the providers'
 marks served from `static/icons/providers/` with their licences, table rows 40 px with their content on the middle;
 `#/controls` shows every control on one page for checking a look. Faces: every actor is a character (below); an agent
 wears the look you choose, Dot its own (Settings › General), and an actor without one (a delegated run, a campaign, a
@@ -1184,14 +1192,15 @@ or expression at once. Two characters move: the home's face and the look editor'
 frame. One moving face costs about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads
 it from Chrome's performance metrics and caps it). `#/controls` shows every shape, expression, colour and animation.
 Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits
-a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them, has no
+a breath apart; a unit test checks it); the sidebar is a hair lighter than the page in dark and darker in light, with no line between them, has no
 dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the right of its
 row in figures of one width ("5m", "3h", "2d") and its open row is a flat tint of the ink (item 1205); the top bar's
 pills show a border only when they count something; a card's head is lighter than its body; a folded step of the
-timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms), the rise of a message
-sent (180 ms) and of a sheet (260 ms), and one easing for what changes (item 1205), and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
+timeline is one line whose duration shows on hover. Motion: three durations (120, 160 and 240 ms), the rise of a message
+sent (180 ms) and of a sheet (200 ms), and one calm easing for what changes (`cubic-bezier(0.4, 0, 0.2, 1)`, no overshoot,
+item 1324), and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
 transition and animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash
-menu and the toasts fade in, and a menu of actions opens from 96 %; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
+menu and the toasts fade in, and a menu of actions opens from 98 %; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
 (the breath, the pulse, the spinners, the ring of a working run's dot, the drawer's slide) and the fades stay, so a
 state change is still seen. What repeats without end stands still while Dot's window is not the one in front or is out
 of sight, and moves again once it is (item 662: the page marks itself away, and every endless animation takes its play

@@ -26,11 +26,11 @@
     { id: 600, label: "Semibold" },
   ];
   // A phone, as app.css draws one (item 329): its body is iOS's 16 px, down to 12 (item 347), a message 16; elsewhere
-  // the body is Dot's 14, 13 to 17, a message 15.
+  // the body is Dot's 14, 13 to 17, a message 14 (the dense scale, item 1324).
   const PHONE = window.matchMedia(
     "(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)",
   ).matches;
-  const BODY = PHONE ? { own: 16, least: 12, most: 20, message: 16 } : { own: 14, least: 13, most: 17, message: 15 };
+  const BODY = PHONE ? { own: 16, least: 12, most: 20, message: 16 } : { own: 14, least: 13, most: 17, message: 14 };
 
   /** A whole number between `least` and `most` on steps of `step` from `least`, read from its digits; else null. */
   const wholeIn = (least, most, step) => (stored) => {
@@ -158,7 +158,7 @@
     answerWeight: weight("dot.weightAnswers", "--answer-weight"),
     /** The message box's face: the interface's by default. */
     composerFont: family("dot.fontComposer", "--composer-font", FOLLOWING_STACKS, "var(--font)", {}),
-    composerSize: size("dot.sizeComposer", "--composer-size", 12, 20, 15),
+    composerSize: size("dot.sizeComposer", "--composer-size", 12, 20, 14),
     composerWeight: weight("dot.weightComposer", "--composer-weight"),
     /** The code's face: Geist Mono by default. */
     codeFont: family("dot.fontCode", "--mono", FAMILY_STACKS, "var(--family-geist-mono)", {}),

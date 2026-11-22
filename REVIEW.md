@@ -29,6 +29,18 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/unit/test_css_tokens.py::test_the_ink_on_dots_warm_backdrop_reads_on_every_stop_of_it_in_both_looks_and_both_schemes` — the
+  hint and the title on Dot's computer's amber backdrop took the page's ink, light in dark: 1.37:1 (item 1324's review).
+- `tests/unit/test_css_tokens.py::test_no_text_is_set_in_the_accent_which_is_a_fill_colour` — six rules still set text in
+  `--accent` after it became a fill colour: 4.06:1 on the dark surfaces (item 1325's review).
+- `tests/unit/test_css_tokens.py::test_the_focus_ring_is_the_solid_accent_and_reads_at_3_to_1_on_every_surface` — the
+  focus ring was the accent at 60 %, 2.2:1 in dark, under the 3:1 of a focus indicator (item 1325's review).
+- `tests/unit/test_css_tokens.py::test_the_docs_name_the_easing_the_sheets_use_and_not_an_older_one` — `docs/daemon.md` still
+  told the springy easing, a 96 % menu and a 260 ms sheet after the look changed them (item 1326's review).
+- `tests/unit/test_css_tokens.py::test_a_phone_draws_no_text_token_under_13_px` — the phone's two metadata sizes were 11 and
+  12 px under the 13 px the sheet and the docs promise there (item 1324's review).
+- `tests/unit/test_css_tokens.py::test_no_sheet_comment_or_doc_lists_what_is_round` — the token's comment, the design
+  page, the daemon page and the item's record each listed the round things and no two agreed (item 1324's review).
 - `tests/smoke/test_oauth_accounts.py::test_a_refused_revoke_keeps_the_token_to_ask_again_and_the_sign_out_stands` — a
   sign-out forgot the tokens before the provider's revoke, and a refusal was only logged (its error dropped), so the
   provider kept listing Dot and the page said "signed out" (item 1312).
