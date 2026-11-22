@@ -4,6 +4,7 @@
 import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { agentPanel } from "../agentpanel.js";
+import { automationsPanel } from "../automations.js";
 import { api, eventNotShown, follow, query, sharedGet, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
@@ -1642,6 +1643,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     lead: { id: run.id, goal: run.goal, actor: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id, since: run.created_at, state: () => status },
     onOpenAgents: () => inspector.openTab("agents"),
   });
+  // The schedules and loops of this chat (item 1334), in the Task tab under the Lineage.
+  const automations = automationsPanel({ threadId: run.thread_id });
   const lineageCompact = agents.lineage({ compact: true });
   const lineageFull = agents.lineage({ compact: false });
   const withAgent = agentPanel({ agent });
@@ -1674,7 +1677,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // The lessons at the tab's foot, after what the run did (item 856, the owner's ask: they stood at its head).
       // What came of the task first (its answer's files, how it ended), then the recap and the sources, the technical
       // last (the owner's ask of 2026-11-13: the files made stood under the recap and the skills, with their lines).
-      { id: "run", label: t("tabs.task"), icon: "info", sections: [...context.head, recap.element, lineageCompact.element, ...context.rest, more.element, lessonsSlot] },
+      { id: "run", label: t("tabs.task"), icon: "info", sections: [...context.head, recap.element, lineageCompact.element, automations.element, ...context.rest, more.element, lessonsSlot] },
       { id: "changes", label: t("tabs.changes"), icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: t("tabs.plan"), icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: t("tabs.agents"), icon: "users", sections: [lineageFull.element, withSection.element] },
@@ -2099,6 +2102,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     queue.dispose();
     background.dispose();
     loops.dispose();
+    automations.dispose();
     meter.dispose();
     bubble.dispose();
     frame.dispose();

@@ -804,7 +804,14 @@ it, its subagents that work, each a mark, its title, how long it has worked ("8m
 while it works, amber waiting for you, green done, red failed; the row is the way to its page, and what it does now
 is its tooltip), and a **Previous agents** row with how many failed ("1 failed") and how many there are, which folds
 open the rows of those that ended. The Task tab holds the same Lineage, compact, whenever the chat has handed work to
-a subagent, and its Previous agents row opens the Agents tab. Under the Lineage the Agents tab says who
+a subagent, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
+`/loop`, a schedule a run made in the chat, a schedule that fires into it), each a calendar-clock mark with a green dot
+while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
+Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00"), a pencil that opens its editor on the Schedules page
+(`#/schedules?schedule=<id>&edit=1`; the address forgets `edit=1` as the editor opens, so a reload or a Back to the page
+does not open it again), a play that runs it now (a run as at its time; its next time and its switch stay) and a switch that
+pauses it or puts it on again, which the scheduler reads at its next firing; the head's button opens all the schedules
+(`#/schedules`). A chat with none shows no section. Under the Lineage the Agents tab says who
 the chat is with (item 846), as a messaging app's panel shows the contact: for one of your agents its face, name and
 role, its model, approvals and actions, what it learned, its instructions, **Edit**, which opens the agent's editor in
 the panel and shows the agent as saved, and **Open its page**; for Dot its

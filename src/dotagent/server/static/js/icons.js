@@ -7,6 +7,15 @@ import { svg } from "./dom.js";
 const SHAPES = {
   paperclip: [["path", { d: "m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" }]],
   check: [["path", { d: "M20 6 9 17l-5-5" }]],
+  // A schedule (item 1334): a calendar with a clock.
+  calendarClock: [
+    ["path", { d: "M16 14v2.2l1.6 1" }],
+    ["path", { d: "M16 2v4" }],
+    ["path", { d: "M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5" }],
+    ["path", { d: "M3 10h5" }],
+    ["path", { d: "M8 2v4" }],
+    ["circle", { cx: "16", cy: "16", r: "6" }],
+  ],
   // The check of a plugin from its own maker (item 542): a rosette, which the page fills, around a check.
   badgeCheck: [
     [

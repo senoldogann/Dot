@@ -41,6 +41,9 @@ here points at a test that no longer exists.
   12 px under the 13 px the sheet and the docs promise there (item 1324's review).
 - `tests/unit/test_css_tokens.py::test_no_sheet_comment_or_doc_lists_what_is_round` — the token's comment, the design
   page, the daemon page and the item's record each listed the round things and no two agreed (item 1324's review).
+- `tests/smoke/test_panel_automations.py::test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and_runs_them` — the
+  pencil of a chat's Automations linked to `#/settings/schedules/<id>`, which no route matches, so a press dropped the
+  owner on New chat while the docs said the editor opened; the test follows the pencil to the open editor (item 1334).
 - `tests/smoke/test_oauth_accounts.py::test_a_refused_revoke_keeps_the_token_to_ask_again_and_the_sign_out_stands` — a
   sign-out forgot the tokens before the provider's revoke, and a refusal was only logged (its error dropped), so the
   provider kept listing Dot and the page said "signed out" (item 1312).
