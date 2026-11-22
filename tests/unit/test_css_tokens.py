@@ -185,11 +185,8 @@ def _block(look: str) -> str:
 def _pairs(look: str) -> dict[str, tuple[str, str]]:
     """Each token of ``look`` with its light and its dark hex, for the tokens written as a pair of hexes."""
     pairs: dict[str, tuple[str, str]] = {name: (light, dark) for name, light, dark in _PAIR.findall(_block(look))}
-    if look == "neutral":
-        pairs["--on-bubble"] = ("#1c1c1c", "#1c1c1c")
-    else:
-        pairs["--bubble"] = pairs["--accent-weak"]
-        pairs["--on-bubble"] = pairs["--text"]
+    pairs["--bubble"] = pairs["--accent-weak"]
+    pairs["--on-bubble"] = pairs["--text"]
     return pairs
 
 
@@ -244,26 +241,43 @@ def test_the_muted_ink_and_the_sidebars_group_labels_read_at_aa_in_the_two_looks
     assert ratio >= 4.5, f".side-label ({label.group(1)}) on --sidebar: {ratio:.2f} < 4.5"
 
 
-def test_a_phones_greys_keep_every_text_tier_at_aa_and_step_up_as_a_macs_do() -> None:
-    """Item 1205: on a phone the neutral look takes a phone's own dark greys (themes.css); the text tiers of the look
-    read on each of them at 4.5:1, and the surfaces still step up from the page."""
+def test_a_phone_has_no_look_of_its_own_in_the_neutral_look() -> None:
+    """Item 1324: a phone draws the same greys as a Mac (one design language), so themes.css holds no block that
+    changes the neutral look's surfaces for a touch screen."""
     themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
-    start: int = themes.index(':root[data-theme="neutral"] {') + len(':root[data-theme="neutral"] {')
-    phone: dict[str, tuple[str, str]] = {
-        name: (light, dark) for name, light, dark in _PAIR.findall(themes[start : themes.index("}", start)])
-    }
-    assert set(phone) == set(_SURFACES), phone
-    pairs: dict[str, tuple[str, str]] = {**_pairs("neutral"), **phone}
-    short: list[str] = [
-        f"{tier} on {surface} ({scheme}): {contrast(pairs[tier][scheme], pairs[surface][scheme]):.2f}"
-        for tier, least in _LEAST
-        for surface in _SURFACES
-        for scheme in (0, 1)
-        if contrast(pairs[tier][scheme], pairs[surface][scheme]) < least
+    assert ':root[data-theme="neutral"] {' not in themes
+    assert "(pointer: coarse)" not in themes
+
+
+def _mix(one: str, other: str, share: float) -> str:
+    """``color-mix(in srgb, one share%, other)`` of two hex colours, as a hex colour."""
+    mixed: list[int] = [
+        round(int(one[i : i + 2], 16) * share + int(other[i : i + 2], 16) * (1 - share)) for i in (1, 3, 5)
     ]
-    assert short == [], short
-    dark: list[float] = [_luminance(pairs[name][1]) for name in ("--bg", "--surface", "--surface-2", "--surface-3")]
-    assert dark == sorted(dark), dark
+    return "#" + "".join(f"{channel:02x}" for channel in mixed)
+
+
+def test_the_ink_on_dots_warm_backdrop_reads_on_every_stop_of_it_in_both_looks_and_both_schemes() -> None:
+    """Item 1324 (review, round 2): the hint and the title of Dot's computer took the page's ink, which is light in dark
+    and was 1.4:1 on the amber. They take ``--brand-ink``, which is the same in every look and scheme and reads at 4.5:1
+    on each of the three stops of ``--computer-backdrop``; no rule that sits on the backdrop names ``--on-bubble``."""
+    themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
+    brand: re.Match[str] | None = re.search(r"^\s+--brand: (#[0-9a-f]{6});", themes, re.M)
+    ink: re.Match[str] | None = re.search(r"^\s+--brand-ink: (#[0-9a-f]{6});", themes, re.M)
+    backdrop: re.Match[str] | None = re.search(r"^\s+--computer-backdrop: ([^;]+);", themes, re.M)
+    assert brand is not None and ink is not None and backdrop is not None
+    stops: list[str] = re.findall(r"color-mix\(in srgb, var\(--brand\) (\d+)%, (#[0-9a-f]{6})\)", backdrop.group(1))
+    assert len(stops) == 2, backdrop.group(1)  # the two ends; the middle one is --brand itself
+    colours: list[str] = [_mix(brand.group(1), other, int(share) / 100) for share, other in stops] + [brand.group(1)]
+    for colour in colours:
+        ratio: float = contrast(ink.group(1), colour)
+        assert ratio >= 4.5, f"--brand-ink on the backdrop stop {colour}: {ratio:.2f} < 4.5"
+    run: str = (_CSS / "run.css").read_text(encoding="utf-8")
+    for selector in (".computer-screen .hint", ".computer-empty-mark", ".computer-empty-title"):
+        rule: re.Match[str] | None = re.search(rf"^{re.escape(selector)} \{{([^}}]*)\}}", run, re.M)
+        assert rule is not None, selector
+        assert "--on-bubble" not in rule.group(1), f"{selector} sits on the warm backdrop and takes --brand-ink"
+        assert "--brand-ink" in rule.group(1), selector
 
 
 def test_the_surfaces_step_up_by_lightness_in_dark_and_down_in_light() -> None:

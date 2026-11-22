@@ -2569,7 +2569,7 @@ dialog.modal.file-dialog .file-picture img {
 }
 
 .computer-screen .hint {
-  color: var(--on-bubble);
+  color: var(--brand-ink);
   text-align: center;
 }
 
@@ -2592,10 +2592,10 @@ dialog.modal.file-dialog .file-picture img {
   width: 44px;
   height: 44px;
   margin-bottom: 4px;
-  border: 1px solid color-mix(in srgb, var(--on-bubble) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-ink) 18%, transparent);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  color: var(--on-bubble);
+  background: color-mix(in srgb, var(--mark-rim) 55%, transparent);
+  color: var(--brand-ink);
 }
 
 .computer-empty[data-state="waiting"] .computer-empty-mark {
@@ -2610,7 +2610,7 @@ dialog.modal.file-dialog .file-picture img {
 }
 
 .computer-empty-title {
-  color: var(--on-bubble);
+  color: var(--brand-ink);
   font-size: var(--text-md);
   font-weight: var(--weight-title);
   line-height: var(--leading-ui);
