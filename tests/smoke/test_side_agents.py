@@ -172,7 +172,9 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                         # No face stands at the top any more, and no phone's rows: one button.
                         await expect(page.locator(".side-agent-faces, .side-bots, nav.side-links")).to_have_count(0)
                         await button.click()
-                        menu: Locator = page.get_by_role("dialog" if width < 860 else "menu", name="Your agents")
+                        # A narrow window with a mouse has the menu; a touch screen's sheet is
+                        # test_agent_conversation.py's.
+                        menu: Locator = page.get_by_role("menu", name="Your agents")
                         items: Locator = menu.get_by_role("menuitem")
                         # Dot first (item 1245), then the newest, as neither has worked yet; every entry its count.
                         await expect(items).to_have_text(
@@ -185,9 +187,13 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                                 "Campaigns",
                             ]
                         )
-                        scout: Locator = items.filter(has_text=re.compile(r"^SCScout"))
+                        scout: Locator = items.filter(has_text=re.compile(r"^Scout"))
                         await expect(scout).to_have_attribute("title", "Looks things up")
-                        await expect(menu.locator(".side-badge")).to_have_text(["DO", "CW", "SC"])
+                        codes: list[str] = await menu.locator(".side-badge").evaluate_all(
+                            "(badges) => badges.map((badge) => badge.dataset.code)"
+                        )
+                        # Scout is renamed Scout Two further on, and a later look has its new letters.
+                        assert codes in (["DO", "CW", "SC"], ["DO", "CW", "ST"]), codes
                         await page.screenshot(
                             path=str(tmp_path / f"agents-{width}-{scheme}.png"), animations="disabled"
                         )

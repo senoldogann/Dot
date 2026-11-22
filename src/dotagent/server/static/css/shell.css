@@ -543,6 +543,7 @@ a.stage-name-link {
 
 .side-search-input {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -819,13 +820,18 @@ a.stage-name-link {
 
 /* Select is a word of the label's line, not a button: small, muted, on no ground. */
 .side-list-head .btn {
-  min-height: 0;
   padding: 0 var(--space-1);
   background: transparent;
   color: var(--muted);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   font-weight: var(--weight-label);
+}
+
+@media (pointer: fine) {
+  .side-list-head .btn {
+    min-height: 0;
+  }
 }
 
 @media (hover: hover) {
@@ -989,6 +995,10 @@ a.stage-name-link {
   line-height: var(--leading-3xs);
   font-weight: var(--weight-title);
   letter-spacing: var(--tracking-caps);
+}
+
+.side-badge::before {
+  content: attr(data-code);
 }
 
 .side-agent {
@@ -1176,6 +1186,14 @@ a.stage-name-link {
 
   .shell[data-nav="drawer"][data-sidebar="open"] .sidebar {
     box-shadow: none;
+  }
+
+  /* A phone reads at the reading size (item 329: nothing under 13 px, nine characters in ten at 15 or more): the lines
+     of a row, the labels of the groups and the dock say what they say in the size of the title, and the badge's two
+     letters, a mark, stay small. */
+  :is(.side-title, .side-run-goal, .side-chat-top, .side-chat-last, .side-age, .side-working, .side-waiting, .side-label, .side-note) {
+    font-size: var(--text-md);
+    line-height: var(--leading-ui);
   }
 
   .side-head {

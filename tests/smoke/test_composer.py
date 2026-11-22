@@ -15,7 +15,6 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from composer_choices import show_choices
 from PIL import Image
 from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
@@ -169,7 +168,6 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
         try:
             for width in (1280, 390):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                await show_choices(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 goal = page.locator(GOAL)
                 menu = page.locator(".composer .slash-menu")
@@ -238,7 +236,6 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
             # A phone's box has the model's pill alone (item 1121): `_phone_box_rests_until_used` reads it.
             for width in (1280,):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                await show_choices(page)
                 refused: list[str] = []
                 page.on("console", _collect_refusals(refused))
                 await page.route("**/api/models", _with_a_thinking_model)
@@ -278,7 +275,11 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 # A model with levels brings the Reasoning pill: the daemon's level until one is picked, then the one
                 # picked.
                 await expect(reasoning_pill).to_contain_text("Medium")
-                await expect(reasoning_pill.locator("[data-icon='brain']")).to_have_count(1)
+                # The level is bars beside the model's name (item 1330): three of the four filled for the default
+                # Medium, the second of the three levels offered; the words are for a screen reader.
+                bars = reasoning_pill.locator(".level-bars")
+                await expect(bars).to_have_count(1)
+                await expect(bars.locator("rect[data-on]")).to_have_count(3)
                 await reasoning_pill.click()
                 levels = page.locator(".composer .composer-popover[aria-label='Reasoning']")
                 await expect(levels.locator("[role=option]")).to_have_count(4)
@@ -287,6 +288,7 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await levels.get_by_role("option", name="High", exact=True).click()
                 await expect(levels).to_be_hidden()
                 await expect(reasoning_pill).to_contain_text("High")
+                await expect(bars.locator("rect[data-on]")).to_have_count(4)
                 # Back to the daemon's default: the Reasoning pill goes again.
                 await model_pill.click()
                 await popover.get_by_role("option", name="Default (scripted)").click()
@@ -438,7 +440,6 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
             # A phone's line (items 1120 and 1121) is `_phone_box_rests_until_used`'s.
             for width in (1280, 800):
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900})
-                await show_choices(page)
                 await page.route("**/api/models", _with_a_thinking_model)
                 await page.goto(ui_url(host, port, TOKEN))
                 await expect(page.locator(".composer-pill[data-pill='agent']")).to_be_visible()
@@ -457,17 +458,21 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 right, parts = bar["right"], bar["parts"]
                 assert isinstance(right, float | int)
                 # On Auto (item 495) the bar has no mode pill; Chrome has speech recognition, so it has a microphone.
-                # A wider window has the choices' own button beside the "+"; a phone shows them while the box is used.
+                # The choices are always in sight (item 1330): no button of their own beside the "+".
                 wide: bool = width > _PHONE_PX
-                assert isinstance(parts, list) and len(parts) == (9 if wide else 8), (width, bar)
+                assert isinstance(parts, list) and len(parts) == 8, (width, bar)
                 by_name: dict[str, list[float]] = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
                 named: set[str] = {"plus", "mic", "send", "field", "agent", "model", "reasoning", "options"}
-                assert set(by_name) == (named | {"choices"} if wide else named), bar
-                # The pills keep one line at every width, and their height is the bar's (item 273).
-                pills = [by_name[name] for name in ("agent", "model", "reasoning", "options")]
+                assert set(by_name) == named, bar
+                # The pills keep one line at every width, and their height is the bar's (item 273); on a wide window the
+                # approvals stand under the box, at its right, quiet words on no ground (item 1330).
+                line = ("agent", "model", "reasoning") if wide else ("agent", "model", "reasoning", "options")
+                pills = [by_name[name] for name in line]
                 assert max(float(pill[0]) for pill in pills) - min(float(pill[0]) for pill in pills) <= 1, (width, bar)
                 height_px = _BAR_PX if width > _PHONE_PX else _PHONE_BAR_PX
                 assert all(round(float(pill[4])) == height_px for pill in pills), (width, bar)
+                if wide:
+                    assert float(by_name["options"][2]) >= float(bar["bottom"]) - 1, (width, bar)
                 assert all(float(part[2]) <= right + 0.5 for part in parts), (width, bar)
                 plus, send, field = by_name["plus"], by_name["send"], by_name["field"]
                 # The microphone is as tall as the "+" (item 574).
@@ -477,7 +482,6 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                     # The desk keeps the box above its controls: one line of pills, the field over it, and the
                     # microphone on the send's line, left of it.
                     assert max(abs(float(plus[0]) - float(pill[0])) for pill in pills) <= 1, (width, bar)
-                    assert abs(float(by_name["choices"][0]) - float(plus[0])) <= 1, (width, bar)
                     assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
                     assert float(field[3]) < float(pills[0][2]) - 1, (width, bar)
                     assert abs(float(mic[0]) - float(send[0])) <= 1 and float(mic[1]) < float(send[1]), (width, bar)
@@ -515,7 +519,6 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
-            await show_choices(page)
             await page.goto(ui_url(host, port, TOKEN))
             await page.locator(".composer input[type=file]").set_input_files(
                 [
@@ -666,24 +669,17 @@ async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_says_to_wa
             await browser.close()
 
 
-async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) -> None:
-    """Items 1120 and 1121 on a phone's width: the box at rest is the "+", the words and the send, YOLO's pill and the
-    microphone away too; a touch in the words brings the line under them, the model's pill alone standing for the
-    choices, and its sheet (item 1202) holds the approvals and the mode; a touch elsewhere puts the line away, and the
-    "+" menu has no Model and options."""
+async def _phone_box_has_its_line(browser: Browser, host: str, port: int) -> None:
+    """Items 1120, 1121 and 1330 on a phone's width: the box is the words with, on the line under them, the "+", the
+    model's pill, the microphone and the send, always in sight; the model's pill alone stands for the choices, and its
+    sheet (item 1202) holds the approvals and the mode; the "+" menu has no Model and options."""
     page: Page = await browser.new_page(viewport={"width": 390, "height": 900}, reduced_motion="reduce")
     await page.goto(ui_url(host, port, TOKEN))
     composer: Locator = page.locator(".composer").last
     model: Locator = composer.locator(".composer-pill[data-pill='model']")
-    await expect(composer).to_have_attribute("data-quiet", "")
-    for part in (".plus-button", ".composer-field", ".btn.send"):
-        await expect(composer.locator(part)).to_be_visible()
-    for part in (".mic-button", ".composer-pill[data-pill='model']", ".composer-pill[data-pill='options']"):
-        await expect(composer.locator(part)).to_be_hidden()
-    await composer.locator("textarea").click()
     await expect(composer).not_to_have_attribute("data-quiet", "")
-    await expect(model).to_be_visible()
-    await expect(composer.locator(".mic-button")).to_be_visible()
+    for part in (".plus-button", ".composer-field", ".btn.send", ".mic-button", ".composer-pill[data-pill='model']"):
+        await expect(composer.locator(part)).to_be_visible()
     await expect(composer.locator(".composer-pill[data-pill='options']")).to_be_hidden()
     # The words over the line; on it the "+", the model, the microphone and the send, on one centre line, the
     # microphone as tall as the send and left of it (read in one frame).
@@ -715,25 +711,22 @@ async def _phone_box_rests_until_used(browser: Browser, host: str, port: int) ->
     # A pick repaints the sheet: the row stays open, and the sheet stays within the screen.
     await menu.locator(".pop-option[data-mode='ask']").click()
     await expect(menu.locator(".pop-option[data-mode='ask']")).to_have_attribute("aria-selected", "true")
-    await expect(composer).not_to_have_attribute("data-quiet", "")
     shown = await menu.bounding_box()
     assert shown is not None
     assert shown["y"] >= 0 and shown["y"] + shown["height"] <= 900, shown
     await page.keyboard.press("Escape")
-    await page.mouse.click(4, 240)
-    await expect(composer).to_have_attribute("data-quiet", "")
-    # A phone's "+" holds what adds to the message; the choices come with the box in use, and have no button.
-    await expect(composer.locator(".choices-toggle")).to_be_hidden()
+    # A phone's "+" holds what adds to the message; the choices are in the bar, and have no button.
+    await expect(composer.locator(".choices-toggle")).to_have_count(0)
     await page.close()
 
 
-async def test_the_words_have_their_own_line_and_the_runs_choices_wait_behind_the_plus(
+async def test_the_words_have_their_own_line_and_the_runs_choices_stand_in_the_bar(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
-    """Item 833: the box with the run's choices behind their own "Model and options" button beside the "+", which
-    shows and hides them and is kept; the least-asking mode stays in sight while they are away; the microphone stands
-    alone until words are typed, and the send then comes beside it. Item 1249: on a Mac the words have a line of their
-    own, and the "+", the microphone and the send the line under them, however many lines the words take."""
+    """Items 833, 1249 and 1330: the choices of the run are always in the bar (the model's pill with its reasoning, the
+    approvals under the box), with no button of their own beside the "+" and no resting state that puts them away; the
+    microphone and the send stand side by side from the start. On a Mac the words have a line of their own, and the
+    "+", the microphone and the send the line under them, however many lines the words take."""
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None
@@ -744,8 +737,9 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_wait_behind_th
                 page: Page = await browser.new_page(viewport={"width": width, "height": 900}, reduced_motion="reduce")
                 await page.goto(ui_url(host, port, TOKEN))
                 composer: Locator = page.locator(".composer").last
-                await expect(composer).to_have_attribute("data-quiet", "")
-                await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
+                await expect(composer).not_to_have_attribute("data-quiet", "")
+                await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_visible()
+                await expect(composer.locator(".choices-toggle")).to_have_count(0)
                 # The words on a line of their own, the "+" under them, read in one frame.
                 plus: Locator = composer.locator(".plus-button")
                 field: Locator = composer.locator(".composer-field")
@@ -755,11 +749,11 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_wait_behind_th
                     " box.querySelector('.composer-field').getBoundingClientRect().bottom]"
                 )
                 assert edges[0] >= edges[1] - 2, edges
-                # The microphone alone until words are typed, then the send beside it: more can still be dictated.
+                # The microphone and the send side by side from the start: more can still be dictated after words.
                 mic: Locator = composer.locator(".mic-button")
                 send: Locator = composer.locator(".btn.send")
                 await expect(mic).to_be_visible()
-                await expect(send).to_be_hidden()
+                await expect(send).to_be_visible()
                 await composer.locator("textarea").fill("Plan the garden")
                 await expect(send).to_be_visible()
                 await expect(mic).to_be_visible()
@@ -773,30 +767,21 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_wait_behind_th
                 assert all(abs(top - tops[0]) <= 4 for top in tops[:3]), tops
                 assert tops[0] > tops[3], tops
                 await composer.locator("textarea").fill("")
-                # The "+" adds to the message alone; the button beside it shows the choices, and the choice is kept.
+                # The "+" adds to the message alone: the choices are in the bar.
                 await plus.click()
                 await expect(page.get_by_role("menuitem", name="Add files")).to_be_visible()
                 await expect(page.get_by_role("menuitem", name="Model and options")).to_have_count(0)
                 await page.keyboard.press("Escape")
-                choices: Locator = composer.get_by_role("button", name="Model and options")
-                await expect(choices).to_have_attribute("aria-pressed", "false")
-                await choices.click()
-                await expect(choices).to_have_attribute("aria-pressed", "true")
-                await expect(composer).not_to_have_attribute("data-quiet", "")
                 options: Locator = composer.locator(".composer-pill[data-pill='options']")
                 await expect(options).to_be_visible()
-                assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") == "shown"
-                # YOLO chosen, then the choices hidden: its pill stays in sight, with no tint.
+                # YOLO chosen: its pill says so with no tint.
                 await options.click()
                 await page.locator(".composer-popover .pop-option[data-mode='yolo']").click()
                 await page.keyboard.press("Escape")
-                await choices.click()
-                await expect(composer).to_have_attribute("data-quiet", "")
-                await expect(options).to_be_visible()
                 await expect(options).to_contain_text("Pay or send")
                 await expect(options).not_to_have_attribute("data-tone", "warn")
                 # On a line of 440 px or less (the bar's own width, which its container query reads) its open lock
-                # alone, so that the words keep their room; its name still says the mode.
+                # alone, so that the model keeps its room; its name still says the mode.
                 await expect(options).to_have_accessible_name(re.compile(r"\bPay or send\b"))
                 pill = await options.bounding_box()
                 assert pill is not None
@@ -807,13 +792,10 @@ async def test_the_words_have_their_own_line_and_the_runs_choices_wait_behind_th
                 assert (pill["width"] <= 44) == (line <= 440), (
                     f"{width}: the YOLO pill is {pill['width']} px wide on a line of {line} px"
                 )
-                await expect(composer.locator(".composer-pill[data-pill='model']")).to_be_hidden()
-                assert await page.evaluate("() => localStorage.getItem('dot.composer.choices')") is None
                 # Back to the mode the module's other tests expect.
-                await choices.click()
                 await options.click()
                 await page.locator(".composer-popover .pop-option[data-mode='ask']").click()
                 await page.close()
-            await _phone_box_rests_until_used(browser, host, port)
+            await _phone_box_has_its_line(browser, host, port)
         finally:
             await browser.close()

@@ -7,6 +7,39 @@ or removed without a row here.
 The shell is `settings.js` (the settings sidebar and tabs); `customize.js` gathers skills, plugins and connectors; the
 home page is `runs.js`, and one run is `run.js`.
 
+## The shell around every page (items 1327 to 1330)
+
+The shell is one design on a Mac and on a phone, after the reference app's: plain, hairlines instead of shadows, no mascot in a list
+or a bar. A phone's drawer is the same sidebar component as a Mac's, a finger's room larger; the sizes and the colours are
+the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_tokens.py`).
+
+- **The sidebar** (`sidebar.js`, `shell.css`): a head with the title; the search with three small buttons at its right (the
+  agents' menu, a new agent, a message to Dot); the chats as rows of three lines (the agent's two-letter badge and name with
+  the age or "Working 3m" / "Waiting 3m" at the right; the title; a last line of the loop and campaign marks, the team, what
+  it delegated, its last words and the dot of an unread chat); the pinned chats first and then the days (Today, Yesterday,
+  Previous 7 days); in a dock under the list, **Working** (what waits for the owner and what works, with a count and a fold
+  that never hides what waits) and **Settled** (the chats resting past a week, folded); Dot's work, the agents' work, the
+  code reviews and iMessage stand as sections of the same look; and at the foot four small buttons: Settings, Connect
+  apps, Watch the Mac and Models (there is no account usage page, so the fourth leads to Settings › Models). The agents
+  are a menu behind the first button: each its badge, name and how many chats it has, to its conversation else its page,
+  then All agents, New agent and Campaigns. Schedules has no icon here: its page is a row of Settings, beside Connect apps (`settingstabs.js`). The badge's letters
+  (`badge.js`) are drawn from `data-code`, a mark of the row and no text.
+- **The stage bar** (`shell.js`, `stage.js`, `shell.css`): 52 px, sticky, a hairline under it only once the page has scrolled
+  under it (`layout.js`, `data-scrolled`). At the left the sidebar's button (a phone's Back or menu: the edge swipe and the
+  rules of Back are those of items 338, 1079 and 1321), then the breadcrumb: the agent's badge, its name, a slash and the
+  chat's title. At the right the toggles of the panels. A page that is no chat's names itself alone. The face a page puts
+  before an agent's name stays in the badge, out of sight, and its state tints the badge.
+- **The composer** (`composer.js`, `choices.js`, `app.css`): one rounded box on the token's radius with a hairline edge; the
+  words on top and, under them, one bar: the "+" at the left; at the right the model's pill (the provider's mark, the name and
+  the reasoning as bars), the microphone and the round send. The mode (when named) and the context meter are quiet
+  pills of the same bar; on a Mac the approvals stand under the box at its right, and on a phone the model's sheet holds
+  them (YOLO's lock stays in the bar). The choices are always in sight: there is no resting state and no button that hides
+  them. The queue's sheet over the box is on the box's own ground; the line over it that says the work's state is a quiet pill.
+
+Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows.py`, `test_activity.py`,
+`test_side_agents.py` (the agents' menu), `test_chat_menu.py`, `test_connect_apps.py`, `test_phone_layout.py`,
+`test_phone_back.py`, `test_desktop_lights.py` and `test_composer.py`.
+
 | Page | View file | What it is for |
 |---|---|---|
 | Home | `runs.js` | Dot's presence and the composer; one conversation at a time. |
@@ -61,7 +94,8 @@ size, a radius or a duration in a view's sheet, nor a gap off the 4 px grid; tak
   `--radius-menu`, `--radius-bubble`, `--radius-composer`, `--radius-lg`, `--radius-xs`; their values are in `css/app.css`).
   What is fully round takes `--radius-pill`, and its rules are the only list of that: no doc or comment keeps one.
   The same on a phone. A box is drawn by a hairline ring (`--box-shadow`), not a shadow; only what floats (a menu, a
-  dialog, a sheet, the composer) has one, and in dark it is a ring.
+  dialog, a sheet, the panel of questions that takes the composer's place, a picture in flight: `--shadow-composer`) has one,
+  and in dark it is a ring. The composer itself is a box of the page's: a hairline for its edge, no shadow.
 - **Type**: the system face (`-apple-system`, Inter after it). Sizes `--text-3xs` 10, `--text-2xs` 11 (metadata: an age,
   a count), `--text-xs` 12, `--text-sm` 13, `--text-ui` and `--text-md` 14, `--text-lg` 16, `--text-xl` 18,
   `--text-2xl` 24, each with its `--leading-*`; weights `--weight-text` 400, `--weight-label` 500, `--weight-title` 600.

@@ -516,7 +516,7 @@
 }
 
 /* The line over the composer is one bar (item 401): how the run works, how its helpers stand and how many messages wait
-   at its left, the way down at its right end. It is a pane of glass, the look of the composer under it on a phone. */
+   at its left, the way down at its right end. It is a pane of glass of its own: the composer under it is a plain box (item 1330). */
 .status-bar {
   display: flex;
   align-items: center;
@@ -717,18 +717,9 @@
     margin-top: var(--space-2);
   }
 
-  .composer {
-    --shadow-composer: var(--shadow-raised);
-
-    background: var(--glass-surface);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-    border-color: var(--glass-border);
-  }
-
-  /* While it is used (item 1120, after another assistant's), the box gives the words their whole line and puts everything else on
-     the line under them: the "+" at the left, the model with its reasoning and approvals (item 1121), then the context
-     meter, the microphone and the send at the thumb. */
+  /* The box gives the words their whole line and puts everything else on the line under them (items 1120 and 1329): the
+     "+" at the left, the model with its reasoning (item 1121), then the context meter, the microphone and the send at the
+     thumb. */
   .composer-bar {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
@@ -784,49 +775,11 @@
     grid-area: meter;
   }
 
-  /* One line on a phone too while the run's choices are away (item 833): the "+", the words, the YOLO tag, the
-     microphone, the size of a chat near full and the send, at the thumb, as a row rather than the grid, so that a part
-     that is not there leaves no gap beside the words. While the microphone listens, the recorder takes the line under
-     the words, as it does with the choices shown (app.css). */
-  .composer[data-quiet] .composer-bar:not(.recording) {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: flex-end;
-  }
-
-  /* Until the words wrap (the owner's ask of 2026-11-19): then they take the whole line and the "+" and the send the
-     line under them, at the edges, rather than leaving the words a few to a line between them. */
-  .composer[data-quiet]:not([data-multiline]) {
-    border-radius: var(--radius-composer);
-  }
-
-  .composer[data-quiet]:not([data-multiline]) .composer-bar > .composer-field {
-    flex: 1 1 0;
-    order: 0;
-  }
-
-  .composer[data-quiet][data-multiline] .composer-bar:not(.recording) {
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .composer[data-quiet][data-multiline] .composer-bar > .composer-field {
-    flex: 1 0 100%;
-    order: -1;
-  }
-
-  .composer[data-quiet][data-multiline] .composer-bar > .send {
-    margin-inline-start: auto;
-  }
-
-  .composer[data-quiet] .composer-bar > .composer-options {
-    min-height: 0;
-  }
-
   /* The model's pill stands for the run's choices (item 1121): its menu holds the reasoning, the approvals and the mode,
      and the pill says the mode and the reasoning in small words after the name, not the approvals (item 1163); their
-     own pills are a Mac's. The agent keeps its pill. */
-  .composer-options > .composer-pill:is([data-pill="mode"], [data-pill="reasoning"], [data-pill="options"]) {
+     own pills are a Mac's, but for YOLO's, which stays in sight as the lock it is: in that mode the run asks nothing, and
+     the box must say so. The agent keeps its pill. */
+  .composer-options > .composer-pill:is([data-pill="mode"], [data-pill="reasoning"], [data-pill="options"]:not([data-yolo])) {
     display: none;
   }
 
@@ -849,17 +802,6 @@
   .composer:has(> .composer-popover:not([hidden])) {
     z-index: 21;
   }
-
-  /* At rest the box is the "+", the words and the send alone (item 1120): the model, the approvals (YOLO's pill too),
-     the context meter and the microphone wait for the box to be used. */
-  .composer[data-quiet] .composer-bar > :is(.composer-options, .mic-button, .context-meter) {
-    display: none;
-  }
-
-  .composer[data-quiet][data-empty]:not([data-stop]):not(:has(> .attach-list:not([hidden]))) > .composer-bar.has-mic > .btn.send {
-    display: inline-flex;
-  }
-
 }
 
 /* The rows of what Dot did sit closer on a phone (the owner's word of 2026-10-20): a call is one line with its icon,

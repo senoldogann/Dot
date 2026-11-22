@@ -3935,39 +3935,31 @@ dialog.modal.versions-dialog {
   cursor: pointer;
 }
 
-/* One frame for the three composers (items 104 and 115): the box of one line that grows with its text, the attached
-   files and the picks under it, then one bar: the "+" button (item 318) and the mode at the left; the agent, the model, the reasoning, the
-   approvals and the round send at the right. */
-/* The composer is a card on the larger corner with a soft shadow under it (item 121), drawn by a ring of half a pixel
-   that grows stronger under the pointer and in focus, with no halo (item 1205); its corners close from 22 to 18 px
-   once its text wraps, as OpenMausBot's do. */
+/* One frame for the three composers (items 104, 115 and 1330), the reference app's: one rounded box, its radius the token's, a
+   hairline for its edge (stronger in focus) and no shadow; the words on top and, under them, one bar: the "+" at the left,
+   at the right the model's pill, the microphone and the round send. The attached files and the picks stand under the
+   words. */
 .composer {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: var(--space-2);
-  border-color: transparent;
+  padding: var(--space-3) var(--space-2) var(--space-2);
+  border-color: var(--border-strong);
   border-radius: var(--radius-composer);
   background: var(--surface);
-  box-shadow: var(--shadow-composer);
+  box-shadow: none;
   transition:
     border-color var(--motion-quick) var(--ease),
-    border-radius var(--motion-slow) var(--ease),
-    box-shadow var(--motion-quick) var(--ease),
     background-color var(--motion-quick) var(--ease);
 }
 
-.composer[data-multiline] {
-  border-radius: var(--radius-composer-wrapped);
-}
-
 .composer:focus-within {
-  box-shadow: var(--shadow-composer-focus);
+  border-color: var(--control);
 }
 
 @media (hover: hover) {
   .composer:hover {
-    box-shadow: var(--shadow-composer-focus);
+    border-color: var(--control);
   }
 }
 
@@ -4007,10 +3999,6 @@ dialog.modal.versions-dialog {
   mask:
     linear-gradient(var(--text) 0 0) content-box exclude,
     linear-gradient(var(--text) 0 0);
-}
-
-.composer[data-boost]:focus-within {
-  box-shadow: var(--shadow-composer);
 }
 
 /* The box starts one line high, its text on the left edge of the "+" button's icon. */
@@ -4146,7 +4134,7 @@ dialog.modal.versions-dialog {
 /* The bar holds the box and its controls: the box takes a line of its own, the controls the one under it (item 108), and
    a phone puts the "+" and the send beside the box instead (item 374). It is a size container: as it narrows, the mode's
    name folds to its icon, then the chevrons go and the agent's name and the model's give way with an ellipsis; the
-   reasoning keeps its level's word (item 273), and the approvals and the send never move. */
+   reasoning keeps its bars (item 1330: its words are out of sight), and the approvals and the send never move. */
 .composer-bar {
   container: composer-bar / inline-size;
   display: flex;
@@ -4178,44 +4166,6 @@ dialog.modal.versions-dialog {
   .composer-options {
     justify-content: flex-end;
   }
-}
-
-/* The box as one line, as a messaging app's (item 833): the "+", the words and the microphone. The run's choices (its
-   mode, agent, model, reasoning and options) wait behind the "+" menu's "Model and options", and come back on the line
-   under the words when chosen. YOLO stays in sight, as the pill it is, with no tint (item 500: YOLO warns of
-   nothing): in that mode the run asks nothing, which the box must say. The size of the chat shows once it is near
-   full. A phone's box rests quieter still (item 1120, run.css): the "+", the words and the send, its choices, YOLO
-   among them, on the model's pill once the words are touched. */
-/* What stays in sight of the choices (YOLO) stands at the right, where the choices come back. */
-.composer[data-quiet] .composer-options {
-  flex: 1;
-}
-
-/* The words have the box's whole width on a line of their own, and the controls the line under them (the owner's ask of
-   2026-11-19: a long message wrapped between the "+" and the send, a few words a line): the "+" and the button of the
-   choices at the left, YOLO's pill, the microphone and the send at the right. The corners are those of a box of two lines from the start. */
-.composer[data-quiet] {
-  border-radius: var(--radius-composer-wrapped);
-}
-
-.composer[data-quiet] .composer-bar > .mic-button,
-.composer[data-quiet] .composer-bar:not(.has-mic) > .send {
-  margin-inline-start: auto;
-}
-
-/* What is out of sight leaves no gap: the choices but YOLO's pill, and their line when YOLO is not chosen. */
-.composer[data-quiet] .composer-options > :not([data-pill="options"][data-yolo]),
-.composer[data-quiet] .composer-options:not(:has(> [data-pill="options"][data-yolo])),
-.composer[data-quiet] .context-meter[data-level="room"] {
-  display: none;
-}
-
-
-/* With a microphone, the send waits for words or a file, and the microphone stands alone at the end until then. The
-   microphone stays once there are words, so that more can be dictated after them (items 574 and 605). A Stop stays in
-   sight (item 120). */
-.composer[data-quiet][data-empty]:not([data-stop]):not(:has(> .attach-list:not([hidden]))) > .composer-bar.has-mic > .btn.send {
-  display: none;
 }
 
 .composer .plus-button,
@@ -4268,7 +4218,7 @@ dialog.modal.versions-dialog {
   flex: 1 0 100%;
 }
 
-.composer-bar.recording > :is(.plus-button, .choices-toggle, .composer-options, .mic-button, .send, .context-meter) {
+.composer-bar.recording > :is(.plus-button, .composer-options, .mic-button, .send, .context-meter) {
   display: none;
 }
 
@@ -4567,6 +4517,57 @@ dialog.modal.versions-dialog {
   transform: rotate(90deg);
 }
 
+/* The model's pill and the reasoning beside it read as one control (item 1330, the reference app's): the provider's mark, the model's
+   name and the level as bars, with no chevron; the level's words are for a screen reader and the tooltip. */
+.composer-pill[data-pill="model"] > .icon:last-child,
+.composer-pill[data-pill="reasoning"] > .icon:last-child {
+  display: none;
+}
+
+.composer-pill[data-pill="reasoning"] .composer-pill-value {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.composer-pill[data-pill="model"] + .composer-pill[data-pill="reasoning"] {
+  margin-inline-start: calc(-1 * var(--space-1));
+  padding-inline-start: var(--space-1);
+}
+
+.level-bars {
+  fill: currentcolor;
+  stroke: none;
+}
+
+.level-bars rect {
+  opacity: 0.3;
+}
+
+.level-bars rect[data-on] {
+  opacity: 1;
+}
+
+/* The approvals stand under the box at its right, quiet words on no ground, as the reference app's "Full access" does; on a phone
+   the model's menu holds them, and YOLO's pill alone stays in the bar. */
+@media (min-width: 721px) {
+  .composer:has(.composer-pill[data-pill="options"]) {
+    margin-bottom: calc(var(--leading-xs) + var(--space-3));
+  }
+
+  .composer-pill[data-pill="options"] {
+    position: absolute;
+    top: calc(100% + var(--space-3));
+    right: var(--space-1);
+    height: auto;
+    padding: 0 var(--space-1);
+    color: var(--muted);
+  }
+}
+
 /* On a chat's page while a run works (item 133), the choices wait for the next follow-up: the pills step back until
    the pointer or the focus comes to them, and their tooltips say so. */
 .composer-pill[data-waiting] {
@@ -4672,9 +4673,9 @@ dialog.modal.versions-dialog {
     display: none;
   }
 
-  /* On a phone's line of one, YOLO is its open lock alone, so that the words keep their room (item 833); its name
-     stays for a screen reader and in its tooltip, and its menu says what it means. */
-  .composer[data-quiet] .composer-pill[data-pill="options"] .composer-pill-value {
+  /* In a narrow box the approvals are the lock alone, so that the model keeps its room (item 833); its name stays for a
+     screen reader and in its tooltip, and its menu says what it means. */
+  .composer-pill[data-pill="options"] .composer-pill-value {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -8524,7 +8525,7 @@ dialog.message-sheet::backdrop {
   padding: var(--space-1) var(--space-1) calc(var(--radius-composer) + var(--space-1));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .queue + .composer {
@@ -10514,26 +10515,8 @@ button.attach-chip {
 }
 
 .plus-button,
-.mic-button,
-.choices-toggle {
+.mic-button {
   flex: none;
-}
-
-/* The run's choices have a button of their own beside the "+" (the "+" adds to the message): pressed while they show.
-   A box whose page gives it no choices has none, and a phone shows them while the box is used (item 1120). */
-.composer-bar:not(:has(> .composer-options > *)) > .choices-toggle {
-  display: none;
-}
-
-.choices-toggle[aria-pressed="true"] {
-  background: var(--control);
-  color: var(--text);
-}
-
-@media (max-width: 720px) {
-  .choices-toggle {
-    display: none;
-  }
 }
 
 /* The row over the box (the run's page): the note on what waits for the next task when a message is added to it. */
@@ -10548,13 +10531,6 @@ button.attach-chip {
   font-size: var(--text-xs);
 }
 
-/* A phone's box at rest is one line (item 1120): the note comes with the line under the words once the box is used,
-   or once it holds words. */
-@media (max-width: 720px) {
-  .composer[data-quiet][data-empty] > .composer-head {
-    display: none;
-  }
-}
 
 .dropping {
   outline: 2px dashed var(--accent);

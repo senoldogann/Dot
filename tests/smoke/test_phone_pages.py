@@ -23,7 +23,6 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-from composer_choices import show_choices
 from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -164,7 +163,6 @@ async def _signed_in(browser: Browser, address: str, width: int, scheme: Literal
     page: Page = await browser.new_page(
         viewport={"width": width, "height": 844}, color_scheme=scheme, reduced_motion="reduce"
     )
-    await show_choices(page)
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
     return page
 
@@ -228,6 +226,9 @@ async def _bar_and_composer(
     composer_bar: Locator = page.locator(".composer-bar")
     assert await composer_bar.evaluate("(row) => row.scrollWidth <= row.clientWidth + 1")
     for control in await composer_bar.locator("button:visible").all():
+        if width >= 720 and await control.get_attribute("data-pill") == "options":
+            # The approvals stand under the box on a wide window (item 1330).
+            continue
         assert _inside(await _box(control), await _box(composer_bar)), await control.get_attribute("aria-label")
     phone: bool = width < 720
     # A window without a touch screen zooms into no field, so the box keeps the size chosen for it at every width (item

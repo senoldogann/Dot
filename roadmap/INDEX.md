@@ -6,6 +6,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1330](1330.md) | done | 2026-11-22 | The composer as the reference app's: one rounded box, the "+" at the left, at the right the model with its reasoning as bars, the microphone and the round send, always in sight |
+| [1329](1329.md) | done | 2026-11-22 | The stage bar as the reference app's breadcrumb: the agent's badge, a slash and the chat's title, 52 px, a hairline only when the page scrolls, the same on a phone |
+| [1328](1328.md) | done | 2026-11-22 | The sidebar's head, search row and foot as the reference app's: the agents a menu instead of faces, four small buttons at the foot, no Schedules icon |
 | [1327](1327.md) | done | 2026-11-22 | The sidebar's chat rows as the reference app's: three quiet lines, no faces, Working and Settled in a dock at the foot |
 | [1326](1326.md) | done | 2026-11-22 | The docs and the appearance settings say the new look: 14 px messages, the design language page, the tests |
 | [1325](1325.md) | done | 2026-11-22 | The generic controls are one restrained set: 32 px, a hairline, a calm blue, no pills, no bounce |

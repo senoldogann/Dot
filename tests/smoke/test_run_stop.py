@@ -149,10 +149,8 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 await page.wait_for_timeout(_SETTLE_MS)
                 await page.screenshot(path=str(tmp_path / f"queue-{width}-{scheme}.png"))
                 if width > 720:
-                    # The choices shown from the button beside the "+" stand at the right, by the send, on a page whose
-                    # box has no mode pill too (item 1320).
-                    toggle: Locator = page.locator(".dock .choices-toggle")
-                    await toggle.click()
+                    # The choices stand at the right, by the send, on a page whose box has no mode pill too (items 1320
+                    # and 1330: they are always in the bar).
                     model: Locator = page.locator(".dock .composer-pill[data-pill='model']")
                     await expect(model).to_be_visible()
                     model_box = await model.bounding_box()
@@ -161,7 +159,6 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                     assert model_box["x"] > bar_box["x"] + bar_box["width"] / 2, (model_box, bar_box)
                     await page.wait_for_timeout(_SETTLE_MS)
                     await page.screenshot(path=str(tmp_path / f"choices-{width}-{scheme}.png"))
-                    await toggle.click()
                 await box.fill("")
                 await expect(send).to_have_attribute("aria-label", "Stop")
                 await send.click()

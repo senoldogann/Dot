@@ -15,7 +15,6 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from composer_choices import show_choices
 from model_menu import expect_chosen, model_box, offered, pick
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
@@ -157,7 +156,6 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     context: BrowserContext = await browser.new_context(
         viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
     )
-    await show_choices(context)
     page: Page = await context.new_page()
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
