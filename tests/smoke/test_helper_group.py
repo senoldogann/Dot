@@ -222,9 +222,8 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
 
                 # The count shows whole while the faces breathe: a face moved by `transform` is lifted over a
                 # neighbour that is not placed, and the "+" lay under the last face. What lies at the count's first
-                # quarter, where it
-                # leans on that face, and at its middle is the count itself. Motion is on here (the pages above ask for
-                # none), and the breath is shown to run.
+                # quarter, where it leans on that face, and at its middle is the count itself. Motion is on here (the
+                # pages above ask for none), and the breath is shown to run.
                 moving: Page = await browser.new_page(
                     viewport={"width": 390, "height": 900}, reduced_motion="no-preference"
                 )
