@@ -35,7 +35,9 @@ export function closeMenuFrom(...roots) {
 }
 
 /** One entry of a menu: a choice, or the line between two groups of them. */
-/** @typedef {"separator" | { label: string, icon: string, danger?: boolean, title?: string, run: () => void }} MenuEntry */
+/** An entry has an `icon`, or a `mark` of its own in its place (a node, an agent's badge); a `detail` says more at its right
+ * (a count), and `current` marks the choice that is where the owner stands now.
+ * @typedef {"separator" | { label: string, icon?: string, mark?: Node, detail?: string, current?: boolean, danger?: boolean, title?: string, run: () => void }} MenuEntry */
 
 /** Whether the menu open now is the one `button` opened. */
 export function menuOpenedBy(button) {
@@ -68,9 +70,17 @@ export function openMenu({ label, items, at, back, button }) {
       const choice = el(
         "button",
         // `title` says more of the choice where the pointer rests on it (a schedule's Run now: it does real work).
-        { class: item.danger ? "menu-item danger" : "menu-item", type: "button", role: "menuitem", tabindex: "-1", title: item.title ?? null },
-        icon(item.icon),
-        el("span", null, item.label),
+        {
+          class: item.danger ? "menu-item danger" : "menu-item",
+          type: "button",
+          role: "menuitem",
+          tabindex: "-1",
+          title: item.title ?? null,
+          "aria-current": item.current === true ? "true" : null,
+        },
+        item.mark ?? icon(item.icon ?? "chevron"),
+        el("span", { class: "menu-label" }, item.label),
+        item.detail === undefined ? null : el("span", { class: "menu-detail" }, item.detail),
       );
       choice.addEventListener("click", () => {
         close(true);
@@ -168,9 +178,16 @@ function openSheet({ label, items, back, button }) {
     }
     const choice = el(
       "button",
-      { class: item.danger ? "sheet-action danger" : "sheet-action", type: "button", role: "menuitem", title: item.title ?? null },
-      icon(item.icon),
-      el("span", null, item.label),
+      {
+        class: item.danger ? "sheet-action danger" : "sheet-action",
+        type: "button",
+        role: "menuitem",
+        title: item.title ?? null,
+        "aria-current": item.current === true ? "true" : null,
+      },
+      item.mark ?? icon(item.icon ?? "chevron"),
+      el("span", { class: "menu-label" }, item.label),
+      item.detail === undefined ? null : el("span", { class: "menu-detail" }, item.detail),
     );
     choice.addEventListener("click", () => {
       close(true);

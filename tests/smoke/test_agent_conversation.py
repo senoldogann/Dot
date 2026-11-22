@@ -120,6 +120,19 @@ async def _sent_from_page(manager: RunManager, page: Page, words: str) -> str:
     return run_id
 
 
+async def _entry(page: Page, name: str) -> Locator:
+    """An agent's entry in the sidebar's agents menu (item 1328: the faces became a menu), which this opens; whatever
+    acts on the entry closes the menu."""
+    await page.get_by_role("button", name="Your agents", exact=True).click()
+    return page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name=re.compile(f"^{name}"))
+
+
+async def _opens(page: Page, name: str, route: str) -> None:
+    """Open the agent's entry and see where it leads."""
+    await (await _entry(page, name)).click()
+    await expect(page).to_have_url(re.compile(f"#{route}$"))
+
+
 async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.AsyncClient]) -> None:
     manager, client = served
     made = await client.post("/api/agents", json=_AGENT)
@@ -128,10 +141,9 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
-            # With no chat yet, its face opens its page, whose box starts the first chat.
+            # With no chat yet, its entry opens its page, whose box starts the first chat.
             page: Page = await _opened(browser, client, f"/agents/{agent_id}")
-            face: Locator = page.locator(f".side-agent-faces a.side-agent-face[title^='{_AGENT['name']}:']")
-            await expect(face).to_have_attribute("href", f"#/agents/{agent_id}")
+            await _opens(page, "Scout", f"/agents/{agent_id}")
             first: str = await _sent_from_page(manager, page, "Find two sources on the matter")
             thread: str = (await client.get(f"/api/runs/{first}")).json()["run"]["thread_id"]
 
@@ -140,9 +152,10 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             await expect(name).to_have_text("Scout")
             await expect(name).to_have_attribute("href", f"#/agents/{agent_id}")
 
-            # Its face now opens that chat, and is marked while it is open.
-            await expect(face).to_have_attribute("href", f"#/runs/{first}")
-            await expect(face).to_have_attribute("aria-current", "page")
+            # Its entry now opens that chat, and is marked while it is open.
+            await _opens(page, "Scout", f"/runs/{first}")
+            await expect(await _entry(page, "Scout")).to_have_attribute("aria-current", "true")
+            await page.keyboard.press("Escape")
 
             # A message from its page goes on in the same chat, rather than starting a new one.
             await page.goto(page.url.split("#", 1)[0] + f"#/agents/{agent_id}")
@@ -153,7 +166,7 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             assert second != first
             assert (await client.get(f"/api/runs/{second}")).json()["run"]["thread_id"] == thread
 
-            # New chat in the page's "…" starts the next message afresh, and the face follows the newest chat.
+            # New chat in the page's "…" starts the next message afresh, and the entry follows the newest chat.
             await page.goto(page.url.split("#", 1)[0] + f"#/agents/{agent_id}")
             await page.get_by_role("button", name="More for Scout").click()
             await page.get_by_role("menuitem", name="New chat").click()
@@ -161,9 +174,9 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             third: str = await _sent_from_page(manager, page, "Something else entirely")
             fresh: str = (await client.get(f"/api/runs/{third}")).json()["run"]["thread_id"]
             assert fresh != thread
-            await expect(face).to_have_attribute("href", f"#/runs/{third}")
+            await _opens(page, "Scout", f"/runs/{third}")
 
-            # The conversation deleted from the sidebar, the page and the face go on in the chat left, not a gone one.
+            # The conversation deleted from the sidebar, the page and the entry go on in the chat left, not a gone one.
             await page.goto(page.url.split("#", 1)[0] + f"#/agents/{agent_id}")
             await expect(page.get_by_role("link", name="Open your chat with Scout")).to_have_attribute(
                 "href", f"#/runs/{third}"
@@ -174,24 +187,24 @@ async def test_an_agent_is_one_conversation(served: tuple[RunManager, httpx.Asyn
             await row.hover()
             await row.get_by_role("button", name="More for Something else entirely").click()
             await page.get_by_role("menuitem", name="Delete").click()
-            await page.get_by_role("dialog").get_by_role("button", name="Delete").click()
+            # The agents are read again as the chat goes, so that the entry leads to the chat left.
+            async with page.expect_response(re.compile(r"/api/agents$")):
+                await page.get_by_role("dialog").get_by_role("button", name="Delete").click()
             await expect(page.get_by_role("link", name="Open your chat with Scout")).to_have_attribute(
                 "href", f"#/runs/{second}"
             )
-            await expect(face).to_have_attribute("href", f"#/runs/{second}")
+            await _opens(page, "Scout", f"/runs/{second}")
+            await page.goto(page.url.split("#", 1)[0] + f"#/agents/{agent_id}")
 
-            # Its conversation's run that ends while you are elsewhere puts the dot of an unread chat on its face
-            # (item 1235); opening the chat takes it off.
+            # Its conversation's run that ends while you are elsewhere puts the dot of an unread chat on its row
+            # (item 1235); opening the chat from the entry takes it off.
             more = await client.post("/api/runs", json={"goal": "One more", "agent_id": agent_id, "thread_id": thread})
             assert more.status_code == 201, more.text
             await _settled(manager, more.json()["id"])
-            await expect(face.locator(".side-agent-unread")).to_be_visible()
-            await expect(face).to_have_attribute("aria-label", "Scout (unread)")
-            await expect(face).to_have_attribute("href", f"#/runs/{more.json()['id']}")
-            await face.click()
-            await expect(page).to_have_url(re.compile(f"#/runs/{more.json()['id']}$"))
-            await expect(face.locator(".side-agent-unread")).to_be_hidden()
-            await expect(face).to_have_attribute("aria-label", "Scout")
+            unread: Locator = page.locator("#sidebar a.side-run .side-unread")
+            await expect(unread).to_have_count(1)
+            await _opens(page, "Scout", f"/runs/{more.json()['id']}")
+            await expect(unread).to_have_count(0)
             await page.close()
         finally:
             await browser.close()
@@ -215,15 +228,19 @@ async def test_dot_is_one_conversation(served: tuple[RunManager, httpx.AsyncClie
         try:
             page: Page = await _opened(browser, client, "/runs")
             home: str = page.url.split("#", 1)[0] + "#/runs"
-            # No "+" starts a new chat; Dot's face leads the column, to the home before there is a chat with Dot.
+            # No button starts a new chat: the one beside the search writes to Dot, in its one conversation. Dot's entry
+            # leads the agents' menu, to the home before there is a chat with Dot.
             await expect(page.locator("#sidebar").get_by_role("link", name="New chat")).to_have_count(0)
-            face: Locator = page.locator(".side-agent-faces a.side-dot-face")
-            await expect(face).to_have_attribute("href", "#/runs")
+            await expect(page.locator("#sidebar").get_by_role("link", name="Write to Dot")).to_have_attribute(
+                "href", "#/runs"
+            )
+            await _opens(page, "Dot", "/runs")
             await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_hidden()
             first: str = await _sent_from_home(manager, page, "Plan my week")
             thread: str = (await client.get(f"/api/runs/{first}")).json()["run"]["thread_id"]
-            await expect(face).to_have_attribute("href", f"#/runs/{first}")
-            await expect(face).to_have_attribute("aria-current", "page")
+            await _opens(page, "Dot", f"/runs/{first}")
+            await expect(await _entry(page, "Dot")).to_have_attribute("aria-current", "true")
+            await page.keyboard.press("Escape")
 
             # The home's next message goes on in that chat, rather than starting a new one.
             await page.goto(home)
@@ -235,22 +252,22 @@ async def test_dot_is_one_conversation(served: tuple[RunManager, httpx.AsyncClie
             assert (await client.get(f"/api/runs/{second}")).json()["run"]["thread_id"] == thread
 
             # No New chat under the box (item 1279, the owner's one chat per agent): the way back into the chat is all
-            # the home offers, and the face leads to the newest run of the same chat.
+            # the home offers, and Dot's entry leads to the newest run of the same chat.
             await page.goto(home)
             await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_visible()
             await expect(page.get_by_role("button", name="New chat")).to_have_count(0)
-            await expect(face).to_have_attribute("href", f"#/runs/{second}")
+            await _opens(page, "Dot", f"/runs/{second}")
             await page.close()
         finally:
             await browser.close()
 
 
-async def test_the_plus_makes_an_agent_and_a_phone_lists_the_agents_as_rows(
+async def test_the_plus_makes_an_agent_and_a_phone_lists_its_chat_as_the_mac_does(
     served: tuple[RunManager, httpx.AsyncClient],
 ) -> None:
-    """Item 1259: on a phone each agent is a row under Dot's face, its name over its conversation's last words, and its
-    conversation leaves the days; the "+" makes an agent from a face and a name and opens its page, whose box talks to
-    it."""
+    """Items 1259 and 1328: the "+" makes an agent from a face and a name and opens its page, whose box talks to it; on
+    a phone its conversation is a chat of the list as on a Mac, with the agent's badge and name, and the agents' menu
+    lists the agent."""
     manager, client = served
     port: int | None = client.base_url.port
     assert port is not None
@@ -278,24 +295,29 @@ async def test_the_plus_makes_an_agent_and_a_phone_lists_the_agents_as_rows(
 
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.get_by_role("button", name="Show sidebar").click()
-            row: Locator = page.locator(".side-bots a.side-bot").filter(has_text="Quill")
-            await expect(row).to_be_visible()
-            await expect(row.locator(".side-run-goal")).to_have_text("Quill")
+            # Its conversation is a chat among the days as every chat is (item 1328: a phone's list is the Mac's): its
+            # agent's badge and name over its title and last words.
+            await expect(page.locator(".side-runs .spinner")).to_have_count(0)
+            row: Locator = page.locator(".side-runs .side-chat").filter(has_text="Draft a short note")
+            await expect(row.locator(".side-agent")).to_have_text("Quill")
+            await expect(row.locator(".side-run-goal")).to_have_text("Draft a short note")
             await expect(row.locator(".side-chat-words")).to_have_text("Done.")
             home = (await client.get(f"/api/agents/{agent_id}")).json()["home"]
-            await expect(row).to_have_attribute("href", f"#/runs/{home['latest_run_id']}")
-            # Its conversation is the agent's row, not a chat among the days, once they are read; the faces' column is
-            # the desktop's.
-            await expect(page.locator(".side-runs .spinner")).to_have_count(0)
-            await expect(page.locator(".side-runs .side-chat").filter(has_text="Draft a short note")).to_have_count(0)
-            # Unread until its chat is open; the row's dot goes then, as a face's does (item 1235).
+            link: Locator = row.locator("a.side-run")
+            await expect(link).to_have_attribute("href", f"#/runs/{home['latest_run_id']}")
+            # The agents' menu, a sheet on a phone, lists it with its count of chats and opens its conversation.
+            await page.get_by_role("button", name="Your agents", exact=True).click()
+            entry: Locator = page.get_by_role("dialog", name="Your agents").get_by_role(
+                "menuitem", name=re.compile("^Quill")
+            )
+            await expect(entry).to_contain_text("1")
+            # Unread until its chat is open; the row's dot goes then (item 1235).
             await expect(row.locator(".side-unread")).to_be_visible()
-            await row.click()
+            await entry.click()
             await page.wait_for_url(f"**/#/runs/{home['latest_run_id']}")
             await page.get_by_role("button", name="Show sidebar").click()
             await expect(row.locator(".side-unread")).to_have_count(0)
-            await expect(row).to_have_attribute("aria-current", "page")
-            await expect(page.locator(".side-agent-faces")).to_be_hidden()
+            await expect(link).to_have_attribute("aria-current", "page")
             await context.close()
         finally:
             await browser.close()
@@ -336,7 +358,12 @@ async def test_a_phone_opens_an_agent_as_a_chat_and_goes_back_to_the_chats(
             await page.route("**/api/schedules", hold)
             button: Locator = page.locator(".stagebar-left button")
             await button.click()
-            await page.locator(".side-bots a.side-bot").filter(has_text="Ledger").click()
+            await page.get_by_role("button", name="Your agents", exact=True).click()
+            await (
+                page.get_by_role("dialog", name="Your agents")
+                .get_by_role("menuitem", name=re.compile("^Ledger"))
+                .click()
+            )
             await expect(page).to_have_url(re.compile(f"#/agents/{agent_id}$"))
             await expect(page.locator("main .chat-loading")).to_be_visible()
             await expect(page.locator("main .agent-home .card")).to_have_count(0)

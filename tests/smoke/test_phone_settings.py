@@ -44,7 +44,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TOKEN: str = "phone-settings-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
-# The sheet's rows that open a tab, in order, by the tab each opens (item 995); Connect apps stands second.
+# The sheet's rows that open a tab, in order, by the tab each opens (item 995); Connect apps and Schedules (the sidebar
+# has no icon for it, item 1328) stand second.
 _TABS: dict[str, str] = {
     "general": "General",
     "vault": "Vault",
@@ -62,7 +63,7 @@ _TABS: dict[str, str] = {
     "snapshots": "Snapshots",
     "system": "System",
 }
-_ROWS: list[str] = [*list(_TABS.values())[:2], "Connect apps", *list(_TABS.values())[2:]]
+_ROWS: list[str] = [*list(_TABS.values())[:2], "Connect apps", "Schedules", *list(_TABS.values())[2:]]
 _NOTES: tuple[str, ...] = (
     "Prefers window seats and morning flights.",
     "The team stand-up is at 09:30 on weekdays.",
@@ -183,6 +184,7 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 rows: Locator = listed.get_by_role("link")
                 await expect(rows.locator(".settings-row-label")).to_have_text(_ROWS)
                 await expect(rows.filter(has_text="Connect apps")).to_have_attribute("href", "#/customize/connectors")
+                await expect(rows.filter(has_text="Schedules")).to_have_attribute("href", "#/schedules")
                 for name, value in _VALUES.items():
                     held: Locator = rows.filter(has=page.locator(".settings-row-label", has_text=name)).locator(
                         ".settings-row-value"

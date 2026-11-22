@@ -255,39 +255,41 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(full).to_have_count(0)
                     await expect(page.locator("#inspector-panel-screen .computer")).to_have_count(1)
 
-                    # The sidebar is the list of chats over the whole screen, the phone's home (item 991): your
-                    # initials and a new chat at its head, the agents' rows under their label, the apps and the search
-                    # at its foot.
+                    # The sidebar is the list of chats over the whole screen, the phone's home: the Mac's own sidebar
+                    # (item 1328), the title, the search with the agents' menu, a new agent and a message to Dot at its
+                    # right, the rows and, at its foot, four small buttons.
                     await bar.get_by_role("button", name="Show sidebar").click()
                     sidebar: Locator = page.get_by_role("complementary", name="Sidebar")
                     await expect(sidebar.locator(".side-title")).to_have_text("Dot")
                     width: int = await page.evaluate("window.innerWidth")
                     assert round((await _box(sidebar))["width"]) == width
+                    top: Locator = sidebar.locator(".side-top")
+                    await expect(top.get_by_role("searchbox", name="Search chats")).to_be_visible()
+                    await expect(top.get_by_role("button", name="Your agents", exact=True)).to_be_visible()
                     foot: Locator = sidebar.locator(".side-foot")
-                    await expect(foot.get_by_role("searchbox", name="Search chats")).to_be_visible()
+                    await expect(foot.locator(".side-tool")).to_have_count(4)
                     await expect(foot.get_by_role("button", name="Connect apps")).to_be_visible()
-                    # The settings are your initials at the head's left (item 991, the owner's ask for a plain home:
-                    # they were at the foot, item 834), and no "+" starts a new chat (item 1245).
-                    head: Locator = sidebar.locator(".side-head")
-                    await expect(head.get_by_role("link", name="New chat")).to_have_count(0)
-                    await expect(head.get_by_role("link", name="Settings")).to_be_visible()
-                    await expect(foot.get_by_role("link", name="Settings")).to_be_hidden()
-                    # Dot's own conversation leads the agents (item 1265): a row as every other, to the home before
-                    # there is one, since Dot has no agent page. The label says what the rows are.
-                    bots: Locator = sidebar.locator(".side-agents-phone")
-                    await expect(bots.locator(".side-label")).to_contain_text("Agents")
-                    await expect(bots.locator("a.side-bot").first).to_have_attribute("href", "#/runs")
+                    # The settings are a button of the foot as on a Mac (item 1328), and no button starts a new chat
+                    # (item 1245): the one beside the search writes to Dot, in its one conversation.
+                    await expect(foot.get_by_role("link", name="Settings")).to_be_visible()
+                    await expect(sidebar.get_by_role("link", name="New chat")).to_have_count(0)
+                    await expect(top.get_by_role("link", name="Write to Dot")).to_have_attribute("href", "#/runs")
                     await page.screenshot(path=str(tmp_path / f"chats-{scheme}.png"))
-                    # Dot's row and its face take the name the owner gives it at once (item 420, item 1265). The
-                    # settings card saves through the same module, so this is the owner's way, without its clicks.
+                    # Dot's entry in the agents' menu and the button's name take the name the owner gives it at once
+                    # (item 420). The settings card saves through the same module, so this is the owner's way, without
+                    # its clicks.
                     save_name: str = (
                         "async (name) => { const { saveAssistant } = await import('/js/assistant.js');"
                         " await saveAssistant({ name }); }"
                     )
                     await page.evaluate(save_name, "Nova")
-                    await expect(bots.locator("a.side-bot").first).to_contain_text("Nova")
+                    await expect(top.get_by_role("link", name="Write to Nova")).to_be_visible()
+                    await top.get_by_role("button", name="Your agents", exact=True).click()
+                    sheet: Locator = page.get_by_role("dialog", name="Your agents")
+                    await expect(sheet.get_by_role("menuitem").first).to_contain_text("Nova")
+                    await sheet.get_by_role("button", name="Cancel").click()
                     await page.evaluate(save_name, "Dot")
-                    await expect(bots.locator("a.side-bot").first).to_contain_text("Dot")
+                    await expect(top.get_by_role("link", name="Write to Dot")).to_be_visible()
                     await context.close()
 
                 # A wide window keeps its bar: the face, the name and the panel's switch alone; the line over the

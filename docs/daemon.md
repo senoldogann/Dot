@@ -72,27 +72,24 @@ Folded over a chat you have not read, the label shows the accent's dot after its
 chat's, with its menu; Select and the arrow keys reach it, and a search shows what it finds in it, folded or not. A
 chat of it at work stands with what works like every chat (item 202) and comes back once the run ends, and one you
 pinned stays under Pinned.
-Above the list: a search over the titles (⌘K or `/`) and, while you have no agent of your own, the way to **Agents**;
-**Campaigns** and **Schedules** (a page of its own since item 401) are icons at the right of the sidebar's head
-(item 855: they were rows of their own), and at the far right the **+** makes a new agent (item 1259, where item 834's
-new chat stood until item 1245): a dialog of its face (shape and colour) and its name, then its page, whose box starts
-its conversation; its instructions, model and actions start at the defaults and are set with Edit. Dot is one
-conversation, as each agent is. Under the search Dot and your agents stand as faces (item
-835), as a messaging app's people: Dot's first, to its conversation (item 1245: its home chat, the owner's newest with
-Dot, else the home), and the two agents that worked last, each its face over its name on one line, to its
-conversation (item 1233: its home chat, where a message to it goes on, the chat bound to it ever after; its page while
-it has none), the one whose page
-or conversation is open marked, a face whose agent's newest run works wearing its working look and one whose
-conversation is unread the dot of an unread chat (item 1235, as Grok Bot's column of faces marks a bot that wrote; not
-while that chat is open), and **All**, the page of every agent and team, in
-four columns the sidebar holds whole (item 855: the row scrolled sideways and cut a face at its edge); an agent made,
-changed or deleted on a page shows there at once, and one a run made once that run ends. In the foot, **Connect apps**
-([Connect apps](extending.md#connect-apps), items 492 and 545), which opens
-[Customize › Connectors](extending.md#customize--connectors), over your account's row, your initials and your name,
-which opens **Settings** (item 999, after a cog beside Connect apps), and
-the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
+Above the list: a search over the titles (⌘K or `/`) with three small buttons at its right (item 1328, after the reference
+app's): the **agents' menu**, the **+** that makes a new agent (item 1259, where item 834's new chat stood until item 1245: a
+dialog of its face (shape and colour) and its name, then its page, whose box starts its conversation; its instructions, model
+and actions start at the defaults and are set with Edit) and a **message to Dot** (the home with the cursor in its box). Dot is
+one conversation, as each agent is. The agents' menu lists Dot and your agents, each its badge, its name and how many chats it
+has, to its conversation (item 1245 for Dot: its home chat, the owner's newest with Dot, else the home; item 1233 for an agent:
+its home chat, where a message to it goes on, the chat bound to it ever after; its page while it has none), and under them
+**All agents** (the page of every agent and team), **New agent** and **Campaigns** (a page of its own since item 401). Until item
+1328 Dot and the agents stood as faces under the search, and Campaigns and Schedules as icons in the head (item 855); there is
+no **Schedules** icon now: its page, `#/schedules`, is a row of Settings, in the group of Connect apps (a Mac's nav and a
+phone's sheet), and the links to it in the Agents page, the teach toast and the notifications go on. An agent made, changed or
+deleted on a page shows in the menu at once, and one a run made once that run ends. In the foot stand four small icon buttons
+(item 1328): **Settings** (item 999; named with your name for a screen reader), **Connect apps** ([Connect
+apps](extending.md#connect-apps), items 492 and 545, which opens [Customize ›
+Connectors](extending.md#customize--connectors)), **Watch the Mac** (item 1264) and **Models** (Settings › Models: Dot has no
+account usage page). While the sidebar is closed the top bar holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close (in Dot.app the
-sidebar's head, its opener and the settings' Hide sidebar are 32 px, so that the five buttons of the head fit beside
+sidebar's head, its opener and the settings' Hide sidebar are 32 px, so that they fit beside
 the traffic lights: item 1273). The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
@@ -103,19 +100,17 @@ proposals; a row of the Memory, Vault and Schedules pages shows one action (a sc
 its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
 a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
 at the foot (Dot's work, a channel's) fold on a click of their label, and the folds are kept between visits. The
-sidebar's head holds the button that folds it away, at its left, and the **+** of a new agent at its right (item 1259). **Select** turns the list
-into checkboxes, each chat keeping its creature and the mark of
+sidebar's head holds the button that folds it away, at its left, and the title. **Select** turns the list
+into checkboxes, each row keeping its badge and the mark of
 its loop (item 635): tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event
 and approval of theirs; they leave the list at the yes, while the daemon deletes them, and come back with why if the
 delete fails (item 1248). A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to
 end, or cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a
 drawer. On a touch screen of a phone's width it has no X (item 888): a chat you choose closes it, and so does a swipe
 to the left; a narrow window of the Mac keeps its button. On a phone the list is the home (item 991, the owner's
-ask of 2026-11-05 for a plain one): your initials at the head's left open the settings, with Campaigns and Schedules
-at its right with the **+** of a new agent; the six agents you worked with last stand as rows under their label and
-count (item 1265), Dot's own conversation their first row (item 1245) and **All agents** their last (item 1259,
-[Phone](phone.md)); the foot holds the apps (Connect apps, a grid of tiles) and the search, the account's row
-of a Mac having moved to your initials. The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
+ask of 2026-11-05 for a plain one), and the drawer is the same sidebar as a Mac's, a finger's room larger (item 1328; the
+agents' rows of item 1265, the initials at the head and the foot's tiles are gone): the search with its three buttons,
+the chats, the dock and the foot's four buttons, Settings among them ([Phone](phone.md)). The list stays where you scrolled it while it is painted again (a chat deleted, pinned, renamed or marked, chats
 deleted under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only
 when the page comes to another chat (item 204).
 

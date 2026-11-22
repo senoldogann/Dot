@@ -181,11 +181,11 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     # Customize has one address for its open tab.
     await page.goto(f"{address}/#/customize")
     await expect(page).to_have_url(f"{address}/#/customize/plugins")
-    # A chat opened from the sidebar: the button is the way to the list of chats. On a phone Dot's own conversation is
-    # the agents' first row (item 1245); the column of faces above it is a wide window's.
+    # A chat opened from the sidebar: the button is the way to the list of chats. On a phone, as on a Mac, Dot's own
+    # conversation is a chat of the list (item 1328).
     await page.get_by_role("button", name="Show sidebar").click()
     places: int = await page.evaluate("history.length")
-    await page.locator(f"#sidebar .side-bots a[href='#/runs/{run.id}']").first.click()
+    await page.locator(f"#sidebar .side-chat a.side-run[href='#/runs/{run.id}']").first.click()
     await _opens_the_chats(page, address, run)
     # A chat chosen in the sidebar takes the place of the page left (item 1321): iOS's edge swipe goes back through the
     # history on its own, and would show the chat before instead of the list of chats.

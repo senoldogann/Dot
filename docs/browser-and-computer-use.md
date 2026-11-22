@@ -849,7 +849,7 @@ every mode but `yolo` (item 433).
 
 ### Watch: the Mac's screen, live
 
-**Watch** in the sidebar's head (the screen beside Campaigns and Schedules; `#/watch`) shows the Mac's main display
+**Watch** in the sidebar's foot (the screen beside Settings, Connect apps and Models, item 1328; `#/watch`) shows the Mac's main display
 live, in a browser on the Mac or on a paired phone, whether a task works or not (item 1264). ScreenCaptureKit captures
 it at up to 1920 pixels on its longest side and 60 frames a second, the Mac's hardware encoder makes it H.264
 (VideoToolbox), and the page's own decoder (WebCodecs: Safari 16.4 or later, Chrome) draws it. Measured on a MacBook: 57

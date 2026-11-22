@@ -30,6 +30,7 @@ _ROWS: list[str] = [
     "General",
     "Vault",
     "Connect apps",
+    "Schedules",
     "Rules",
     "Memory",
     "Models",
@@ -140,6 +141,8 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     await expect(nav.get_by_role("heading", level=2)).to_have_text("Settings")
     await expect(nav.get_by_role("heading", level=3)).to_have_text(["Dot", "Phones and channels", "App"])
     await expect(nav.locator(".settings-nav-label")).to_have_text(_ROWS)
+    # The sidebar has no Schedules icon (item 1328): Settings is the way to its page.
+    await expect(nav.get_by_role("link", name="Schedules")).to_have_attribute("href", "#/schedules")
     open_tab = nav.locator("[aria-current='page']")
     await expect(open_tab).to_have_count(1)
     await expect(open_tab.locator(".settings-nav-label")).to_have_text("Models")
@@ -148,8 +151,9 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     await expect(nav.get_by_role("link", name="Models")).not_to_contain_text(SCRIPTED_MODEL.partition(":")[2])
     # Back to chats stands at the foot of the nav, under the groups (item 852), which scroll on their own.
     back_box = await nav.get_by_role("link", name="Back to chats").bounding_box()
-    last_box = await nav.locator(".settings-nav-link").last.bounding_box()
-    assert back_box is not None and last_box is not None and back_box["y"] > last_box["y"], (back_box, last_box)
+    groups_box = await nav.locator(".settings-nav-groups").bounding_box()
+    assert back_box is not None and groups_box is not None, (back_box, groups_box)
+    assert back_box["y"] >= groups_box["y"] + groups_box["height"], (back_box, groups_box)
     await expect(nav.get_by_role("link", name="Memory")).to_contain_text("1")
     # Nothing stands at the foot (item 577): the daemon's state is the page's, the connection and the emergency stop's
     # banner.
@@ -176,7 +180,7 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     # Back to chats leads out of the settings, to the chat the owner was on, and the sidebar is the chats' again.
     await nav.get_by_role("link", name="Back to chats").click()
     await expect(page).to_have_url(f"{base}/#/runs")
-    await expect(sidebar.get_by_role("link", name="Agents")).to_be_visible()
+    await expect(sidebar.get_by_role("button", name="Your agents")).to_be_visible()
     await expect(nav).to_be_hidden()
     await page.close()
 
