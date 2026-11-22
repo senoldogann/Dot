@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1327](1327.md) | done | 2026-11-22 | The sidebar's chat rows as the reference app's: three quiet lines, no faces, Working and Settled in a dock at the foot |
 | [1326](1326.md) | done | 2026-11-22 | The docs and the appearance settings say the new look: 14 px messages, the design language page, the tests |
 | [1325](1325.md) | done | 2026-11-22 | The generic controls are one restrained set: 32 px, a hairline, a calm blue, no pills, no bounce |
 | [1324](1324.md) | done | 2026-11-22 | The look is plain and professional: true black and zinc greys, a calm blue, an 8 px scale and dense type |

@@ -1,5 +1,5 @@
-"""The side menu shows every agent of a run (item 198): a chat at work wears the faces of every run it delegated, those
-at work and those that ended, three at most with the rest counted (item 507), and its name for a screen reader says how
+"""The side menu shows every agent of a run (item 198): a chat at work shows every run it delegated, those
+at work and those that ended, as one count (items 507 and 1327), and its name for a screen reader says how
 many there are. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a
 phone, light and dark."""
 
@@ -282,13 +282,13 @@ async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
             for width, scheme in _SHOTS:
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 section: Locator = page.locator("#sidebar [data-section=working]")
-                # Working holds the run's chat (item 202), wearing the faces of every run it delegated (item 507):
+                # Working holds the run's chat (item 202), with the count of every run it delegated (items 507, 1327):
                 # three, the one at work among them, and nothing under the row.
                 await expect(section.locator(".side-chat")).to_have_count(1)
                 row: Locator = section.locator(".side-chat > .side-run")
-                faces = row.locator(".side-chat-helpers .side-helper")
-                await expect(faces).to_have_count(len(_SHELVES))
-                await expect(faces.locator(".avatar[data-state='working']")).to_have_count(1)
+                helpers = row.locator(".side-chat-helpers .side-helpers")
+                await expect(helpers).to_have_text(str(len(_SHELVES)))
+                await expect(helpers).to_have_attribute("data-working", "1")
                 await expect(section.locator(".side-children")).to_have_count(0)
                 assert "3 helpers" in (await row.get_attribute("aria-label") or "")
                 await page.screenshot(path=str(tmp_path / f"agents-{width}-{scheme}.png"))
