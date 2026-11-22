@@ -220,6 +220,30 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                     await expect(group.locator("details.child").first).to_be_visible()
                     await page.close()
 
+                # The count shows whole while the faces breathe: a face moved by `transform` is lifted over a
+                # neighbour that is not placed, and the "+" lay under the last face. What lies at the count's first
+                # quarter, where it leans on that face, and at its middle is the count itself. Motion is on here (the
+                # pages above ask for none), and the breath is shown to run.
+                moving: Page = await browser.new_page(
+                    viewport={"width": 390, "height": 900}, reduced_motion="no-preference"
+                )
+                await moving.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await moving.goto(f"{address}/#/runs/{parent.id}")
+                count: Locator = moving.locator(".helpers-head .helpers-more")
+                await expect(count).to_have_text("+1")
+                assert (
+                    await moving.locator(".helpers-faces .avatar").last.evaluate(
+                        "(face) => face.getAnimations().length"
+                    )
+                    > 0
+                ), "the faces do not breathe"
+                assert await count.evaluate(
+                    "(chip) => { const box = chip.getBoundingClientRect(); const y = box.top + box.height / 2;"
+                    " return [0.25, 0.5].every((part) =>"
+                    " document.elementFromPoint(box.left + box.width * part, y) === chip); }"
+                ), "the count of the faces lies under a face"
+                await moving.close()
+
                 page = await _open_run(browser, address, parent.id, 1280, "light")
                 state: Locator = page.locator(".helpers .helpers-state")
                 await expect(state).to_have_text("1 working · 3 done")
