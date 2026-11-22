@@ -28,22 +28,28 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 TOKEN: str = "settings-nav-test-token"
 _ROWS: list[str] = [
     "General",
-    "Vault",
-    "Connect apps",
-    "Schedules",
+    "Appearance",
     "Rules",
     "Memory",
+    "Vault",
+    "Snapshots",
+    "Agents",
     "Models",
-    "AI services",
-    "Web search",
     "Browser",
+    "Web search",
+    "Scheduled tasks",
+    "Campaigns",
     "Self-improvement",
-    "Self-repair",
+    "Connectors",
+    "Plugins",
+    "Skills",
+    "AI services",
     "Phone",
     "Channels",
-    "Appearance",
-    "Snapshots",
     "System",
+    "Self-repair",
+    "Diagnostics",
+    "Open source licences",
 ]
 
 
@@ -136,46 +142,66 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     nav = sidebar.get_by_role("navigation", name="Settings")
     await expect(nav).to_be_visible()
     # The chats and the pages are gone from the sidebar while the settings are open.
-    await expect(sidebar.get_by_role("link", name="Agents")).to_be_hidden()
     await expect(sidebar.get_by_role("searchbox", name="Search chats")).to_be_hidden()
-    await expect(nav.get_by_role("heading", level=2)).to_have_text("Settings")
-    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Dot", "Phones and channels", "App"])
-    await expect(nav.locator(".settings-nav-label")).to_have_text(_ROWS)
-    # The sidebar has no Schedules icon (item 1328): Settings is the way to its page.
-    await expect(nav.get_by_role("link", name="Schedules")).to_have_attribute("href", "#/schedules")
+    # A search of the settings at the top, then the groups under their small names (items 999 and 1336).
+    await expect(nav.get_by_role("searchbox", name="Search settings")).to_be_visible()
+    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Agents", "Connections", "Maintenance", "About"])
+    await expect(nav.locator(".snav-label")).to_have_text(_ROWS)
     open_tab = nav.locator("[aria-current='page']")
     await expect(open_tab).to_have_count(1)
-    await expect(open_tab.locator(".settings-nav-label")).to_have_text("Models")
+    await expect(open_tab.locator(".snav-label")).to_have_text("Models")
     # What a row holds stands at its right.
     # Models shows no model's name, which ran long beside it (item 852).
     await expect(nav.get_by_role("link", name="Models")).not_to_contain_text(SCRIPTED_MODEL.partition(":")[2])
     # Back to chats stands at the foot of the nav, under the groups (item 852), which scroll on their own.
     back_box = await nav.get_by_role("link", name="Back to chats").bounding_box()
-    groups_box = await nav.locator(".settings-nav-groups").bounding_box()
+    groups_box = await nav.locator(".snav-groups").bounding_box()
     assert back_box is not None and groups_box is not None, (back_box, groups_box)
-    assert back_box["y"] >= groups_box["y"] + groups_box["height"], (back_box, groups_box)
+    assert back_box["y"] >= groups_box["y"] + groups_box["height"] - 1, (back_box, groups_box)
     await expect(nav.get_by_role("link", name="Memory")).to_contain_text("1")
     # Nothing stands at the foot (item 577): the daemon's state is the page's, the connection and the emergency stop's
     # banner.
     await expect(nav.get_by_role("status")).to_have_count(0)
     await expect(nav).not_to_contain_text("Daemon up")
-    # The page is the tab alone under its own name (item 999): one h1, the tab's name, no row of tabs, and the line
-    # that says what the tab is for.
-    await expect(page.get_by_role("heading", level=1)).to_have_text("Models")
+    # The page is the open page alone: its name in the bar as a breadcrumb (item 1336), no row of tabs, and the line
+    # that says what the page is for.
+    await expect(page.locator("h1.crumbs")).to_have_text("Settings/Models")
     await expect(page.get_by_role("navigation", name="Models")).to_have_count(0)
     await expect(page.locator(".set-lead")).not_to_be_empty()
-    # The bar's name of the tab is a phone's: on a wide window the bar shows none (item 966).
-    await expect(page.locator(".stage-title")).to_be_hidden()
+
+    # The search narrows the rows to those that match, and Enter opens the first.
+    search = nav.get_by_role("searchbox", name="Search settings")
+    await search.fill("sched")
+    await expect(nav.locator(".snav-link:not([hidden])")).to_have_text(["Scheduled tasks"])
+    await expect(nav.get_by_role("heading", level=3)).to_have_text(["Agents"])
+    await search.fill("zzzz")
+    await expect(nav.get_by_text("No setting matches.")).to_be_visible()
+    await search.fill("")
+    await expect(nav.locator(".snav-link:not([hidden])")).to_have_count(len(_ROWS))
+    # "/" takes the focus when no box has it.
+    await page.locator("body").click(position={"x": 700, "y": 600})
+    await page.keyboard.press("/")
+    await expect(search).to_be_focused()
+    await search.fill("vault")
+    await search.press("Enter")
+    await expect(page).to_have_url(f"{base}/#/settings/vault")
+    await expect(open_tab.locator(".snav-label")).to_have_text("Vault")
 
     await nav.get_by_role("link", name="AI services").click()
     await expect(page).to_have_url(f"{base}/#/settings/keys")
-    await expect(page.get_by_role("heading", level=1)).to_have_text("AI services")
-    await expect(open_tab.locator(".settings-nav-label")).to_have_text("AI services")
+    await expect(page.locator("h1.crumbs")).to_have_text("Settings/AI services")
+    await expect(open_tab.locator(".snav-label")).to_have_text("AI services")
     await expect(nav.locator("[aria-current='page']")).to_have_count(1)
 
-    # The pages under System keep System marked.
+    # The old addresses of the pages that moved in lead to their rows, with what they carry.
     await page.goto(f"{base}/#/diagnostics")
-    await expect(open_tab.locator(".settings-nav-label")).to_have_text("System")
+    await expect(page).to_have_url(f"{base}/#/settings/diagnostics")
+    await expect(open_tab.locator(".snav-label")).to_have_text("Diagnostics")
+    await page.goto(f"{base}/#/customize/skills")
+    await expect(page).to_have_url(f"{base}/#/settings/skills")
+    await expect(open_tab.locator(".snav-label")).to_have_text("Skills")
+    await page.goto(f"{base}/#/schedules?schedule=abc")
+    await expect(page).to_have_url(f"{base}/#/settings/schedules?schedule=abc")
 
     # Back to chats leads out of the settings, to the chat the owner was on, and the sidebar is the chats' again.
     await nav.get_by_role("link", name="Back to chats").click()
@@ -188,14 +214,14 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
 async def test_the_nav_is_in_the_drawer_of_a_narrow_window(browser: Browser, client: httpx.AsyncClient) -> None:
     page, base = await _opened(browser, client, 800, "general")
     sidebar = page.get_by_role("complementary", name="Sidebar")
-    await expect(page.get_by_role("heading", level=1)).to_have_text("General")
+    await expect(page.locator("h1.crumbs")).to_have_text("Settings/General")
     await expect(sidebar).to_be_hidden()
     await page.get_by_role("button", name="Show sidebar").click()
     nav = sidebar.get_by_role("navigation", name="Settings")
     await expect(nav).to_be_visible()
     await nav.get_by_role("link", name="Rules").click()
     await expect(page).to_have_url(f"{base}/#/settings/rules")
-    await expect(page.get_by_role("heading", level=1)).to_have_text("Rules")
+    await expect(page.locator("h1.crumbs")).to_have_text("Settings/Rules")
     await expect(sidebar).to_be_hidden()
     await page.close()
 
@@ -203,8 +229,8 @@ async def test_the_nav_is_in_the_drawer_of_a_narrow_window(browser: Browser, cli
 async def test_a_phone_keeps_its_sidebar_and_its_sheet(browser: Browser, client: httpx.AsyncClient) -> None:
     page, _ = await _opened(browser, client, 390, "keys")
     # The bar names the tab its row opened (item 995), and the page has no row of tabs.
-    await expect(page.locator("h1.stage-h1")).to_have_text("AI services")
-    await expect(page.locator(".set-title")).to_be_hidden()
+    await expect(page.locator("h1.crumbs .crumb-here")).to_have_text("AI services")
+    await expect(page.locator(".crumb-far").first).to_be_hidden()
     await expect(page.get_by_role("navigation", name="Models")).to_have_count(0)
     assert await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1
     await expect(page.locator("#sidebar")).not_to_have_attribute("data-mode", "settings")

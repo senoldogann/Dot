@@ -1,8 +1,11 @@
-/* The settings page (items 330 and 562): in a Mac's window the nav is the sidebar's (settingsnav.js, shell.css) and the page
-   is the open tab alone, in a column of 920 px: its head, then its sections 32 px apart, each a name over a card of rows.
-   A phone has the list of tabs for a page of its own and each tab a page of its own (item 330). */
+/* The settings page (items 330, 562 and 1338), drawn as T3 Code draws its settings: in a Mac's window the nav is the
+   sidebar's (settingsnav.js, below) and the page is the open page alone, in a column of 800 px: its line, then its
+   sections 32 px apart, each a name of 14 px over a bordered card of rows; a row is its title and the muted line under it
+   on the left and its control on the right, parted from the next by a hairline. A phone has the list of pages for a page of
+   its own and each page a page of its own (item 330), in the same cards and rows, a control that does not fit beside the text
+   going under it at the full width. */
 .page:has(> .settings-frame) {
-  max-width: 960px;
+  max-width: 800px;
 }
 
 /* The frame measures the width the page gives the settings, whatever the window and the sidebar are doing. */
@@ -15,17 +18,26 @@
 }
 
 .settings-pane > * + * {
+  margin-top: var(--space-6);
+}
+
+.settings-pane > .set-section + .set-section,
+.settings-pane > .set-sections > .set-section + .set-section {
   margin-top: 32px;
 }
 
-/* The head: the tab's name and the line that says what it is for, and at the right what it holds and its buttons, level
-   with the bottom of the line. */
+/* The head: the line that says what the page is for and, at the right, what it holds and its buttons. The page's name is
+   in the bar, as a breadcrumb (views/settings.js). */
 .set-head {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-2) var(--space-4);
+}
+
+.set-head:not(:has(.set-lead:not(:empty), .set-meta:not(:empty), .set-actions:not(:empty))) {
+  display: none;
 }
 
 .set-head-text {
@@ -34,23 +46,20 @@
 }
 
 .set-title {
-  margin: 0;
-  font-size: var(--text-2xl);
-  line-height: var(--leading-2xl);
-  font-weight: var(--weight-title);
-  letter-spacing: var(--tracking-title);
-}
-
-.set-lead {
-  margin-top: var(--space-3);
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .set-lead {
   max-width: 64ch;
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--muted);
-  font-size: var(--text-md);
-  line-height: var(--leading-md);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
 }
 
 .set-lead:empty {
@@ -61,7 +70,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
+  gap: var(--space-2) var(--space-3);
   min-width: 0;
 }
 
@@ -69,16 +78,16 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
+  gap: var(--space-1) var(--space-2);
   color: var(--muted);
-  font-size: var(--text-ui);
-  line-height: var(--leading-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
 }
 
 .set-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .set-meta:empty,
@@ -93,8 +102,8 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 8px 16px;
-  margin-bottom: 12px;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .set-section-text {
@@ -106,7 +115,7 @@
   color: var(--text);
   font-size: var(--text-ui);
   line-height: var(--leading-ui);
-  font-weight: var(--weight-title);
+  font-weight: var(--weight-label);
 }
 
 .set-section-lead {
@@ -116,11 +125,11 @@
   line-height: var(--leading-sm);
 }
 
-/* A card of rows: a row's title and the muted line under it on the left, its control on the right. */
+/* A card of rows: a hairline round it and a hairline between its rows, and no shadow. */
 .set-card {
-  border: 1px solid var(--box-border);
-  box-shadow: var(--box-shadow);
-  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
@@ -132,7 +141,7 @@
 }
 
 .set-row {
-  padding: 16px 20px;
+  padding: var(--space-3) var(--space-4);
 }
 
 .set-row + .set-row,
@@ -146,26 +155,26 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px 24px;
+  gap: var(--space-2) var(--space-6);
 }
 
 .set-row-text {
-  flex: 1 1 160px;
+  flex: 1 1 200px;
   min-width: 0;
 }
 
 .set-row-title {
   color: var(--text);
-  font-size: var(--text-md);
-  line-height: var(--leading-md);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
   font-weight: var(--weight-label);
 }
 
 .set-row-lead {
   margin-top: var(--space-half);
   color: var(--muted);
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }
 
 .set-row-control {
@@ -173,8 +182,22 @@
   flex: none;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: var(--space-2);
   max-width: 100%;
+}
+
+/* On a phone a control that is not a switch goes under the text at the full width. */
+@media (max-width: 720px) {
+  .set-row-control:has(> :is(.select, .input, .segmented, .textarea)) {
+    flex: 1 1 100%;
+    justify-content: stretch;
+  }
+
+  .set-row-control > :is(.select, .input) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 
 /* A tab's cards that are not drawn as rows yet name themselves over their body, as a phone's do (app.css): a card's head
@@ -196,10 +219,10 @@
   }
 
   .settings-pane .card:not(.fold) > .card-head + * {
-    border: 1px solid var(--box-border);
-    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--surface);
-    box-shadow: var(--box-shadow);
+    box-shadow: none;
   }
 }
 
@@ -214,16 +237,42 @@
   }
 }
 
-/* On a phone the tab's name is in the bar (views/settings.js): the page opens with its line. Elsewhere the page's own
-   name shows and the bar's is hidden, by the same width (item 966). */
-@media (max-width: 720px) {
-  .set-title {
-    display: none;
-  }
+/* The breadcrumb in the bar (views/settings.js): a Mac's window shows every part, a phone's the last alone. */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-text);
 }
 
-@media not all and (max-width: 720px) {
-  .stage-title:has(> .set-phone-title) {
+.crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+a.crumb:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.crumb-here {
+  color: var(--text);
+  font-weight: var(--weight-label);
+}
+
+.crumb-sep {
+  color: var(--faint);
+}
+
+@media (max-width: 720px) {
+  .crumb-far {
     display: none;
   }
 }
@@ -5218,4 +5267,271 @@
 .dot-look-face {
   display: inline-flex;
   flex: none;
+}
+
+/* ---------- the settings nav (items 562, 999 and 1336) ---------- */
+
+/* The sidebar's settings nav, as T3 Code's: a search at the top, the groups of rows under their small names, each row a
+   mark of 16 px and a name. The sidebar shows it in place of the chats (shell.css); the phone's sheet uses the search
+   and the rows' own look below. */
+.snav-search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) var(--space-1) var(--space-3);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.snav-search:focus-within {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.snav-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-ui);
+  outline: none;
+}
+
+.snav-input::placeholder {
+  color: var(--muted);
+}
+
+.snav-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.snav-key {
+  flex: none;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.snav-search:focus-within .snav-key {
+  display: none;
+}
+
+.snav-groups {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: 0 var(--space-half);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.snav-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.snav-group-title {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+}
+
+.snav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: var(--space-half) var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--text-2);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+}
+
+.snav-link[hidden],
+.snav-group[hidden] {
+  display: none;
+}
+
+@media (hover: hover) {
+  .snav-link:hover {
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+    color: var(--text);
+    text-decoration: none;
+  }
+}
+
+.snav-link[aria-current="page"] {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+
+.snav-link > .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.snav-link[aria-current="page"] > .icon {
+  color: var(--text);
+}
+
+.snav-label {
+  flex: none;
+}
+
+.snav-value {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.snav-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--fine);
+}
+
+.snav-empty {
+  margin: var(--space-4) var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* The phone's sheet starts with the same search, full width. */
+.settings-list > .snav-search {
+  margin: 0 0 var(--space-4);
+  padding: 0 var(--space-3);
+}
+
+@media (max-width: 720px) {
+  .snav-input {
+    height: 40px;
+    font-size: var(--touch-text);
+  }
+}
+
+/* ---------- one card, one row (item 1338) ---------- */
+
+/* The cards and rows the tabs draw by hand (a `.card`, a `.card-pad`, a `.setting`) take the look of the shared ones above:
+   a hairline round the card, rows of 12 px over 16 px parted by hairlines, the title and the muted line at the left and the
+   control at the right, centred on both lines. */
+.settings-pane .card:not(.fold),
+.settings-group > .card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.settings-pane .card-pad {
+  padding: var(--space-3) var(--space-4);
+}
+
+.settings-pane .card-pad.stack:has(> .setting) {
+  gap: 0;
+  padding-block: 0;
+}
+
+.settings-pane .card-pad.stack > .setting {
+  padding-block: var(--space-3);
+}
+
+.settings-pane .card-pad.stack > .setting + .setting,
+.settings-pane .card-pad > .setting + .setting {
+  border-top: 1px solid var(--border);
+}
+
+.settings-pane .setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-half);
+}
+
+.settings-pane .setting > .row {
+  display: contents;
+}
+
+.settings-pane .setting > .row > .grow {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+}
+
+.settings-pane .setting > .row > :not(.grow) {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+}
+
+.settings-pane .setting > .hint {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+/* A setting that is a scale keeps its value beside its name, and the scale under both. */
+.settings-pane .setting:has(> .range) > .row > :not(.grow) {
+  grid-row: 1;
+}
+
+.settings-pane .setting > .range {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.settings-pane .setting:has(> .range) > .hint {
+  grid-row: 3;
+  grid-column: 1 / -1;
+}
+
+/* On a phone a control that wants room (a box, a menu, a choice) goes under the title at the full width. */
+@media (max-width: 720px) {
+  .settings-pane .setting:has(> .row > :is(.input, .select, .segmented, .textarea)) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-pane .setting:has(> .row > :is(.input, .select, .segmented, .textarea)) > .row > :not(.grow) {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    margin-block: var(--space-1);
+  }
+
+  .settings-pane .setting:has(> .row > :is(.input, .select, .segmented, .textarea)) > .hint {
+    grid-row: 3;
+  }
 }

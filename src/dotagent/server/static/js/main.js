@@ -33,21 +33,50 @@ const DEFAULT_ROUTE = "/runs";
 // The chat screen the owner was on last, a run's page or New chat: Dot opens there (item 286).
 // Where a home-screen app added before item 286 starts (its manifest's start_url then): it opens the last chat instead.
 const OLD_START = "#/activity";
-// The pages of the earlier sidebar live on as tabs of the settings or of Customize; their old addresses lead there.
+// The pages of the earlier sidebar live on as pages of the settings (items 1336 and 1337); their old addresses lead there,
+// with the query they carry (`?schedule=<id>`, `?thread=<id>`).
 const MOVED = new Map([
   ["/memory", "/settings/memory"],
-  ["/settings/schedules", "/schedules"],
   ["/rules", "/settings/rules"],
   ["/system", "/settings/system"],
-  // Connect apps and the settings' Skills became tabs of Customize (items 316 and 317); the services' tab is Connectors
-  // since the plugins Dot installs took the name Plugins (item 542).
-  ["/connect", "/customize/connectors"],
-  // Customize opens on Plugins, under Plugins' own address, so that the open tab is one page with one address.
-  ["/customize", "/customize/plugins"],
-  ["/settings/skills", "/customize/skills"],
+  // Connect apps and Customize are the settings' Connectors, Plugins and Skills (items 316, 317, 542 and 1336).
+  ["/connect", "/settings/connectors"],
+  ["/customize", "/settings/plugins"],
+  // The agents' list, Diagnostics and the open source licences are pages of the settings too; an agent's own address,
+  // its conversation, stays (`/agents/<id>`).
+  ["/agents", "/settings/agents"],
+  ["/diagnostics", "/settings/diagnostics"],
+  ["/licences", "/settings/licences"],
   // The Activity page is gone (item 364): what it listed stands in the sidebar and on the home's Today strip.
   ["/activity", "/runs"],
 ]);
+// The moved pages that carry an id after them: a schedule's editor, a campaign, a plugin's or a service's own page.
+const MOVED_PATTERNS = [
+  { pattern: /^\/(schedules|campaigns)(\/[A-Za-z0-9_-]+)?$/, to: (found) => `/settings/${found[1]}${found[2] ?? ""}` },
+  { pattern: /^\/customize\/(plugins|skills|connectors)(\/[a-z0-9-]+)?$/, to: (found) => `/settings/${found[1]}${found[2] ?? ""}` },
+];
+
+/** Where the old address `path` leads now, or undefined for an address that did not move. */
+function movedTo(path) {
+  const found = MOVED.get(path);
+  if (found !== undefined) {
+    return found;
+  }
+  for (const { pattern, to } of MOVED_PATTERNS) {
+    const match = pattern.exec(path);
+    if (match !== null) {
+      return to(match);
+    }
+  }
+  return undefined;
+}
+
+/** The query of the address in the bar (`?thread=...`), with its question mark, or an empty string. */
+function currentQuery() {
+  const at = location.hash.indexOf("?");
+  return at === -1 ? "" : location.hash.slice(at);
+}
+
 // The chat and the home are what every opening needs and come with main.js; every other page is loaded when it is
 // first asked for (`load`), and fetched once the browser is idle after the first page, so that it opens at once later
 // and the service worker keeps a copy of it.
@@ -57,14 +86,6 @@ const MOVED = new Map([
 const ROUTES = [
   { tab: "runs", layout: "home", title: "Chat", pattern: /^\/runs$/, view: runs, parent: () => null },
   { tab: "runs", layout: "run", title: "Task", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
-  {
-    tab: "campaigns",
-    layout: "page",
-    title: "Campaigns",
-    pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/,
-    load: () => import("./views/campaigns.js"),
-    parent: ([id]) => (id === undefined ? null : "/campaigns"),
-  },
   {
     tab: "agents",
     layout: "page",
@@ -79,36 +100,18 @@ const ROUTES = [
   { tab: "agents", layout: "page", title: "Handoffs", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
   // A team of the owner's (item 610): its agents' faces, a box for a message to it and its chats.
   { tab: "agents", layout: "page", title: "Team", pattern: /^\/teams\/([A-Za-z0-9_-]+)$/, load: () => import("./views/teams.js"), parent: () => "/agents" },
-  {
-    tab: "schedules",
-    layout: "page",
-    title: "Schedules",
-    pattern: /^\/schedules$/,
-    load: () => import("./views/schedules.js"),
-    parent: () => null,
-  },
   // The Mac's screen, live (item 1264).
   { tab: "watch", layout: "watch", title: "Watch", pattern: /^\/watch$/, load: () => import("./views/watch.js"), parent: () => null },
-  {
-    tab: "customize",
-    layout: "page",
-    title: "Customize",
-    pattern: /^\/customize(?:\/(plugins|skills|connectors))?(?:\/([a-z0-9-]+))?$/,
-    load: () => import("./views/customize.js"),
-    parent: ([tab = "plugins", id]) => (id === undefined ? null : `/customize/${tab}`),
-  },
   {
     tab: "settings",
     layout: "page",
     title: "Settings",
-    pattern: /^\/settings(?:\/([a-z]+))?$/,
+    pattern: /^\/settings(?:\/([a-z]+)(?:\/([A-Za-z0-9_-]+))?)?$/,
     load: () => import("./views/settings.js"),
-    // On a phone a tab is a page of the list of the settings (item 330); in a wider window the tabs are the page.
-    parent: ([tab]) => (tab === undefined || !PHONE.matches ? null : "/settings"),
+    // On a phone a page is a page of the list of the settings (item 330) and a page's own page (a schedule's editor)
+    // goes back to it; in a wider window the nav is always there.
+    parent: ([tab, id]) => (tab === undefined || !PHONE.matches ? null : id === undefined ? "/settings" : `/settings/${tab}`),
   },
-  // Settings › System's Diagnostics (item 370) and Open source licences (item 371), pages of their own under it.
-  { tab: "settings", layout: "page", title: "Diagnostics", pattern: /^\/diagnostics$/, load: () => import("./views/diagnostics.js"), parent: () => "/settings/system" },
-  { tab: "settings", layout: "page", title: "Open source licences", pattern: /^\/licences$/, load: () => import("./views/licences.js"), parent: () => "/settings/system" },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
   { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, load: () => import("./views/controls.js"), parent: () => null },
 ];
@@ -485,7 +488,7 @@ function beginSession() {
       if (link instanceof HTMLAnchorElement && link.target === "" && plain && link.closest("#sidebar") === null) {
         const path = link.getAttribute("href").slice(1).split("?")[0];
         // A link to an old address counts for the page it leads to.
-        linkedTo = MOVED.get(path) ?? path;
+        linkedTo = movedTo(path) ?? path;
       }
     },
     { capture: true, signal: controller.signal },
@@ -582,9 +585,9 @@ function beginSession() {
 
   async function openPage() {
     const path = currentPath();
-    const moved = MOVED.get(path);
+    const moved = movedTo(path);
     if (moved !== undefined) {
-      location.replace(`${location.pathname}${location.search}#${moved}`);
+      location.replace(`${location.pathname}${location.search}#${moved}${currentQuery()}`);
       return;
     }
     const found = findRoute(path);

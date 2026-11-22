@@ -1697,10 +1697,10 @@ input[type="radio"] {
   }
 
   :is(.settings-pane .card:not(.fold), .connect-section, .agent-editor) > .card-head + * {
-    border: 1px solid var(--box-border);
-    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--surface);
-    box-shadow: var(--box-shadow);
+    box-shadow: none;
   }
 }
 
@@ -2047,51 +2047,10 @@ input[type="radio"] {
   padding-top: 0;
 }
 
-/* Customize (items 316, 317, 542 and 545): its three tabs, links drawn as a segmented control, each opening with the
-   head they share (the search and the tab's controls in it); the services and the skills as tiles of a grid, two a row
-   and one on a phone. A service's tile is a link to its own page through its name, whose link covers the tile under
+/* Settings › Plugins, Skills and Connectors (items 316, 317, 542 and 545; Customize's three tabs until item 1336), each
+   opening with the head they share (the search and the page's controls in it); the services and the skills as tiles of a
+   grid, two a row and one on a phone. A service's tile is a link to its own page through its name, whose link covers the tile under
    its step. */
-.customize-tabs a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 4px 12px;
-  border-radius: calc(var(--radius-control) - 3px);
-  color: var(--muted);
-  font-weight: var(--weight-label);
-  text-decoration: none;
-}
-
-.customize-tabs a .icon {
-  color: inherit;
-}
-
-@media (hover: hover) {
-  .customize-tabs a:hover {
-    color: var(--text);
-    text-decoration: none;
-  }
-}
-
-.customize-tabs a[aria-current="page"] {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--shadow-seg);
-}
-
-/* On the narrowest phones the three tabs keep their words and leave their icons, so that they fit the width. */
-@media (max-width: 360px) {
-  .customize-tabs a .icon {
-    display: none;
-  }
-}
-
-.customize-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
 .plugin-page-bar {
   display: flex;
   align-items: center;
@@ -2486,15 +2445,6 @@ input[type="radio"] {
 .customize-hero {
   display: grid;
   gap: var(--space-1);
-}
-
-.customize-hero-title {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-title);
-  letter-spacing: var(--tracking-title);
-  line-height: var(--leading-xl);
 }
 
 .customize-hero-line {
@@ -3394,7 +3344,6 @@ dialog.modal.versions-dialog {
 }
 
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  .customize-tabs a,
   .chat-skill-row {
     min-height: 44px;
   }

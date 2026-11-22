@@ -696,7 +696,6 @@ export function mount(root) {
   tabs.element.setAttribute("aria-label", "Skills to show");
   // Out of what paints again, so that the search keeps the focus while the cards are drawn anew.
   const head = customizeHead({
-    title: "Skills",
     line: "What Dot knows how to do: the skills it learned from your chats, those you wrote or imported, and those of its plugins. A task reads the ones it needs.",
     search,
     controls: [tabs.element, saveButton, importButton],

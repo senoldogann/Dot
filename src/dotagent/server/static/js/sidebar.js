@@ -2,7 +2,7 @@
 // a head with the title; the search with three small buttons at its right (the agents' menu, a new agent, a message to
 // Dot); the chats as rows of three lines, the pinned first and then the days; and, in a dock that keeps its place, Working
 // (what waits for the owner and what works, with a count and a fold) and Settled (the chats resting past a week, folded);
-// and, at the foot, four small buttons: the settings, Connect apps (the way to Customize, item 545), the Mac's screen live
+// and, at the foot, four small buttons: the settings, Connect apps (the way to Settings › Connectors, item 545), the Mac's screen live
 // and the models. A run stops from its composer (item 289). A row whose run works says Working and for how long (item
 // 122). A chat's menu (item 130) pins it, names it, copies its link, starts choosing chats with it and deletes it (several
 // can be deleted at once); the pinned chats come first, under Pinned.
@@ -34,6 +34,7 @@ import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu, openOnHold } from "./
 import { placeWork } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { buildSettingsNav } from "./settingsnav.js";
+import { tabAt } from "./settingstabs.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
@@ -52,8 +53,8 @@ const ACTIVITY_SECTIONS = [
 // What a chat's row says while something of it waits for the owner, ahead of what waits (item 836).
 const WAITS_WORDS = t("side.waiting");
 const DAY_LABELS = [t("side.today"), t("side.yesterday"), t("side.week"), t("side.older")];
-// Where Connect apps leads (item 545): the services' tab of Customize.
-const CONNECTORS_PATH = "#/customize/connectors";
+// Where Connect apps leads (item 545): the services' page of the settings (its address was under Customize until item 1336).
+const CONNECTORS_PATH = "#/settings/connectors";
 // Which sections at the foot the owner folded, by their ids (`work`, `agents`, `reviews`, `imessage`), kept between visits; a fold of
 // `chats`, `initiative` or `schedule` kept from before item 855, or of `waiting` or `working` from before item 836,
 // whose groups no longer fold, is not read.
@@ -622,7 +623,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   const top = el("div", { class: "side-top" }, searchBox, el("div", { class: "side-tools" }, agentsButton, newBot, composeButton));
   // The foot: four small icon buttons (the reference app's), the settings with the owner's name for a screen reader, Connect apps
-  // (items 492 and 545, the way to Customize › Connectors), the Mac's screen live (item 1264) and the models.
+  // (items 492 and 545, the way to Settings › Connectors), the Mac's screen live (item 1264) and the models.
   const settingsLink = pageTool("#/settings", t("sidebar.settings"), "settings", "side-settings");
   const watchLink = pageTool("#/watch", t("sidebar.watch"), "monitor");
   const modelsLink = pageTool("#/settings/models", t("sidebar.models"), "layers");
@@ -1706,10 +1707,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       markAgents();
       mark(watchLink, tab === "watch");
       mark(settingsLink, tab === "settings");
-      // Customize is reached from Connect apps (item 545), which stands for it while it is open.
-      connectButton.toggleAttribute("data-current", tab === "customize");
+      // Settings › Connectors is reached from Connect apps (item 545), which stands for it while it is open. The address
+      // says it: Connectors is a page of the settings route since item 1336, no route of its own.
+      const onConnectors = tab === "settings" && tabAt(location.hash) === "connectors";
+      connectButton.toggleAttribute("data-current", onConnectors);
       // The styles read data-current; a screen reader reads aria-current, as the links of the pages give it (item 559).
-      mark(connectButton, tab === "customize");
+      mark(connectButton, onConnectors);
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;

@@ -1,13 +1,16 @@
-// The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562: the groups of rows, item 999) and the
-// page is the open tab alone: its name, a line that says what it is for and what it holds, in a column of its own; on a
-// phone, one sheet of the same rows, a row a tab that opens as a page of its own (items 330 and 995). Each tab is drawn by the module that owns it.
+// The settings. In a Mac's window the sidebar is their nav (settingsnav.js, item 562: a search and the groups of rows, items
+// 999 and 1336) and the page is the open page alone: its place in the bar as a breadcrumb ("Settings / General"), a line
+// that says what it is for and what it holds, then its sections, each a name over a card of rows; on a phone, one sheet of
+// the same rows, a row a page that opens on its own (items 330 and 995). Each page is drawn by the module that owns it: the
+// first ones come with this module, the others (Scheduled tasks, Connectors, Plugins, Skills, Agents, Campaigns,
+// Diagnostics, Open source licences) are loaded when their page is asked for.
 
 import { api, query } from "../api.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
 import { PHONE } from "../layout.js";
-import { settingsHead } from "../panels.js";
-import { DEFAULT_TAB, SETTINGS_GROUPS, TABS } from "../settingstabs.js";
+import { hostPageHeads, settingsHead } from "../panels.js";
+import { DEFAULT_TAB, matchesSearch, SETTINGS_GROUPS, settingsHref, tabOf } from "../settingstabs.js";
 import { setStageTitle } from "../stage.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
@@ -42,37 +45,71 @@ const MOUNTS = {
   snapshots: snapshots.mount,
   system: mountSystem,
 };
+// The pages whose module is loaded when the page is asked for.
+// `params` is what the module reads of its address: `[page, id]` for those that take an id after the page, `[id]` for
+// the two that were pages of their own (`#/agents`, `#/campaigns/<id>`).
+const LOADED = {
+  schedules: { load: () => import("./schedules.js") },
+  connectors: { load: () => import("./connectors.js") },
+  plugins: { load: () => import("./plugins.js") },
+  skills: { load: () => import("./skills.js") },
+  agents: { load: () => import("./agents.js"), params: ([, id]) => [id] },
+  campaigns: { load: () => import("./campaigns.js"), params: ([, id]) => [id] },
+  diagnostics: { load: () => import("./diagnostics.js") },
+  licences: { load: () => import("./licences.js") },
+};
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
 
 /** A row of the phone's sheet (item 995): its mark, its name over the line that says what it holds, `value` (what it
- * holds, or nothing) and an arrow; it opens its tab, or the page it names. */
+ * holds, or nothing) and an arrow; it opens its page. */
 function listRow(row, value) {
-  const tab = row.tab === undefined ? null : TABS.find((candidate) => candidate.id === row.tab);
-  const label = tab === null ? row.label : tab.label;
+  const tab = tabOf(row.tab);
   return el(
     "a",
-    { class: "settings-row", href: tab === null ? row.href : `#/settings/${tab.id}` },
-    icon(tab === null ? row.icon : tab.icon),
-    el("span", { class: "settings-row-words" }, el("span", { class: "settings-row-label" }, label), el("span", { class: "settings-row-line" }, row.line)),
+    { class: "settings-row", href: settingsHref(tab.id) },
+    icon(tab.icon),
+    el("span", { class: "settings-row-words" }, el("span", { class: "settings-row-label" }, tab.label), el("span", { class: "settings-row-line" }, row.line)),
     value ?? null,
     icon("chevron"),
   );
 }
 
-/** The phone's sheet of the settings (item 995): the groups of rows, then the first steps while one is left.
- * Appearance tells the theme on screen, Memory how many notes Dot keeps and Vault how many entries it holds. */
+/** The phone's sheet of the settings (item 995): a search, the groups of rows, then the first steps while one is left.
+ * Appearance tells the theme on screen, Memory how many notes Dot keeps, Vault how many entries it holds and Scheduled
+ * tasks how many are on. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
-  const values = new Map(TABS.map((tab) => [tab.id, el("span", { class: "settings-row-value" })]));
-  const groups = SETTINGS_GROUPS.map((group) =>
-    el(
+  const values = new Map(["appearance", "memory", "vault", "schedules"].map((id) => [id, el("span", { class: "settings-row-value" })]));
+  const entries = [];
+  const groups = SETTINGS_GROUPS.map((group) => {
+    const rows = group.rows.map((row) => {
+      const link = listRow(row, row.value === undefined ? null : values.get(row.value));
+      entries.push({ tab: tabOf(row.tab), line: row.line, link });
+      return link;
+    });
+    const section = el(
       "section",
       { class: "settings-group", "aria-label": group.title ?? null },
       group.title === null ? null : el("h2", { class: "settings-group-title" }, group.title),
-      el("div", { class: "card" }, group.rows.map((row) => listRow(row, row.value === undefined ? null : values.get(row.value)))),
-    ),
-  );
-  const sheet = el("nav", { class: "settings-list", "aria-label": "Settings" }, ...groups);
+      el("div", { class: "card" }, rows),
+    );
+    return { section, rows };
+  });
+  const search = el("input", { class: "snav-input", type: "search", autocomplete: "off", spellcheck: "false", placeholder: "Search settings", "aria-label": "Search settings" });
+  const empty = el("p", { class: "snav-empty", hidden: true }, "No setting matches.");
+  search.addEventListener("input", () => {
+    const typed = search.value.trim();
+    let shown = 0;
+    for (const entry of entries) {
+      entry.link.hidden = typed !== "" && !matchesSearch(entry.tab, entry.line, typed);
+      shown += entry.link.hidden ? 0 : 1;
+    }
+    for (const group of groups) {
+      group.section.hidden = group.rows.every((link) => link.hidden);
+    }
+    empty.hidden = shown !== 0;
+  });
+  const sheet = el("nav", { class: "settings-list", "aria-label": "Settings" }, el("label", { class: "snav-search" }, icon("search"), search), ...groups.map((group) => group.section), empty);
   root.append(sheet);
   // What a Dot that started afresh has to set up (item 811) stands under the sheet while a step is left: it comes once
   // the daemon answers, and over the rows it pushed them down under a finger on its way to one (item 996, main's CI).
@@ -94,6 +131,11 @@ function mountList(root, ctx) {
     const held = counts.login + counts.card + counts.contact;
     values.get("vault").textContent = held === 0 ? "" : String(held);
   });
+  attempt(async () => {
+    const schedules = await api.get("/schedules");
+    const on = schedules.filter((view) => view.record.enabled).length;
+    values.get("schedules").textContent = on === 0 ? "" : String(on);
+  });
   return () => {
     steps.dispose();
     SYSTEM_DARK.removeEventListener("change", paintTheme);
@@ -103,28 +145,93 @@ function mountList(root, ctx) {
   };
 }
 
-/** Draw the settings of the route. On a phone `#/settings` is the sheet of the tabs (item 995); in a wider window it leads to
- * General, and so does an unknown tab. `#/settings/<tab>` draws that tab under its own name: the tab is given `ctx.head`, to say what it is for (`setLead`), what it holds (`setMeta`) and the
- * buttons that belong to the whole page (`setActions`). */
+/**
+ * The page's place in the bar (item 1336): "Settings / <page>", and a third part (`setDetail`) for a page of the page, a
+ * schedule's editor. The parts before the last lead back. A phone's bar has the last part alone: its Back goes up.
+ */
+function breadcrumb(tab) {
+  const element = el("h1", { class: "stage-h1 crumbs" });
+  let detail = "";
+  function paint() {
+    const root = el("a", { class: "crumb crumb-far", href: "#/settings" }, "Settings");
+    const sep = () => el("span", { class: "crumb-sep", "aria-hidden": "true" }, "/");
+    const page =
+      detail === ""
+        ? el("span", { class: "crumb crumb-here", "aria-current": "page" }, tab.label)
+        : el("a", { class: "crumb crumb-far", href: settingsHref(tab.id) }, tab.label);
+    element.replaceChildren(
+      root,
+      el("span", { class: "crumb-sep crumb-far", "aria-hidden": "true" }, "/"),
+      page,
+      ...(detail === "" ? [] : [sep(), el("span", { class: "crumb crumb-here", "aria-current": "page" }, detail)]),
+    );
+  }
+  paint();
+  return {
+    element,
+    setDetail(text) {
+      detail = text;
+      paint();
+    },
+  };
+}
+
+/** Draw the settings of the route. On a phone `#/settings` is the sheet of the pages (item 995); in a wider window it leads
+ * to General, and so does an unknown page. `#/settings/<page>` draws that page: the page is given `ctx.head`, to say what it is for (`setLead`),
+ * what it holds (`setMeta`) and the buttons that belong to the whole page (`setActions`), and `ctx.setCrumb(text)`, which names a page of the page
+ * in the bar. */
 export function mount(root, ctx) {
   if (ctx.params[0] === undefined && PHONE.matches) {
     return mountList(root, ctx);
   }
-  const tab = TABS.find((candidate) => candidate.id === ctx.params[0]);
+  const tab = tabOf(ctx.params[0]);
   if (tab === undefined) {
     location.replace(`${location.pathname}${location.search}#/settings/${DEFAULT_TAB}`);
     return () => undefined;
   }
   ctx.setTitle(`${tab.label} · Settings`);
-  // The page is named after its row (item 999), as on a phone, with no row of tabs over it.
   const head = settingsHead(tab.label);
-  const pane = el("div", { class: "settings-pane" }, head.element);
+  const pane = el("div", { class: "settings-pane", dataset: { page: tab.id } }, head.element);
   root.append(el("div", { class: "settings-frame" }, pane));
-  const dispose = MOUNTS[tab.id](pane, { ...ctx, head });
-  // The page names itself in its head; on a phone, whose page is the tab alone, the bar names the tab. The bar's name is
-  // always there and the width alone shows one or the other (settings.css), as the page's own name is hidden: two
-  // choices made apart, one by the script as the page was drawn and one by the style, showed both a moment after a
-  // phone turned (item 966).
-  setStageTitle(el("h1", { class: "stage-h1 set-phone-title" }, tab.label));
-  return dispose;
+  // An agent's own page is its conversation, which is not a page of the settings (item 1233).
+  if (tab.id === "agents" && ctx.params[1] !== undefined) {
+    location.replace(`${location.pathname}${location.search}#/agents/${ctx.params[1]}`);
+    return () => undefined;
+  }
+  const crumbs = breadcrumb(tab);
+  setStageTitle(crumbs.element);
+  const pageCtx = {
+    ...ctx,
+    head,
+    setCrumb: (text) => {
+      crumbs.setDetail(text);
+      setStageTitle(crumbs.element);
+    },
+  };
+  const own = MOUNTS[tab.id];
+  if (own !== undefined) {
+    return own(pane, pageCtx);
+  }
+  // A page loaded when asked for: its module draws into the pane once it is here, and the page it leaves stops it.
+  let gone = false;
+  let dispose = () => undefined;
+  // A page that heads itself with `pageHead` has its title in the breadcrumb and its line under it.
+  const letGo = hostPageHeads({
+    say: (title, subtitle) => {
+      pageCtx.setCrumb(title === tab.label ? "" : title);
+      head.setLead(subtitle);
+    },
+  });
+  attempt(async () => {
+    const { load, params = (found) => found } = LOADED[tab.id];
+    const module = await load();
+    if (!gone) {
+      dispose = module.mount(pane, { ...pageCtx, params: params(ctx.params) }) ?? dispose;
+    }
+  });
+  return () => {
+    gone = true;
+    letGo();
+    dispose();
+  };
 }
