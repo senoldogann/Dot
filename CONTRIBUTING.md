@@ -63,7 +63,9 @@ uvx zizmor@1.31.1 --min-severity low .
   `127.0.0.1` or a local page plays the rest. The tests marked `live`, `internet` and `hosted` are the exceptions, and
   they stay on your Mac.
 - Point `DOT_HOME`, `DOT_LOG_DIR` and `DOT_CHROME_DIR` at throwaway folders when you run the tests, so that none of them
-  touches your own Dot.
+  touches your own Dot. `tests/conftest.py` does it for a variable you left unset, and fails a test that reaches
+  `~/Library/Application Support/Dot` or `~/Library/Logs/Dot` (item 1315); a run that holds `live`, `hosted`, `internet`
+  or `desktop` tests is your own Mac's, and keeps what it was given.
 - Prefer the real thing to a mock: the real server, the real store, a real browser against a local page.
 - Add the test a change needs, and check that it fails without the change.
 
