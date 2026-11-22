@@ -188,17 +188,26 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{run.id}")
                     bar: Locator = page.locator("header.stagebar")
-                    # The bar: whom the chat is with, face and name on glass in its middle (item 1101), and the
-                    # tools in one pill; the name stands clear of the way back and of the tools.
+                    # The bar is the Mac's (item 1329): the way back, the breadcrumb (the agent's badge and name, a
+                    # slash, the chat's title) and the tools, on one line of 52 px, none on glass; the breadcrumb
+                    # stands clear of the way back and of the tools.
                     await expect(bar.locator(".stage-name")).to_have_text("Dot")
-                    await expect(bar.locator(".stage-heading")).to_be_hidden()
-                    named: dict[str, float] = await bar.locator(".stage-title").evaluate(_EDGES)
-                    whole: dict[str, float] = await bar.evaluate(_EDGES)
-                    tools: dict[str, float] = await bar.locator(".stage-tools").evaluate(_EDGES)
-                    opener: dict[str, float] = await bar.locator(".stagebar-left").evaluate(_EDGES)
-                    middle: float = (named["left"] + named["right"]) / 2
-                    assert abs(middle - (whole["left"] + whole["right"]) / 2) <= 1, (named, whole)
+                    await expect(bar.locator(".stage-title .stage-badge")).to_be_visible()
+                    await expect(bar.locator(".stage-heading-title")).to_be_visible()
+                    await expect(bar.locator(".stage-heading-sub")).to_be_hidden()
+                    # The tools come as the run's helpers and screen do: the breadcrumb gives way to them, so it is
+                    # read once they are there, and given a moment to settle.
+                    await expect(bar.get_by_role("button", name="Show the helpers")).to_be_visible()
+                    for _ in range(30):
+                        named: dict[str, float] = await bar.locator(".stage-title").evaluate(_EDGES)
+                        tools: dict[str, float] = await bar.locator(".stage-tools").evaluate(_EDGES)
+                        opener: dict[str, float] = await bar.locator(".stagebar-left").evaluate(_EDGES)
+                        if opener["right"] <= named["left"] and named["right"] <= tools["left"]:
+                            break
+                        await page.wait_for_timeout(100)
                     assert opener["right"] <= named["left"] and named["right"] <= tools["left"], (opener, named, tools)
+                    assert await bar.locator(".stagebar-row").evaluate("(row) => row.offsetHeight") == 52
+                    assert await bar.evaluate("(node) => getComputedStyle(node).position") == "sticky"
                     helpers_button: Locator = bar.get_by_role("button", name="Show the helpers")
                     await expect(helpers_button).to_have_text(str(len(_HELPERS)))
                     screen_button: Locator = bar.get_by_role("button", name="Show Dot's computer")
@@ -292,13 +301,13 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(top.get_by_role("link", name="Write to Dot")).to_be_visible()
                     await context.close()
 
-                # A wide window keeps its bar: the face, the name and the panel's switch alone; the line over the
+                # A wide window keeps its bar: the badge, the name, the title and the panel's switch; the line over the
                 # composer is there too while the run works (item 352).
                 wide: Page = await browser.new_page(viewport={"width": 1280, "height": 800})
                 await wide.goto(ui_url("127.0.0.1", port, TOKEN))
                 await wide.goto(f"{address}/#/runs/{run.id}")
                 await expect(wide.locator(".stage-title .stage-name")).to_be_visible()
-                await expect(wide.locator(".stage-heading")).to_be_hidden()
+                await expect(wide.locator(".stage-heading-title")).to_be_visible()
                 await expect(wide.locator(".stage-tools button:visible")).to_have_count(1)
                 await expect(wide.locator(".capsule")).to_contain_text("Working")
                 # The line names none of the run's calls (item 360): the conversation shows them. Before, it named

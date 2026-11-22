@@ -520,9 +520,10 @@ step, a delegated run, an eval's, one of OpenCode's agent, a chat-mode run and a
 585; the review model is not asked whether the steps will recur: you chose). The box of a run held it as **Save
 skill**, under a **More** button, until item 406.
 
-A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
-while it works, an amber ring while it waits for you, a tick in the text's ink for a moment when the run ends done
-(item 839: it was green), red when it failed (with reduced motion the tick simply shows). The panel button sits on the
+A run opens as a conversation under the bar's breadcrumb: the agent's badge and name, a slash and the chat's title (item
+1329). The badge is the state, in its tint alone: plain when the run rests or ended done, a step stronger while it works,
+the warning's while it waits for you, the bad's once it failed (the face is not drawn in the bar; it was a breath, an amber
+ring, a tick and red). The panel button sits on the
 right; the run's facts (its state,
 agent, model, approval mode, goal mode, campaign, work, time, mode, start and id) are under More on the panel's Task tab,
 closed the first time (items 452 and 544). Your goal is the
@@ -806,8 +807,8 @@ took, and a row opens its page (item 296); the pointer at rest on a row, or the 
 the conversation's rows do, with its whole goal, and a phone has none (item 426). It stays closed until the panel button
 in the head of the run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px,
 is a drawer below that, and on a phone a sheet that rises from the foot (item 296). The run's head is the top bar
-itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
-nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
+itself: the breadcrumb on the left, the panel button on the right; the bar is solid with a hairline under it once the
+page has scrolled (item 1329), so nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
 itself in the same bar (Agents, Campaigns, Settings) and opens with one line of description. A run's page, live or over, opens at
 its end, where its next words come or its newest message stands, and stays there as the earlier turns fill in above (items
 403 and 440). What the last six earlier turns did is read before the page is drawn, side by side, so a long chat opens
@@ -822,7 +823,7 @@ its answer drawn at once and its face at rest, as a run that was over when its p
 answer written in again (item 447).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
-end, opens with its still face; the run's state is the top bar's face and the first fact under More, with no card for
+end, opens with its still face; the run's state is the top bar's badge and the first fact under More, with no card for
 it at the head of the conversation. Every row of a run reads down one edge (item 656): what it said, a group of steps
 and each step in it, a quiet line (a change of the memory, a stall) and the answer start their words 36 px in, where a
 message's do, and centre their mark on the 28 px column of the face. The panel is one surface on the composer's corner, in five tabs

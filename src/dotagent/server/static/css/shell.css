@@ -60,9 +60,12 @@
   outline: none;
 }
 
-/* The top bar (item 78): one solid bar on every page with a hairline under it; nothing scrolls under a blur. It
-   carries the sidebar opener, the page's name (stage.js), the page's tools and the daemon's pills. It keeps out of a
-   phone's top safe area, and stays at the top of what is seen while the keyboard pans the page (items 275 and 293). */
+/* The top bar (items 78 and 1328), the reference app's: one solid bar, 52 px, on every page, a Mac's and a phone's alike, with a
+   hairline under it only while the page has scrolled under it (layout.js: `data-scrolled`); nothing scrolls under a
+   blur. It carries the sidebar opener (a phone's Back, item 338), the breadcrumb (stage.js: the agent's badge and name,
+   a slash, the chat's title), the page's tools, which are the toggles of the panels, and the daemon's pills. It keeps
+   out of a phone's top safe area, and stays at the top of what is seen while the keyboard pans the page (items 275 and
+   293). */
 .stagebar {
   position: sticky;
   top: 0;
@@ -70,15 +73,183 @@
   z-index: 20;
   padding-top: var(--safe-top);
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--motion-quick) var(--ease);
+}
+
+.stagebar[data-scrolled] {
+  border-bottom-color: var(--border);
 }
 
 .stagebar-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  padding: 4px 16px;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 var(--space-4);
+}
+
+/* The breadcrumb: the agent's badge and name, a slash and the chat's title, one line, cut with an ellipsis where the
+   bar is short (the title first). A page that is no chat's names itself alone. */
+.stage-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+}
+
+.stage-title:empty {
+  display: none;
+}
+
+/* The badge of the bar keeps the agent's face inside it out of sight (stage.js) and wears what the face says of the run in
+   the badge's tint alone: a run that works a step stronger, one that waits in the warning's ink, one that failed in the
+   bad's. */
+.stage-badge > :is(.avatar, .team-duo) {
+  display: none;
+}
+
+.stage-badge[data-state="working"] {
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+  color: var(--text);
+}
+
+.stage-badge[data-state="waiting"] {
+  background: var(--warn-weak);
+  color: var(--warn);
+}
+
+.stage-badge[data-state="failed"] {
+  background: var(--bad-weak);
+  color: var(--bad);
+}
+
+.stage-h1 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+}
+
+.stage-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+/* An agent's name in its chat's bar opens its page (item 1234): it reads as the name, not as a link. */
+a.stage-name-link {
+  color: var(--text-2);
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+}
+
+@media (hover: hover) {
+  a.stage-name-link:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+}
+
+.stage-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.stage-heading::before {
+  content: "/";
+  content: "/" / "";
+  flex: none;
+  color: var(--faint);
+  font-weight: var(--weight-text);
+}
+
+.stage-heading-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* The model and the state under the title are in the panel's Details; a delegated run's own breadcrumb (its parent's
+   goal, a slash, its own) needs no second title. */
+.stage-heading-sub,
+.stage-title:has(> .stage-crumb) > .stage-heading {
+  display: none;
+}
+
+/* A page's tools in the bar, before the daemon's pills: buttons on no ground (the toggles of the panels). */
+.stage-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.stage-tools:empty {
+  display: none;
+}
+
+.stage-tools:not(:empty) {
+  margin-left: auto;
+}
+
+.stage-tools:not(:empty) + .stagebar-right {
+  margin-left: 0;
+}
+
+.stage-tools .chip {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Dot's computer and the helpers are a phone's quick ways; a wider bar has them in the panel. */
+.stage-pill > .stage-quick {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .stage-pill > .stage-quick:not([hidden]) {
+    display: inline-grid;
+  }
+
+  .stage-pill > .stage-helpers:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    width: auto;
+    padding: 0 var(--space-2);
+  }
+}
+
+.stage-quick-count {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  font-variant-numeric: tabular-nums;
 }
 
 .stagebar-left {
@@ -228,7 +399,7 @@
   align-items: center;
   gap: var(--space-2);
   flex: none;
-  min-height: 48px;
+  min-height: 52px;
   padding: 0 var(--space-2) 0 var(--space-4);
 }
 
@@ -743,8 +914,7 @@
 
 @media (max-width: 720px) {
   .stagebar-row {
-    gap: 8px;
-    padding: 4px 8px;
+    padding: 0 var(--space-2);
   }
 }
 

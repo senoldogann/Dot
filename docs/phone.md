@@ -218,12 +218,12 @@ and, at the foot under the thumb, four small buttons: Settings, Connect apps (it
 are the menu behind the first button, not rows of faces (until item 1328, the agents you worked with last stood as rows of
 44 px faces, item 1265): each its badge, its name and how many chats it has, to its conversation (its page while it has
 none), then All agents, New agent and Campaigns. A conversation with an agent is a row among the days like any chat
-(until item 1328 the agents' conversations left the days), and a search finds it there. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
-1101; the title and the model are in the panel's Details), and its tools
-in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
-no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under
-the composer. A new chat and an agent's page wear the same bar (item 1123): the way back round, an agent's face and
-name in the middle, its tools in one pill, all on glass over the page. An agent's page
+(until item 1328 the agents' conversations left the days), and a search finds it there. A chat's bar is the Mac's (item 1329): 52 px, on the page's own ground, sticky, with a hairline under it only once the
+conversation has scrolled; at its left the way back (items 338, 1079 and 1321: the rules of Back and the edge swipe are
+unchanged), then the breadcrumb, the agent's badge and name, a slash and the chat's title (the model is in the panel's
+Details); at its right the panel's switch, Dot's computer once the run has had a page and the helpers with their count. The
+conversation begins under the bar, which no longer floats over it as three panes of glass (item 1119). A new chat and an
+agent's page wear the same bar (item 1123). An agent's page
 is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
 in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from. The line over the
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand

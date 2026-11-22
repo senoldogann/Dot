@@ -647,27 +647,9 @@
     top: var(--space-2);
   }
 
-  /* The chat's bar floats over the conversation (item 1119, the owner's ask after Grok Bot's), as the composer does at
-     its foot: the bar draws no ground, only its parts are panes of glass, and the messages go by under them. The bar
-     lets a touch between its parts through to the conversation. */
-  html.chat-shell .stage:has(> .page[data-layout="run"]) > .stagebar {
-    position: absolute;
-    top: 0;
-    inset-inline: 0;
-  }
-
   /* A menu of the composer opens over the bar, not under it. */
   html.chat-shell .dock:has(.composer-popover:not([hidden])) {
     z-index: 21;
-  }
-
-  html.chat-shell .page[data-layout="run"] .run-thread {
-    padding-top: calc(var(--safe-top) + var(--stagebar-h) + var(--space-2));
-  }
-
-  /* What the column goes to stands under the bar's glass, not behind it. */
-  html.chat-shell .page[data-layout="run"] .run-thread :is(.answer, .bubble.user) {
-    scroll-margin-top: calc(var(--safe-top) + var(--stagebar-h) + var(--space-2));
   }
 
   /* The bar's parts are a phone's width together (item 401): the three counters and the way down fit one row. */

@@ -127,8 +127,8 @@ that work with the tools it names (item 936): Dot's ways of working name the she
 message, and carries the agent's id (item 553). Ask the delegated run to end with a `Verification:` section: the
 command or check it ran and the answer. A report without one, or with one that holds no check (a word or two,
 "none"), is marked as a claim (item 1065), so the sender does not close a plan
-step on trust alone. The run's page wears the agent's face and name in the bar, the name a link to its page (item 1234); its rows in the sidebar and on
-the home's Today strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item
+step on trust alone. The run's page names the agent in the bar's breadcrumb, with its badge, the name a link to its page (items 1234 and 1329); its rows in
+the sidebar wear the badge (item 1327) and those on the home's Today strip the face. A schedule can run as one of your agents (its **Agent** on Schedules, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
 learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent
 named, so that none goes on firing with every tool; one you switch on again runs as Dot, or as the agent you then pick
@@ -264,10 +264,10 @@ an agent a run of Dot's made, which the line marks "made by Dot". An agent you m
 `agent_id`, is that agent's run and does not lead the team. Removing the team leaves its chats as chats with Dot, whose
 later messages are told no team.
 
-The chat wears the team: the sidebar's row shows the faces of two of its agents and the team's name ahead of its last
-words while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there (a phone's in its
-middle, on glass, item 1101) the name and the same faces; an agent you put in the chat answers as itself, its run's bar and, while
-its run is the latest, the row wearing its face. The Task tab's Details name the team, a link to its page. The API: `GET
+The chat wears the team: the sidebar's row shows the team's name as its agent, and its name ahead of its last
+words, while the chat's latest run is Dot's, which leads the team, and the bar of a run of Dot's there the team's name in its
+breadcrumb (items 1327 and 1329; the faces of two agents stood in both until then); an agent you put in the chat answers as itself, its run's bar and, while
+its run is the latest, the row showing its badge and name. The Task tab's Details name the team, a link to its page. The API: `GET
 /api/teams` (each team with its agents as they are now and its
 newest chat), `GET /api/teams/{id}` (with its chats), `POST /api/teams` (201; `name`, `purpose` and `agents`, the ids of
 your agents in order; 422 for an id that is not one of your agents, one named twice, or none), `PUT /api/teams/{id}`

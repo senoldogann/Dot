@@ -32,10 +32,10 @@ LIGHTS_Y: float = 26.0
 LIGHTS_ROOM: float = 96.0
 # The row of the lights: the top bars' 52 px.
 LIGHTS_ROW: float = 2 * LIGHTS_Y
-# A browser's bars: the sidebar's head and the top bar's row are both 48 px tall (item 1328), and so stand their buttons
-# on one line.
-_BROWSER_HEAD_Y: float = 24.0
-_BROWSER_BAR_Y: float = 24.0
+# A browser's bars: the sidebar's head and the top bar's row are both 52 px tall (items 1328 and 1329), and so stand
+# their buttons on one line.
+_BROWSER_HEAD_Y: float = 26.0
+_BROWSER_BAR_Y: float = 26.0
 _BROWSER_LEFT: float = 16.0
 _TOLERANCE_PX: float = 1.0
 
