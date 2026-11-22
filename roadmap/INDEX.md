@@ -6,6 +6,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1322](1322.md) | done | 2026-11-22 | The Screen tab of a run's panel shows the Mac's screen live, whether a task works or not |
+| [1321](1321.md) | done | 2026-11-22 | A chat chosen in the sidebar on a phone takes the place of the chat left, so the edge swipe opens the sidebar |
 | [1320](1320.md) | done | 2026-11-22 | The composer plainer: no send-way choice, no second Stop, the choices at the right |
 | [1319](1319.md) | done | 2026-11-22 | The web tools' "public only" rule is applied before the browser sends a request, and watch_video walks its link's redirects first |
 | [1318](1318.md) | done | 2026-11-22 | Small leftovers and drift in the docs after the Trader and the trading desk went |

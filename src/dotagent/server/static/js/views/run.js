@@ -13,6 +13,7 @@ import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
+import { createMacScreen } from "../macscreen.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
@@ -1636,6 +1637,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
   // stand there once it works. The empty panel is the page's own, in Dot's voice; the card of the page takes its place
   // as soon as there is a page.
+  // The Mac's screen, live whenever the tab is on screen (item 1322), under what a task's browser shows.
+  const macScreen = createMacScreen();
   const screenQuiet = emptyPanel(
     "monitor",
     t("run.computerQuiet"),
@@ -1663,7 +1666,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       { id: "changes", label: t("tabs.changes"), icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: t("tabs.plan"), icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: t("tabs.agents"), icon: "users", sections: [withSection.element, agents.element] },
-      { id: "screen", label: t("tabs.screen"), icon: "monitor", sections: [screenQuiet, computer.element] },
+      { id: "screen", label: t("tabs.screen"), icon: "monitor", sections: [screenQuiet, computer.element, macScreen.element] },
     ],
     screensIn: "screen",
     onFile: (source) => {
@@ -2073,6 +2076,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     stopLifecycle();
     stopBack();
     computer.dispose();
+    macScreen.dispose();
     withAgent.dispose();
     reactions.dispose();
     inspector.dispose();

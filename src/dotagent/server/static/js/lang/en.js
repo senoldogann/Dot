@@ -799,6 +799,11 @@ export const EN = {
   "tabs.plan": "Plan",
   "tabs.agents": "Agents",
   "tabs.screen": "Screen",
+  "screen.mac": "The Mac's screen",
+  "screen.pause": "Pause",
+  "screen.resume": "Watch live",
+  "screen.paused": "Paused. Watch live starts it again.",
+  "screen.idle": "The Mac's screen shows here while this tab is open.",
   "panel.recap": "Recap",
   "panel.more": "More",
   // How long ago, in the fewest characters (dom.js).

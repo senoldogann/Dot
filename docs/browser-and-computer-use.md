@@ -856,7 +856,8 @@ it at up to 1920 pixels on its longest side and 60 frames a second, the Mac's ha
 frames a second, about 15 ms to encode a frame, 8% of one core and 1 to 1.5 Mbit/s for an ordinary desktop, the first
 picture within a third of a second.
 
-- It only watches: the mouse and the keyboard stay the Mac's.
+- It only watches: the mouse and the keyboard stay the Mac's. The Screen tab of a chat's side panel shows the same stream
+  while it is on screen (item 1322), so a phone with that tab open is a viewer too.
 - One capture serves every page that watches; it starts with the first and stops a second or two after the last one
   closes or goes out of sight, so nothing is captured while nobody watches, and macOS shows its screen recording mark
   meanwhile. A page that falls behind (a slow network) drops frames until the next key frame and so shows the screen

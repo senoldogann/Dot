@@ -247,10 +247,16 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                     await page.keyboard.press("ArrowRight")
                     await expect(panel.get_by_role("tab", name="Agents")).to_be_focused()
                     await expect(shown.locator(".panel-section-title")).to_have_text(["Agent", "Previous agents"])
-                    await page.keyboard.press("End")
+                    # The Screen tab opens the Mac's screen live, a task or not (item 1322): the stream is asked for as
+                    # the tab comes into sight, and Pause holds it.
+                    async with page.expect_request("**/api/screen/live"):
+                        await page.keyboard.press("End")
                     screen_tab: Locator = panel.get_by_role("tab", name="Screen")
                     await expect(screen_tab).to_have_attribute("aria-selected", "true")
-                    await expect(shown.locator(".panel-section-title")).to_have_text(["Dot's computer", "Screenshots"])
+                    await expect(shown.locator(".panel-section-title")).to_have_text(
+                        ["Dot's computer", "The Mac's screen", "Screenshots"]
+                    )
+                    await expect(shown.get_by_role("button", name="Pause")).to_be_visible()
                     # The run has opened no page in a browser: the view says so in the shape of a screen.
                     await expect(shown.locator(".computer-empty")).to_have_attribute("data-state", "no-page")
                     await expect(shown.locator(".computer-empty-title")).to_have_text("No page yet")
