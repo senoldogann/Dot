@@ -8,15 +8,16 @@ for an account's access token (:meth:`Accounts.access_token`), which is refreshe
 here logs a token, a code or an address."""
 
 import asyncio
+import secrets
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
-from pydantic import JsonValue, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, JsonValue, TypeAdapter, ValidationError
 
-from dotagent.core.errors import SignInError
+from dotagent.core.errors import DotError, SignInError, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy, retry_async
 from dotagent.core.text import truncate_middle
@@ -44,6 +45,39 @@ _REFRESH_MARGIN_S: float = 120.0
 _HTTP_TIMEOUT_S: float = 30.0
 _RETRY: RetryPolicy = RetryPolicy(attempts=3, base_delay_s=1.0, max_delay_s=8.0)
 _ACCOUNT_LIST: TypeAdapter[list[Account]] = TypeAdapter(list[Account])
+_HTTP_OK: int = 200
+_HTTP_BAD_REQUEST: int = 400
+# What Google's revoke call answers (400) for a token that is already revoked or expired: no grant is left to end.
+_ALREADY_INVALID: str = "invalid_token"
+# The sign-outs a provider did not take (item 1312): the store's record, with no token in it, and how long they are
+# asked for. The tokens wait in the Keychain under ``pending-revoke-<id>`` until the provider took them or time is up.
+_PENDING_KEY: str = "oauth.pending_revokes"
+GIVE_UP_AFTER_S: float = 7 * 24 * 3600.0
+RETRY_EVERY_S: float = 3600.0
+type RevokeOutcome = Literal["revoked", "already_invalid", "failed"]
+
+
+class PendingRevoke(FrozenModel):
+    """A sign-out whose revoke the provider has not taken yet: ``id`` names the tokens parked in the Keychain."""
+
+    id: str
+    provider: ProviderId
+    since: float
+
+
+class _RevokeAnswer(BaseModel):
+    """What a provider's revoke call answers when it refuses: its error code (``{"error": "invalid_token"}``)."""
+
+    model_config = ConfigDict(extra="ignore")
+    error: str | None = None
+
+
+_PENDING_LIST: TypeAdapter[list[PendingRevoke]] = TypeAdapter(list[PendingRevoke])
+
+
+def _parked_address(pending_id: str) -> str:
+    """The place in the Keychain where the tokens of a sign-out wait for their revoke."""
+    return f"pending-revoke-{pending_id}"
 
 
 class Waiting(FrozenModel):
@@ -435,16 +469,29 @@ class Accounts:
             raise _refused(provider, response, "to refresh the sign-in (sign in again in Customize › Connectors)")
         return tokens_from(_json(provider, response), time.time(), refresh_token)
 
-    async def forget(self, provider_id: ProviderId, address: str) -> None:
-        """Sign the account out: its tokens leave the Keychain and it leaves the list, and the provider is asked to end
-        the grant the refresh token stands for (:meth:`_revoke`). It waits for a refresh of the account's tokens that
+    async def forget(self, provider_id: ProviderId, address: str) -> bool:
+        """Sign the account out and say whether the provider ended the grant (item 1312). The account leaves the list
+        and its tokens the account's place in the Keychain, whatever the provider answers: sign-out never fails for a
+        provider that cannot be reached. Where the provider has a revoke call (:meth:`_revoke`) the tokens go first
+        to a place of their own in the Keychain, with a record in the store, and stay there until the provider took
+        the token or said it was already invalid; a provider that could not be asked is asked again by
+        :meth:`retry_pending_revokes` for :data:`GIVE_UP_AFTER_S`. It waits for a refresh of the account's tokens that
         is under way, which would write fresh ones into the Keychain after they were removed, with no account left in
         the list to sign out of (item 558)."""
         provider: Provider = PROVIDERS[provider_id]
         lock: asyncio.Lock = self._refreshing.setdefault(f"{provider_id}:{address}", asyncio.Lock())
         async with lock:
             tokens: Tokens | None = await self._keychain.read(provider_id, address)
-            await self._keychain.forget(provider_id, address)
+            parked: str | None = None
+            if tokens is not None and provider.revoke_url is not None:
+                parked = await self._park(provider_id, tokens)
+            try:
+                await self._keychain.forget(provider_id, address)
+            except SignInError:
+                # The account stays signed in, so the copy parked for its revoke must not outlive this attempt.
+                if parked is not None:
+                    await self._unpark(provider_id, parked)
+                raise
             await self._keep(
                 [
                     account
@@ -452,24 +499,130 @@ class Accounts:
                     if not (account.provider == provider_id and account.address == address)
                 ]
             )
-        revoked: bool = tokens is not None and await self._revoke(provider, tokens)
-        log.info("signed_out", provider=provider_id, revoked=revoked)
+        outcome: RevokeOutcome | None = None
+        if tokens is not None and provider.revoke_url is not None:
+            outcome = await self._revoke(provider, tokens)
+        revoked: bool = outcome is not None and outcome != "failed"
+        if parked is not None and revoked:
+            await self._unpark(provider_id, parked)
+        log.info("signed_out", provider=provider_id, revoked=revoked, kept_to_retry=parked is not None and not revoked)
+        return revoked
 
-    async def _revoke(self, provider: Provider, tokens: Tokens) -> bool:
+    async def _revoke(self, provider: Provider, tokens: Tokens) -> RevokeOutcome:
         """Give the refresh token (else the access token) back to the provider, which ends the grant: a copy of the
-        token taken before the owner signed out mints no more. Best effort: a provider that cannot be reached or that
-        refuses is logged, without the token, and the sign-out stands. Microsoft has no such call for a client like
-        Dot's: the app's consent is taken away at the owner's account."""
+        token taken before the owner signed out mints no more. ``already_invalid`` is the provider's own word that the
+        token is already revoked or expired (400 ``invalid_token``): nothing is left to end. Anything else is
+        ``failed`` and logged with the provider's status and error code, never the token. Microsoft has no such call
+        for a client like Dot's (``revoke_url`` None): the app's consent is taken away at the owner's account."""
         if provider.revoke_url is None:
-            return False
+            raise SignInError(f"{provider.name} has no call that ends a sign-in", {"provider": provider.id})
         token: str = tokens.refresh_token or tokens.access_token
         try:
             async with self.client() as client:
                 response: httpx.Response = await client.post(provider.revoke_url, data={"token": token})
         except httpx.HTTPError as error:
             log.warning("sign_out_not_revoked", provider=provider.id, error=type(error).__name__)
-            return False
-        if response.status_code != 200:
-            log.warning("sign_out_not_revoked", provider=provider.id, status=response.status_code)
-            return False
-        return True
+            return "failed"
+        if response.status_code == _HTTP_OK:
+            return "revoked"
+        try:
+            given: str | None = _RevokeAnswer.model_validate_json(response.content).error
+        except ValidationError:
+            given = None
+        if response.status_code == _HTTP_BAD_REQUEST and given == _ALREADY_INVALID:
+            log.info("sign_out_already_revoked", provider=provider.id)
+            return "already_invalid"
+        log.warning(
+            "sign_out_not_revoked",
+            provider=provider.id,
+            status=response.status_code,
+            error=None if given is None else truncate_middle(given, _CODE_CHARS),
+        )
+        return "failed"
+
+    async def _pending(self) -> list[PendingRevoke]:
+        kept: str | None = await self._store.kv_get(_PENDING_KEY)
+        if kept is None:
+            return []
+        try:
+            return _PENDING_LIST.validate_json(kept)
+        except ValidationError as error:
+            raise SignInError(
+                "the list of sign-outs the provider has not taken yet could not be read",
+                {"errors": error.error_count()},
+            ) from error
+
+    async def _change_pending(self, change: Callable[[list[PendingRevoke]], list[PendingRevoke]]) -> None:
+        def update(kept: str | None) -> str:
+            try:
+                before: list[PendingRevoke] = [] if kept is None else _PENDING_LIST.validate_json(kept)
+            except ValidationError as error:
+                raise SignInError(
+                    "the list of sign-outs the provider has not taken yet could not be read",
+                    {"errors": error.error_count()},
+                ) from error
+            return _PENDING_LIST.dump_json(change(before)).decode("utf-8")
+
+        await self._store.kv_update(_PENDING_KEY, update)
+
+    async def _park(self, provider_id: ProviderId, tokens: Tokens) -> str | None:
+        """Keep ``tokens`` under a place of their own in the Keychain and a record in the store, so that a revoke the
+        provider does not take can be asked again; its id, or None when the Keychain or the store would not keep them
+        (logged: the sign-out goes on, with the one try it has)."""
+        pending: PendingRevoke = PendingRevoke(id=secrets.token_hex(8), provider=provider_id, since=time.time())
+        try:
+            await self._keychain.save(provider_id, _parked_address(pending.id), tokens)
+            await self._change_pending(lambda before: [*before, pending])
+        except (SignInError, StoreError) as error:
+            log.warning("sign_out_revoke_not_kept", provider=provider_id, error=str(error))
+            return None
+        return pending.id
+
+    async def _unpark(self, provider_id: ProviderId, pending_id: str) -> None:
+        """Forget the parked tokens and their record: the provider took the token, or it is not to be asked again."""
+        try:
+            await self._keychain.forget(provider_id, _parked_address(pending_id))
+            await self._change_pending(lambda before: [item for item in before if item.id != pending_id])
+        except (SignInError, StoreError) as error:
+            log.warning("sign_out_revoke_record_not_cleared", provider=provider_id, error=str(error))
+
+    async def retry_pending_revokes(self, now: float) -> int:
+        """Ask the providers again for the tokens of the accounts signed out whose revoke they did not take: each is
+        settled when the provider takes it or says it is already invalid, and given up, its tokens forgotten, once
+        :data:`GIVE_UP_AFTER_S` have passed since the sign-out. Returns how many were settled."""
+        settled: int = 0
+        for pending in await self._pending():
+            if now - pending.since > GIVE_UP_AFTER_S:
+                log.warning("sign_out_revoke_given_up", provider=pending.provider, since=pending.since)
+                await self._unpark(pending.provider, pending.id)
+                settled += 1
+                continue
+            try:
+                tokens: Tokens | None = await self._keychain.read(pending.provider, _parked_address(pending.id))
+            except SignInError as error:
+                log.warning("sign_out_revoke_not_read", provider=pending.provider, error=str(error))
+                continue
+            if tokens is not None and await self._revoke(PROVIDERS[pending.provider], tokens) == "failed":
+                continue
+            await self._unpark(pending.provider, pending.id)
+            settled += 1
+        return settled
+
+
+async def keep_revoking(accounts: Accounts, stopping: asyncio.Event) -> None:
+    """Ask for the sign-outs the providers did not take (:meth:`Accounts.retry_pending_revokes`) as the daemon starts
+    and every :data:`RETRY_EVERY_S` after, until it stops. A round that fails is logged and the next one still runs: a
+    fault of Dot's own (a bug, a database error) is logged with its traceback and must not end the task for the rest of
+    the daemon's life, as the phone keeper's rounds do not (item 1313). A round is an hour apart, so no longer wait is
+    added for the ones that fail."""
+    while not stopping.is_set():
+        try:
+            await accounts.retry_pending_revokes(time.time())
+        except DotError as error:
+            log.warning("sign_out_revoke_retry_failed", error=str(error))
+        except Exception as error:
+            log.error("sign_out_revoke_retry_crashed", error=str(error), error_type=type(error).__name__, exc_info=True)
+        try:
+            await asyncio.wait_for(stopping.wait(), RETRY_EVERY_S)
+        except TimeoutError:
+            continue
