@@ -232,7 +232,7 @@ async def test_a_closed_helper_row_keeps_its_steps_out_of_the_page_until_it_open
             await expect(page.locator(".timeline details.child")).to_have_count(len(_HELPERS))
             await expect(_row(page, done.id).locator(".child-progress")).to_have_text(_HELPERS[0][2])
             await expect(_row(page, failed.id).locator(".child-progress")).to_contain_text("failed")
-            await expect(_row(page, working.id).locator(".child-progress")).to_contain_text(f"step {_STEPS}")
+            await expect(_row(page, working.id).locator(".child-progress")).to_contain_text(f"shelf-{_STEPS}")
             closed: int = await page.evaluate(_COUNT)
             for helper, ring in ((done, "s-done"), (failed, "s-failed"), (working, "s-running")):
                 row: Locator = _row(page, helper.id)
@@ -245,7 +245,7 @@ async def test_a_closed_helper_row_keeps_its_steps_out_of_the_page_until_it_open
             for step in range(_STEPS + 1, _STEPS + _CLOSED_STEPS + 1):
                 await _step(runtime, working.id, step)
             at_work: Locator = _row(page, working.id)
-            await expect(at_work.locator(".child-progress")).to_contain_text(f"step {_STEPS + _CLOSED_STEPS}")
+            await expect(at_work.locator(".child-progress")).to_contain_text(f"shelf-{_STEPS + _CLOSED_STEPS}")
             await expect(page.locator("details.child details.tool")).to_have_count(0)
             # Opened, it shows every step, those that came while it was closed among them, and takes in the next ones.
             await at_work.locator("summary.child-row").click()
@@ -256,7 +256,7 @@ async def test_a_closed_helper_row_keeps_its_steps_out_of_the_page_until_it_open
                 await _step(runtime, working.id, step)
             await expect(at_work.locator("details.tool")).to_have_count(_STEPS + _CLOSED_STEPS + _OPEN_STEPS)
             await expect(at_work.locator(".child-progress")).to_contain_text(
-                f"step {_STEPS + _CLOSED_STEPS + _OPEN_STEPS}"
+                f"shelf-{_STEPS + _CLOSED_STEPS + _OPEN_STEPS}"
             )
             # A row whose run ended stands closed (endChild closes it): it opens on its steps and its answer.
             for helper, status in ((done, "done"), (failed, "failed")):

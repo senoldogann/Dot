@@ -515,6 +515,79 @@
   }
 }
 
+/* While the task waits for its subagents (item 1331) one quiet line stands over the bar: what it waits on, what the
+   first of them does now, and Details (the Agents tab) and Stop at its end. */
+.wait-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: 0 auto var(--space-1);
+  padding: var(--space-half) var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.wait-line[hidden] {
+  display: none;
+}
+
+.wait-line-mark {
+  display: inline-grid;
+  flex: none;
+}
+
+.wait-line-mark .icon {
+  width: 14px;
+  height: 14px;
+  animation: spin var(--motion-spin) linear infinite;
+  animation-play-state: var(--endless);
+}
+
+.wait-line-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.wait-line-text {
+  flex: none;
+  color: var(--text-2);
+}
+
+.wait-line-now {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wait-line-button {
+  flex: none;
+  padding: var(--space-half) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: var(--weight-label);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .wait-line-button:hover {
+    background: var(--surface-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wait-line-mark .icon {
+    animation: none;
+  }
+}
+
 /* The line over the composer is one bar (item 401): how the run works, how its helpers stand and how many messages wait
    at its left, the way down at its right end. It is a pane of glass of its own: the composer under it is a plain box (item 1330). */
 .status-bar {

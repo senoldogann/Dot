@@ -200,7 +200,7 @@ async def test_a_helper_of_an_agents_own_run_is_a_helper_and_says_nothing_as_the
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/runs/{run.id}")
                 await expect(page.locator(".answer .prose").last).to_have_text("Seven sources.")
-                await expect(page.locator(".child-row .child-name")).to_have_text("Helper 1")
+                await expect(page.locator(".child-row .child-name")).to_have_text("Subagent 1")
                 await expect(page.locator(".agent-said")).to_have_count(0)
                 await page.close()
             finally:

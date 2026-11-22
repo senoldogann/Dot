@@ -890,9 +890,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       queue.expand();
       queue.element.scrollIntoView({ block: "nearest" });
     },
+    onStop: () => stopRun(),
   });
   const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
-  const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, frame.element, foot);
+  const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, frame.element, foot);
   // The plan over the composer (item 644): its part in the capsule opens it as a bubble above the dock.
   bubble = planBubble({ anchor: capsule.plan, frame: dock, onOpenTab: () => inspector.openTab("plan") });
   bubble.paint(planNow.steps, planNow.targets);
@@ -1266,6 +1267,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       now: Date.now() / 1000,
       plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: timeline.helperStatuses(),
+      helpersNow: timeline.helperNow(),
       queued: queue.count(),
     });
     // The plan's bubble goes with its part: once the run no longer works, it is not left open over nothing (item 644).

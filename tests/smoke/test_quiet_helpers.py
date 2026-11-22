@@ -1,9 +1,9 @@
 """A chat whose helpers work writes on its page only what changed (item 310), on the pages of a daemon in Chrome as a
 phone. A chat hands three helpers a part each; each lists a folder step after step. While they work the page is watched
-for four seconds: no text on it is written again as it was, while the time of the group of helpers and each helper's
-step line still move on. Before, the page wrote every helper's time and the head of their group again at every event of
-the chat and its helpers, the same text nearly every time, and a helper's line lost its tool's name at every step and
-got it back.
+for four seconds: no text on it is written again as it was, while the time of the group of helpers and of each helper
+still moves on (a helper's line says what it does now, which here stays the same). Before, the page wrote every
+helper's time and the head of their group again at every event of the chat and its helpers, the same text nearly
+every time, and a helper's line lost its tool's name at every step and got it back.
 
 No network and no model service is used: the model is a stand-in that answers in code, every role is it and Ollama's
 address is a closed port.
@@ -196,4 +196,3 @@ async def test_a_chat_whose_helpers_work_writes_only_what_changed(served: tuple[
         await manager.wait(run.id)
     assert same == [], f"{len(same)} texts written again as they were, {changed} other changes: {sorted(set(same))}"
     assert after[0] != before[0], (before, after)
-    assert all(line != earlier for line, earlier in zip(after[1], before[1], strict=True)), (before, after)

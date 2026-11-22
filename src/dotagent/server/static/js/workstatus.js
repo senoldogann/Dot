@@ -21,7 +21,7 @@
 
 import { clip, el, setText } from "./dom.js";
 import { t } from "./i18n.js";
-import { callKind, describeArguments, narrates } from "./tools.js";
+import { callKind, describeArguments, narrates, toolWords } from "./tools.js";
 
 // The words for each kind of work (tools.js callKind): one phrase each, which stays while the same work goes on.
 /** @type {Record<string, import("./i18n.js").WordKey>} */
@@ -57,6 +57,21 @@ const DETAILED = {
   search: (detail) => t("work.searchOf", { what: clip(detail, DETAIL_CHARS) }),
   page: (detail) => t("work.readOf", { what: clip(hostOf(detail), DETAIL_CHARS) }),
 };
+
+/** What a call is, in the line's words ("Running swift test", "Reading README.md", "Searching the web for “Dot”"): the
+ * subtitle of a subagent's row says what it does now with them (timeline.js). */
+export function callPhrase(tool, args) {
+  const kind = callKind(tool);
+  const about = describeArguments(args).trim();
+  if (Object.hasOwn(DETAILED, kind) && about !== "") {
+    return DETAILED[kind](about);
+  }
+  // A tool with no phrase of its own is named as the steps name it ("List folder"), with what it is about.
+  if (kind === "other") {
+    return about === "" ? toolWords(tool) : `${toolWords(tool)}: ${clip(about, DETAIL_CHARS)}`;
+  }
+  return t(PHRASES[kind] ?? PHRASES.other);
+}
 
 /** What a step's message says it does next, as the line says it (item 1131): its first line, without the marks of
  * markdown or the stop at its end ("Kanıt netleşti. Son bir kontrol yapıp sonucu yazıyorum." stays whole). */
