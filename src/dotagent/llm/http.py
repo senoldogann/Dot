@@ -30,6 +30,13 @@ _MAX_AUTOMATIC_WAIT_S: float = 120.0
 _TRANSPORT_ERRORS: tuple[type[Exception], ...] = (httpx.TransportError, httpx.DecodingError, ssl.SSLError)
 
 
+# How long an idle connection to a provider is kept for the next call (item 1314). A connection that sat longer than the
+# provider's own side keeps it is broken on the wire ("bad record mac" in the log), and each retry of a call that met it
+# sends the prompt (28 to 51k characters) again; 30 s is under what the services keep, and a run's steps follow each
+# other within seconds.
+KEEPALIVE_EXPIRY_S: float = 30.0
+
+
 class SseEvent(FrozenModel):
     event: str | None
     data: str
@@ -39,7 +46,9 @@ def build_client(connect_timeout_s: float, read_timeout_s: float) -> httpx.Async
     timeout: httpx.Timeout = httpx.Timeout(
         connect=connect_timeout_s, read=read_timeout_s, write=60.0, pool=connect_timeout_s
     )
-    limits: httpx.Limits = httpx.Limits(max_connections=32, max_keepalive_connections=16, keepalive_expiry=60.0)
+    limits: httpx.Limits = httpx.Limits(
+        max_connections=32, max_keepalive_connections=16, keepalive_expiry=KEEPALIVE_EXPIRY_S
+    )
     return httpx.AsyncClient(timeout=timeout, limits=limits, http2=False, follow_redirects=False)
 
 
