@@ -354,7 +354,11 @@ async def test_the_row_says_its_notifications_and_a_one_time_schedule_no_switch_
                 await expect(single.locator(".chip", has_text="Switch off")).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"notify-{width}-{scheme}.png"), full_page=True)
-                await page.locator("[data-schedule]", has_text="told on trouble").first.get_by_role("link", name=re.compile("^Edit ")).click()
+                await (
+                    page.locator("[data-schedule]", has_text="told on trouble")
+                    .first.get_by_role("link", name=re.compile("^Edit "))
+                    .click()
+                )
                 level: Locator = page.get_by_role("combobox", name="Notifications")
                 await expect(level).to_have_value("problems")
                 await expect(level.locator("option")).to_have_text(

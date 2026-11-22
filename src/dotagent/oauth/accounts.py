@@ -277,7 +277,7 @@ class Accounts:
             signed: str = ", ".join(f"{account.address} ({PROVIDERS[account.provider].name})" for account in accounts)
             raise SignInError(
                 f"no account {address!r} is signed in: "
-                + (f"the accounts are {signed}" if signed else "the owner signs one in on Customize › Connectors"),
+                + (f"the accounts are {signed}" if signed else "the owner signs one in on Settings › Connectors"),
                 {"accounts": len(accounts)},
             )
         return found
@@ -410,14 +410,14 @@ class Accounts:
             tokens: Tokens | None = await self._keychain.read(provider.id, address)
             if tokens is None:
                 raise SignInError(
-                    f"this account is not signed in to {provider.name}: sign in in Customize › Connectors",
+                    f"this account is not signed in to {provider.name}: sign in in Settings › Connectors",
                     {"provider": provider.id},
                 )
             if tokens.expires_at - _REFRESH_MARGIN_S > time.time():
                 return tokens.access_token
             if tokens.refresh_token is None:
                 raise SignInError(
-                    f"{provider.name} gave no way to stay signed in: sign in again in Customize › Connectors",
+                    f"{provider.name} gave no way to stay signed in: sign in again in Settings › Connectors",
                     {"provider": provider.id},
                 )
             fresh: Tokens = await self._refresh(provider, tokens.refresh_token)
@@ -433,7 +433,7 @@ class Accounts:
             tokens: Tokens | None = await self._keychain.read(provider.id, address)
             if tokens is None:
                 raise SignInError(
-                    f"this account is not signed in to {provider.name}: sign in in Customize › Connectors",
+                    f"this account is not signed in to {provider.name}: sign in in Settings › Connectors",
                     {"provider": provider.id},
                 )
             if tokens.access_token != refused:
@@ -441,7 +441,7 @@ class Accounts:
             if tokens.refresh_token is None:
                 raise SignInError(
                     f"{provider.name} turned the sign-in away and gave no way to stay signed in: sign in again in "
-                    "Customize › Connectors",
+                    "Settings › Connectors",
                     {"provider": provider.id},
                 )
             fresh: Tokens = await self._refresh(provider, tokens.refresh_token)
@@ -466,7 +466,7 @@ class Accounts:
                 {"provider": provider.id, "error": type(error).__name__},
             ) from error
         if response.status_code != 200:
-            raise _refused(provider, response, "to refresh the sign-in (sign in again in Customize › Connectors)")
+            raise _refused(provider, response, "to refresh the sign-in (sign in again in Settings › Connectors)")
         return tokens_from(_json(provider, response), time.time(), refresh_token)
 
     async def forget(self, provider_id: ProviderId, address: str) -> bool:

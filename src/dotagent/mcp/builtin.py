@@ -4,7 +4,7 @@ starts those, and its tools are offered and judged like any server's tools; what
 to configure it.
 
 It starts when the package can be imported, ``[builtin_mcp] web_research`` is on and no other server has its name: a
-``[[mcp]]`` table, a plugin, a server added from another agent or one added on Customize › Connectors that is called
+``[[mcp]]`` table, a plugin, a server added from another agent or one added on Settings › Connectors that is called
 ``web-research`` replaces it, so that the owner's own checkout of the server wins over this one.
 """
 
@@ -194,7 +194,7 @@ def switch_of(server: str) -> BuiltinMcpSetting | None:
 
 def builtin_servers(config: AppConfig, taken: Collection[str] = ()) -> tuple[McpServerConfig, ...]:
     """The servers that come with this Dot, each as it starts, ``enabled`` as ``config`` switches it: one that is off is
-    here too, for ``dotx mcp list``, the doctor and Customize › Connectors to show. A server whose package is not
+    here too, for ``dotx mcp list``, the doctor and Settings › Connectors to show. A server whose package is not
     installed is not, and neither is one whose name another server has (``taken``): that server replaces it."""
     servers: list[McpServerConfig] = []
     if web_research_installed() and WEB_RESEARCH not in taken:

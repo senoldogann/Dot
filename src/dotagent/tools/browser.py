@@ -1552,7 +1552,7 @@ LOGIN_TOOLS: frozenset[str] = frozenset({LOGINS_TOOL, FILL_LOGIN_TOOL})
 VAULT_TOOLS: frozenset[str] = LOGIN_TOOLS | {CONTACTS_TOOL}
 # What a run is told when 1Password is not connected (item 493).
 _NOT_CONNECTED: str = (
-    "1Password is not connected: the owner connects it on Customize › Connectors › 1Password, and until then the "
+    "1Password is not connected: the owner connects it on Settings › Connectors › 1Password, and until then the "
     "logins of 1Password are theirs to type"
 )
 
@@ -1596,7 +1596,7 @@ async def _login(ctx: ToolContext, wanted: str) -> LoginChoice:
     if not choices:
         raise ToolInputError(
             "there is no login to fill: the owner keeps theirs in Settings › Vault, or connects 1Password on "
-            "Customize › Connectors, and until then the logins are theirs to type"
+            "Settings › Connectors, and until then the logins are theirs to type"
             + ("" if unreadable is None else f" ({_unreadable_note(unreadable)})"),
             {},
         )

@@ -1,4 +1,4 @@
-"""Routes of the MCP servers on Customize › Connectors (items 279 and 316): every server Dot has with where it stands,
+"""Routes of the MCP servers on Settings › Connectors (items 279 and 316): every server Dot has with where it stands,
 the catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
 authorization server sends the browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs
 no token; its page is :mod:`dotagent.server.callback_page`).
@@ -605,7 +605,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     async def remove_server(name: str) -> McpServersView:
         """Remove a server added on the Connectors page, or let go of a try: its tools leave the runs that start after,
         and Dot forgets its address and its sign-in. One added from another agent of this Mac is taken back as
-        Customize › Skills › Found on this Mac takes it back, and stopped now (item 497). A server of Dot's config is
+        Settings › Skills › Found on this Mac takes it back, and stopped now (item 497). A server of Dot's config is
         the owner's to take out of ``config.toml``, and one of a plugin goes with its plugin
         (``DELETE /api/installed-plugins/{name}``)."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()

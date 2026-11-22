@@ -1803,7 +1803,7 @@ class ProfileCheck(FrozenModel):
 
 
 class ConnectionView(FrozenModel):
-    """One application of Customize › Connectors (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
+    """One application of Settings › Connectors (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
     drives it with AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it
     keeps in sync. ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None``
     when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
@@ -1839,7 +1839,7 @@ type GalleryState = Literal["available", "installed", "outdated", "updated", "ta
 
 
 class GalleryPluginView(FrozenModel):
-    """A plugin of the gallery as Customize › Plugins shows it (item 542): ``skills`` are the names of its skill
+    """A plugin of the gallery as Settings › Plugins shows it (item 542): ``skills`` are the names of its skill
     folders, ``logo`` a file of ``static/icons/plugins`` (else the page draws its plugin mark), ``repository`` and
     ``commit`` the GitHub repository and the commit Install downloads, ``homepage`` that commit's page, and ``state``
     whether Dot installed it, has another plugin of its name (``taken``), or can install it. A plugin Dot installed
@@ -1887,7 +1887,7 @@ class ScoutFindingView(FrozenModel):
 
 
 class ScoutCandidateView(FrozenModel):
-    """A proposal of the plugin scout (item 712) as Customize › Plugins shows it: a new plugin or an update, where it
+    """A proposal of the plugin scout (item 712) as Settings › Plugins shows it: a new plugin or an update, where it
     comes from and how far that is trusted, what the review made of it and what its skills need that it does not bring
     (in the owner's language, item 949), what the scan found, how near it is to the owner's work, and where it
     stands."""
@@ -1951,8 +1951,8 @@ class McpLeftOut(FrozenModel):
 
 
 class McpServerView(FrozenModel):
-    """One MCP server Dot has, as Customize › Connectors shows it (item 279). ``origin`` is where it is set up: Dot's
-    config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), the
+    """One MCP server Dot has, as Settings › Connectors shows it (item 279). ``origin`` is where it is set up: Dot's
+    config, a plugin (``plugin`` names it), another agent of the Mac (Settings › Skills › Found on this Mac), the
     Connectors page itself, or Dot (``builtin``, item 583: it comes with Dot, and ``[builtin_mcp]`` switches it, on
     the page too, listed switched off as well). Remove takes out one added on the page or from another agent (item
     497); one of a plugin goes with its plugin, and one of the config is the owner's to take out of it. ``address`` is

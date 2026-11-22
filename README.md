@@ -117,7 +117,7 @@ Dot asks (the search APIs whose keys you save there among them), and its tools (
 of sites set, it also reads pages of its own choosing: the heads of a news search's results for their dates, and another
 copy of a page behind a wall. It sends the queries to DuckDuckGo and Yahoo, and to Google when those refuse, and
 requests the pages itself ([What leaves this Mac](docs/safety.md#what-leaves-this-mac) says the rest). Switch it off
-with its switch in Customize › Connectors, or with `[builtin_mcp] web_research = false` in `config.toml`; a `[[mcp]]`
+with its switch in Settings › Connectors, or with `[builtin_mcp] web_research = false` in `config.toml`; a `[[mcp]]`
 table named `web-research` replaces it with your own ([MCP servers](docs/extending.md#mcp-servers)).
 
 ## First steps

@@ -662,7 +662,9 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
         await reader.opens("The form that adds a watcher", page.get_by_role("button", name="New watcher").first)
         await reader.opens("The form of the morning brief", page.get_by_role("button", name="Morning brief settings"))
         # The form that adds a schedule is a page of the settings (item 1337).
-        await reader.go("/settings/schedules/new", "Settings › Scheduled tasks › New schedule", ".settings-pane .set-card")
+        await reader.go(
+            "/settings/schedules/new", "Settings › Scheduled tasks › New schedule", ".settings-pane .set-card"
+        )
         reader.done()
         await page.context.close()
 

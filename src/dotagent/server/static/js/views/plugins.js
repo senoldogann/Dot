@@ -1,4 +1,4 @@
-// Customize › Plugins (item 542): the gallery of the plugins Dot installs, after Qoder's page. A head that says what a
+// Settings › Plugins (item 542): the gallery of the plugins Dot installs, after Qoder's page. A head that says what a
 // plugin is, with the search and a few of the gallery's marks; New & noteworthy, the plugins the gallery features; and
 // All plugins, with All, Featured and Installed and an order, Popular (the stars of its repository) or Newest (when the
 // gallery took it). Each plugin is a card: its mark (its logo, else a skill's puzzle piece on a tile of its kind's
@@ -433,7 +433,7 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "gallery-card-main" },
-        el("div", { class: "gallery-card-head" }, el("a", { class: "gallery-card-name", href: `#/customize/plugins/${plugin.id}` }, plugin.name), plugin.official ? verified(plugin) : null),
+        el("div", { class: "gallery-card-head" }, el("a", { class: "gallery-card-name", href: `#/settings/plugins/${plugin.id}` }, plugin.name), plugin.official ? verified(plugin) : null),
         el("div", { class: "gallery-card-by" }, ...joined([plugin.publisher, CATEGORIES[plugin.category]?.label ?? null, plural(plugin.skills.length, "skill", "skills")])),
         el("p", { class: "gallery-card-does" }, plugin.does),
       ),
@@ -529,7 +529,7 @@ export function mount(root, ctx) {
       ["In the gallery since", DAY.format(new Date(`${plugin.added}T00:00:00`))],
     ];
     holder.replaceChildren(
-      el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/customize/plugins" }, icon("arrowLeft"), "Plugins")),
+      el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/settings/plugins" }, icon("arrowLeft"), "Plugins")),
       el(
         "header",
         { class: "gallery-page-head", dataset: { plugin: plugin.id, state: plugin.state } },
@@ -582,7 +582,7 @@ export function mount(root, ctx) {
     const plugin = gallery.plugins.find((one) => one.id === pluginId);
     if (plugin === undefined) {
       // A service's page had this address before the plugins took the name (item 542): it is under Connectors now.
-      location.replace(`${location.pathname}${location.search}#/customize/connectors/${pluginId}`);
+      location.replace(`${location.pathname}${location.search}#/settings/connectors/${pluginId}`);
       return;
     }
     paintPlugin(plugin);

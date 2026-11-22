@@ -6,7 +6,7 @@ it rewrites that skill as a new version, the old one kept.
 
 A skill is an instruction every later run follows, so only the owner's words may make one: a run that has read content
 third parties can author (a page, a mail, a tool's output) cannot save one, nor can a run in a chat Dot opened on its
-own initiative, and the secrets Dot holds are masked in it. The owner sees it under Customize › Skills, where they
+own initiative, and the secrets Dot holds are masked in it. The owner sees it under Settings › Skills, where they
 change, pin or drop it, and the conversation says it was saved."""
 
 import asyncio
@@ -58,7 +58,7 @@ def _skill_save_tool() -> RegisteredTool:
             return _refused(
                 "this run has read content others can write (a page, a mail, a tool's output), and a skill is an "
                 "instruction every later run follows. Ask the owner to say the steps in a chat that has not, or to "
-                "save them under Customize › Skills."
+                "save them under Settings › Skills."
             )
         if await ctx.runtime.store.opened_by(ctx.thread_id) == INITIATIVE_SOURCE:
             return _refused("a skill is the owner's instruction, and this chat is one Dot opened on its own.")
@@ -88,7 +88,7 @@ def _skill_save_tool() -> RegisteredTool:
         name: str = await asyncio.to_thread(save_said_skill, playbooks_dir(), draft, ctx.agent_id, now)
         return ok(
             f"Saved the skill {name}: later runs of this kind read it first and follow it. Tell the owner, in a line, "
-            "that you saved it and that Customize › Skills shows it. Told otherwise later, rewrite it with replace."
+            "that you saved it and that Settings › Skills shows it. Told otherwise later, rewrite it with replace."
         )
 
     return make_tool(

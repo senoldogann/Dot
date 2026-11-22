@@ -1,4 +1,4 @@
-"""The plugin scout's proposals on Customize › Plugins (item 712) through the API of a real in-process server: the
+"""The plugin scout's proposals on Settings › Plugins (item 712) through the API of a real in-process server: the
 proposals and the refused are listed, Install puts a proposed plugin in Dot's plugins folder (the archive is made here:
 no network) and the gallery lists it, Skip takes a proposal away, an update keeps the version it replaces and Revert
 puts it back (the Trash is one made here), an update whose installed version moved is refused and changes nothing, and

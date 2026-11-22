@@ -1,4 +1,4 @@
-"""Customize › Plugins' gallery (item 542) through the API of a real in-process server. Install downloads the pinned
+"""Settings › Plugins' gallery (item 542) through the API of a real in-process server. Install downloads the pinned
 commit (an archive made here: no network), puts the plugin in Dot's plugins folder and offers its skills to the runs
 that start after, without a restart; a second Install, a plugin the gallery does not have and one whose files are not
 the ones pinned are refused, and the last leaves nothing behind. Remove plugin moves it to the Trash (one made here) and

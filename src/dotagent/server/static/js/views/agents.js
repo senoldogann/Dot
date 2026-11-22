@@ -1597,7 +1597,7 @@ function mountPage(root, ctx, agentId) {
     if (confirmed) {
       await api.del(`/agents/${record.id}`);
       toast("ok", `${record.name} deleted.`);
-      ctx.navigate("/agents");
+      ctx.navigate("/settings/agents");
     }
   }
 
@@ -1742,7 +1742,7 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
-  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/agents" }, icon("arrowLeft"), "All agents"), page));
+  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), "All agents"), page));
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(refresh);

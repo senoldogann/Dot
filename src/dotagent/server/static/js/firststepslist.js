@@ -15,7 +15,7 @@ export const STEPS = [
   { id: "passwords", title: "Bring your passwords", where: "Settings › Vault: Import from CSV", href: "#/settings/vault" },
   { id: "imessage", title: "Reach Dot from iMessage", where: "Settings › Channels", href: "#/settings/channels" },
   { id: "phone", title: "Pair your phone", where: "Settings › Phone", href: "#/settings/phone" },
-  { id: "apps", title: "Connect your apps", where: "Customize › Connectors", href: "#/customize/connectors" },
+  { id: "apps", title: "Connect your apps", where: "Settings › Connectors", href: "#/settings/connectors" },
   { id: "chat", title: "Introduce yourself", where: "Write to Dot: who you are and what you work on", href: null },
 ];
 

@@ -378,7 +378,7 @@ async def _waiting(store: Store) -> Quoted:
 
 
 async def _plugins(store: Store) -> Quoted:
-    """How many plugins the scout proposed wait for the owner on Customize › Plugins (item 711): only the numbers,
+    """How many plugins the scout proposed wait for the owner on Settings › Plugins (item 711): only the numbers,
     since a plugin's name and what the review wrote of it are a stranger's words, which the brief does not quote."""
     state: ScoutState = await scout_service.load(store)
     now: float = time.time()
@@ -389,7 +389,7 @@ async def _plugins(store: Store) -> Quoted:
         return Quoted(lines=("Plugins proposed by Dot's nightly look: none waiting.",), run_ids=())
     new: int = sum(1 for candidate in waiting if candidate.kind == "new")
     line: str = (
-        f"Plugins proposed by Dot's nightly look, waiting for the owner on Customize › Plugins: {len(waiting)} "
+        f"Plugins proposed by Dot's nightly look, waiting for the owner on Settings › Plugins: {len(waiting)} "
         f"({new} new, {len(waiting) - new} updates)."
     )
     return Quoted(lines=(line,), run_ids=())

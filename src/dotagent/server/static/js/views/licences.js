@@ -4,7 +4,6 @@
 
 import { api } from "../api.js";
 import { el } from "../dom.js";
-import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, pageHead } from "../panels.js";
 import { attempt } from "../ui.js";
 
@@ -102,7 +101,6 @@ export function mount(root) {
   }
 
   root.append(
-    el("a", { class: "back", href: "#/settings/system" }, icon("arrowLeft"), "System"),
     pageHead("Open source licences", "The notices of the open source software, fonts and pictures Dot is built from, as they are on this Mac.", null),
     holder,
   );

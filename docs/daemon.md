@@ -79,14 +79,14 @@ and actions start at the defaults and are set with Edit) and a **message to Dot*
 one conversation, as each agent is. The agents' menu lists Dot and your agents, each its badge, its name and how many chats it
 has, to its conversation (item 1245 for Dot: its home chat, the owner's newest with Dot, else the home; item 1233 for an agent:
 its home chat, where a message to it goes on, the chat bound to it ever after; its page while it has none), and under them
-**All agents** (the page of every agent and team), **New agent** and **Campaigns** (a page of its own since item 401). Until item
+**All agents** (the page of every agent and team), **New agent** and **Campaigns** (Settings › Campaigns since item 1336). Until item
 1328 Dot and the agents stood as faces under the search, and Campaigns and Schedules as icons in the head (item 855); there is
-no **Schedules** icon now: its page, `#/schedules`, is a row of Settings, in the group of Connect apps (a Mac's nav and a
-phone's sheet), and the links to it in the Agents page, the teach toast and the notifications go on. An agent made, changed or
+no **Schedules** icon now: its page is **Scheduled tasks** (item 1337), a row of Settings under Agents (`#/settings/schedules`; a
+Mac's nav and a phone's sheet), and the links to it in the Agents page, the teach toast and the notifications lead there. An agent made, changed or
 deleted on a page shows in the menu at once, and one a run made once that run ends. In the foot stand four small icon buttons
 (item 1328): **Settings** (item 999; named with your name for a screen reader), **Connect apps** ([Connect
-apps](extending.md#connect-apps), items 492 and 545, which opens [Customize ›
-Connectors](extending.md#customize--connectors)), **Watch the Mac** (item 1264) and **Models** (Settings › Models: Dot has no
+apps](extending.md#connect-apps), items 492 and 545, which opens [Settings ›
+Connectors](extending.md#settings--connectors)), **Watch the Mac** (item 1264) and **Models** (Settings › Models: Dot has no
 account usage page). While the sidebar is closed the top bar holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close (in Dot.app the
 sidebar's head, its opener and the settings' Hide sidebar are 32 px, so that they fit beside
@@ -94,10 +94,10 @@ the traffic lights: item 1273). The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
 while it is being made or lost; what waits and what works stand in the dock under the list. A page's name in the top bar has an (i) beside it
-that shows, under the bar, the line that says what the page is for (item 848: Agents, Schedules, Campaigns,
-Handoffs, Diagnostics and the licences open on what they hold), and so do the parts of the Agents page and Customize's
-proposals; a row of the Memory, Vault and Schedules pages shows one action (a schedule's switch) and keeps the rest in
-its **…**. Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
+that shows, under the bar, the line that says what the page is for (item 848: Handoffs and the pages of the
+settings open on what they hold, the line under their breadcrumb since item 1336), and so do the parts of the Agents page
+and the plugins' proposals; a row of the Memory and Vault pages shows one action and keeps the rest in its **…**; a
+schedule's row shows its switch, **Run now** and **Edit**, and keeps **Delete** there (item 1337). Every icon draws about the same area at its size, with the same stroke (item 849): a "+", a speaker or
 a microphone no smaller than a copy beside it, each shape seen through a frame of its own (`icons.js`). The sections
 at the foot (Dot's work, a channel's) fold on a click of their label, and the folds are kept between visits. The
 sidebar's head holds the button that folds it away, at its left, and the title. **Select** turns the list
@@ -442,11 +442,11 @@ word goes; a command does its work. `@` at the start of a word opens the menu of
 367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **Connected apps**, the plugins: each one by
 its name and the number of its tools, filtered by the letters after it — the skills and the servers' tools, which the
 slash menu carries, are not there; a pick is a chip and the at word goes. In both menus a server, and each of its tools,
-wears the mark its service's Customize tile wears, in the theme's ink on that quiet tile (item 946): the service's logo, else its icon or its
+wears the mark its service's tile in Settings › Connectors wears, in the theme's ink on that quiet tile (item 946): the service's logo, else its icon or its
 letters (DeepWiki's magnifier, Context7's C7), the plug for a service with no mark of its own, and Dot's own icon, its
 own tile as an application's is, for a server of no service (web-research, a server added by hand; item 581, on its
-Customize tile and its chip too); and a skill wears the puzzle piece, here and as a chip and as the row of a call to the
-`skill` tool, plain in the ink of the text (item 537; the Customize cards keep the marks of item 477: the download arrow
+tile in Settings › Connectors and its chip too); and a skill wears the puzzle piece, here and as a chip and as the row of a call to the
+`skill` tool, plain in the ink of the text (item 537; the cards of Settings › Skills keep the marks of item 477: the download arrow
 of an imported skill, the brain of a learned one; the daemon's palette says which server is of which service). An `@`
 inside a word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the
 composer and scrolls inside it. A run that waits for your approval is listed under Waits for you, below the composer,
@@ -721,7 +721,7 @@ is not a check that the work holds. Under the recap stand the run's sources and 
 only when it has a row (item 539): **Sources** (the pages it fetched and the searches it made, a page opening in a new
 tab; a fetch that failed is not a page it read), **Changed files** (the files the chat wrote with their added and
 removed lines, each opening the Changes tab where the diff is), **Skills & connected apps** (the skills and MCP servers
-the run used, with how many times it used each, opening Customize; a skill is the `skill` tool's name, a server the one
+the run used, with how many times it used each, opening Settings › Skills or Settings › Connectors; a skill is the `skill` tool's name, a server the one
 in `mcp__server__tool`; the section stays out of sight until the run uses one, item 546) and **Memory updated** (the
 notes it saved, corrected or forgot, each opening its note in Settings › Memory). These sections are the chat's,
 from its start (item 650): a new message opens a new run, whose page shows what the chat's earlier turns used, read and
@@ -959,20 +959,30 @@ value (item 378: this Dot, how it acts, what it works with and its models), the 
 their own). Which folds are open is kept in the browser. A card that folds keeps its head on its ground, so that
 folded it is a row of the page, as a group of the health checks is (item 576).
 In a Mac's window the sidebar is the settings' nav while they are open (item 562): its first row holds the button that
-hides the sidebar where the chats' head holds it (in the desktop app beside the traffic lights, item 577), then the
-settings' groups of rows (item 999, the phone's sheet; before, seven sections of tabs, item 845), and at its foot
-**Back to chats**, to the chat last open (item 852; it stood at the top). The rows are **General** and **Vault**,
-**Connect apps**, then under **Dot** Rules, Memory, Models, AI services, Web search, Browser, Self-improvement and
-Self-repair, under **Phones and channels** Phone and Channels, and under **App** Appearance, Snapshots and System; a row
-is its name alone, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, a dot when
-a phone reaches Dot; no model's name, item 852), and the rows scroll on their own in a short window; whether the
-daemon answers and the emergency stop are the page's, as on every page. The page is the open tab alone, in a column of
-920 px under its own name and the line that says what it is for, with no row of tabs, each section a name over a card of
-rows; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are the same rows as one
-sheet (item 995), each with a line under its name, each opening its tab as a page of its own (item 330,
-under [Dot on the phone](phone.md#dot-on-the-phone)). The addresses of the tabs are as they were (`#/settings/keys` opens AI
-services). The earlier addresses of the memory, rules and system pages lead to their tabs, and
-the schedules' tab (`#/settings/schedules`) to the Schedules page. **Snapshots** (item 405) is the window captured into
+hides the sidebar where the chats' head holds it (in the desktop app beside the traffic lights, item 577), under it a
+search of the settings (item 1336: `/` takes the focus while the settings are open, Escape clears it, Enter opens the
+first match; it reads each page's name, its line and its words), then the settings' groups of rows (item 999, the phone's
+sheet), and at its foot **Back to chats**, to the chat last open (item 852). Every page that configures Dot is a row:
+**General**, **Appearance**, **Rules**, **Memory**, **Vault** and **Snapshots**; under **Agents**
+Agents, Models, Browser, Web search, **Scheduled tasks** (item 1337: what was the Schedules page), Campaigns and
+Self-improvement; under **Connections** Connectors, Plugins, Skills, AI services, Phone and Channels; under
+**Maintenance** System, Self-repair and Diagnostics; under **About** Open source licences. A row is a small mark and its
+name, with what it holds at its right (how many notes Dot keeps, how many items the vault holds, how many schedules are
+on, a dot when a phone reaches Dot; no model's name, item 852), and the rows scroll on their own in a short window;
+whether the daemon answers and the emergency stop are the page's, as on every page. The page is the open page alone, in a
+column of 800 px: its place in the top bar as a breadcrumb (**Settings / General**; a page of a page adds a part, **Settings
+/ Scheduled tasks / Morning briefing**), the line that says what it is for, then its sections, each a name of 14 px over a
+card with a hairline round it, whose rows are a title and the muted line under it at the left and the control at the
+right, parted by hairlines; in a window too narrow for the docked sidebar the nav is in the drawer. On a phone they are the
+same rows as one sheet with the same search (item 995), each with a line under its name, each opening its page as a page
+of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)); a control that does not fit beside its title goes
+under it at the full width, and the bar names the page alone. The addresses are `#/settings/<page>` (`#/settings/keys`
+opens AI services); the pages that were top-level ones are rows of it now, and their old addresses lead to them with what they
+carry: Memory, Rules and System (`#/memory`, `#/rules`, `#/system`), the page that was called Customize (`#/customize/plugins`, `/skills`,
+`/connectors`, and a plugin's or a service's page under them) and `#/connect` to Plugins, Skills and Connectors,
+`#/agents` (not an agent's own page, `#/agents/<id>`, which is its conversation) and `#/campaigns/<id>` to Agents and
+Campaigns, `#/diagnostics` and `#/licences` to Diagnostics and Open source licences, and `#/schedules` to Scheduled
+tasks. **Snapshots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
 
 ### Settings › Vault
@@ -1059,7 +1069,7 @@ the introduction and the first message you send end it, and the daemon keeps tha
 **First steps** (item 811). While Dot is fresh (its first run is not 14 days old, or it has none) and a step is left,
 the home lists the first steps under the greeting and the composer, which keep their place in the middle: tell Dot
 your name (Settings › General), bring your passwords (Settings › Vault, Import from CSV), reach Dot from iMessage
-(Settings › Channels), pair your phone (Settings › Phone), connect your apps (Customize › Connectors) and introduce
+(Settings › Channels), pair your phone (Settings › Phone), connect your apps (Settings › Connectors) and introduce
 yourself (a first chat), each a link to its page and a check once it is done, with how many are. **Hide** puts the
 card away for good in that browser, and it goes by itself once every step is done; a Dot used for long never shows it
 (`GET /api/assistant/first-steps`: `fresh` and each step's `done`, read from the store, the channels, the paired phones
@@ -1499,11 +1509,11 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /browser/remote-input` (`{"remote_input": true\|false}`)                | whether a held run's page can be used from the screen (item 470), kept in the config file |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
-| `GET /connections`, `POST /connections/{id}`      | the applications of Customize › Connectors, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
+| `GET /connections`, `POST /connections/{id}`      | the applications of Settings › Connectors, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
 | `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `mark`, `picks_tools`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there, or take back one added from another agent of this Mac and stop it now (item 497; 409 for one of a plugin, which goes with its plugin, for one of the config, and for one that comes with Dot, which is switched) |
 | `PUT /mcp/servers/{name}/switch` (`{"on": true}`) (item 583) | switch a server that comes with Dot (`origin` `builtin`: `web-research`) on or off: on starts it and offers its tools to the runs that start after, off stops it now; the config file keeps it as `[builtin_mcp]`, written once the server answered when it is switched on and before it stops when it is switched off, so a server that cannot start (an error that says why) or a config file that cannot be changed (422) leaves the switch as it was; 409 for a server that does not come with Dot or is being tried, 404 for no such server. A server that comes with Dot is listed switched off too, and `POST /mcp/servers/{name}/connect` tries one that is on and was left out again (409 for one switched off) |
 | `GET /mcp/servers/{name}/offered`, `PUT /mcp/servers/{name}/allow` (`{"tools": [...]}`) (items 426 and 524) | for a server added on the page (409 for one set up elsewhere, 404 for one that is not there): every tool it lists with what it says it does, and its allow list (`allow`, empty when it offers them all); then the tools to offer, at least one of the names it lists (422 otherwise, nothing changed), all of them keeping no list, connected first and kept with the server after, so a server that does not answer leaves the choice unwritten and a restart offers the same ones. The page offers the choice when `picks_tools` is true: the server runs, or it was left out with an allow list |
-| `GET /plugin-gallery`, `POST /plugin-gallery/{id}` | the plugins of Customize › Plugins' gallery (item 542) and those installed from the nightly look's proposals (item 712), each with where it stands (`available`, `installed`, `outdated`, `updated`, `taken`) and whether an update can be reverted, its skills, its repository and pinned commit, and the plugins Dot reads that are not the gallery's (`others`); install one: its pinned commit downloaded from GitHub, its skills checked against the hash the gallery keeps and put in Dot's plugins, offered to the runs that start after (404 for no such plugin, 409 for a name taken, a download that fails or files that are not the ones pinned, which leave nothing behind) |
+| `GET /plugin-gallery`, `POST /plugin-gallery/{id}` | the plugins of Settings › Plugins' gallery (item 542) and those installed from the nightly look's proposals (item 712), each with where it stands (`available`, `installed`, `outdated`, `updated`, `taken`) and whether an update can be reverted, its skills, its repository and pinned commit, and the plugins Dot reads that are not the gallery's (`others`); install one: its pinned commit downloaded from GitHub, its skills checked against the hash the gallery keeps and put in Dot's plugins, offered to the runs that start after (404 for no such plugin, 409 for a name taken, a download that fails or files that are not the ones pinned, which leave nothing behind) |
 | `GET /plugin-scout`, `POST /plugin-scout/look` | the nightly look's proposals waiting for you, those its review refused, its last look and whether one is under way (items 710-712); start a look now (409 while the emergency stop is engaged; one under way is not started twice) |
 | `POST /plugin-scout/{id}/install`, `POST /plugin-scout/{id}/skip` (`?kind=update` for an update) | install a proposed plugin, or take a proposed update, exactly at the commit and with the files that were checked, keeping the version an update replaces (409 when the files differ, the name is taken or the installed version moved); skip a proposal for good (404 for none waiting) |
 | `POST /plugin-gallery/{id}/revert` | put back the version an update from a proposal replaced; the updated one goes to the Trash (409 when no earlier version is kept) |

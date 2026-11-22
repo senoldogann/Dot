@@ -175,7 +175,9 @@ async def test_a_saved_task_repeats_from_the_panel_and_its_schedule_says_so(own_
                     await page.screenshot(path=str(tmp_path / f"repeat-{width}.png"))
                     await repeat.get_by_role("button", name="Repeat it").click()
                     said = repeat.locator(".teach-repeated")
-                    await expect(said).to_have_text("It repeats on Mondays at 08:30, in this chat. See it in Scheduled tasks")
+                    await expect(said).to_have_text(
+                        "It repeats on Mondays at 08:30, in this chat. See it in Scheduled tasks"
+                    )
                     await page.screenshot(path=str(tmp_path / f"repeated-{width}.png"))
                     if width == 1280:
                         await said.get_by_role("link", name="See it in Scheduled tasks").click()

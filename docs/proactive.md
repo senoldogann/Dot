@@ -2,12 +2,12 @@
 
 Dot does not only answer when it is asked. Each morning it writes you a brief and sends you its first line (item 570),
 and its watchers tell you when a mail, a calendar event or a GitHub notification you care about comes (item 571). Both
-are set on Schedules, and what Dot tells you on its own goes through one place, which the phone's push, the desktop's
+are set in Settings › Scheduled tasks, and what Dot tells you on its own goes through one place, which the phone's push, the desktop's
 notifications and, when it is on, iMessage share (see [Telling you](#telling-you)).
 
 ## Morning brief
 
-The **Morning brief** card stands under your schedules on the Schedules page, as one line: its name, when it writes
+The **Morning brief** card stands under your schedules in Settings › Scheduled tasks, as one line: its name, when it writes
 ("Every day at 08:00", or Off) and its switch (item 609); its **Settings** button opens them in a dialog, so that the
 page keeps its size (item 615). The settings are the time of day (08:00, read in `[scheduler]
 timezone`, which is the zone of this Mac unless the configuration says another), every day or the weekdays, and a box,
@@ -41,7 +41,7 @@ in what its chat shows, are Dot's instructions for the brief and Dot's record of
 dated answers of a schedule's earlier runs are:
 
 - what waits for you: the questions and approvals that runs left, and the drafts waiting for you to send them;
-- how many plugins the nightly look proposed wait on Customize › Plugins (only the numbers, item 711);
+- how many plugins the nightly look proposed wait on Settings › Plugins (only the numbers, item 711);
 - the runs that failed since the last brief, with the first line of what each said;
 - the goals of the last week started again in other chats whose runs keep failing, with a run since the last brief,
   however few tokens they spent (a schedule's firings, each in a chat of its own, are not a goal started again):
@@ -85,7 +85,7 @@ goes to your phone's push service and, with iMessage on, to Apple's iMessage ser
 ## Evening check-in
 
 The morning brief's twin at the end of the day (item 930), after Codync's lead bot, which checks in at 09:00 and 18:00
-to follow up on what is open and offer the next step. Schedules › Evening check-in is one line: its time and its
+to follow up on what is open and offer the next step. Scheduled tasks › Evening check-in is one line: its time and its
 switch (`GET` and `PUT /api/checkin`, `{enabled, time, days}`; off at 18:00 every day until you switch it on). On, Dot
 writes it at that time as a schedule of its own, which only reads (`research`; its notice is always), in one chat
 for all check-ins, named "Evening check-in". Its run reads Dot's record of itself in a fence, as the brief's does
@@ -98,7 +98,7 @@ first line, at most 140 characters, goes to your phone and iMessage under *Your 
 
 ## Watchers
 
-**Watchers** is the panel under the brief on Schedules (with none, its head says *None yet* and a line says what a
+**Watchers** is the panel under the brief in Scheduled tasks (with none, its head says *None yet* and a line says what a
 watcher does, item 609); **New watcher** makes one, and a watcher's pencil changes it, in a dialog (item 615) that
 asks before it drops what you typed and says inside it why the daemon refused (twenty watchers are the most). A
 watcher has:
@@ -140,7 +140,7 @@ time, the oldest first: each is judged, told and written down as handled before 
 that is cut has told and kept what it finished, and the next look takes the rest (a look judged them all before it told
 any, so one cut told nothing and the next asked about the same mails again, item 612).
 
-**GitHub.** The notifications API with the personal access token Dot keeps when you add GitHub on Customize › Connectors
+**GitHub.** The notifications API with the personal access token Dot keeps when you add GitHub on Settings › Connectors
 (`MCP_GITHUB_GITHUB_PAT` in its `.env`); with none, the watcher says on its row to add it. GitHub's notifications need a
 classic token with the notifications scope: a fine-grained one cannot read them, and the refusal says so. Without words,
 a review asked of you, a mention, an assignment and a check of yours that failed are told; with words, the fast model
@@ -168,7 +168,7 @@ model's line, the notification, the event), the same in your conversation with y
 in the sidebar, unread, with the newest tell as its last line. The line is a run that no model made (its goal says which
 watcher and what kind, its result is the tell), kept by `RunManager.keep_notice` and marked untrusted: what a third
 party wrote is in its result only, never in its goal, which a later run in that chat would take as yours. A tell that
-could not be kept (a run of yours is at work in that chat) goes out all the same and opens Schedules.
+could not be kept (a run of yours is at work in that chat) goes out all the same and opens Scheduled tasks.
 
 **The run a watcher starts.** With **Tell me and start a task**, each item told starts a run, in a chat of its own named
 for the watcher and the item, at most `[watchers] runs_per_hour` (5) an hour from one watcher: a tell past that goes out
@@ -186,7 +186,7 @@ and `judged_per_look`.
 ## On its own
 
 **Dot works for you on its own while the Mac is idle** (item 715, an idea of makecindy/cindy's companions). The **On its
-own** card under the watchers on Schedules has its switch (off until you switch it on) and Dot's own list: the things it
+own** card under the watchers in Scheduled tasks has its switch (off until you switch it on) and Dot's own list: the things it
 means to do for you, each with why it helps you, where it stands (to do, doing now, done, let go) and how many runs
 tried it; a row opens the chat of the run that did it. A run puts a thing on the list with the tool `todo_add` (a
 follow-up its work calls for, something you asked to be done later, a chore it noticed), and takes back with `todo_drop`
@@ -399,7 +399,7 @@ later listens for the same event. It is not stored: what is kept is the run it o
 
 **On iMessage** a tell is one message, marked with a zero-width space, of the title (a title Dot gives in your
 language, item 918), a colon, the text and the link to the page it opens
-(`#/runs/<id>` or `#/schedules`, at the address of the links of the channel, the name `[server] reach` gives and never
+(`#/runs/<id>` or `#/settings/schedules`, at the address of the links of the channel, the name `[server] reach` gives and never
 one that carries the access token; with no such name there is no link, item 611):
 *Your morning brief: Nothing needs you today. https://…/#/runs/…*. It is masked of the secrets Dot holds and sent as
 plain text, and it is never read back as a command, since every message of Dot's in that conversation starts with the

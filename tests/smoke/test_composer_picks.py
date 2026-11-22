@@ -383,7 +383,7 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
             refused: dict[str, tuple[JsonObject, str]] = {
                 "a server that is not connected": (
                     {"plugins": ["nowhere"]},
-                    f"the MCP server nowhere is not connected (the servers connected now: {SERVER}); Customize › "
+                    f"the MCP server nowhere is not connected (the servers connected now: {SERVER}); Settings › "
                     "Connectors says why",
                 ),
                 "a skill not offered": ({"skills": ["nope"]}, "no skill offered to this run is called nope"),

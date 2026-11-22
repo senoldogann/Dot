@@ -2,7 +2,7 @@
 
 Two kinds. A **merge**: each night the review model is shown the pairs of skills whose kinds are close in meaning
 (``[agent] skill_merge_similarity``) and says which are one procedure (:func:`propose_merges`); for each yes a second
-call writes the merged steps, and the proposal waits as a card on Customize › Skills. A **rewrite from the owner's
+call writes the merged steps, and the proposal waits as a card on Settings › Skills. A **rewrite from the owner's
 words** (:func:`propose_rewrite`, which item 586's reactions call): the same second call changes one skill as they say.
 Nothing is written to a skill until the owner says yes (:func:`accept_proposal`): it makes a new version of the skill
 (the file it replaces is kept, so a restore undoes it), marked if any skill it was made from was, and a merge puts the

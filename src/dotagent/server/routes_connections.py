@@ -1,4 +1,4 @@
-"""Routes of the applications of Customize › Connectors (item 278): where each one stands, and the step that sets it up;
+"""Routes of the applications of Settings › Connectors (item 278): where each one stands, and the step that sets it up;
 and the listings of the Connectors page (item 316), which takes those steps."""
 
 import asyncio

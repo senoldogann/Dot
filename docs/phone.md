@@ -194,9 +194,10 @@ have space between them; a ready team the owner has already says so under its wo
 the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
 
 On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-05 for one plain sheet; before, a list
-of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General and
-Vault, then Connect apps and Schedules (the sidebar has no Schedules icon, so its page is a row here), then the groups Dot (Rules, Memory, Models, AI services, Web search, Browser, Self-improvement,
-Self-repair), Phones and channels (Phone, Channels) and App (Appearance, Snapshots, System), and under them the first
+of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General,
+Appearance, Rules, Memory, Vault and Snapshots, then the groups Agents (Agents, Models, Browser, Web search, Scheduled tasks,
+Campaigns, Self-improvement; the sidebar has no Schedules icon, so its page is a row here), Connections (Connectors, Plugins,
+Skills, AI services, Phone, Channels), Maintenance (System, Self-repair, Diagnostics) and About (Open source licences), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
 how many notes there are, how many items the vault holds; Models no model's name, item 852). A row opens its tab on its
@@ -205,7 +206,7 @@ card, as a section's title does on the redrawn tabs (item 576); a card that fold
 Mac's window the sidebar is the settings' nav while they are open, the same rows by their names (items 562 and 999); see
 [the daemon, the web UI and the service](daemon.md#the-daemon-the-web-ui-and-the-service). On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Interface size starts at a phone's 16 px
-(item 331). A service's page of Customize › Connectors and an agent's editor name their cards the same way, a row of the
+(item 331). A service's page of Settings › Connectors and an agent's editor name their cards the same way, a row of the
 home's Today strip keeps its facts to one line that fades where it runs out of room, and Handoffs' empty page says what
 brings messages there (item 332).
 
@@ -232,7 +233,7 @@ end, in the same bar; it is a row of 40 px, a plain surface on a hairline and th
 and no pill (items 352 and 360, drawn so since item 1335; a wider window has the same bar), as wide as its parts and the
 way down and no wider, in the middle of the dock, not across all of it (item 427). While the task waits for its
 subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331).
-A list row (Campaigns, Schedules, agents, notes) is its face or switch, its title and its buttons on one line, and
+A list row (Campaigns, Scheduled tasks, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
 a turn after a turn keeps 8 px and the rows of what a run did 4, what you wrote sits in a box that holds its words in 8 px above and

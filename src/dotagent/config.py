@@ -922,9 +922,9 @@ class McpServerConfig(FrozenModel):
 
     Values of ``env`` and ``headers`` may refer to secrets as ``${NAME}``; they are looked up like API keys
     (environment, ``.env``, Keychain). ``allow`` lists the server's tools to offer to the model (empty: all of them, up
-    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Customize ›
-    Plugins (item 279): Dot then sends the access token it keeps for the server and renews it. ``cwd`` is the folder a
-    server Dot starts (a ``command``) starts in, a whole path; the workspace when it names none (item 637). The
+    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Settings ›
+    Connectors (item 279): Dot then sends the access token it keeps for the server and renews it. ``cwd`` is the
+    folder a server Dot starts (a ``command``) starts in, a whole path; the workspace when it names none (item 637). The
     web-research server that comes with Dot starts in its own data folder, where a run cannot write, so that no file
     a run leaves in the workspace runs in it or in a program it starts. ``description`` is what
     the server is for, in the owner's own words (item 659): the line of its tool group in a run's instructions says it,

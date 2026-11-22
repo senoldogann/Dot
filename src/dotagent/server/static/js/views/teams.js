@@ -161,7 +161,7 @@ function mountPage(root, ctx, teamId) {
     if (confirmed) {
       await api.del(`/teams/${detail.record.id}`);
       toast("ok", `${detail.record.name} removed. Its agents are still yours.`);
-      ctx.navigate("/agents");
+      ctx.navigate("/settings/agents");
     }
   }
 
@@ -241,7 +241,7 @@ function mountPage(root, ctx, teamId) {
     }
   }
 
-  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/agents" }, icon("arrowLeft"), "All agents"), page));
+  root.append(el("div", { class: "agent-page" }, el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), "All agents"), page));
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
       attempt(refresh);

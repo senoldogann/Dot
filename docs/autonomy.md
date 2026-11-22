@@ -480,7 +480,7 @@ notes wait for you to forget or keep them.
 **The reflection and the learned skills (item 585).** In the same night a skill whose record counts uses and has no
 date of its last read is given one, and the review model is asked which pairs of skills whose kinds are close in
 meaning (`[agent] skill_merge_similarity`, 0.75) are one procedure: each yes is a merge that waits as a card on
-Customize › Skills, at most `skill_proposals_per_night` (3) a night, for your yes. No skill is written, rested or
+Settings › Skills, at most `skill_proposals_per_night` (3) a night, for your yes. No skill is written, rested or
 deleted by it: see Learned skills in [Extending Dot](extending.md).
 
 **Taking back the file changes of a run.** At the head of the side panel's Changes tab of a chat's run (item 841;

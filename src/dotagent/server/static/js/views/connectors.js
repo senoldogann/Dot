@@ -1,4 +1,4 @@
-// Customize › Connectors (items 316, 542 and 545): every service Dot works with, where Connect apps at the foot of the
+// Settings › Connectors (items 316, 542 and 545): every service Dot works with, where Connect apps at the foot of the
 // sidebar leads. The head the three tabs share (customizehead.js) with the search, Connected and All and Check again;
 // the accounts; the sections as chips, one showing its section alone; and the services in sections (Popular, which
 // the page opens on, its chip pressed, until All, another chip, a search or Connected lists the rest, item 1000; Code, Design, Data, Research,
@@ -39,7 +39,7 @@ const POPULAR = "popular";
 const MCP_ORIGIN_WORDS = {
   config: "Set up in Dot's settings file; remove it there.",
   plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
-  elsewhere: "Added from another agent of this Mac (Customize › Skills › Found on this Mac).",
+  elsewhere: "Added from another agent of this Mac (Settings › Skills › Found on this Mac).",
   builtin: "Comes with Dot: it searches the web and reads pages.",
 };
 // A server's tile names this many of its tools.
@@ -309,7 +309,7 @@ export function mount(root, ctx) {
     let action = null;
     if (step?.page) {
       // A service whose step is its page (1Password, item 493): its button leads there.
-      action = el("a", { class: "btn sm plugin-add", href: `#/customize/connectors/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, step.label);
+      action = el("a", { class: "btn sm plugin-add", href: `#/settings/connectors/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, step.label);
     } else if (step !== null && step.link !== undefined) {
       action = el(
         "a",
@@ -342,7 +342,7 @@ export function mount(root, ctx) {
       el(
         "div",
         { class: "plugin-main" },
-        el("a", { class: "plugin-name", href: `#/customize/connectors/${plugin.id}` }, plugin.name),
+        el("a", { class: "plugin-name", href: `#/settings/connectors/${plugin.id}` }, plugin.name),
         el("div", { class: "plugin-does" }, plugin.does),
         el("div", { class: "plugin-meta" }, catalogue.howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : catalogue.standing(plugin)),
       ),
@@ -552,7 +552,7 @@ export function mount(root, ctx) {
   function paintPlugin(plugin) {
     ctx.setTitle(`${plugin.name} · Connectors`);
     const again = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
-    holder.replaceChildren(el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/customize/connectors" }, icon("arrowLeft"), "Connectors"), again), ...serviceParts(catalogue, plugin));
+    holder.replaceChildren(el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/settings/connectors" }, icon("arrowLeft"), "Connectors"), again), ...serviceParts(catalogue, plugin));
   }
 
   function paint() {
@@ -565,7 +565,7 @@ export function mount(root, ctx) {
     }
     const plugin = catalogue.plugins.find((one) => one.id === pluginId);
     if (plugin === undefined) {
-      holder.replaceChildren(el("a", { class: "back", href: "#/customize/connectors" }, icon("arrowLeft"), "Connectors"), errorPanel(new Error(`Dot lists no connector ${pluginId}.`)));
+      holder.replaceChildren(el("a", { class: "back", href: "#/settings/connectors" }, icon("arrowLeft"), "Connectors"), errorPanel(new Error(`Dot lists no connector ${pluginId}.`)));
     } else {
       paintPlugin(plugin);
     }

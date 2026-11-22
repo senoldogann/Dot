@@ -255,7 +255,7 @@ async def look_github(accounts: Accounts, watcher: WatcherRecord, now: float) ->
     token: str | None = await asyncio.to_thread(optional_secret, GITHUB_TOKEN_NAME)
     if token is None:
         raise ConfigError(
-            "GitHub is not set up: add it on Customize › Connectors with a personal access token",
+            "GitHub is not set up: add it on Settings › Connectors with a personal access token",
             {"watcher": watcher.id},
         )
     answer: Notifications = await read_notifications(accounts, token, watcher.state.modified)

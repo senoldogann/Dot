@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1339](1339.md) | done | 2026-11-22 | The rest of the settings: Connectors, Plugins and Skills as lists, the words and addresses of the docs |
 | [1338](1338.md) | done | 2026-11-22 | Every settings page draws in plain rows and cards: a hairline card, a title and its muted line at the left, the control at the right |
 | [1337](1337.md) | done | 2026-11-22 | Schedules are Settings › Scheduled tasks: a list in rows with a switch, Run now, Edit and Delete, and a page for the form |
 | [1336](1336.md) | done | 2026-11-22 | The settings are one plain shell: a search and groups of rows in the nav, a breadcrumb in the bar, and every page that configures Dot a row of it |

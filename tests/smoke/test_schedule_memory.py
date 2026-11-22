@@ -11,8 +11,8 @@ No network and no model service is used.
 """
 
 import asyncio
-import re
 import json
+import re
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path

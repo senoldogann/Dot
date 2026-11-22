@@ -1,4 +1,4 @@
-// The versions of a learned skill (item 585, Customize › Skills): a dialog that lists them, the newest first, each with when
+// The versions of a learned skill (item 585, Settings › Skills): a dialog that lists them, the newest first, each with when
 // it was made, how (a run rewrote it, a merge, a restore, the owner's words), whether its steps carry the mark of content
 // third parties can author, and the steps it changed from the version before it. Restore puts one back as a new version of
 // its own, so that the put-back can be taken back: the steps the skill has now stay in the list.

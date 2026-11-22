@@ -309,7 +309,7 @@ async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
             await browser.close()
 
 
-# Where a Popular card of Customize › Connectors draws its mark, its name and what it does, read from the page.
+# Where a Popular card of Settings › Connectors draws its mark, its name and what it does, read from the page.
 _POPULAR_TILES: str = """() => {
   const tiles = document.querySelectorAll('.plugin-section[data-section="popular"] .plugin-tile');
   return [...tiles].map((tile) => {
@@ -331,10 +331,10 @@ _POPULAR_TILES: str = """() => {
 async def test_the_popular_cards_are_rows_on_a_phone_and_keep_their_words_in_their_column(
     own_home: Path, mac_at_rest: None
 ) -> None:
-    """Item 604: on the owner's iPhone the Popular cards of Customize › Connectors stood up as on a desk, a 48 px mark
+    """Item 604: on the owner's iPhone the Popular cards of Settings › Connectors stood up as on a desk, a 48 px mark
     over words that a row's rules had put in a second column, beside an empty one, so a short line started halfway
-    across the card. On a phone they are rows as the other sections' are, the words beside a mark of 40 px; on a desk
-    they stand up, the words under the mark and from its edge."""
+    across the card. They are rows as the other sections' are (on a desk too since item 1339), the words beside a mark
+    of 40 px or less."""
     async with _served(own_home) as (runtime, port), async_playwright() as playwright:
         await _fill(runtime, port)
         browser: Browser = await playwright.webkit.launch()
@@ -351,11 +351,8 @@ async def test_the_popular_cards_are_rows_on_a_phone_and_keep_their_words_in_the
                     where: str = f"{tile['name']} at {width}"
                     # The name and what it does start where each other does.
                     assert abs(tile["words"]["x"] - tile["does"]["x"]) <= 1, where
-                    if width == 390:
-                        assert tile["mark"]["width"] <= 40, where
-                        assert tile["mark"]["right"] < tile["words"]["x"] <= tile["mark"]["right"] + 16, where
-                    else:
-                        assert abs(tile["words"]["x"] - tile["mark"]["x"]) <= 1, where
+                    assert tile["mark"]["width"] <= 40, where
+                    assert tile["mark"]["right"] < tile["words"]["x"] <= tile["mark"]["right"] + 16, where
                 await page.context.close()
         finally:
             await browser.close()

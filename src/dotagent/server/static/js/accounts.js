@@ -1,4 +1,4 @@
-// The official sign-ins of Google and Microsoft (item 422), at the head of Customize › Connectors: whether the client
+// The official sign-ins of Google and Microsoft (item 422), at the head of Settings › Connectors: whether the client
 // the owner registered is set, the accounts signed in, each with Sign out, and Sign in, which opens the provider's page
 // in a new tab and follows the sign-in until the account is there.
 

@@ -7,7 +7,7 @@ are flagged, are prepared and never run, and one that is run goes to a stand-in 
 what Dot does with the server: it starts with the daemon's own Python and keeps its data in Dot's home, its tools are
 offered and judged like any MCP server's, the owner's host lists and the long-address flag bind its addresses, it takes
 no ``.env`` into its environment, a server of the owner's with its name replaces it, and the switch
-(``[builtin_mcp] web_research``, on Customize › Connectors and in ``dotx mcp list``) turns it off and on.
+(``[builtin_mcp] web_research``, on Settings › Connectors and in ``dotx mcp list``) turns it off and on.
 
 The suite looks for the package under a name nothing has (``tests/conftest.py``); ``web_research_comes`` asks for the
 real one back."""

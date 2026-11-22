@@ -1,4 +1,4 @@
-"""Customize › Connectors (items 278, 316, 542 and 545) end to end: Connect apps at the foot of the sidebar opens it,
+"""Settings › Connectors (items 278, 316, 542 and 545) end to end: Connect apps at the foot of the sidebar opens it,
 wide and light and on a phone and dark. Every service in its section, 25 or more, each with its mark, what Dot does
 with it and how it connects; a search, and Connected next to All. With macOS's answers given by the test (an
 application allowed, one not asked, one refused, one not installed), Mail is connected and offers no step, Outlook is

@@ -1,4 +1,4 @@
-"""Customize › Plugins (item 542): the plugins of the gallery, whether each is installed, and Install, which downloads
+"""Settings › Plugins (item 542): the plugins of the gallery, whether each is installed, and Install, which downloads
 the pinned commit of its repository and offers its skills to the runs that start after
 (:mod:`dotagent.plugins.gallery`). Remove is ``DELETE /installed-plugins/{name}`` (item 497), which moves the folder to
 the Trash.

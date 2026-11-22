@@ -190,15 +190,13 @@ async def test_in_the_desktop_shell_the_settings_keep_their_button_on_the_lights
             assert abs(await _left(hide) - head_left) <= _TOLERANCE_PX
             # Back to chats stands at the nav's foot, under the sections (item 852), clear of the lights.
             back = await nav.get_by_role("link", name="Back to chats").bounding_box()
-            # The groups scroll in a box of their own above it, so that a window too short for every row (Schedules
-            # is one since item 1328) never puts a row under it: Back stands below that box.
-            groups = await nav.locator(".settings-nav-groups").bounding_box()
-            assert back is not None and groups is not None and back["y"] >= groups["y"] + groups["height"], (
+            # The groups scroll in a box of their own above it, so that a window too short for every row never puts a
+            # row under it: Back stands below that box.
+            groups = await nav.locator(".snav-groups").bounding_box()
+            assert back is not None and groups is not None and back["y"] >= groups["y"] + groups["height"] - 1, (
                 back,
                 groups,
             )
-            groups = await nav.locator(".snav-groups").bounding_box()
-            assert back is not None and groups is not None and back["y"] >= groups["y"] + groups["height"] - 1, (back, groups)
             await page.screenshot(path=str(tmp_path / "lights-1280-settings.png"), animations="disabled")
             # Hidden, the sidebar leaves the top bar's opener at the same place.
             await hide.click()
@@ -234,13 +232,9 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             # No button of a new chat (item 1245): Dot is one conversation, which its entry, first in the agents' menu,
             # opens (item 1328), and the button beside the search writes to it.
             await expect(page.locator("#sidebar").get_by_role("link", name="New chat")).to_have_count(0)
-            await page.goto(f"{address}/#/agents")
+            await page.goto(f"{address}/#/team")
             await page.get_by_role("button", name="Your agents", exact=True).click()
             await page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name=re.compile("^Dot")).click()
-            dot_face: Locator = page.locator("#sidebar .side-agent-faces .side-dot-face")
-            await expect(dot_face).to_be_visible()
-            await page.goto(f"{address}/#/team")
-            await dot_face.click()
             await expect(page).to_have_url(re.compile(r"#/runs$"))
             await expect(page.get_by_role("textbox", name="Goal")).to_be_focused()
             await hide.click()

@@ -1,8 +1,8 @@
 """Connect apps (items 492, 545 and 1328) end to end: the small button at the foot of the sidebar, right of Settings,
-leads to Customize › Connectors, the page of the services Dot works with, which stands for it while it is open: wide
-and light in the desktop shell, and on a phone and dark, the same four buttons. On the page the sections are chips, one
-showing its section alone and All every one; Popular stands up as Plugins' New & noteworthy does; the search keeps
-its focus and shows what it finds, each card its step in words.
+leads to Settings › Connectors (item 1336), the page of the services Dot works with, which stands for it while it is
+open: wide and light in the desktop shell, and on a phone and dark, the same four buttons. On the page the sections
+are chips, one showing its section alone and All every one; Popular is a row as Plugins' New & noteworthy is (item
+1339); the search keeps its focus and shows what it finds, each card its step in words.
 
 The server that is ready is the MCP fixture of the tests, started on this Mac, which the test has the daemon take for
 one of Sentry's, for its mark (``service_of``): no service of the catalogue answers offline.
@@ -179,14 +179,19 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             ).to_be_visible()
             await page.keyboard.press("Escape")
 
-            # It opens Customize › Connectors, no dialog over the page, and stands for the page while it is open.
+            # It opens Settings › Connectors (item 1336), no dialog over the page.
             await button.click()
             await expect(page).to_have_url(f"{address}/#/settings/connectors")
             await expect(page.get_by_role("dialog")).to_have_count(0)
             await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("Connectors")
-            await expect(button).to_have_attribute("data-current", "")
-            # The styles read data-current, a screen reader aria-current, as the links of the pages give it (item 559).
-            await expect(button).to_have_attribute("aria-current", "page")
+            # The sidebar is the settings' nav while the page is open: Connectors is its marked row.
+            await expect(page.locator("#sidebar .snav-link[aria-current='page'] .snav-label")).to_have_text(
+                "Connectors"
+            )
+            # Connect apps stands for the page while it is open; the nav shows the settings, so its attributes are read.
+            held: Locator = page.locator("#sidebar .side-connect")
+            await expect(held).to_have_attribute("data-current", "")
+            await expect(held).to_have_attribute("aria-current", "page")
             await expect(page.locator(".customize-hero-line")).to_contain_text("Dot works in the apps")
             titles: Locator = page.locator(".plugin-section-title")
             # The page opens on Popular alone, a line saying how to see the rest (item 1000); All lists every section.
@@ -195,9 +200,10 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await page.locator("[data-chip='all']").click()
             await expect(page.locator(".connect-browse")).to_have_count(0)
             await expect(titles).to_have_text([_TITLES[section] for section in shown_sections])
-            # Popular stands up as Plugins' New & noteworthy does; a section's title counts its cards.
+            # Popular is a row as the other sections' are, as Plugins' New & noteworthy is (item 1339); a section's
+            # title counts its cards.
             popular: Locator = page.locator(".plugin-section[data-section='popular'] .plugin-tile").first
-            assert await popular.evaluate("(tile) => getComputedStyle(tile).flexDirection") == "column"
+            assert await popular.evaluate("(tile) => getComputedStyle(tile).flexDirection") == "row"
             assert await titles.first.get_attribute("data-count") == str(members["popular"])
             await page.screenshot(path=str(tmp_path / "connectors-1280-light.png"))
             # A chip shows its section alone, All every one.
@@ -227,10 +233,10 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await search.fill("")
             wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert wide <= 0, wide
-            # Away from Customize the button stands for it no more.
-            await page.get_by_role("link", name="Write to Dot").click()
-            await expect(button).not_to_have_attribute("data-current", "")
-            await expect(button).not_to_have_attribute("aria-current", "page")
+            # Away from Settings › Connectors the button stands for it no more.
+            await page.get_by_role("link", name="Back to chats").click()
+            await expect(held).not_to_have_attribute("data-current", "")
+            await expect(held).not_to_have_attribute("aria-current", "page")
             assert errors == []
 
             # On a phone: the same small button at the foot of the list of chats, which opens the same page.

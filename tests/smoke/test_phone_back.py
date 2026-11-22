@@ -181,13 +181,10 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page).to_have_url(f"{address}/#/runs")
     # The old address of Customize leads to its open tab, a page of the settings (item 1336).
     await page.goto(f"{address}/#/customize")
-    await expect(page).to_have_url(f"{address}/#/customize/plugins")
-    # A chat opened from the sidebar: the button is the way to the list of chats. On a phone, as on a Mac, Dot's own
-    # conversation is a chat of the list (item 1328).
     await expect(page).to_have_url(f"{address}/#/settings/plugins")
     await page.goto(f"{address}/#/runs")
-    # A chat opened from the sidebar: the button is the way to the list of chats. On a phone Dot's own conversation is
-    # the agents' first row (item 1245); the column of faces above it is a wide window's.
+    # A chat opened from the sidebar: the button is the way to the list of chats. On a phone, as on a Mac, Dot's own
+    # conversation is a chat of the list (item 1328).
     await page.get_by_role("button", name="Show sidebar").click()
     places: int = await page.evaluate("history.length")
     await page.locator(f"#sidebar .side-chat a.side-run[href='#/runs/{run.id}']").first.click()
@@ -328,9 +325,10 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await expect(wide.get_by_role("button", name="Back")).to_have_count(0)
                     # The page's link back shows with the sidebar beside it (item 380), and with the sidebar hidden.
                     await expect(wide.locator("main .back")).to_be_visible()
+                    # Diagnostics is a row of the settings' nav (item 1336): the page has no link back of its own.
                     await wide.goto(f"{address}/#/diagnostics")
-                    await expect(wide.locator("main .back")).to_have_text("System")
-                    await expect(wide.locator("main .back")).to_be_visible()
+                    await expect(wide.locator("nav.crumbs .crumb-here")).to_have_text("Diagnostics")
+                    await expect(wide.locator("main .back")).to_have_count(0)
                     await wide.goto(f"{address}/#/settings/connectors/notion")
                     await wide.get_by_role("button", name="Hide sidebar").click()
                     await expect(wide.locator("main .back")).to_be_visible()

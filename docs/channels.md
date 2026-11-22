@@ -143,7 +143,7 @@ folds like Chats does and keeps its fold (item 619, [Dot's web UI](daemon.md#the
 - What Dot tells you on its own comes the same way (item 582): the first line of the morning brief and each tell of a
   watcher ([Dot comes to you](proactive.md)), as one message, **marked** as an answer is, that holds the title (one
   Dot gives, such as *Dot did on its own*, in your language, item 918; a watcher's name as you wrote it), a colon, the
-  text and the link to the page the tell opens (the brief's run, the chat Watchers or Schedules; with no `[server]
+  text and the link to the page the tell opens (the brief's run, the chat Watchers or Settings › Scheduled tasks; with no `[server]
   reach` there is no link, item 611): *Your morning brief: Nothing needs you today. https://…/#/runs/…*. It goes
   to the conversation you wrote in last, masked of the secrets Dot holds and as plain text, while iMessage is on and a
   number is paired; with the channel off, or no number paired, nothing is sent. Your phone's push and the page's

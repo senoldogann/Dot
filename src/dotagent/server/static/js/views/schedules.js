@@ -775,7 +775,6 @@ function mountList(root, ctx) {
     holder.replaceChildren(...sections);
     const asked = askedId === "" ? null : holder.querySelector(`[data-schedule="${CSS.escape(askedId)}"]`);
     askedId = "";
-    askedEdit = false;
     if (asked !== null) {
       asked.classList.add("asked");
       asked.scrollIntoView({ block: "nearest" });

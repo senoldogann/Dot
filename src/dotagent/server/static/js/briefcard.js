@@ -140,7 +140,7 @@ export function mountBrief(ctx, onSaved) {
       parts.push(el("a", { href: `#/runs/${view.last_run_id}` }, "Open the last brief"));
     }
     if (view.accounts === 0) {
-      parts.push(el("span", null, "No mail or calendar account is signed in: the brief covers what Dot knows of itself. ", el("a", { href: "#/customize/connectors" }, "Add one")));
+      parts.push(el("span", null, "No mail or calendar account is signed in: the brief covers what Dot knows of itself. ", el("a", { href: "#/settings/connectors" }, "Add one")));
     }
     status.replaceChildren(...joined(parts));
   }
