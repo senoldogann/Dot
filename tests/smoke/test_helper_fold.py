@@ -195,7 +195,7 @@ async def test_a_helper_is_a_closed_row_that_opens_for_its_approval_and_folds_ag
                 # The helper that works is its row alone: closed, its last line and its time in sight.
                 closed: Locator = _row(page, working.id)
                 await expect(closed).to_have_js_property("open", False)
-                await expect(closed.locator(".child-progress")).to_contain_text("step")
+                await expect(closed.locator(".child-progress")).to_contain_text("Running")
                 await expect(closed.locator(".child-time")).not_to_have_text("")
                 await expect(closed.locator(".steps")).to_be_hidden()
                 figure: Locator = closed.locator(".child-time")

@@ -28,6 +28,7 @@ import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { callKind, describeArguments, flowIcon, flowWords, narrates, shortPaths, toolRow, toolWords } from "./tools.js";
 import { detailsFold } from "./ui.js";
+import { callPhrase } from "./workstatus.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
@@ -50,6 +51,16 @@ const STATUS_WORDS = {
   done: t("timeline.statusDone"),
   failed: t("timeline.statusFailed"),
   cancelled: t("timeline.statusCancelled"),
+};
+// How a subagent's row says its state in a word beside the time ("Running 8m 15s"); a state not listed here shows none.
+const ROW_WORDS = {
+  queued: t("timeline.rowQueued"),
+  running: t("timeline.rowRunning"),
+  ending: t("timeline.rowEnding"),
+  blocked: t("timeline.rowWaiting"),
+  done: t("timeline.rowDone"),
+  failed: t("timeline.rowFailed"),
+  cancelled: t("timeline.rowStopped"),
 };
 // The words of a delegated run's status ring, for its tooltip and for a screen reader.
 const RING_LABELS = { ...STATUS_WORDS, blocked: t("timeline.statusWaiting") };
@@ -112,6 +123,12 @@ function paintRing(ring, status) {
   ring.className = `status-ring s-${status}`;
   ring.title = label;
   ring.setAttribute("aria-label", label);
+}
+
+/** The state word of a subagent's row, beside its time, in the colour of how it stands (run.css). */
+function paintWord(word, status) {
+  word.dataset.state = status;
+  setText(word, ROW_WORDS[status] ?? status);
 }
 
 /** A markdown text as one plain line (item 245): without the marks of its headings, lists, bold and code, its links as
@@ -383,7 +400,10 @@ function buildFlock() {
   const time = el("span", { class: "helpers-time" });
   const main = el("span", { class: "helpers-main" }, title, state);
   const head = el("summary", { class: "helpers-head" }, faces, main, time, el("span", { class: "chev" }, icon("chevron")));
-  const body = el("div", { class: "helpers-body" });
+  // How the group works, said while a subagent works: side by side, the chat waits, each answer comes back (the way a
+  // developer tool says it); it goes once none works.
+  const how = el("p", { class: "helpers-how" }, t("timeline.flockHow"));
+  const body = el("div", { class: "helpers-body" }, how);
   const node = el("details", { class: "helpers", open: true }, head, body);
   return { node, body, faces, title, state, time };
 }
@@ -732,6 +752,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     // The last line of the delegated run: its step and tool, then how it ended and how many steps it took.
     const progress = el("span", { class: "child-last small muted meta-facts child-progress" }, el("span", null, STARTING));
     const time = el("span", { class: "child-time" });
+    const word = el("span", { class: "child-word" });
+    paintWord(word, "running");
     const open = el(
       "a",
       { class: "child-open", href: `#/runs/${runId}`, title: t("timeline.helperPage"), "aria-label": t("timeline.helperTask") },
@@ -749,11 +771,18 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       el(
         "span",
         { class: "child-main" },
-        el("span", { class: "child-title" }, el("span", { class: "child-name" }, name), " ", el("span", { class: "child-goal" }, clip(shortPaths(data.goal ?? ""), GOAL_CHARS))),
+        // The job is the title; an agent's name stands before it, a numbered subagent's stays for a screen reader.
+        el(
+          "span",
+          { class: "child-title" },
+          el("span", { class: agentName === null ? "child-name visually-hidden" : "child-name" }, name),
+          " ",
+          el("span", { class: "child-goal" }, clip(shortPaths(data.goal ?? ""), GOAL_CHARS)),
+        ),
         progress,
       ),
       meta,
-      time,
+      el("span", { class: "child-state" }, word, time),
       open,
       el("span", { class: "chev" }, icon("chevron")),
     );
@@ -787,11 +816,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       began: ts,
       ended: null,
       action: null,
+      words: null,
       calls: 0,
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
     // `line`: the facts its last line shows (see paintChild); `showSteps()` puts the run's steps in the row.
-    const panel = { node, face, status, meta, progress, line: STARTING, time, steps: 0, helper, flock: null, showSteps };
+    const panel = { node, face, status, word, meta, progress, line: STARTING, time, steps: 0, helper, flock: null, showSteps };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     // The agent the run is of, by its name (item 668): its answer stands in the parent's conversation as its message.
     scope.agentName = agentName;
@@ -868,6 +898,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   function endChild(scope, status, steps, ts, result) {
     Object.assign(scope.panel.helper, { status, ended: ts, calls: 0 });
     paintRing(scope.panel.status, status);
+    paintWord(scope.panel.word, status);
     scope.panel.face.setAttribute("data-state", faceState(status));
     scope.panel.face.classList.add("ended");
     // Its last line is the start of its answer (item 245), after how it ended unless it is done;
@@ -875,6 +906,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const answer = clip(plainLine(result), PREVIEW_CHARS);
     const said = STATUS_WORDS[status] ?? status;
     const facts = answer === "" ? [said, tCount(steps, "timeline.stepOne", "timeline.stepMany")] : status === "done" ? [answer] : [said, answer];
+    scope.panel.node.dataset.ended = status;
     paintChild(scope, ts, facts);
     liveChildren.delete(scope);
     paintFlock(scope.panel.flock, ts);
@@ -909,7 +941,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         endChild(scope, run.status, run.steps, run.finished_at, run.result);
       } else if (run.steps > scope.panel.steps) {
         scope.panel.steps = run.steps;
-        paintChild(scope, now, [t("timeline.stepAt", { step: run.steps })]);
+        scope.panel.node.dataset.steps = String(run.steps);
+        // A step the page saw the call of is said by what it does; one it did not read, by its number.
+        paintChild(scope, now, [scope.panel.helper.words ?? t("timeline.stepAt", { step: run.steps })]);
       }
     }
   }
@@ -1048,6 +1082,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     }
     scope.panel.helper.status = waiting ? "blocked" : "running";
     paintRing(scope.panel.status, scope.panel.helper.status);
+    paintWord(scope.panel.word, scope.panel.helper.status);
     paintFlock(scope.panel.flock, ts);
   }
 
@@ -1261,8 +1296,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
       if (atWork(scope)) {
         // The tool in the words the steps use ("Write file", "Web Research · Web scrape").
-        paintChild(scope, record.ts, [t("timeline.stepAt", { step: scope.panel.steps }), toolWords(data.tool)]);
+        // What it does now, in the words of the line over the composer ("Running swift test").
+        paintChild(scope, record.ts, [callPhrase(data.tool, data.args)]);
         scope.panel.helper.action = describeCall(data.tool, data.args);
+        scope.panel.helper.words = callPhrase(data.tool, data.args);
         scope.panel.helper.calls += 1;
       }
       showCall(scope, { id: data.call_id, tool: data.tool, args: data.args });
@@ -1924,6 +1961,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
   // The statuses of the run's delegated runs, in the order they started.
   const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
+// What the subagents that work do now, one line each, in the order they started: "Title: Running swift test".
+const helperNow = () =>
+  [...liveChildren]
+    .filter((scope) => scope.panel !== null)
+    .map((scope) => ({ title: clip(shortPaths(scope.panel.helper.goal), GOAL_CHARS), words: scope.panel.helper.words ?? t("timeline.starting") }));
   return {
     element,
     push,
@@ -1932,6 +1974,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     knows: (runId) => scopes.has(runId),
     helper,
     helperStatuses,
+    helperNow,
     draft: (record) => drafts.get(record.id)?.update(record),
   };
 }

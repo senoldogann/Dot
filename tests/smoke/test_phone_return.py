@@ -115,7 +115,7 @@ _SIGHT: str = """(state) => {
 _RECORD: str = """(words) => {
   const log = { start: 0, moves: [], said: {}, added: {}, stepsAt: null };
   window.__calm = log;
-  const steps = () => (document.querySelector(".helpers-body")?.textContent.match(/step \\d+/g) ?? []).join(",");
+  const steps = () => (document.querySelector(".helpers-body")?.textContent.match(/echo \\d+/g) ?? []).join(",");
   log.steps = steps();
   // What stands at three heights of the screen, but never a helper's row: a row is made again when a step arrives (its
   // state and time are new), and the point at 30 per cent of a phone's screen can land on one now that the conversation
@@ -415,7 +415,7 @@ async def _chat_page(context: BrowserContext, proxy: Proxy, run: RunRecord) -> P
     await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
     await page.goto(f"http://127.0.0.1:{proxy.port}/#/runs/{run.id}")
     await expect(page.locator(".capsule")).to_contain_text("Working", timeout=15_000)
-    await expect(page.locator(".helpers-body")).to_contain_text("step", timeout=15_000)
+    await expect(page.locator(".helpers-body")).to_contain_text("Running sleep", timeout=15_000)
     await page.wait_for_timeout(1_500)
     return page
 
@@ -435,7 +435,7 @@ async def _keep_pages_copy(page: Page) -> None:
     await page.wait_for_function("() => navigator.serviceWorker.controller !== null")
     await page.reload()
     await _until_true(page, "async () => (await caches.match('/js/main.js')) !== undefined", None)
-    await expect(page.locator(".helpers-body")).to_contain_text("step", timeout=15_000)
+    await expect(page.locator(".helpers-body")).to_contain_text("Running sleep", timeout=15_000)
 
 
 async def _places(page: Page, scope: str) -> dict[str, list[int]]:
@@ -595,7 +595,7 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
                     said.extend(word for word in _WORDS if word in text)
                     await again.wait_for_timeout(100)
                 assert said == [], said
-                await expect(again.locator(".helpers-body")).to_contain_text("step")
+                await expect(again.locator(".helpers-body")).to_contain_text("Running sleep")
                 await expect(again.locator(".waiting")).to_have_count(0)
                 await again.screenshot(path=str(tmp_path / f"again-shown-{scheme}.png"))
                 shown: dict[str, list[int]] = await _places(again, ".shell")
@@ -720,7 +720,7 @@ async def test_a_page_that_an_update_left_behind_says_so_in_place_and_loads_agai
                 await page.evaluate(_SIGHT, "hidden")
                 outdated[0] = False
             assert await page.evaluate("() => window.dotStayed === undefined")
-            await expect(page.locator(".helpers-body")).to_contain_text("step", timeout=15_000)
+            await expect(page.locator(".helpers-body")).to_contain_text("Running sleep", timeout=15_000)
             await expect(banner).to_be_hidden()
         finally:
             await browser.close()

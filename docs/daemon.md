@@ -559,19 +559,22 @@ whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line b
 a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
 at), never from what a page says; its title is the page's own, shown as text and cut at a line. A turn lists 12 pages
 at most and counts the rest; a fetch that failed and a search read none. A delegated run
-is a row: the face with its state at the corner (turning while it works, amber while it waits for you, a check in
-the text's ink when it is done, item 839, red when it failed), its name and its goal over the last thing it did and,
-once it ended, the
-start of its answer (item 245): an agent's run is named by the agent ("Scout"), any other by its place among the
-helpers of the run that started it ("Helper 1", "Helper 2"), and the goal follows quieter, its paths cut to their last
-two parts ("…/housestory/brief.md"); the last thing it did names the tool in the words the steps use ("step 32 ·
-Write file", "Web Research · Web scrape"; item 669), the time it has taken (counting on every second while it works),
-the way to its own page (under the pointer, where there is one; on a touch screen, on an open row, item 1281) and a chevron that opens its steps. Since item 884 the
-row is no card: a line of the conversation on no fill, its face in the column of the faces and its words where theirs
-start, and an agent's folded message under it starts there too. Rows that follow each other gather in one group: its head shows their faces, how many they
-are ("3 helpers") and, once none works, how they stand ("2 done · 1 stopped") and the time from the first one's start to
-the last one's end (while one works, the status line over the composer says how the run's helpers stand and how long the run has worked,
-and the head does not say it twice, item 1281), and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;
+is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning
+while it works, amber while it waits for you, a check in the text's ink when it is done, item 839, red when it
+failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Subagent
+1" for a screen reader only; the goal's paths are cut to their last two parts, "…/housestory/brief.md", item 669), under
+it in one quiet line what it does now in the words of the line over the composer ("Running swift test", "Reading
+README.md", "List folder: shelf-3"; item 1331) and, once it ended, the start of its answer as the result (item 245),
+its state in a word beside the time it has taken ("Running 8m 15s": the word in blue while it works, amber while it
+waits, red when it failed; the time counts on every second), the way to its own page (under the pointer, where there
+is one; on a touch screen, on an open row, item 1281) and a chevron that opens its steps. In a group the rows share one
+card with a hairline between them; one subagent alone is a card of its own. Rows that follow each other gather in one
+group: its head shows their faces, how many they are ("3 subagents"), how they stand ("2 working", in blue while one
+works; "2 done · 1 stopped" after) and the time from the first one's start to the last one's end, counting on while
+one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
+side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
+says **Waiting on 2 subagents** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
+and the subagents with it); the status line under it stays as it was. An approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
 again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
 the row is its line alone, which its events keep up to date, so a chat whose helpers took hundreds of steps opens light
@@ -759,7 +762,7 @@ send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
 box (items 352 and 360) says in a few quiet words how long the run has worked, that it waits to start, that it waits
 for you or that it stops (once Stop was pressed, until it has),
-how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its helpers stand
+how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its subagents stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
 parts has something to say and goes when none has. The plan's part opens the plan as a bubble over the
 composer: how far it has come, its targets, its steps as the Plan tab draws them and **Open in the side

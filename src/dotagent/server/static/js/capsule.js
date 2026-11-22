@@ -7,9 +7,12 @@
 // pressed the line says it stops until the run ends.
 
 import { duration, el, setText } from "./dom.js";
-import { t } from "./i18n.js";
+import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { flockState } from "./timeline.js";
+
+// The states of a subagent that the run waits on.
+const LIVE = new Set(["queued", "running", "ending", "blocked"]);
 
 /**
  * The line. A tap on a part calls `onWork()`, `onHelpers()` or `onQueued()`; the plan's part is `plan`,
@@ -19,7 +22,7 @@ import { flockState } from "./timeline.js";
  * (`{ done, total }`, or null), the statuses of its helpers and the messages queued.
  * `status` is null for a run that no longer works.
  */
-export function createCapsule({ onWork, onHelpers, onQueued }) {
+export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
   const workMark = el("span", { class: "capsule-mark" });
   const workText = el("span", { class: "capsule-time" });
   const work = el("button", { class: "capsule-part capsule-work", type: "button", onclick: onWork }, workMark, workText);
@@ -31,11 +34,23 @@ export function createCapsule({ onWork, onHelpers, onQueued }) {
   const queued = el("button", { class: "capsule-part capsule-queued", type: "button", onclick: onQueued }, icon("listOrdered"), queuedText);
   // A group, not a live region: its time changes every second, which a screen reader would read out each time.
   const element = el("div", { class: "capsule", role: "group", "aria-label": t("capsule.label"), hidden: true }, work, plan, helpers, queued);
+  // The line over the bar while the run waits for subagents (item 1331), as a developer tool says it: "Waiting on 2
+  // subagents" and what the first of them does now, Details (the Agents tab) and Stop.
+  const waitText = el("span", { class: "wait-line-text" });
+  const waitNow = el("span", { class: "wait-line-now" });
+  const wait = el(
+    "div",
+    { class: "wait-line", hidden: true, role: "group", "aria-label": t("capsule.waitLabel") },
+    el("span", { class: "wait-line-mark", "aria-hidden": "true" }, icon("circleDashed")),
+    el("span", { class: "wait-line-main" }, waitText, waitNow),
+    el("button", { class: "wait-line-button", type: "button", onclick: onHelpers }, t("capsule.details")),
+    el("button", { class: "wait-line-button", type: "button", onclick: onStop }, t("capsule.stop")),
+  );
   let markFor = null;
   // Stop was pressed and the run has not ended yet.
   let halting = false;
 
-  function paint({ status, since, now, plan: steps = null, helpers: statuses, queued: waiting }) {
+  function paint({ status, since, now, plan: steps = null, helpers: statuses, helpersNow = [], queued: waiting }) {
     const working = status !== null;
     if (!working) {
       halting = false;
@@ -56,6 +71,11 @@ export function createCapsule({ onWork, onHelpers, onQueued }) {
       workText,
       halting ? t("capsule.stopping") : blocked ? t("work.waitingForYou") : status === "queued" ? t("work.queued") : t("capsule.working", { took }),
     );
+    const live = statuses.filter((each) => LIVE.has(each)).length;
+    wait.hidden = !working || live === 0 || halting;
+    setText(waitText, live === 0 ? "" : tCount(live, "capsule.waitOne", "capsule.waitMany"));
+    const first = helpersNow[0];
+    setText(waitNow, first === undefined ? "" : `${first.title}: ${first.words}`);
     helpers.hidden = !working || statuses.length === 0;
     setText(helpersText, flockState(statuses));
     queued.hidden = waiting === 0;
@@ -65,6 +85,7 @@ export function createCapsule({ onWork, onHelpers, onQueued }) {
 
   return {
     element,
+    wait,
     plan,
     paint,
     stopping: () => {

@@ -6977,10 +6977,10 @@ html[data-chat-details="on"] .chat-internal {
   overflow-wrap: anywhere;
 }
 
-/* A delegated run is a row (item 82): the face with its state at the corner, the goal over its last line, the time it
-   has taken, the way to its page and a chevron; opened, the run's steps hang under it. Since item 884 (the owner's
-   word: the chat looked "çok çirkin") it is no card: a line of the lane on no fill, its face in the column of the
-   faces and its words where the words of the messages start, as the lines around it are; a tint under the pointer. */
+/* A delegated run is a row (item 82), drawn as a developer tool draws its subagents (item 1331): a small face with its
+   state at the corner, the job in the text's own ink over what it does now in one quiet line, its state in a word
+   beside the time it has taken, the way to its page and a chevron; opened, the run's steps hang under it. In a group
+   the rows share one card, a hairline between them; a lone subagent is a card of its own. */
 .child {
   min-width: 0;
 }
@@ -6988,9 +6988,8 @@ html[data-chat-details="on"] .chat-internal {
 .child > summary {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin: 0 calc(var(--space-2) * -1);
-  padding: var(--space-1) var(--space-2);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   cursor: pointer;
   list-style: none;
@@ -6998,7 +6997,7 @@ html[data-chat-details="on"] .chat-internal {
 
 @media (hover: hover) {
   .child > summary:hover {
-    background: color-mix(in srgb, var(--text) 4%, transparent);
+    background: var(--surface-2);
   }
 }
 
@@ -7018,21 +7017,21 @@ summary:has(> .chev)::-webkit-details-marker {
 .child-face {
   position: relative;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 .child-face .avatar {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 .child-face .status-ring {
   position: absolute;
   right: -3px;
   bottom: -3px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   background: var(--bg);
 }
 
@@ -7051,30 +7050,59 @@ summary:has(> .chev)::-webkit-details-marker {
   font-weight: var(--weight-label);
 }
 
-/* A helper's name stands first, in the text's colour, and what it is for after it, quieter (item 669). */
+/* The job is the title, in the text's colour. An agent's name stands before it, and then the job is the quieter part
+   (item 669); a numbered subagent's name stays for a screen reader. */
 .child-name {
   color: var(--text);
 }
 
 .child-goal {
+  color: var(--text);
+}
+
+.child-name:not(.visually-hidden) ~ .child-goal {
   color: var(--muted);
   font-weight: var(--weight-text);
 }
 
-.child-time {
+/* The state beside the time: "Running 8m 15s", the word in the colour of how the run stands. */
+.child-state {
   flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
   color: var(--muted);
   font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.child-word[data-state="running"],
+.child-word[data-state="ending"],
+.child-word[data-state="queued"] {
+  color: var(--accent-strong);
+}
+
+.child-word[data-state="blocked"] {
+  color: var(--warn);
+}
+
+.child-word[data-state="failed"] {
+  color: var(--bad);
+}
+
+.child-time {
+  color: var(--muted);
 }
 
 /* Opened, the run's steps hang under the row on a hairline from the face's middle, their words where the row's are. */
 .child > .timeline {
-  margin: var(--space-1) 0 var(--space-2) 12px;
-  padding-left: calc(28px + var(--space-2) - 12px);
+  margin: var(--space-1) 0 var(--space-2) calc(var(--space-3) + 12px);
+  padding-left: calc(24px + var(--space-3) - 12px);
   border-left: 1px solid var(--border);
 }
 
-/* A row's last line stays one line (item 245): the start of the answer is cut where the row ends. */
+/* A row's last line stays one line (item 245): what it does now, or the start of its answer, cut where the row ends. */
 .child-progress {
   flex-wrap: nowrap;
 }
@@ -7086,9 +7114,16 @@ summary:has(> .chev)::-webkit-details-marker {
   white-space: nowrap;
 }
 
-/* Helpers that follow one another (item 245): a head with their faces, how many
-   they are and how they stand, the time from the first one's start to the last one's end and a chevron; under it, their
-   rows in one box. */
+/* A lone subagent is a card of its own; in a group the rows are the group's. */
+.timeline > .child {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* Subagents that follow one another (items 245 and 1331): a head with their faces, how many they are, how they stand
+   in the colour of work while one works, the time from the first one's start to the last one's end and a chevron;
+   under it, their rows in one card. */
 .helpers > summary {
   display: flex;
   align-items: center;
@@ -7097,12 +7132,6 @@ summary:has(> .chev)::-webkit-details-marker {
   border-radius: var(--radius-sm);
   cursor: pointer;
   list-style: none;
-}
-
-@media (hover: hover) {
-  .helpers > summary:hover {
-    background: var(--surface-2);
-  }
 }
 
 .helpers > summary::-webkit-details-marker {
@@ -7122,7 +7151,7 @@ summary:has(> .chev)::-webkit-details-marker {
 }
 
 .helpers-faces > * + * {
-  margin-left: calc(-1 * var(--space-2));
+  margin-left: calc(-1 * var(--space-1));
 }
 
 .helpers-faces .avatar,
@@ -7172,15 +7201,12 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-sm);
 }
 
-.helpers-state.bad {
-  color: var(--bad);
+.helpers[data-live] .helpers-state {
+  color: var(--accent-strong);
 }
 
-/* While a helper works the status line over the composer says how they stand and how long it has been (the capsule); the
-   head says how many they are, and the state and the time once none works (item 1281). */
-.helpers[data-live] .helpers-state,
-.helpers[data-live] .helpers-time {
-  display: none;
+.helpers-state.bad {
+  color: var(--bad);
 }
 
 .helpers-time {
@@ -7192,37 +7218,56 @@ summary:has(> .chev)::-webkit-details-marker {
 
 .helpers-body {
   margin-top: var(--space-1);
-  padding: var(--space-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  overflow: hidden;
 }
 
-/* In a group the rows share its box: no card of their own, a little room between them. */
+/* How the group works, said while one works. */
+.helpers-how {
+  display: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.helpers[data-live] .helpers-how {
+  display: block;
+}
+
+/* In a group the rows share its card: a hairline between them, no card of their own. */
 .helpers-body > .child {
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
 }
 
 .helpers-body > .child + .child {
-  margin-top: var(--space-half);
+  border-top: 1px solid var(--border);
 }
 
 .helpers-body > .child > summary {
-  border-top: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
 }
 
-/* A phone keeps the head of the helpers one line tall (item 401): the state words never wrap and the title gives way
-   with an ellipsis. A helper's row is two lines, as it is on a wide window (item 1281): its name and what it is for,
-   then its last line, each cut with an ellipsis at the row's end; side by side, on 390 px, the name took the line and
-   left the goal "Gör…" and the last line half the row. The rows a finger taps stay 40 px tall through `min-height`
-   (app.css). */
+/* A phone keeps the head of the subagents one line tall (item 401): the state words never wrap and the title gives way
+   with an ellipsis. A row is two lines, as it is on a wide window: the job and what it does now, each cut with an
+   ellipsis at the row's end; the state's word stands over the time at its end, so that the job keeps the room. The rows
+   a finger taps stay 40 px tall through `min-height` (app.css). */
 @media (max-width: 720px) {
   .child > summary {
     gap: var(--space-2);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-2);
+  }
+
+  .child-state {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    font-size: var(--text-xs);
   }
 
   .helpers > summary {

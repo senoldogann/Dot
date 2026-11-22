@@ -1,6 +1,6 @@
 """Helpers that follow one another sit in one group (item 245), on the pages of a daemon in Chrome. A run delegates four
 helpers in one step: three answer at once, one waits in a shell command. In the run's conversation their rows are one
-group whose head shows three faces and "+1", "4 helpers", "1 working · 3 done" and a time that counts on while one
+group whose head shows three faces and "+1", "4 subagents", "1 working · 3 done" and a time that counts on while one
 works; a click on the head folds the rows away and another brings them back. A row that is done shows the start of its
 answer as one plain line. Once the working helper is stopped the head says "3 done · 1 stopped" and its time stands
 still, and the page loaded again shows the same group. Wide and on a phone, light and dark. Before, each helper was a
@@ -176,13 +176,13 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                     await expect(group).to_have_count(1)
                     await expect(group.locator("details.child")).to_have_count(len(SHELVES))
                     head: Locator = group.locator("summary.helpers-head")
-                    await expect(head.locator(".helpers-title")).to_have_text("4 helpers")
+                    await expect(head.locator(".helpers-title")).to_have_text("4 subagents")
                     await expect(head.locator(".helpers-state")).to_have_text("1 working · 3 done")
-                    # While one works the head says how many they are and no more (item 1281): how they stand and how
-                    # long it has been is the status line's over the composer.
+                    # While one works the head says how many they are, how they stand and how long it has been
+                    # (item 1331), as a developer tool's subagent card does; the state is in the colour of work.
                     await expect(group).to_have_attribute("data-live", "")
-                    await expect(head.locator(".helpers-state")).to_be_hidden()
-                    await expect(head.locator(".helpers-time")).to_be_hidden()
+                    await expect(head.locator(".helpers-state")).to_be_visible()
+                    await expect(head.locator(".helpers-time")).to_be_visible()
                     await expect(head.locator(".helpers-faces .avatar")).to_have_count(3)
                     await expect(head.locator(".helpers-more")).to_have_text("+1")
                     span: Locator = head.locator(".helpers-time")
@@ -194,11 +194,11 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                     # The rows that are done show the start of their answer, one plain line; the working one its step.
                     # Each row is named by its place, as no agent's (item 669).
                     await expect(group.locator(".child-name")).to_have_text(
-                        [f"Helper {number}" for number in range(1, len(SHELVES) + 1)]
+                        [f"Subagent {number}" for number in range(1, len(SHELVES) + 1)]
                     )
                     previews: Locator = group.locator(".child-progress")
                     await expect(previews.filter(has_text=PLAIN)).to_have_count(len(SHELVES) - 1)
-                    await expect(_row(page, working.id).locator(".child-progress")).to_contain_text("Command")
+                    await expect(_row(page, working.id).locator(".child-progress")).to_contain_text("Running sleep 300")
                     for row in await group.locator("summary.child-row").all():
                         assert await row.evaluate(
                             "(row) => row.querySelector('.child-progress').offsetHeight"
@@ -247,7 +247,7 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                 page = await _open_run(browser, address, parent.id, 1280, "light")
                 state: Locator = page.locator(".helpers .helpers-state")
                 await expect(state).to_have_text("1 working · 3 done")
-                await expect(state).to_be_hidden()
+                await expect(state).to_be_visible()
                 manager.cancel(working.id)
                 await expect(state).to_have_text("3 done · 1 stopped")
                 # Once none works the head says how they stand and how long it took.
@@ -265,7 +265,7 @@ async def test_helpers_that_follow_one_another_sit_in_one_group_that_folds(
                 # Loaded again, the page shows the same group from the stored events.
                 page = await _open_run(browser, address, parent.id, 390, "dark")
                 await expect(page.locator(".helpers")).to_have_count(1)
-                await expect(page.locator(".helpers .helpers-title")).to_have_text("4 helpers")
+                await expect(page.locator(".helpers .helpers-title")).to_have_text("4 subagents")
                 await expect(page.locator(".helpers .helpers-state")).to_have_text("3 done · 1 stopped")
                 await expect(_row(page, working.id).locator(".child-progress")).to_contain_text("cancelled")
                 await page.screenshot(path=str(tmp_path / "group-loaded-again.png"))
@@ -316,7 +316,9 @@ async def test_a_chat_at_work_opened_again_shows_its_helpers_as_the_store_has_th
             try:
                 page: Page = await _open_run(browser, address, parent.id, 390, "light")
                 await expect(page.locator(".helpers .helpers-state")).to_have_text("1 working · 3 done")
-                await expect(_row(page, working.id).locator(".child-progress")).to_have_text("step 40")
+                # The row says what the helper does now; the steps the store counts stand in the row for the page.
+                await expect(_row(page, working.id).locator(".child-progress")).to_have_text("Running sleep 300")
+                await expect(_row(page, working.id)).to_have_attribute("data-steps", "40")
                 # The steps it takes from here on come by the stream, which goes on after what was read.
                 manager.cancel(working.id)
                 await expect(page.locator(".helpers .helpers-state")).to_have_text("3 done · 1 stopped")
