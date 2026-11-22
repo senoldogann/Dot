@@ -8,6 +8,7 @@ import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { forgetSentPictures } from "./attachments.js";
 import { setPageTitle, watchAttention } from "./attention.js";
+import { createLeaveGuard } from "./leaveguard.js";
 import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
@@ -557,6 +558,39 @@ function beginSession() {
   // Which page was asked for last: a page whose script came after another was asked for is not opened.
   let asked = 0;
 
+  // A page that holds what the owner typed asks before it is swapped (`ctx.onBeforeLeave`, leaveguard.js, item 1337),
+  // whatever changed the address. The address has changed when `hashchange` comes, so the change is put back at once
+  // (the walk undone, or the page's address written over the entry with `replaceState`: no event, so no second round)
+  // and made again when the owner says "leave".
+  /** The index of the history entry on screen (the Navigation API's), or null where the browser has none. */
+  const entryIndex = () => {
+    /** @type {{ currentEntry?: { index?: number } } | undefined} */
+    const navigation = /** @type {any} */ (window).navigation;
+    const index = navigation?.currentEntry?.index;
+    return typeof index === "number" ? index : null;
+  };
+  const placeNow = () => ({
+    hash: location.hash,
+    state: history.state,
+    index: entryIndex(),
+  });
+  const leaving = createLeaveGuard({
+    now: placeNow,
+    restore: (place) => {
+      history.replaceState(place.state, "", `${location.pathname}${location.search}${place.hash}`);
+    },
+    go: (delta) => {
+      history.go(delta);
+    },
+    proceed: () => {
+      void show();
+    },
+    // The link that was clicked led nowhere: it tells nothing of the page opened next.
+    kept: () => {
+      linkedTo = null;
+    },
+  });
+
   /** The page asked for by the address, in place of the one before, which goes at once: it opens at its top. */
   function show() {
     leavePage();
@@ -578,6 +612,7 @@ function beginSession() {
   function leavePage() {
     disposeView();
     disposeView = () => undefined;
+    leaving.clear();
     clearStage();
     forgetImages();
     forgetSentPictures();
@@ -600,6 +635,7 @@ function beginSession() {
     }
     const linked = linkedHere(path);
     current = { found, linked };
+    leaving.shownAt(placeNow());
     shell.setRoute({
       tab: found.route.tab,
       runId: found.route.layout === "run" ? found.params[0] : null,
@@ -625,6 +661,8 @@ function beginSession() {
       setTitle: (text) => {
         setPageTitle(`${text} · Dot`);
       },
+      // Ask `hook` before this page is left; false keeps the page and the address. Returns what takes the hook away.
+      onBeforeLeave: (hook) => leaving.onBeforeLeave(hook),
     };
     const ticket = ++asked;
     try {
@@ -676,7 +714,10 @@ function beginSession() {
   const stopPainting = onChange((snapshot) => shell.paint(snapshot));
   shell.paint(getSnapshot());
   const stopAttention = watchAttention();
-  window.addEventListener("hashchange", show);
+  const onHashChange = () => {
+    void leaving.arrived();
+  };
+  window.addEventListener("hashchange", onHashChange);
   document.addEventListener("visibilitychange", reloadOutOfSight);
   // What repeats without end stands still while the page is away (item 662): the style sheets pause those animations
   // while it is marked so (`--endless`).
@@ -705,7 +746,8 @@ function beginSession() {
       controller.abort();
       stopPainting();
       stopAttention();
-      window.removeEventListener("hashchange", show);
+      window.removeEventListener("hashchange", onHashChange);
+      leaving.stop();
       document.removeEventListener("visibilitychange", reloadOutOfSight);
       liftCurtain();
       disposeView();

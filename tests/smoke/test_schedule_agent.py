@@ -5,6 +5,7 @@ deleting the agent switches its schedules off; a cut-off run of an agent goes on
 the agents, names the approvals the agent gives, and shows the agent's name on the row."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -12,16 +13,8 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from form_dialogs import (
-    asks_before_dropping,
-    closes_with_escape,
-    foot_is_in_view,
-    keeps_inside_the_window,
-    open_form,
-    shows_the_failure,
-)
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
-from row_menu import more_of, open_row_form
+from form_dialogs import keeps_inside_the_window
+from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.manager import RunManager
@@ -347,9 +340,9 @@ async def test_the_form_offers_the_agents_and_the_row_names_its_agent(
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"agent-{width}-{scheme}.png"), full_page=True)
                 guided: Locator = page.locator("[data-schedule]", has_text="guided").first
-                dialog: Locator = await open_row_form(page, guided, "Edit", "Edit schedule")
+                await guided.get_by_role("link", name=re.compile("^Edit ")).click()
+                await expect(page.get_by_role("combobox", name="Agent")).to_be_visible()
                 await keeps_inside_the_window(page)
-                await foot_is_in_view(page, dialog)
                 await page.screenshot(path=str(tmp_path / f"agent-form-{width}-{scheme}.png"))
                 agent: Locator = page.get_by_role("combobox", name="Agent")
                 await expect(agent).to_have_value(guide.id)
@@ -379,10 +372,10 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 1000}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
             await page.goto(f"http://127.0.0.1:{port}/#/schedules")
-            form: Locator = page.get_by_role("dialog", name="New schedule")
+            form: Locator = page.locator(".settings-pane")
             agent: Locator = form.get_by_role("combobox", name="Agent")
             approvals: Locator = form.get_by_role("combobox", name="Approvals")
-            await page.get_by_role("button", name="New schedule").click()
+            await page.get_by_role("link", name="New schedule").click()
             await expect(agent.locator(f"option[value='{chosen.id}']")).to_have_count(1)
             await form.get_by_label("Name", exact=True).fill("Morning look")
             await form.get_by_label("Goal", exact=True).fill("Look at the tide.")
@@ -391,7 +384,7 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
             await approvals.select_option("supervised")
             await form.get_by_role("button", name="Add schedule").click()
             await expect(page.locator(".toast.ok", has_text="Schedule added.")).to_be_visible()
-            await expect(form).to_have_count(0)
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
             added: list[ScheduleRecord] = [
                 record for record in await runtime.store.list_schedules() if record.name == "Morning look"
             ]
@@ -400,7 +393,7 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
                     (chosen.id, "supervised")
                 ]
                 # The next one opens on the defaults: Dot, the configured approvals, nothing typed.
-                await page.get_by_role("button", name="New schedule").click()
+                await page.get_by_role("link", name="New schedule").click()
                 await expect(agent.locator(f"option[value='{chosen.id}']")).to_have_count(1)
                 await expect(agent).to_have_value("")
                 await expect(approvals).to_have_value("")
@@ -416,13 +409,13 @@ async def test_the_form_that_added_a_schedule_starts_the_next_one_from_the_defau
 
 
 @pytest.mark.browser
-async def test_new_schedule_and_edit_are_a_dialog_that_fits_asks_before_it_drops_and_says_why_it_failed(
+async def test_new_schedule_and_edit_are_a_page_that_fits_cancels_and_says_why_it_failed(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
-    """Item 615: New schedule and a schedule's Edit open the form in a dialog over the page, which does not grow; the
-    caret is in the name; Escape closes it, asking first when something was typed, and the focus goes back to the button
-    that opened it; the daemon's refusal is shown inside it with what was typed still there; on a phone it is a sheet
-    whose foot is in view."""
+    """Items 615 and 1336: New schedule and a schedule's Edit open the form as a page of the settings, in rows and
+    cards, at `#/settings/schedules/new` and `.../<id>`, which fits the window; Cancel goes back to the list; the
+    daemon's refusal is shown above the foot with what was typed still there; saved, it goes back to the list, which has
+    the row."""
     port: int | None = client.base_url.port
     assert port is not None
     async with async_playwright() as playwright:
@@ -439,53 +432,281 @@ async def test_new_schedule_and_edit_are_a_dialog_that_fits_asks_before_it_drops
                 )
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"http://127.0.0.1:{port}/#/schedules")
-                opener: Locator = page.get_by_role("button", name="New schedule")
-                await expect(opener).to_have_attribute("aria-haspopup", "dialog")
-                # No form stands in the page: it comes with the button.
+                await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+                opener: Locator = page.get_by_role("link", name="New schedule")
+                # No form stands in the list: it comes with the link, as a page of its own.
                 await expect(page.get_by_label("Custom timing")).to_have_count(0)
-                dialog: Locator = await open_form(page, opener, "New schedule")
-                name: Locator = dialog.get_by_label("Name", exact=True)
-                await expect(name).to_be_focused()
+                await opener.click()
+                await expect(page).to_have_url(re.compile(r"/#/settings/schedules/new$"))
+                name: Locator = page.get_by_label("Name", exact=True)
+                await expect(name).to_be_visible()
                 await keeps_inside_the_window(page)
-                await foot_is_in_view(page, dialog)
                 await page.screenshot(path=str(tmp_path / f"new-schedule-{width}-{scheme}.png"))
-                # Nobody touched it: Escape closes it at once, the focus back on the button.
-                await closes_with_escape(page, dialog, opener)
-                # Something typed is not dropped without asking.
-                dialog = await open_form(page, opener, "New schedule")
-                await asks_before_dropping(page, dialog, dialog.get_by_label("Name", exact=True), "Evening look")
-                await expect(opener).to_be_focused()
-                # A schedule that fires every minute is refused; the reason is in the dialog, and what was typed stays.
-                dialog = await open_form(page, opener, "New schedule")
-                await dialog.get_by_label("Name", exact=True).fill("Too often")
-                await dialog.get_by_label("Goal", exact=True).fill("Look at the tide.")
-                await dialog.get_by_label("Custom timing", exact=True).fill("* * * * *")
-                await dialog.get_by_role("button", name="Add schedule").click()
-                await shows_the_failure(dialog, "fires too often")
+                # Cancel leads back to the list, nothing made.
+                await page.get_by_role("link", name="Cancel").click()
+                await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+                # A schedule that fires every minute is refused; the reason is on the page, and what was typed stays.
+                await opener.click()
+                await page.get_by_label("Name", exact=True).fill("Too often")
+                await page.get_by_label("Goal", exact=True).fill("Look at the tide.")
+                await page.get_by_label("Custom timing", exact=True).fill("* * * * *")
+                await page.get_by_role("button", name="Add schedule").click()
+                await expect(page.get_by_role("alert").filter(has_text="fires too often")).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"new-schedule-refused-{width}-{scheme}.png"))
-                await expect(dialog.get_by_label("Name", exact=True)).to_have_value("Too often")
-                await expect(dialog.get_by_label("Goal", exact=True)).to_have_value("Look at the tide.")
-                await expect(dialog.get_by_label("Custom timing", exact=True)).to_have_value("* * * * *")
+                await expect(page.get_by_label("Name", exact=True)).to_have_value("Too often")
+                await expect(page.get_by_label("Goal", exact=True)).to_have_value("Look at the tide.")
+                await expect(page.get_by_label("Custom timing", exact=True)).to_have_value("* * * * *")
                 assert [record for record in await runtime.store.list_schedules() if record.name == "Too often"] == []
-                # Put right, it is added, the dialog closes and the list has the row.
-                await dialog.get_by_label("Custom timing", exact=True).fill("0 9 * * 1-5")
-                await dialog.get_by_role("button", name="Add schedule").click()
-                await expect(dialog).to_have_count(0)
+                # Put right, it is added, the list is shown and has the row.
+                await page.get_by_label("Custom timing", exact=True).fill("0 9 * * 1-5")
+                await page.get_by_role("button", name="Add schedule").click()
+                await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
                 row: Locator = page.locator("[data-schedule]", has_text="Too often")
                 await expect(row).to_have_count(1)
-                await expect(opener).to_be_focused()
-                # Its Edit, in its "…" (item 848), opens the same dialog, filled; Escape gives the focus back to the
-                # "…".
-                edit: Locator = more_of(row)
-                dialog = await open_row_form(page, row, "Edit", "Edit schedule")
-                await expect(dialog.get_by_label("Name", exact=True)).to_have_value("Too often")
-                await expect(dialog.get_by_label("Custom timing", exact=True)).to_have_value("0 9 * * 1-5")
-                await expect(dialog.get_by_role("switch", name="Switched on")).to_have_attribute("aria-checked", "true")
-                await foot_is_in_view(page, dialog)
-                await closes_with_escape(page, dialog, edit)
+                # Its Edit opens the same form, filled, under the schedule's name in the bar.
+                await row.get_by_role("link", name=re.compile("^Edit ")).click()
+                await expect(page.get_by_label("Name", exact=True)).to_have_value("Too often")
+                await expect(page.get_by_label("Custom timing", exact=True)).to_have_value("0 9 * * 1-5")
+                await expect(page.get_by_role("switch", name="Switched on")).to_have_attribute("aria-checked", "true")
+                await expect(page.locator("h1.crumbs .crumb-here")).to_have_text("Too often")
                 await page.close()
                 for record in await runtime.store.list_schedules():
                     if record.name == "Too often":
                         await runtime.store.delete_schedule(record.id)
         finally:
             await browser.close()
+
+
+@pytest.mark.browser
+async def test_the_editor_asks_before_a_link_drops_what_was_typed_and_not_for_a_form_left_alone(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 1337: the editor's page asks "Discard your changes?" before a link of the app (Cancel, the nav, the
+    breadcrumb) or Run now drops what was typed, as the dialog it was did; Keep editing leaves the form as it was, and a
+    form nobody changed leaves without a question, the models and agents it fills in later being no change."""
+    saved: ScheduleRecord = await _schedule(
+        client, {"name": "Keeps its words", "goal": "Look at the tide.", "cron": "0 9 * * *"}
+    )
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            question: Locator = page.locator("dialog", has_text="Discard your changes?")
+            # A form nobody changed: Cancel leads back at once, once the selects were filled in.
+            await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules/{saved.id}")
+            await expect(page.get_by_label("Name", exact=True)).to_have_value("Keeps its words")
+            await expect(page.get_by_role("combobox", name="Model").locator("option")).not_to_have_count(1)
+            await page.get_by_role("link", name="Cancel").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+            await expect(question).to_have_count(0)
+            # A changed one asks, whichever link leaves: Keep editing keeps it, Discard goes on to where the link led.
+            await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules/{saved.id}")
+            name: Locator = page.get_by_label("Name", exact=True)
+            await expect(name).to_have_value("Keeps its words")
+            await name.fill("Changed words")
+            await page.get_by_role("link", name="Cancel").click()
+            await expect(question).to_be_visible()
+            await expect(page).to_have_url(re.compile(rf"/#/settings/schedules/{saved.id}$"))
+            await question.get_by_role("button", name="Keep editing").click()
+            await expect(question).to_have_count(0)
+            await expect(name).to_have_value("Changed words")
+            await page.locator("#sidebar").get_by_role("link", name="Memory").click()
+            await expect(question).to_be_visible()
+            await question.get_by_role("button", name="Keep editing").click()
+            await expect(page).to_have_url(re.compile(rf"/#/settings/schedules/{saved.id}$"))
+            await page.get_by_role("button", name="Run now").click()
+            await expect(question).to_be_visible()
+            await question.get_by_role("button", name="Keep editing").click()
+            await expect(page).to_have_url(re.compile(rf"/#/settings/schedules/{saved.id}$"))
+            assert (await runtime.store.get_schedule(saved.id)).name == "Keeps its words"
+            await page.locator("#sidebar").get_by_role("link", name="Memory").click()
+            await question.get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/memory$"))
+            assert (await runtime.store.get_schedule(saved.id)).name == "Keeps its words"
+            # Saved, it leaves without a question.
+            await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules/{saved.id}")
+            await expect(name).to_have_value("Keeps its words")
+            await name.fill("Saved words")
+            await page.get_by_role("button", name="Save changes").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+            await expect(question).to_have_count(0)
+            assert (await runtime.store.get_schedule(saved.id)).name == "Saved words"
+            await page.close()
+            await runtime.store.delete_schedule(saved.id)
+        finally:
+            await browser.close()
+
+
+async def _asks_and_keeps(page: Page, name: Locator, kept: str, here: re.Pattern[str]) -> None:
+    """The question is open with the address as it was; Keep editing closes it and leaves the address and the words."""
+    question: Locator = page.locator("dialog", has_text="Discard your changes?")
+    await expect(question).to_be_visible()
+    await expect(page).to_have_url(here)
+    await question.get_by_role("button", name="Keep editing").click()
+    await expect(question).to_have_count(0)
+    await expect(page).to_have_url(here)
+    await expect(name).to_have_value(kept)
+
+
+@pytest.mark.browser
+async def test_every_way_out_of_the_editor_asks_not_the_links_alone_and_the_browsers_back_is_put_back(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 1337, review round 2: the router asks the editor before it swaps the page, so the browser's own Back, Enter
+    in the settings' search and the New chat and Appearance shortcuts ask as a link does (Chromium, 1280 wide). Connect
+    apps, which the settings' sidebar does not show, is pressed in the phone's test. Keep editing leaves the form and
+    the address, with no second round; Discard goes where the change led."""
+    saved: ScheduleRecord = await _schedule(
+        client, {"name": "Holds its words", "goal": "Look at the tide.", "cron": "0 9 * * *"}
+    )
+    port: int | None = client.base_url.port
+    assert port is not None
+    editor: re.Pattern[str] = re.compile(rf"/#/settings/schedules/{saved.id}$")
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            question: Locator = page.locator("dialog", has_text="Discard your changes?")
+            name: Locator = page.get_by_label("Name", exact=True)
+
+            async def open_editor_from_the_list() -> None:
+                await page.goto(f"http://127.0.0.1:{port}/#/settings/schedules")
+                await (
+                    page.locator("[data-schedule]", has_text="Holds its words")
+                    .get_by_role("link", name=re.compile("^Edit "))
+                    .click()
+                )
+                await expect(name).to_have_value("Holds its words")
+                await expect(page.get_by_role("combobox", name="Model").locator("option")).not_to_have_count(1)
+
+            # The browser's own Back: the address has changed when the page hears of it, and is put back.
+            await open_editor_from_the_list()
+            await name.fill("Typed once")
+            await page.go_back()
+            await _asks_and_keeps(page, name, "Typed once", editor)
+            # Nothing was opened again and no entry was added: a second Back asks once more, and Discard leaves.
+            await page.go_back()
+            await expect(question).to_be_visible()
+            await question.get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+
+            # Enter in the settings' search.
+            await open_editor_from_the_list()
+            await name.fill("Typed twice")
+            search: Locator = page.locator("#sidebar").get_by_role("searchbox", name="Search settings")
+            await search.fill("memory")
+            await search.press("Enter")
+            await _asks_and_keeps(page, name, "Typed twice", editor)
+            await search.fill("memory")
+            await search.press("Enter")
+            await question.get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/memory$"))
+
+            # The shortcuts: New chat and Appearance.
+            for keys, arrived in (("Control+Shift+O", r"/#/runs$"), ("Control+Alt+A", r"/#/settings/appearance$")):
+                await open_editor_from_the_list()
+                await name.fill("Typed again")
+                await page.keyboard.press(keys)
+                await _asks_and_keeps(page, name, "Typed again", editor)
+                await page.keyboard.press(keys)
+                await question.get_by_role("button", name="Discard").click()
+                await expect(page).to_have_url(re.compile(arrived))
+
+            # A form nobody changed leaves by every one of them without a question; a redirect of an old address asks
+            # nothing of the page it lands on.
+            await open_editor_from_the_list()
+            await page.go_back()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+            await open_editor_from_the_list()
+            await page.goto(f"http://127.0.0.1:{port}/#/memory")
+            await expect(page).to_have_url(re.compile(r"/#/settings/memory$"))
+            await expect(question).to_have_count(0)
+            assert (await runtime.store.get_schedule(saved.id)).name == "Holds its words"
+            await page.close()
+            await runtime.store.delete_schedule(saved.id)
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_the_phones_back_button_and_connect_apps_ask_before_the_editor_drops_what_was_typed(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 1337, review round 2: on a phone (WebKit, the owner's iPhone) the bar's Back is the one way out of the
+    editor, and it asks, whether the editor was opened from the list (Back goes back in the history) or by its address
+    (Back opens the list in its place); so does Connect apps, whose button is in the drawer. Keep editing leaves the
+    form and the address."""
+    saved: ScheduleRecord = await _schedule(
+        client, {"name": "Phone words", "goal": "Look at the tide.", "cron": "0 9 * * *"}
+    )
+    port: int | None = client.base_url.port
+    assert port is not None
+    address: str = f"http://127.0.0.1:{port}"
+    editor: re.Pattern[str] = re.compile(rf"/#/settings/schedules/{saved.id}$")
+    async with async_playwright() as playwright:
+        webkit: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            context: BrowserContext = await webkit.new_context(
+                **playwright.devices["iPhone 17 Pro Max"], reduced_motion="reduce"
+            )
+            await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            page: Page = await context.new_page()
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            question: Locator = page.locator("dialog", has_text="Discard your changes?")
+            name: Locator = page.get_by_label("Name", exact=True)
+            back: Locator = page.locator(".stagebar-left button")
+
+            async def ready(url: str) -> None:
+                await page.goto(url)
+                await expect(name).to_have_value("Phone words")
+                await expect(page.get_by_role("combobox", name="Model").locator("option")).not_to_have_count(1)
+                await expect(back).to_have_attribute("aria-label", "Back")
+
+            # Opened by its address: Back opens the list in its place (`location.replace`).
+            await ready(f"{address}/#/settings/schedules/{saved.id}")
+            await name.fill("Typed on a phone")
+            await back.click()
+            await _asks_and_keeps(page, name, "Typed on a phone", editor)
+            await back.click()
+            await question.get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+
+            # Opened by a link of the list: Back goes back in the history (`history.back()`).
+            await (
+                page.locator("[data-schedule]", has_text="Phone words")
+                .get_by_role("link", name=re.compile("^Edit "))
+                .click()
+            )
+            await expect(name).to_have_value("Phone words")
+            await expect(page.get_by_role("combobox", name="Model").locator("option")).not_to_have_count(1)
+            await name.fill("Typed again")
+            await back.click()
+            await _asks_and_keeps(page, name, "Typed again", editor)
+            await back.click()
+            await question.get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+
+            # Connect apps: the drawer's button (the bar's button is Back here, so the drawer is not opened by it).
+            await ready(f"{address}/#/settings/schedules/{saved.id}")
+            await name.fill("Typed for the drawer")
+            connect: str = "document.querySelector('#sidebar .side-connect').click()"
+            await page.evaluate(connect)
+            await _asks_and_keeps(page, name, "Typed for the drawer", editor)
+            await page.evaluate(connect)
+            await question.get_by_role("button", name="Discard").click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/connectors$"))
+
+            # A form nobody changed: Back leaves it without a question.
+            await ready(f"{address}/#/settings/schedules/{saved.id}")
+            await back.click()
+            await expect(page).to_have_url(re.compile(r"/#/settings/schedules$"))
+            await expect(question).to_have_count(0)
+            assert (await runtime.store.get_schedule(saved.id)).name == "Phone words"
+            await page.close()
+            await runtime.store.delete_schedule(saved.id)
+        finally:
+            await webkit.close()

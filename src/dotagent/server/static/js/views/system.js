@@ -1853,7 +1853,7 @@ function buildModels(isDisposed, asked, head) {
       el("span", null, scheduled.length === 0 ? "No schedules. " : `Schedules: ${count(scheduled)}. `),
       el("span", null, made.length === 0 ? "No agents. " : `Agents: ${count(made)}. `),
       el("span", null, "Each is chosen on its own page: "),
-      el("a", { href: "#/schedules" }, "Schedules"),
+      el("a", { href: "#/settings/schedules" }, "Scheduled tasks"),
       el("span", null, ", "),
       el("a", { href: "#/agents" }, "Agents"),
       el("span", null, "."),

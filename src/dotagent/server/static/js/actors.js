@@ -1,7 +1,7 @@
 // The faces of the actors (items 83 and 102). Every actor (Dot, an agent, a delegated run, a campaign, a schedule) is a
 // character (character/): an agent wears the look the owner chose for it, Dot its own, and an actor without a look the
 // shape and colour its id's hue gives it (hues.js), so it keeps its face wherever it shows: the rows of a chat, the
-// sidebar, the Campaigns and Schedules pages, the bar of its own page. A face is a still frame; its state (face.js)
+// sidebar, the Campaigns and Scheduled tasks pages, the bar of its own page. A face is a still frame; its state (face.js)
 // picks the animation posed and the expression worn.
 import { sharedGet } from "./api.js";
 import { mountCharacter } from "./character/character.js";

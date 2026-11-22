@@ -25,7 +25,6 @@ from form_dialogs import (
 )
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 from pydantic import TypeAdapter
-from row_menu import choose
 from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
@@ -714,7 +713,7 @@ async def test_the_settings_open_in_a_dialog_set_the_brief_the_list_labels_it_an
                 # The owner's schedules lead the page; the brief is a line under them (item 609).
                 assert await page.evaluate(
                     """() => {
-                      const list = document.querySelector('.schedule-panel');
+                      const list = document.querySelector('.settings-pane .set-sections');
                       const brief = document.querySelector('[data-brief]');
                       const watchers = document.querySelector('[data-watchers]');
                       const before = (a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
@@ -764,7 +763,7 @@ async def test_the_settings_open_in_a_dialog_set_the_brief_the_list_labels_it_an
                 # How its tasks start stands under the row's Details (item 1136).
                 await row.get_by_role("button", name=re.compile(r"^Details of ")).click()
                 await expect(row.locator(".chip", has_text="research")).to_be_visible()
-                await choose(row, "Edit the brief's settings")
+                await row.get_by_role("button", name=re.compile("^Edit ")).click()
                 await expect(dialog).to_be_visible()
                 await expect(dialog.get_by_label("Time")).to_be_focused()
                 await expect(page.locator("[data-schedule-form]")).to_have_count(0)
@@ -828,7 +827,7 @@ async def test_a_brief_the_daemon_refuses_says_why_in_the_dialog_and_keeps_what_
             dialog = await open_form(page, settings, "Morning brief")
             await dialog.get_by_role("button", name="Write one now").click()
             await shows_the_failure(dialog, "A run of it is going.")
-            await expect(page).to_have_url(re.compile(r"#/schedules$"))
+            await expect(page).to_have_url(re.compile(r"#/settings/schedules$"))
             # Write one now saves what was changed first: the brief written now is the one the dialog says, and leaving
             # the page drops nothing (the review of item 615).
             await page.keyboard.press("Escape")
@@ -871,18 +870,18 @@ async def test_a_link_in_the_dialog_asks_before_it_takes_what_was_typed_to_anoth
             await expect(question).to_be_visible()
             await question.get_by_role("button", name="Keep editing").click()
             await expect(question).to_have_count(0)
-            await expect(page).to_have_url(re.compile(r"#/schedules$"))
+            await expect(page).to_have_url(re.compile(r"#/settings/schedules$"))
             await expect(dialog.get_by_label("Also tell me about")).to_have_value("the roof repair")
             await dialog.get_by_role("link", name="Add one").click()
             await page.locator("dialog", has_text="Discard your changes?").get_by_role("button", name="Discard").click()
-            await expect(page).to_have_url(re.compile(r"#/customize/connectors$"))
+            await expect(page).to_have_url(re.compile(r"#/settings/connectors$"))
             await expect(page.get_by_role("dialog")).to_have_count(0)
             # Nothing typed: the link goes at once.
             await page.goto(f"http://127.0.0.1:{port}/#/schedules")
             await expect(settings).to_be_enabled()
             dialog = await open_form(page, settings, "Morning brief")
             await dialog.get_by_role("link", name="Add one").click()
-            await expect(page).to_have_url(re.compile(r"#/customize/connectors$"))
+            await expect(page).to_have_url(re.compile(r"#/settings/connectors$"))
             await expect(page.get_by_role("dialog")).to_have_count(0)
             await page.close()
         finally:

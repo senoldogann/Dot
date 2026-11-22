@@ -162,7 +162,7 @@ def _due_schedule_row(schedule: ScheduleRecord, due: float) -> ActivityRow:
         detail=f"fires at {_clock(due)}",
         channel="",
         since=due,
-        href="#/schedules",
+        href="#/settings/schedules",
         run_id=None,
         status="scheduled",
         minutes=None,

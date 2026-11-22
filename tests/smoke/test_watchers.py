@@ -887,7 +887,7 @@ async def test_a_github_watcher_without_a_token_says_to_add_github(
 ) -> None:
     watcher: JsonObject = await _make(client, name="Mine", kind="github", account="", words="")
     outcome: LookOutcome = await _look(runtime, manager, str(watcher["id"]), 0)
-    assert outcome.error is not None and "add it on Customize › Connectors" in outcome.error
+    assert outcome.error is not None and "add it on Settings › Connectors" in outcome.error
     assert WORLD.calls("api.github.com") == []
 
 
@@ -1202,7 +1202,7 @@ async def test_a_tell_that_cannot_be_kept_goes_out_and_opens_the_page_of_the_wat
     WORLD.gmail = [_mail("a", _LANDLORD, "Rent A", NOW + 10)]
     with capture_logs() as logs:
         await _look(runtime, manager, str(watcher["id"]), 60)
-    assert [data["url"] for data in told.owner] == ["#/schedules"]
+    assert [data["url"] for data in told.owner] == ["#/settings/schedules"]
     assert any(entry["event"] == "watcher_line_not_kept" for entry in logs)
     again: LookOutcome = await _look(runtime, manager, str(watcher["id"]), 400)
     assert (again.found, again.told) == (0, 0)
