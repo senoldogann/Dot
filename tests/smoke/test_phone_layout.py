@@ -2,12 +2,12 @@
 and dark. The bar names whom the chat is with in its middle (item 1101), and holds its tools in one pill: Dot's
 computer once the run has had a page, the helpers with their count, and the details. A line over the composer says how
 long the run has worked, how its helpers stand and how many messages are queued (item 352), and its parts open where
-they tell of. The
-details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the Agents tab's rows say each
-helper's state, model and what it does. Dot's computer opens over the whole page with the page's address and the pill of
-who has control, and goes back to the panel when it closes. The sidebar is the list of chats over the whole screen,
-Dot's name at its head and Settings, the search and a new chat at its foot. A wide window keeps its bar as it was: the
-face, the name and the panel's switch alone; the line over the composer is there too.
+they tell of. The details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the Agents
+tab's Lineage says which helpers work and, by a dot, how each stands. Dot's computer opens over the whole page with the
+page's address and the pill of who has control, and goes back to the panel when it closes. The sidebar is the list of
+chats over the whole screen, Dot's name at its head and Settings, the search and a new chat at its foot. A wide
+window keeps its bar as it was: the face, the name and the panel's switch alone; the line over the composer is there
+too.
 
 The model is a scripted one; the run's page is a local one in Dot's own headless Chrome.
 """
@@ -231,11 +231,14 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     box: FloatRect = await _box(sheet)
                     assert round(box["y"] + box["height"]) == height, (box, height)
                     assert box["y"] > height * 0.05, (box, height)
-                    rows: Locator = sheet.locator(".inspector-panel:not([hidden]) .agent-row")
+                    # The Lineage (item 1332): the task that leads and the subagents that work, a dot for each.
+                    rows: Locator = sheet.locator(".inspector-panel:not([hidden]) a.lineage-row")
                     await expect(rows).to_have_count(len(_HELPERS))
-                    await expect(rows.locator(".agent-state")).to_have_text(["Running"] * len(_HELPERS))
-                    await expect(rows.locator(".agent-model")).to_have_text(["scripted"] * len(_HELPERS))
-                    await expect(rows.locator(".agent-doing")).to_have_text(["Now: sleep 600"] * len(_HELPERS))
+                    await expect(rows.locator(".lineage-dot.s-running")).to_have_count(len(_HELPERS))
+                    lineage: Locator = sheet.locator(".inspector-panel:not([hidden]) .lineage")
+                    await expect(lineage.locator(".panel-section-title")).to_have_text(
+                        f"Lineage · {len(_HELPERS)} running"
+                    )
                     await page.screenshot(path=str(tmp_path / f"sheet-{scheme}.png"))
                     # A drag of its head down closes it.
                     head: FloatRect = await _box(sheet.locator(".inspector-head"))

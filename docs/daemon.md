@@ -797,14 +797,21 @@ model and its reasoning level, the approval mode, goal mode when it is on, the c
 (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as compactions,
 reviews and the goal check), the compactions once there is one, the duration, and the run's mode, its start and its id
 (with a copy button); its other tabs hold the files the chat changed (Changes), the
-plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). The Agents tab opens with who
+plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). The panel is drawn as a developer tool's details panel (item 1332): one rounded card on a hairline, the tabs small
+and quiet over a hairline, and the sections of a tab stacked, a hairline between them, each titled by a small muted
+label. The Agents tab opens on the **Lineage** (item 1332), titled "Lineage · 2 running": the task that leads and, under
+it, its subagents that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
+while it works, amber waiting for you, green done, red failed; the row is the way to its page, and what it does now
+is its tooltip), and a **Previous agents** row with how many failed ("1 failed") and how many there are, which folds
+open the rows of those that ended. The Task tab holds the same Lineage, compact, whenever the chat has handed work to
+a subagent, and its Previous agents row opens the Agents tab. Under the Lineage the Agents tab says who
 the chat is with (item 846), as a messaging app's panel shows the contact: for one of your agents its face, name and
 role, its model, approvals and actions, what it learned, its instructions, **Edit**, which opens the agent's editor in
 the panel and shows the agent as saved, and **Open its page**; for Dot its
 model, its name and look, its rules and its memory, each a link to the settings that hold it. Each tab wears its icon, and where the strip has no room for
-every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
-the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
-provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how long it
+every name, the tabs not chosen show their icon and count alone (item 227). The Previous agents fold lists, newest first, the runs
+the chat's runs handed work to that ended: five at first and the rest on **Show N more**, each with its face and goal, its
+provider's mark, model and state, what it did last (from the conversation on the page) and how long it
 took, and a row opens its page (item 296); the pointer at rest on a row, or the focus on it, shows the helper's card as
 the conversation's rows do, with its whole goal, and a phone has none (item 426). It stays closed until the panel button
 in the head of the run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px,

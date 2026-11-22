@@ -258,9 +258,10 @@ tool name stays on its row's one line, cut by an ellipsis (items 512 and 513). A
 1281 and 1331; item 401 made it one, which left the name the line and the goal three letters): its face, the job as its
 title, then what it does now, each cut by an ellipsis rather than wrapped, with the word of its state over its time at the
 right and the chevron; the way to its own page shows on the row once it is open, not as a second icon on every closed one. The
-helpers' own head is one line. The details rise from the foot
-as a sheet with a grabber, and a drag of its head down closes it; its Agents tab says of each helper its state, its
-model and what it does now (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
+group's own head is one line. The details rise from the foot
+as a sheet with a grabber, and a drag of its head down closes it; its Agents tab opens on the Lineage (item 1332: the
+task and its subagents, each with how long it has worked and a dot for how it stands) and says of each agent its state,
+its model and what it does now, or did last for one that ended (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
 setting that turns it on. Dot's computer opens over the whole screen, with the page's address and who has control (Take
 over), and goes back to the side panel when it closes. **Zoom** beside the address, or a tap on the page while it is

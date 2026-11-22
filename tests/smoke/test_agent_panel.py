@@ -126,7 +126,7 @@ async def test_the_agents_tab_opens_with_the_chats_agent_and_edits_it_in_the_pan
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
             page, shown = await _agents_tab(browser, client, run_id)
-            await expect(shown.locator(".panel-section-title").first).to_have_text("Agent")
+            await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Agent"])
             card: Locator = shown.locator(".agent-panel")
             await expect(card.locator(".agent-panel-name")).to_have_text("Scout")
             await expect(card.locator(".agent-panel-role")).to_have_text("Finds and checks sources")
