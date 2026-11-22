@@ -191,12 +191,12 @@ async def test_the_line_says_what_the_run_does_and_hides_the_steps_until_asked(o
                 # out of the conversation as wide.
                 phone: Page = await _open(browser, port, address, run.id, "status", 390)
                 await expect(phone.locator(".answer-steps")).to_have_text("Show the steps")
-                # On a phone the answer sits in a bubble; on a Mac's width it is plain text (item 1091; item 854).
-                # What the run said on the way is no bubble: it folds with the steps, a note among them (item 1131).
+                # On a phone the answer is plain text as on a Mac's width: no bubble round what Dot says (items 854 and
+                # 1334). What the run said on the way folds with the steps, a note among them (item 1131).
                 fills: list[str] = await phone.locator(".run-thread :is(.answer, .bubble.say) > .prose").evaluate_all(
                     "nodes => nodes.map((node) => getComputedStyle(node).backgroundColor)"
                 )
-                assert len(fills) == 2 and fills[0] == "rgba(0, 0, 0, 0)" and fills[1] != "rgba(0, 0, 0, 0)", fills
+                assert fills == ["rgba(0, 0, 0, 0)"] * 2, fills
                 await expect(phone.locator(".bubble.say.say-progress")).to_be_hidden()
                 # A step whose model has sent only spaces holds no empty bubble: timeline.js marks it blank, and the
                 # rule that hides it is one the browser keeps (a `:has()` inside a `:has()` was dropped whole).

@@ -311,24 +311,9 @@
   display: none;
 }
 
-/* On a phone what Dot says sits in a soft bubble, as a messaging app's (item 1091, the owner's ask): each line along
-   the way its own, and the answer; on a Mac's wide window they stay plain text beside the face (item 854). */
-@media (max-width: 720px) {
-  .run-thread :is(.answer, .bubble.say) > .prose {
-    width: fit-content;
-    max-width: 100%;
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-bubble);
-    background: var(--msg-agent);
-  }
-
-  /* A block of code or a table in the bubble is set into it, in the page's own colour, with no line of its own around
-     it (item 1186): a box drawn in a box was two frames around one thing. */
-  .run-thread :is(.answer, .bubble.say) > .prose :is(.code-block, .prose-table) {
-    border-color: transparent;
-    background: var(--bg);
-  }
-}
+/* What Dot says is plain text on every width, a phone's included (item 1335): one design language for the desktop and the
+   phone, as a developer tool draws its assistant's turns, with no bubble round them (item 1091 had put each line and the
+   answer in a soft one on a phone); only what you wrote is a box. */
 
 @media (prefers-reduced-motion: reduce) {
   .work-status-words,
@@ -589,7 +574,8 @@
 }
 
 /* The line over the composer is one bar (item 401): how the run works, how its helpers stand and how many messages wait
-   at its left, the way down at its right end. It is a pane of glass of its own: the composer under it is a plain box (item 1330). */
+   at its left, the way down at its right end. Since item 1335 it is a plain bar on a hairline, no glass and no shadow,
+   like the composer under it (item 1330). */
 .status-bar {
   display: flex;
   align-items: center;
@@ -599,12 +585,9 @@
   min-height: 40px;
   margin: 0 auto var(--space-1);
   padding-right: var(--space-1);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: var(--glass-surface);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: var(--shadow-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .status-bar[hidden] {
@@ -1287,7 +1270,7 @@
   gap: 12px;
   padding: 4px 8px 4px 4px;
   border-radius: var(--radius-sm);
-  color: var(--text-2);
+  color: var(--muted);
   font-size: var(--text-sm);
   cursor: pointer;
   list-style: none;
@@ -1300,7 +1283,8 @@
 
 @media (hover: hover) {
   .steps-head:hover {
-    background: color-mix(in srgb, var(--text) 4%, transparent);
+    background: var(--surface-2);
+    color: var(--text-2);
   }
 }
 
@@ -1318,7 +1302,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: var(--weight-title);
+  font-weight: var(--weight-label);
   white-space: nowrap;
 }
 

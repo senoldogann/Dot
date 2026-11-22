@@ -689,8 +689,7 @@ begins; a step's boxes begin wrapped) and the copy of its text as it was written
 the page shows only the first part of, is all of it; Show all puts all of it in the box. A table has a copy that takes
 it as
 markdown (item 403) at its top right corner, over its head row, shown where the pointer rests on the table or the
-keyboard is in it, and always on a touch screen (item 1186). On a phone, where Dot's words sit in a bubble, a block of
-code or a table in it is set into the bubble in the page's colour, with no frame of its own. Code shows its letters as
+keyboard is in it, and always on a touch screen (item 1186). Code shows its letters as
 they are: no font turns `->`
 or `!=` into one glyph.
 The box stands at the foot of the window from the first message, the conversation filling the space above it from
@@ -760,7 +759,7 @@ picture and each file with its ×, its name the tooltip, and the files the box h
 the send does, or the queue's next message to the run when the box is empty. Settings › General › Messages chooses the
 send's way (item 230). A held queue
 says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
-box (items 352 and 360) says in a few quiet words how long the run has worked, that it waits to start, that it waits
+box (items 352 and 360, drawn since item 1335 as a plain bar on a hairline, no glass and no shadow) says in a few quiet words how long the run has worked, that it waits to start, that it waits
 for you or that it stops (once Stop was pressed, until it has),
 how far its plan has come (**Plan 1/3**, while it works and has a plan, item 644), how its subagents stand
 and how many messages are queued; each part opens what it tells of, and the line comes while one of its
@@ -1170,8 +1169,10 @@ string; an empty page or list stands a mark in a 36 px rounded square, a title a
 in the middle of its place (item 407); a chat is drawn as a messaging app draws one (item 832): your messages on one raised
 surface (`--msg-me`, one step off the page: lighter in dark, a shade darker in light, item 1324) on a 10 px corner with 8 by 12 px
 of room, two of yours in a row on a touch screen joined at a 4 px corner, and what Dot and its agents say, the
-answer and the lines along the way, as plain text beside the face, on no fill (item 854: a soft bubble until then), and
-on a phone's width each in a soft bubble of its own (`--msg-agent`, item 1091, the owner's ask); the
+answer and the lines along the way, as plain text beside the face, on no fill, on every width, a phone's too (item 854: a soft bubble until then; item
+1091 gave each a bubble of its own on a phone, and item 1335 took it away again, so that the desktop and the phone have
+one design language and only what you wrote is a box); the group of the steps of a turn is one quiet line, its words
+in the muted ink with the small icon and the time, a chevron at its end; the
 line under an answer that ended well and under your message shows where the pointer rests or the focus is (a reaction
 that stands, a failure and a stop stay in sight; a screen with no pointer to rest shows only the reactions that stand,
 and the rest in the sheet a hold of the message opens, item 1064), an answer that

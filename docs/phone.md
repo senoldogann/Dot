@@ -226,17 +226,18 @@ conversation begins under the bar, which no longer floats over it as three panes
 agent's page wear the same bar (item 1123). An agent's page
 is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
 in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from. The line over the
-composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
+composer is one bar (item 401): how long the run has worked (or that it waits for you), how its subagents stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
-end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
-rounded pill (items 352 and 360; a wider window has the same bar), as wide as its parts and the way down and no wider,
-in the middle of the dock, not across all of it (item 427).
+end, in the same bar; it is a row of 40 px, a plain surface on a hairline and the card's corner, with no glass, no shadow
+and no pill (items 352 and 360, drawn so since item 1335; a wider window has the same bar), as wide as its parts and the
+way down and no wider, in the middle of the dock, not across all of it (item 427). While the task waits for its
+subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331).
 A list row (Campaigns, Schedules, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
-a turn after a turn keeps 8 px and the rows of what a run did 4, a message's bubble holds its words in 7 px above and
-below and 12 at the sides and is rounded 18 px, so one of a line is nearly a pill and a longer one a rounded box (items
-1101 and 1205), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
+a turn after a turn keeps 8 px and the rows of what a run did 4, what you wrote sits in a box that holds its words in 8 px above and
+below and 12 at the sides and is rounded 10 px, one of a line and a longer one alike, as on a Mac (items 1101, 1205 and
+1324; what Dot says has no box, item 1335), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
