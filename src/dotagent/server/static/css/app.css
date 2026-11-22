@@ -5317,85 +5317,6 @@ dialog.modal.versions-dialog {
   }
 }
 
-/* The run page's name in the top bar (item 78): the face, Dot's name, the run's state and its start on one line. */
-.stage-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 1 auto;
-  min-width: 0;
-  font-weight: var(--weight-label);
-}
-
-.stage-title:empty {
-  display: none;
-}
-
-.stage-h1 {
-  margin: 0;
-  font-size: var(--text-md);
-  line-height: var(--leading-md);
-  font-weight: var(--weight-label);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.stage-title .avatar {
-  width: 28px;
-  height: 28px;
-}
-
-/* The name gives way with an ellipsis when the bar is short; a breadcrumb's parent gives way first. */
-.stage-name {
-  flex: 0 1 auto;
-  min-width: 72px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* An agent's name in its chat's bar opens its page (item 1234): it reads as the name, not as a link. */
-a.stage-name-link {
-  color: inherit;
-  text-decoration: none;
-  border-radius: var(--radius-xs);
-}
-
-@media (hover: hover) {
-  a.stage-name-link:hover {
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-}
-
-/* A page's tools in the bar, before the daemon's pills. */
-.stage-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.stage-tools:empty {
-  display: none;
-}
-
-.stage-tools:not(:empty) {
-  margin-left: auto;
-}
-
-.stage-tools:not(:empty) + .stagebar-right {
-  margin-left: 0;
-}
-
-.stage-tools .chip {
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .plan-list {
   padding: 0;
 }
@@ -9831,7 +9752,7 @@ dialog.modal.file-dialog[open] {
 
 /* ---------- small screens ---------- */
 
-/* On a phone the bar keeps the face, the name and the panel's switch. */
+/* On a phone the bar keeps the badge, the agent, the chat's title and the panel's switch. */
 @media (max-width: 720px) {
   /* The breadcrumb's parent waits in the pill under the conversation; the bar keeps the run's own name. */
   .stage-crumb,
@@ -9839,17 +9760,13 @@ dialog.modal.file-dialog[open] {
     display: none;
   }
 
-  /* The bar's buttons keep their icon alone on a phone; the name keeps its first word. */
+  /* The bar's buttons keep their icon alone on a phone. */
   .stage-tools .btn .label {
     display: none;
   }
 
   .stage-tools .btn {
     padding: 0 8px;
-  }
-
-  .stage-name {
-    min-width: 56px;
   }
 
   .stage-tools .chip {
@@ -11778,13 +11695,6 @@ button.attach-chip {
 
 /* ---------- a phone's run page (items 295 and 297) ---------- */
 
-/* The bar's quick ways are a phone's, and its name in the middle of the bar (item 1101); a wider page keeps the face
-   and the name at the left and the panel's switch alone. The line over the composer is every width's (item 352). */
-.stage-heading,
-.stage-pill > .stage-quick {
-  display: none;
-}
-
 /* The line over the composer (items 297, 352 and 360): a few quiet words in the middle, its parts on short hairlines,
    each a button. It has no frame and no shadow, only the page's ground, so that what scrolls under the dock does not
    show through its words. It rises into place when it comes. */
@@ -11866,192 +11776,6 @@ button.attach-chip {
   .capsule:not([hidden]),
   .capsule-work[data-state="working"] .capsule-mark .icon {
     animation: none;
-  }
-}
-
-.stage-pill {
-  display: flex;
-  align-items: center;
-}
-
-/* A wider bar keeps the gap its tools had (an agent's page, item 1123); a phone's pill holds them side by side. */
-@media (min-width: 720.02px) {
-  .stage-pill {
-    gap: var(--space-2);
-  }
-}
-
-@media (max-width: 720px) {
-  /* The bar named the chat (item 295): its title, and under it the agent and the model in small type. A chat's page and
-     its loading curtain name whom it is with since item 1101 (below), the heading kept hidden; a helper's page keeps it. */
-  .stage-title:has(> .stage-heading) {
-    flex: 1 1 auto;
-  }
-
-  .stage-title:has(> .stage-heading) > .stage-name {
-    display: none;
-  }
-
-  .stage-tools {
-    flex: none;
-  }
-
-  .stage-title .avatar {
-    width: 24px;
-    height: 24px;
-  }
-
-  .stage-heading {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  .stage-heading-title,
-  .stage-heading-sub {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .stage-heading-title {
-    color: var(--text);
-    font-size: var(--text-md);
-    line-height: var(--leading-md);
-    font-weight: var(--weight-title);
-  }
-
-  .stage-heading-sub {
-    color: var(--muted);
-    font-size: var(--text-xs);
-    line-height: var(--leading-xs);
-    font-weight: var(--weight-text);
-  }
-
-  /* A chat's bar names whom it is with, in the middle of the bar on glass, its face and name (item 1101: the owner's
-     screenshot of Grok Bot's); the chat's title and model are in the panel's Details. A helper's page keeps its goal. */
-  .stagebar-row {
-    position: relative;
-  }
-
-  /* A chat's bar stands on nothing (item 1113, the owner's ask after Grok Bot's): its parts, the way back, the name and
-     the tools' pill, have their own grounds of glass, and the bar no ground and no line under it. The conversation
-     passes under it (item 1119, run.css), as under the composer. */
-  .stagebar[data-glass] {
-    background: transparent;
-    border-bottom-color: transparent;
-    /* A touch between the bar's parts goes through to the page under it (item 1123). */
-    pointer-events: none;
-  }
-
-  .stagebar[data-glass] :is(.stagebar-row > *, .banner) {
-    pointer-events: auto;
-  }
-
-  /* The way back is a round pane of glass, as the name's and the tools' are (item 1119): the conversation goes by under
-     all three. */
-  .stagebar[data-glass] .stagebar-left > .icon-btn {
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-pill);
-    background: var(--glass-surface);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-  }
-
-  .stagebar[data-glass] .stage-pill {
-    outline-color: var(--glass-border);
-    background: var(--glass-surface);
-    -webkit-backdrop-filter: var(--glass-blur);
-    backdrop-filter: var(--glass-blur);
-  }
-
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)),
-  .stagebar[data-glass] .stage-title:has(> .stage-name):not(:has(> .stage-heading)) {
-    position: absolute;
-    left: 50%;
-    translate: -50% 0;
-    /* Twice the wider side: the way back or the tools' pill with the panel's switch alone (40 px), the bar's padding
-       (8 px) and room to breathe (40 px), so that the name, in the middle, reaches neither. */
-    max-width: calc(100% - 176px);
-    padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-pill);
-    background: var(--glass-surface);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-  }
-
-  /* With Dot's computer or the helpers in the bar's pill there is less room beside the name: up to three buttons of
-     40 px, the pill's padding and the bar's, on each side as the name stays in the middle. test_phone_layout.py checks
-     that the name stays clear of both. */
-  .stagebar-row:has(.stage-quick:not([hidden])) > .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) {
-    max-width: calc(100% - 272px);
-  }
-
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) > .stage-name,
-  .stagebar[data-glass] .stage-title:has(> .stage-name):not(:has(> .stage-heading)) > .stage-name {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-    font-size: var(--text-md);
-    font-weight: var(--weight-title);
-  }
-
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) > .stage-heading {
-    display: none;
-  }
-
-  /* An agent's page with two tools in its pill (two buttons and the "…") leaves the name less room. */
-  .stagebar[data-glass] .stagebar-row:has(.stage-pill > :nth-child(2)) > .stage-title:has(> .stage-name):not(:has(> .stage-heading)) {
-    max-width: calc(100% - 272px);
-  }
-
-  .stagebar[data-glass] .stage-pill > .btn > .label {
-    display: none;
-  }
-
-  .stage-title:has(> .stage-heading):not(:has(> .stage-crumb)) .avatar,
-  .stagebar[data-glass] .stage-title:has(> .stage-name):not(:has(> .stage-heading)) .avatar {
-    width: 28px;
-    height: 28px;
-  }
-
-  /* The page's tools in one pill: Dot's computer, the helpers with their count, the panel's switch. Its hairline is drawn
-     inside its edge, so the pill is as tall as its buttons and as the bar's way back, and the bar as tall as the
-     curtain's, which has the way back alone (items 328 and 329). */
-  .stage-pill {
-    flex: none;
-    outline: 1px solid var(--border);
-    outline-offset: -1px;
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-  }
-
-  .stage-pill > .icon-btn {
-    border-radius: var(--radius-pill);
-    color: var(--text);
-  }
-
-  .stage-pill > .stage-quick:not([hidden]) {
-    display: inline-grid;
-  }
-
-  .stage-pill > .stage-helpers:not([hidden]) {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    width: auto;
-    padding: 0 8px;
-  }
-
-  .stage-quick-count {
-    font-size: var(--text-sm);
-    font-weight: var(--weight-label);
-    font-variant-numeric: tabular-nums;
   }
 }
 

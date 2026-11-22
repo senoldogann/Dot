@@ -599,11 +599,16 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
                 await expect(again.locator(".waiting")).to_have_count(0)
                 await again.screenshot(path=str(tmp_path / f"again-shown-{scheme}.png"))
                 shown: dict[str, list[int]] = await _places(again, ".shell")
-                # The composer and the bar's name are where they were, the name the same (item 1101): the bar's tools
-                # are only on the page, in a pill as tall as the way back (item 329), and the name's pill neither
-                # grows nor moves when the page comes.
+                # The composer and the bar's breadcrumb are where they were, the name the same (items 1101 and 1328):
+                # the bar's tools and pills are only on the page, so the breadcrumb starts at the same place and is as
+                # tall, and only its end, which the tools come to, gives way: it never grows or moves when the page
+                # comes.
                 assert waiting["composer"] == shown["composer"], (waiting, shown)
-                assert waiting["title"] == shown["title"], (waiting, shown)
+                assert waiting["title"][:2] == shown["title"][:2] and waiting["title"][3] == shown["title"][3], (
+                    waiting,
+                    shown,
+                )
+                assert waiting["title"][2] >= shown["title"][2], (waiting, shown)
                 await expect(again.locator(".shell .stage-name")).to_have_text(named)
                 assert await again.evaluate("() => scrollY + innerHeight >= document.documentElement.scrollHeight - 2")
                 # The shell came from the copy: no script or style sheet was asked of the daemon.

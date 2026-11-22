@@ -6,7 +6,7 @@ import { el, setText, showFrom } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
-import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
+import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackScrolled, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
@@ -202,6 +202,7 @@ export function buildShell({ homeRoute }) {
   );
   const stage = el("div", { class: "stage" }, stagebar, main);
   trackStagebar(stagebar);
+  const stopScrollLine = trackScrolled(stagebar);
   backsOnEdgeSwipe(stage, () => {
     if (!isOpen()) {
       menu.click();
@@ -327,6 +328,7 @@ export function buildShell({ homeRoute }) {
       window.removeEventListener(RUN_BACK_EVENT, onPageBack);
       removeShortcuts();
       stopFollowing();
+      stopScrollLine();
       sidebar.dispose();
     },
   };

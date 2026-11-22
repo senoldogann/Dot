@@ -4,6 +4,7 @@
 // network has woken. Nothing says that Dot connects unless that takes longer than a phone's network takes to wake
 // (RETURN_GRACE_MS); the curtain lifts once the page shows what it was opened for (PAGE_READY_EVENT, main.js).
 
+import { badge } from "./badge.js";
 import { CHAT_BOX_PX, composerFrame } from "./composer.js";
 import { el, showAfter } from "./dom.js";
 import { icon } from "./icons.js";
@@ -61,10 +62,12 @@ function chatPage(look, frame, note) {
         el(
           "div",
           { class: "stage-title" },
-          el("span", { class: "avatar" }),
+          badge(look.name),
           el("span", { class: "stage-name" }, look.name),
           el("span", { class: "stage-heading" }, el("span", { class: "stage-heading-title" }, look.title), el("span", { class: "stage-heading-sub" }, look.sub)),
         ),
+        // The place of the panel's switch, so that the title has the room it will have (item 1329).
+        el("div", { class: "stage-tools" }, el("div", { class: "stage-pill" }, el("span", { class: "icon-btn" }, icon("panelRight")))),
       ),
     ),
     el(

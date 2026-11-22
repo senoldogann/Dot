@@ -143,6 +143,27 @@ export function trackStagebar(stagebar) {
   return trackHeight(stagebar, document.documentElement, STAGEBAR_PROPERTY);
 }
 
+/** Draw the hairline under the stage bar only while the page has scrolled under it (item 1329, as the reference app's bar): the
+ * window's own scroll on a Mac, the conversation's on a phone, where it alone scrolls (item 352). The bar says it with
+ * `data-scrolled`. Returns the function that stops it. */
+export function trackScrolled(stagebar) {
+  function read() {
+    const thread = document.querySelector(".run-thread");
+    stagebar.toggleAttribute("data-scrolled", window.scrollY > 0 || (thread !== null && thread.scrollTop > 0));
+  }
+  function readAfterRoute() {
+    requestAnimationFrame(read);
+  }
+  // Scroll events do not bubble: the capture on the document hears the conversation's and any box's.
+  document.addEventListener("scroll", read, { capture: true, passive: true });
+  window.addEventListener("hashchange", readAfterRoute);
+  read();
+  return () => {
+    document.removeEventListener("scroll", read, { capture: true });
+    window.removeEventListener("hashchange", readAfterRoute);
+  };
+}
+
 const TOUCH_FIRST = window.matchMedia("(hover: none) and (pointer: coarse)");
 // A phone held upright, which gets the phone layout (items 294 to 298); the stylesheets share the
 // width.

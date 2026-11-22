@@ -344,12 +344,13 @@ async def test_a_message_to_a_team_starts_a_run_in_a_chat_with_the_team_which_th
         assert detail["team"] == {"id": desk["id"], "name": "Desk", "agents": [scout["id"], writer["id"]]}
         head: str = next(m.content for m in MODEL.requests[-1].messages if m.role == "system")
         assert head.startswith('You lead the team "Desk"') and "  - Scout: Finds and checks sources" in head, head[:300]
-        # The chat's bar and the sidebar's row name the team and wear the faces of its agents.
+        # The chat's bar and the sidebar's row name the team, each with its badge (items 1327 and 1329).
         await expect(page.locator(".stage-title .stage-name")).to_have_text("Desk")
-        await expect(page.locator(".stage-title .team-duo .avatar")).to_have_count(2)
+        await expect(page.locator(".stage-title .stage-badge")).to_have_text("DE")
         row: Locator = page.locator("#sidebar a.side-run", has_text="Write the report on the launch")
         await expect(row.locator(".side-chat-team")).to_have_text("Desk")
-        await expect(row.locator(".team-duo .avatar")).to_have_count(2)
+        await expect(row.locator(".side-agent")).to_have_text("Desk")
+        await expect(row.locator(".side-badge")).to_have_text("DE")
         await expect(page.locator(f"#panel-run-details a[href='#/teams/{desk['id']}']")).to_have_count(1)
         await page.screenshot(path=tmp_path / "team-chat-1280.png")
         # The chat's next message, typed in the chat's own box, is told the team too.
@@ -384,8 +385,8 @@ async def test_a_message_to_a_team_starts_a_run_in_a_chat_with_the_team_which_th
         async with asyncio.timeout(_RUN_WAIT_S):
             await manager.wait(asked.json()["id"])
         await page.context.set_offline(False)
-        await expect(row.locator(".team-duo")).to_have_count(0, timeout=15_000)
-        await expect(row.locator(".avatar")).to_have_count(1)
+        await expect(row.locator(".side-agent")).to_have_text("Scout", timeout=15_000)
+        await expect(row.locator(".side-badge")).to_have_text("SC")
         # The team's page lists the chat once, whatever the runs it holds.
         await page.goto(f"{page.url.split('#')[0]}#/teams/{desk['id']}")
         await expect(page.locator(".list-row[data-chat]")).to_have_count(1)

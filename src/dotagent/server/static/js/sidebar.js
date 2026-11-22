@@ -24,6 +24,7 @@ import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
 import { DOT_ID } from "./actors.js";
 import { onAssistant } from "./assistant.js";
+import { badge, badgeCode } from "./badge.js";
 import { shownOwner } from "./presence.js";
 import { dotName } from "./face.js";
 import { requestCompose } from "./shortcuts.js";
@@ -35,14 +36,6 @@ import { readFolds, writePref } from "./prefs.js";
 import { buildSettingsNav } from "./settingsnav.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
-
-// What a reader sees as a word's first character: a letter with its marks, an emoji made of several (item 991).
-const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-
-/** The first character of `word` as a reader sees it. */
-function firstGrapheme(word) {
-  return GRAPHEMES.segment(word)[Symbol.iterator]().next().value?.segment ?? "";
-}
 
 // The chats listed at first, the step by which "Show older chats" lists more, and the most the API lists at once.
 const LIST_LIMIT = 200;
@@ -159,17 +152,6 @@ function mark(node, current) {
   } else {
     node.removeAttribute("aria-current");
   }
-}
-
-/** A badge's two letters for an agent's name: the initials of its first two words ("Code Reviewer" is CR), else its first
- * two letters ("Dot" is DO), upper case; a letter as a reader sees it, so an emoji or a letter with marks stays whole. */
-function badgeCode(name) {
-  const words = name.split(/[\s._-]+/).filter((word) => word !== "");
-  if (words.length >= 2) {
-    return `${firstGrapheme(words[0])}${firstGrapheme(words[1])}`.toLocaleUpperCase();
-  }
-  const letters = [...GRAPHEMES.segment(words[0] ?? "")].map((part) => part.segment);
-  return letters.slice(0, 2).join("").toLocaleUpperCase();
 }
 
 /** Whose chat a row is, for the row's first line: the agent's name and its two-letter badge. */
@@ -726,7 +708,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         const reading = routeTab === "runs" && home !== null && home !== undefined && home.id === routeThreadId;
         return {
           label: name,
-          mark: el("span", { class: "side-badge", "aria-hidden": "true" }, badgeCode(name)),
+          mark: badge(name),
           detail: String(chatsOf(record.id)),
           current: reading || (routeTab === "agents" && record.id === open),
           title: record.role === "" || record.id === DOT_ID ? undefined : record.role,
