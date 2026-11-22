@@ -38,6 +38,9 @@ here points at a test that no longer exists.
 - `tests/unit/test_push_hosts.py::test_no_packaged_entry_takes_a_domain_that_serves_what_anyone_hosts` — the first list
   took `*.googleapis.com/fcm/`, which `<bucket>.storage.googleapis.com/fcm/...` matches, so a caller still named where
   Dot posts a push (item 1311).
+- `tests/smoke/test_stream_reread.py::test_events_of_a_run_that_reach_the_bus_late_are_read_from_its_own_cursor_not_the_newest_id_of_another_run` — a
+  stream re-read from one cursor for every run, so the events of a `dotx` run, relayed late, were skipped for good
+  (item 1313).
 - `tests/unit/test_store_schema.py::test_a_copy_that_meets_a_full_disk_says_the_disk_is_full` — the copy made before
   an upgrade told a full disk only from the system's error, while SQLite's online backup, its largest write, reports
   it as its own (item 1268).

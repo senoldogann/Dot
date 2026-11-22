@@ -105,9 +105,13 @@ def list_argv(output: Path) -> tuple[str, ...]:
 
 async def run_command(argv: Sequence[str], timeout_s: float) -> CommandResult:
     """The real :class:`CommandRunner`: the program as a child process, killed when it outlives ``timeout_s``."""
-    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-        *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
+    try:
+        process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+    except OSError as error:
+        # ``xcrun`` missing, or no process to spare: the keeper's own error, not one that ends its loop (item 1313).
+        raise PhoneError("a command could not be started", {"argv": list(argv), "error": str(error)}) from error
     try:
         out, err = await asyncio.wait_for(process.communicate(), timeout_s)
     except TimeoutError as error:
@@ -130,16 +134,20 @@ class XcrunDevicectl:
         self._runner: CommandRunner = runner
 
     async def is_available(self, udid: str) -> bool:
-        with tempfile.TemporaryDirectory(prefix="dot-devicectl-") as folder:
-            output: Path = Path(folder) / "devices.json"
-            result: CommandResult = await self._runner(list_argv(output), _LIST_TIMEOUT_S)
-            if result.returncode != 0:
-                raise PhoneError(
-                    "devicectl could not list the devices",
-                    {"returncode": result.returncode, "stderr": result.stderr[:_OUTPUT_CHARS]},
-                )
-            listing: str = await asyncio.to_thread(output.read_text, encoding="utf-8")
-            return device_available(listing, udid)
+        try:
+            with tempfile.TemporaryDirectory(prefix="dot-devicectl-") as folder:
+                output: Path = Path(folder) / "devices.json"
+                result: CommandResult = await self._runner(list_argv(output), _LIST_TIMEOUT_S)
+                if result.returncode != 0:
+                    raise PhoneError(
+                        "devicectl could not list the devices",
+                        {"returncode": result.returncode, "stderr": result.stderr[:_OUTPUT_CHARS]},
+                    )
+                listing: str = await asyncio.to_thread(output.read_text, encoding="utf-8")
+        except OSError as error:
+            # A folder that cannot be made, or a listing devicectl wrote nowhere or unreadably (item 1313).
+            raise PhoneError("devicectl's list of devices could not be read", {"error": str(error)}) from error
+        return device_available(listing, udid)
 
     async def launch(self, udid: str, bundle: str) -> None:
         result: CommandResult = await self._runner(launch_argv(udid, bundle), _LAUNCH_TIMEOUT_S)

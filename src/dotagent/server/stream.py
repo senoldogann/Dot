@@ -8,7 +8,7 @@ import asyncio
 import base64
 import json
 import time
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Iterable, Mapping
 
 from starlette.responses import StreamingResponse
 
@@ -132,12 +132,15 @@ def joins_family(family: set[str], event: EventRecord) -> bool:
 UNREAD_BY_PAGES: tuple[str, ...] = (LOOP_STATE_EVENT,)
 
 
-async def _stored_events(store: Store, run_ids: Iterable[str], after: int) -> list[EventRecord]:
+async def _stored_events(
+    store: Store, run_ids: Iterable[str], after: int, newest: Mapping[str, int] | None = None
+) -> list[EventRecord]:
     """The stored events of the runs after id ``after`` a page reads (not :data:`UNREAD_BY_PAGES`), in the order they
-    happened."""
+    happened. With ``newest`` (the newest id sent of each run), a run is read from there (item 1313,
+    :func:`reread_after`), a run not in it from ``after``."""
     found: list[EventRecord] = []
     for run_id in sorted(run_ids):
-        cursor: int = after
+        cursor: int = reread_after(after, newest[run_id]) if newest is not None and run_id in newest else after
         while True:
             page: list[EventRecord] = await store.list_events_without(run_id, cursor, _PAGE, UNREAD_BY_PAGES)
             found.extend(page)
@@ -145,6 +148,36 @@ async def _stored_events(store: Store, run_ids: Iterable[str], after: int) -> li
                 break
             cursor = page[-1].id
     return sorted(found, key=lambda event: event.id)
+
+
+# How far behind the newest id a stream has sent of a run it reads the store again after a drop (item 1313): two events
+# stored at once may be told to the bus in the other order, so one of them can be lost in the queue while one after it
+# was sent. A few ids is room for that; the ones read twice are passed over by :class:`_Sent`.
+_REREAD_SLACK: int = 64
+
+
+def reread_after(after: int, newest: int) -> int:
+    """The id a stream reads one run's stored events from again, after a drop: the newest event it sent of that run
+    (less :data:`_REREAD_SLACK`) or the id the client asked from, whichever is later, so that a long run's whole history
+    is not read and passed over at every drop (item 1313). The cursor is the run's own: event ids are one order for
+    every run, but the events of a run a ``dotx`` command drives reach the bus late (``RunManager.relay_elsewhere``), so
+    the newest id sent of another run says nothing of what this one has lost."""
+    return max(after, newest - _REREAD_SLACK)
+
+
+class _Sent:
+    """The stored events a stream has sent, and the newest id sent of each run."""
+
+    def __init__(self) -> None:
+        self.ids: set[int] = set()
+        self.newest: dict[str, int] = {}
+
+    def __contains__(self, event_id: object) -> bool:
+        return event_id in self.ids
+
+    def add(self, event: EventRecord) -> None:
+        self.ids.add(event.id)
+        self.newest[event.run_id] = max(event.id, self.newest.get(event.run_id, 0))
 
 
 async def _widen(store: Store, family: set[str]) -> None:
@@ -193,7 +226,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
     """
     store: Store = ctx.runtime.store
     family: set[str] = {run_id}
-    sent: set[int] = set()
+    sent: _Sent = _Sent()
     async with ctx.runtime.bus.subscribe(None) as feed:
 
         async def stored(upto_end: bool) -> tuple[bytes, bool]:
@@ -203,14 +236,18 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
             until the next keepalive, 15 s on, so that a chat at work opened without its steps on about every other
             try (item 716)."""
             await _widen(store, family)
-            fresh: list[EventRecord] = [
-                event for event in await _stored_events(store, family, after) if event.id not in sent
-            ]
+            # Each run is read from the newest event sent of its own; one that joined only now (its start was one of
+            # the events lost) has none, and is read from where the page asked, as its events may be older than any.
+            read: list[EventRecord] = await _stored_events(store, family, after, sent.newest)
+            fresh: list[EventRecord] = sorted(
+                (event for event in read if event.id not in sent), key=lambda event: event.id
+            )
             ends: list[int] = [
                 at for at, event in enumerate(fresh) if event.kind == _FINISHED and event.run_id == run_id
             ]
             told: list[EventRecord] = fresh[: ends[0] + 1] if ends and upto_end else fresh
-            sent.update(event.id for event in told)
+            for event in told:
+                sent.add(event)
             return b"".join(encode_event(event) for event in told), bool(ends)
 
         def live(event: EventRecord) -> bytes | None:
@@ -224,7 +261,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
             if event.id > 0:
                 if event.id in sent:
                     return None
-                sent.add(event.id)
+                sent.add(event)
             return encode_event(event)
 
         frames, ended = await stored(True)
@@ -276,15 +313,16 @@ async def follow_runs(ctx: ServerContext, run_ids: frozenset[str], after: int) -
     not followed (each run's own stream has them). Ends once none of the runs works, and when the daemon starts to
     stop; event ids are the store's, one order for every run, so a client goes on after the last one it read."""
     store: Store = ctx.runtime.store
-    sent: set[int] = set()
+    sent: _Sent = _Sent()
     async with ctx.runtime.bus.subscribe(None) as feed:
 
         async def stored() -> bytes:
             fresh: list[EventRecord] = sorted(
-                (event for event in await _stored_events(store, run_ids, after) if event.id not in sent),
+                (event for event in await _stored_events(store, run_ids, after, sent.newest) if event.id not in sent),
                 key=lambda event: event.id,
             )
-            sent.update(event.id for event in fresh)
+            for event in fresh:
+                sent.add(event)
             return b"".join(encode_event(event) for event in fresh)
 
         frames: bytes = await stored()
@@ -322,7 +360,7 @@ async def follow_runs(ctx: ServerContext, run_ids: frozenset[str], after: int) -
             ):
                 continue
             if incoming.id > 0:
-                sent.add(incoming.id)
+                sent.add(incoming)
             owed, written = True, time.monotonic()
             yield encode_event(incoming)
 
