@@ -400,7 +400,13 @@ in a new tab; you say yes there, the provider sends the browser back to the daem
 address with a code, which Dot trades for tokens with PKCE, and the card follows until the account is there, named by
 its address; **Sign out** takes it away, and gives Google the refresh token back, which ends the grant there (item
 558; Microsoft has no such call for a client like Dot's: take Dot's access away at your Microsoft account, under the
-apps that may use it). A refresh under way ends first, so that no token it fetched is written back after the sign-out.
+apps that may use it). Signing out always works on the Mac. When Google did not take the token back (it could not be
+reached, or it refused: the log says its status and error code, never the token), the card says "Signed out here;
+Google may still list Dot: remove it at myaccount.google.com/permissions" (Microsoft's says the same, with
+`account.live.com/consent/Manage`), and Dot keeps the token in the Keychain, under a place of its own with a record in
+the store, and asks again as the daemon starts and every hour for a week, then lets it go (item 1312). A token Google
+calls invalid has been revoked already and is not asked about again. A refresh under way ends first, so that no token it
+fetched is written back after the sign-out.
 The list below the card is drawn once the card has read the accounts (item 511), so the tiles do not move down under a
 finger as its rows come. A sign-in starts only from a page on this Mac (the
 provider comes back to the Mac's loopback address, which a phone does not reach). An account's access token is refreshed

@@ -29,6 +29,9 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_oauth_accounts.py::test_a_refused_revoke_keeps_the_token_to_ask_again_and_the_sign_out_stands` — a
+  sign-out forgot the tokens before the provider's revoke, and a refusal was only logged (its error dropped), so the
+  provider kept listing Dot and the page said "signed out" (item 1312).
 - `tests/smoke/test_phone_limits.py::test_a_foreign_push_host_is_refused_and_a_removed_phone_takes_its_subscriptions` — a web
   push subscription took any https address, so Dot posted every push, signed, to a host the caller named, and it
   belonged to no phone, so removing the phone left it (item 1311).
