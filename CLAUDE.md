@@ -20,6 +20,8 @@ it lets a run do as much as by how it reads.
 ## Checks
 
 Point `DOT_HOME`, `DOT_LOG_DIR` and `DOT_CHROME_DIR` at throwaway folders first, so no test touches the owner's own Dot.
+`tests/conftest.py` does it too for a variable left unset (item 1315) and fails a test whose `dot_home()`, `log_dir()` or
+`plugins_dir()` is the owner's own; a run that holds `live`, `hosted`, `internet` or `desktop` tests keeps its variables.
 While working, run the tests of what changed (`uv run pytest tests/unit/test_x.py tests/smoke/test_y.py -q`), not the
 whole gate. Run the whole gate once, when the change is done; `.github/workflows/gate.yml` runs it again on the pull
 request. `-n auto` spreads the tests over the Mac's cores.

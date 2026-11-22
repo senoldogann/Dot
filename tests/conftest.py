@@ -19,9 +19,16 @@ The MCP server that comes with Dot is out of every test that did not ask for it 
 :func:`_no_builtin_servers` says. The folder Dot copies the pictures it sends into, ``~/Pictures/Dot``, is the owner's:
 no test reaches it (item 617), as :func:`_owners_pictures_stay_theirs` says. Whether a model's server can be connected
 to (item 769) is checked on this Mac alone: a server elsewhere counts as one that can be, as
-:func:`_connection_checks_stay_on_this_mac` says."""
+:func:`_connection_checks_stay_on_this_mac` says.
+
+The owner's own Dot is out of every test too (item 1315): ``DOT_HOME``, ``DOT_LOG_DIR`` and ``DOT_CHROME_DIR`` are
+folders of the run's own unless they are set to one already, and a test that reaches ``~/Library/Application
+Support/Dot`` or ``~/Library/Logs/Dot`` fails, as :func:`_owners_dot_stays_theirs` and
+:func:`_a_test_stays_out_of_the_owners_dot` say. A run that holds ``live``, ``hosted``, ``internet`` or ``desktop``
+tests is the owner's own run on their Mac and keeps what it was given."""
 
 import os
+import pwd
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -33,6 +40,7 @@ from dotagent import secrets
 from dotagent.channels.pictures import Pictures
 from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.config import load_default_config, providers_by_key
+from dotagent.core.paths import dot_home, log_dir, plugins_dir
 from dotagent.llm import reach
 from dotagent.mcp import builtin
 
@@ -49,6 +57,35 @@ def _key_variables() -> tuple[str, ...]:
     config = load_default_config()
     providers = config.providers
     return (*providers_by_key(config), providers.openai.organization_env, providers.openai.project_env)
+
+
+# The marks of the tests that run on the owner's own Mac, with their own Dot (item 1315).
+_THEIR_OWN_DOT: tuple[str, ...] = ("live", "hosted", "internet", "desktop")
+# The variables that name where Dot keeps its files, and where each one's folder stands when it is not set.
+_HOME_VARIABLES: tuple[str, ...] = ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR")
+
+
+def _owners_home() -> Path:
+    """The owner's home folder, from the account database: ``HOME`` is what a test may point elsewhere."""
+    return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+# Where the owner's own Dot keeps its files and logs (read once, as the run began).
+_REAL_PLACES: tuple[Path, ...] = tuple(
+    Path(os.path.realpath(_owners_home() / part))
+    for part in ("Library/Application Support/Dot", "Library/Logs/Dot", "Library/Application Support/Google/Chrome")
+)
+
+
+def _in_the_owners_dot(path: Path) -> bool:
+    where: Path = Path(os.path.realpath(path))
+    return any(where.is_relative_to(real) for real in _REAL_PLACES)
+
+
+def _reaching_the_owners_dot() -> list[str]:
+    """What Dot would use now that is the owner's own: its home, its logs and its plugins folder."""
+    found: dict[str, Path] = {"dot_home()": dot_home(), "log_dir()": log_dir(), "plugins_dir()": plugins_dir()}
+    return [f"{name} is {where}" for name, where in found.items() if _in_the_owners_dot(where)]
 
 
 # What the owner has in those variables, as the run began (read as this file is, before any fixture).
@@ -147,3 +184,49 @@ def _owners_pictures_stay_theirs(tmp_path_factory: pytest.TempPathFactory) -> It
 def web_research_comes(monkeypatch: pytest.MonkeyPatch) -> None:
     """For a test of the server that comes with Dot: its package is found where it is installed, as it is for Dot."""
     monkeypatch.setattr(builtin, "WEB_RESEARCH_PACKAGE", _REAL_WEB_RESEARCH_PACKAGE)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _owners_dot_stays_theirs(
+    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[bool]:
+    """Dot's home, its logs and the owner's Chrome are folders of the run's own (item 1315), so a test that asks
+    :func:`dotagent.core.paths.dot_home`, ``log_dir`` or ``plugins_dir`` without making a home of its own reads and
+    writes nothing of the owner's (two tests had read their plugins and the daemon's log). A variable the run was
+    given stays as it is, unless it names the owner's own folder; a run that holds a test of the owner's own Mac
+    (``live``, ``hosted``, ``internet``, ``desktop``) is left as it is. A child process a test starts has the same
+    environment. Yields whether the guard is on, for :func:`_a_test_stays_out_of_the_owners_dot`."""
+    if any(item.get_closest_marker(name) is not None for item in request.session.items for name in _THEIR_OWN_DOT):
+        yield False
+        return
+    with pytest.MonkeyPatch.context() as patch:
+        for variable in _HOME_VARIABLES:
+            given: str = os.environ.get(variable, "")
+            if given == "" or _in_the_owners_dot(Path(given).expanduser()):
+                patch.setenv(variable, str(tmp_path_factory.mktemp(variable.lower())))
+        yield True
+
+
+@pytest.fixture(autouse=True)
+def _a_test_stays_out_of_the_owners_dot(_owners_dot_stays_theirs: bool) -> Iterator[None]:
+    """The test starts with Dot's home, logs and plugins in a folder that is not the owner's (item 1315)."""
+    if _owners_dot_stays_theirs:
+        assert not (reached := _reaching_the_owners_dot()), f"a test stays out of the owner's own Dot: {reached}"
+    yield
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item) -> Iterator[None]:
+    """The same check as the fixture's, made around the test's own body, where its fixtures and its monkeypatches
+    have already set the environment (item 1315)."""
+    guarded: bool = bool(item.funcargs.get("_owners_dot_stays_theirs")) if hasattr(item, "funcargs") else False
+    if guarded:
+        before: list[str] = _reaching_the_owners_dot()
+        if before:
+            pytest.fail(f"the test begins in the owner's own Dot: {before}", pytrace=False)
+    result = yield
+    if guarded:
+        after: list[str] = _reaching_the_owners_dot()
+        if after:
+            pytest.fail(f"the test left Dot's folders on the owner's own: {after}", pytrace=False)
+    return result
