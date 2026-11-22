@@ -803,7 +803,7 @@ function typeCard() {
   });
   const composerSize = rangeOf({
     label: "Message box size",
-    hint: "15 px is its own.",
+    hint: "14 px is its own.",
     setting: COMPOSER_SIZE,
     min: 12,
     max: 20,

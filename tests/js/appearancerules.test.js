@@ -83,12 +83,12 @@ test("what a browser kept before every face offered the same families reads as w
 
 test("a size of the answers kept stays when the interface's brings their default to it", () => {
   const { rules, paintAll } = load(false);
-  const read = kept({ "dot.sizeInterface": "17", "dot.sizeAnswers": "18" });
-  // 15 × 17 / 14 rounds to 18: the default is the size kept, which is painted all the same.
-  assert.equal(rules.answerSize.initial(read), 18);
+  const read = kept({ "dot.sizeInterface": "17", "dot.sizeAnswers": "17" });
+  // 14 × 17 / 14 is 17: the default is the size kept, which is painted all the same.
+  assert.equal(rules.answerSize.initial(read), 17);
   const root = element();
   paintAll(read, root);
-  assert.equal(root.tokens.get("--answer-size"), "18px");
+  assert.equal(root.tokens.get("--answer-size"), "17px");
 });
 
 test("a phone's own body and message are 16 px", () => {

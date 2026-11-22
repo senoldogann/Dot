@@ -268,31 +268,31 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
 
     # Every face has the same three (item 1062): its family, its weight and its size.
     answers = ".type-preview[data-preview='answers']"
-    # Until set, the answers' size follows the interface's: a message's 15 px scaled by 16 over 14.
-    await expect(page.get_by_role("slider", name="Answers size")).to_have_value("17")
+    # Until set, the answers' size follows the interface's: a message's 14 px scaled by 16 over 14.
+    await expect(page.get_by_role("slider", name="Answers size")).to_have_value("16")
     await page.get_by_role("combobox", name="Answers font").select_option("serif")
     assert (await _style(page, answers, "font-family")).startswith("ui-serif")
     await page.get_by_role("combobox", name="Answers weight").select_option("500")
-    await page.get_by_role("slider", name="Answers size").fill("18")
+    await page.get_by_role("slider", name="Answers size").fill("17")
     assert await _style(page, answers, "font-weight") == "500"
-    assert await _style(page, answers, "font-size") == "18px"
-    # An answer's first heading a step over its text and its inline code a step under, as 17 and 13 are to 15; code has
+    assert await _style(page, answers, "font-size") == "17px"
+    # An answer's first heading a step over its text and its inline code a step under, as 16 and 13 are to 14; code has
     # the code's weight, but in bold it keeps the bold's; its headings are a step and two over its weight (500).
     assert await page.evaluate(_ANSWER) == {
-        "h1": "20.4px",
+        "h1": "19.4286px",
         "h1_weight": "700",
         "h3_weight": "600",
-        "code": "15.6px",
+        "code": "15.7857px",
         "code_weight": "400",
         "bold_code": "700",
     }
-    # A size kept stays when the interface's brings the default to it (17 px: 15 × 17 / 14 is 18), and after it.
+    # A size kept stays when the interface's brings the default to it (17 px: 14 × 17 / 14 is 17), and after it.
     await page.get_by_role("slider", name="Interface size").fill("17")
     await page.reload()
-    await expect(page.get_by_role("slider", name="Answers size")).to_have_value("18")
-    assert await _style(page, answers, "font-size") == "18px"
+    await expect(page.get_by_role("slider", name="Answers size")).to_have_value("17")
+    assert await _style(page, answers, "font-size") == "17px"
     await page.get_by_role("slider", name="Interface size").fill("13")
-    assert await _style(page, answers, "font-size") == "18px"
+    assert await _style(page, answers, "font-size") == "17px"
     await page.get_by_role("slider", name="Interface size").fill("16")
     await page.get_by_role("combobox", name="Code font").select_option("menlo")
     await page.get_by_role("combobox", name="Code weight").select_option("500")
@@ -326,7 +326,7 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
         "--type-scale": str(16 / 14),
         "--weight-text": "300",
         "--voice": "var(--family-serif)",
-        "--answer-size": "18px",
+        "--answer-size": "17px",
         "--answer-weight": "500",
         "--composer-font": "var(--family-geist-mono)",
         "--composer-size": "18px",
@@ -370,10 +370,10 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await page.get_by_role("combobox", name="Interface weight").select_option("400")
     await page.get_by_role("combobox", name="Answers font").select_option("")
     await page.get_by_role("combobox", name="Answers weight").select_option("400")
-    await page.get_by_role("slider", name="Answers size").fill("15")
+    await page.get_by_role("slider", name="Answers size").fill("14")
     await page.get_by_role("combobox", name="Message box font").select_option("")
     await page.get_by_role("combobox", name="Message box weight").select_option("400")
-    await page.get_by_role("slider", name="Message box size").fill("15")
+    await page.get_by_role("slider", name="Message box size").fill("14")
     await page.get_by_role("combobox", name="Code font").select_option("")
     await page.get_by_role("combobox", name="Code weight").select_option("400")
     await page.get_by_role("slider", name="Code size").fill("13")

@@ -233,7 +233,7 @@ async def _bar_and_composer(
     # A window without a touch screen zooms into no field, so the box keeps the size chosen for it at every width (item
     # 311); a phone's floor is in test_phone_fit.py.
     text_px: str = await box.evaluate("(field) => getComputedStyle(field).fontSize")
-    assert text_px == "15px", text_px
+    assert text_px == "14px", text_px
     if phone:
         assert (await _size(page.get_by_role("button", name="Start")))[:2] == (36, 36)
     await page.screenshot(path=str(shots / f"composer-{width}-{scheme}.png"))
