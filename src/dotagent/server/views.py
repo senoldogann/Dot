@@ -1522,6 +1522,15 @@ class ScheduleView(FrozenModel):
     ran_once: bool = False
 
 
+class ThreadAutomation(FrozenModel):
+    """A schedule that belongs to a chat as the chat's side panel lists it (item 1333): the schedule as the Schedules
+    page shows it, and whether it is the chat's own loop (``/loop 30m <message>``) rather than a schedule a run or the
+    owner made in the chat."""
+
+    schedule: ScheduleView
+    loop: bool
+
+
 class ContextChoice(FrozenModel):
     """The context size of a model's runs as Settings › Models shows and chooses it (item 250). ``tokens`` is the budget
     of its next run; ``chosen`` the size chosen for it, ``None`` when its runs have the default; ``default`` the budget

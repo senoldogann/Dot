@@ -4,7 +4,8 @@ named by its message, and each of its runs is told how the loop ends."""
 import pytest
 
 from dotagent.core.errors import InvalidValueError
-from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
+from dotagent.scheduler.loops import LoopRhythm, is_loop, loop_goal, loop_name, loop_rhythm
+from dotagent.store.models import ScheduleOptions, ScheduleRecord
 
 
 @pytest.mark.parametrize(
@@ -35,3 +36,42 @@ def test_the_schedule_is_named_by_the_first_line_and_each_run_is_told_how_the_lo
         "check the build\n\n(This message is a loop of this chat: it is asked again every 30 minutes."
     )
     assert 'delete the schedule "Loop: check the build"' in goal and "schedule_delete" in goal
+
+
+def _record(name: str, cron: str | None) -> ScheduleRecord:
+    options: ScheduleOptions = ScheduleOptions(
+        model=None,
+        effort=None,
+        speed=None,
+        approvals=None,
+        goal_mode=None,
+        timezone=None,
+        history_runs=None,
+        same_chat=None,
+        stop_after_failures=None,
+        notify=None,
+        agent_id=None,
+    )
+    return ScheduleRecord(
+        id="sch_1",
+        name=name,
+        cron=cron,
+        run_at=None if cron is not None else 1.0,
+        goal="Check the build",
+        mode="task",
+        enabled=True,
+        created_at=0.0,
+        last_run_at=None,
+        next_run_at=None,
+        thread_id="thr_1",
+        last_status="",
+        options=options,
+        runs_failed_in_row=0,
+    )
+
+
+def test_a_loop_is_a_repeating_schedule_the_loops_name_made() -> None:
+    assert is_loop(_record(loop_name("check the build"), "*/30 * * * *"))
+    # A schedule of the chat that is no loop: another name, or a time that happens once.
+    assert not is_loop(_record("Check the build", "*/30 * * * *"))
+    assert not is_loop(_record(loop_name("check the build"), None))

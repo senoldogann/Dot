@@ -6,6 +6,7 @@ import re
 
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
+from dotagent.store.models import ScheduleRecord
 
 # The rhythms a loop keeps exactly with a cron expression: minutes that divide an hour, hours that divide a day. Five
 # minutes is the scheduler's shortest gap ([scheduler] min_interval_s).
@@ -13,6 +14,7 @@ _MINUTES: tuple[int, ...] = (5, 10, 15, 20, 30)
 _HOURS: tuple[int, ...] = (1, 2, 3, 4, 6, 8, 12)
 _RHYTHM: re.Pattern[str] = re.compile(r"(\d+)\s*([mh])")
 _NAME_CHARS: int = 40
+LOOP_PREFIX: str = "Loop: "
 
 
 class LoopRhythm(FrozenModel):
@@ -44,7 +46,12 @@ def loop_rhythm(every: str) -> LoopRhythm:
 def loop_name(text: str) -> str:
     """The name of the loop's schedule: its message's first line, short."""
     first: str = " ".join(text.strip().splitlines()[0].split()) if text.strip() else ""
-    return f"Loop: {first if len(first) <= _NAME_CHARS else first[: _NAME_CHARS - 1] + '…'}"
+    return f"{LOOP_PREFIX}{first if len(first) <= _NAME_CHARS else first[: _NAME_CHARS - 1] + '…'}"
+
+
+def is_loop(record: ScheduleRecord) -> bool:
+    """Whether ``record`` is a chat's loop: a repeating schedule that :func:`loop_name` named."""
+    return record.cron is not None and record.name.startswith(LOOP_PREFIX)
 
 
 def loop_goal(text: str, rhythm: LoopRhythm, name: str) -> str:

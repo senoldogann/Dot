@@ -49,6 +49,7 @@ from dotagent.memory.service import (
 from dotagent.policy.drafting import DraftedRule
 from dotagent.proactive.brief import read_state
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler.loops import is_loop
 from dotagent.scheduler.plans import (
     ScheduleRequest,
     create_schedule,
@@ -93,6 +94,7 @@ from dotagent.server.views import (
     ScheduleUpdateRequest,
     ScheduleView,
     SearchQuery,
+    ThreadAutomation,
     TrashedNote,
     TrashView,
     UnmergeView,
@@ -436,6 +438,25 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
         return [
             _schedule_view(record, await schedule_zone(record.options, zone), agents, brief_id)
             for record in sorted(await store.list_schedules(), key=schedule_order)
+        ]
+
+    @router.get("/threads/{thread_id}/automations")
+    async def list_thread_automations(thread_id: str) -> list[ThreadAutomation]:
+        """The schedules of the chat (item 1333), the side panel's Automations: those whose chat it is, its own loop
+        among them (``loop``), switched-on ones first and soonest first; 404 for no chat. Switching one on or off and
+        running it now are the schedule's own routes below, and what they change is read at the next firing."""
+        await store.get_thread(thread_id)
+        agents: dict[str, AgentRecord] = await agents_by_id()
+        brief_id: str | None = (await read_state(store)).schedule_id
+        records: list[ScheduleRecord] = [
+            record for record in await store.list_schedules() if record.thread_id == thread_id
+        ]
+        return [
+            ThreadAutomation(
+                schedule=_schedule_view(record, await schedule_zone(record.options, zone), agents, brief_id),
+                loop=is_loop(record),
+            )
+            for record in sorted(records, key=schedule_order)
         ]
 
     @router.get("/schedules/{schedule_id}")
