@@ -6,9 +6,34 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1319](1319.md) | done | 2026-11-22 | The web tools' "public only" rule is applied before the browser sends a request, and watch_video walks its link's redirects first |
+| [1318](1318.md) | done | 2026-11-22 | Small leftovers and drift in the docs after the Trader and the trading desk went |
 | [1317](1317.md) | done | 2026-11-22 | The roadmap from item 459 on has an index, and the gate keeps it current |
 | [1316](1316.md) | done | 2026-11-22 | What the code imports is declared in pyproject.toml |
 | [1315](1315.md) | done | 2026-11-22 | A test never reaches the owner's own Dot by default |
+| [1314](1314.md) | done | 2026-11-22 | A connector a key change retired is closed after its calls end, and idle connections to a provider are dropped after 30 seconds |
+| [1313](1313.md) | done | 2026-11-22 | The phone keeper outlives a failing devicectl, a question's wait says what failed, and a stream reads on after a drop |
+| [1312](1312.md) | done | 2026-11-22 | Signing out of Google keeps the token until Google took it back, and the page says when it did not |
+| [1311](1311.md) | done | 2026-11-22 | A web push subscription is taken only at a browser maker's push service, and goes with the phone that registered it |
+| [1310](1310.md) | done | 2026-11-22 | A restart that waits for Dot to be idle is kept in the store, told to the owner, goes on after two hours, and a refused load no longer leaves Dot down |
+| [1309](1309.md) | done | 2026-11-22 | A retired Ollama cloud model is remembered, its replacement is named, and the doctor says which role names it |
+| [1308](1308.md) | done | 2026-11-22 | The lessons of a run no longer drop when embeddings are down, and the owner is told once that memory is on word search |
+| [1307](1307.md) | done | 2026-11-22 | One rule for the nearest reasoning level, and a schedule keeps the level its firing ran at |
+| [1306](1306.md) | done | 2026-11-22 | A model call's retries have a budget, a provider's Retry-After is held within it, and a long rate limit goes to the run |
+| [1305](1305.md) | done | 2026-11-22 | A skill that cannot be read is logged once, a plugin whose skills cannot load is not proposed, and a SKILL.md may begin with blank lines |
+| [1304](1304.md) | done | 2026-11-22 | A plugin archive that is refused no longer stops the plugins after it, and one that never comes is not downloaded every night |
+| [1303](1303.md) | done | 2026-11-22 | An awk program that prints to a target it works out while it runs asks |
+| [1302](1302.md) | done | 2026-11-22 | A program that is handed a command line by an option of its own is judged by that line |
+| [1301](1301.md) | done | 2026-11-22 | A file git runs as code is asked about when a file tool writes it, and git's output and command options are judged |
+| [1300](1300.md) | done | 2026-11-22 | The count of a group's faces shows its "+" |
+| [1299](1299.md) | done | 2026-11-22 | A desktop screenshot blacks out what was on the screen during the capture, and a script that times out dies with its commands |
+| [1298](1298.md) | done | 2026-11-22 | A download has a size limit and a folder quota, and a crawl follows its start address through a redirect |
+| [1297](1297.md) | done | 2026-11-22 | A run is told when Chrome quit under its tabs, and a quiet read's failed close no longer replaces the page it read |
+| [1296](1296.md) | done | 2026-11-22 | A navigation a redirect cuts off is read where the tab stands, not failed |
+| [1295](1295.md) | done | 2026-11-22 | `browser_captcha` never reads a page it could not read as a page that passed, and presses only a pixel that is the check's own |
+| [1294](1294.md) | done | 2026-11-21 | `browser_create_login` finds the owner's login by its site, keeps every earlier password, and takes turns |
+| [1293](1293.md) | done | 2026-11-21 | The shell environment filter holds back more of the variables that carry a secret |
+| [1292](1292.md) | done | 2026-11-21 | A held secret is masked in each form a text writes it in, by one function |
 | [1291](1291.md) | done | 2026-11-21 | Two tests no longer read the Mac they run on |
 | [1290](1290.md) | done | 2026-11-21 | An account a run makes keeps one login in the vault, and a sign-up that failed gets a new password under it |
 | [1289](1289.md) | done | 2026-11-21 | A question that asks the user for a secret is refused, and the run asks on the card |
