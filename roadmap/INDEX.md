@@ -6,6 +6,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1334](1334.md) | done | 2026-11-22 | The Automations of a chat are a section of its side panel, each with a pencil, a play and a switch |
+| [1333](1333.md) | done | 2026-11-22 | A chat's schedules and loops are one list the side panel can read |
+| [1332](1332.md) | done | 2026-11-22 | The run's side panel is a quiet details panel with a Lineage of the task and its subagents |
+| [1331](1331.md) | done | 2026-11-22 | The subagents of a task are one card with a row each, and the task says it waits on them |
 | [1330](1330.md) | done | 2026-11-22 | The composer as the reference app's: one rounded box, the "+" at the left, at the right the model with its reasoning as bars, the microphone and the round send, always in sight |
 | [1329](1329.md) | done | 2026-11-22 | The stage bar as the reference app's breadcrumb: the agent's badge, a slash and the chat's title, 52 px, a hairline only when the page scrolls, the same on a phone |
 | [1328](1328.md) | done | 2026-11-22 | The sidebar's head, search row and foot as the reference app's: the agents a menu instead of faces, four small buttons at the foot, no Schedules icon |

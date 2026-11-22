@@ -710,7 +710,20 @@ export function mount(root, ctx) {
   const openFirings = new Set();
   // The schedule a line of a conversation led here to (item 665, `#/schedules?schedule=ID`): marked and in sight once,
   // when the list is first painted.
-  let askedId = new URLSearchParams(location.hash.split("?")[1] ?? "").get("schedule") ?? "";
+  const asking = new URLSearchParams(location.hash.split("?")[1] ?? "");
+  let askedId = asking.get("schedule") ?? "";
+  // The same address with `&edit=1` (the pencil of a chat's Automations, item 1334) opens that schedule's editor, once:
+  // the address forgets it as the editor opens (`forgetEdit`), so a reload or a Back to this page does not open it again.
+  let askedEdit = asking.get("edit") === "1";
+  function forgetEdit() {
+    const path = location.hash.slice(1);
+    const target = path.replace(/([?&])edit=1(&|$)/, (_, lead, tail) => (tail === "&" ? lead : ""));
+    if (target === path) {
+      return;
+    }
+    // The router keeps `dotPath` without the query, so the entry's state stays as it is.
+    history.replaceState(history.state, "", `${location.pathname}${location.search}#${target}`);
+  }
   // What stops measuring the list's cut after its third row (item 634), when it is painted again or the page goes.
   let stopCut = () => {};
   const holder = el("div", null, loadingPanel());
@@ -753,10 +766,16 @@ export function mount(root, ctx) {
     stopCut = cutAfterThird(list);
     list.scrollTop = scrolled;
     const asked = askedId === "" ? null : list.querySelector(`[data-schedule="${CSS.escape(askedId)}"]`);
+    const toEdit = askedEdit ? views.find((view) => view.record.id === askedId) : undefined;
     askedId = "";
+    askedEdit = false;
     if (asked !== null) {
       asked.classList.add("asked");
       asked.scrollIntoView({ block: "nearest" });
+    }
+    if (toEdit !== undefined) {
+      forgetEdit();
+      handlers.onEdit(toEdit);
     }
     count.textContent = plural(views.length, "schedule", "schedules");
     for (const list of holder.querySelectorAll("[data-firings]")) {

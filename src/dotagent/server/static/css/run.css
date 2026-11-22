@@ -1629,6 +1629,124 @@ button.lineage-row:focus-visible {
   margin-top: var(--space-1);
 }
 
+/* The Automations of a chat (item 1334), in the Task tab: the schedules and loops that belong to it. A row is a
+   calendar-clock mark with a green dot while the schedule is on, its title over a quiet line, a pencil, a play and a
+   switch; the title gives way with an ellipsis, so that the three controls keep their place. */
+.automation-count {
+  margin-left: var(--space-1);
+  color: var(--faint);
+  font-weight: var(--weight-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.automation-list {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(4 * 52px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.automation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 48px;
+  padding: var(--space-1) 0;
+}
+
+.automation-mark {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--space-1);
+  place-items: center;
+  color: var(--muted);
+}
+
+.automation-mark .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.automation-dot {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--faint);
+}
+
+.automation-dot[data-state="on"] {
+  background: var(--ok);
+}
+
+.automation-dot[data-state="failed"] {
+  background: var(--bad);
+}
+
+.automation-dot[data-state="off"] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--faint);
+}
+
+.automation-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+}
+
+.automation-title,
+.automation-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.automation-title {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+}
+
+.automation-line {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.automation-row .icon-btn {
+  flex: none;
+}
+
+.automation-row .icon-btn .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.automation-switch {
+  margin-left: var(--space-1);
+}
+
+/* A finger's target (item 606): the three controls of a row take the touch-target token (item 1325) on a touch screen. */
+@media (pointer: coarse) {
+  .automation-row .icon-btn {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+  }
+
+  .automation-row {
+    min-height: 52px;
+  }
+}
+
 /* The agents of a chat (items 227 and 296), in the Agents tab: a row for
    each, the face with its state at the corner; the goal over the provider's mark, the model and the state in a word,
    and what it does or did last; how long it took and a chevron at the right; the whole row is the way to its page. */
