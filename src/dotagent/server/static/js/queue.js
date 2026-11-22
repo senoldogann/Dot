@@ -7,6 +7,7 @@
 
 import { api } from "./api.js";
 import { el } from "./dom.js";
+import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, toast } from "./ui.js";
@@ -409,7 +410,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         toast("ok", "A request of its own: started at once in a chat of its own.", {
           label: "Open",
           run: () => {
-            location.hash = `#/runs/${runId}`;
+            goTo(`#/runs/${runId}`);
           },
         });
       }
