@@ -26,6 +26,7 @@ import pytest
 
 from dotagent.connections import mac
 from dotagent.connections.mac import AutomationState
+from dotagent.core.errors import DesktopPermissionError
 from dotagent.desktop import perms
 
 MISSING_OPENCODE: str = "/nonexistent/dot-tests/opencode"
@@ -65,6 +66,22 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     dropped: list[pytest.Item] = [item for item in items if item.nodeid.split("::")[0] not in kept_files]
     config.hook.pytest_deselected(items=dropped)
     items[:] = kept
+
+
+@pytest.fixture(autouse=True)
+def _no_screen_capture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Screen tab of a run's panel watches the Mac's screen as it comes into sight (item 1322): no test captures the
+    owner's screen, or has macOS ask for its permission. Where the frameworks are not there (Linux) the route answers
+    an error by itself."""
+    try:
+        from dotagent.desktop import live
+    except ImportError:
+        return
+
+    def refuse(self: object) -> None:
+        raise DesktopPermissionError("tests do not capture the screen", {})
+
+    monkeypatch.setattr(live.LiveScreen, "check_allowed", refuse)
 
 
 def pytest_configure(config: pytest.Config) -> None:
