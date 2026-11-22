@@ -103,6 +103,9 @@ uvx zizmor@1.31.1 --min-severity low .
   branches hold numbers); `uv run python scripts/pr_body.py <item>... [--title]` makes the pull request's title
   and body from the roadmap entries of its items.
 - A change in what Dot does changes the page under [docs/](docs/) that describes it, in the same pull request.
+- `roadmap/INDEX.md` lists every item from 459 on; `uv run python scripts/roadmap_index.py` writes it again from the
+  `roadmap/<item>.md` files and goes in the item's commit, and the gate's item-records check fails on a stale one
+  (item 1317).
 - Its changelog entry is a file of its own, `changes/<item>.md`, and its roadmap item `roadmap/<item>.md`
   ([changes/README.md](changes/README.md), [roadmap/README.md](roadmap/README.md)): pull requests made side by side then
   add files instead of conflicting at the top of CHANGELOG.md and the end of ROADMAP.md.

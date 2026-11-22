@@ -1,5 +1,8 @@
 # Autonomy roadmap and handoff
 
+> This file stops at item 458. **For items after 458 use [roadmap/INDEX.md](roadmap/INDEX.md)**: every item from 459
+> on in one table, newest first, each linking to its own file.
+
 The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatever model runs it**. This file is the
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
 work, read it first, and keep the status table, the item sections and the log at the bottom true. With
