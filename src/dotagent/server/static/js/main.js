@@ -20,6 +20,7 @@ import { buildShell } from "./shell.js";
 import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
+import { goTo, takesThePlace, touchScreen } from "./hop.js";
 import { applyStoredDensity, applyStoredWork, PHONE } from "./layout.js";
 import { LAST_CHAT_KEY, openedAtLastChat, readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
@@ -489,6 +490,30 @@ function beginSession() {
     },
     { capture: true, signal: controller.signal },
   );
+  // A chat chosen in the sidebar on a phone takes the place of the one left in the history (item 1321, hop.js). It is
+  // told after the link's own handlers have run, so that a click one of them cancelled (the hold of a row, which opens
+  // its sheet) goes nowhere; the sidebar's own click handler still runs.
+  document.addEventListener(
+    "click",
+    (event) => {
+      const link = event.target instanceof Element ? event.target.closest("a[href^='#/']") : null;
+      if (
+        link instanceof HTMLAnchorElement &&
+        !event.defaultPrevented &&
+        takesThePlace({
+          plain: event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey,
+          inSidebar: link.closest("#sidebar") !== null,
+          sameTab: link.target === "",
+          phone: PHONE.matches,
+          touch: touchScreen(),
+        })
+      ) {
+        event.preventDefault();
+        location.replace(`${location.pathname}${location.search}${link.getAttribute("href")}`);
+      }
+    },
+    { signal: controller.signal },
+  );
   // The page on screen and whether it was opened by a link: Back is reckoned again when a phone turns (a settings tab
   // has a page above it on a phone alone).
   let current = null;
@@ -784,7 +809,7 @@ if ("serviceWorker" in navigator) {
       return;
     }
     if (location.hash !== data.route) {
-      location.hash = data.route;
+      goTo(data.route);
     }
     // The worker waits for this word; a window that does not give it is sent to the route instead.
     event.ports[0]?.postMessage("opened");

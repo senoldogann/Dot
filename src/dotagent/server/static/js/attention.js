@@ -6,6 +6,7 @@
 
 import { api } from "./api.js";
 import { faceDataUrl, overallState } from "./face.js";
+import { goTo } from "./hop.js";
 import { readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle } from "./state.js";
 
@@ -157,7 +158,7 @@ function tell({ title, body, tag, route, state }) {
   const note = new Notification(title, { body, tag, icon: faceDataUrl(state) });
   note.addEventListener("click", () => {
     window.focus();
-    location.hash = route;
+    goTo(route);
     note.close();
   });
 }

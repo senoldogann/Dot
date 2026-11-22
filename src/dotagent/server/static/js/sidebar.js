@@ -16,6 +16,7 @@ import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, 
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
 import { serviceFailure, serviceWords } from "./errors.js";
 import { t, tCount } from "./i18n.js";
+import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
 import { actorFace, DOT_ID, lookOf, teamDuo } from "./actors.js";
 import { onAssistant } from "./assistant.js";
@@ -1492,7 +1493,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       paintLists();
     }
     if (routeThreadId !== null && leaving.has(routeThreadId)) {
-      location.hash = homeHref;
+      goTo(homeHref);
     }
     let outcome;
     try {

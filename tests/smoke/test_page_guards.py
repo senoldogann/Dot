@@ -456,9 +456,10 @@ async def test_the_listeners_a_session_adds_end_with_it(runtime: Runtime, addres
                     ended: one.signal !== null && one.signal.aborted,
                 }))"""
             )
-            # One of each for each session, each scoped to its session; the first session's have ended.
-            assert len(listeners) == 4, listeners
+            # Three for each session (the two clicks, the second the sidebar's place in the history, item 1321, and the
+            # phone's media query), each scoped to its session; the first session's have ended.
+            assert len(listeners) == 6, listeners
             assert all(one["scoped"] for one in listeners), listeners
-            assert [one["ended"] for one in listeners] == [True, True, False, False], listeners
+            assert [one["ended"] for one in listeners] == [True, True, True, False, False, False], listeners
         finally:
             await browser.close()

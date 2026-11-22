@@ -143,7 +143,7 @@ of the screen, its choices in groups and Cancel at the foot; a finger's hold of 
 same sheet, as a right-click does with a mouse; a swipe from the screen's left edge does what the button at the top
 left does (back, or the list of chats), and in the iPhone app it is the only swipe back: WebKit's own went back in the
 history at the same time, to the chat opened before (item 1272; it takes a new build of the app, and in a Safari tab
-Safari's own swipe still goes back in the history, which a page cannot turn off); a row of a list and a chat's row darken while pressed, with no grey box of the
+Safari's own swipe goes back in the history, which a page cannot turn off, so on a phone's touch screen a link of the sidebar, a notification tapped, the toast's Open and the home after the open chat was deleted take the place of the page left in the history instead of adding one: what it leaves behind is nothing to go back to, and the swipe is Dot's, item 1321; a page opened by a link of a page keeps its place, and Back leads to it); a row of a list and a chat's row darken while pressed, with no grey box of the
 browser, and nothing stays tinted after a tap (item 1086: every style of a pointer resting on something applies only
 where a pointer can rest, `@media (hover: hover)`, which `tests/unit/test_touch_hover.py` holds), and a sheet takes
 the focus itself, so that its first choice is not drawn ringed; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
