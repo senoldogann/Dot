@@ -178,7 +178,7 @@ under, or under 500 px high on its side) the body is 16 px, as iOS's own text, a
 and the like are 13 px; Settings › Appearance's Interface size still scales them all, and code keeps the size chosen
 for it. A phone's buttons and fields are 36 px tall and the small ones 32 (an icon button answers a finger's 44 px around it, and a button keeps its words, item 787), the heads of the steps and the rows of a
 delegated run keep 40, and what sits in a line (a chip, a way to a page) 32; a link inside a line of text is no target
-of its own. A switch's 40 by 24 px track sits in a 48 px box (item 337); a tap anywhere on a setting's row turns its
+of its own. A switch's 32 by 18 px track (the same as on a Mac, item 1325) sits in a 48 px box (item 337); a tap anywhere on a setting's row turns its
 switch, and a step's duration shows without a hover. An iPad and a Mac keep their
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
 

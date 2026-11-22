@@ -280,6 +280,35 @@ def test_the_ink_on_dots_warm_backdrop_reads_on_every_stop_of_it_in_both_looks_a
         assert "--brand-ink" in rule.group(1), selector
 
 
+@pytest.mark.parametrize("look", [look for look, _ in _LOOKS])
+@pytest.mark.parametrize("scheme", [0, 1], ids=["light", "dark"])
+def test_the_focus_ring_is_the_solid_accent_and_reads_at_3_to_1_on_every_surface(look: str, scheme: int) -> None:
+    """Item 1325 (review, round 2): the ring was the accent at 60 %, 2.19:1 on the dark card and 2.9:1 on the light
+    page, under the 3:1 of a focus indicator. It is the accent itself, and the accent reads at 3:1 on every surface."""
+    themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
+    assert re.search(r"^\s+--ring: var\(--accent\);", themes, re.M), "--ring is not the solid accent"
+    pairs: dict[str, tuple[str, str]] = _pairs(look)
+    short: list[str] = []
+    for surface in _SURFACES:
+        ratio: float = contrast(pairs["--accent"][scheme], pairs[surface][scheme])
+        if ratio < 3.0:
+            short.append(f"--accent on {surface}: {ratio:.2f} < 3")
+    assert short == [], short
+
+
+_TEXT_COLOUR: re.Pattern[str] = re.compile(r"^\s*color:\s*var\(--accent\)\s*(!important\s*)?;")
+
+
+@pytest.mark.parametrize("name", _DRAWN)
+def test_no_text_is_set_in_the_accent_which_is_a_fill_colour(name: str) -> None:
+    """Item 1325 (review, round 2): the accent fills (a button, a switch, a ring, a border) and reads at 4.06:1 as text
+    on the dark surfaces; text takes ``--accent-strong``, which reads at 4.5:1. A ``color`` line that names
+    ``--accent`` is text (a background, a border, an outline, ``accent-color`` and the rest are other properties and
+    stay)."""
+    left: list[str] = [f"{name}:{number}: {line.strip()}" for number, line in _lines(name) if _TEXT_COLOUR.match(line)]
+    assert left == [], left
+
+
 def test_the_surfaces_step_up_by_lightness_in_dark_and_down_in_light() -> None:
     for look, _ in _LOOKS:
         pairs: dict[str, tuple[str, str]] = _pairs(look)

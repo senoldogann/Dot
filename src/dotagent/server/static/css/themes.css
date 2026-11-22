@@ -42,6 +42,11 @@
   --border: light-dark(rgb(0 0 0 / 9%), rgb(255 255 255 / 8%));
   --border-strong: light-dark(rgb(0 0 0 / 16%), rgb(255 255 255 / 14%));
   --control: light-dark(#8a8a93, #8a8a8f);
+  /* A text field's ground (a hair over the surface it stands on in dark, as an input is drawn) and the thumb of a
+     scrollbar (item 1325). A switch's track while it is off is --control, which every look and theme solves to 3:1. */
+  --field: light-dark(var(--surface), color-mix(in srgb, var(--text) 4%, var(--surface)));
+  --scroll-thumb: light-dark(rgb(0 0 0 / 20%), rgb(255 255 255 / 24%));
+  --scroll-thumb-hover: light-dark(rgb(0 0 0 / 32%), rgb(255 255 255 / 40%));
   --text: light-dark(#18181b, #f5f5f5);
   --text-2: light-dark(#3f3f46, #d4d4d4);
   --muted: light-dark(#5f5f69, #a3a3a3);
@@ -66,6 +71,10 @@
   --bad-weak: light-dark(#fdecec, #2b1313);
   --bad-border: light-dark(#f0b4b4, #6a2626);
   --on-bad: light-dark(#ffffff, #1a0505);
+  /* The ground of a filled destructive button, with white on it in both schemes (item 1325): red, not the salmon that
+     reads as text on black. */
+  --bad-fill: light-dark(#b91c1c, #dc2626);
+  --on-bad-fill: #ffffff;
   /* What a message of the owner's and a mark of attention sit on: the accent's tint, with the text's ink on it (the
      amber of Dot's face is --brand and stays on the face, and so does the ink that reads on it, --brand-ink). */
   --bubble: var(--accent-weak);
@@ -129,8 +138,9 @@
   --shadow-ink-soft: light-dark(rgb(28 28 28 / 10%), rgb(0 0 0 / 30%));
   --shadow-ink-deep: light-dark(rgb(28 28 28 / 24%), rgb(0 0 0 / 60%));
   --shadow: 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
-  /* The focus ring: the accent at a third, so focus is seen without a dark frame (item 95). */
-  --ring: color-mix(in srgb, var(--accent) 38%, transparent);
+  /* The focus ring: the accent itself, so that the ring reads at 3:1 on every surface of every look and scheme (it was the
+     accent at 60 %, 2.2:1 in dark; tests/unit/test_css_tokens.py measures it). */
+  --ring: var(--accent);
   --shadow-seg: 0 1px 2px var(--shadow-ink-soft);
   --shadow-knob: 0 1px 2px var(--shadow-ink-soft);
   --shadow-raised: 0 2px 8px var(--shadow-ink);
@@ -274,8 +284,8 @@
   --on-msg-me: var(--text);
 }
 
-/* The boxes and the buttons have no frame (item 837); with the contrast set they are framed again, in its stronger
-   lines, so that their edges are seen. A button's tint and a fine state's ink (item 839) are made again where the text
+/* The boxes have a 1 px --border ring and the buttons a hairline --border-strong (items 837, 1325); with the contrast
+   set they are framed in the stronger lines, so that their edges are seen. A button's tint and a fine state's ink (item 839) are made again where the text
    is, so that they take its stronger ink too. */
 :root[data-contrast] body {
   --box-border: var(--border);
