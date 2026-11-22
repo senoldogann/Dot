@@ -21,6 +21,7 @@ from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
     2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
+    3: "55d5f864bf810ebc4143a0362e800ead6ed5fbaf4b54d9f32ddd4f3ebaf00067",
 }
 
 
@@ -106,6 +107,25 @@ async def test_a_database_from_before_versions_is_copied_then_brought_to_the_ver
     again: Store = await Store.open(database, tmp_path / "images")
     await again.close()
     assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 1
+
+
+async def test_a_version_2_database_takes_the_run_ledger_in_the_step_to_version_3_after_a_copy(tmp_path: Path) -> None:
+    """Version 3 adds the ledger of the runs of deleted chats (item 1323) to a database without it, copied first."""
+    database: Path = tmp_path / "dot.sqlite3"
+    first: Store = await Store.open(database, tmp_path / "images")
+    await first.close()
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.execute("DROP TABLE run_ledger")
+        old.execute("PRAGMA user_version = 2")
+        old.commit()
+    finally:
+        old.close()
+    store: Store = await Store.open(database, tmp_path / "images")
+    await store.close()
+    assert _version(database) == SCHEMA_VERSION
+    assert _tables_digest(database) == _PINNED[SCHEMA_VERSION]
+    assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v2").glob("dot-*.sqlite3.gz"))) == 1
 
 
 async def test_a_version_1_database_loses_its_trading_tables_in_the_step_to_version_2_after_a_copy(

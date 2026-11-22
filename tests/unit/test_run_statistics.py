@@ -638,3 +638,74 @@ async def test_the_statistics_and_the_costs_of_a_run_carry_the_version_it_took(t
 async def _runs_of(database: Path) -> list[str]:
     with sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True) as connection:
         return [row[0] for row in connection.execute("SELECT id FROM runs WHERE harness_version IS NULL").fetchall()]
+
+
+async def test_a_deleted_chat_leaves_its_runs_numbers_in_the_ledger_and_the_statistics_still_count_them(
+    tmp_path: Path,
+) -> None:
+    """Item 1323: deleting a chat deletes its runs with their words, and keeps one row of numbers per run (no goal, no
+    answer), so that how the runs ended and what they cost is still counted."""
+    database: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(database, tmp_path / "images")
+    try:
+        thread = await store.create_thread("t", "schedule")
+        await store.link_schedule_thread(thread.id, "sch_daily")
+        run: RunRecord = await _run(store, thread.id, "ollama:a", "done", "the secret answer", 7, 7000)
+        await _events(
+            store,
+            run.id,
+            [
+                ("tool_call", {"tool": "shell"}),
+                ("tool_call", {"tool": "shell"}),
+                ("tool_result", {"tool": "shell", "ok": True, "seconds": 1.0}),
+                ("tool_result", {"tool": "shell", "ok": False, "seconds": 1.0}),
+                ("stall", {}),
+                ("compacted", {}),
+            ],
+        )
+        assert await store.delete_threads([thread.id]) == [thread.id]
+    finally:
+        await store.close()
+    connection: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 0
+        row = connection.execute(
+            "SELECT source, model, status, steps, input_tokens, schedule_id, tool_calls, tool_errors FROM run_ledger"
+        ).fetchall()
+        columns: list[str] = [column[1] for column in connection.execute("PRAGMA table_info(run_ledger)").fetchall()]
+    finally:
+        connection.close()
+    assert row == [("test", "ollama:a", "done", 7, 7000, "sch_daily", 2, 1)]
+    assert "goal" not in columns and "result" not in columns
+    stats: RunStatistics = collect_statistics(database, time.time() - DAY_S)
+    counted: ModelStats = _by_model(stats)["ollama:a"]
+    assert (counted.runs, counted.steps, counted.input_tokens) == (1, 7, 7000)
+    assert (counted.tool_calls, counted.tool_errors) == (2, 1)
+    assert (counted.stalls, counted.compaction.compactions) == (1, 1)
+
+
+async def test_an_old_run_without_a_stored_end_reason_keeps_how_it_ended_after_its_chat_is_deleted(
+    tmp_path: Path,
+) -> None:
+    """A run stored before end reasons were kept is classified by its answer, which the delete removes: the ledger keeps
+    the reason read from it (the pre-push review of item 1323)."""
+    database: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(database, tmp_path / "images")
+    try:
+        thread = await store.create_thread("t", "test")
+        run: RunRecord = await _run(store, thread.id, "ollama:a", "failed", RESULT_STALLED, 4, 4000)
+    finally:
+        await store.close()
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.execute("UPDATE runs SET end_reason = NULL WHERE id = ?", (run.id,))
+        old.commit()
+    finally:
+        old.close()
+    store = await Store.open(database, tmp_path / "images")
+    try:
+        await store.delete_threads([thread.id])
+    finally:
+        await store.close()
+    stats: RunStatistics = collect_statistics(database, time.time() - DAY_S)
+    assert [(count.ending, count.runs) for count in _by_model(stats)["ollama:a"].endings] == [("stalled", 1)]

@@ -33,7 +33,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search, plain_line
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
-from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
+from dotagent.llm.types import INVALID_ARGUMENTS_KEY, Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
@@ -946,6 +946,7 @@ def _todo(row: aiosqlite.Row) -> TodoRecord:
     )
 
 
+_STATUS: TypeAdapter[RunStatus] = TypeAdapter(RunStatus)
 _RUN_IDS: TypeAdapter[tuple[str, ...]] = TypeAdapter(tuple[str, ...])
 _OBJECTIVE_NOTES: TypeAdapter[tuple[ObjectiveNote, ...]] = TypeAdapter(tuple[ObjectiveNote, ...])
 
@@ -1470,7 +1471,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 # or renamed, data rewritten) is a step of ``_MIGRATIONS`` under the next version, and raises this. A database below
 # the version is copied first; one of a later version (a newer Dot wrote it) is refused, so that this one never writes
 # what it does not know. test_store_schema.py pins the tables of the version.
-SCHEMA_VERSION: int = 2
+SCHEMA_VERSION: int = 3
 
 
 async def _drop_trading_tables(connection: aiosqlite.Connection) -> None:
@@ -1480,9 +1481,30 @@ async def _drop_trading_tables(connection: aiosqlite.Connection) -> None:
     await connection.execute("DROP TABLE IF EXISTS trading_orders")
 
 
+async def _make_run_ledger(connection: aiosqlite.Connection) -> None:
+    """Version 3 (item 1323): the ledger of the runs whose chats were deleted. Deleting a chat deletes its runs with
+    their words; the ledger keeps one row of numbers per run (where it came from, its model, how it ended, its steps,
+    tokens and minutes, its schedule, its tool calls, how many failed or did not parse, its stalls and compactions)
+    and no text of it, so that what the runs
+    cost and how they ended is still counted (``dotx stats``) after the owner tidies their chats."""
+    await connection.execute(
+        "CREATE TABLE IF NOT EXISTS run_ledger ("
+        " id TEXT PRIMARY KEY, source TEXT NOT NULL, model TEXT NOT NULL, effort TEXT, status TEXT NOT NULL,"
+        " end_reason TEXT, created_at REAL NOT NULL, finished_at REAL, steps INTEGER NOT NULL,"
+        " input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL, parent_run_id TEXT, agent_id TEXT,"
+        " campaign_id TEXT, schedule_id TEXT, harness_version TEXT, tool_calls INTEGER NOT NULL,"
+        " tool_errors INTEGER NOT NULL, invalid_arguments INTEGER NOT NULL, stalls INTEGER NOT NULL,"
+        " compactions INTEGER NOT NULL, deleted_at REAL NOT NULL)"
+    )
+    await connection.execute("CREATE INDEX IF NOT EXISTS run_ledger_created ON run_ledger(created_at DESC)")
+
+
 # The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
 # additive layer itself, which every open applies: no step.
-_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = ((2, _drop_trading_tables),)
+_MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = (
+    (2, _drop_trading_tables),
+    (3, _make_run_ledger),
+)
 # Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from,
 # which keeps its newest two (``_copy_before_upgrade``); runs neither read nor change them (``runtime._guarded_files``),
 # as the other copies.
@@ -2655,6 +2677,37 @@ class Store:
             " GROUP BY r.thread_id"
             " ON CONFLICT(thread_id) DO UPDATE SET ended = MAX(thread_taints.ended, excluded.ended)",
             (*named, *TAINT_EVENTS, *named),
+        )
+        # The numbers of every run that goes, before its events do, into the ledger of item 1323 (no text of it).
+        await self._db.execute(
+            f"{doomed} INSERT OR IGNORE INTO run_ledger(id, source, model, effort, status, end_reason, created_at,"
+            " finished_at, steps, input_tokens, output_tokens, parent_run_id, agent_id, campaign_id, schedule_id,"
+            " harness_version, tool_calls, tool_errors, invalid_arguments, stalls, compactions, deleted_at)"
+            " SELECT r.id, r.source, r.model, r.effort, r.status, r.end_reason, r.created_at, r.finished_at, r.steps,"
+            " r.input_tokens, r.output_tokens, r.parent_run_id, r.agent_id, r.campaign_id, t.schedule_id,"
+            " r.harness_version,"
+            " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_call'),"
+            " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_result'"
+            "  AND json_extract(e.data, '$.ok') = 0),"
+            " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_call'"
+            "  AND instr(e.data, ?) > 0),"
+            " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'stall'),"
+            " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'compacted'), ?"
+            " FROM runs AS r LEFT JOIN threads AS t ON t.id = r.thread_id WHERE r.id IN (SELECT id FROM doomed)",
+            (*named, INVALID_ARGUMENTS_KEY, time.time()),
+        )
+        # A run stored before its end reason was kept is classified by its answer, which goes now: its reason is read
+        # here and kept, so that a stalled run of an old chat still counts as stalled (the review of item 1323).
+        unreasoned: list[aiosqlite.Row] = await self._all(
+            f"{doomed} SELECT id, status, result FROM runs WHERE id IN (SELECT id FROM doomed) AND end_reason IS NULL",
+            named,
+        )
+        await self._db.executemany(
+            "UPDATE run_ledger SET end_reason = ? WHERE id = ?",
+            [
+                (classify_ending(_STATUS.validate_python(row["status"]), str(row["result"])), str(row["id"]))
+                for row in unreasoned
+            ],
         )
         # Every event but the owner's save of a lesson, which keeps that lesson theirs, never merged nor proposed to be
         # forgotten, after its chat is gone, as the prune keeps it (the review of 2026-11-01).
