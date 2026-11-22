@@ -13,6 +13,9 @@ _CSS: Path = Path(__file__).resolve().parents[2] / "src" / "dotagent" / "server"
 _DRAWN: tuple[str, ...] = ("app.css", "shell.css", "run.css", "settings.css")
 _COLOUR: re.Pattern[str] = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\bwhite\b|\bblack\b")
 _FONT_SIZE: re.Pattern[str] = re.compile(r"font-size:\s*[0-9.]+(px|em|rem|%)")
+# A font size that multiplies a token by a number (`calc(var(--text-xs) * 0.75)`) is a size of its own that no token
+# names and the phone's floor of 13 px does not reach (item 1327's review).
+_FONT_SIZE_SCALED: re.Pattern[str] = re.compile(r"font-size:[^;{}]*\bcalc\([^;{}]*\*")
 # A weight, line-height, letter-spacing or family written as a number or a name instead of a token (item 77); the
 # @font-face blocks declare the faces and their weight ranges and are the one place a number belongs.
 _TYPE_LITERAL: re.Pattern[str] = re.compile(
@@ -46,6 +49,17 @@ def test_font_sizes_and_radii_are_tokens(name: str) -> None:
         for n, line in _lines(name)
         if (_FONT_SIZE.search(line) or _RADIUS.search(line)) and not line.strip().startswith("--")
     ]
+    assert hits == [], hits
+
+
+@pytest.mark.parametrize("name", _DRAWN)
+def test_no_font_size_multiplies_a_token_by_a_number(name: str) -> None:
+    """Item 1327's review: `.side-badge` drew its letters at `calc(var(--text-xs) * 0.75)`, 9 px on a Mac and under the
+    phone's floor of 13, a size no token names, which the literal-size rule did not see."""
+    assert _FONT_SIZE_SCALED.search("font-size: calc(var(--text-xs) * 0.75);")
+    assert _FONT_SIZE_SCALED.search("font-size: calc(0.5 * var(--text-ui))")
+    assert _FONT_SIZE_SCALED.search("font-size: var(--text-xs);") is None
+    hits: list[str] = [f"{name}:{n}: {line.strip()}" for n, line in _lines(name) if _FONT_SIZE_SCALED.search(line)]
     assert hits == [], hits
 
 

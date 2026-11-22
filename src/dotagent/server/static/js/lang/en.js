@@ -701,6 +701,10 @@ export const EN = {
   "outcome.openTask": "Open task",
   // The chat list of the sidebar (sidebar.js).
   "side.waiting": "Waiting for you",
+  "side.waitingShort": "Waiting",
+  "side.waitingSince": "Waiting since {when}",
+  "side.settled": "Settled",
+  "side.agent": "Agent",
   "side.working": "Working",
   "side.workingSince": "Working since {when}",
   "side.today": "Today",

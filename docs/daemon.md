@@ -20,40 +20,42 @@ The web UI is laid out like a chat app: the chats in a sidebar on the left, one 
 page of their own.
 
 The sidebar lists your chats (the conversation threads) grouped by day, newest activity first, the pinned ones above the
-days, and a chat opens at its latest run. Each chat wears a creature of Dot's character engine, as a messenger's list
-shows faces (item 277): a chat with an agent the agent's look, a chat with a team (item 610) the faces of two of its
-agents while its latest run is Dot's (an agent's run there wears the agent's face), with the team's name ahead of the
-last line, a chat with Dot a shape and a colour its own id picks;
-the creature works while the chat's run goes on, waits while the run waits for you and is sad once it failed. Its name
-stands over its last line: the answer of its latest run in plain words, or your message, after "You:", while the run
-works. The creatures rest; only those at work move, and the mark of a chat's loop (item 580): a chat that asks again
-by itself, with a loop of `/loop` or a schedule a run of it made that goes on in it, wears at the foot of its creature
-a disc of violet and blue whose arrows turn slowly in a glow that breathes (still when the system reduces motion), its
-row saying how often and when next ("Loops every 30 minutes, next 15:30", "Loops on Mon, Wed and Fri at 18:30, next Fri
-18:30": a rhythm of days and times in words too, item 590, days together by their short names, item 592); stopped, the
-loop takes its mark with it. A campaign's conversation wears another mark at the other foot (item 705), a still target
-on a disc of orange and pink, so that a chat a schedule asks again and one a campaign drives are told apart; deleted,
-the campaign takes its mark with it.
-Each chat stands once (item 202):
-while its latest run works, a chat leaves its day for the rows of what works, above the list, and goes back once the
-run ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
-**Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second).
-Under its name, in the line its last words would take, stand the faces of the runs it delegated (item 507), those at
-work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
-rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
+days, and a chat opens at its latest run. A chat is a row of three quiet lines (item 1327, after the reference app's: no
+face or creature stands in a row): the **badge** of its agent (a 20 px square on a 4 px corner, of the ink's tint, with two letters, "Code
+Reviewer" is CR and "Dot" is DO) and its name, with the run's age at the right; the chat's title under them, in the heavier
+weight, on one line cut by an ellipsis; and a last line that holds the marks of its loop and its campaign, the team it is
+with, what it delegated and its last words (the answer of its latest run in plain words, or your message after "You:" while
+the run works; for a run its model's service stopped, a few words of what stopped it) and the dot of an unread chat. A chat is
+the team's when it leads it, else the agent's of its latest run, else Dot's. The mark of a chat's loop (item 580) is a small
+line icon of two arrows: a chat that asks again by itself, with a loop of `/loop` or a schedule a run of it made that goes
+on in it, wears it, and its tooltip and the row's name for a screen reader say how often and when next ("Loops every 30
+minutes, next 15:30", "Loops on Mon, Wed and Fri at 18:30, next Fri 18:30": a rhythm of days and times in words too, item
+590, days together by their short names, item 592); stopped, the loop takes its mark with it. A campaign's conversation wears
+another mark (item 705), a small target, so that a chat a schedule asks again and one a campaign drives are told apart;
+deleted, the campaign takes its mark with it. Neither mark glows or moves.
+Each chat stands once (item 202): while its latest run works or waits for you, a chat leaves its day for **Working**, a dock
+under the list that keeps its place while the list scrolls (item 1327), and goes back once the run ends; a pinned chat stays
+under Pinned. Working's label counts what waits for you and what works together and folds what works, never what waits: a
+step that needs your answer is not folded out of sight. Its fold is kept in that browser under a key of its own, so that one
+kept from before item 836 is not read as it. At the right of a chat at work the age gives way to **Working** and how long
+since the run was asked for ("12s", "4m", "1h 5m", read again every second). What a chat delegated (item 507), the runs at
+work and those that ended, is one quiet count in its last line (the users mark and how many), and its name for a screen reader
+says how many there are. Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. What works lists too what is no chat's: the session of a campaign
 (which works in a thread of its own). A run another run delegated stands under the chat its work came from, never as a
 row of its own, also once the run that delegated it has ended (item 1074: a work order's try outlives the lead's turn
-that gave it): that chat stands at work while it works, and the home's Today strip lists no such run either. A chat that waits for you (item 836) leaves its day too and stands first, above
-what works, as its own row with its menu, its creature waiting: its last line says **Waiting for you:** and what
-has waited longest, with how many more wait ("(+1)"), in the warning's ink, the dot of a run that waits stands in its
-age's place, and its name for a screen reader names each thing and how it waits; a pinned chat stays under Pinned,
-saying it there. A chat that waits while its run goes on (a step kept for you, item 482) stands once, with what
-waits. What waits that is no listed chat's (a run whose chat is not listed, a session of a campaign) is a row
-of the same shape: its creature, what waits, and **Waiting for you** with how it waits. Neither has a heading, nor
-folds, as a messaging app's rows say what they are themselves (until item 836, **Waiting for you** and **Working**
-were sections with a label, a count and a fold, item 513); a search keeps what waits in sight, and its Enter and the
-arrows reach what waits first, then what works and the list, as the search finds them.
+that gave it): that chat stands at work while it works, and the home's Today strip lists no such run either. A chat that
+waits for you (item 836) leaves its day too and stands first, above what works, as its own row with its menu: its last line
+says **Waiting for you:** and what has waited longest, with how many more wait ("(+1)"), in the warning's ink; **Waiting** and
+how long stand at the right in place of the age, a pill with the warning's dot; and its name for a screen reader names each
+thing and how it waits. A pinned chat stays under Pinned, saying it there. A chat that waits while its run goes on (a step
+kept for you, item 482) stands once, with what waits. What waits that is no listed chat's (a run whose chat is not listed, a
+session of a campaign) is a row of the same shape: its agent's badge and name, what waits, and **Waiting for you** with how it
+waits. The rows in the dock have no heading of their own but Working's label (until item 1327, **Waiting for you** and
+**Working** were rows with no label at all, and until item 836 sections with a label, a count and a fold, item 513); a search
+keeps what waits in sight, and its Enter and the arrows reach what waits first, then what works and the list, as the search
+finds them. **Settled** stands under Working in the dock (item 1327): the chats that rest past a week, which stood in the
+days' Older, folded with their count, the fold kept under a key of its own.
 **The chats a channel's messages made** (item 619, [Channels](channels.md): today the **iMessage** chat, a thread whose
 `source` is the channel's id) leave the days for a section of their own at the foot of the list, under the days, with
 its name and how many chats it holds: **iMessage 1**, with no mark, its label where the days' labels stand (items 828
@@ -94,7 +96,7 @@ sidebar's head, its opener and the settings' Hide sidebar are 32 px, so that the
 the traffic lights: item 1273). The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
 longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
-while it is being made or lost; what works stands at the top of the list. A page's name in the top bar has an (i) beside it
+while it is being made or lost; what waits and what works stand in the dock under the list. A page's name in the top bar has an (i) beside it
 that shows, under the bar, the line that says what the page is for (item 848: Agents, Schedules, Campaigns,
 Handoffs, Diagnostics and the licences open on what they hold), and so do the parts of the Agents page and Customize's
 proposals; a row of the Memory, Vault and Schedules pages shows one action (a schedule's switch) and keeps the rest in
@@ -151,8 +153,8 @@ left or kept for you, and a run whose browser you took over) and what works (the
 campaign, and a run delegated by another; a schedule about to fire is no work yet, and stands under the home's **Due
 today**, item 608), each a chat's row with no heading over it (item 836), its group named for a screen reader
 (**Waiting for you**, **Working**); a row opens the run. A run at work that is no chat's latest run, a later session
-of a campaign among them, is drawn as a chat is (item 705): its creature, its name over what it is, and **Working**
-with how long at the right; a session wears the campaign's target at the foot of its creature. They are `GET
+of a campaign among them, is drawn as a chat is (item 705): its agent's badge and name over what it is, and **Working**
+with how long at the right; a session wears the campaign's target in its last line. They are `GET
 /api/activity`, which carries the runs that ended today too, for the home's **Today** strip; the Activity page that
 showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
 it took and what it cost in tokens. The rows of what waits and what works, and the strip, follow the lifecycle
@@ -184,8 +186,8 @@ banner floats under the bar, so nothing on the page moves, and a page left out o
 out of sight. The daemon serves the pages as it read them when it started, hidden files
 left out (item 309): files changed on disk while it runs (a merge, a batch of work ported in) wait for its next start,
 so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
-run stands in the sidebar as a small face in the row of the run that delegated it, three at most with the rest counted
-(item 507), and the row's name says how many there are. In the chat, the delegated run's card carries a chip with its
+run stands in the sidebar as one count in the last line of the row of the run that delegated it, the users mark and how
+many (item 507; until item 1327 small faces, three at most), and the row's name says how many there are. In the chat, the delegated run's card carries a chip with its
 progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, the time it has worked and an **open** link to
 the run's own page.
 
@@ -1148,7 +1150,7 @@ keeps 12); only what floats casts a shadow (menus, dialogs, sheets and the compo
 icons of a 1.5 stroke against the interface's 1.75); the radii are a 0.5 rem scale, one token for each kind of box
 (`--radius-*` in `app.css`), and what is fully round takes `--radius-pill`, which is the one place that says what that is;
 the open row of the sidebar and the open tab of Settings are a flat tint of the ink, the row's name a step bolder; a
-chat's name and last line in the sidebar fade out over their last 28 px where they are cut; motion has one calm easing
+chat's name and last line in the sidebar are cut with an ellipsis where they run out of room; motion has one calm easing
 (`cubic-bezier(0.4, 0, 0.2, 1)`, no overshoot): a menu opens from 98 %, a sheet rises 16 px in 200 ms and a message you just sent
 180 ms, all still under reduced motion but for a fade; bold in an answer is 600 and its paragraphs wrap with no lone
 last word (`text-wrap: pretty`); section labels are sentence case; the facts of a row are spans a gap apart rather than one dotted

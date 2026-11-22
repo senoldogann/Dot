@@ -183,7 +183,7 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
                 # delegated (item 507) rather than a row of its own.
                 section: Locator = sidebar.locator("[data-section=working]")
                 await expect(section.locator("a.side-run .side-working")).to_have_count(1)
-                await expect(section.locator(".side-chat-helpers .side-helper")).to_have_count(1)
+                await expect(section.locator(".side-chat-helpers .side-helpers")).to_have_text("1")
                 await expect(section.locator(".side-children")).to_have_count(0)
                 for slot in await section.locator(".side-working").all():
                     await expect(slot).to_have_text(_WORKING)
@@ -194,7 +194,7 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
                 await expect(busy.locator(".side-working")).to_have_text(_WORKING)
                 await expect(busy.locator(".side-age")).to_have_count(0)
                 waiting: Locator = sidebar.locator(f"[data-section=waiting] a.side-run[href='#/runs/{asking.id}']")
-                await expect(waiting.locator(".avatar[data-state='waiting']")).to_have_count(1)
+                await expect(waiting.locator(".side-waiting")).to_have_count(1)
                 await expect(waiting.locator(".side-waits-dot")).to_have_count(1)
                 await expect(waiting.locator(".side-age")).to_have_count(0)
                 await expect(waiting.locator(".side-working")).to_have_count(0)
@@ -238,7 +238,7 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
             held: Locator = sidebar.locator(f"[data-section=waiting] a.side-run[href='#/runs/{working.id}']")
             await expect(held.locator(".side-chat-waits")).to_have_text("Waiting for you: Write notes.md")
             # Its creature waits, as the row says, though its run goes on.
-            await expect(held.locator(".avatar[data-state='waiting']")).to_have_count(1)
+            await expect(held.locator(".side-waiting")).to_have_count(1)
             await expect(
                 sidebar.locator(f"[data-section=working] a.side-run[href='#/runs/{working.id}']")
             ).to_have_count(0)

@@ -1,9 +1,10 @@
 """The side menu shows each chat once (item 202): a chat at work stands in Working, as a chat with its menu, its time
-and the faces of the runs it delegated (item 507), and not again among the days; a pinned chat at work stays among the
-pinned ones, wearing the same faces there; what waits for an answer stands first, as its chat's row out of its day,
-saying what waits (item 836), and a pinned one stays pinned, saying it there; neither has a heading or folds; the
-search finds the chats at work and keeps what waits in sight; once the runs end, the chats are back among the days.
-Scripted runs, served by a real server, wide and on a phone, light and dark."""
+and the count of the runs it delegated (items 507 and 1327), and not again among the days; a pinned chat at work stays
+among the pinned ones, with the same count there; what waits for an answer stands first, as its chat's row out of its
+day, saying what waits (item 836), and a pinned one stays pinned, saying it there; only Working's label counts both and
+folds what works, never what waits (item 1327); the search finds the chats at work and keeps what waits in sight; once
+the runs end, the chats are back among the days. Scripted runs, served by a real server, wide and on a phone, light
+and dark."""
 
 import asyncio
 import re
@@ -215,9 +216,11 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(chats.locator(".side-group").first).to_be_visible()
                 await expect(working).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"side-{width}-{scheme}.png"))
-                # Working: the chat at work, once, as a chat with its menu, its time and the faces of what it delegated;
-                # no heading over it, as a messaging app's rows (item 836): the row says it works itself.
-                await expect(sidebar.locator(".side-activity-nav .side-label")).to_have_count(0)
+                # Working: the chat at work, once, as a chat with its menu, its time and the count of what it delegated;
+                # the dock names the group with its count, as the reference app's sidebar does.
+                await expect(sidebar.locator(".side-activity-nav > .side-label")).to_have_text(
+                    re.compile(r"^Working \d$")
+                )
                 await expect(working).to_have_attribute("aria-label", "Working")
                 row: Locator = working.locator(".side-chat").filter(
                     has=page.locator(f"a.side-run[href='#/runs/{shelves.id}']")
@@ -225,10 +228,10 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(row).to_have_count(1)
                 await expect(row.locator(".side-working")).to_have_text(_WORKING)
                 await expect(row.get_by_role("button", name="More for Read the shelves")).to_have_count(1)
-                # The chat wears the faces of the runs it delegated (item 507): three here, laid over one another, and
-                # nothing hangs under the row; its name for a screen reader says how many there are.
-                await expect(row.locator(".side-chat-helpers .side-helper")).to_have_count(len(_SHELVES))
-                await expect(row.locator(".side-helpers .avatar[data-state='working']")).to_have_count(1)
+                # The chat shows the runs it delegated as one count (items 507 and 1327): three here, and nothing hangs
+                # under the row; its name for a screen reader says how many there are.
+                await expect(row.locator(".side-chat-helpers .side-helpers")).to_have_text(str(len(_SHELVES)))
+                await expect(row.locator(".side-helpers")).to_have_attribute("data-working", "1")
                 await expect(working.locator(".side-children")).to_have_count(0)
                 assert "3 helpers" in (await row.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(chats.locator(f"a[href='#/runs/{shelves.id}']")).to_have_count(0)
@@ -237,7 +240,7 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 pinned: Locator = chats.locator(".side-group").first
                 await expect(_titles(pinned)).to_have_text(["Count the boxes"])
                 await expect(pinned.locator(".side-chat .side-working")).to_have_text(_WORKING)
-                await expect(pinned.locator(".side-chat-helpers .side-helper")).to_have_count(1)
+                await expect(pinned.locator(".side-chat-helpers .side-helpers")).to_have_text("1")
                 assert "1 helper" in (await pinned.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(working.locator(f"a[href='#/runs/{boxes.id}']")).to_have_count(0)
                 # What waits for an answer stands first (item 836): its chat, once, out of its day, its last line
@@ -250,7 +253,7 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(asked.locator(".side-run-goal")).to_have_text("Pick a shelf")
                 await expect(asked.locator(".side-chat-waits")).to_have_text("Waiting for you: Which shelf?")
                 await expect(asked.locator(".side-waits-dot")).to_have_count(1)
-                await expect(asked.locator(".avatar[data-state='waiting']")).to_have_count(1)
+                await expect(asked.locator(".side-waiting")).to_have_count(1)
                 assert "waiting for you: Which shelf?, waits for your answer" in (
                     await asked.get_attribute("aria-label") or ""
                 )

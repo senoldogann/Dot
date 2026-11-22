@@ -368,7 +368,7 @@
 .side-more {
   position: absolute;
   top: 50%;
-  right: 4px;
+  right: var(--space-1);
   display: grid;
   place-items: center;
   width: 24px;
@@ -436,36 +436,36 @@
   margin-top: 0;
 }
 
-/* The labels of the list's groups (Pinned, Today, Yesterday…) orient and recede: small (item 855), in the muted ink, the
-   lightest that reads at 4.5:1 on the sidebar (item 74). */
+/* The labels of the list's groups (Pinned, Today, Working, Settled…) are one: small, in the muted ink, the lightest that
+   reads at 4.5:1 on the sidebar (item 74). A group that folds has its count and a chevron at the right. */
 .side-label {
   margin: 0;
-  padding: 12px 8px 4px;
+  padding: var(--space-3) var(--space-2) var(--space-1);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   font-weight: var(--weight-label);
   color: var(--muted);
 }
 
-/* The count after a section's label: the same ink, the text weight. */
+/* The count after a section's label: the same ink, the text weight, at the right. */
 .side-label-count {
+  margin-left: auto;
   font-weight: var(--weight-text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* The chats a channel's messages made stand in a section of their own at the foot of the list (item 619), outside the
-   list so that folding Chats does not fold them, and so do Dot's own (item 822): its label is the button that folds it,
-   with no mark, so that its words stand where Chats' do (items 827 and 828), and, while it is folded over a chat nobody
-   has read, the accent's dot after its count. */
+   list so that folding does not fold them, and so do Dot's own (item 822): its label is the button that folds it, and,
+   while it is folded over a chat nobody has read, the accent's dot after its name. */
 .side-channels {
   display: flex;
   flex-direction: column;
   gap: var(--space-half);
 }
 
-/* Below the days a little room parts the sections from the last chat; with the days folded, the first section follows
-   Chats as one section follows another (item 827: the gap under a folded Chats was 11 px more than between two). */
+/* Below the days a little room parts the sections from the last chat. */
 .side-runs:not([hidden]) + .side-channels:not(:empty) {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .side-label-dot:not([hidden]) {
@@ -498,6 +498,7 @@
   width: 12px;
   height: 12px;
   flex: none;
+  margin-left: var(--space-half);
   transform: rotate(90deg);
   transition: transform var(--motion-quick) var(--ease);
 }
@@ -524,18 +525,20 @@
   background: transparent;
 }
 
-/* A chat's name and its last line fade out over their last 28 px where they are cut (item 1205), rather than end
-   in an ellipsis; a line that fits ends before the fade. */
+/* A chat's title: one line, cut with an ellipsis where it ends, in the heavier weight, the first thing a row says. */
 .side-run-goal {
-  flex: 1;
+  display: block;
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  -webkit-mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  font-weight: var(--weight-label);
 }
 
-/* A chat's last activity at the right of its row, in figures of one width (item 121). */
+/* A chat's last activity at the right of its first line, in figures of one width (item 121). */
 .side-age {
   flex: none;
   color: var(--muted);
@@ -544,23 +547,30 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A row whose run works says so where its age sits at rest (item 122): a dashed circle, the
-   word and the time it has worked, in the running state's colour; only the figure changes, nothing shimmers. */
-.side-working {
+/* What a row whose run works or waits says at its right, where its age sits at rest (items 122 and 836), as the reference app's
+   rows do: the mark of the state, the word and the time, in the muted ink; the dot of a run that waits is the warning's.
+   Only the figure changes, nothing shimmers. */
+.side-working,
+.side-waiting {
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: var(--accent-strong);
+  gap: var(--space-1);
+  color: var(--text-2);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   font-weight: var(--weight-label);
   font-variant-numeric: tabular-nums;
 }
 
-.side-working .icon {
-  width: 16px;
-  height: 16px;
+.side-working .icon,
+.side-waiting .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.side-waiting {
+  color: var(--warn);
 }
 
 /* The button that starts choosing chats to delete, at the right of the list's first label (item 855): the chats have no
@@ -869,138 +879,41 @@
   line-clamp: 2;
 }
 
-/* What waits for you and what works stand above the chats as their rows (item 836), with no heading: a row says what
-   it is itself. Before, two folding sections held shorter rows of their own. */
-.side-activity-nav {
+/* What waits for you and what works stand as rows under Working (items 836 and 1326), Settled's chats as the days' are. */
+.side-activity-nav,
+.side-settled-nav {
   display: flex;
   flex-direction: column;
-  margin-top: 4px;
 }
 
-/* A chat's row (item 277), after a messenger's list: its creature, its name over its last line, and at its right its
-   age or its working time over the dot of a chat that is unread. The list rests: only the creature of a chat at work
-   moves. */
+/* The dock under the list (the reference app's sidebar): what works and waits, then what rests past a week, at the foot of the
+   list where the eye rests, over the foot's buttons. It keeps its place while the list scrolls and scrolls on its own
+   when it holds more than its share. */
+.side-dock {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 45%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-2);
+}
+
+.side-dock:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.side-dock .side-label {
+  padding-top: var(--space-2);
+}
+
+/* A chat's row, three quiet lines as the reference app's: its agent's badge and name with the run's age or state at the right; the
+   chat's title; and a last line of marks (a loop, a campaign), the team, what it delegated, its last words and the dot of
+   a chat that is unread. The list rests: nothing in it moves. */
 .side-chat > .side-run,
 .side-pick {
-  gap: 12px;
-}
-
-.side-chat .avatar,
-.side-pick .avatar {
-  width: 32px;
-  height: 32px;
-}
-
-.side-chat .avatar[data-state="idle"],
-.side-pick .avatar[data-state="idle"] {
-  animation: none;
-}
-
-/* A chat's loop (item 580): a mark at the foot of its creature, arrows that turn slowly on a disc of violet and blue
-   whose glow breathes, so that a chat that asks again by itself stands out in the resting list. It is cut out of the
-   row's ground by a ring of that ground; under reduced motion it stands still in its glow. */
-.side-face {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-}
-
-.side-loop {
-  --loop-ring: var(--sidebar);
-  --loop-glow: color-mix(in oklab, var(--mark-violet) 40%, transparent);
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(150deg, var(--mark-violet), var(--mark-blue));
-  box-shadow:
-    0 0 0 2px var(--loop-ring),
-    0 0 6px 1px var(--loop-glow);
-  color: var(--mark-on-hue);
-}
-
-/* The glow's breath is a wider glow that comes and goes over the mark's own: its opacity is what changes, which the
-   compositor draws, where a changing shadow was drawn again on every frame and kept the page at work at rest (item
-   645: a third of a core in Dot.app with three loops in the sidebar). */
-.side-loop::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  /* The ring of the row's ground over the glow, as the mark's own shadow draws it, so that the glow never tints it. */
-  box-shadow:
-    0 0 0 2px var(--loop-ring),
-    0 0 12px 3px color-mix(in oklab, var(--mark-violet) 70%, transparent);
-  opacity: 0;
-  pointer-events: none;
-  animation: loop-glow var(--motion-breath) var(--ease) infinite;
-  animation-play-state: var(--endless);
-}
-
-.side-run[aria-current="page"] .side-loop {
-  --loop-ring: color-mix(in srgb, var(--text) 8%, var(--sidebar));
-}
-
-/* While chats are chosen (item 635) the mark stays, cut out of a ticked row's ground as of the list's. */
-.side-pick:has(.side-check:checked) .side-loop {
-  --loop-ring: color-mix(in srgb, var(--text) 7%, var(--sidebar));
-}
-
-.side-loop .icon {
-  width: 10px;
-  height: 10px;
-  animation: spin var(--motion-turn) linear infinite;
-  animation-play-state: var(--endless);
-}
-
-@keyframes loop-glow {
-  50% {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .side-loop::after,
-  .side-loop .icon {
-    animation: none;
-  }
-}
-
-/* A campaign's conversation or one of its sessions (item 705): a target at the other foot of its creature, on a disc of
-   orange and pink, cut out of the row's ground as the loop's mark is, and still: a schedule's chat turns, a campaign's
-   aims. */
-.side-campaign {
-  --campaign-ring: var(--sidebar);
-  position: absolute;
-  left: -4px;
-  bottom: -4px;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(150deg, var(--mark-orange), var(--mark-pink));
-  box-shadow:
-    0 0 0 2px var(--campaign-ring),
-    0 0 6px 1px color-mix(in oklab, var(--mark-orange) 40%, transparent);
-  color: var(--mark-on-hue);
-}
-
-.side-run[aria-current="page"] .side-campaign {
-  --campaign-ring: color-mix(in srgb, var(--text) 8%, var(--sidebar));
-}
-
-.side-pick:has(.side-check:checked) .side-campaign {
-  --campaign-ring: color-mix(in srgb, var(--text) 7%, var(--sidebar));
-}
-
-.side-campaign .icon {
-  width: 10px;
-  height: 10px;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
 .side-chat-text {
@@ -1010,19 +923,55 @@
   flex-direction: column;
 }
 
-.side-chat-text .side-run-goal {
+.side-chat-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+/* The agent's badge: two letters on a small square of the ink's tint, no colour, so that the rows are told apart by their
+   words and the list stays calm. Its letters are the smallest metadata size, a token like every other (10 px on a Mac,
+   13 on a phone, whose floor it keeps); the square is 20 px and grows to its letters rather than cutting them. */
+.side-badge {
+  display: grid;
   flex: none;
-  color: var(--text);
-  font-weight: var(--weight-label);
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding-inline: var(--space-half);
+  border-radius: var(--radius-joined);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text-2);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-3xs);
+  font-weight: var(--weight-title);
+  letter-spacing: var(--tracking-caps);
+}
+
+.side-agent {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-chat-meta {
+  flex: none;
+  display: flex;
+  align-items: center;
 }
 
 .side-run[aria-current="page"] .side-chat-text .side-run-goal {
   font-weight: var(--weight-title);
 }
 
-/* The chat's last line: its words, faded where they are cut, and the faces of what it delegated at their end (item 507). It is one
-   line whatever it holds (item 510): words put in it bare, as a page of an earlier build put them, wrapped to as many
-   lines as they took and made the row tall. */
+/* The chat's last line, one line whatever it holds (item 510): the marks, the words cut with an ellipsis and, at the end,
+   the dot of an unread chat. */
 .side-chat-last {
   display: flex;
   align-items: center;
@@ -1031,21 +980,19 @@
   overflow: hidden;
   white-space: nowrap;
   color: var(--muted);
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }
 
 .side-chat-words {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  -webkit-mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to right, var(--text) calc(100% - 28px), transparent);
 }
 
-/* A row that waits for you (item 836) says so in its last line, in the warning's ink, and has the dot of a run that
-   waits at its right, where a row at rest has its age. */
+/* A row that waits for you (item 836) says so in its last line, in the warning's ink. */
 .side-chat-last.side-chat-waits {
   color: var(--warn);
 }
@@ -1074,77 +1021,44 @@
   font-weight: var(--weight-text);
 }
 
-.side-chat-meta {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-/* An unread chat (item 131): the accent's dot under its age. */
+/* An unread chat (item 131): the accent's dot at the end of its last line. */
 .side-unread {
+  flex: none;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
   background: var(--accent);
 }
 
-/* The runs a row delegated, laid over one another (item 507), as the marks of the connected apps stand in the foot: three
-   faces at most, the rest counted, each ringed in the sidebar's own ground so that a hovered row does not show through.
-   A chat wears them in the line its last words would take; the row itself opens the chat they work in. */
+/* The marks of a chat that asks again by itself (item 580) and of a campaign's work (item 705): a small line icon in the
+   muted ink, before the last words; the row's name says them to a screen reader. */
+.side-loop,
+.side-campaign {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--muted);
+}
+
+.side-loop .icon,
+.side-campaign .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* What a row delegated (item 507), one count: the users mark and how many, the ink of a row's words. */
 .side-helpers {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
   flex: none;
-}
-
-/* Placed, so that they stack in the order they stand in: a face that breathes is moved by `transform`, which lifts it over
-   every neighbour that is not placed, and the count after the faces lost its "+" under the last one. */
-.side-helpers > * {
-  position: relative;
-}
-
-.side-helpers > * + * {
-  margin-left: calc(-1 * var(--space-1));
-}
-
-.side-helper {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  box-shadow: 0 0 0 2px var(--sidebar);
-}
-
-.side-helper .avatar {
-  width: 20px;
-  height: 20px;
-}
-
-.side-helper .status-dot {
-  width: 8px;
-  height: 8px;
-  /* Its ring reaches 8 px past it, as a 10 px dot's does (item 645). */
-  --pulse-reach: 3;
-}
-
-.side-helper-more {
-  display: grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  padding-inline: var(--space-1);
-  border-radius: var(--radius-pill);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  background: var(--surface-3);
-  box-shadow: 0 0 0 2px var(--sidebar);
-  color: var(--muted);
-  font-size: var(--text-xs);
-  line-height: var(--leading-xs);
+}
+
+.side-helpers .icon {
+  width: 12px;
+  height: 12px;
 }
 
 /* Inside the desktop shell (item 88) the system draws the traffic lights over the top left of the page, where the
@@ -1288,16 +1202,6 @@
 
   .side-body {
     padding: 8px 12px 12px;
-  }
-
-  /* The rows a step roomier, on hairlines. */
-  .side-chat > .side-run {
-    padding-top: 12px;
-    padding-bottom: 12px;
-  }
-
-  .side-chat + .side-chat {
-    border-top: 1px solid var(--border);
   }
 
   /* The foot under the thumb: the apps in a round button beside the search, a pill (item 991). */

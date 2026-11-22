@@ -305,7 +305,10 @@ async def test_the_side_menu_stays_where_it_was_scrolled_through_a_delete_a_pin_
                     (),
                 )
                 await _first_tool_call(runtime, started.id)
-                await expect(side.locator("[data-section='working']")).to_contain_text(f"Start a new chat {width}")
+                # Working stands in the dock under the list (item 1327), outside the box that scrolls.
+                await expect(page.locator("#sidebar .side-dock [data-section='working']")).to_contain_text(
+                    f"Start a new chat {width}"
+                )
                 assert await _list_scroll(page) > before - _ROW_SLACK_PX
                 runs: list[str] = [started.id]
                 if index == 0:
@@ -318,7 +321,7 @@ async def test_the_side_menu_stays_where_it_was_scrolled_through_a_delete_a_pin_
                     follow_up: str = page.url.rpartition("/")[2]
                     runs.append(follow_up)
                     await _first_tool_call(runtime, follow_up)
-                    working: Locator = side.locator("[data-section='working'] .side-chat")
+                    working: Locator = page.locator("#sidebar .side-dock [data-section='working'] .side-chat")
                     await expect(working.filter(has_text=f"Chat {_CHATS:02d}")).to_have_count(1)
                     assert await _list_scroll(page) > before - _ROW_SLACK_PX
                 await page.screenshot(path=str(tmp_path / f"side-scroll-{width}-{scheme}.png"), animations="disabled")
