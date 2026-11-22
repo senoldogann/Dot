@@ -89,38 +89,48 @@ class ApprovalBroker:
                 {"approval_id": record.id, "tool": tool, "summary": summary, "severity": severity, "args": args},
                 True,
             )
-            outcome = await asyncio.wait_for(future, timeout=self._timeout_s)
-        except TimeoutError:
-            outcome = ApprovalOutcome(
-                approval_id=record.id,
-                status="expired",
-                decided_by=TIMEOUT_DECIDER,
-                note="no decision before the deadline",
-            )
+            # Only the wait for the answer is the deadline: a store that timed out marking the run blocked, or
+            # emitting the question, is that failure and not "no decision before the deadline" (item 1313).
+            try:
+                outcome = await asyncio.wait_for(future, timeout=self._timeout_s)
+            except TimeoutError:
+                outcome = ApprovalOutcome(
+                    approval_id=record.id,
+                    status="expired",
+                    decided_by=TIMEOUT_DECIDER,
+                    note="no decision before the deadline",
+                )
         finally:
             self._waiting.pop(record.id, None)
             self._run_of.pop(record.id, None)
-            # A decision made through ``resolve`` is stored already and stays as it is; the other endings are stored
-            # here. The run acts on what is stored, also when the deadline passed while a person's decision was being
-            # stored.
-            stored: ApprovalRecord = await self._store.decide_approval(
-                record.id, outcome.status, outcome.decided_by, outcome.note
-            )
-            if stored.status in ("approved", "denied") and stored.status != outcome.status:
-                outcome = ApprovalOutcome(
-                    approval_id=record.id,
-                    status="approved" if stored.status == "approved" else "denied",
-                    decided_by=stored.decided_by or "",
-                    note=stored.note,
+            # Each step of the cleanup runs whatever the one before it did (item 1313): a store that fails to keep the
+            # decision still unblocks the run and tells the screens the question is closed, and the failure goes on
+            # to the caller after them.
+            try:
+                # A decision made through ``resolve`` is stored already and stays as it is; the other endings are
+                # stored here. The run acts on what is stored, also when the deadline passed while a person's decision
+                # was being stored.
+                stored: ApprovalRecord = await self._store.decide_approval(
+                    record.id, outcome.status, outcome.decided_by, outcome.note
                 )
-            # Another question of the run that is still open keeps it blocked (item 1050).
-            await self._store.unblock_run(run_id)
-            await self._bus.emit(
-                run_id,
-                "approval_decided",
-                {"approval_id": record.id, "status": outcome.status, "note": outcome.note},
-                True,
-            )
+                if stored.status in ("approved", "denied") and stored.status != outcome.status:
+                    outcome = ApprovalOutcome(
+                        approval_id=record.id,
+                        status="approved" if stored.status == "approved" else "denied",
+                        decided_by=stored.decided_by or "",
+                        note=stored.note,
+                    )
+            finally:
+                try:
+                    # Another question of the run that is still open keeps it blocked (item 1050).
+                    await self._store.unblock_run(run_id)
+                finally:
+                    await self._bus.emit(
+                        run_id,
+                        "approval_decided",
+                        {"approval_id": record.id, "status": outcome.status, "note": outcome.note},
+                        True,
+                    )
         return outcome
 
     async def record_automatic(

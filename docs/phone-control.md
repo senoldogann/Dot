@@ -20,7 +20,11 @@ without a session, locked or not. When no address answers and `xcrun devicectl l
 (`[phone] udid`) as available, it launches the runner app again with `xcrun devicectl device process launch --device
 <udid> --terminate-existing <runner_bundle>` and looks for its server for 40 seconds, the time its looks take counted;
 a launch that fails, or whose server stays silent (a phone out of the Mac's reach), is not tried again for five
-minutes. An address that answers but does not say whether the phone is locked (a refusal, or another device at that
+minutes; the log's `phone_relaunch_failed` carries the first line (300 characters at most) of what `devicectl` said. A
+round that fails for any reason, `xcrun` missing or a listing devicectl did not write among them, is logged
+(`phone_keeper_round_crashed`, with its traceback, when it is not one of Dot's own errors) and the keeper tries again,
+waiting twice as long for each round in a row that failed, up to ten minutes (item 1313): it never ends before the
+daemon does. An address that answers but does not say whether the phone is locked (a refusal, or another device at that
 address on the home network) leaves the link *unclear*, and what it answered goes to the daemon's log, never to a run.
 
 A phone that stays out of reach, or unclear, for `notify_after_s` seconds is told to you once, as any other notice of
