@@ -69,18 +69,18 @@ export function aboutToggle(text, label, noteClass = "hint") {
 }
 
 /**
- * The head of a settings tab (item 562): the tab's name, the line that says what it is for and, at the right, what the
- * tab holds and the buttons that belong to the whole page. Returns the element and `setLead(text)`, `setMeta(...nodes)` and
- * `setActions(...nodes)`, which a tab calls once it knows them.
+ * The head of a settings page (items 562 and 1336): the line that says what the page is for and, at the right, what the
+ * page holds and the buttons that belong to the whole page; its name is the bar's breadcrumb (views/settings.js). Returns
+ * the element and `setLead(text)`, `setMeta(...nodes)` and `setActions(...nodes)`, which a page calls once it knows them.
  */
-export function settingsHead(title) {
+export function settingsHead() {
   const lead = el("p", { class: "set-lead" });
   const meta = el("span", { class: "set-meta" });
   const actions = el("div", { class: "set-actions" });
   const element = el(
     "header",
     { class: "set-head" },
-    el("div", { class: "set-head-text" }, el("h1", { class: "set-title" }, title), lead),
+    el("div", { class: "set-head-text" }, lead),
     el("div", { class: "set-head-side" }, meta, actions),
   );
   const fill = (node, nodes) => node.replaceChildren(...nodes.filter((child) => child !== null && child !== undefined));

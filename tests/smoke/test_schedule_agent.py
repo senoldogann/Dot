@@ -468,7 +468,7 @@ async def test_new_schedule_and_edit_are_a_page_that_fits_cancels_and_says_why_i
                 await expect(page.get_by_label("Name", exact=True)).to_have_value("Too often")
                 await expect(page.get_by_label("Custom timing", exact=True)).to_have_value("0 9 * * 1-5")
                 await expect(page.get_by_role("switch", name="Switched on")).to_have_attribute("aria-checked", "true")
-                await expect(page.locator("h1.crumbs .crumb-here")).to_have_text("Too often")
+                await expect(page.get_by_role("heading", level=1)).to_have_text("Too often")
                 await page.close()
                 for record in await runtime.store.list_schedules():
                     if record.name == "Too often":

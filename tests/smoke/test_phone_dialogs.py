@@ -144,9 +144,8 @@ async def _note_menu(page: Page) -> None:
 
 # Each form: the page it is on, what to do first, the button that opens it and the dialog's title.
 _FORMS: tuple[tuple[str, Callable[[Page], Awaitable[None]], str, str], ...] = (
-    ("#/schedules", _nothing, "New schedule", "New schedule"),
-    ("#/schedules", _nothing, "Morning brief settings", "Morning brief"),
-    ("#/schedules", _nothing, "New watcher", "New watcher"),
+    ("#/settings/schedules", _nothing, "Morning brief settings", "Morning brief"),
+    ("#/settings/schedules", _nothing, "New watcher", "New watcher"),
     ("#/settings/harness", _nothing, "Write your own", "Write your own version"),
     ("#/settings/keys", _key_panel, "Add key", "Add the OpenAI key"),
     ("#/settings/memory", _note_menu, "Edit", "Edit note"),
@@ -218,8 +217,8 @@ async def test_the_foot_of_a_sheet_stands_on_what_is_seen_above_the_keyboard(own
             await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             page: Page = await context.new_page()
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
-            await page.goto(f"{address}/#/schedules")
-            dialog: Locator = await open_form(page, page.get_by_role("button", name="New schedule"), "New schedule")
+            await page.goto(f"{address}/#/settings/schedules")
+            dialog: Locator = await open_form(page, page.get_by_role("button", name="New watcher"), "New watcher")
             height: int = await page.evaluate("window.innerHeight")
             foot: str = (
                 "() => Math.round(document.querySelector('dialog.form-dialog .modal-actions')"

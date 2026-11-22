@@ -169,7 +169,7 @@ async def test_a_campaigns_row_stops_marks_achieved_and_deletes_it_where_it_is(o
         "achieved": ["Delete the campaign"],
     }
     assert after_stop == ["Mark the campaign achieved", "Delete the campaign"]
-    assert stayed.endswith("#/campaigns")
+    assert stayed.endswith("#/settings/campaigns")
     assert sorted(left) == sorted([active.id, stopped.id])
     assert sorted(statuses) == ["achieved", "stopped"]
     assert wider == 0

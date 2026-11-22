@@ -272,8 +272,8 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 link_box: FloatRect = await _box(connect)
                 assert link_box["y"] + link_box["height"] <= 860, link_box
                 await connect.click()
-                await expect(page).to_have_url(f"{address}/#/customize/connectors")
-                await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
+                await expect(page).to_have_url(f"{address}/#/settings/connectors")
+                await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("Connectors")
                 # The page opens on Popular (item 1000); All lists every service in its section, each with its mark,
                 # what Dot does with it and how it connects.
                 await page.locator("[data-chip='all']").click()
@@ -332,7 +332,7 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await expect(_tile(page, "linkedin")).to_be_visible()
                 # The sections the search leaves empty are not drawn, not even as a word.
                 await expect(page.locator(".plugin-section-title")).to_have_text(["Communication"])
-                await expect(page.locator(".customize-body")).not_to_contain_text("null")
+                await expect(page.locator(".settings-pane")).not_to_contain_text("null")
                 await search.fill("")
                 await page.get_by_role("button", name=re.compile(r"^Connected \d+$")).click()
                 await expect(tiles).to_have_count(3)
@@ -344,7 +344,7 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await page.get_by_role("button", name=re.compile(r"^All \d+$")).click()
                 # Notes' own page: how it connects, where it stands, where its data goes, and its step.
                 await _tile(page, "notes").locator(".plugin-name").click()
-                await expect(page).to_have_url(f"{address}/#/customize/connectors/notes")
+                await expect(page).to_have_url(f"{address}/#/settings/connectors/notes")
                 # A service's own page has no Accounts card over it, and its mark is the same tile, larger.
                 await expect(page.locator("section[aria-label='Accounts']")).to_have_count(0)
                 await expect(page.locator(".plugin-hero .plugin-mark")).to_have_count(1)
@@ -355,7 +355,7 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
                 await expect(page.locator(".plugin-card[data-kind='data']")).to_contain_text(
                     "through macOS on this Mac; what a task reads there goes to the task's model"
                 )
-                await expect(page.locator(".customize-body")).not_to_contain_text("null")
+                await expect(page.locator(".settings-pane")).not_to_contain_text("null")
                 # On a phone the wide button goes under the text instead of squeezing it; on a wide page it sits beside.
                 settings: Locator = way.get_by_role("button", name="Open System Settings")
                 text_box: FloatRect = await _box(way.locator(".row-main"))
@@ -376,7 +376,7 @@ async def test_connectors_shows_where_each_service_stands_and_takes_its_step(
             await calendar_page.goto(ui_url("127.0.0.1", port, TOKEN))
             # The old address of Connect apps leads to the page.
             await calendar_page.goto(f"{address}/#/connect")
-            await expect(calendar_page).to_have_url(f"{address}/#/customize/connectors")
+            await expect(calendar_page).to_have_url(f"{address}/#/settings/connectors")
             calendar: Locator = _tile(calendar_page, "calendar")
             await expect(calendar.locator(".badge")).to_have_text("Not asked yet")
             await calendar.get_by_role("button", name="Allow Calendar").click()
@@ -508,7 +508,7 @@ async def test_a_keyed_services_tile_asks_for_its_key_in_a_dialog_and_keeps_none
                 await page.screenshot(path=str(tmp_path / f"key-{width}.png"))
                 # Typed and dropped, with a question first: the key is not there when the dialog opens again.
                 await asks_before_dropping(page, dialog, key, "tvly-typed-and-cancelled")
-                await expect(page).to_have_url(f"{address}/#/customize/connectors")
+                await expect(page).to_have_url(f"{address}/#/settings/connectors")
                 dialog = await open_form(page, opener, "Add Tavily")
                 await expect(key).to_have_value("")
                 # The daemon refuses the key: the reason is in the dialog, the key is still typed, nothing is kept.
@@ -520,7 +520,7 @@ async def test_a_keyed_services_tile_asks_for_its_key_in_a_dialog_and_keeps_none
                 # Add again, and the dialog closes.
                 await dialog.get_by_role("button", name="Add", exact=True).click()
                 await expect(dialog).to_have_count(0)
-                await expect(page).to_have_url(f"{address}/#/customize/connectors")
+                await expect(page).to_have_url(f"{address}/#/settings/connectors")
                 assert len(added) == 2 and all(isinstance(body, dict) for body in added), added
                 for body in added:
                     assert isinstance(body, dict)

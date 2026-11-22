@@ -46,24 +46,34 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
 # The sheet's rows that open a tab, in order, by the tab each opens (item 995); Connect apps and Schedules (the sidebar
 # has no icon for it, item 1328) stand second.
+# The sheet's rows that open a page, in order, by the page each opens (items 995 and 1336).
 _TABS: dict[str, str] = {
     "general": "General",
-    "vault": "Vault",
+    "appearance": "Appearance",
     "rules": "Rules",
     "memory": "Memory",
+    "vault": "Vault",
+    "snapshots": "Snapshots",
+    "agents": "Agents",
     "models": "Models",
-    "keys": "AI services",
-    "websearch": "Web search",
     "browser": "Browser",
+    "websearch": "Web search",
+    "schedules": "Scheduled tasks",
+    "campaigns": "Campaigns",
     "harness": "Self-improvement",
-    "repair": "Self-repair",
+    "connectors": "Connectors",
+    "plugins": "Plugins",
+    "skills": "Skills",
+    "keys": "AI services",
     "phone": "Phone",
     "channels": "Channels",
-    "appearance": "Appearance",
-    "snapshots": "Snapshots",
     "system": "System",
+    "repair": "Self-repair",
+    "diagnostics": "Diagnostics",
+    "licences": "Open source licences",
 }
 _ROWS: list[str] = [*list(_TABS.values())[:2], "Connect apps", "Schedules", *list(_TABS.values())[2:]]
+_ROWS: list[str] = list(_TABS.values())
 _NOTES: tuple[str, ...] = (
     "Prefers window seats and morning flights.",
     "The team stand-up is at 09:30 on weekdays.",
@@ -180,7 +190,7 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/settings")
                 listed: Locator = page.get_by_role("navigation", name="Settings")
-                await expect(listed.get_by_role("heading")).to_have_text(["Dot", "Phones and channels", "App"])
+                await expect(listed.get_by_role("heading")).to_have_text(["Agents", "Connections", "Maintenance", "About"])
                 rows: Locator = listed.get_by_role("link")
                 await expect(rows.locator(".settings-row-label")).to_have_text(_ROWS)
                 await expect(rows.filter(has_text="Connect apps")).to_have_attribute("href", "#/customize/connectors")
@@ -204,7 +214,7 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                         .first.click()
                     )
                     await expect(page).to_have_url(f"{address}/#/settings/{tab}")
-                    await expect(page.locator("h1.stage-h1")).to_have_text(name)
+                    await expect(page.locator("h1.crumb-here")).to_have_text(name)
                     # The one way back is the bar's button at the top left (item 338).
                     back: Locator = page.get_by_role("button", name="Back")
                     await expect(back).to_be_visible()
@@ -244,11 +254,11 @@ async def test_a_macs_window_opens_the_settings_on_general_with_the_nav_in_the_s
             await expect(page).to_have_url(f"{address}/#/settings/general")
             nav: Locator = page.get_by_role("navigation", name="Settings")
             # A Mac's nav is the sheet's rows, their names alone (item 999).
-            await expect(nav.locator(".settings-nav-label")).to_have_text(_ROWS)
+            await expect(nav.locator(".snav-label")).to_have_text(_ROWS)
             await expect(nav.locator("[aria-current='page']")).to_contain_text("General")
             await expect(page.get_by_role("heading", level=1)).to_have_text("General")
-            # The bar's name of the tab is drawn for a phone only, by the width (item 966).
-            await expect(page.locator("h1.stage-h1")).to_be_hidden()
+            # The bar names the page as a breadcrumb (item 1336).
+            await expect(page.locator("nav.crumbs")).to_have_text("Settings/General")
             await expect(page.get_by_role("button", name="Back")).to_have_count(0)
             await expect(page.locator(".settings-list")).to_have_count(0)
             card: dict[str, object] = await page.locator(".settings-pane .card:has(> .card-head)").first.evaluate(_CARD)

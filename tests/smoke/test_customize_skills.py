@@ -168,8 +168,8 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await page.goto(ui_url("127.0.0.1", port, TOKEN))
                         # The settings' old address leads to Customize › Skills.
                         await page.goto(f"{served}/#/settings/skills")
-                        await expect(page).to_have_url(f"{served}/#/customize/skills")
-                        await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Skills")
+                        await expect(page).to_have_url(f"{served}/#/settings/skills")
+                        await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("Skills")
                         await expect(page.get_by_role("button", name=re.compile(r"^Personal \d+$"))).to_have_text(
                             "Personal 9"
                         )
@@ -248,7 +248,7 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await _card(page, _FOUND).get_by_role("button", name="Remove").click()
                         await page.locator("dialog.modal").get_by_role("button", name="Remove").click()
                         await expect(_section(page, "imported")).to_have_count(0)
-                        await expect(page.locator(".customize-body")).not_to_contain_text("null")
+                        await expect(page.locator(".settings-pane")).not_to_contain_text("null")
                         await expect(page.get_by_role("button", name="Import from other apps")).to_be_enabled()
                         await page.close()
                         # On a phone, dark: one card a row, nothing wider than the screen.

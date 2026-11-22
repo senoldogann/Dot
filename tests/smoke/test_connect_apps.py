@@ -181,13 +181,13 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
 
             # It opens Customize › Connectors, no dialog over the page, and stands for the page while it is open.
             await button.click()
-            await expect(page).to_have_url(f"{address}/#/customize/connectors")
+            await expect(page).to_have_url(f"{address}/#/settings/connectors")
             await expect(page.get_by_role("dialog")).to_have_count(0)
-            await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Connectors")
+            await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("Connectors")
             await expect(button).to_have_attribute("data-current", "")
             # The styles read data-current, a screen reader aria-current, as the links of the pages give it (item 559).
             await expect(button).to_have_attribute("aria-current", "page")
-            await expect(page.locator(".customize-hero-title")).to_have_text("Connect your apps")
+            await expect(page.locator(".customize-hero-line")).to_contain_text("Dot works in the apps")
             titles: Locator = page.locator(".plugin-section-title")
             # The page opens on Popular alone, a line saying how to see the rest (item 1000); All lists every section.
             await expect(titles).to_have_text(["Popular"])
@@ -241,7 +241,7 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             size: FloatRect = await _box(round_button)
             assert round(size["width"]) == 36 and round(size["height"]) == 36, size
             await round_button.click()
-            await expect(phone).to_have_url(f"{address}/#/customize/connectors")
+            await expect(phone).to_have_url(f"{address}/#/settings/connectors")
             await expect(phone.locator(".plugin-tile[data-plugin]").first).to_be_visible()
             over: int = await phone.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert over <= 0, over

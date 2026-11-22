@@ -239,7 +239,7 @@ def _scripts(notes: Path) -> dict[str, list[tuple[str, str, list[tuple[str, dict
 
 def _other_apps(home: Path) -> None:
     """What other apps of this Mac set up, in the home of this test: a Claude Code skill and a server of Claude Desktop,
-    which Customize › Skills offers to import."""
+    which Settings › Skills offers to import."""
     skill: Path = home / ".claude" / "skills" / "tidy-desk"
     skill.mkdir(parents=True)
     (skill / "SKILL.md").write_text(
@@ -658,10 +658,11 @@ async def test_the_sidebar_and_the_pages_beside_it_say_what_they_mean(browser: B
         await page.get_by_role("button", name="More actions").first.click()
         await reader.opens("The form that makes a team", page.get_by_role("menuitem", name="New team"))
         await reader.go("/team", "Handoffs", "main.page")
-        await reader.go("/schedules", "Schedules", "main.page")
-        await reader.opens("The form that adds a schedule", page.get_by_role("button", name="New schedule").first)
+        await reader.go("/settings/schedules", "Settings › Scheduled tasks", ".settings-pane")
         await reader.opens("The form that adds a watcher", page.get_by_role("button", name="New watcher").first)
         await reader.opens("The form of the morning brief", page.get_by_role("button", name="Morning brief settings"))
+        # The form that adds a schedule is a page of the settings (item 1337).
+        await reader.go("/settings/schedules/new", "Settings › Scheduled tasks › New schedule", ".settings-pane .set-card")
         reader.done()
         await page.context.close()
 
@@ -712,13 +713,13 @@ async def test_customize_says_what_a_plugin_a_skill_and_a_connector_are_in_words
     for width in _SIZES:
         page: Page = await _signed_in(browser, served, width)
         reader: _Reader = _Reader(page, width)
-        await reader.go("/customize/plugins", "Customize › Plugins", ".customize-body")
-        await reader.go("/customize/skills", "Customize › Skills", ".customize-body")
+        await reader.go("/settings/plugins", "Settings › Plugins", ".settings-pane")
+        await reader.go("/settings/skills", "Settings › Skills", ".settings-pane")
         await reader.opens("The skills of other apps", page.get_by_role("button", name="Import from other apps").first)
         await reader.opens("The skill saved from a chat", page.get_by_role("button", name="Save from a chat").first)
-        await reader.go("/customize/connectors", "Customize › Connectors", ".customize-body")
+        await reader.go("/settings/connectors", "Settings › Connectors", ".settings-pane")
         await reader.opens("The form that adds a connected app", page.get_by_role("button", name="Add connected app"))
-        await reader.go("/customize/connectors/github", "A connector's page", ".customize-body")
+        await reader.go("/settings/connectors/github", "A connector's page", ".settings-pane")
         reader.done()
         await page.context.close()
 
@@ -731,11 +732,11 @@ async def test_the_lead_of_diagnostics_and_the_licences_says_what_the_page_is_fo
     for width in _SIZES:
         page: Page = await _signed_in(browser, served, width)
         for route, words in (
-            ("/diagnostics", "what went wrong"),
-            ("/licences", "open source software"),
+            ("/settings/diagnostics", "what went wrong"),
+            ("/settings/licences", "open source software"),
         ):
             await page.goto(f"{served.address}/#{route}")
-            lead: Locator = page.locator(".page-sub").first
+            lead: Locator = page.locator(".set-lead").first
             await expect(lead).to_contain_text(words)
             text: str = await lead.inner_text()
             found: list[str] = [m.group(0) for m in (*JARGON.finditer(text), *RUN_AS_A_THING.finditer(text))]

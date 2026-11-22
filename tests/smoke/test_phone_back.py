@@ -115,28 +115,29 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page).to_have_url(f"{address}/#/settings")
     await expect(button).to_have_attribute("aria-label", "Show sidebar")
     # A service's page opened by its address leads to Connectors; its own link back does not show.
-    await page.goto(f"{address}/#/customize/connectors/notion")
+    await page.goto(f"{address}/#/settings/connectors/notion")
     await expect(page.locator(".plugin-hero")).to_be_visible()
     await expect(page.locator("main .back")).to_be_hidden()
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/customize/connectors")
-    await expect(button).to_have_attribute("aria-label", "Show sidebar")
+    await expect(page).to_have_url(f"{address}/#/settings/connectors")
+    # Connectors is a page of the settings now (item 1336): its Back goes up to the list of the settings.
+    await expect(button).to_have_attribute("aria-label", "Back")
     # A service opened from its tile returns to Connectors.
     await page.locator(".plugin-tile[data-plugin='linear'] .plugin-name").click()
-    await expect(page).to_have_url(f"{address}/#/customize/connectors/linear")
+    await expect(page).to_have_url(f"{address}/#/settings/connectors/linear")
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/customize/connectors")
+    await expect(page).to_have_url(f"{address}/#/settings/connectors")
     # A plugin's page of the gallery leads to Plugins (item 542), and a service's page at the address it had before
     # the gallery took the name leads to the service under Connectors.
     await page.goto(f"{address}/#/customize/plugins/superpowers")
     await expect(page.locator(".gallery-page-head")).to_be_visible()
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/customize/plugins")
+    await expect(page).to_have_url(f"{address}/#/settings/plugins")
     await page.goto(f"{address}/#/customize/plugins/notion")
-    await expect(page).to_have_url(f"{address}/#/customize/connectors/notion")
+    await expect(page).to_have_url(f"{address}/#/settings/connectors/notion")
     await expect(page.locator(".plugin-hero")).to_be_visible()
     # A chat's page opens the list of chats in place (item 401), wherever the page was opened from: no page of chats
     # between them, and the address stays the run's.
@@ -166,7 +167,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Show sidebar")
     await _home_with_links(page, address)
     await page.locator("#stopped-link").click()
-    await expect(page).to_have_url(f"{address}/#/customize/connectors/notion")
+    await expect(page).to_have_url(f"{address}/#/settings/connectors/notion")
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
     await expect(page).to_have_url(f"{address}/#/runs")
@@ -178,11 +179,15 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page).to_have_url(f"{address}/#/settings")
     await page.go_back()
     await expect(page).to_have_url(f"{address}/#/runs")
-    # Customize has one address for its open tab.
+    # The old address of Customize leads to its open tab, a page of the settings (item 1336).
     await page.goto(f"{address}/#/customize")
     await expect(page).to_have_url(f"{address}/#/customize/plugins")
     # A chat opened from the sidebar: the button is the way to the list of chats. On a phone, as on a Mac, Dot's own
     # conversation is a chat of the list (item 1328).
+    await expect(page).to_have_url(f"{address}/#/settings/plugins")
+    await page.goto(f"{address}/#/runs")
+    # A chat opened from the sidebar: the button is the way to the list of chats. On a phone Dot's own conversation is
+    # the agents' first row (item 1245); the column of faces above it is a wide window's.
     await page.get_by_role("button", name="Show sidebar").click()
     places: int = await page.evaluate("history.length")
     await page.locator(f"#sidebar .side-chat a.side-run[href='#/runs/{run.id}']").first.click()
@@ -318,7 +323,7 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await wide.goto(ui_url("127.0.0.1", port, TOKEN))
                     # The hero is drawn only after the catalogue's reads return; until then the page says Loading.
                     async with wide.expect_response("**/api/plugins"):
-                        await wide.goto(f"{address}/#/customize/connectors/notion")
+                        await wide.goto(f"{address}/#/settings/connectors/notion")
                     await expect(wide.locator(".plugin-hero")).to_be_visible()
                     await expect(wide.get_by_role("button", name="Back")).to_have_count(0)
                     # The page's link back shows with the sidebar beside it (item 380), and with the sidebar hidden.
@@ -326,7 +331,7 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await wide.goto(f"{address}/#/diagnostics")
                     await expect(wide.locator("main .back")).to_have_text("System")
                     await expect(wide.locator("main .back")).to_be_visible()
-                    await wide.goto(f"{address}/#/customize/connectors/notion")
+                    await wide.goto(f"{address}/#/settings/connectors/notion")
                     await wide.get_by_role("button", name="Hide sidebar").click()
                     await expect(wide.locator("main .back")).to_be_visible()
                     await expect(wide.locator(".stagebar-left button")).to_have_attribute("aria-label", "Show sidebar")

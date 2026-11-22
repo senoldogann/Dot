@@ -197,6 +197,8 @@ async def test_in_the_desktop_shell_the_settings_keep_their_button_on_the_lights
                 back,
                 groups,
             )
+            groups = await nav.locator(".snav-groups").bounding_box()
+            assert back is not None and groups is not None and back["y"] >= groups["y"] + groups["height"] - 1, (back, groups)
             await page.screenshot(path=str(tmp_path / "lights-1280-settings.png"), animations="disabled")
             # Hidden, the sidebar leaves the top bar's opener at the same place.
             await hide.click()
@@ -235,6 +237,10 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             await page.goto(f"{address}/#/agents")
             await page.get_by_role("button", name="Your agents", exact=True).click()
             await page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name=re.compile("^Dot")).click()
+            dot_face: Locator = page.locator("#sidebar .side-agent-faces .side-dot-face")
+            await expect(dot_face).to_be_visible()
+            await page.goto(f"{address}/#/team")
+            await dot_face.click()
             await expect(page).to_have_url(re.compile(r"#/runs$"))
             await expect(page.get_by_role("textbox", name="Goal")).to_be_focused()
             await hide.click()
@@ -250,7 +256,7 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             assert await _centre_y(nav.get_by_role("button", name="Hide sidebar")) < LIGHTS_ROW
             # It stands where the chats' head held it: opening the settings moves it neither way.
             assert abs(await _left(nav.get_by_role("button", name="Hide sidebar")) - _BROWSER_LEFT) <= _TOLERANCE_PX
-            assert await _centre_y(back) > await _centre_y(nav.locator(".settings-nav-link").last)
+            assert await _centre_y(back) > await _centre_y(nav.locator(".snav-groups"))
             assert errors == []
         finally:
             await browser.close()
