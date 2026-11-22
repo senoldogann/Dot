@@ -533,8 +533,8 @@ function buildAbout() {
     body: el(
       "div",
       { class: "list" },
-      row("#/diagnostics", "Diagnostics", "Which programs Dot runs, how much space its files take, and its logs. For finding out what went wrong."),
-      row("#/licences", "Open source licences", "The notices of the open source software Dot is built from."),
+      row("#/settings/diagnostics", "Diagnostics", "Which programs Dot runs, how much space its files take, and its logs. For finding out what went wrong."),
+      row("#/settings/licences", "Open source licences", "The notices of the open source software Dot is built from."),
     ),
     openByDefault: true,
   }).element;
@@ -1576,7 +1576,7 @@ function buildModels(isDisposed, asked, head) {
   const lookFailed = el("div", { class: "set-row models-look-failed", hidden: true });
   const look = modelSetting({
     label: "Own work model",
-    hint: "Decides what is worth doing when Dot works on its own while the Mac is idle (Schedules › On its own). The work itself runs on the default model.",
+    hint: "Decides what is worth doing when Dot works on its own while the Mac is idle (Scheduled tasks › On its own). The work itself runs on the default model.",
     className: "models-role",
     // The look is a run with tools OpenCode's agent is not given (its list, the owner's mail); the Claude plan's run has
     // every tool (items 916, 1032 and 1063).

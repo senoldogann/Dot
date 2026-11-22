@@ -165,7 +165,7 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
     await expect(nav).not_to_contain_text("Daemon up")
     # The page is the open page alone: its name in the bar as a breadcrumb (item 1336), no row of tabs, and the line
     # that says what the page is for.
-    await expect(page.locator("h1.crumbs")).to_have_text("Settings/Models")
+    await expect(page.locator("nav.crumbs")).to_have_text("Settings/Models")
     await expect(page.get_by_role("navigation", name="Models")).to_have_count(0)
     await expect(page.locator(".set-lead")).not_to_be_empty()
 
@@ -189,7 +189,7 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
 
     await nav.get_by_role("link", name="AI services").click()
     await expect(page).to_have_url(f"{base}/#/settings/keys")
-    await expect(page.locator("h1.crumbs")).to_have_text("Settings/AI services")
+    await expect(page.locator("nav.crumbs")).to_have_text("Settings/AI services")
     await expect(open_tab.locator(".snav-label")).to_have_text("AI services")
     await expect(nav.locator("[aria-current='page']")).to_have_count(1)
 
@@ -214,14 +214,14 @@ async def test_the_sidebar_holds_the_settings_in_groups_of_rows_and_follows_the_
 async def test_the_nav_is_in_the_drawer_of_a_narrow_window(browser: Browser, client: httpx.AsyncClient) -> None:
     page, base = await _opened(browser, client, 800, "general")
     sidebar = page.get_by_role("complementary", name="Sidebar")
-    await expect(page.locator("h1.crumbs")).to_have_text("Settings/General")
+    await expect(page.locator("nav.crumbs")).to_have_text("Settings/General")
     await expect(sidebar).to_be_hidden()
     await page.get_by_role("button", name="Show sidebar").click()
     nav = sidebar.get_by_role("navigation", name="Settings")
     await expect(nav).to_be_visible()
     await nav.get_by_role("link", name="Rules").click()
     await expect(page).to_have_url(f"{base}/#/settings/rules")
-    await expect(page.locator("h1.crumbs")).to_have_text("Settings/Rules")
+    await expect(page.locator("nav.crumbs")).to_have_text("Settings/Rules")
     await expect(sidebar).to_be_hidden()
     await page.close()
 
@@ -229,7 +229,7 @@ async def test_the_nav_is_in_the_drawer_of_a_narrow_window(browser: Browser, cli
 async def test_a_phone_keeps_its_sidebar_and_its_sheet(browser: Browser, client: httpx.AsyncClient) -> None:
     page, _ = await _opened(browser, client, 390, "keys")
     # The bar names the tab its row opened (item 995), and the page has no row of tabs.
-    await expect(page.locator("h1.crumbs .crumb-here")).to_have_text("AI services")
+    await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("AI services")
     await expect(page.locator(".crumb-far").first).to_be_hidden()
     await expect(page.get_by_role("navigation", name="Models")).to_have_count(0)
     assert await page.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth") <= 1

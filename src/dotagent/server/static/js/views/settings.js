@@ -150,20 +150,16 @@ function mountList(root, ctx) {
  * schedule's editor. The parts before the last lead back. A phone's bar has the last part alone: its Back goes up.
  */
 function breadcrumb(tab) {
-  const element = el("h1", { class: "stage-h1 crumbs" });
+  // The nav of the parts (`aria-label` Breadcrumb) holds the page's own name as its h1, the last part.
+  const element = el("nav", { class: "crumbs", "aria-label": "Breadcrumb" });
   let detail = "";
+  const sep = () => el("span", { class: "crumb-sep crumb-far", "aria-hidden": "true" }, "/");
+  const here = (text) => el("h1", { class: "crumb crumb-here" }, text);
   function paint() {
-    const root = el("a", { class: "crumb crumb-far", href: "#/settings" }, "Settings");
-    const sep = () => el("span", { class: "crumb-sep", "aria-hidden": "true" }, "/");
-    const page =
-      detail === ""
-        ? el("span", { class: "crumb crumb-here", "aria-current": "page" }, tab.label)
-        : el("a", { class: "crumb crumb-far", href: settingsHref(tab.id) }, tab.label);
     element.replaceChildren(
-      root,
-      el("span", { class: "crumb-sep crumb-far", "aria-hidden": "true" }, "/"),
-      page,
-      ...(detail === "" ? [] : [sep(), el("span", { class: "crumb crumb-here", "aria-current": "page" }, detail)]),
+      el("a", { class: "crumb crumb-far", href: "#/settings" }, "Settings"),
+      sep(),
+      ...(detail === "" ? [here(tab.label)] : [el("a", { class: "crumb crumb-far", href: settingsHref(tab.id) }, tab.label), sep(), here(detail)]),
     );
   }
   paint();
@@ -190,7 +186,7 @@ export function mount(root, ctx) {
     return () => undefined;
   }
   ctx.setTitle(`${tab.label} · Settings`);
-  const head = settingsHead(tab.label);
+  const head = settingsHead();
   const pane = el("div", { class: "settings-pane", dataset: { page: tab.id } }, head.element);
   root.append(el("div", { class: "settings-frame" }, pane));
   // An agent's own page is its conversation, which is not a page of the settings (item 1233).

@@ -240,10 +240,9 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 await page.goto(f"{address}/#/customize")
-                await expect(page).to_have_url(f"{address}/#/customize/plugins")
-                await expect(page.locator(".customize-tabs a")).to_have_text(["Plugins", "Skills", "Connectors"])
-                await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Plugins")
-                await expect(page.locator(".customize-hero-title")).to_have_text("Discover plugins")
+                await expect(page).to_have_url(f"{address}/#/settings/plugins")
+                await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("Plugins")
+                await expect(page.locator(".customize-hero-line")).to_be_visible()
                 # New & noteworthy holds the featured plugin; All plugins every one, the most starred first.
                 await expect(page.locator(".gallery-featured .gallery-card")).to_have_count(1)
                 cards: Locator = page.locator(".gallery-grid .gallery-card")
@@ -308,7 +307,7 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
             page = await browser.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
-            await page.goto(f"{address}/#/customize/plugins")
+            await page.goto(f"{address}/#/settings/plugins")
             acme = _card(page, "acme")
             # Install: the plugin's skills land in Dot's plugins folder and its card says Installed.
             await acme.get_by_role("button", name="Install Acme Skills").click()
@@ -340,7 +339,7 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
             await expect(acme.get_by_role("button", name="Install Acme Skills")).to_be_visible()
             # A plugin's own page: its skills and where it comes from.
             await acme.locator(".gallery-card-name").click()
-            await expect(page).to_have_url(f"{address}/#/customize/plugins/acme")
+            await expect(page).to_have_url(f"{address}/#/settings/plugins/acme")
             await expect(page.locator(".gallery-page-head .plugin-title")).to_have_text("Acme Skills")
             await expect(page.locator(".gallery-skills li")).to_have_text(list(_SKILLS))
             source: Locator = page.locator(".gallery-facts a")
@@ -352,7 +351,7 @@ async def test_the_gallery_installs_lists_and_removes_a_plugin(
             await page.screenshot(path=str(tmp_path / "gallery-plugin-1280.png"), full_page=True)
             # A service's page at the address Plugins had before the gallery is under Connectors.
             await page.goto(f"{address}/#/customize/plugins/notion")
-            await expect(page).to_have_url(f"{address}/#/customize/connectors/notion")
+            await expect(page).to_have_url(f"{address}/#/settings/connectors/notion")
             await expect(page.locator(".plugin-hero")).to_be_visible()
             await page.close()
 
@@ -394,7 +393,7 @@ async def test_a_plugin_whose_pin_the_gallery_moved_since_says_older_version(
                         )
                         await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                         await page.goto(ui_url("127.0.0.1", port, TOKEN))
-                        await page.goto(f"{address}/#/customize/plugins")
+                        await page.goto(f"{address}/#/settings/plugins")
                         acme: Locator = _card(page, "acme")
                         older: Locator = acme.locator(".gallery-outdated")
                         await expect(older).to_have_text("Older version")

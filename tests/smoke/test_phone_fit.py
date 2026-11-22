@@ -519,7 +519,7 @@ async def test_a_phones_drawer_has_no_x_and_closes_with_a_swipe_to_the_left(own_
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
             page: Page = await _phone(playwright, browser, "Pixel 7", address)
-            await page.goto(f"{address}/#/schedules")
+            await page.goto(f"{address}/#/runs")
             await _drawer_open(page)
             await expect(page.get_by_role("button", name="Hide sidebar")).to_be_hidden()
             scroll: str = _SWIPE.replace("at(150, 410)", "at(290, 200)")
@@ -529,7 +529,7 @@ async def test_a_phones_drawer_has_no_x_and_closes_with_a_swipe_to_the_left(own_
             narrow = await browser.new_context(viewport={"width": 390, "height": 844}, reduced_motion="reduce")
             desk: Page = await narrow.new_page()
             await desk.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
-            await desk.goto(f"{address}/#/schedules")
+            await desk.goto(f"{address}/#/runs")
             await _drawer_open(desk)
             await expect(desk.get_by_role("button", name="Hide sidebar")).to_be_visible()
         finally:

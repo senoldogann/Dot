@@ -386,7 +386,7 @@ async def test_a_phone_opens_an_agent_as_a_chat_and_goes_back_to_the_chats(
             await expect(page).to_have_url(re.compile(f"#/agents/{agent_id}$"))
             await expect(button).to_have_attribute("aria-label", "Back")
             await button.click()
-            await expect(page).to_have_url(re.compile(r"#/agents$"))
+            await expect(page).to_have_url(re.compile(r"#/settings/agents$"))
             await context.close()
         finally:
             await browser.close()

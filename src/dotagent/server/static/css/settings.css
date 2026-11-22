@@ -48,15 +48,6 @@
   min-width: 0;
 }
 
-.set-title {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .set-lead {
   max-width: 64ch;
   margin: 0;
@@ -130,7 +121,6 @@
 
 /* A card of rows: a hairline round it and a hairline between its rows, and no shadow. */
 .set-card {
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -190,8 +180,15 @@
   max-width: 100%;
 }
 
-/* On a phone a control that is not a switch goes under the text at the full width. */
+/* On a phone a control that is not a switch goes under the text at the full width, and the muted lines read at the size a
+   phone reads at. */
 @media (max-width: 720px) {
+  .set-row-lead,
+  .settings-pane .setting > .hint {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
   .set-row-control:has(> :is(.select, .input, .segmented, .textarea)) {
     flex: 1 1 100%;
     justify-content: stretch;
@@ -266,7 +263,10 @@ a.crumb:hover {
 }
 
 .crumb-here {
+  margin: 0;
   color: var(--text);
+  font-size: inherit;
+  line-height: var(--leading-ui);
   font-weight: var(--weight-label);
 }
 
@@ -277,6 +277,11 @@ a.crumb:hover {
 @media (max-width: 720px) {
   .crumb-far {
     display: none;
+  }
+
+  .crumb-here {
+    font-size: var(--text-md);
+    font-weight: var(--weight-title);
   }
 }
 
@@ -1541,7 +1546,9 @@ a.crumb:hover {
 .set-tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .set-tile {
@@ -1549,11 +1556,11 @@ a.crumb:hover {
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
-  padding: 16px 20px;
-  border: 1px solid var(--box-border);
-  box-shadow: var(--box-shadow);
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: var(--space-3) var(--space-4);
+}
+
+.set-tile + .set-tile {
+  border-left: 1px solid var(--border);
 }
 
 .set-tile-head {
@@ -1575,9 +1582,9 @@ a.crumb:hover {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-xl);
-  line-height: var(--leading-xl);
-  font-weight: var(--weight-title);
+  font-size: var(--text-lg);
+  line-height: var(--leading-lg);
+  font-weight: var(--weight-label);
 }
 
 .set-tile-line {
@@ -1614,10 +1621,10 @@ a.crumb:hover {
 .failsafe {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
@@ -1630,16 +1637,12 @@ a.crumb:hover {
   display: grid;
   flex: none;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-pill);
-  background: var(--bad-weak);
   color: var(--bad);
 }
 
 .failsafe-mark .icon {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .failsafe-text {
@@ -1770,6 +1773,11 @@ a.crumb:hover {
 @media (max-width: 720px) {
   .set-tiles {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .set-tile + .set-tile {
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
 
   .failsafe {
@@ -2688,7 +2696,9 @@ a.crumb:hover {
 }
 
 /* The choices keep one line (item 578): where they and the search do not fit side by side, the search goes under
-   them and fills its line; the last choice had wrapped alone under the other three. */
+   them and fills its line; the last choice had wrapped alone under the other three. The search takes 12rem: in the
+   settings' column of 800 px (item 1338) the notes' name, the four choices and a search of 16rem no longer fit one line,
+   and the tools stood under the name instead of level with the card's right edge. */
 .note-tools {
   display: flex;
   flex-wrap: wrap;
@@ -2717,7 +2727,7 @@ a.crumb:hover {
 .note-search {
   position: relative;
   display: block;
-  flex: 1 0 16rem;
+  flex: 1 0 12rem;
   min-width: 0;
 }
 
@@ -5437,6 +5447,7 @@ a.crumb:hover {
    a hairline round the card, rows of 12 px over 16 px parted by hairlines, the title and the muted line at the left and the
    control at the right, centred on both lines. */
 .settings-pane .card:not(.fold),
+.settings-pane .card.fold,
 .settings-group > .card {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -5471,6 +5482,15 @@ a.crumb:hover {
 
 .settings-pane .setting > .row {
   display: contents;
+}
+
+/* A sentence with a button beside it (the hint is the row's own growing part) keeps its own line of the two. */
+.settings-pane .setting:has(> .row > .hint.grow) {
+  display: block;
+}
+
+.settings-pane .setting > .row:has(> .hint.grow) {
+  display: flex;
 }
 
 .settings-pane .setting > .row > .grow {
@@ -5511,8 +5531,14 @@ a.crumb:hover {
   grid-column: 1 / -1;
 }
 
-/* On a phone a control that wants room (a box, a menu, a choice) goes under the title at the full width. */
+/* On a phone a control that wants room (a box, a menu, a choice) goes under the title at the full width, and the muted
+   line reads at the size a phone reads at. */
 @media (max-width: 720px) {
+  .settings-pane .setting > .hint {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
   .settings-pane .setting:has(> .row > :is(.input, .select, .segmented, .textarea)) {
     grid-template-columns: minmax(0, 1fr);
   }

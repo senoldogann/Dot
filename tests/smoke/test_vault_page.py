@@ -190,7 +190,7 @@ async def test_an_empty_vault_says_so_and_what_dot_never_sees(browser: Browser, 
             await expect(_tab(page, name)).to_be_visible()
         await expect(page.get_by_role("searchbox", name="Search the vault")).to_be_visible()
         # The tab is its own row of the settings' nav (item 999), marked as the one open.
-        await expect(page.locator(".settings-nav-link[aria-current='page'] .settings-nav-label")).to_have_text("Vault")
+        await expect(page.locator(".snav-link[aria-current='page'] .snav-label")).to_have_text("Vault")
         button: Locator = page.get_by_role("button", name="New item")
         await button.click()
         menu: Locator = page.get_by_role("menu", name="New item")

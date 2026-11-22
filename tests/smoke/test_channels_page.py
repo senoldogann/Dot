@@ -223,7 +223,7 @@ async def test_the_tab_stands_beside_phone_and_says_where_imessage_stands(browse
         if width >= 1280:
             nav: Locator = page.get_by_role("navigation", name="Settings")
             # Its own row in the group of the phones, under Phone (item 999).
-            await expect(nav.locator("[aria-current='page'] .settings-nav-label")).to_have_text("Channels")
+            await expect(nav.locator("[aria-current='page'] .snav-label")).to_have_text("Channels")
             await expect(page.get_by_role("heading", level=1)).to_have_text("Channels")
         await _fits(page, f"{width} {scheme}")
         await page.context.close()

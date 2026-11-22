@@ -218,9 +218,9 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     for row in await rows.all():
                         assert await row.locator(".icon").evaluate("(mark) => getComputedStyle(mark).rotate") == "none"
                     await expect(rows.first).to_contain_text("how much space its files take, and its logs")
-                    await page.get_by_role("link", name=re.compile(r"^Diagnostics")).click()
-                    await expect(page).to_have_url(f"{address}/#/diagnostics")
-                    await expect(page.locator(".page-sub")).to_have_text(
+                    await page.locator(".about-row", has_text="Diagnostics").click()
+                    await expect(page).to_have_url(f"{address}/#/settings/diagnostics")
+                    await expect(page.locator(".set-lead")).to_have_text(
                         "For finding out what went wrong: the programs Dot runs and how much of the Mac they use, the "
                         "room its files take, and its logs, read on this Mac."
                     )
@@ -245,8 +245,8 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await expect(lines).to_have_text("first line")
                     await page.screenshot(path=tmp_path / f"diagnostics-{width}-{scheme}.png", full_page=True)
                     await page.goto(f"{address}/#/settings/system")
-                    await page.get_by_role("link", name=re.compile(r"^Open source licences")).click()
-                    await expect(page).to_have_url(f"{address}/#/licences")
+                    await page.locator(".about-row", has_text="Open source licences").click()
+                    await expect(page).to_have_url(f"{address}/#/settings/licences")
                     await expect(page.locator(".notice-name", has_text="Inter")).to_be_visible()
                     await page.get_by_role("searchbox", name="Find a package").fill("fastapi")
                     await expect(page.locator("tr[data-package]:visible").first).to_contain_text("fastapi")

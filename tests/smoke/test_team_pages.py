@@ -493,7 +493,7 @@ async def test_a_removed_team_leaves_its_agents_and_its_chats_and_its_page_says_
         dialog: Locator = page.locator("dialog.modal")
         await expect(dialog).to_contain_text("Its agents stay yours")
         await dialog.get_by_role("button", name="Remove").click()
-        await expect(page).to_have_url(f"{page.url.split('#')[0]}#/agents")
+        await expect(page).to_have_url(f"{page.url.split('#')[0]}#/settings/agents")
         await expect(page.locator(".toast.ok", has_text="Desk removed")).to_be_visible()
         await expect(page.locator(".owned-team")).to_have_count(0)
         await expect(page.locator(f".agent-card[data-agent='{scout['id']}']")).to_have_count(1)
@@ -542,7 +542,7 @@ async def test_agents_picked_on_their_cards_make_a_team_in_the_order_picked(
         )
         await expect(bar).to_contain_text("2 agents picked")
         # Picking stays on the page: no card led away.
-        await expect(page).to_have_url(re.compile(r"#/agents$"))
+        await expect(page).to_have_url(re.compile(r"#/settings/agents$"))
         await page.screenshot(path=str(tmp_path / "picking.png"))
         await bar.get_by_role("button", name="Make a team").click()
         editor: Locator = page.locator(".team-editor")
