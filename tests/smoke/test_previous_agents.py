@@ -201,8 +201,14 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 await agents_tab.click()
                 await expect(agents_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.locator(".inspector-panel:not([hidden])")
-                # Who the chat is with stands over the helpers (item 846).
-                await expect(shown.locator(".panel-section-title")).to_have_text(["Agent", "Previous agents"])
+                # The Lineage stands over who the chat is with (items 846 and 1331); "Previous agents" under the task
+                # that leads says how many failed and how many there are, and opens the rows of those that ended.
+                await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Agent"])
+                previous: Locator = shown.get_by_role("button", name=re.compile("^Previous agents"))
+                await expect(previous).to_have_text(re.compile(r"1 failed\s*7"))
+                await expect(shown.locator(".lineage-lead")).to_have_count(1)
+                await expect(shown.locator(".agent-row").first).to_be_hidden()
+                await previous.click()
                 rows: Locator = shown.locator(".agent-row")
                 await expect(rows).to_have_count(_FIRST_ROWS)
                 await expect(rows.locator(".agent-title")).to_have_text(
@@ -239,7 +245,7 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
             await expect(agents_tab).to_have_text("Agents")
             shown = panel.locator(".inspector-panel:not([hidden])")
             await expect(shown.locator(".hint")).to_have_text(
-                "When Dot hands part of the work to a helper, the helper shows here."
+                "When Dot hands part of the work to a subagent, it shows here."
             )
             await expect(shown.locator(".agent-row")).to_have_count(0)
             await page.close()
@@ -266,6 +272,7 @@ async def test_a_row_of_the_agents_tab_shows_its_helpers_card_on_a_rest_wide_and
                 panel: Locator = page.locator(".inspector")
                 await panel.get_by_role("tab", name="Agents").click()
                 shown: Locator = panel.locator(".inspector-panel:not([hidden])")
+                await shown.get_by_role("button", name=re.compile("^Previous agents")).click()
                 rows: Locator = shown.locator(".agent-row")
                 card: Locator = shown.locator(".helper-card")
                 await expect(rows).to_have_count(2)
@@ -308,11 +315,44 @@ async def test_a_row_of_the_agents_tab_shows_its_helpers_card_on_a_rest_wide_and
             page = await _open(browser, address, parent.id, 390, "dark", touch=True)
             panel = page.locator(".inspector")
             await panel.get_by_role("tab", name="Agents").click()
+            await panel.get_by_role("button", name=re.compile("^Previous agents")).click()
             row: Locator = panel.locator(".inspector-panel:not([hidden]) .agent-row").first
             await expect(row).to_be_visible()
             await row.hover()
             await page.wait_for_timeout(1000)
             await expect(panel.locator(".helper-card")).to_be_hidden()
+            await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_list_that_cannot_be_read_says_so_and_not_what_it_would_say_of_an_empty_one(
+    runtime: Runtime, address: str, tmp_path: Path
+) -> None:
+    """A read that fails leaves the Agents tab with the problem alone (item 1332): the Lineage's note of what shows
+    once Dot hands work to a subagent is for a list that was read and is empty, and it stood beside the error."""
+    chat: ThreadRecord = await runtime.store.create_thread("Read the brief", "test")
+    run: RunRecord = await _ended(runtime, chat.id, "Read the brief", None, "done")
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
+            await page.route(
+                "**/api/threads/*/helpers*",
+                lambda route: route.fulfill(status=500, content_type="application/json", body='{"detail":"disk"}'),
+            )
+            await page.goto(f"{address}/#/runs/{run.id}")
+            panel: Locator = page.locator(".inspector")
+            await expect(panel).to_be_visible()
+            await panel.get_by_role("tab", name="Agents").click()
+            shown: Locator = panel.locator(".inspector-panel:not([hidden])")
+            await expect(shown.locator(".lineage-problem")).to_contain_text("The agents could not be loaded")
+            await expect(shown.locator(".lineage-note")).to_be_hidden()
+            await expect(shown.locator(".lineage-previous")).to_be_hidden()
             await page.close()
         finally:
             await browser.close()

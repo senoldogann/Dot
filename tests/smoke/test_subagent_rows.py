@@ -192,6 +192,21 @@ async def test_the_subagents_are_one_card_with_a_row_each_and_the_task_says_it_w
                         await expect(page.get_by_role("tab", name=re.compile("^Agents"))).to_have_attribute(
                             "aria-selected", "true"
                         )
+                        # The Agents tab opens on the Lineage (item 1332): the task that leads, then its subagents
+                        # that work, each with its age and a dot; the Task tab has the same, compact.
+                        shown: Locator = page.locator(".inspector-panel:not([hidden])")
+                        await expect(shown.locator(".lineage .panel-section-title")).to_have_text("Lineage · 2 running")
+                        await expect(shown.locator(".lineage-lead .lineage-title")).to_have_text(
+                            "Ship the dictation work"
+                        )
+                        assert sorted(
+                            await shown.locator("a.lineage-row .lineage-title").all_text_contents()
+                        ) == sorted(_JOBS)
+                        await expect(shown.locator("a.lineage-row .lineage-dot.s-running")).to_have_count(len(_JOBS))
+                        await page.get_by_role("tab", name="Task").click()
+                        compact: Locator = page.locator(".inspector-panel:not([hidden]) .lineage")
+                        await expect(compact.locator(".panel-section-title")).to_have_text("Lineage · 2 running")
+                        await expect(compact.locator("a.lineage-row")).to_have_count(len(_JOBS))
                 finally:
                     await browser.close()
             # Stop stops the task, and the subagents with it.

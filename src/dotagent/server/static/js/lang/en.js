@@ -646,6 +646,11 @@ export const EN = {
   "rhythm.fri": "Fri",
   "rhythm.sat": "Sat",
   // The loops of a chat over the composer (loops.js).
+  "lineage.title": "Lineage",
+  "lineage.titleRunning": "Lineage · {count} running",
+  "lineage.previous": "Previous agents",
+  "lineage.failed": "{count} failed",
+  "lineage.empty": "When Dot hands part of the work to a subagent, it shows here.",
   "loops.region": "Loops of this chat",
   "loops.title": "Repeats",
   "loops.one": "Repeats {rhythm}",

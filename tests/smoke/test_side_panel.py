@@ -246,7 +246,7 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                     await plan_tab.focus()
                     await page.keyboard.press("ArrowRight")
                     await expect(panel.get_by_role("tab", name="Agents")).to_be_focused()
-                    await expect(shown.locator(".panel-section-title")).to_have_text(["Agent", "Previous agents"])
+                    await expect(shown.locator(".panel-section-title")).to_have_text(["Lineage", "Agent"])
                     # The Screen tab opens the Mac's screen live, a task or not (item 1322): the stream is asked for as
                     # the tab comes into sight, and Pause holds it.
                     async with page.expect_request("**/api/screen/live"):

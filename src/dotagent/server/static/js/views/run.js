@@ -1572,6 +1572,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       finishedAt = endedAt;
       paintWorking();
       syncControls();
+      agents.repaint();
       if (!replayed) {
         reconcile();
         refreshChanges();
@@ -1633,7 +1634,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   });
   // The agents of the chat: the runs its runs handed work to (item 227), under who the chat is with and how it is set
   // (item 846), Dot or one of your agents, as a messaging app's panel shows the contact.
-  const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
+  // The Lineage (item 1332): the task that leads and its subagents that work, in the Task tab and, with the fold of the
+  // ones that ended, at the head of the Agents tab.
+  const agents = agentList({
+    threadId: run.thread_id,
+    helper: (id) => timeline.helper(id),
+    lead: { id: run.id, goal: run.goal, actor: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id, since: run.created_at, state: () => status },
+    onOpenAgents: () => inspector.openTab("agents"),
+  });
+  const lineageCompact = agents.lineage({ compact: true });
+  const lineageFull = agents.lineage({ compact: false });
   const withAgent = agentPanel({ agent });
   const withSection = panelSection({ id: "run-agent", title: t("run.agent"), actions: null, body: withAgent.element });
   // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
@@ -1664,10 +1674,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // The lessons at the tab's foot, after what the run did (item 856, the owner's ask: they stood at its head).
       // What came of the task first (its answer's files, how it ended), then the recap and the sources, the technical
       // last (the owner's ask of 2026-11-13: the files made stood under the recap and the skills, with their lines).
-      { id: "run", label: t("tabs.task"), icon: "info", sections: [...context.head, recap.element, ...context.rest, more.element, lessonsSlot] },
+      { id: "run", label: t("tabs.task"), icon: "info", sections: [...context.head, recap.element, lineageCompact.element, ...context.rest, more.element, lessonsSlot] },
       { id: "changes", label: t("tabs.changes"), icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: t("tabs.plan"), icon: "squareCheck", sections: [plan.element] },
-      { id: "agents", label: t("tabs.agents"), icon: "users", sections: [withSection.element, agents.element] },
+      { id: "agents", label: t("tabs.agents"), icon: "users", sections: [lineageFull.element, withSection.element] },
       { id: "screen", label: t("tabs.screen"), icon: "monitor", sections: [screenQuiet, computer.element, macScreen.element] },
     ],
     screensIn: "screen",
