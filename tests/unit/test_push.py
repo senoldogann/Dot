@@ -14,6 +14,7 @@ from py_vapid import VapidException
 from pywebpush import WebPushException
 from structlog.testing import capture_logs
 
+from dotagent.config import NotifyConfig, load_defaults
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify import push
 from dotagent.notify.keys import keys_problem
@@ -310,6 +311,12 @@ class _Answer:
         self.text: str = f"MARKER-answer-{status_code}"
 
 
+# The hosts of the endpoints these tests store (``[notify] push_hosts`` in a daemon).
+_HOSTS: tuple[str, ...] = ("push.example",)
+# Dot's packaged ``[notify] push_hosts``.
+_DEFAULT_HOSTS: list[str] = NotifyConfig.model_validate(load_defaults()["notify"]).push_hosts
+
+
 def _usable_keys() -> tuple[str, str]:
     point: bytes = (
         ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
@@ -344,7 +351,7 @@ async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_to
         for endpoint in ("https://push.example/gone", "https://push.example/refusing", "https://push.example/good"):
             await store.add_push_subscription(endpoint, p256dh, auth)
         await store.add_push_subscription("https://push.example/unusable", "!!!", auth)
-        totals: PushTotals = await push_event(store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}))
+        totals: PushTotals = await push_event(store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}), _HOSTS)
         assert totals == PushTotals(sent=1, failed=1, removed=2)
         assert taken == [
             (
@@ -362,7 +369,9 @@ async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_to
             "https://push.example/good",
         ]
         # An event the phone is not told of reaches no push service.
-        assert await push_event(store, keys, _notice("run_started", {})) == PushTotals(sent=0, failed=0, removed=0)
+        assert await push_event(store, keys, _notice("run_started", {}), _HOSTS) == PushTotals(
+            sent=0, failed=0, removed=0
+        )
         assert len(taken) == 1
     finally:
         await store.close()
@@ -494,11 +503,67 @@ async def test_a_push_that_cannot_be_signed_is_one_failed_and_the_next_goes(
         for endpoint in ("https://push.example/unsigned", "https://push.example/good"):
             await store.add_push_subscription(endpoint, p256dh, auth)
         with capture_logs() as logs:
-            totals: PushTotals = await push_event(store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}))
+            totals: PushTotals = await push_event(store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}), _HOSTS)
         assert totals == PushTotals(sent=1, failed=1, removed=0)
         assert taken == ["https://push.example/good"]
         # Why it failed is in the log, as the watch's end said it before.
         failed: list[dict[str, object]] = [entry for entry in logs if entry["event"] == "push_failed"]
         assert len(failed) == 1 and "Missing 'sub'" in str(failed[0]["detail"])
+    finally:
+        await store.close()
+
+
+async def test_a_subscription_stored_at_a_foreign_host_is_not_posted_to_and_the_others_are(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    taken: list[str] = []
+
+    def webpush(subscription_info: dict[str, str], data: str, **signing: object) -> None:
+        taken.append(subscription_info["endpoint"])
+        assert json.loads(data)["title"]
+
+    monkeypatch.setattr(pywebpush, "webpush", webpush)
+    keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        p256dh, auth = _usable_keys()
+        for endpoint in ("https://attacker.example/x", "https://web.push.apple.com/good"):
+            await store.add_push_subscription(endpoint, p256dh, auth)
+        with capture_logs() as logs:
+            totals: PushTotals = await push_event(
+                store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}), _DEFAULT_HOSTS
+            )
+        assert totals == PushTotals(sent=1, failed=1, removed=0)
+        assert taken == ["https://web.push.apple.com/good"]
+        refused = [entry for entry in logs if entry["event"] == "push_subscription_host_refused"]
+        assert len(refused) == 1 and refused[0]["setting"] == "[notify] push_hosts"
+        # Kept, not deleted: the list is the owner's to change.
+        assert len(await store.list_push_subscriptions()) == 2
+    finally:
+        await store.close()
+
+
+async def test_a_subscription_is_the_phones_that_registered_it_and_goes_with_that_phone(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        await store.add_push_subscription("https://push.example/mac", "p", "a")
+        await store.add_push_subscription("https://push.example/one", "p", "a", "aaaaaaaaaaaa")
+        await store.add_push_subscription("https://push.example/two", "p", "a", "bbbbbbbbbbbb")
+        await store.add_push_subscription("https://push.example/one-more", "p", "a", "aaaaaaaaaaaa")
+        # The installation's token registering an endpoint again leaves the phone it belongs to.
+        await store.add_push_subscription("https://push.example/one", "p2", "a2")
+        owners: dict[str, str | None] = {s.endpoint: s.phone_id for s in await store.list_push_subscriptions()}
+        assert owners == {
+            "https://push.example/mac": None,
+            "https://push.example/one": "aaaaaaaaaaaa",
+            "https://push.example/two": "bbbbbbbbbbbb",
+            "https://push.example/one-more": "aaaaaaaaaaaa",
+        }
+        assert await store.delete_phone_push_subscriptions("aaaaaaaaaaaa") == 2
+        assert sorted(s.endpoint for s in await store.list_push_subscriptions()) == [
+            "https://push.example/mac",
+            "https://push.example/two",
+        ]
+        assert await store.delete_phone_push_subscriptions("aaaaaaaaaaaa") == 0
     finally:
         await store.close()

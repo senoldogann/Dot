@@ -6,6 +6,7 @@ narrows stays open to it, and so does yolo, the owner's to use from wherever the
 campaign kept in yolo. The Mac's token does it all. No network and no model service is used."""
 
 import asyncio
+import base64
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -13,6 +14,8 @@ from pathlib import Path
 
 import httpx
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -316,3 +319,54 @@ async def test_only_a_phones_own_key_registers_its_app_for_apns_and_its_removal_
         assert (await client.delete(f"/phone/phones/{device.phone_id}", headers=mac)).status_code == 204
         assert await runtime.store.list_apns_devices() == []
         assert await runtime.store.live_activities_of(FLEET_ID) == []
+
+
+async def test_a_foreign_push_host_is_refused_and_a_removed_phone_takes_its_subscriptions(
+    own_home: Path,
+) -> None:
+    """Item 1311: Dot posts a signed push to a subscription's address, so a foreign host is refused with why, for a
+    phone's key as for the Mac's token; a phone's own subscriptions go when it is removed, and the others stay."""
+    async with _served(own_home) as (client, _, runtime):
+        first: str = await _phone_key(client)
+        second: str = await _phone_key(client)
+        mac: dict[str, str] = {"Authorization": f"Bearer {TOKEN}"}
+        phones: dict[str, str] = {"first": f"Bearer {first}", "second": f"Bearer {second}"}
+        keys: dict[str, str] = {
+            "p256dh": base64.urlsafe_b64encode(
+                ec.generate_private_key(ec.SECP256R1())
+                .public_key()
+                .public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+            ).decode("ascii"),
+            "auth": base64.urlsafe_b64encode(b"0123456789abcdef").decode("ascii"),
+        }
+
+        async def subscribe(endpoint: str, authorization: str) -> httpx.Response:
+            return await client.post(
+                "/push/subscriptions",
+                json={"endpoint": endpoint, "expirationTime": None, "keys": keys},
+                headers={"Authorization": authorization},
+            )
+
+        for who in (f"Bearer {TOKEN}", phones["first"]):
+            refused: httpx.Response = await subscribe("https://attacker.example/x", who)
+            assert refused.status_code == 422, refused.text
+            assert "attacker.example is not a push service" in refused.json()["message"]
+            assert "push_hosts" in refused.json()["message"]
+        assert await runtime.store.list_push_subscriptions() == []
+        apple: str = "https://web.push.apple.com/"
+        for endpoint, who in (
+            (apple + "mac", f"Bearer {TOKEN}"),
+            (apple + "first", phones["first"]),
+            ("https://fcm.googleapis.com/fcm/send/first-too", phones["first"]),
+            ("https://updates.push.services.mozilla.com/wpush/v2/second", phones["second"]),
+        ):
+            assert (await subscribe(endpoint, who)).status_code == 201, endpoint
+        owned: dict[str, str | None] = {s.endpoint: s.phone_id for s in await runtime.store.list_push_subscriptions()}
+        first_id: str | None = owned[apple + "first"]
+        assert first_id is not None and owned[apple + "mac"] is None
+        assert owned["https://fcm.googleapis.com/fcm/send/first-too"] == first_id
+        assert (await client.delete(f"/phone/phones/{first_id}", headers=mac)).status_code == 204
+        assert sorted(s.endpoint for s in await runtime.store.list_push_subscriptions()) == [
+            "https://updates.push.services.mozilla.com/wpush/v2/second",
+            apple + "mac",
+        ]

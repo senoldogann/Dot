@@ -2,7 +2,8 @@
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from contextlib import asynccontextmanager, suppress
 
 from dotagent.agent.sizes import ContextSizes
 from dotagent.config import AppConfig
@@ -47,6 +48,11 @@ from dotagent.opencode.server import OpenCodeServer
 from dotagent.secrets import optional_secret, require_secret
 
 log = get_logger(__name__)
+
+# How long a connector that a key change took out of service waits after its last call that the router knows of ended
+# before it is closed (item 1314): the router counts the calls it makes itself (``complete``, ``model_info``), and a
+# caller that took the connector from ``provider`` before the key changed, and keeps it for a listing, has this long.
+_RETIRED_GRACE_S: float = 30.0
 
 
 class ModelRef(FrozenModel):
@@ -197,8 +203,16 @@ class ModelRouter:
         self._pauses: dict[str, Pause] = {}
         # The names served by a connector given through `register`; `retire` leaves them alone.
         self._registered: set[str] = set()
-        # The connectors `retire` took out of service, closed with the others at `aclose`.
+        # The connectors `retire` took out of service: each is closed once the calls the router sends it have ended and
+        # a short grace is over (:meth:`_close_when_idle`), and the rest with the others at `aclose`.
         self._retired: list[ChatProvider] = []
+        # How many of the router's own calls each connector (by identity) is serving, and the tasks that close a retired
+        # connector once it is idle.
+        self._leases: dict[int, int] = {}
+        self._closers: set[asyncio.Task[None]] = set()
+        # Set by :meth:`aclose`, which closes every connector itself: a retired connector waiting out its grace stops
+        # waiting.
+        self._swept: asyncio.Event = asyncio.Event()
         # One connector is made, retired or registered at a time for each provider, and not for all of them (item 558):
         # finding a key can take seconds (a Keychain that does not answer), and holds back only the calls that wait for
         # that provider's connector, not those of a provider whose connector exists.
@@ -285,10 +299,45 @@ class ModelRouter:
             self._providers[name] = provider
             self._registered.add(name)
 
+    @asynccontextmanager
+    async def _leased(self, name: str) -> AsyncIterator[ChatProvider]:
+        """The connector of ``name`` for one call of the router's own, counted while the call lasts: a connector retired
+        meanwhile is closed after its last call ends (item 1314), not under it."""
+        provider: ChatProvider = await self.provider(name)
+        # Counted before anything can wait: a retire cannot come between the connector and its count.
+        self._leases[id(provider)] = self._leases.get(id(provider), 0) + 1
+        try:
+            yield provider
+        finally:
+            left: int = self._leases[id(provider)] - 1
+            if left > 0:
+                self._leases[id(provider)] = left
+            else:
+                del self._leases[id(provider)]
+                if provider in self._retired:
+                    self._close_when_idle(provider)
+
+    def _close_when_idle(self, provider: ChatProvider) -> None:
+        """Close the retired ``provider`` once :data:`_RETIRED_GRACE_S` have passed with no call of the router on it."""
+        task: asyncio.Task[None] = asyncio.create_task(
+            self._close_after_grace(provider, self._swept), name="retired-connector"
+        )
+        self._closers.add(task)
+        task.add_done_callback(self._closers.discard)
+
+    async def _close_after_grace(self, provider: ChatProvider, swept: asyncio.Event) -> None:
+        with suppress(TimeoutError):
+            await asyncio.wait_for(swept.wait(), _RETIRED_GRACE_S)
+        # Whoever takes it off the list closes it, so that it is closed once: this, or :meth:`aclose`.
+        if self._leases.get(id(provider), 0) == 0 and provider in self._retired:
+            self._retired.remove(provider)
+            await provider.aclose()
+
     async def retire(self, name: str) -> None:
         """Make the next request to the provider ``name`` create a new connector, with the key in use then, and end the
-        pauses of its models, which the new key may answer. The old connector is closed at ``aclose``, so a request it
-        is serving is not cut. A connector given through ``register`` stays in service."""
+        pauses of its models, which the new key may answer. The old connector is closed once the calls it is serving
+        have ended (and a short grace, for a caller that holds it outside the router's count), so a request it is
+        serving is not cut; ``aclose`` closes what is left. A connector given through ``register`` stays in service."""
         self._pauses = {
             label: pause for label, pause in self._pauses.items() if parse_model_ref(label).provider != name
         }
@@ -297,6 +346,8 @@ class ModelRouter:
                 retired: ChatProvider | None = self._providers.pop(name, None)
                 if retired is not None:
                     self._retired.append(retired)
+                    if self._leases.get(id(retired), 0) == 0:
+                        self._close_when_idle(retired)
         for listener in self._retire_listeners:
             await listener(name)
 
@@ -328,8 +379,8 @@ class ModelRouter:
             await sink(delta)
 
         try:
-            provider: ChatProvider = await self.provider(ref.provider)
-            reply: ModelReply = await provider.complete(request, timed)
+            async with self._leased(ref.provider) as provider:
+                reply: ModelReply = await provider.complete(request, timed)
         except asyncio.CancelledError:
             await self._record_failure(
                 _failed(ref, request, origin, time.monotonic() - started, _first(first), CANCELLED)
@@ -420,8 +471,8 @@ class ModelRouter:
         return address is None or await reach.reaches(address)
 
     async def model_info(self, ref: ModelRef) -> ModelInfo:
-        provider: ChatProvider = await self.provider(ref.provider)
-        return await provider.model_info(ref.model)
+        async with self._leased(ref.provider) as provider:
+            return await provider.model_info(ref.model)
 
     async def window_of(self, ref: ModelRef) -> int | None:
         """The window a call of ``ref`` made outside a run's steps asks for (``ChatRequest.window``), as a run that
@@ -434,9 +485,17 @@ class ModelRouter:
         return grown_window(info.context_length, info.own_context_length, self.context_sizes.of(ref.label))
 
     async def aclose(self) -> None:
+        """Close every connector, those retired and still waiting out their grace among them."""
         self._closings += 1
+        swept: asyncio.Event = self._swept
+        self._swept = asyncio.Event()
+        swept.set()
+        closers: list[asyncio.Task[None]] = list(self._closers)
         providers: list[ChatProvider] = [*self._providers.values(), *self._retired]
         self._providers.clear()
         self._retired.clear()
         for provider in providers:
             await provider.aclose()
+        # A retired connector a closer had already taken off the list is being closed by it: wait for that to end.
+        for closer in closers:
+            await closer

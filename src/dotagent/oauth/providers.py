@@ -15,7 +15,8 @@ type ProviderId = Literal["google", "microsoft"]
 class Provider(FrozenModel):
     """One sign-in: ``extra`` are the parameters of its authorization request besides the common ones;
     ``profile_url`` says who signed in, read with the new access token; ``revoke_url`` is where a token is given back
-    to end its grant at the provider (``None``: it has none for a client like Dot's, item 558)."""
+    to end its grant at the provider (``None``: it has none for a client like Dot's, item 558); ``permissions`` is the
+    page of the owner's account where the apps that may use it are listed and taken away (item 1312)."""
 
     id: ProviderId
     name: str
@@ -28,6 +29,7 @@ class Provider(FrozenModel):
     extra: tuple[tuple[str, str], ...]
     profile_url: str
     revoke_url: str | None
+    permissions: str
 
 
 GOOGLE: Provider = Provider(
@@ -50,6 +52,7 @@ GOOGLE: Provider = Provider(
     extra=(("access_type", "offline"), ("prompt", "consent")),
     profile_url="https://openidconnect.googleapis.com/v1/userinfo",
     revoke_url="https://oauth2.googleapis.com/revoke",
+    permissions="myaccount.google.com/permissions",
 )
 MICROSOFT: Provider = Provider(
     id="microsoft",
@@ -63,5 +66,6 @@ MICROSOFT: Provider = Provider(
     extra=(("prompt", "select_account"),),
     profile_url="https://graph.microsoft.com/v1.0/me",
     revoke_url=None,
+    permissions="account.live.com/consent/Manage",
 )
 PROVIDERS: dict[ProviderId, Provider] = {GOOGLE.id: GOOGLE, MICROSOFT.id: MICROSOFT}

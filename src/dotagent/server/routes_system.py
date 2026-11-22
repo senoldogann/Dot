@@ -59,6 +59,7 @@ from dotagent.core.errors import (
     ConfigError,
     DotError,
     ElsewhereError,
+    InvalidValueError,
     MissingSecretError,
     NotFoundError,
     OpenCodeMissing,
@@ -114,13 +115,14 @@ from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_m
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import KNOWN_PROVIDERS, WHOLE_RUN_AGENTS, ChatProvider, Effort, ModelInfo, answers_role
 from dotagent.notify.health import NotifyHealth
+from dotagent.notify.hosts import push_host_problem
 from dotagent.opencode.server import learns_from_data
 from dotagent.restart_flag import RestartFlag
 from dotagent.restart_notice import pending_restart
 from dotagent.runtime import Runtime
 from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import daemon_proof, refuse_from_a_phone
+from dotagent.server.guard import PHONE_STATE, daemon_proof, refuse_from_a_phone
 from dotagent.server.palette import palette_view
 from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_mcp import service_of
@@ -305,7 +307,7 @@ def proof_router(token: str, phones: PairedPhones) -> APIRouter:
     return router
 
 
-def system_router(ctx: ServerContext, pages: str) -> APIRouter:
+def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRouter:
     """The daemon's own routes; ``pages`` is what the pages it serves are
     (``dotagent.server.kept_pages.pages_build``)."""
     router: APIRouter = APIRouter(prefix="/api")
@@ -333,8 +335,27 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return PushKeyView(public_key=ctx.runtime.push_keys.public_key)
 
     @router.post("/push/subscriptions", status_code=201)
-    async def push_subscribe(request: PushSubscribeRequest) -> PushSubscription:
-        return await ctx.runtime.store.add_push_subscription(request.endpoint, request.keys.p256dh, request.keys.auth)
+    async def push_subscribe(request: PushSubscribeRequest, http: Request) -> PushSubscription:
+        """Keep a browser's subscription (item 1311): its endpoint must be on a push service of ``[notify] push_hosts``,
+        or Dot would post its pushes, signed, to any host the caller names. A phone's key ties the subscription to that
+        phone, so that removing the phone removes it; the installation's token ties it to none."""
+        problem: str | None = push_host_problem(request.endpoint, config.notify.push_hosts)
+        if problem is not None:
+            raise InvalidValueError(
+                f"that push address is refused: {problem}; a browser's own push service is taken, and another one is "
+                "added to [notify] push_hosts in config.toml",
+                {"endpoint": request.endpoint[:200]},
+            )
+        phone: object = getattr(http.state, PHONE_STATE, None)
+        phone_id: str | None = phone if isinstance(phone, str) else None
+        record: PushSubscription = await ctx.runtime.store.add_push_subscription(
+            request.endpoint, request.keys.p256dh, request.keys.auth, phone_id
+        )
+        # The phone may have been removed while this request was on its way: its subscription must not outlive it.
+        if phone_id is not None and all(paired.id != phone_id for paired in phones.listed()):
+            await ctx.runtime.store.delete_phone_push_subscriptions(phone_id)
+            raise NotFoundError("that phone is not paired", {})
+        return record
 
     @router.delete("/push/subscriptions", status_code=204)
     async def push_unsubscribe(endpoint: str) -> None:

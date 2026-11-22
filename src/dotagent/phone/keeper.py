@@ -20,6 +20,23 @@ log = get_logger(__name__)
 
 type Teller = Callable[[str, str], Awaitable[None]]
 
+# After a round that failed the next waits twice as long for each failure in a row, up to this, so that a daemon with
+# a phone that is gone does not ask devicectl every ``check_every_s`` for days.
+_MOST_BACKOFF_S: float = 600.0
+_BACKOFF_DOUBLINGS: int = 6
+# How much of a command's error output the log keeps: its first line.
+_STDERR_CHARS: int = 300
+
+
+def first_line(text: object) -> str | None:
+    """The first line of ``text``, cut to :data:`_STDERR_CHARS`; None when there is no text: a command's whole error
+    output stays out of the log's line (it is in the error's context)."""
+    if not isinstance(text, str):
+        return None
+    lines: list[str] = text.strip().splitlines()
+    return None if not lines else lines[0][:_STDERR_CHARS]
+
+
 # The title and the text that tell the owner of a state that needs them; a phone that is up or locked needs nothing.
 _NOTICES: dict[PhoneStateKind, tuple[str, str]] = {
     "unclear": (
@@ -89,7 +106,7 @@ async def keep_once(link: PhoneLink, tell: Teller, notify_after_s: float) -> Pho
             relaunched: bool = await link.relaunch()
         except PhoneError as error:
             # The Mac could not list or start it (devicectl failed or timed out): the owner is still told below.
-            log.warning("phone_relaunch_failed", error=str(error))
+            log.warning("phone_relaunch_failed", error=error.message, stderr=first_line(error.context.get("stderr")))
             relaunched = False
         if relaunched:
             state = await link.check()
@@ -101,17 +118,34 @@ async def keep_once(link: PhoneLink, tell: Teller, notify_after_s: float) -> Pho
     return state
 
 
+def wait_after(check_every_s: float, failed_in_a_row: int) -> float:
+    """How long the keeper waits for its next round: ``check_every_s``, doubled for each round in a row that failed, up
+    to :data:`_MOST_BACKOFF_S` (never less than ``check_every_s``)."""
+    return min(check_every_s * (1 << min(failed_in_a_row, _BACKOFF_DOUBLINGS)), max(_MOST_BACKOFF_S, check_every_s))
+
+
 async def keep_phone(
     link: PhoneLink, tell: Teller, check_every_s: float, notify_after_s: float, stopping: asyncio.Event
 ) -> None:
-    """Run :func:`keep_once` every ``check_every_s`` seconds until ``stopping`` is set. A round that fails with one of
-    Dot's own errors is logged and the next one tries again; anything else ends the loop."""
+    """Run :func:`keep_once` every ``check_every_s`` seconds until ``stopping`` is set. A round that fails is logged and
+    the next one tries again, after a longer wait for each round in a row that failed (doubling, at most
+    :data:`_MOST_BACKOFF_S`, never less than ``check_every_s``): a phone that is not reachable must not end the keeper
+    for the rest of the daemon's life (item 1313), and a fault of Dot's own (a bug, an ``OSError`` of the system) is
+    logged with its traceback, where one of Dot's own errors says its words."""
+    failed_in_a_row: int = 0
     while not stopping.is_set():
         try:
             await keep_once(link, tell, notify_after_s)
         except DotError as error:
+            failed_in_a_row += 1
             log.warning("phone_keeper_round_failed", error=str(error), error_type=type(error).__name__)
+        except Exception as error:
+            failed_in_a_row += 1
+            log.error("phone_keeper_round_crashed", error=str(error), error_type=type(error).__name__, exc_info=True)
+        else:
+            failed_in_a_row = 0
+        wait_s: float = wait_after(check_every_s, failed_in_a_row)
         try:
-            await asyncio.wait_for(stopping.wait(), check_every_s)
+            await asyncio.wait_for(stopping.wait(), wait_s)
         except TimeoutError:
             continue

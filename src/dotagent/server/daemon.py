@@ -34,6 +34,7 @@ from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.health import NotifyHealth
 from dotagent.notify.owner import tell_owner
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
+from dotagent.oauth.accounts import keep_revoking
 from dotagent.phone.keeper import keep_phone
 from dotagent.proactive.watching import watch_loop
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -312,11 +313,17 @@ async def run_daemon(config: AppConfig) -> int:
             phone: NotifyHealth = NotifyHealth()
             feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(PUSH_KINDS))
             pusher: asyncio.Task[None] = asyncio.create_task(
-                watch_pushes(runtime.store, feed, runtime.push_keys, stopping), name="push"
+                watch_pushes(runtime.store, feed, runtime.push_keys, stopping, runtime.config.notify.push_hosts),
+                name="push",
             )
             phone.mark_live("push")
             pusher.add_done_callback(functools.partial(_log_push_end, phone, "push"))
             cleanup.push_async_callback(_cancelled, pusher)
+            # A sign-out the provider did not take is asked again now and every hour for a week (item 1312).
+            revoking: asyncio.Task[None] = asyncio.create_task(
+                keep_revoking(runtime.accounts, stopping), name="sign-out-revokes"
+            )
+            cleanup.push_async_callback(_cancelled, revoking)
             # The iPhone app hears the same through APNs, and a run's Live Activity too (item 997), once a key is set.
             if apns_set(config.apns):
                 transport: HttpTransport = HttpTransport()

@@ -66,8 +66,14 @@ export function accountsCard() {
             type: "button",
             onclick: () =>
               attempt(async () => {
-                paint(await api.del(`/accounts/${provider.id}/${encodeURIComponent(account.address)}`));
-                toast("ok", `${account.address} is signed out.`);
+                const answered = await api.del(`/accounts/${provider.id}/${encodeURIComponent(account.address)}`);
+                paint(answered.providers);
+                // The sign-out always stands here; when the provider has not ended Dot's access too, the toast says where.
+                if (answered.revoked) {
+                    toast("ok", `${account.address} is signed out.`);
+                } else {
+                    toast("info", `${account.address}: ${answered.notice}`);
+                }
               }),
           },
           "Sign out",
