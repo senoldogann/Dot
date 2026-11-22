@@ -89,7 +89,6 @@ export function mount(root, ctx) {
     paint();
   });
   const head = customizeHead({
-    title: "Discover plugins",
     line: "Skills from the makers of the apps you use and from the community, each one checked by Dot before it is used. Install one and the tasks that start after can use it.",
     search,
     controls: [],

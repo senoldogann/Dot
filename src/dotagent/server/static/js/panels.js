@@ -11,9 +11,27 @@ import { attempt, detailsFold } from "./ui.js";
 const STATUS_LABEL = { blocked: "waiting", ending: "saving the end" };
 const FOLD_KEY_PREFIX = "dot.fold.";
 
+// The settings page that holds a page of its own (views/settings.js, item 1336): its head is the settings' own, so the
+// title goes to the bar's breadcrumb and the subtitle to the line under it.
+let host = null;
+
+/** Let `next.say(title, subtitle)` draw the heads of the pages mounted from now on (`pageHead`); returns what lets go. */
+export function hostPageHeads(next) {
+  host = next;
+  return () => {
+    if (host === next) {
+      host = null;
+    }
+  };
+}
+
 /** The heading of a page: a title, an optional one-line subtitle and optional controls on the right. The subtitle
  * stands behind an (i) beside the title in the bar (item 848), so that the page opens on what it holds. */
 export function pageHead(title, subtitle, actions) {
+  if (host !== null) {
+    host.say(title, subtitle);
+    return paneHead(null, actions);
+  }
   const about = subtitle === "" ? null : aboutToggle(subtitle, `About ${title}`, "grow page-sub");
   setStageTitle(el("h1", { class: "stage-h1" }, title), about?.button ?? null);
   return paneHead(about?.note ?? null, actions);

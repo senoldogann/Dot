@@ -1,6 +1,7 @@
-// The sidebar while the settings are open (item 562): Back to chats and the settings' groups of rows (item 999, as the
-// phone's sheet, after seven sections of tabs, item 845), a row one page, with what some hold (how many notes Dot keeps,
-// how many entries the Vault holds, whether a phone reaches Dot). sidebar.js
+// The sidebar while the settings are open (item 562): a search of the settings (`/` takes the focus, item 1336), the
+// settings' groups of rows (item 999, as the phone's sheet, after seven sections of tabs, item 845), a row one page with a
+// small mark, with what some hold (how many notes Dot keeps, how many entries the Vault holds, how many schedules are on,
+// whether a phone reaches Dot), and Back to chats at the foot. sidebar.js
 // shows it in the place of the chats and its pages (a Mac's window; a phone has the list of tabs for a page of its own,
 // views/settings.js). The daemon's state is the page's (shell.js): the connection, and the emergency stop's banner.
 
@@ -8,14 +9,14 @@ import { api, query } from "./api.js";
 import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { LAST_CHAT_KEY, readPref } from "./prefs.js";
-import { SETTINGS_GROUPS, TABS, tabAt } from "./settingstabs.js";
+import { matchesSearch, SETTINGS_GROUPS, settingsHref, tabAt, tabOf } from "./settingstabs.js";
 
 // The chat the owner was on last, which main.js keeps; Back to chats leads there.
 // What the phone needs asked of Tailscale is read again no sooner than this: a tab's visit should not ask it each time.
 const PHONE_FRESH_MS = 60_000;
 // The rows whose count or state the nav shows at their right (readValues); the main model's name, which ran long beside
 // Models, it shows no more (item 852), and the theme is the phone's sheet's alone.
-const NAV_VALUES = new Set(["memory", "vault", "phone"]);
+const NAV_VALUES = new Set(["memory", "vault", "phone", "schedules"]);
 
 /**
  * Build the nav. `homeHref` is where Back to chats leads when no chat was open before. `onNavigate` runs after a link is
@@ -25,42 +26,92 @@ const NAV_VALUES = new Set(["memory", "vault", "phone"]);
 export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
   const hide = el("button", { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse }, icon("panelLeft"));
   const back = el("a", { class: "settings-back", href: homeHref, onclick: onNavigate }, icon("arrowLeft"), el("span", null, "Back to chats"));
-  const values = new Map([...NAV_VALUES].map((id) => [id, el("span", { class: "settings-nav-value" })]));
-  // A row of the tab it names, by its id (the open one is marked), or of the page it names (Connect apps): its mark
-  // and its name, without the phone's line under it.
+  const values = new Map([...NAV_VALUES].map((id) => [id, el("span", { class: "snav-value" })]));
+  // A row of the page it names, by its id (the open one is marked): its small mark and its name.
   const links = new Map();
-  const groups = SETTINGS_GROUPS.map((group) =>
-    el(
+  const entries = [];
+  const groups = SETTINGS_GROUPS.map((group) => {
+    const section = el(
       "section",
-      { class: "settings-nav-group", "aria-label": group.title ?? null },
-      group.title === null ? null : el("h3", { class: "settings-nav-group-title" }, group.title),
+      { class: "snav-group", "aria-label": group.title ?? null },
+      group.title === null ? null : el("h3", { class: "snav-group-title" }, group.title),
       group.rows.map((row) => {
-        const tab = row.tab === undefined ? null : TABS.find((candidate) => candidate.id === row.tab);
+        const tab = tabOf(row.tab);
         const link = el(
           "a",
-          { class: "settings-nav-link", href: tab === null ? row.href : `#/settings/${tab.id}`, onclick: onNavigate },
-          icon(tab === null ? row.icon : tab.icon),
-          el("span", { class: "settings-nav-label" }, tab === null ? row.label : tab.label),
+          { class: "snav-link", href: settingsHref(tab.id), onclick: onNavigate },
+          icon(tab.icon),
+          el("span", { class: "snav-label" }, tab.label),
           row.value === undefined ? null : (values.get(row.value) ?? null),
         );
-        if (tab !== null) {
-          links.set(tab.id, link);
-        }
+        links.set(tab.id, link);
+        entries.push({ tab, line: row.line, link });
         return link;
       }),
-    ),
-  );
-  // The first row holds the button that hides the sidebar where the chats' head holds it (items 113 and 134), beside
-  // the traffic lights of the desktop shell (item 88); Back to chats stands at the foot of the nav, under the groups
-  // (item 852, the owner's ask: it stood at the top, item 577).
+    );
+    return { section, rows: group.rows.map((row) => links.get(row.tab)) };
+  });
+  const search = el("input", {
+    class: "snav-input",
+    type: "search",
+    autocomplete: "off",
+    spellcheck: "false",
+    placeholder: "Search",
+    "aria-label": "Search settings",
+  });
+  const empty = el("p", { class: "snav-empty", hidden: true }, "No setting matches.");
   const element = el(
     "nav",
     { class: "settings-nav", "aria-label": "Settings" },
     el("div", { class: "settings-nav-top", "data-tauri-drag-region": "" }, hide),
-    el("h2", { class: "settings-nav-title" }, "Settings"),
-    el("div", { class: "settings-nav-groups" }, groups),
+    el("label", { class: "snav-search" }, icon("search"), search, el("kbd", { class: "snav-key", "aria-hidden": "true" }, "/")),
+    el("div", { class: "snav-groups" }, groups.map((group) => group.section), empty),
     el("div", { class: "settings-nav-foot" }, back),
   );
+
+  /** Show the rows that match `search` (all of them when it is empty) and the groups that still hold one. */
+  function filter() {
+    const typed = search.value.trim();
+    let shown = 0;
+    for (const entry of entries) {
+      const match = typed === "" || matchesSearch(entry.tab, entry.line, typed);
+      entry.link.hidden = !match;
+      shown += match ? 1 : 0;
+    }
+    for (const group of groups) {
+      group.section.hidden = group.rows.every((link) => link.hidden);
+    }
+    empty.hidden = shown !== 0;
+  }
+  search.addEventListener("input", filter);
+  search.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && search.value !== "") {
+      event.preventDefault();
+      search.value = "";
+      filter();
+    } else if (event.key === "Enter") {
+      const first = entries.find((entry) => !entry.link.hidden);
+      if (first !== undefined) {
+        event.preventDefault();
+        location.hash = first.link.getAttribute("href");
+        search.value = "";
+        filter();
+        search.blur();
+        onNavigate?.();
+      }
+    }
+  });
+  // `/` takes the focus while the settings are open and no box has it.
+  function onSlash(event) {
+    const typing = event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable]") !== null;
+    if (event.key !== "/" || typing || event.metaKey || event.ctrlKey || event.altKey || element.closest("#sidebar")?.dataset.mode !== "settings") {
+      return;
+    }
+    event.preventDefault();
+    search.focus();
+    search.select();
+  }
+  document.addEventListener("keydown", onSlash);
 
   let disposed = false;
   let phoneReadAt = 0;
@@ -78,10 +129,11 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
 
   /** What the tabs hold, read from the daemon each time the nav is shown or the tab changes; one that cannot be read leaves its place empty. */
   async function readValues() {
-    const [notes, vault, phone] = await Promise.allSettled([
+    const [notes, vault, phone, schedules] = await Promise.allSettled([
       api.get(`/memories${query({ limit: 1, offset: 0 })}`),
       api.get("/vault/counts"),
       Date.now() - phoneReadAt < PHONE_FRESH_MS ? Promise.resolve(null) : api.get("/phone"),
+      api.get("/schedules"),
     ]);
     if (disposed) {
       return;
@@ -93,10 +145,14 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
       const held = vault.value.login + vault.value.card + vault.value.contact;
       setText(values.get("vault"), held === 0 ? "" : String(held));
     }
+    if (schedules.status === "fulfilled") {
+      const on = schedules.value.filter((view) => view.record.enabled).length;
+      setText(values.get("schedules"), on === 0 ? "" : String(on));
+    }
     if (phone.status === "fulfilled" && phone.value !== null) {
       phoneReadAt = Date.now();
       const reached = phone.value.tailnet.reached;
-      values.get("phone").replaceChildren(...(reached ? [el("span", { class: "settings-nav-dot", title: "A phone reaches Dot" })] : []));
+      values.get("phone").replaceChildren(...(reached ? [el("span", { class: "snav-dot", title: "A phone reaches Dot" })] : []));
     }
   }
 
@@ -116,6 +172,7 @@ export function buildSettingsNav({ homeHref, onNavigate, onCollapse }) {
     },
     dispose() {
       disposed = true;
+      document.removeEventListener("keydown", onSlash);
     },
   };
 }

@@ -4,7 +4,7 @@ A map for an agent that has to use or change the interface: each view file, what
 that hold the three pages an agent is most likely to break. `tests/unit/test_ui_map.py` fails when a view file is added
 or removed without a row here.
 
-The shell is `settings.js` (the settings sidebar and tabs); `customize.js` gathers skills, plugins and connectors; the
+The shell is `settings.js` (the settings' breadcrumb, sheet and pages; the nav in the sidebar is `settingsnav.js`); the
 home page is `runs.js`, and one run is `run.js`.
 
 ## The shell around every page (items 1327 to 1330)
@@ -51,9 +51,8 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | Campaigns | `campaigns.js` | Goals Dot keeps working on in sessions until a check confirms the outcome. |
 | Schedules | `schedules.js` | Goals once or on a cron schedule while the daemon runs. |
 | Rules | `rules.js` | What Dot may do on its own, what it asks first, and what it leaves to the owner. |
-| Settings | `settings.js` | The settings shell and its sidebar; the page is the open tab alone in a Mac window. |
+| Settings | `settings.js` | The settings shell: the breadcrumb in the bar, the page of the open tab (the nav is in the sidebar, `settingsnav.js`), and on a phone the sheet of the pages. |
 | Appearance | `appearance.js` | Colour schemes as miniatures of Dot's window. |
-| Customize | `customize.js` | The hub of what Dot works with and knows how to do. |
 | Skills | `skills.js` | Learned and built-in skills, their versions and the owner's changes. |
 | Plugins | `plugins.js` | The gallery of plugins Dot can install. |
 | Connectors | `connectors.js` | The services Dot works with and where to connect them. |

@@ -208,8 +208,12 @@ async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_a
                         await expect(watch).to_have_attribute("aria-current", "true")
                         await expect(scout).not_to_have_attribute("aria-current", "true")
                         await items.filter(has_text="All agents").click()
-                        await expect(page).to_have_url(f"{address}/#/agents")
-                        await expect(button).to_have_attribute("data-current", "")
+                        # The page of every agent is Settings › Agents since item 1336: the sidebar is the settings' nav
+                        # while it is open, with Agents its marked row, and Back to chats gives the chats' sidebar back.
+                        await expect(page).to_have_url(f"{address}/#/settings/agents")
+                        settings: Locator = page.get_by_role("navigation", name="Settings")
+                        await expect(settings.locator("[aria-current='page'] .snav-label")).to_have_text("Agents")
+                        await settings.get_by_role("link", name="Back to chats").click()
                         # An agent renamed from a page shows its new name at once, in the menu and on its chats' rows.
                         await page.evaluate(
                             "async (id) => { const { api } = await import('/js/api.js');"

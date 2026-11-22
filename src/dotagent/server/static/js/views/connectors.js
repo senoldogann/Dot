@@ -436,7 +436,6 @@ export function mount(root, ctx) {
   // Out of what paints again, so that the search keeps the focus while the tiles are drawn anew; a service's page has
   // none of it.
   const head = customizeHead({
-    title: "Connect your apps",
     line: "Dot works in the apps and services you use. Connect one once, and every task can read it and act there, asking you first for what matters.",
     search,
     controls: [tabs.element, recheck],
