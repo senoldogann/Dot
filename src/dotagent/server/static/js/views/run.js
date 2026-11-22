@@ -765,43 +765,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
   });
   // ------------------------------------------------------------------------- what a send does while the task works
-  // A message to a task at work goes into it (a steer, item 230) or after it (the chat's queue, item 148). Which one is
-  // said before the send, by a choice of two over the box: it starts from Settings › General's, holds for the page, and
-  // ⌘⇧Enter sends one message the other way, as the hint beside the choice says. The send's name is the chosen way's.
-  // Where only one way is open (a held run, a campaign's session, a run a Terminal command drives) the choice is not
-  // shown and the send names that way.
+  // A message to a task at work goes after it (the chat's queue, item 148), where a queued message can still be sent
+  // into the task at once, or into it (a steer, item 230) where Settings › General says so; ⌘⇧Enter sends one message
+  // the other way. The box shows no choice of its own: the placeholder and the send's name say
+  // which way a message goes. Where only one way is open (a held run, a campaign's session, a run a Terminal command
+  // drives) the send names that way.
   let intent = settingValue(BUSY_SEND) === "steer" ? "steer" : "queue";
-  /** @type {Record<string, HTMLButtonElement>} */
-  const intentOptions = {};
-  for (const id of ["steer", "queue"]) {
-    intentOptions[id] = el(
-      "button",
-      {
-        class: "intent-option",
-        type: "button",
-        role: "radio",
-        "aria-checked": "false",
-        tabindex: "-1",
-        title: t(id === "steer" ? "intent.steerHint" : "intent.queueHint"),
-        dataset: { intent: id },
-        onclick: () => chooseIntent(id, false),
-      },
-      t(id === "steer" ? "intent.steer" : "intent.queue"),
-    );
-  }
-  const intentGroup = el("div", { class: "intent", role: "radiogroup", "aria-label": t("intent.label") }, intentOptions.steer, intentOptions.queue);
-  // The arrows, Home and End move the choice, as a group of radio buttons does (APG); the group is one stop of Tab.
-  intentGroup.addEventListener("keydown", (event) => {
-    const moves = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"];
-    if (!moves.includes(event.key)) {
-      return;
-    }
-    event.preventDefault();
-    const next = event.key === "Home" ? "steer" : event.key === "End" ? "queue" : intent === "steer" ? "queue" : "steer";
-    chooseIntent(next, true);
-  });
-  const intentKey = el("span", { class: "intent-key", "aria-hidden": "true" });
-  const intentRow = el("div", { class: "intent-row" }, intentGroup, intentKey);
   // What a send that adds to the task leaves for the next task, said before it is sent: the choice for one message
   // (Ultrathink, Ultracode) and the picks (plugins, skills, Plan first) go with a message that starts a task. They are
   // not dropped: they wait in the box for the next message.
@@ -812,7 +781,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       class: "btn ghost sm",
       type: "button",
       onclick: () => {
-        chooseIntent("queue", false);
+        chooseIntent("queue");
         input.focus();
       },
     },
@@ -821,22 +790,19 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const intentNote = el("div", { class: "note intent-note", hidden: true }, icon("info"), intentNoteWords, queueInstead);
   // A polite status region that stays in place, so that the note is said once as it comes.
   const intentStatus = el("div", { role: "status", class: "intent-status" }, intentNote);
-  frame.head.append(intentRow, intentStatus);
+  frame.head.append(intentStatus);
 
   /** Whether a send can go either way now: into the task at work or after it. */
   function bothWays() {
     return active && !elsewhere && !holding && queueing && run.parent_run_id === null;
   }
 
-  function chooseIntent(id, focus) {
+  function chooseIntent(id) {
     intent = id;
     syncControls();
-    if (focus) {
-      intentOptions[id].focus();
-    }
   }
 
-  // The choice is painted once the run's choices it reads are made (their construction already tells of changes).
+  // The note is painted once the run's choices it reads are made (their construction already tells of changes).
   let intentLive = false;
 
   function paintIntent() {
@@ -844,16 +810,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       return;
     }
     const editing = queue.editing() !== null;
-    intentRow.hidden = !bothWays() || editing;
-    for (const [id, option] of Object.entries(intentOptions)) {
-      option.setAttribute("aria-checked", String(id === intent));
-      option.tabIndex = id === intent ? 0 : -1;
-    }
-    setText(intentKey, t(intent === "steer" ? "intent.keyQueue" : "intent.keySteer"));
     const leftForNext = choices.value().once !== null || frame.picks.count() > 0;
     intentNote.hidden = !(active && !editing && run.parent_run_id === null && steers(false) && leftForNext);
     queueInstead.hidden = !bothWays();
-    frame.head.hidden = intentRow.hidden && intentNote.hidden;
+    frame.head.hidden = intentNote.hidden;
   }
 
   // The choices of the next follow-up (item 133): the mode, the model with its reasoning,
@@ -929,7 +889,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       queue.expand();
       queue.element.scrollIntoView({ block: "nearest" });
     },
-    onStop: stopRun,
   });
   const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
   const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, frame.element, foot);
@@ -1097,8 +1056,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
 
   // Whether a message sent while the run works goes to it at once rather than into the queue (item 230): a run that a
-  // dotx command drives takes no steer and a campaign's session no queue; else the choice over the box says, which
-  // starts from Settings › General's, and `other` (⌘⇧Enter) turns it around.
+  // dotx command drives takes no steer and a campaign's session no queue; else Settings › General says, and `other`
+  // (⌘⇧Enter) turns it around.
   function steers(other) {
     if (elsewhere) {
       return false;
@@ -1274,8 +1233,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     // A messaging app's few words (item 833); what the at sign and the slash open is the box's tooltip.
     input.placeholder = active ? working : t("composer.followUp");
     keepLook();
-    // The send says what it does, in the words of the choice over the box: the same name on the button, in its tooltip
-    // and to a screen reader.
+    // The send says which way it sends: the same name on the button, in its tooltip and to a screen reader.
     const sendWord = active ? (holding ? t("intent.sendToTask") : steers(false) ? t("intent.steer") : t("intent.queue")) : t("composer.followUp");
     frame.setSendLabel(editing ? t("composer.save") : sendWord);
     paintIntent();
@@ -1308,8 +1266,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: timeline.helperStatuses(),
       queued: queue.count(),
-      // A delegated run is stopped from its pill (item 120), which stands where the composer would.
-      stoppable: run.parent_run_id === null,
     });
     // The plan's bubble goes with its part: once the run no longer works, it is not left open over nothing (item 644).
     if (capsule.plan.hidden) {

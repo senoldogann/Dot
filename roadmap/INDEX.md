@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1320](1320.md) | done | 2026-11-22 | The composer plainer: no send-way choice, no second Stop, the choices at the right |
 | [1319](1319.md) | done | 2026-11-22 | The web tools' "public only" rule is applied before the browser sends a request, and watch_video walks its link's redirects first |
 | [1318](1318.md) | done | 2026-11-22 | Small leftovers and drift in the docs after the Trader and the trading desk went |
 | [1317](1317.md) | done | 2026-11-22 | The roadmap from item 459 on has an index, and the gate keeps it current |

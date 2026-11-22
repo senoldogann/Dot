@@ -297,9 +297,12 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
                 await expect(page.locator(".toast")).to_contain_text("keeps its level")
                 await expect(box).to_have_value("")
                 await _expect_boost(dock, pill, None, "Medium")
-                # Added to the task, a choice for one message armed on the pill is said to wait before the send, not
-                # after it; the note's button sends after the task instead, and the note goes.
-                await page.get_by_role("radio", name="Add to task").click()
+                # Added to the task (Settings › General's way while a task works; the box shows no choice of its own),
+                # a choice for one message armed on the pill is said to wait before the send, not after it; the note's
+                # button sends after the task instead, and the note goes.
+                await page.evaluate("() => localStorage.setItem('dot.busySend', 'steer')")
+                await page.reload()
+                await expect(dock.locator(".btn.send")).to_have_attribute("aria-label", "Stop")
                 await pill.click()
                 await page.locator(".composer-popover .pop-option", has_text="Ultrathink").first.click()
                 await page.keyboard.press("Escape")
@@ -307,9 +310,9 @@ async def test_while_a_run_works_the_word_goes_with_a_queued_message_and_not_wit
                 await expect(note).to_be_visible()
                 await expect(note).to_contain_text("wait in the box for your next message")
                 await note.get_by_role("button", name="Send after this task instead").click()
-                after: Locator = page.get_by_role("radio", name="After this task")
-                await expect(after).to_have_attribute("aria-checked", "true")
                 await expect(note).to_be_hidden()
+                await box.fill("one more")
+                await expect(dock.locator(".btn.send")).to_have_attribute("aria-label", "After this task")
                 await page.close()
             finally:
                 await browser.close()

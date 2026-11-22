@@ -4114,9 +4114,16 @@ dialog.modal.versions-dialog {
   min-width: 0;
 }
 
-/* The mode stays at the left by the "+" button; the pills after it go to the right, by the send. */
+/* The mode stays at the left by the "+" button; the pills after it go to the right, by the microphone and the send, as
+   a coding app's model does, on a page whose box has a mode and on one whose has none alike. */
 .composer-pill[data-pill="mode"] {
   margin-inline-end: auto;
+}
+
+@media (min-width: 721px) {
+  .composer-options {
+    justify-content: flex-end;
+  }
 }
 
 /* The box as one line, as a messaging app's (item 833): the "+", the words and the microphone. The run's choices (its
@@ -4125,13 +4132,14 @@ dialog.modal.versions-dialog {
    nothing): in that mode the run asks nothing, which the box must say. The size of the chat shows once it is near
    full. A phone's box rests quieter still (item 1120, run.css): the "+", the words and the send, its choices, YOLO
    among them, on the model's pill once the words are touched. */
+/* What stays in sight of the choices (YOLO) stands at the right, where the choices come back. */
 .composer[data-quiet] .composer-options {
-  flex: none;
+  flex: 1;
 }
 
 /* The words have the box's whole width on a line of their own, and the controls the line under them (the owner's ask of
-   2026-11-19: a long message wrapped between the "+" and the send, a few words a line): the "+" and the choices at the
-   left, the microphone and the send at the right. The corners are those of a box of two lines from the start. */
+   2026-11-19: a long message wrapped between the "+" and the send, a few words a line): the "+" and the button of the
+   choices at the left, YOLO's pill, the microphone and the send at the right. The corners are those of a box of two lines from the start. */
 .composer[data-quiet] {
   border-radius: var(--radius-composer-wrapped);
 }
@@ -10547,8 +10555,7 @@ button.attach-chip {
   }
 }
 
-/* What a send does while the task works (the run's page): a choice of two over the box, the shortcut for the other way
-   beside it on a keyboard's device, and the note on what waits for the next task. */
+/* The row over the box (the run's page): the note on what waits for the next task when a message is added to it. */
 .composer-head:not([hidden]) {
   display: flex;
   flex-direction: column;
@@ -10556,69 +10563,15 @@ button.attach-chip {
   margin-bottom: var(--space-1);
 }
 
-.intent-row:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.intent {
-  display: inline-flex;
-  padding: var(--space-half);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--bg);
-}
-
-.intent-option {
-  min-height: 28px;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  cursor: pointer;
-}
-
-.intent-option[aria-checked="true"] {
-  background: var(--surface);
-  box-shadow: 0 0 0 1px var(--border-strong);
-  color: var(--text);
-  font-weight: var(--weight-label);
-}
-
-.intent-option:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.intent-key {
-  color: var(--muted);
-  font-size: var(--text-xs);
-}
-
-@media (hover: none) {
-  .intent-key {
-    display: none;
-  }
-}
-
 .intent-note {
   font-size: var(--text-xs);
 }
 
-/* A phone's box at rest is one line (item 1120): the choice comes with the line under the words once the box is used,
+/* A phone's box at rest is one line (item 1120): the note comes with the line under the words once the box is used,
    or once it holds words. */
 @media (max-width: 720px) {
   .composer[data-quiet][data-empty] > .composer-head {
     display: none;
-  }
-
-  .intent-option {
-    min-height: 32px;
   }
 }
 
@@ -11836,24 +11789,6 @@ button.attach-chip {
 .capsule-work[data-state="waiting"],
 .capsule-work[data-state="waiting"] .icon {
   color: var(--warn);
-}
-
-/* The run's Stop at the line's end: in the danger's ink, so that it reads as the one that ends the task. */
-.capsule-stop,
-.capsule-stop .icon {
-  color: var(--bad);
-}
-
-@media (hover: hover) {
-  .capsule-stop:hover {
-    background: var(--bad-weak);
-  }
-}
-
-/* While the box is empty its send is the Stop, so the line does not show a second one (item 1174); a word typed brings
-   the line's back. */
-.dock:has(> .composer[data-stop]) .capsule-stop {
-  display: none;
 }
 
 @keyframes capsule-in {
