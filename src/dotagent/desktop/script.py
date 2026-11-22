@@ -101,7 +101,7 @@ async def run_osascript(
     waits for an Automation approval the user never sees times out; one whose wait is cancelled (a stopped run, the
     tool's own timeout) is killed, so it never goes on acting on the Mac without its run. What a run's script starts
     (``do shell script``) has ``env`` too, so a run's script is given the environment its commands are: without the
-    variables that look like secrets, ``SSH_AUTH_SOCK`` among them (item 555). ``targets`` are the applications the
+    variables that look like secrets (items 555 and 1293). ``targets`` are the applications the
     script names: when it times out, the windows they show say what it may be waiting for (item 751)."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         *confinement,

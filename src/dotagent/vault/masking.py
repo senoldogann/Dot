@@ -3,15 +3,13 @@ taken out of what the browser tools of the same chat give back: a page that show
 value, an error that quotes a field. A value shorter than a few characters is left as it is: masking it would cut
 ordinary words."""
 
-import json
-import string
 from collections.abc import Iterable
-from functools import lru_cache
-from urllib.parse import quote, quote_plus, unquote
+from urllib.parse import unquote
 
 from pydantic import JsonValue
 
 from dotagent.core.errors import DotError, ForbiddenUrlError
+from dotagent.core.secret_forms import mask_values
 
 # What stands where a value was.
 MASK: str = "[filled from your vault]"
@@ -19,56 +17,13 @@ MASK: str = "[filled from your vault]"
 _MASKED_FROM_CHARS: int = 4
 # How many times over the escapes of an address are read back, for a value escaped again and again.
 _READ_BACK_TIMES: int = 3
-# What a browser leaves as it is when it writes a form's field into an address (the URL standard's form encoding).
-_FORM_KEPT: frozenset[str] = frozenset(string.ascii_letters + string.digits + "*-._")
-
-
-def _form_encoded(value: str) -> str:
-    """``value`` as a browser writes a form's field into an address: letters, digits and ``*-._`` as they are, a
-    space as ``+``, every other byte of its UTF-8 as ``%XX``."""
-    return "".join(
-        chr(byte) if chr(byte) in _FORM_KEPT else "+" if byte == 0x20 else f"%{byte:02X}"
-        for byte in value.encode("utf-8")
-    )
-
-
-# The values whose forms are kept, the most recently masked: every cookie value of every site a script ran in passes
-# through here, and session cookies change, so a cache without a bound grew for as long as the daemon ran (item 730).
-_FORMS_KEPT: int = 2048
-
-
-@lru_cache(maxsize=_FORMS_KEPT)
-def _forms(value: str) -> frozenset[str]:
-    """``value`` as a page or a script may write it back: as it is; in an address, as a form, a script's
-    ``encodeURIComponent`` and ``encodeURI``, and Python write it (``%21`` or ``!``, ``+`` or ``%20`` for a space);
-    inside a JSON string; and each of those with its runs of blanks made one space, as a line of a view is written."""
-    written: set[str] = {
-        value,
-        _form_encoded(value),
-        quote(value, safe="!~*'()"),
-        quote(value, safe="!~*'();,/?:@&=+$#"),
-        quote(value, safe=""),
-        quote(value),
-        quote_plus(value),
-        json.dumps(value)[1:-1],
-    }
-    return frozenset(written | {" ".join(form.split()) for form in written})
 
 
 def masked(text: str, values: Iterable[str], mask: str = MASK) -> str:
     """``text`` with each of ``values`` of a few characters or more replaced by ``mask`` (:data:`MASK` for a value of
-    a vault), in each of the forms a page may write it in, the longest first, so that a value inside another is masked
-    with it."""
-    forms: set[str] = {
-        form
-        for value in values
-        if len(value) >= _MASKED_FROM_CHARS
-        for form in _forms(value)
-        if len(form) >= _MASKED_FROM_CHARS
-    }
-    for form in sorted(forms, key=len, reverse=True):
-        text = text.replace(form, mask)
-    return text
+    a vault), in each of the forms a page may write it in (:func:`dotagent.core.secret_forms.forms_of`), the longest
+    first, so that a value inside another is masked with it."""
+    return mask_values(text, values, mask, _MASKED_FROM_CHARS)
 
 
 def _read_back(address: str) -> frozenset[str]:

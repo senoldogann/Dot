@@ -6,6 +6,7 @@ it did and its end adds no more than the word it was writing."""
 from collections.abc import Sequence
 from typing import Literal
 
+from dotagent.core.secret_forms import held_forms
 from dotagent.core.text import KNOWN_SECRET_MIN_CHARS, redact_known
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import DeltaSink, StreamDelta
@@ -111,6 +112,7 @@ class StreamMask:
     def __init__(self, show: DeltaSink) -> None:
         self._show: DeltaSink = show
         self._known: tuple[str, ...] = ()
+        self._forms: tuple[str, ...] = ()
         self._kind: Literal["text", "thinking"] = "text"
         self._waiting: str = ""
 
@@ -118,6 +120,7 @@ class StreamMask:
         """The stream of the next step: masked with the secrets ``known`` (:func:`dotagent.secrets.known_secrets`);
         what the last one left waiting is dropped."""
         self._known = tuple(value for value in known if len(value) >= KNOWN_SECRET_MIN_CHARS)
+        self._forms = held_forms(self._known, KNOWN_SECRET_MIN_CHARS)
         self._waiting = ""
 
     async def __call__(self, delta: StreamDelta) -> None:
@@ -140,10 +143,10 @@ class StreamMask:
             await self._show(StreamDelta(kind=self._kind, text=redact_known(rest, self._known)))
 
     def _secret_start(self, text: str) -> int:
-        """Where the longest end of ``text`` that is the start of a secret Dot holds begins; ``len(text)`` when none
-        is."""
+        """Where the longest end of ``text`` that is the start of a secret Dot holds begins, in any of the forms
+        :func:`~dotagent.core.secret_forms.forms_of` knows; ``len(text)`` when none is."""
         start: int = len(text)
-        for value in self._known:
+        for value in self._forms:
             for size in range(min(len(value) - 1, len(text)), 0, -1):
                 if text.endswith(value[:size]):
                     start = min(start, len(text) - size)

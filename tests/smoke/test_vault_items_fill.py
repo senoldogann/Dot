@@ -23,6 +23,7 @@ import threading
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote, quote_plus
 
 import pytest
@@ -1450,3 +1451,140 @@ async def test_a_login_the_owner_saved_is_never_replaced_and_a_failed_replace_gi
     assert "did not keep it" in str(failed.value)  # the fill failed after the login was replaced
     assert keychain.kept[made.id]["password"] == "dots-old-password"
     assert keychain.kept[made.id]["notes"] == "Made by Dot for a new account on 2026-11-01."
+
+
+def _logins_of(items: Sequence[VaultRecord], username: str) -> list[VaultRecord]:
+    return [item for item in items if (item.username or "").strip().lower() == username.strip().lower()]
+
+
+@pytest.mark.parametrize(
+    "spelled",
+    [
+        "shop.example.localhost:{port}",
+        "HTTPS://SHOP.Example.Localhost:{port}/login?next=/",
+        "https://www.shop.example.localhost:{port}/",
+        "http://shop.example.localhost:{port}",
+    ],
+    ids=["no-scheme", "scheme-and-host-in-capitals", "www-and-path", "other-scheme"],
+)
+async def test_a_login_the_owner_saved_under_another_spelling_of_the_site_is_found_and_not_doubled(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites, spelled: str
+) -> None:
+    """Item 1294: the vault keeps the website as the owner typed it. The page's address is ``https://host:port``, and
+    the same site written without its scheme, in capitals, with ``www.`` or a path is found by its host and port: the
+    call is refused, with replace too, and no second login is made. The username is read without case and blanks."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    mine: VaultRecord = await vault.create(
+        LoginDraft(
+            kind="login",
+            website=spelled.format(port=sites.shop.port),
+            username="  Ada@Example.COM ",
+            password=SecretStr("owners-own-password"),
+        )
+    )
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    refs: dict[str, str] = await _refs(ctx, gate, url, {"pass": "Password"})
+    with pytest.raises(ToolInputError, match="already holds a login") as plain:
+        await _call(ctx, gate, "browser_create_login", {"password": refs["pass"], "username": "ada@example.com"})
+    assert mine.id in str(plain.value)
+    with pytest.raises(ToolInputError, match="one you saved"):
+        await _call(
+            ctx,
+            gate,
+            "browser_create_login",
+            {"password": refs["pass"], "username": "ADA@example.com", "replace": True},
+        )
+    assert len(await vault.of_kind("login")) == 1 and keychain.kept[mine.id]["password"] == "owners-own-password"
+
+
+async def test_a_login_of_another_account_or_another_port_is_still_made_beside_the_owners(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 1294, the other side: only the same host and port and the same username are the same account. A login of
+    the owner's for another port of the host, or for another username on this site, leaves the call free to make its
+    own."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    await vault.create(
+        LoginDraft(
+            kind="login",
+            website=f"shop.example.localhost:{sites.shop.port + 1}",
+            username="ada@example.com",
+            password=SecretStr("another-port"),
+        )
+    )
+    await vault.create(
+        LoginDraft(
+            kind="login",
+            website=f"shop.example.localhost:{sites.shop.port}",
+            username="grace@example.com",
+            password=SecretStr("another-account"),
+        )
+    )
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    refs: dict[str, str] = await _refs(ctx, gate, url, {"pass": "Password"})
+    await _call(ctx, gate, "browser_create_login", {"password": refs["pass"], "username": "ada@example.com"})
+    made: list[VaultRecord] = [item for item in await vault.of_kind("login") if item.website == url.rsplit("/", 1)[0]]
+    assert len(made) == 1 and keychain.kept[made[0].id]["notes"].startswith("Made by Dot")
+    assert len(await vault.of_kind("login")) == 3
+
+
+async def test_every_earlier_password_of_a_replaced_login_stays_in_its_notes(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites
+) -> None:
+    """Item 1294: the notes keep the password of each sign-up that failed, not only the one before the last."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    passwords: list[str] = []
+    for replace in (False, True, True):
+        refs: dict[str, str] = await _refs(ctx, gate, url, {"pass": "Password"})
+        await _call(
+            ctx,
+            gate,
+            "browser_create_login",
+            {"password": refs["pass"], "username": "again@example.com", "replace": replace},
+        )
+        (login,) = _logins_of(await vault.of_kind("login"), "again@example.com")
+        passwords.append(keychain.kept[login.id]["password"])
+    assert len(set(passwords)) == 3
+    notes: str = keychain.kept[login.id]["notes"]
+    assert notes.startswith("Made by Dot for a new account on ")
+    # The first and the second password are both there, the oldest first; the one in force is not.
+    assert notes.index(passwords[0]) < notes.index(passwords[1]) and passwords[2] not in notes
+    assert notes.count("its earlier password:") == 2
+
+
+async def test_two_calls_for_one_account_that_start_together_make_one_login(
+    parts: tuple[Runtime, MemorySecretStore, Path], sites: _Sites, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1294: both calls pass the check of the vault before either has made its login, unless they take turns."""
+    runtime, keychain, _ = parts
+    vault: VaultItems = await _vault(runtime)
+    ctx, gate = await _context(runtime, "yolo")
+    url: str = f"https://shop.example.localhost:{sites.shop.port}/signup"
+    refs: dict[str, str] = await _refs(ctx, gate, url, {"pass": "Password"})
+    read = vault.of_kind
+
+    async def slow_read(kind: Literal["login", "card"]) -> list[VaultRecord]:
+        """The vault's answer, a moment late: the second call looks while the first has not yet made its login."""
+        found: list[VaultRecord] = await read(kind)
+        await asyncio.sleep(0.3)
+        return found
+
+    monkeypatch.setattr(vault, "of_kind", slow_read)
+    outcomes: list[ToolResult | BaseException] = await asyncio.gather(
+        _call(ctx, gate, "browser_create_login", {"password": refs["pass"], "username": "Race@example.com"}),
+        _call(ctx, gate, "browser_create_login", {"password": refs["pass"], "username": " race@EXAMPLE.com"}),
+        return_exceptions=True,
+    )
+    made: list[ToolResult] = [outcome for outcome in outcomes if isinstance(outcome, ToolResult)]
+    refused: list[BaseException] = [outcome for outcome in outcomes if not isinstance(outcome, ToolResult)]
+    assert len(made) == 1 and len(refused) == 1, outcomes
+    assert isinstance(refused[0], ToolInputError) and "already holds a login" in str(refused[0])
+    (login,) = _logins_of(await vault.of_kind("login"), "race@example.com")
+    assert keychain.kept[login.id]["notes"].startswith("Made by Dot")

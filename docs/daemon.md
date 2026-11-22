@@ -966,7 +966,7 @@ the box by both Command keys pressed together: see below.
 **Vault** (item 621, `#/settings/vault`) is where you keep the logins, cards and contact details
 you give Dot. It signs in with a login and types your contact details into pages where a form asks; a card is kept and
 shown to you, and Dot fills it into no page. A login a run made for a new account (`browser_create_login`, item 740) is
-kept here too, with the note "Made by Dot for a new account on …"; one that a sign-up failed on and was made again has its earlier password in that note (item 1290). Passwords and cards are kept in your Mac's Keychain,
+kept here too, with the note "Made by Dot for a new account on …"; one that a sign-up failed on and was made again has its earlier passwords in that note, one line each (items 1290 and 1294). Passwords and cards are kept in your Mac's Keychain,
 not in Dot's database; what Dot sees and what it cannot see is in [Safety](safety.md#safety). The page has the tabs
 **All**, **Logins**, **Cards** and **Contacts**, each with its count (two by two on a phone, item 778), a search
 (**Search the vault**: it looks in the labels, sites, usernames, nicknames, last four digits and the details of contacts

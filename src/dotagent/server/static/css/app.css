@@ -7129,24 +7129,42 @@ summary:has(> .chev)::-webkit-details-marker {
   flex: none;
 }
 
+/* A face that breathes or pulses is moved by `transform`, which lifts it above every neighbour that is not placed, whatever
+   their order: the count after the faces lay under the last one and lost its "+". Each one is placed, so that they stack
+   in the order they stand in, the count last and over the face it leans on. */
+.helpers-faces > * {
+  position: relative;
+}
+
 .helpers-faces > * + * {
   margin-left: calc(-1 * var(--space-2));
 }
 
 .helpers-faces .avatar,
 .helpers-more {
-  width: 24px;
   height: 24px;
   border-radius: 50%;
   box-shadow: 0 0 0 2px var(--bg);
 }
 
+.helpers-faces .avatar {
+  width: 24px;
+}
+
+/* The count is a pill that grows with its digits ("+12" does not spill out of a circle), and its text starts clear of
+   the face it leans on. */
 .helpers-more {
   display: inline-grid;
   place-items: center;
+  min-width: 24px;
+  padding-inline: var(--space-2) var(--space-1);
   background: var(--surface-2);
   color: var(--muted);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-xs);
+  white-space: nowrap;
+  border-radius: var(--radius-pill);
 }
 
 .helpers-main {

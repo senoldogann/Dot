@@ -19,7 +19,7 @@ from dotagent.policy.engine import decide, route_for
 from dotagent.policy.shell import assess_shell
 from dotagent.policy.types import ActionInfo, Decision, Flag
 from dotagent.store.models import Behavior, RuleRecord
-from dotagent.vault.hosts import SameOrigin, elsewhere_advice, fills_on, website_hosts
+from dotagent.vault.hosts import SameOrigin, elsewhere_advice, fills_on, same_site, website_hosts
 from dotagent.vault.masking import MASK, in_address, mask_error, masked
 
 
@@ -506,3 +506,28 @@ def test_the_probe_chrome_sends_of_every_page_is_refused_without_a_line_in_the_l
     }
     assert refused.get("chrome-extension://invalid/") in (None, "debug")
     assert refused["file:///etc/passwd"] == "info"
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "same"),
+    [
+        ("github.com", "https://github.com", True),
+        ("GitHub.com", "https://www.github.com/login?x=1", True),
+        ("https://github.com:443", "github.com", True),
+        ("shop.example.localhost:8443", "https://shop.example.localhost:8443", True),
+        ("HTTPS://SHOP.example.localhost:8443/a", "http://shop.example.localhost:8443", True),
+        ("localhost", "http://localhost", True),
+        ("shop.example.localhost:8443", "https://shop.example.localhost:8444", False),
+        ("shop.example.localhost:8443", "https://shop.example.localhost", False),
+        ("github.com", "https://gist.github.com", False),
+        ("github.com", "https://github.org", False),
+        ("not an address", "https://github.com", False),
+        ("github.com:notaport", "https://github.com", False),
+    ],
+)
+def test_two_websites_are_one_site_by_host_and_port_however_they_are_written(
+    first: str, second: str, same: bool
+) -> None:
+    """Item 1294: the vault keeps the website as its owner typed it; a login is found by its site, not its spelling."""
+    assert same_site(first, second) is same
+    assert same_site(second, first) is same
