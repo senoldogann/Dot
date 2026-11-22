@@ -1099,6 +1099,12 @@
   flex: none;
 }
 
+/* Placed, so that they stack in the order they stand in: a face that breathes is moved by `transform`, which lifts it over
+   every neighbour that is not placed, and the count after the faces lost its "+" under the last one. */
+.side-helpers > * {
+  position: relative;
+}
+
 .side-helpers > * + * {
   margin-left: calc(-1 * var(--space-1));
 }
@@ -1128,9 +1134,12 @@
 .side-helper-more {
   display: grid;
   place-items: center;
-  width: 20px;
+  min-width: 20px;
   height: 20px;
+  padding-inline: var(--space-1);
   border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   background: var(--surface-3);
   box-shadow: 0 0 0 2px var(--sidebar);
   color: var(--muted);
