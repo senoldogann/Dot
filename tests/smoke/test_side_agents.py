@@ -143,14 +143,13 @@ async def _open_sidebar(browser: Browser, address: str, width: int, scheme: Lite
     return page
 
 
-async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_to_every_agent(
+async def test_the_owners_agents_are_a_menu_beside_the_search_each_to_its_page_and_all_to_every_agent(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
-    """Item 835: the owner's agents stand as faces at the sidebar's top, as a messaging app's people: each its face
-    over its name, to its page, the open one marked; the last tile, All, leads to every agent, as the Agents row did,
-    and the row gives way to that row while the owner has no agent. Since item 855 the row holds the three that worked
-    last and All, whole in the sidebar's width (it scrolled, a face cut at the edge), each name on one line. Wide and
-    on a phone, light and dark."""
+    """Items 835 and 1327: the owner's agents stand in a menu behind the button beside the search (the faces of item 835
+    and the rows of a phone's home, item 1259, are one quiet list): each its badge, its name and the count of its
+    chats, to its page while it has no chat, the open one marked; under them All agents, New agent and Campaigns. Wide
+    and on a phone, light and dark."""
     _, address = served
     agents: dict[str, str] = {}
     async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
@@ -169,84 +168,57 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                 try:
                     for width, scheme in _SHOTS:
                         page: Page = await _open_sidebar(browser, address, width, scheme)
+                        button: Locator = page.get_by_role("button", name="Your agents", exact=True)
+                        # No face stands at the top any more, and no phone's rows: one button.
+                        await expect(page.locator(".side-agent-faces, .side-bots, nav.side-links")).to_have_count(0)
+                        await button.click()
+                        menu: Locator = page.get_by_role("dialog" if width < 860 else "menu", name="Your agents")
+                        items: Locator = menu.get_by_role("menuitem")
+                        # Dot first (item 1245), then the newest, as neither has worked yet; every entry its count.
+                        await expect(items).to_have_text(
+                            [
+                                re.compile(r"Dot\s*0$"),
+                                re.compile(r"Competitor Watch\s*0$"),
+                                re.compile(r"Scout( Two)?\s*0$"),
+                                "All agents",
+                                "New agent",
+                                "Campaigns",
+                            ]
+                        )
+                        scout: Locator = items.filter(has_text=re.compile(r"^SCScout"))
+                        await expect(scout).to_have_attribute("title", "Looks things up")
+                        await expect(menu.locator(".side-badge")).to_have_text(["DO", "CW", "SC"])
+                        await page.screenshot(
+                            path=str(tmp_path / f"agents-{width}-{scheme}.png"), animations="disabled"
+                        )
                         if width < 860:
-                            # A phone lists the agents as rows (item 1259), the page of every one at their foot.
-                            rows: Locator = page.get_by_role("navigation", name="Agents", exact=True)
-                            await expect(rows.locator(".side-run-goal")).to_have_text(
-                                ["Competitor Watch", re.compile(r"^Scout( Two)?$"), "All agents"]
-                            )
-                            await expect(rows.get_by_role("link", name="All agents")).to_have_attribute(
-                                "href", "#/agents"
-                            )
-                            await expect(page.get_by_role("navigation", name="Your agents")).to_be_hidden()
-                            await page.screenshot(
-                                path=str(tmp_path / f"faces-{width}-{scheme}.png"), animations="disabled"
-                            )
                             await page.close()
                             continue
-                        faces: Locator = page.get_by_role("navigation", name="Your agents")
-                        await expect(faces.get_by_role("link")).to_have_count(4)
-                        # Dot first (item 1245), then the newest, as neither has worked yet (item 855: the ones that
-                        # worked last first).
-                        await expect(faces.locator(".side-agent-name")).to_have_text(
-                            ["Dot", "Competitor Watch", re.compile(r"^Scout( Two)?$"), "All"]
+                        # The open page's agent is marked, and the button on the page of every agent.
+                        watch: Locator = items.filter(has_text="Competitor Watch")
+                        await watch.click()
+                        await expect(page).to_have_url(f"{address}/#/agents/{agents['Competitor Watch']}")
+                        await button.click()
+                        await expect(watch).to_have_attribute("aria-current", "true")
+                        await expect(scout).not_to_have_attribute("aria-current", "true")
+                        await items.filter(has_text="All agents").click()
+                        await expect(page).to_have_url(f"{address}/#/agents")
+                        await expect(button).to_have_attribute("data-current", "")
+                        # An agent renamed from a page shows its new name at once, in the menu and on its chats' rows.
+                        await page.evaluate(
+                            "async (id) => { const { api } = await import('/js/api.js');"
+                            " await api.put(`/agents/${id}`, { name: 'Scout Two', role: 'Looks things up',"
+                            " instructions: '', model: '', effort: null, approvals: null }); }",
+                            agents["Scout"],
                         )
-                        # The row holds every tile whole: it does not scroll, and no tile runs past its edge.
-                        assert await faces.evaluate(
-                            "row => row.scrollWidth <= row.clientWidth + 1"
-                            " && [...row.children].every((tile) => tile.getBoundingClientRect().right"
-                            " <= row.getBoundingClientRect().right + 1)"
-                        )
-                        scout: Locator = faces.get_by_role("link", name=re.compile(r"^Scout( Two)?$"))
-                        await expect(scout).to_have_attribute("href", f"#/agents/{agents['Scout']}")
-                        await expect(scout).to_have_attribute("title", re.compile(r"^Scout( Two)?: Looks things up$"))
-                        # A name takes two lines before it is cut (item 1148), its whole in the tile's name; each
-                        # tile is a finger's size and more.
-                        watch: Locator = faces.get_by_role("link", name="Competitor Watch")
-                        assert await watch.locator(".side-agent-name").evaluate(
-                            "name => getComputedStyle(name).webkitLineClamp === '2'"
-                            " && getComputedStyle(name).overflow === 'hidden'"
-                        )
-                        tile = await watch.bounding_box()
-                        assert tile is not None and tile["height"] >= 44 and tile["width"] >= 44, tile
-                        # The faces stand for the Agents row, whose way is All's.
-                        await expect(
-                            page.locator("#sidebar nav.side-links").get_by_text("Agents", exact=True)
-                        ).to_be_hidden()
-                        await expect(faces.get_by_role("link", name="All agents")).to_have_attribute("href", "#/agents")
-                        await page.screenshot(path=str(tmp_path / f"faces-{width}-{scheme}.png"), animations="disabled")
-                        if width >= 860:
-                            # The face of the agent whose page is open is marked, and All on the page of every agent.
-                            await watch.click()
-                            await expect(page).to_have_url(f"{address}/#/agents/{agents['Competitor Watch']}")
-                            await expect(watch).to_have_attribute("aria-current", "page")
-                            await expect(scout).not_to_have_attribute("aria-current", "page")
-                            await faces.get_by_role("link", name="All agents").click()
-                            await expect(page).to_have_url(f"{address}/#/agents")
-                            await expect(faces.get_by_role("link", name="All agents")).to_have_attribute(
-                                "aria-current", "page"
-                            )
-                            await expect(watch).not_to_have_attribute("aria-current", "page")
-                            # The same agents read again leave the tiles standing, the focus on one among them; an
-                            # agent renamed from a page shows its new name at once.
-                            await watch.focus()
-                            # The agents' answer awaited, then a frame for the paint, so that the look is after it.
-                            async with page.expect_response(re.compile(r"/api/agents$")):
-                                await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
-                            await page.evaluate("() => new Promise((done) => requestAnimationFrame(() => done(null)))")
-                            await expect(watch).to_be_focused()
-                            await page.evaluate(
-                                "async (id) => { const { api } = await import('/js/api.js');"
-                                " await api.put(`/agents/${id}`, { name: 'Scout Two', role: 'Looks things up',"
-                                " instructions: '', model: '', effort: null, approvals: null }); }",
-                                agents["Scout"],
-                            )
-                            await expect(faces.get_by_role("link", name="Scout Two")).to_be_visible()
+                        async with page.expect_response(re.compile(r"/api/agents$")):
+                            await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
+                        await button.click()
+                        await expect(items.filter(has_text="Scout Two")).to_be_visible()
+                        await page.keyboard.press("Escape")
                         await page.close()
-                    # An agent deleted from its page leaves the row at once; with none left, the Agents row is back.
+                    # An agent deleted from its page leaves the menu at once; Dot stays (item 1245), All agents too.
                     page = await _open_sidebar(browser, address, 1280, "light")
-                    faces = page.get_by_role("navigation", name="Your agents")
-                    await expect(faces.get_by_role("link")).to_have_count(4)
                     for agent_id in agents.values():
                         await page.evaluate(
                             "async (id) => { const { api } = await import('/js/api.js');"
@@ -254,12 +226,12 @@ async def test_the_owners_agents_are_faces_at_the_top_each_to_its_page_and_all_t
                             agent_id,
                         )
                     agents.clear()
-                    # Dot's face stays (item 1245), All goes with the agents.
-                    await expect(faces.get_by_role("link")).to_have_count(1)
-                    await expect(faces.get_by_role("link", name="All agents")).to_be_hidden()
-                    await expect(
-                        page.locator("#sidebar nav.side-links").get_by_role("link", name="Agents", exact=True)
-                    ).to_be_visible()
+                    async with page.expect_response(re.compile(r"/api/agents$")):
+                        await page.evaluate("() => window.dispatchEvent(new CustomEvent('dot:agents-changed'))")
+                    await page.get_by_role("button", name="Your agents", exact=True).click()
+                    await expect(page.get_by_role("menu", name="Your agents").get_by_role("menuitem")).to_have_text(
+                        [re.compile(r"Dot\s*0$"), "All agents", "New agent", "Campaigns"]
+                    )
                     await page.close()
                 finally:
                     await browser.close()

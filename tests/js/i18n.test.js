@@ -37,6 +37,12 @@ test("a place without its value is an error, not a blank on the screen", () => {
   assert.equal(fill("{a} and {b}", { a: 1, b: "two" }, "key"), "1 and two");
 });
 
+test("no Turkish sentence glues a suffix to a name the owner chose", () => {
+  // Dot's name is the owner's (item 420): "{name}'a" is right for "Dot" and wrong for "Nova" ("Nova'ya").
+  const glued = Object.entries(TR).filter(([, text]) => /\{name\}['’][\p{L}]/u.test(text));
+  assert.deepEqual(glued, []);
+});
+
 test("the group of chats resting past a week is not called the finished ones", () => {
   assert.equal(t("side.settled"), "Settled");
   assert.notEqual(TR["side.settled"], "Tamamlananlar", "Settled holds chats resting past a week, not finished ones");

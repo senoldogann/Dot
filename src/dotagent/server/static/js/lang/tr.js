@@ -149,6 +149,8 @@ export const TR = {
   "sidebar.yourAgents": "Ajanlarınız",
   "sidebar.agentRows": "Ajanlar",
   "sidebar.newBot": "Yeni ajan",
+  "sidebar.writeTo": "Mesaj yaz: {name}",
+  "sidebar.models": "Modeller",
   "newBot.title": "Yeni ajan",
   "newBot.name": "Ad",
   "newBot.namePlaceholder": "Ajanınıza bir ad verin",

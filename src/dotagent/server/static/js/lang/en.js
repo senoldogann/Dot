@@ -152,6 +152,8 @@ export const EN = {
   "sidebar.yourAgents": "Your agents",
   "sidebar.agentRows": "Agents",
   "sidebar.newBot": "New agent",
+  "sidebar.writeTo": "Write to {name}",
+  "sidebar.models": "Models",
   "newBot.title": "New agent",
   "newBot.name": "Name",
   "newBot.namePlaceholder": "Give your agent a name",

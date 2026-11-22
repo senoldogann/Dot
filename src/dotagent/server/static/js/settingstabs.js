@@ -35,7 +35,11 @@ export const SETTINGS_GROUPS = [
   },
   {
     title: null,
-    rows: [{ href: "#/customize/connectors", label: "Connect apps", icon: "appsGrid", line: "Apps, plugins and skills" }],
+    rows: [
+      { href: "#/customize/connectors", label: "Connect apps", icon: "appsGrid", line: "Apps, plugins and skills" },
+      // The sidebar has no Schedules icon (item 1328): the page stands here, beside the other pages the settings lead to.
+      { href: "#/schedules", label: "Schedules", icon: "calendar", line: "Goals Dot runs once or on a cron schedule" },
+    ],
   },
   {
     title: "Dot",

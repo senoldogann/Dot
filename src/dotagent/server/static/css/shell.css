@@ -220,25 +220,51 @@
   background: var(--scrim);
 }
 
+/* The head: the button that folds the sidebar away (item 113) at the left, where the top bar's opener sits while the
+   sidebar is away, so that it does not move under the pointer, and the title after it. The rest of the head is the
+   desktop shell's drag region, and a drag starts only on the element that carries it. */
 .side-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex: none;
-  padding: 12px 8px 8px 16px;
+  min-height: 48px;
+  padding: 0 var(--space-2) 0 var(--space-4);
 }
 
-/* The head holds the button that folds the sidebar away (item 113): at the left, where the top bar's opener sits while
-   the sidebar is away, so the button does not move under the pointer; and at its right the "+" of a new chat (item
-   834). The rest of the head is the desktop shell's drag region, and a drag starts only on the element that carries
-   it. */
+.side-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: var(--text-ui);
+  line-height: var(--leading-ui);
+  font-weight: var(--weight-label);
+}
+
+/* The search and the three small buttons at its right: the row at the top of the reference app's sidebar, which never scrolls. */
+.side-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.side-tools {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
 .side-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-half);
-  padding: 8px 8px 12px;
+  padding: 0 var(--space-2) var(--space-2);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -267,16 +293,6 @@
 .icon-btn .icon {
   width: 19px;
   height: 19px;
-}
-
-/* The agents' rows are a phone's list (item 1259); a wider sidebar has their faces' column. */
-.side-bots {
-  display: none;
-}
-
-/* The agents' label and rows are a phone's home's (item 1265): a wide window shows them as the column of faces above. */
-.side-group.side-agents-phone {
-  display: none;
 }
 
 /* Rows never carry muted text while they are tinted: the tint would take it below the contrast limit. */
@@ -316,21 +332,38 @@
   color: var(--muted);
 }
 
+/* The search: a field of the ink's tint, no frame, as the reference app's; the keys it answers to at its right on a Mac. */
 .side-search {
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 4px;
-  padding: 0 8px;
-  border: 1px solid var(--border-strong);
+  gap: var(--space-2);
+  min-width: 0;
+  height: 32px;
+  margin: 0;
+  padding: 0 var(--space-2);
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text-2);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--muted);
+}
+
+.side-search .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+@media (hover: hover) {
+  .side-search:hover {
+    background: color-mix(in srgb, var(--text) 9%, transparent);
+  }
 }
 
 .side-search:focus-within {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
+  color: var(--text-2);
 }
 
 .side-search:focus-within kbd {
@@ -340,19 +373,46 @@
 .side-search-input {
   flex: 1;
   min-width: 0;
-  padding: 8px 0;
+  padding: 0;
   border: 0;
   background: transparent;
+  color: var(--text);
   outline: none;
   appearance: none;
 }
 
 .side-search-input::placeholder {
-  color: var(--faint);
+  color: var(--muted);
   opacity: 1;
 }
 
-.side-links,
+/* The small buttons of the search row and of the foot (the reference app's): a line icon in the muted ink on no ground, tinted
+   under the pointer, the page's that is open stronger. They keep a finger's room on a phone (below). */
+.icon-btn.side-tool {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+}
+
+.icon-btn.side-tool .icon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (hover: hover) {
+  .icon-btn.side-tool:hover {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
+  }
+}
+
+.icon-btn.side-tool[aria-current="page"],
+.icon-btn.side-tool[data-current],
+.icon-btn.side-tool[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
 .side-group {
   display: flex;
   flex-direction: column;
@@ -582,8 +642,26 @@
 .side-list-head {
   position: absolute;
   top: var(--space-1);
-  right: 0;
+  right: var(--space-2);
   z-index: 1;
+}
+
+/* Select is a word of the label's line, not a button: small, muted, on no ground. */
+.side-list-head .btn {
+  min-height: 0;
+  padding: 0 var(--space-1);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+}
+
+@media (hover: hover) {
+  .side-list-head .btn:hover {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    color: var(--text);
+  }
 }
 
 /* While chats are being chosen, this bar stands in for the head: the count, select all and delete. */
@@ -642,124 +720,18 @@
   font-size: var(--text-sm);
 }
 
-/* The foot holds Connect apps over your account's row, which leads to the settings (item 999: as the other chat apps
-   have it, after a cog beside Connect apps, items 492 and 855), above a phone's home indicator and out of its rounded
-   corners (item 275). */
+/* The foot: four small icon buttons (the reference app's), settings, Connect apps, Watch the Mac and the models, the last at the
+   right, above a phone's home indicator and out of its rounded corners (item 275). */
 .side-foot {
   flex: none;
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  padding: 8px 8px calc(8px + var(--safe-bottom));
-}
-
-.side-foot > .side-link {
-  min-width: 0;
-}
-
-/* Your account: your initials in a round mark, then your name, one row the width of the sidebar. */
-.side-foot > .side-settings {
-  gap: var(--space-2);
-  min-height: 40px;
-}
-
-.side-account-initials {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-label);
-}
-
-.side-account-initials > .icon {
-  width: 16px;
-  height: 16px;
-}
-
-.side-account-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Connect apps (item 492), over your account's row: a pill with the plug, its words and the marks of the servers Dot is
-   connected to, each a small light tile as on Customize, a little over the one before it. */
-.side-connect {
-  display: flex;
-  flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  min-height: 36px;
-  padding: 0 var(--space-2) 0 var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  /* The sidebar's own ground (item 509). */
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-@media (hover: hover) {
-  .side-connect:hover {
-    border-color: var(--border-strong);
-    background: color-mix(in srgb, var(--text) 4%, transparent);
-  }
-}
-
-.side-connect[data-current] {
-  box-shadow: 0 1px 2px var(--shadow-ink);
-  font-weight: var(--weight-label);
-}
-
-.side-connect > .icon {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  color: var(--text-2);
-}
-
-.side-connect-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Each logo bare, on no tile and no ring, side by side (item 964, the owner's ask): the button's own ground is theirs. */
-.side-connect-marks {
-  display: flex;
-  flex: none;
   gap: var(--space-1);
+  padding: var(--space-2) var(--space-2) calc(var(--space-2) + var(--safe-bottom));
 }
 
-.side-connect-marks:empty {
-  display: none;
-}
-
-.side-connect-mark {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  color: var(--text);
-}
-
-.side-connect-mark .plugin-logo,
-.side-connect-mark .icon {
-  width: 14px;
-  height: 14px;
+.side-foot > :last-child {
+  margin-left: auto;
 }
 
 /* With the sidebar next to the page, the way back to the list of chats is in sight, so a chat's page shows no link back
@@ -774,109 +746,6 @@
     gap: 8px;
     padding: 4px 8px;
   }
-}
-
-/* Your initials are a phone's home's alone (item 991). */
-@media (min-width: 720.02px) {
-  .side-owner {
-    display: none;
-  }
-}
-
-/* The way to the agents while the owner has none of their own, under the search (item 95); with their faces at the top
-   it holds nothing and takes no room (item 855). */
-.side-links {
-  margin-top: 4px;
-}
-
-.side-links:not(:has(> :not([hidden]))) {
-  display: none;
-}
-
-/* The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name on one
-   line, the three that worked last and All, in four equal columns the sidebar holds whole (item 855: the row scrolled
-   sideways, and a face cut at the edge looked broken); never squeezed by the list under it, which scrolls. A face
-   stands on nothing, hovered or open (item 998: the tile behind it looked like a smudge between the faces); the open
-   one has its name in the text's full colour and the weight of a label. All is a round mark the size of a face. */
-.side-agent-faces {
-  display: grid;
-  flex: none;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-1);
-  padding: var(--space-1) 0 var(--space-2);
-}
-
-.side-agent-face {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-1) 0;
-  border-radius: var(--radius-control);
-  color: var(--text-2);
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-  text-decoration: none;
-}
-
-.side-agent-face[aria-current="page"] {
-  color: var(--text);
-  text-decoration: none;
-}
-
-@media (hover: hover) {
-  .side-agent-face:hover {
-    color: var(--text);
-    text-decoration: none;
-  }
-}
-
-/* The open one's name is the heavier too, so that a face hovered does not look like the open one. */
-.side-agent-face[aria-current="page"] .side-agent-name {
-  font-weight: var(--weight-label);
-}
-
-/* The dot of an agent whose conversation is unread (item 1235), at the top right of its face, ringed in the sidebar's
-   ground. */
-.side-agent-unread {
-  position: absolute;
-  top: var(--space-1);
-  right: calc(50% - 22px);
-  box-shadow: 0 0 0 2px var(--sidebar);
-}
-
-.side-agent-face .avatar,
-.side-agent-mark {
-  width: 40px;
-  height: 40px;
-}
-
-.side-agent-face .avatar[data-state="idle"] {
-  animation: none;
-}
-
-.side-agent-mark {
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-}
-
-/* A name takes two lines before it gives way (a name of two words cut to "Rekla…" on one line was not told from the
-   next); the whole name is the tile's tooltip and its name for a screen reader. */
-.side-agent-name {
-  display: -webkit-box;
-  max-width: 100%;
-  padding: 0 var(--space-half);
-  overflow: hidden;
-  line-height: var(--leading-sm);
-  text-align: center;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
 }
 
 /* What waits for you and what works stand as rows under Working (items 836 and 1326), Settled's chats as the days' are. */
@@ -1074,19 +943,16 @@
   padding: 0 8px 0 96px;
 }
 
-/* The sidebar's head of the desktop shell holds the button that folds the sidebar, Watch, Campaigns, Schedules and the
-   "+" beside the lights (item 1273): at the 36 px of the bar's buttons they needed 292 px of the sidebar's 272, and the
-   "+" stood past its edge. Its buttons are 32 px and 4 px apart after the lights' 96 px: 272 px with the 8 px at the
-   right. The buttons that stand where its fold button does, the bar's opener while the sidebar is away and the
-   settings' Hide sidebar, are 32 px too, so the button keeps its place and its size. The sidebar stays 272 px wide, as
-   the panel beside a conversation needs its room in a 1280 px window. A window as narrow as a phone keeps the phone's
-   head. */
+/* The sidebar's head of the desktop shell holds the button that folds the sidebar and the title beside the lights (item
+   1273). The buttons that stand where its fold button does, the bar's opener while the sidebar is away and the settings'
+   Hide sidebar, are 32 px too, so the button keeps its place and its size. The sidebar stays 272 px wide, as the panel
+   beside a conversation needs its room in a 1280 px window. A window as narrow as a phone keeps the phone's head. */
 @media (min-width: 721px) {
   :root[data-shell="desktop"] .side-head {
     gap: 4px;
   }
 
-  :root[data-shell="desktop"] :is(.side-head :is(.icon-btn, .side-page), .settings-nav-top .icon-btn, .side-opener) {
+  :root[data-shell="desktop"] :is(.side-head .icon-btn, .settings-nav-top .icon-btn, .side-opener) {
     width: 32px;
     height: 32px;
   }
@@ -1101,25 +967,6 @@
 }
 
 /* ---------- a phone (items 294 and 295) ---------- */
-
-/* The sidebar's title is a phone's. A new chat is a "+" at the right of the head (item 834), a round button of the foot
-   on a phone. */
-.side-title {
-  display: none;
-}
-
-/* Campaigns and Schedules, icons at the right of the head before the "+" (item 855). */
-.side-pages {
-  display: flex;
-  align-items: center;
-  margin-inline-start: auto;
-}
-
-.side-pages > [aria-current="page"] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px var(--shadow-ink);
-  color: var(--text);
-}
 
 /* A tap shows as the press each control draws (item 1079), not as the browser's grey box over it, as in an iPhone app;
    a chat's row is pressed as a row of a list is. */
@@ -1141,8 +988,7 @@
 }
 
 @media (max-width: 720px) {
-  /* The way back to the chats is the chevron alone on the page's own ground, its box a finger's (item 373); the
-     sidebar's close keeps the round surface it opens and shuts on. */
+  /* The way back to the chats is the chevron alone on the page's own ground, its box a finger's (item 373). */
   .stagebar-left > .icon-btn {
     border: 0;
     border-radius: var(--radius-control);
@@ -1150,15 +996,9 @@
     color: var(--text);
   }
 
-  .side-head > .icon-btn {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--text);
-  }
-
   /* The list of chats covers the screen on the page's own ground (item 294): it slides in from the left, as the list a
-     chat goes back to, and nothing of the page shows beside it. */
+     chat goes back to, and nothing of the page shows beside it. It is the same sidebar as a Mac's: the same head, search
+     row, rows, dock and foot, a finger's room more. */
   .shell[data-nav="drawer"] .sidebar {
     width: 100%;
     background: var(--bg);
@@ -1168,164 +1008,26 @@
     box-shadow: none;
   }
 
-  /* Its head: the close where the bar's way back stands (on a touch screen none), your initials, the pages and the "+"
-     (item 991). */
   .side-head {
-    gap: 12px;
-    padding: 8px 16px 4px 8px;
+    padding: 0 var(--space-3);
   }
 
-  /* The list is the phone's home (item 991): its head holds your initials at the left, the pages and the "+" at the
-     right, and Dot's name stands under its large face in the body rather than in the head. */
-  .side-title {
-    display: none;
+  .side-top {
+    padding: 0 var(--space-3) var(--space-2);
   }
 
-  .side-head > .side-pages {
-    margin-left: auto;
+  .side-search {
+    height: 40px;
+    padding: 0 var(--space-3);
   }
 
-  .side-owner {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 44px;
-    height: 44px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--text-2);
-    font-size: var(--text-md);
-    font-weight: var(--weight-title);
-    text-decoration: none;
+  .side-body,
+  .side-dock {
+    padding-inline: var(--space-3);
   }
 
-  .side-body {
-    padding: 8px 12px 12px;
-  }
-
-  /* The foot under the thumb: the apps in a round button beside the search, a pill (item 991). */
   .side-foot {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px calc(12px + var(--safe-bottom));
-  }
-
-  .side-foot > .side-link,
-  .side-foot > .side-connect,
-  .side-compose {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--text);
-  }
-
-  .side-foot > .side-connect {
-    min-height: 0;
-  }
-
-  .side-foot > .side-connect > .side-connect-marks {
-    display: none;
-  }
-
-  .side-foot > .side-link > span,
-  .side-foot > .side-connect > .side-connect-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .side-foot .side-search {
-    flex: 1;
-    min-width: 0;
-    height: 44px;
-    margin: 0;
-    padding: 0 16px;
-    border-color: var(--border);
-    border-radius: var(--radius-pill);
-  }
-
-  .side-foot .icon {
-    width: 20px;
-    height: 20px;
-  }
-
-  /* Settings is your initials at the top (item 991): the account's row leaves the foot, which holds the apps and the
-     search. */
-  .side-foot > .side-link.side-settings {
-    display: none;
-  }
-
-  .side-owner {
-    text-decoration: none;
-  }
-
-  @media (hover: hover) {
-    .side-owner:hover {
-      text-decoration: none;
-  
-    }
-  }
-
-  /* Under the agents' label their rows are the list itself (item 1259), as a messaging app's people: a face, the name,
-     the last words under it, Dot's own conversation first. */
-  .side-agents-phone:not([hidden]) {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .side-agents-phone > .side-label {
-    padding: 8px 8px 4px;
-  }
-
-  /* The faces' own label is a wide window's (item 1265): a phone's rows carry theirs. */
-  .side-faces-head {
-    display: none;
-  }
-
-  .side-agent-faces {
-    display: none;
-  }
-
-  /* An agent's row is fuller than a chat's (item 1259), as a messaging app's people: a large face, the name a step
-     larger, the last words under it. */
-  .side-bots:not([hidden]) {
-    display: flex;
-    flex-direction: column;
-    padding-bottom: var(--space-3);
-  }
-
-  .side-bots > .side-bot {
-    gap: var(--space-2);
-    padding: 8px var(--space-2);
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  .side-bots > .side-bot > .avatar,
-  .side-bots > .side-bot > .side-agent-mark {
-    flex: none;
-    width: 44px;
-    height: 44px;
-  }
-
-  .side-bots > .side-bot .side-run-goal {
-    font-size: var(--text-md);
-  }
-
-  .side-bots > .side-bot .side-chat-last {
-    font-size: var(--text-sm);
-    line-height: var(--leading-sm);
+    padding: var(--space-2) var(--space-3) calc(var(--space-2) + var(--safe-bottom));
   }
 }
 
@@ -1347,6 +1049,11 @@
     content: "";
     position: absolute;
     inset: -4px;
+  }
+
+  .icon-btn.side-tool {
+    width: 36px;
+    height: 36px;
   }
 
   .side-link,
@@ -1527,13 +1234,37 @@
 }
 
 /* On a touch screen of a phone's width the drawer has no X (item 888, the owner's ask): a chat chosen or a swipe to the
-   left closes it, and Dot's name stands where the X stood. A narrow window of the Mac keeps its button. */
+   left closes it, and the title stands where the X stood. A narrow window of the Mac keeps its button. */
 @media (max-width: 720px) and (pointer: coarse) {
   .side-head > .side-close {
     display: none;
   }
+}
 
-  .side-head {
-    padding-left: 16px;
-  }
+/* A menu's rows that carry more than a mark and a name (menu.js): an agent's badge for its mark, a count at the right,
+   and the choice where the owner stands now in the heavier weight. */
+.menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.menu-detail {
+  flex: none;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-item[aria-current="true"],
+.sheet-action[aria-current="true"] {
+  font-weight: var(--weight-title);
+}
+
+.menu-item > .side-badge,
+.sheet-action > .side-badge {
+  flex: none;
 }

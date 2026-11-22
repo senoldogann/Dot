@@ -1,8 +1,8 @@
-"""Connect apps (items 492 and 545) end to end: the button at the foot of the sidebar, right of Settings, wears the mark
-of the server that is ready and leads to Customize › Connectors, the page of the services Dot works with, which
-stands for it while it is open: wide and light in the desktop shell, and on a phone and dark, where it is a round
-button of its own. On the page the sections are chips, one showing its section alone and All every one; Popular stands
-up as Plugins' New & noteworthy does; the search keeps its focus and shows what it finds, each card its step in words.
+"""Connect apps (items 492, 545 and 1328) end to end: the small button at the foot of the sidebar, right of Settings,
+leads to Customize › Connectors, the page of the services Dot works with, which stands for it while it is open: wide
+and light in the desktop shell, and on a phone and dark, the same four buttons. On the page the sections are chips, one
+showing its section alone and All every one; Popular stands up as Plugins' New & noteworthy does; the search keeps
+its focus and shows what it finds, each card its step in words.
 
 The server that is ready is the MCP fixture of the tests, started on this Mac, which the test has the daemon take for
 one of Sentry's, for its mark (``service_of``): no service of the catalogue answers offline.
@@ -154,27 +154,30 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             page: Page = await _page(browser, address, 1280, "light")
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            # The button stands over your account's row, which opens the settings (item 999), level with it and in
-            # sight, and wears the mark of the server that is ready; the list of pages names Customize no more.
-            button: Locator = page.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
-            await expect(button).to_be_visible()
-            settings: FloatRect = await _box(page.locator("#sidebar .side-foot").get_by_role("link", name="Settings"))
-            at: FloatRect = await _box(button)
-            assert at["y"] + at["height"] <= settings["y"] and settings["y"] + settings["height"] <= 860, (at, settings)
-            assert abs(at["x"] - settings["x"]) <= 1, (at, settings)
-            # The pages are Agents' row (while there is no agent of one's own) and the head's icons (item 855).
-            await expect(page.locator("#sidebar nav.side-links a.side-link")).to_have_text(["Agents"])
-            heads: list[str] = await page.locator("#sidebar .side-head nav.side-pages a").evaluate_all(
-                "(links) => links.map((link) => link.getAttribute('aria-label'))"
+            # The foot holds four small icon buttons on one line (item 1328): settings, Connect apps, Watch the Mac
+            # and Models; no Schedules icon stands in the sidebar (Settings holds it), and Campaigns is in the agents'
+            # menu.
+            foot: Locator = page.locator("#sidebar .side-foot")
+            tools: Locator = foot.locator(".side-tool")
+            await expect(tools).to_have_count(4)
+            names: list[str] = await tools.evaluate_all(
+                "(tools) => tools.map((tool) => tool.getAttribute('aria-label'))"
             )
-            assert heads == ["Watch the Mac", "Campaigns", "Schedules"], heads
-            # The ready server with no logo shows none: the logo's mark first, and the services most connect first after
-            # it, four in all (item 959), each drawn inline.
-            marks: Locator = button.locator(".side-connect-mark .mark-logo")
-            await expect(marks).to_have_count(4)
-            logos: list[str] = await marks.evaluate_all("(shapes) => shapes.map((shape) => shape.dataset.logo)")
-            assert logos == [sentry.logo, "google-icon.svg", "github-icon.svg", "slack-icon.svg"], logos
-            await expect(marks.locator("svg")).to_have_count(4)
+            assert [name.split(",")[0] for name in names] == ["Settings", "Connect apps", "Watch the Mac", "Models"], (
+                names
+            )
+            button: Locator = foot.get_by_role("button", name="Connect apps")
+            await expect(button).to_be_visible()
+            settings: FloatRect = await _box(foot.get_by_role("link", name="Settings"))
+            at: FloatRect = await _box(button)
+            assert abs(at["y"] - settings["y"]) <= 1 and settings["x"] + settings["width"] <= at["x"], (at, settings)
+            await expect(page.locator("#sidebar").get_by_role("link", name="Schedules")).to_have_count(0)
+            await expect(page.locator("#sidebar").get_by_role("link", name="Campaigns")).to_have_count(0)
+            await page.get_by_role("button", name="Your agents").click()
+            await expect(
+                page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name="Campaigns")
+            ).to_be_visible()
+            await page.keyboard.press("Escape")
 
             # It opens Customize › Connectors, no dialog over the page, and stands for the page while it is open.
             await button.click()
@@ -224,21 +227,19 @@ async def test_connect_apps_leads_to_the_connectors_page_from_the_foot_of_the_si
             await search.fill("")
             wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
             assert wide <= 0, wide
-            # Back from Customize the button reads the servers that are ready again: here, the same one.
-            async with page.expect_response(lambda response: response.url.endswith("/api/mcp/servers")):
-                await page.get_by_role("link", name="Agents").click()
+            # Away from Customize the button stands for it no more.
+            await page.get_by_role("link", name="Write to Dot").click()
             await expect(button).not_to_have_attribute("data-current", "")
             await expect(button).not_to_have_attribute("aria-current", "page")
-            await expect(marks).to_have_count(4)
             assert errors == []
 
-            # On a phone: a round button at the foot of the list of chats, which opens the same page.
+            # On a phone: the same small button at the foot of the list of chats, which opens the same page.
             phone: Page = await _page(browser, address, 390, "dark")
             await phone.get_by_role("button", name="Show sidebar").first.click()
             round_button: Locator = phone.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
             await expect(round_button).to_be_visible()
             size: FloatRect = await _box(round_button)
-            assert round(size["width"]) == 44 and round(size["height"]) == 44, size
+            assert round(size["width"]) == 36 and round(size["height"]) == 36, size
             await round_button.click()
             await expect(phone).to_have_url(f"{address}/#/customize/connectors")
             await expect(phone.locator(".plugin-tile[data-plugin]").first).to_be_visible()

@@ -96,14 +96,14 @@ binds to it (`threads.agent_id`), staying its own whichever run comes last in it
 that agent alone — or, for an agent the owner chatted with before that binding existed, the newest chat of yours with
 it, whose latest run is the agent's (the daemon names it, `home`
 in `GET /api/agents` and `GET /api/agents/{id}`, not one a schedule, a watcher, Dot's initiative, a lead's work order
-or the agents' work among themselves started, nor a team's or a campaign's), its face in the
-sidebar opens that chat and is marked while it is open, and its page's box goes on in it, as the office's panel does
+or the agents' work among themselves started, nor a team's or a campaign's), its row in the
+agents' menu of the sidebar opens that chat, and its page's box goes on in it, as the office's panel does
 (item 898): to the run at work while there is one, queued or steered as Settings › General › Messages says, and the
 chat opens. Under the box, **Open your chat with Scout** leads back into it. **New chat** in the page's "…" is the one
 way to leave the conversation (item 1279: an agent has one chat, so the office's panel and the home have no such button):
 it starts the next message afresh (the way back hides until then); that chat is then the newest, and the conversation
 from there on.
-Chats deleted in the sidebar may take the conversation with them: the face and the open page then name the one left. With no chat yet, the face opens
+Chats deleted in the sidebar may take the conversation with them: the menu's row and the open page then name the one left. With no chat yet, the row opens
 the page, whose first message starts the conversation. In a chat with an agent, its name in the bar opens its page
 (item 1234), where its role, schedules and what it learned are. The box of that page has the home's Mode, Model, Reasoning and Options
 pickers (item 426), starting from the agent's own: its model, its reasoning level and its approvals, not what this

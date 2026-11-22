@@ -194,8 +194,8 @@ have space between them; a ready team the owner has already says so under its wo
 the name of a plugin is not cut by an ellipsis while there is room for it, which WebKit did to every name of two words.
 
 On a phone the settings open on one sheet (item 995, the owner's ask of 2026-11-05 for one plain sheet; before, a list
-of seven sections, items 330 and 845), which your initials at the top of the home lead to: General and Vault, then
-Connect apps, then the groups Dot (Rules, Memory, Models, AI services, Web search, Browser, Self-improvement,
+of seven sections, items 330 and 845), which Settings at the foot of the sidebar leads to (item 1328; before, your initials at the top of the home): General and
+Vault, then Connect apps and Schedules (the sidebar has no Schedules icon, so its page is a row here), then the groups Dot (Rules, Memory, Models, AI services, Web search, Browser, Self-improvement,
 Self-repair), Phones and channels (Phone, Channels) and App (Appearance, Snapshots, System), and under them the first
 steps while one is left (item 996: over the rows they came late and pushed a row from under a finger).
 A row is one tab, its name over a line that says what it holds, with what it holds at its right (the theme on screen,
@@ -210,14 +210,15 @@ home's Today strip keeps its facts to one line that fades where it runs out of r
 brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
-list of chats over the whole screen, the phone's home (item 991): your initials at its head's left open the settings
-and the **+** at its right makes a new agent (item 1259: its face and its name, then its conversation); the agents you
-worked with last stand under their label and count (item 1265, six at most), Dot's own conversation their first row
-(item 1245), a row each (item 1259): its face (44 px), its name over the last words of
-its conversation, their age and the dot of an unread one at its right, the one that talked last first, to its
-conversation (its page while it has none), its unread dot gone while that chat is open, and **All agents** under them,
-the page of every agent and team. Their conversations leave the days,
-which hold your other chats; a search finds them there too; Connect apps (item 492, a grid of tiles) and the search are at its foot, under the thumb. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
+list of chats over the whole screen, the phone's home (item 991), and the same component as a Mac's, a finger's room
+larger (item 1328, after the reference app's): the search at the top with three small buttons at its right (the agents'
+menu, a new agent (item 1259: its face and its name, then its conversation) and a message to Dot), the chats as rows of three
+lines (the agent's badge and name, the title, the last line; item 1327), the dock of **Working** and **Settled** under them
+and, at the foot under the thumb, four small buttons: Settings, Connect apps (item 492), Watch the Mac and Models. The agents
+are the menu behind the first button, not rows of faces (until item 1328, the agents you worked with last stood as rows of
+44 px faces, item 1265): each its badge, its name and how many chats it has, to its conversation (its page while it has
+none), then All agents, New agent and Campaigns. A conversation with an agent is a row among the days like any chat
+(until item 1328 the agents' conversations left the days), and a search finds it there. A chat's bar has a way back to that list, round, in its middle the face and name of whom the chat is with (item
 1101; the title and the model are in the panel's Details), and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The bar has
 no ground of its own (item 1119): its three parts are panes of glass and the conversation scrolls under them, as under

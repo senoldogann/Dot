@@ -32,8 +32,9 @@ LIGHTS_Y: float = 26.0
 LIGHTS_ROOM: float = 96.0
 # The row of the lights: the top bars' 52 px.
 LIGHTS_ROW: float = 2 * LIGHTS_Y
-# A browser's bars: the sidebar's head puts its button 12 px under the top, and the top bar's row is 48 px tall.
-_BROWSER_HEAD_Y: float = 30.0
+# A browser's bars: the sidebar's head and the top bar's row are both 48 px tall (item 1328), and so stand their buttons
+# on one line.
+_BROWSER_HEAD_Y: float = 24.0
 _BROWSER_BAR_Y: float = 24.0
 _BROWSER_LEFT: float = 16.0
 _TOLERANCE_PX: float = 1.0
@@ -189,8 +190,13 @@ async def test_in_the_desktop_shell_the_settings_keep_their_button_on_the_lights
             assert abs(await _left(hide) - head_left) <= _TOLERANCE_PX
             # Back to chats stands at the nav's foot, under the sections (item 852), clear of the lights.
             back = await nav.get_by_role("link", name="Back to chats").bounding_box()
-            last = await nav.locator(".settings-nav-link").last.bounding_box()
-            assert back is not None and last is not None and back["y"] >= last["y"] + last["height"], (back, last)
+            # The groups scroll in a box of their own above it, so that a window too short for every row (Schedules
+            # is one since item 1328) never puts a row under it: Back stands below that box.
+            groups = await nav.locator(".settings-nav-groups").bounding_box()
+            assert back is not None and groups is not None and back["y"] >= groups["y"] + groups["height"], (
+                back,
+                groups,
+            )
             await page.screenshot(path=str(tmp_path / "lights-1280-settings.png"), animations="disabled")
             # Hidden, the sidebar leaves the top bar's opener at the same place.
             await hide.click()
@@ -223,12 +229,12 @@ async def test_a_browsers_page_keeps_its_own_bars(runtime: Runtime, address: str
             await _on_line(hide, _BROWSER_HEAD_Y)
             assert abs(await _left(hide) - _BROWSER_LEFT) <= _TOLERANCE_PX
             await _on_line(page.locator(".stagebar-row"), _BROWSER_BAR_Y)
-            # No "+" of a new chat (item 1245): Dot is one conversation, which its face, first in the column, opens.
+            # No button of a new chat (item 1245): Dot is one conversation, which its entry, first in the agents' menu,
+            # opens (item 1328), and the button beside the search writes to it.
             await expect(page.locator("#sidebar").get_by_role("link", name="New chat")).to_have_count(0)
-            dot_face: Locator = page.locator("#sidebar .side-agent-faces .side-dot-face")
-            await expect(dot_face).to_be_visible()
             await page.goto(f"{address}/#/agents")
-            await dot_face.click()
+            await page.get_by_role("button", name="Your agents", exact=True).click()
+            await page.get_by_role("menu", name="Your agents").get_by_role("menuitem", name=re.compile("^Dot")).click()
             await expect(page).to_have_url(re.compile(r"#/runs$"))
             await expect(page.get_by_role("textbox", name="Goal")).to_be_focused()
             await hide.click()

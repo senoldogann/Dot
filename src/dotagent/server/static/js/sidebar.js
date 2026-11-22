@@ -1,16 +1,20 @@
-// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and the
-// schedules, what waits and what works (folded or not, as the owner left them), the chats themselves (several of them
-// can be deleted at once) and, in the foot, Connect apps (the way to Customize, item 545) and the way to the settings;
-// a run stops from its composer (item 289). A row whose run works says Working and for how long (item 122). A chat's
-// menu (item 130) pins it, names it, copies its link, starts choosing chats with it and deletes it; the pinned chats
-// come first, under Pinned.
+// The sidebar, one component on a Mac beside the page and on a phone as its drawer (items 1327 and 1328, after the reference app's):
+// a head with the title; the search with three small buttons at its right (the agents' menu, a new agent, a message to
+// Dot); the chats as rows of three lines, the pinned first and then the days; and, in a dock that keeps its place, Working
+// (what waits for the owner and what works, with a count and a fold) and Settled (the chats resting past a week, folded);
+// and, at the foot, four small buttons: the settings, Connect apps (the way to Customize, item 545), the Mac's screen live
+// and the models. A run stops from its composer (item 289). A row whose run works says Working and for how long (item
+// 122). A chat's menu (item 130) pins it, names it, copies its link, starts choosing chats with it and deletes it (several
+// can be deleted at once); the pinned chats come first, under Pinned.
 // A chat whose latest run ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark
-// read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
-// (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
+// read. Each chat stands once (item 202): a chat at work stands under Working, counting the runs it delegated (item 507),
+// and goes back among the days once it rests; a pinned one stays under Pinned, with the same count.
 // The chats a channel's messages made (item 619: the "iMessage" chat) leave the days for a section of their own at the foot
-// of the list, with a count and no mark (item 828); it folds like the Chats group does and keeps its fold, and a search
+// of the list, with a count and no mark (item 828); it folds like the other groups do and keeps its fold, and a search
 // finds its chats as it finds the others. Dot's own work does too (item 822): the chats of On its own and of the
 // schedules stand folded at the foot, so that the days hold the owner's own chats.
+// The agents are a menu (item 1328), where a column of faces and a phone's rows stood: each its badge, its name and how many
+// chats it has, to its conversation (item 1233), else its page; under them All agents, a new agent and Campaigns.
 
 import { AGENTS_CHANGED_EVENT, ApiError, api, request, SCHEDULES_CHANGED_EVENT, sharedGet, TEAMS_CHANGED_EVENT } from "./api.js";
 import { age, clip, copyText, dateTime, debounce, el, foldSearch, keepChildren, setText, workingFor } from "./dom.js";
@@ -18,14 +22,13 @@ import { serviceFailure, serviceWords } from "./errors.js";
 import { t, tCount } from "./i18n.js";
 import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
-import { actorFace, DOT_ID } from "./actors.js";
+import { DOT_ID } from "./actors.js";
 import { onAssistant } from "./assistant.js";
 import { shownOwner } from "./presence.js";
 import { dotName } from "./face.js";
 import { requestCompose } from "./shortcuts.js";
 import { PHONE } from "./layout.js";
 import { loopRhythm, nextFiring } from "./rhythm.js";
-import { markContent } from "./marks.js";
 import { closeMenu, closeMenuFrom, menuOpenedBy, openMenu, openOnHold } from "./menu.js";
 import { placeWork } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
@@ -56,11 +59,6 @@ const ACTIVITY_SECTIONS = [
 // What a chat's row says while something of it waits for the owner, ahead of what waits (item 836).
 const WAITS_WORDS = t("side.waiting");
 const DAY_LABELS = [t("side.today"), t("side.yesterday"), t("side.week"), t("side.older")];
-// Connect apps at the foot shows the logos of this many services (item 492; four since item 959, the owner's ask): the
-// ones it is connected to, the same ones while they stay connected (item 853), and while fewer are, the logos of the
-// services most connect first, in this order, as what it leads to.
-const CONNECTED_MARKS = 4;
-const OFFERED_LOGOS = ["google-icon.svg", "github-icon.svg", "slack-icon.svg", "notion-icon.svg"];
 // Where Connect apps leads (item 545): the services' tab of Customize.
 const CONNECTORS_PATH = "#/customize/connectors";
 // Which sections at the foot the owner folded, by their ids (`work`, `agents`, `reviews`, `imessage`), kept between visits; a fold of
@@ -162,11 +160,6 @@ function mark(node, current) {
     node.removeAttribute("aria-current");
   }
 }
-
-// How many of the owner's agents the row at the top shows, with All beside them (item 855).
-const SIDE_FACES = 3;
-/** How many of the agents a phone's home lists before the "All agents" row: the ones worked last, Dot's own first. */
-const SIDE_BOTS = 6;
 
 /** A badge's two letters for an agent's name: the initials of its first two words ("Code Reviewer" is CR), else its first
  * two letters ("Dot" is DO), upper case; a letter as a reader sees it, so an emoji or a letter with marks stays whole. */
@@ -534,7 +527,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const keptSections = new Map();
   const keptLabels = new Map();
   const ageTicker = setInterval(() => {
-    for (const node of [...list.querySelectorAll(".side-age"), ...botsNav.querySelectorAll(".side-age")]) {
+    for (const node of element.querySelectorAll(".side-age")) {
       setText(node, age(Number(node.dataset.ts)));
     }
   }, AGE_REFRESH_MS);
@@ -597,70 +590,82 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // Working's label folds what works; what waits for the owner is never folded out of sight.
   const workingCount = el("span", { class: "side-label-count" });
   const workingLabel = foldLabel("h3", false, () => toggleFold(DOCK_KEY), `${t("side.working")} `, workingCount);
-  const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, t("side.agents")));
-  // Campaigns and Schedules are icons in the head, beside the "+" (item 855, the owner's ask: two rows of their own
-  // before the chats).
-  const campaignsLink = el("a", { class: "icon-btn side-page", href: "#/campaigns", title: t("sidebar.campaigns"), "aria-label": t("sidebar.campaigns"), onclick: onNavigate }, icon("target"));
-  // Settings is your account's row at the foot, under Connect apps, on a Mac (item 999, as the other chat apps have it):
-  // your initials and your name; on a phone your initials at the head (item 991). Its name for a reader of the screen
-  // holds the name it shows (WCAG 2.5.3).
-  const accountInitials = el("span", { class: "side-account-initials", "aria-hidden": "true" });
-  const accountName = el("span", { class: "side-account-name" });
-  const settingsLink = el(
-    "a",
-    { class: "side-link side-settings", href: "#/settings", title: t("sidebar.settings"), onclick: onNavigate },
-    accountInitials,
-    accountName,
+  // The search, with the three small buttons at its right (the row at the top of the reference app's sidebar): the agents, a new
+  // agent and a new chat. One box on a Mac and on a phone: the drawer is this sidebar.
+  const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
+  // A tool of the rows at the head and the foot: an icon button that leads to a page, marked while that page is open.
+  const pageTool = (href, label, name, extra = "") =>
+    el("a", { class: `icon-btn side-tool ${extra}`.trim(), href, title: label, "aria-label": label, onclick: onNavigate }, icon(name));
+  // The agents: a menu of the owner's agents, each with its chats' count, to its conversation (item 1233), where a message
+  // to it goes on, else to its page; All agents, a new agent and Campaigns under them. It stands where a column of the
+  // agents' faces stood (item 835): faces made a toy of the list, and the agents are few.
+  const agentsButton = el(
+    "button",
+    {
+      class: "icon-btn side-tool side-agents-button",
+      type: "button",
+      title: t("sidebar.yourAgents"),
+      "aria-label": t("sidebar.yourAgents"),
+      "aria-haspopup": "menu",
+      "aria-expanded": "false",
+      onclick: () => void openAgentsMenu(),
+    },
+    icon("users"),
   );
-  const schedulesLink = el("a", { class: "icon-btn side-page", href: "#/schedules", title: t("sidebar.schedules"), "aria-label": t("sidebar.schedules"), onclick: onNavigate }, icon("calendar"));
-  // The Mac's screen, live (item 1264): at any moment, whether a task works or not.
-  const watchLink = el("a", { class: "icon-btn side-page", href: "#/watch", title: t("sidebar.watch"), "aria-label": t("sidebar.watch"), onclick: onNavigate }, icon("monitor"));
-  // The owner's agents as faces at the top (item 835), as a messaging app's people: each its face over its name, to its
-  // conversation (item 1233), where a message to it goes on, else to its page; the three that worked last (item 855: the row scrolled and cut a face), and its
-  // last tile, All, is the page of every agent and team, which the Agents row is while the owner has no agent of their
-  // own. A list that did not load leaves the row as it was.
-  const facesNav = el("nav", { class: "side-agent-faces", "aria-label": t("sidebar.yourAgents"), hidden: true });
-  // On a phone the agents are the list itself (item 1259), as a messaging app's people: a row each, its face, its name
-  // over the last words of its conversation, at its right their age and the dot of an unread one, the one that talked
-  // last first. Their conversations then leave the days, which hold the other chats. The faces' column is the desktop's.
-  // Its last row is All agents, the page of every agent and team, as the faces' last tile is.
-  const botsNav = el("nav", { class: "side-bots", "aria-label": t("sidebar.agentRows"), hidden: true });
-  // Dot's own conversation is the agents' first row on a phone (item 1245), under the label that says what they are
-  // (item 1265): one shape for every conversation, never a face larger than the others.
-  const botsCount = el("span", { class: "side-label-count" }, "");
-  const botsHead = el("h3", { class: "side-label" }, t("sidebar.agentRows"), botsCount);
-  const botsSection = el("section", { class: "side-group side-agents-phone", hidden: true }, botsHead, botsNav);
-  // A wide window's column of faces says what it holds too (item 1265), as a phone's rows do.
-  const facesCount = el("span", { class: "side-label-count" }, "");
-  const facesHead = el("h3", { class: "side-label side-faces-head" }, t("sidebar.agentRows"), facesCount);
-  const botLinks = new Map();
-  const allRow = el(
-    "a",
-    { class: "side-run side-bot side-bot-all", href: "#/agents", "aria-label": t("sidebar.allAgents"), onclick: onNavigate },
-    el("span", { class: "side-agent-mark", "aria-hidden": "true" }, icon("users")),
-    el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal" }, t("sidebar.allAgents"))),
+  // A new agent: its name and its look, then its conversation. Dot itself stays one conversation. Its dialog is loaded
+  // when asked for, as the page's first paint needs none of it.
+  const newBot = el(
+    "button",
+    { class: "icon-btn side-tool side-new-agent", type: "button", title: t("sidebar.newBot"), "aria-label": t("sidebar.newBot"), onclick: () => void attempt(openNewBotDialog) },
+    icon("plus"),
   );
-  // What the rows show, as last drawn: the same agents read again leave them standing, the focus on one among them.
-  let botsDrawn = null;
-  // The chats that are an agent's conversation (item 1233), which a phone's list shows as the agent's row.
-  let agentHomes = new Set();
-  const allAgents = el(
+  async function openNewBotDialog() {
+    const { openNewBot } = await import("./newbot.js");
+    await openNewBot();
+  }
+  // A message to Dot: the home, with the cursor in its box; it goes on in Dot's one conversation (item 1279).
+  const composeButton = el(
     "a",
-    { class: "side-agent-face side-agent-all", href: "#/agents", title: t("sidebar.allAgents"), "aria-label": t("sidebar.allAgents"), onclick: onNavigate },
-    el("span", { class: "side-agent-mark" }, icon("users")),
-    el("span", { class: "side-agent-name", "aria-hidden": "true" }, t("sidebar.all")),
+    {
+      class: "icon-btn side-tool side-compose",
+      href: homeHref,
+      title: t("sidebar.writeTo", { name: dotName() }),
+      "aria-label": t("sidebar.writeTo", { name: dotName() }),
+      onclick: () => {
+        onNavigate();
+        requestCompose();
+      },
+    },
+    icon("squarePen"),
   );
-  const faceLinks = new Map();
-  // Each face's agent's home chat (item 1233), as the agents were last read: the chat its face opens.
+  const top = el("div", { class: "side-top" }, searchBox, el("div", { class: "side-tools" }, agentsButton, newBot, composeButton));
+  // The foot: four small icon buttons (the reference app's), the settings with the owner's name for a screen reader, Connect apps
+  // (items 492 and 545, the way to Customize › Connectors), the Mac's screen live (item 1264) and the models.
+  const settingsLink = pageTool("#/settings", t("sidebar.settings"), "settings", "side-settings");
+  const watchLink = pageTool("#/watch", t("sidebar.watch"), "monitor");
+  const modelsLink = pageTool("#/settings/models", t("sidebar.models"), "layers");
+  const connectButton = el(
+    "button",
+    {
+      class: "icon-btn side-tool side-connect",
+      type: "button",
+      title: t("sidebar.connectApps"),
+      "aria-label": t("sidebar.connectApps"),
+      onclick: () => {
+        location.hash = CONNECTORS_PATH;
+      },
+    },
+    icon("plug"),
+  );
+  const foot = el("div", { class: "side-foot" }, settingsLink, connectButton, watchLink, modelsLink);
   const homes = new Map();
+  // The owner's agents as `GET /agents` last gave them, Dot first and the others the conversation that moved last first.
+  let agentList = [];
   let facesTicket = 0;
   let agentsNamed = null;
-  // What the tiles show, as last drawn: the same agents read again leave them standing, so that the focus or the
-  // pointer on one stays (the pre-push review).
-  let facesDrawn = null;
   function paintFaces(found) {
-    // Each row names its agent: a name that came or changed paints the list again.
-    const named = JSON.stringify(found.map(({ record }) => [record.id, record.name]));
+    // Each row names its agent: a name that came or changed is said in the rows already drawn.
+    const named = JSON.stringify([dotName(), ...found.map(({ record }) => [record.id, record.name])]);
     if (named !== agentsNamed) {
       agentsNamed = named;
       agentNames.clear();
@@ -669,141 +674,73 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       }
       relabel();
     }
-    const dot = found.find(({ record }) => record.id === DOT_ID);
-    // As many as the sidebar holds whole beside All (item 855: the row scrolled, and a face cut at its edge looked
-    // broken): the agents that worked last first.
-    const worked = (summary) => summary.latest?.created_at ?? summary.record.created_at;
-    // Dot is one conversation as its agents are (item 1245): its face leads the column, to its home chat, and takes
-    // one of the places the agents had.
-    const agentsOwn = found.filter(({ record }) => record.id !== DOT_ID);
-    const mine = [
-      ...(dot === undefined ? [] : [dot]),
-      ...agentsOwn.sort((one, other) => worked(other) - worked(one)).slice(0, SIDE_FACES - 1),
-    ];
-    homes.clear();
-    for (const { record, home } of mine) {
-      homes.set(record.id, home ?? null);
-    }
-    // A face works while the agent's newest run does, and has the dot of an unread chat while its conversation is
-    // unread (item 1235), as a messaging app marks who wrote: Grok Bot's column of faces does.
-    const working = (summary) => summary.latest !== null && WORKING.has(summary.latest.status);
-    const unread = (summary) => summary.home?.unread === true;
-    const drawn = JSON.stringify([dotName(), ...mine.map((summary) => [summary.record.id, summary.record.name, summary.record.role, summary.record.look, working(summary), unread(summary)])]);
-    if (drawn !== facesDrawn) {
-      facesDrawn = drawn;
-      faceLinks.clear();
-      for (const summary of mine) {
-        const { record } = summary;
-        const isDot = record.id === DOT_ID;
-        const name = isDot ? dotName() : record.name;
-        faceLinks.set(
-          record.id,
-          el(
-            "a",
-            {
-              class: isDot ? "side-agent-face side-dot-face" : "side-agent-face",
-              href: isDot ? homeHref : `#/agents/${record.id}`,
-              title: record.role === "" || isDot ? name : `${name}: ${record.role}`,
-              "aria-label": name,
-              onclick: onNavigate,
-            },
-            actorFace(record.id, working(summary) ? "working" : "idle", record.look),
-            el("span", { class: "side-agent-name", "aria-hidden": "true" }, name),
-            unread(summary) ? el("span", { class: "side-unread side-agent-unread" }) : null,
-          ),
-        );
-      }
-      facesNav.replaceChildren(...faceLinks.values(), allAgents);
-    }
-    // The faces are a wide window's (item 855): a phone lists the agents as rows under their label, Dot's first.
-    facesNav.dataset.agents = String(agentsOwn.length);
-    facesNav.hidden = mine.length === 0;
-    facesHead.hidden = mine.length === 0;
-    facesCount.textContent = ` ${agentsOwn.length + (dot === undefined ? 0 : 1)}`;
-    paintBots(agentsOwn, working, unread, dot);
-    agentsLink.hidden = agentsOwn.length > 0;
-    allAgents.hidden = agentsOwn.length === 0;
-    markFaces();
-  }
-  /** The agents' rows of a phone's list (item 1259), the one whose conversation moved last first, Dot's leading. */
-  function paintBots(agentsOwn, working, unread, dot) {
     const lastAt = (summary) => summary.home?.updated_at ?? summary.latest?.created_at ?? summary.record.created_at;
-    const sorted = [...agentsOwn].sort((one, other) => lastAt(other) - lastAt(one));
-    // Every agent's conversation, beside those of the faces `paintFaces` put there: its row is marked while it is open.
-    for (const { record, home } of agentsOwn) {
+    const dot = found.find(({ record }) => record.id === DOT_ID);
+    const others = found.filter(({ record }) => record.id !== DOT_ID).sort((one, other) => lastAt(other) - lastAt(one));
+    agentList = dot === undefined ? others : [dot, ...others];
+    homes.clear();
+    for (const { record, home } of agentList) {
       homes.set(record.id, home ?? null);
     }
-    const rows = dot === undefined ? sorted : [dot, ...sorted];
-    const nameOf = (summary) => (summary.record.id === DOT_ID ? dotName() : summary.record.name);
-    // The home keeps the agents worked last, Dot's first, and the "All agents" row for the rest (item 1265): a phone's
-    // home is the list of chats, and thirty rows of every agent would bury it.
-    const shown = rows.slice(0, SIDE_BOTS);
-    const drawn = JSON.stringify(
-      shown.map((summary) => [summary.record.id, nameOf(summary), summary.record.role, summary.record.look, summary.home, lastAt(summary) || null, working(summary), unread(summary)]),
-    );
-    if (drawn !== botsDrawn) {
-      botsDrawn = drawn;
-      botLinks.clear();
-      for (const summary of shown) {
-        botLinks.set(summary.record.id, botRow(summary, nameOf(summary), lastAt(summary) || null, working(summary), unread(summary)));
-      }
-      botsNav.replaceChildren(...botLinks.values(), allRow);
+    markAgents();
+  }
+  /** The chats an agent's runs answered last, as the chats listed hold them: Dot's are those of no agent. */
+  function chatsOf(id) {
+    return (chats ?? []).filter((chat) => (id === DOT_ID ? (chat.actor_id ?? DOT_ID) === DOT_ID : chat.actor_id === id)).length;
+  }
+  /** Where an agent's entry leads: its conversation, else its page, whose box starts the first chat with it (Dot's is the home). */
+  function goToAgent(record, home) {
+    if (home !== null && home !== undefined) {
+      location.hash = `#/runs/${home.latest_run_id}`;
+    } else {
+      location.hash = record.id === DOT_ID ? homeHref : `#/agents/${record.id}`;
     }
-    botsNav.hidden = shown.length === 0;
-    botsSection.hidden = shown.length === 0;
-    botsCount.textContent = ` ${rows.length}`;
-    // Dot's own conversation is a row above now, so the days' list leaves it out too (item 1265).
-    const now = new Set([
-      ...(dot?.home === null || dot?.home === undefined ? [] : [dot.home.id]),
-      ...agentsOwn.flatMap(({ home }) => (home === null || home === undefined ? [] : [home.id])),
-    ]);
-    if ([...now].join() !== [...agentHomes].join()) {
-      agentHomes = now;
-      paintLists();
+    onNavigate();
+    // Dot's own entry starts its box (item 1265), as its row did.
+    if (record.id === DOT_ID && (home === null || home === undefined)) {
+      requestCompose();
     }
   }
-
-  /** An agent's row: to its conversation, else to its page, whose box starts one. */
-  function botRow(summary, name, at, isWorking, isUnread) {
-    const { record, home } = summary;
-    const words = home === null || home === undefined ? "" : serviceWords(home.last_message ?? "").text;
-    const last = words === "" ? record.role : home.last_role === "user" ? t("side.you", { words }) : words;
-    return el(
-      "a",
-      {
-        class: "side-run side-bot",
-        // Dot's own conversation has no page of its own (item 1245): its row goes home while it has none.
-        href:
-          home === null || home === undefined
-            ? record.id === DOT_ID
-              ? homeHref
-              : `#/agents/${record.id}`
-            : `#/runs/${home.latest_run_id}`,
-        "aria-label": isUnread ? `${name} (${t("side.unread")})` : name,
-        dataset: { name },
-        // As Dot's large face did (item 991): its own row starts its box (item 1265); every other row opens its
-        // conversation, or its page while it has none.
-        onclick: record.id === DOT_ID ? () => {
-          requestCompose();
-          onNavigate();
-        } : onNavigate,
-      },
-      actorFace(record.id, isWorking ? "working" : "idle", record.look),
-      el(
-        "span",
-        { class: "side-chat-text" },
-        el("span", { class: "side-run-goal" }, name),
-        last === "" ? null : el("span", { class: "side-chat-last" }, el("span", { class: "side-chat-words" }, clip(last, 120))),
-      ),
-      el(
-        "span",
-        { class: "side-chat-meta" },
-        at === null || at === undefined || at === 0
-          ? null
-          : el("span", { class: "side-age", "data-ts": String(at), title: dateTime(at) }, age(at)),
-        isUnread ? el("span", { class: "side-unread" }) : null,
-      ),
-    );
+  function openPage(hash) {
+    location.hash = hash;
+    onNavigate();
+  }
+  async function openAgentsMenu() {
+    if (menuOpenedBy(agentsButton)) {
+      closeMenu();
+      return;
+    }
+    // The agents are read again as the menu opens, so that an entry leads to the conversation as it is now: a chat that
+    // began, or went, since the page last read them is not the one it names; a press before the first reading waits
+    // for it rather than showing none.
+    await agentsRead;
+    await loadFaces();
+    if (menuOpenedBy(agentsButton)) {
+      return;
+    }
+    const open = /^#\/agents\/([A-Za-z0-9_-]+)$/.exec(location.hash)?.[1] ?? null;
+    /** @type {Array<import("./menu.js").MenuEntry>} */
+    const items = [
+      ...agentList.map(({ record, home }) => {
+        const name = record.id === DOT_ID ? dotName() : record.name;
+        const reading = routeTab === "runs" && home !== null && home !== undefined && home.id === routeThreadId;
+        return {
+          label: name,
+          mark: el("span", { class: "side-badge", "aria-hidden": "true" }, badgeCode(name)),
+          detail: String(chatsOf(record.id)),
+          current: reading || (routeTab === "agents" && record.id === open),
+          title: record.role === "" || record.id === DOT_ID ? undefined : record.role,
+          run: () => goToAgent(record, home),
+        };
+      }),
+      "separator",
+      { label: t("sidebar.allAgents"), icon: "users", run: () => openPage("#/agents") },
+      { label: t("sidebar.newBot"), icon: "plus", run: () => void attempt(openNewBotDialog) },
+      "separator",
+      { label: t("sidebar.campaigns"), icon: "target", run: () => openPage("#/campaigns") },
+    ];
+    const box = agentsButton.getBoundingClientRect();
+    openMenu({ label: t("sidebar.yourAgents"), items, at: { x: box.left, y: box.bottom + 4 }, back: agentsButton, button: agentsButton });
   }
 
   async function loadFaces() {
@@ -812,50 +749,16 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     try {
       found = await sharedGet("/agents");
     } catch (error) {
-      console.warn("the agents could not be read for their faces in the sidebar", error);
+      console.warn("the agents could not be read for the sidebar", error);
       return;
     }
     if (!disposed && mine === facesTicket) {
       paintFaces(found);
     }
   }
-  // The face of the agent whose page is open is marked as a row of the list is, and All on the page of every agent.
-  // An agent's face opens its conversation (item 1233): its home chat, which the daemon names however many chats are
-  // newer, else its page, whose box starts the first chat with it. The face is marked on its page and in its home chat,
-  // as a messaging app marks whom you are talking to.
-  function markFaces() {
-    const open = /^#\/agents\/([A-Za-z0-9_-]+)$/.exec(location.hash)?.[1] ?? null;
-    for (const [id, link] of faceLinks) {
-      const home = homes.get(id) ?? null;
-      const page = id === DOT_ID ? homeHref : `#/agents/${id}`;
-      link.setAttribute("href", home === null ? page : `#/runs/${home.latest_run_id}`);
-      const reading = routeTab === "runs" && home !== null && home.id === routeThreadId;
-      const onHome = id === DOT_ID && routeTab === "runs" && routeRunId === null && routeThreadId === null;
-      mark(link, (routeTab === "agents" && id === open) || reading || onHome);
-      // The dot of its unread conversation (item 1235), but not while that chat is on the page, being read.
-      const dot = link.querySelector(".side-agent-unread");
-      if (dot instanceof HTMLElement) {
-        dot.hidden = reading;
-      }
-      const name = link.querySelector(".side-agent-name")?.textContent ?? "";
-      link.setAttribute("aria-label", dot !== null && !reading ? `${name} (${t("side.unread")})` : name);
-    }
-    mark(allAgents, routeTab === "agents" && (open === null || !faceLinks.has(open)));
-    for (const [id, row] of botLinks) {
-      const home = homes.get(id) ?? null;
-      const reading = routeTab === "runs" && home !== null && home.id === routeThreadId;
-      // Dot's row stands for its conversation, the home before there is one (item 1245): marked there too.
-      const onHome = id === DOT_ID && routeTab === "runs" && routeRunId === null && routeThreadId === null;
-      mark(row, (routeTab === "agents" && id === open) || reading || onHome);
-      // The dot of its unread conversation, but not while that chat is on the page, as a face's (item 1235).
-      const dot = row.querySelector(".side-unread");
-      if (dot instanceof HTMLElement) {
-        dot.hidden = reading;
-      }
-      const name = row.dataset.name ?? "";
-      row.setAttribute("aria-label", dot !== null && !reading ? `${name} (${t("side.unread")})` : name);
-    }
-    mark(allRow, routeTab === "agents" && (open === null || !botLinks.has(open)));
+  // The agents' button is marked on the pages of the agents, and the foot's tools on theirs.
+  function markAgents() {
+    agentsButton.toggleAttribute("data-current", routeTab === "agents");
   }
 
   // The rows the arrow keys walk and the search's Enter opens, in order: what waits (during a search, the chats among it
@@ -888,7 +791,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const [id, node] of rowNodes) {
       mark(node, id === routeThreadId);
     }
-    markFaces();
+    markAgents();
     const active = rowNodes.get(routeThreadId);
     if (active !== undefined && routeThreadId !== revealedThreadId) {
       revealedThreadId = routeThreadId;
@@ -912,16 +815,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     }
     chats = chats.map((chat) => (chat.id === open.id ? { ...chat, unread: false } : chat));
     paintLists();
-    // The face whose conversation it is loses its dot too (item 1235).
+    // The agent whose conversation it is reads it as read too (item 1235).
     for (const [id, home] of homes) {
-      const link = faceLinks.get(id);
       if (home?.id === open.id) {
         homes.set(id, { ...home, unread: false });
-        link?.querySelector(".side-agent-unread")?.remove();
-        botLinks.get(id)?.querySelector(".side-unread")?.remove();
       }
     }
-    markFaces();
     api.patch(`/threads/${open.id}`, { seen: true }).catch((error) => console.warn("the open chat could not be marked seen", error));
   }
 
@@ -1078,7 +977,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     const shown = shownChats();
     // The chats of the channels stand at the foot, in a section of their own each (item 619); the others among the days.
     const channelChats = shown.filter((chat) => channelOf(chat) !== null);
-    const own = shown.filter((chat) => channelOf(chat) === null && !(PHONE.matches && needle === "" && agentHomes.has(chat.id)));
+    const own = shown.filter((chat) => channelOf(chat) === null);
     const { groups, settled } = groupChats(own, new Date());
     const ids = paintChannels(channelChats);
     ids.push(...paintSettled(settled));
@@ -1743,132 +1642,31 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
 
   paintLists();
   load();
-  loadFaces();
+  const agentsRead = loadFaces();
 
-  // On a phone the sidebar is the list of chats over the whole screen (item 294), the phone's home (item 991): your
-  // initials at its head, the agents' rows under their label (item 1265), the apps and the search at its foot, under the
-  // thumb. The search moves between the head of the list and the foot as the width changes; there is one box. No "+"
-  // starts a new chat (item 1245, after item 834's): Dot is one conversation, its row the agents' first.
-  const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
-  const body = el(
-    "div",
-    { class: "side-body" },
-    searchBox,
-    facesHead,
-    facesNav,
-    botsSection,
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink),
-    el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav),
-  );
+  // The sidebar is one component, in the window beside the page and as the drawer over it on a phone (item 294): a head
+  // with the title, the search row, the list and its dock, and the foot's four tools, the same on both.
+  const body = el("div", { class: "side-body" }, el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list, channelsNav));
   // The dock under the list (the sidebar of the reference app): what works and waits under Working, then what rests past a week,
   // Settled. It keeps its place while the list scrolls.
   const dock = el("div", { class: "side-dock" }, activityNav, settledNav);
-  // Connect apps (items 492 and 545): at the foot, over your account's row (item 999), the way to Customize ›
-  // Connectors, the page of the services Dot works with, with the marks of the MCP servers it is connected to; the list
-  // of pages no longer names Customize. On a phone, a round button of its own that wears a grid of tiles, the account
-  // having moved to your initials at the head (item 991).
-  const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
-  const connectButton = el(
-    "button",
-    {
-      class: "side-connect",
-      type: "button",
-      title: t("sidebar.connectApps"),
-      "aria-label": t("sidebar.connectApps"),
-      onclick: () => {
-        location.hash = CONNECTORS_PATH;
-      },
-    },
-    icon("plug"),
-    el("span", { class: "side-connect-label" }, t("sidebar.connectApps")),
-    connectMarks,
-  );
-  // The logos of the services whose servers are ready, each as its tile wears it (items 408 and 477): only a service's
-  // own logo, not the icon or the plug a server of no logo wears, nor Dot's own (item 853), each service once, in the
-  // order of their names, so that the same ones stand there while they stay connected.
-  let readyServers = [];
-  async function paintConnected() {
-    let found;
-    try {
-      found = await api.get("/mcp/servers");
-    } catch (error) {
-      console.warn("the servers Dot is connected to could not be read for Connect apps", error);
-      return;
-    }
-    if (disposed) {
-      return;
-    }
-    const logos = new Set();
-    readyServers = found.servers
-      .filter((server) => server.state === "ready" && server.mark !== null && server.mark.logo !== null)
-      .sort((one, other) => one.name.localeCompare(other.name))
-      .filter((server) => !logos.has(server.mark.logo) && logos.add(server.mark.logo));
-    showMarks();
-  }
-  /** Show the first few of the ready services' logos, and of the offered ones while fewer are ready. */
-  function showMarks() {
-    const connected = readyServers.slice(0, CONNECTED_MARKS).map((server) => server.mark.logo);
-    const offered = OFFERED_LOGOS.filter((logo) => !connected.includes(logo)).slice(0, CONNECTED_MARKS - connected.length);
-    connectMarks.replaceChildren(
-      ...[...connected, ...offered].map((logo) => el("span", { class: "side-connect-mark" }, markContent({ logo, glyph: null }))),
-    );
-  }
-  paintConnected();
-  const foot = el("div", { class: "side-foot" }, connectButton, settingsLink);
-  // On a phone the list is the home (item 991, the owner's ask of 2026-11-05 for a plain home): your initials at the top
-  // left lead to the settings, the agents' rows stand under their label with Dot's own first (item 1265), and the foot
-  // holds the apps and the search.
-  const ownerInitials = el("span", { class: "side-owner-initials", "aria-hidden": "true" });
-  const ownerLink = el("a", { class: "side-owner", href: "#/settings", title: t("sidebar.settings"), "aria-label": t("sidebar.settings"), onclick: onNavigate }, ownerInitials);
+  // Settings has the owner's name for a screen reader, which it does not show (WCAG 2.5.3: the name holds what is shown).
   function paintOwner() {
     const owner = shownOwner().trim();
-    const words = owner.split(/\s+/).filter((word) => word !== "");
-    // A word's first character whole, a letter outside the Basic Multilingual Plane too.
-    const initials = words
-      .slice(0, 2)
-      .map((word) => firstGrapheme(word).toLocaleUpperCase())
-      .join("");
-    ownerInitials.replaceChildren(initials === "" ? icon("user") : initials);
-    accountInitials.replaceChildren(initials === "" ? icon("user") : initials);
-    setText(accountName, owner === "" ? t("sidebar.settings") : owner);
     settingsLink.setAttribute("aria-label", owner === "" ? t("sidebar.settings") : t("sidebar.settingsOf", { owner }));
   }
   paintOwner();
-  // A new agent is a "+" at the right of the head (item 1259, where item 834's new chat stood until item 1245): its face
-  // and its name, then its conversation. Dot itself stays one conversation, which its face opens. Its dialog is loaded
-  // when asked for, as the page's first paint needs none of it.
-  const newBot = el(
-    "button",
-    { class: "icon-btn side-compose", type: "button", title: t("sidebar.newBot"), "aria-label": t("sidebar.newBot"), onclick: () => void attempt(openNewBotDialog) },
-    icon("plus"),
-  );
-  async function openNewBotDialog() {
-    const { openNewBot } = await import("./newbot.js");
-    await openNewBot();
-  }
   const sideHead = el(
     "div",
     { class: "side-head", "data-tauri-drag-region": "" },
     close,
     el("span", { class: "side-title" }, dotName()),
-    el("nav", { class: "side-pages", "aria-label": "Pages" }, watchLink, campaignsLink, schedulesLink),
   );
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
-    connectButton.firstElementChild.replaceWith(icon(PHONE.matches ? "appsGrid" : "plug"));
-    sideHead.append(newBot);
-    if (PHONE.matches) {
-      close.after(ownerLink);
-      connectButton.after(searchBox);
-    } else {
-      ownerLink.remove();
-      body.prepend(searchBox);
-    }
   }
   placeForWidth();
   PHONE.addEventListener("change", placeForWidth);
-  // A phone's days leave out the agents' conversations, which a wider sidebar lists (item 1259).
-  PHONE.addEventListener("change", paintLists);
   // While the settings are open the sidebar is their nav in place of the chats and the pages (item 562); a phone keeps the
   // sidebar as it is, its settings being a list of tabs on a page of their own.
   const settingsNav = buildSettingsNav({ homeHref, onCollapse, onNavigate });
@@ -1876,6 +1674,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     "aside",
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
     sideHead,
+    top,
     body,
     dock,
     foot,
@@ -1894,8 +1693,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // The name the owner calls Dot by, as it changes (item 420).
   onAssistant((names) => {
     setText(element.querySelector(".side-title"), names.name);
+    composeButton.title = t("sidebar.writeTo", { name: dotName() });
+    composeButton.setAttribute("aria-label", t("sidebar.writeTo", { name: dotName() }));
     paintOwner();
-    // Dot's own row and its face read the name again (item 1265): a rename shows at once.
+    // Dot's own rows and its entry read the name again (item 1265): a rename shows at once.
     void loadFaces();
   });
   const workTicker = setInterval(() => {
@@ -1920,20 +1721,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     setRoute({ tab, runId }) {
       routeTab = tab;
       paintMode();
-      mark(agentsLink, tab === "agents");
-      markFaces();
-      mark(campaignsLink, tab === "campaigns");
-      mark(schedulesLink, tab === "schedules");
+      markAgents();
+      mark(watchLink, tab === "watch");
       mark(settingsLink, tab === "settings");
-      // Customize is reached from Connect apps (item 545), which stands for it while it is open; on the way back from
-      // it, where a server may have been connected or removed, the marks of the servers that are ready are read again.
-      const leavingCustomize = connectButton.hasAttribute("data-current") && tab !== "customize";
+      // Customize is reached from Connect apps (item 545), which stands for it while it is open.
       connectButton.toggleAttribute("data-current", tab === "customize");
       // The styles read data-current; a screen reader reads aria-current, as the links of the pages give it (item 559).
       mark(connectButton, tab === "customize");
-      if (leavingCustomize) {
-        paintConnected();
-      }
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;
