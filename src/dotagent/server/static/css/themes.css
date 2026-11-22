@@ -4,13 +4,14 @@
    data-theme on the page element and change the colour tokens first and the shape second. app.css holds the shape,
    type and spacing tokens and draws the controls on all of them.
 
-   The scale (item 63, made neutral by item 1205 after OpenMausBot's Midnight and Daylight greys): greys with no
-   tint; surfaces step up by lightness (bg, surface, surface-2, surface-3) in both schemes, so depth comes from the step
-   and not from a shadow in dark; borders are the text colour at a small alpha, so they sit on every surface; the text
-   tiers (text, text-2, muted, faint) are measured against every surface by tests/unit/test_css_tokens.py, all four at
-   4.5:1, as small labels are set in the quiet ones (item 1205); shadows are nearly gone in dark, and a box is
-   drawn by a hairline ring (--edge) rather than a shadow. The accent is an ink, not the amber of the bubble: an amber
-   reads at under 2:1 on a light surface, and the accent paints text, focus rings and the send button. */
+   The scale (item 63; neutral since item 1205; a plain, professional palette since item 1324): zinc greys; the dark canvas is true
+   black and the raised surfaces (surface, sidebar: the card, popover and composer's ground) a hair lighter, each step
+   up (surface-2, surface-3) the fill a hover and a selected row take; in light the page is zinc-25, the sidebar
+   zinc-50 and the raised surfaces white. Depth comes from the step and a hairline, not from a shadow in dark; borders
+   are white at 8% in dark and black at 9% in light, so they sit on every surface; the text tiers (text, text-2,
+   muted, faint) are measured against every surface by tests/unit/test_css_tokens.py, all four at 4.5:1, as small
+   labels are set in the quiet ones. The accent is a calm blue (oklch 0.571 0.21 264 in dark, 0.488 in light): it
+   fills the primary button, the switch and the focus ring, and --accent-strong is the blue that reads as text. */
 
 :root {
   color-scheme: light dark;
@@ -27,54 +28,56 @@
 /* ---------- neutral: grey and ink, the base look ---------- */
 
 :root {
-  --bg: light-dark(#fcfcfc, #121212);
-  --sidebar: light-dark(#f5f5f5, #0e0e0e);
-  --surface: light-dark(#ffffff, #1f1f1f);
-  --surface-2: light-dark(#efefef, #282828);
-  --surface-3: light-dark(#e4e4e4, #303030);
-  /* A chat's messages (item 832), as a messaging app draws them: yours in ink in light and one step raised in the dark,
-     Dot's and its agents' on a soft fill. Made of the look's own colours, so that every look and scheme has them. */
-  --msg-me: light-dark(var(--text), var(--surface-3));
-  --on-msg-me: light-dark(var(--surface), var(--text));
+  --bg: light-dark(#fcfcfc, #000000);
+  --sidebar: light-dark(#fafafa, #111111);
+  --surface: light-dark(#ffffff, #111111);
+  --surface-2: light-dark(#f4f4f5, #1a1a1a);
+  --surface-3: light-dark(#e9e9ec, #232323);
+  /* A chat's messages: yours on the one surface step off the page, as a developer tool draws a user turn (lighter than the
+     page in dark, a shade darker in light; in the text's own ink), Dot's and its agents' on the page. Made of the look's own colours, so that
+     every look and scheme has them. */
+  --msg-me: var(--surface-3);
+  --on-msg-me: var(--text);
   --msg-agent: var(--surface-2);
-  --border: light-dark(rgb(28 28 28 / 8%), rgb(245 245 245 / 9%));
-  --border-strong: light-dark(rgb(28 28 28 / 16%), rgb(245 245 245 / 18%));
-  /* The hairline ring a box, the composer and a menu are drawn by (item 1205): half a pixel of the text at a
-     tenth, so that it sits on every ground of every look, and the stronger one the composer takes in focus. */
-  --edge: color-mix(in srgb, var(--text) 10%, transparent);
-  --edge-strong: color-mix(in srgb, var(--text) 22%, transparent);
-  --control: light-dark(#858585, #8a8a8a);
-  --text: light-dark(#1c1c1c, #f5f5f5);
-  --text-2: light-dark(#474747, #c8c8c8);
-  --muted: light-dark(#5c5c5c, #a8a8a8);
-  --faint: light-dark(#636363, #9c9c9c);
-  --accent: light-dark(#2a2a2a, #e8e8e8);
-  --accent-strong: light-dark(#1c1c1c, #f5f5f5);
-  --accent-weak: light-dark(#ececec, #2e2e2e);
-  --on-accent: light-dark(#fcfcfc, #121212);
-  --ok: light-dark(#1b7349, #62cf98);
-  --ok-weak: light-dark(#e3f2e8, #163527);
-  --on-ok: light-dark(#ffffff, #0f2419);
+  --border: light-dark(rgb(0 0 0 / 9%), rgb(255 255 255 / 8%));
+  --border-strong: light-dark(rgb(0 0 0 / 16%), rgb(255 255 255 / 14%));
+  --control: light-dark(#8a8a93, #8a8a8f);
+  --text: light-dark(#18181b, #f5f5f5);
+  --text-2: light-dark(#3f3f46, #d4d4d4);
+  --muted: light-dark(#5f5f69, #a3a3a3);
+  --faint: light-dark(#66666f, #929299);
+  --accent: light-dark(#1b4ed8, #346bf1);
+  --accent-strong: light-dark(#1743b8, #5a9bff);
+  --accent-weak: light-dark(#e8eefc, #142340);
+  --on-accent: light-dark(#ffffff, #ffffff);
+  --ok: light-dark(#047857, #34d399);
+  --ok-weak: light-dark(#e4f5ec, #0d2a1f);
+  --on-ok: light-dark(#ffffff, #052e1c);
   /* A state that is fine (item 839): no colour of its own, as a messaging app's, so that colour stays for what waits
      (the warning's), what failed (the bad's) and what is unread (the dot). Made of each look's own ink and surfaces;
      the ok colours stay for what is a convention of the data (a diff's additions, a string in code, a trade that rose). */
   --fine: var(--text-2);
   --fine-weak: var(--surface-2);
   --on-fine: var(--surface);
-  --warn: light-dark(#8a5400, #ecb458);
-  --warn-weak: light-dark(#fbefd6, #362a10);
-  --warn-border: light-dark(#e3c37a, #6a5020);
-  --bad: light-dark(#b8322f, #ff8f88);
-  --bad-weak: light-dark(#fbebe9, #3b1c1b);
-  --bad-border: light-dark(#efb8b4, #6e3331);
-  --on-bad: light-dark(#ffffff, #2a0b0b);
-  /* The owner's messages and Dot's face: one warm accent, with dark ink on it in light and dark alike. */
-  --bubble: light-dark(#ffcd3c, #e9b93a);
-  --on-bubble: #1c1c1c;
+  --warn: light-dark(#a14a07, #fbbf24);
+  --warn-weak: light-dark(#fdf3df, #2a210a);
+  --warn-border: light-dark(#e8c27a, #5c4513);
+  --bad: light-dark(#b91c1c, #f87171);
+  --bad-weak: light-dark(#fdecec, #2b1313);
+  --bad-border: light-dark(#f0b4b4, #6a2626);
+  --on-bad: light-dark(#ffffff, #1a0505);
+  /* What a message of the owner's and a mark of attention sit on: the accent's tint, with the text's ink on it (the
+     amber of Dot's face is --brand and stays on the face, and so does the ink that reads on it, --brand-ink). */
+  --bubble: var(--accent-weak);
+  --on-bubble: var(--text);
   /* Dot's yellow: its face's (the character's amber) and its accents', the same in every look and scheme (it was the
      disc of the mark until item 642). The faint hairline round the mark (white since item 1081), as render.py draws
      it, and the ball's own black, which a copy of the mark without its gradients would still be drawn in. */
   --brand: #ffcd3c;
+  /* The ink that reads on --brand and on the warm backdrop made of it (--computer-backdrop), the same in every look and
+     scheme: the page's own ink turns light in dark and would be 1.4:1 on the amber (tests/unit/test_css_tokens.py
+     measures it on every stop of the backdrop). */
+  --brand-ink: #1c1c1c;
   --mark-rim: #ffffff;
   --mark-ball: #000000;
   /* The border of a composer with a choice for one message armed (item 259): green, orange and purple, the same in
@@ -138,8 +141,9 @@
      page's scheme is. */
   --orb-edge-light: inset 0 0 0 1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 8%);
   --orb-edge-dark: inset 0 0 0 1px rgb(255 255 255 / 14%), 0 1px 2px rgb(0 0 0 / 18%);
-  /* Dot's computer (run.css): the warm backdrop behind the live view, from the yellow of the bubbles. */
-  --computer-backdrop: linear-gradient(160deg, color-mix(in srgb, var(--bubble) 55%, #ffffff), var(--bubble) 70%, color-mix(in srgb, var(--bubble) 80%, #000000));
+  /* Dot's computer (run.css): the warm backdrop behind the live view, from Dot's own yellow (--brand, the same in every
+     look: the bubbles are the accent's tint since item 1324 and no longer carry it). */
+  --computer-backdrop: linear-gradient(160deg, color-mix(in srgb, var(--brand) 55%, #ffffff), var(--brand) 70%, color-mix(in srgb, var(--brand) 80%, #000000));
   /* The office of the Agents page (item 885): the room stands on a dark stage in every scheme, as a lit diorama does,
      and the tags over the agents are dark glass with light words; a dot says what each one does. */
   --office-stage: radial-gradient(120% 90% at 60% 35%, #2b2a31 0%, #17161b 70%);
@@ -157,21 +161,6 @@
   --office-bubble: #fffdf8;
   --office-bubble-ink: #2a2830;
   --office-bubble-shadow: 0 6px 18px rgb(0 0 0 / 28%);
-}
-
-/* A phone in the neutral look (item 1205): the dark greys a phone's own system draws, a step lighter than a Mac's
-   window, as OpenMausBot draws its Midnight on a phone; light stays as it is. Only the surfaces change, and the text
-   tiers read on these at 4.5:1 too (tests/unit/test_css_tokens.py). A pick of another theme for the other scheme
-   writes the looks' tokens on the page (theme.js), which keeps a Mac's greys. */
-@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  :root:not([data-theme]),
-  :root[data-theme="neutral"] {
-    --bg: light-dark(#fcfcfc, #141414);
-    --sidebar: light-dark(#f5f5f5, #1c1c1e);
-    --surface: light-dark(#ffffff, #242426);
-    --surface-2: light-dark(#efefef, #2c2c2e);
-    --surface-3: light-dark(#e4e4e4, #343436);
-  }
 }
 
 /* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */
@@ -281,8 +270,8 @@
    where the text is, so that they take its stronger ink (the pre-push review: made on the root alone, they kept the
    plain one). */
 :root[data-contrast] body {
-  --msg-me: light-dark(var(--text), var(--surface-3));
-  --on-msg-me: light-dark(var(--surface), var(--text));
+  --msg-me: var(--surface-3);
+  --on-msg-me: var(--text);
 }
 
 /* The boxes and the buttons have no frame (item 837); with the contrast set they are framed again, in its stronger

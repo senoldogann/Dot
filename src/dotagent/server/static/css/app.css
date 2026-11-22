@@ -44,7 +44,7 @@
      Settings › Appearance (item 127) picks the families from these stacks or puts one typed before them, scales the
      seven sizes by --type-scale (the interface's size over 14 px) and sizes the composer and the code on their own. */
   --family-inter: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --family-system: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --family-system: -apple-system, BlinkMacSystemFont, "Inter", system-ui, "Segoe UI", sans-serif;
   --family-serif: ui-serif, "New York", Georgia, "Times New Roman", serif;
   --family-geist-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --family-sf-mono: "SF Mono", ui-monospace, Menlo, monospace;
@@ -67,12 +67,12 @@
      (--composer-font, --composer-size, --composer-weight) and the code (--mono, --code-size, --code-weight). The answers
      are the message size and follow the interface's until given their own. */
   --answer-size: var(--text-md);
-  --answer-leading-ratio: 1.6;
+  --answer-leading-ratio: 1.55;
   --answer-leading: calc(var(--answer-size) * var(--answer-leading-ratio));
-  /* An answer's first heading a step over its text, and its inline code a step under it, as 17 and 13 are to 15. */
-  --answer-heading: calc(var(--answer-size) * 17 / 15);
-  --answer-heading-leading: calc(var(--answer-heading) * 24 / 17);
-  --answer-code: calc(var(--answer-size) * 13 / 15);
+  /* An answer's first heading a step over its text, and its inline code a step under it: the two ratios below. */
+  --answer-heading: calc(var(--answer-size) * 16 / 14);
+  --answer-heading-leading: calc(var(--answer-heading) * 24 / 16);
+  --answer-code: calc(var(--answer-size) * 13 / 14);
   --answer-weight: 400;
   /* An answer's headings a step and two over its own weight, as the interface's labels and titles are over its. */
   --answer-label: calc(var(--answer-weight) + 100);
@@ -80,22 +80,28 @@
   --composer-weight: 400;
   --code-weight: 400;
   --type-scale: 1;
+  /* A dense scale (item 1324): two sizes for the metadata (an age, a count, a shortcut), then captions, secondary
+     lines, the interface and the messages, then the titles. */
+  --text-3xs: calc(10px * var(--type-scale));
+  --leading-3xs: calc(14px * var(--type-scale));
+  --text-2xs: calc(11px * var(--type-scale));
+  --leading-2xs: calc(14px * var(--type-scale));
   --text-xs: calc(12px * var(--type-scale));
   --leading-xs: calc(16px * var(--type-scale));
   --text-sm: calc(13px * var(--type-scale));
   --leading-sm: calc(18px * var(--type-scale));
   --text-ui: calc(14px * var(--type-scale));
   --leading-ui: calc(20px * var(--type-scale));
-  --text-md: calc(15px * var(--type-scale));
-  --leading-md: calc(24px * var(--type-scale));
-  --text-lg: calc(17px * var(--type-scale));
+  --text-md: calc(14px * var(--type-scale));
+  --leading-md: calc(22px * var(--type-scale));
+  --text-lg: calc(16px * var(--type-scale));
   --leading-lg: calc(24px * var(--type-scale));
-  --text-xl: calc(20px * var(--type-scale));
-  --leading-xl: calc(28px * var(--type-scale));
+  --text-xl: calc(18px * var(--type-scale));
+  --leading-xl: calc(26px * var(--type-scale));
   --text-2xl: calc(24px * var(--type-scale));
-  --leading-2xl: calc(32px * var(--type-scale));
-  --composer-size: 15px;
-  --composer-leading-ratio: 1.6;
+  --leading-2xl: calc(30px * var(--type-scale));
+  --composer-size: 14px;
+  --composer-leading-ratio: 1.55;
   --composer-leading: calc(var(--composer-size) * var(--composer-leading-ratio));
   /* The least a box's text is on a touch screen: iOS zooms the page into a box whose text is smaller as it gets the
      focus (item 273). */
@@ -119,35 +125,41 @@
   --weight-title: calc(var(--weight-text) + 200);
   --tracking-title: -0.01em;
   --tracking-caps: 0.04em;
-  /* Shape: the radii of marks, controls, cards, bubbles and pills, soft as a messaging app's (item 837: they were 6, 8,
-     8, 12 and 20 px). A look may round them differently (themes.css). */
-  --radius-xs: 8px;
-  --radius-sm: 10px;
-  --radius-control: 10px;
-  --radius: 16px;
-  --radius-lg: 24px;
-  /* A message's bubble (item 1101; 18 px since item 1205, as OpenMausBot's): a bubble of one line is nearly a pill
-     and a longer one a rounded box whose corners stay as round, as a messaging app's; where two of yours follow each
-     other the corners that meet are joined (6 px), as iMessage draws a run of messages. */
-  --radius-bubble: 18px;
-  --radius-joined: 6px;
-  --pad-bubble: 7px 12px;
-  /* The composer (item 1205): 22 px while it is one line, 18 once it has two: its words wrap (data-multiline,
-     composer.js), or it is a desk's box at rest, whose controls have a line under the words (item 1249). */
-  --radius-composer: 22px;
-  --radius-composer-wrapped: 18px;
-  /* A menu and its rows (item 1205): a menu on 12 px (22 on a phone), a row on 6, 30 px tall. */
-  --radius-menu: 12px;
+  /* Shape (item 1324): a scale on a base of 0.5 rem, one token for each kind of box and named for it. What is fully
+     round takes --radius-pill below; no list of that is kept anywhere else. A look may round them differently
+     (themes.css). */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-control: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  /* A message's bubble: a box of 10 px whose corners stay as round for one line and many; where two of yours follow
+     each other the corners that meet are joined (4 px). */
+  --radius-bubble: 10px;
+  --radius-joined: 4px;
+  --pad-bubble: 8px 12px;
+  /* The composer: 14 px whether its words wrap or not. */
+  --radius-composer: 14px;
+  --radius-composer-wrapped: 14px;
+  /* A menu and its rows: a menu on 10 px, a row on 6, 28 px tall. */
+  --radius-menu: 10px;
   --radius-row: 6px;
-  --menu-row: 30px;
+  --menu-row: 28px;
+  /* The fully round shape: what takes it is what names it (search for the token), not a list kept in a comment or a doc. */
   --radius-pill: 999px;
+  /* The height of a control (item 1325): 32 px, 28 for the small one, 36 for the large; on a touch screen the page
+     takes --touch-target (44 px, the least a finger hits; phone media query below) for what is tapped. */
+  --control-h: 32px;
+  --control-h-sm: 28px;
+  --control-h-lg: 36px;
+  --touch-target: var(--control-h);
   /* The stroke of an icon (item 1205): 1.75, and 1.5 in a menu, where the icons sit beside small words. */
   --icon-stroke: 1.75;
   /* A box of the pages, a card or a settings' group (item 837): no frame, and a ring of half a pixel round its surface
      rather than a shadow under it (item 1205): only what floats over the page (a menu, a dialog, a sheet) casts a
      shadow. The contrast setting draws the frame again (themes.css). */
   --box-border: transparent;
-  --box-shadow: 0 0 0 0.5px var(--edge);
+  --box-shadow: 0 0 0 1px var(--border);
   /* A button's frame (item 837): none, as its fill says it is one; the contrast setting draws it (themes.css). Its
      fill is a tint of the ink over whatever it stands on, so that it is a step from every ground by itself (the
      pre-push reviews: a fill of the second surface vanished on the boxes, the notes and the sidebar of that ground). */
@@ -156,8 +168,8 @@
   --button-fill-hover: color-mix(in srgb, var(--text) 10%, transparent);
   /* The composer's lift (item 121): a ring of half a pixel (item 1205), a stronger one in focus, and a soft shadow
      that falls below it, as it floats over the conversation. */
-  --shadow-composer: 0 0 0 0.5px var(--edge), 0 2px 8px -1px var(--shadow-ink), 0 1px 2px var(--shadow-ink);
-  --shadow-composer-focus: 0 0 0 0.5px var(--edge-strong), 0 2px 8px -1px var(--shadow-ink), 0 1px 2px var(--shadow-ink);
+  --shadow-composer: 0 0 0 1px var(--border), 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
+  --shadow-composer-focus: 0 0 0 1px var(--border-strong), 0 1px 2px var(--shadow-ink), 0 4px 16px var(--shadow-ink);
   /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
      translucent surface a hairline frames with the page blurred under it. */
   --glass-surface: color-mix(in srgb, var(--surface) 78%, transparent);
@@ -174,23 +186,23 @@
   --space-6: 24px;
   /* A card's room (item 838: 16 px before), so that a soft box breathes as a messaging app's; the compact density keeps
      its own (below). */
-  --pad-card: var(--space-5);
+  --pad-card: var(--space-4);
   --pad-row: var(--space-3) var(--space-4);
   --pad-side: var(--space-2) var(--space-2);
   --gap-stack: var(--space-3);
   /* Motion (item 73): three durations and two easings for what changes, and the rhythms of what repeats; every
      transition and animation names one (tests/unit/test_css_tokens.py), and reduced motion keeps the fades. */
   --motion-quick: 120ms;
-  --motion-base: 200ms;
-  --motion-slow: 320ms;
+  --motion-base: 160ms;
+  --motion-slow: 240ms;
   /* The slide of the sidebar and the details panel, 0 to 400 ms in Settings › Appearance (item 127). */
   --motion-panel: var(--motion-base);
   /* One easing for what changes (item 1205, OpenMausBot's): quick out of its start, long and soft into its end. */
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-emphasis: var(--ease);
   /* A message you sent rises into its place; a menu opens from 96 %; a sheet rises 32 px (item 1205). */
   --motion-message: 180ms;
-  --motion-sheet: 260ms;
+  --motion-sheet: 200ms;
   --motion-breath: 4s;
   --motion-pulse: 1.6s;
   --motion-blink: 1.4s;
@@ -232,35 +244,38 @@
   --gap-stack: var(--space-2);
 }
 
-/* A phone (item 329): a touch screen of a phone's width, or of a phone's height on its side. Its text is a phone's, the
-   body 16 px as iOS's own and nothing under 13 px at that size, and the interface's size (Settings › Appearance, 12 to
-   20 px, item 347) still scales the seven sizes; an iPad and a Mac keep the sizes above. */
+/* A phone (item 329): a touch screen of a phone's width, or of a phone's height on its side. Its text is a phone's: the
+   body 16 px as iOS's own and a scale of its own, a step or two above the Mac's, with no text drawn under 13 px
+   (tests/smoke/test_phone_type.py and tests/unit/test_css_tokens.py); the interface's size (Settings › Appearance,
+   item 347) still scales the sizes; an iPad and a Mac keep the sizes above. */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   :root {
+    --text-3xs: calc(13px * var(--type-scale));
+    --leading-3xs: calc(18px * var(--type-scale));
+    --text-2xs: calc(13px * var(--type-scale));
+    --leading-2xs: calc(18px * var(--type-scale));
     --text-xs: calc(13px * var(--type-scale));
     --leading-xs: calc(18px * var(--type-scale));
     --text-sm: calc(15px * var(--type-scale));
     --leading-sm: calc(20px * var(--type-scale));
     --text-ui: calc(16px * var(--type-scale));
     --leading-ui: calc(22px * var(--type-scale));
-    /* A message's text (item 1057): iOS's body size and a line of 1.375, where 17 on 26 set a third less on a screen. */
+    /* A message's text (item 1057): iOS's body size, on the line --answer-leading-ratio below gives it. */
     --text-md: calc(16px * var(--type-scale));
     --leading-md: calc(22px * var(--type-scale));
-    --answer-leading-ratio: 1.375;
+    --answer-leading-ratio: 1.4;
     /* An answer's first heading and its inline code as a phone draws them at its message's 16 px: 19 on 26, and 15. */
     --answer-heading: calc(var(--answer-size) * 19 / 16);
     --answer-heading-leading: calc(var(--answer-heading) * 26 / 19);
     --answer-code: calc(var(--answer-size) * 15 / 16);
-    --text-lg: calc(19px * var(--type-scale));
+    --text-lg: calc(18px * var(--type-scale));
     --leading-lg: calc(26px * var(--type-scale));
-    --text-xl: calc(22px * var(--type-scale));
-    --leading-xl: calc(30px * var(--type-scale));
+    --text-xl: calc(20px * var(--type-scale));
+    --leading-xl: calc(28px * var(--type-scale));
     --text-2xl: calc(26px * var(--type-scale));
-    --leading-2xl: calc(34px * var(--type-scale));
-    /* A phone's corners are rounder, as iOS's (item 1205): a card on 18 px, a menu on 22, a sheet on 28. */
-    --radius: 18px;
-    --radius-lg: 28px;
-    --radius-menu: 22px;
+    --leading-2xl: calc(32px * var(--type-scale));
+    /* The shape is the Mac's (item 1324: one design language); only the size of what a finger hits grows. */
+    --touch-target: 44px;
   }
 }
 
