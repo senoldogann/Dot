@@ -43,7 +43,14 @@ dictation model (your microphone, another look), a look waits for one to end, up
 - A file is read as `read_file` reads one: a file in a protected location (your keys, Dot's own files) is refused.
 - A link is an address as `web_fetch`'s is: `[browser] allowed_hosts` and `blocked_hosts` bind it, a long one or one
   with a key in it is refused, Dot's own server is refused, and its host must be on the public internet unless
-  `[web] allow_private_hosts`. yt-dlp then connects and follows the site's redirects by itself, which Dot does not see.
+  `[web] allow_private_hosts`. Before yt-dlp starts, Dot follows the link's redirects through the web client, which
+  checks the addresses of every hop it connects to, and refuses the link when any hop is not public, and when the redirects cannot be followed to their end (more than six, a
+  hop the rules on addresses turn away or that cannot be reached: the hop nobody looked at may be the private one; item
+  1319). Only the link's own first request failing in transit (a timeout, a connection that cannot be made) leaves the link
+  to yt-dlp, logged; a site that answers with an error page or turns that client away with a status is no failure of the
+  probe, and yt-dlp runs as before.
+  yt-dlp then connects by itself: the addresses its extractor takes out of the page (the media's own) are the site's to
+  choose and are not seen here.
 - ffprobe, ffmpeg and yt-dlp start in the run's sandbox outside `yolo`, as a shell command does. ffmpeg opens video
   and sound files only (MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, MP3, WAV and the like) and reaches no address: a
   playlist or a concat list that names other files, whatever it is called, is refused.

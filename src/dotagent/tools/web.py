@@ -754,6 +754,11 @@ def render_index(result: CrawlResult, files: tuple[Path, ...], nonce: str) -> st
     if result.skipped:
         listed.append(f"Left out ({len(result.skipped)}):")
         listed.extend(f"- {entry.url}: {entry.reason}" for entry in result.skipped)
+    listed.extend(result.notes)
+    if result.dropped:
+        listed.append(
+            "Links outside the scope, not followed: " + ", ".join(f"{site} ({count})" for site, count in result.dropped)
+        )
     if result.robots.disallowed:
         listed.append("Disallowed by robots.txt" + (" (the first 10):" if len(result.robots.disallowed) > 10 else ":"))
         listed.extend(f"- {address}" for address in result.robots.disallowed[:10])
@@ -798,7 +803,9 @@ def _renderer_for(ctx: ToolContext) -> Renderer:
     """A page shown in the run's browser tab: its visible text after JavaScript ran."""
 
     async def render(url: str, max_chars: int) -> str:
-        view: PageView = await ctx.browser.open_url(ctx.thread_id, url, hides_secrets(ctx.approvals))
+        view: PageView = await ctx.browser.open_url(
+            ctx.thread_id, url, hides_secrets(ctx.approvals), public_only=_public_only(ctx)
+        )
         # The rule of the plain client holds for the page the crawl asked to see: where a redirect or a name pointed at
         # the local network led is not read for it (item 554). The tab stays where it is, as the run's own.
         private: str | None = await non_public_address(urlsplit(view.url).hostname or "") if _public_only(ctx) else None

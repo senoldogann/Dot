@@ -60,6 +60,7 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_qr.py",
     "test_scaffold.py",
     "test_screen_text.py",
+    "test_screenshot_redaction_order.py",
     "test_snapshots.py",
     "test_tool_groups.py",
 )

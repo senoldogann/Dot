@@ -645,7 +645,9 @@ out of reach; an image goes to the model as an image, an iPhone's HEIC photo too
 556). A shell command runs with the `PATH` of your login shell, in its own process
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
-times out is killed, after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
+times out is killed with the commands it started (it runs as the leader of a process group of its own, which is what
+is killed, and a process that does not exit when killed is logged, never raised in place of the timeout's own error,
+item 1299), after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
 application or works on a large document (at most 110 s, item 1180); the application may go on with what it was asked,
 which the timeout says. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
@@ -672,7 +674,7 @@ with its reason (for an engine that answered with an error: the HTTP status and 
 masked, so an engine that is down reads differently from one out of credit; the log's `search_engine_failed` and
 `search_engine_benched` carry the whole context), and the age of a remembered answer. Bing is not a rung: without a
 session its page answers some queries with the results of another query. `web_fetch` reads HTML and PDF and refuses
-localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set. A site whose TLS certificate does not verify (a name it does not cover, expired, self-signed) is not tried again and is not told as a failure in transit: the result says the certificate does not verify and another try will not help (item 1285). A body is read as it comes and
+localhost, LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set (a page the browser reads for the web tools is held to it before each of its requests goes out, those of a frame of another site excepting the first, item 1319, [Safety](safety.md)). A site whose TLS certificate does not verify (a name it does not cover, expired, self-signed) is not tried again and is not told as a failure in transit: the result says the certificate does not verify and another try will not help (item 1285). A body is read as it comes and
 inflated a piece at a time (gzip or deflate, once): a body in more codings, or in one Dot does not read, is refused, so
 that a few hundred bytes of nested gzip are not gigabytes in memory (item 554). A page that turns the plain request away
 (HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal), closes the plain request's TLS handshake (some sites answer only
@@ -698,14 +700,16 @@ is lowered to 10 and the result says so.
 
 **Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
 breadth first from the start address, following the links within the scope (`prefix`, the pages under the start
-address's folder, or `host`, every page of its host), several fetches at once and the requests to one host spaced apart,
+address's folder, or `host`, every page of its host; a start address that redirects to the same site's other form,
+`example.com` to `https://www.example.com/`, `http` to `https`, moves the scope to where the site answers from, so its
+links are followed, and a page a redirect carries out of the scope is left out, item 1298), several fetches at once and the requests to one host spaced apart,
 within the limits of `[web.crawl]` (`max_pages` 50, `max_depth` 3, `concurrency` 4, `per_host_spacing_s` 0.5; a call may
 ask for less, never for more). Every page comes back as one clean text document (title, address, description, then the
 text as `web_fetch` renders it, at most `page_max_chars`), each in its own `<web_content>` fence, under an index that
 lists the pages with their depth, size and how they were read, the addresses left out and why, and how many more
 addresses were found within the scope but not read. What the pages and their links wrote of the index (their
 addresses, their titles clipped to 200 characters, the addresses left out, the ones `robots.txt` disallows) stands in a
-fence of its own, and the lines outside it are Dot's; the links listed for a page that is not there, and the JSON of
+fence of its own (with the scope's move and the sites its pages linked to outside the scope, by how many links each), and the lines outside it are Dot's; the links listed for a page that is not there, and the JSON of
 `web_extract`, are fenced the same way (item 554). A page that shows little text without JavaScript (fewer than 400
 characters and three or more script tags) is rendered once in Dot's own browser tab and read from the screen
 (`render = "auto"`; `"never"` fetches only, `"always"` renders every page); PDFs are read as `web_fetch` reads them. A

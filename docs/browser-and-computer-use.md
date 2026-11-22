@@ -72,7 +72,10 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   a new connection: after a restart of the service, or after Chrome itself was closed or restarted. Then the next
   browser call connects again by itself, a notification says "Chrome asks to allow Dot", and a step that waits for
   the click, or that was under way when Chrome went, says in one line that Chrome was closed or restarted and that
-  Allow is to be clicked (item 341). Settings › Browser reads how Chrome stands every 3 seconds while it is open:
+  Allow is to be clicked (item 341). In either mode, when Chrome quit or crashed under tabs a chat held (item 1297),
+  the first browser call of that chat afterwards fails once saying "Chrome was closed or crashed; your tabs and refs
+  are gone; open the page again" instead of working in a new blank tab; `browser_open` and `browser_new_tab` go on in
+  a new tab that carries the same note, and a chat that held no tab is told nothing. Settings › Browser reads how Chrome stands every 3 seconds while it is open:
   connected, waiting for Allow, Chrome closed, remote debugging off, or Chrome restarted, each with what to do. A
   schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails; for the five minutes
   after an Allow nobody clicked, a call of a run nobody watches (a schedule's or a watcher's, a campaign's sessions
@@ -85,7 +88,8 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   the background. The window closes with the tab. Making a window takes about 30 ms more than a tab, once per chat
   and for each quiet read. Dot never minimizes it (a minimized window is throttled); a window covered by others runs
   at full speed.
-- Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
+- Downloads go to the download folder of Chrome, not to Dot's `downloads/`, and `[browser] download_max_mb` and
+  `download_quota_mb` do not apply to them (item 1298).
 - Dot closes the tabs it opened as a chat's do (below). If Dot itself does not end cleanly (a crash, a kill), the next
   Dot that attaches to that Chrome closes them (item 703): each Dot process writes the ids Chrome gave its tabs to
   `<home>/browser-tabs.json`, and the tabs of a process that no longer runs are closed when they still have that id in
@@ -221,7 +225,13 @@ Both modes share what follows.
   the step set off, and waits for such a tab until it is the run's, at most a second (item 342): a tab whose page
   answers later stops the batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change
   for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared (two
-  downloads of one name at once are saved as `name` and `name-1`, item 800). A read
+  downloads of one name at once are saved as `name` and `name-1`, item 800). A download of Dot's own Chrome is held
+  to `[browser] download_max_mb` (500 MB; the largest file) and `download_quota_mb` (5120 MB; the most the downloads
+  folder holds); 0 takes a limit off (item 1298). Each tab has a DevTools session of its own for it, since Chrome tells
+  the bytes taken only to one enabled before the download began; a download that passes its room is cancelled as it
+  comes in, what was saved is deleted and the tab's notes say which limit it passed, and a download of a folder
+  already at its quota is turned away before it is saved. Where the session cannot be made the size is judged when the
+  download has finished and the file is deleted then. A read
   of the page (its settling, its size, its snapshot, its whole text, item 1135) whose document is replaced under it, as a sign-in that hops through
   several pages replaces it, is made again on the new document once it is parsed, five times at most (item 752). The
   result is the part of the page that changed, with the refs of the last snapshot still valid; a page that did not
@@ -339,7 +349,8 @@ Both modes share what follows.
   snapshot shows under them and by the policy's own reading of those elements' names - not by the typed judge
   `browser_act` adds for a label no pattern knows, since a check's own words explain the press. It presses nothing it
   cannot pass: a payment button that a page labels like a check is refused, and the run is told to press it with
-  `browser_act`, which asks the user; a "Verify you are human" line does not press the button drawn beside it. The tool
+  `browser_act`, which asks the user; a "Verify you are human" line does not press the button drawn beside it. The press goes to a pixel read again just before
+  it and checked to be the check's own element, never to one a page covers with its own (item 1295, [captcha](captcha.md)). The tool
   runs under the browser's lock, so it never waits for an approval to hold that lock. A step at a pixel goes first in
   its batch (several in a row are fine): after a step that may move the page it is sent back, to be taken from a new
   screenshot.
@@ -503,7 +514,12 @@ Both modes share what follows.
   page busy for a while (a heavy app starting) has that whole time to answer. A page `browser_open` or `browser_new_tab`
   has loaded that answers but has not settled within that time (still being parsed, or busy past the quiet window) is
   shown as it is, with the note that it is still loading (item 954): the open failed, and the run read the very page
-  with its next call.
+  with its next call. A navigation Chrome cuts off (`net::ERR_ABORTED`: a redirect or the site's own script sent the tab
+  elsewhere before the page committed) is no failure when the tab stands on a real page afterwards (item 1296): it
+  waits a moment for that page to commit and be parsed, runs the same landing and settle checks as for any page, and
+  shows it with the note "the page redirected to <address>"; a tab that stands on no page (blank, Chrome's error page,
+  or where it was) is sent again once, whatever `navigation_attempts` says, and a second cut fails as before. `web_*`
+  reads of a scratch tab take the same road: the address they report is the page the tab ended on.
 - `browser_upload` hands the files straight to the file field of the element it is given (item 704): the field itself,
   which sites move off the screen or put under an icon (a click on such a field waited eight seconds and failed), the
   one file field inside it, as in a label that wraps a hidden field, or (item 745) the field its label (`for`) or its
@@ -596,7 +612,9 @@ Both modes share what follows.
   address, which is never named: in the owner's Chrome it may be a tab of the owner's; item 1160). The cause of such
   a tab is not known yet, and these tell the browser's side of the handover from the page's the next time. A
   quiet read's tab is closed the way it was made, through Chrome's own `Target.closeTarget`: Playwright's close never
-  came back for a tab whose failed navigation Chrome was still committing its error page in (item 960).
+  came back for a tab whose failed navigation Chrome was still committing its error page in (item 960). A close that
+  fails after the page was read is logged and no longer replaces the page with an error (item 1297): the tab is closed
+  again at the next round of the idle reaper.
   macOS brings a newly started Chrome to the front, and Chrome takes the front itself when a page opens a tab of its own
   (a link to a new tab, `window.open`): the app that had the focus is brought back right after, as long as the program
   that runs Dot has Accessibility. Switching tabs does not raise the window. With `true` the window comes to the front
@@ -792,7 +810,10 @@ every mode but `yolo` (item 433).
   not encoded again: the JPEG just made is returned (a 3024×1964 frame took about 71 ms to shrink and encode, and
   about 8 ms to recognise as the same frame). The windows of password
   managers and Keychain Access are painted black, known by their application's bundle id and not only by its name,
-  which is in the language of the Mac (item 555). It comes with the lines of text on it, read on this Mac by macOS's
+  which is in the language of the Mac (item 555); the windows are read again right after the capture and what is painted
+  black is the union of both readings, so a password manager opened or moved while the picture was taken is covered too
+  (item 1299; the window capture of `desktop_snapshot` reads its windows and applications again the same way). It
+  comes with the lines of text on it, read on this Mac by macOS's
   Vision from the picture the model is shown (what is painted black is not read), each with the x, y of its centre
   that `desktop_act` takes (item 701, `read_screen_text`; 50 ms a screen once warm): a window that shows nothing to
   accessibility can be read and clicked by a model that sees no image. A zoom into a region (`x`, `y`, `width`,

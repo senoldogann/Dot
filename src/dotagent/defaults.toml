@@ -798,6 +798,12 @@ background_tab_idle_s = 300.0
 # tab_idle_s: Chrome closes once the chats' own tabs would have closed (it kept about 600 MB in 14 processes while
 # unused, measured 2026-10-27); 0 keeps it open until the daemon stops.
 idle_close_s = 600.0
+# The largest file a download of a page may save, and the most the downloads folder (every run's, under the workspace)
+# may hold, in megabytes (item 1298); 0 takes a limit off. A download that passes either is cancelled as it comes in, the
+# part saved is deleted and the run is told. 500 MB and 5 GB: a report or an installer fits, a page that streams an
+# endless file does not fill the disk.
+download_max_mb = 500
+download_quota_mb = 5120
 screenshot_quality = 60
 # The most steps one browser_act runs (item 700: 10 since 2026-10-26, 5 before).
 max_batch_steps = 10

@@ -54,6 +54,29 @@ b.addEventListener('pointerleave', stop);
 </script></body></html>"""
 )
 
+# The same hold behind a cookie wall that is drawn over it and passes every click to nothing: a press at the button's
+# pixel would land on the wall (item 1295).
+_COVERED_HOLD_PAGE: str = _HOLD_PAGE.replace(
+    "</body>",
+    '<div id="cookiewall" style="position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.3);'
+    'z-index:50"><p>We use cookies</p></div></body>',
+)
+
+# The hold's modal slides in from the left for a moment, as a widget with an entrance animation does: it is pressed
+# where it stops, not where it was first read.
+_SLIDING_HOLD_PAGE: str = _HOLD_PAGE.replace(
+    "left:300px;top:300px;width:500px", "left:0;top:300px;width:500px"
+).replace(
+    "</body>",
+    "<script>let at = 0; const slide = setInterval(() => { at += 12; modal.style.left = at + 'px';"
+    " if (at >= 300) clearInterval(slide); }, 16);</script></body>",
+)
+
+# A page far past what a probe may scan whole, with the hold at the end where a modal is appended.
+_BIG_HOLD_PAGE: str = _HOLD_PAGE.replace(
+    "<h1>Access starts here</h1>", "<h1>Access starts here</h1>" + "<div><span>row of a long feed</span></div>" * 12000
+)
+
 _WIDGET_PAGE: str = """<!doctype html><html><head><title>hCaptcha</title></head><body style="margin:0">
 <div id="checkbox" role="checkbox" aria-checked="false"
      style="width:24px;height:24px;margin:24px;border:1px solid #333"></div>
@@ -71,6 +94,13 @@ _CHECKBOX_PAGE: str = """<!doctype html><html><head><title>Checkbox</title></hea
         style="border:0;position:absolute;left:400px;top:400px"></iframe>
 <script>addEventListener('message', () => { document.querySelector('textarea').value = 'x'.repeat(40); });</script>
 </body></html>"""
+
+# The widget's frame with a page's own element over it.
+_COVERED_CHECKBOX_PAGE: str = _CHECKBOX_PAGE.replace(
+    "</body>",
+    '<div id="promo" style="position:absolute;left:380px;top:380px;width:400px;height:130px;background:#eee;z-index:9">'
+    "Win a prize</div></body>",
+)
 
 _CELL: str = '<td style="width:100px;height:100px;border:1px solid #999"></td>'
 _ROW: str = f"<tr>{_CELL * 3}</tr>"
@@ -118,6 +148,10 @@ class _Handler(BaseHTTPRequestHandler):
         path: str = self.path.split("?", 1)[0]
         pages: dict[str, str] = {
             "/hold": _HOLD_PAGE,
+            "/covered_hold": _COVERED_HOLD_PAGE,
+            "/sliding_hold": _SLIDING_HOLD_PAGE,
+            "/big_hold": _BIG_HOLD_PAGE,
+            "/covered_checkbox": _COVERED_CHECKBOX_PAGE % {"widget": self.widget_port},
             "/widget": _WIDGET_PAGE,
             "/checkbox": _CHECKBOX_PAGE % {"widget": self.widget_port},
             "/grid": _GRID_PAGE % {"widget": self.widget_port},
@@ -247,3 +281,41 @@ async def test_a_check_drawn_beside_a_payment_button_presses_nothing(browser: Br
     assert outcome.did == (), outcome
     assert outcome.result == "none", outcome
     assert took < 3.0, took
+
+
+async def test_a_button_under_a_wall_the_page_draws_over_it_is_not_pressed(browser: BrowserSession, site: str) -> None:
+    """The pixel read for the button belongs to the cookie wall now: the hold is not made, and the run is told what is
+    over it (item 1295)."""
+    outcome, took = await _check(browser, "covered_hold", f"{site}/covered_hold")
+
+    assert outcome.result == "unfinished", outcome
+    assert outcome.did == (), outcome
+    assert "cookiewall" in outcome.note, outcome
+    assert took < 3.0, took
+
+
+async def test_a_widget_with_a_page_element_over_its_frame_is_not_pressed(browser: BrowserSession, site: str) -> None:
+    outcome, _ = await _check(browser, "covered_checkbox", f"{site}/covered_checkbox")
+
+    assert outcome.result == "unfinished", outcome
+    assert outcome.did == (), outcome
+    assert "promo" in outcome.note, outcome
+
+
+async def test_a_button_that_slides_into_place_is_pressed_where_it_stops(browser: BrowserSession, site: str) -> None:
+    """The legitimate twin: an entrance animation is no reason to refuse; the hold goes to the button's new place."""
+    outcome, took = await _check(browser, "sliding_hold", f"{site}/sliding_hold")
+
+    assert outcome.result == "passed", outcome
+    assert outcome.role == "hold"
+    assert took < 4.0, took
+
+
+async def test_a_page_of_twelve_thousand_rows_is_scanned_cheaply_and_its_hold_at_the_end_is_found(
+    browser: BrowserSession, site: str
+) -> None:
+    outcome, took = await _check(browser, "big_hold", f"{site}/big_hold")
+
+    assert outcome.result == "passed", outcome
+    assert outcome.role == "hold"
+    assert took < 4.0, took

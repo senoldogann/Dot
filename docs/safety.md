@@ -58,7 +58,17 @@ run needs, sent where the configuration points:
   `[web] allow_private_hosts` allows more (the owner's SearXNG instance is configuration and is reached wherever it
   is, a loopback one too); a page the browser reads for them in place of a plain request a site turned away is held
   to the same rule, and one it was served from a private address is not given back (item 554, see
-  [Tools](runs.md#tools)); Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
+  [Tools](runs.md#tools)). In Dot's own Chrome the rule is applied before the request goes out as well (item 1319):
+  the scratch tab of such a read, and the run's tab while `web_crawl` renders a page in it, ask the address of the
+  requests they send (the first, each redirect hop, the page's own pictures and scripts, those of a frame of the same
+  site) and refuse, as blocked by the
+  client, one whose host is or resolves to a private, loopback, link-local or metadata address, or whose address cannot
+  be read at all (what is not known to be public is refused). One limit: a frame of another site, which Chrome runs as
+  a target of its own, is asked about for its first request only, so a page can make its frame's redirect hop to a
+  private address, and Dot does not see a service worker's requests at all (not verified); the check after the read
+  looks at the page's own address and the connection Chrome made, not at those. The tabs of the browser tools are not held to it: your
+  local dev servers and the sites you are signed in to are reached as before, and in attach mode the check that follows
+  the read is the only one; Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
   loads its libraries from public CDNs (see [Tools](runs.md#tools)). `recon` makes its own requests: one GET and one
   TLS handshake, and, on `depth = "ports"`, a connect to each of 34 ports that sends nothing but the handshake; that
@@ -760,7 +770,8 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
   title is refused as well). Desktop screenshots black out the password managers' windows, each known by its
-  application's bundle id as well as its name, so on a Mac in any language (item 555), and Dot's own windows for thirty
+  application's bundle id as well as its name, so on a Mac in any language (item 555), the windows read again right after
+  the capture as well as before it, so that one opened while the picture was taken is covered (item 1299), and Dot's own windows for thirty
   seconds after the eye of Settings › Vault showed a secret (item 621), which `desktop_snapshot` and `desktop_read`
   read no more than a password manager's then; their secure fields are not masked.
 - A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password

@@ -48,6 +48,7 @@ from dotagent.browser.console import console_lines
 from dotagent.browser.devtools import devtools_switches, port_is_taken, port_taken
 from dotagent.browser.driver import (
     NEVER_PRESSED,
+    Navigation,
     PageLines,
     Pulse,
     StepResult,
@@ -87,6 +88,7 @@ from dotagent.browser.labels import mark_screenshot
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.network import Fetched, answer_text, call_lines, hidden_address
 from dotagent.browser.pages import (
+    DownloadLimits,
     Tab,
     ThreadTabs,
     add_note,
@@ -99,6 +101,7 @@ from dotagent.browser.pages import (
     target_id_of,
     unhanded_tab,
     watch_births,
+    watch_downloads,
 )
 from dotagent.browser.profile_lock import (
     ask_handover,
@@ -200,7 +203,7 @@ from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
 from dotagent.vault.hosts import SameOrigin
 from dotagent.vault.masking import in_address, mask_error, masked
-from dotagent.web.addresses import is_private_text, non_public_address
+from dotagent.web.addresses import is_private_text, non_public_address, unread_or_non_public
 
 _log = get_logger("dotagent.browser.session")
 # What a page that had not settled after an action that went through is said to be (the review of every module).
@@ -302,6 +305,9 @@ _DRIVER_LOST: str = "Connection closed while reading from the driver"
 # What a step says when the Chrome of the user went away since Dot connected to it, and what the owner is told on the
 # Mac when Dot connects to it again (item 341).
 CHROME_RESTARTED: str = "Chrome was closed or restarted"
+# How long after the last tab of a thread closed that Chrome's loss still counts as what closed it (item 1297).
+_LOSS_WINDOW_S: float = 5.0
+TABS_LOST: str = "Chrome was closed or crashed; your tabs and refs are gone; open the page again"
 RECONNECT_NOTICE: str = "Chrome was closed or restarted: click Allow in Chrome so that Dot can go on."
 # The URL rules on every request of Dot's own Chrome (item 135, measured 2026-10-15 with Playwright 1.63 and Chrome
 # 155): a route on the context sees the first request of every page, popups included, each resource a page loads and
@@ -309,6 +315,16 @@ RECONNECT_NOTICE: str = "Chrome was closed or restarted: click Allow in Chrome s
 # (Chrome follows them before it asks), so each tab is asked about those through a Fetch session of its own
 # (:meth:`BrowserSession._guard_hops`). The owner's Chrome (attach mode) gets neither: its tabs are the owner's.
 _EVERY_URL: re.Pattern[str] = re.compile(".*")
+# What a web tool's page may request before its address is looked at for the public internet (item 1319): only the
+# schemes that reach a server; data:, blob: and the rest carry no address to judge. The look at a host's addresses
+# is kept this long, and given this long to be made.
+_NOT_PUBLIC_MESSAGE: str = (
+    "the page is on a private or local network address; the web tools only reach the public internet "
+    "(web.allow_private_hosts)"
+)
+_NETWORK_SCHEMES: frozenset[str] = frozenset({"http", "https", "ws", "wss", "ftp"})
+_PUBLIC_HOST_TTL_S: float = 30.0
+_PUBLIC_LOOK_TIMEOUT_S: float = 5.0
 _FETCH_PATTERNS: list[dict[str, str]] = [{"urlPattern": "*", "requestStage": "Request"}]
 _DOCUMENT_RESOURCE: str = "Document"
 _BLOCKED_BY_CLIENT: str = "ERR_BLOCKED_BY_CLIENT"
@@ -650,6 +666,9 @@ class _Refusal:
 
     url: str
     reason: str
+    # What the error says, when the refusal is not the URL rules' own: a request to a non-public address for a web tool
+    # says what the later check says (item 1319).
+    message: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1025,6 +1044,12 @@ class BrowserSession:
         # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`), each
         # with the setting up of its session, which a navigation of the page waits for.
         self._guarded: dict[Page, asyncio.Task[None]] = {}
+        # The pages whose requests the web tools hold to the public internet, each before it is sent (item 1319): the
+        # scratch tab of a read for them, and the run's tab while a crawl renders a page in it. Only in Dot's own
+        # Chrome, whose requests Dot answers; no other tab is in it, so the browser tools reach what they did.
+        self._public_only_pages: set[Page] = set()
+        # What the last look at a host's addresses found, for _PUBLIC_HOST_TTL_S: the host's refusal, or None.
+        self._public_hosts: dict[str, tuple[float, str | None]] = {}
         self._reaper: asyncio.Task[None] | None = None
         # The watch for another Dot process that asks for the profile of Dot's own Chrome (item 1198).
         self._handing: asyncio.Task[None] | None = None
@@ -1033,6 +1058,8 @@ class BrowserSession:
         self._uses: int = 0
         self._used_at: float = time.monotonic()
         self._closed: bool = False
+        # Tabs of quiet reads that could not be closed (item 1297): the reaper's round tries them again.
+        self._stray_scratch: set[Page] = set()
         # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
         # when a thread last began to act, and the checks under way that give the front back after a page's own tab.
         self._chrome_pid: int | None = None
@@ -1359,7 +1386,13 @@ class BrowserSession:
         self._refusals.clear()
         self._guarded.clear()
         self._kept_out.clear()
+        now: float = time.monotonic()
         for thread in self._threads.values():
+            # Its tabs are still listed, or the pages of the last of them closed a moment ago: Chrome's crash closes the
+            # pages one by one before it tells that the context is gone.
+            if thread.tabs or (thread.emptied_at and now - thread.emptied_at < _LOSS_WINDOW_S):
+                thread.tabs_lost = True
+            thread.emptied_at = 0.0
             thread.tabs.clear()
             thread.active = 0
 
@@ -1669,6 +1702,10 @@ class BrowserSession:
             except Exception:  # noqa: BLE001 - logged with its traceback
                 _log.exception("browser_idle_tabs_close_failed")
             try:
+                await self._close_strays()
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_stray_close_failed")
+            try:
                 await self._close_unused()
             except Exception:  # noqa: BLE001 - logged with its traceback
                 _log.exception("browser_idle_close_failed", profile=str(self._profile))
@@ -1973,8 +2010,17 @@ class BrowserSession:
 
     async def _register(self, tab: Tab) -> None:
         page: Page = tab.page
-        attach_handlers(tab, self._downloads)
+        attach_handlers(
+            tab,
+            self._downloads,
+            DownloadLimits(
+                max_bytes=self._config.download_max_mb * 1024 * 1024,
+                quota_bytes=self._config.download_quota_mb * 1024 * 1024,
+            ),
+        )
         page.on("close", partial(self._on_page_closed, tab))
+        if self._config.mode == "own" and (self._config.download_max_mb > 0 or self._config.download_quota_mb > 0):
+            await watch_downloads(tab)
         await watch_births(tab)
         if self._config.mode == "attach":
             self._dot_targets.add(tab.target_id)
@@ -2003,6 +2049,8 @@ class BrowserSession:
                 # A tab Dot closes has left its thread by now: one still in it was closed by its page or in Chrome.
                 thread.remove(tab)
                 note_closed(thread, tab.page.url, "its page closed it, or it was closed in Chrome")
+                if not thread.tabs:
+                    thread.emptied_at = time.monotonic()
                 return
 
     def _take_initial_page(self) -> Page | None:
@@ -2032,6 +2080,9 @@ class BrowserSession:
                 with contextlib.suppress(Exception):
                     await page.close()
                 raise
+            if thread.tabs_lost:
+                thread.tabs_lost = False
+                add_note(tab, TABS_LOST)
             thread.tabs.append(tab)
             thread.active = len(thread.tabs) - 1
         await self._enforce_cap(thread)
@@ -2064,13 +2115,20 @@ class BrowserSession:
             _log.warning("browser_tab_close_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     @asynccontextmanager
-    async def _locked(self, thread_id: str) -> AsyncIterator[ThreadTabs]:
+    async def _locked(self, thread_id: str, *, opens: bool = False) -> AsyncIterator[ThreadTabs]:
+        """The thread's lock, with the browser connected. A call that works in the thread's tabs finds them gone when
+        Chrome quit or crashed under them (item 1297) and is told so once, rather than meeting a new blank tab where its
+        page was; one that ``opens`` a page of its own (``browser_open``, ``browser_new_tab``) goes on in a new tab,
+        which carries the note."""
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None:
             thread = ThreadTabs()
             self._threads[thread_id] = thread
         async with thread.lock:
             await self._ensure_context(self._unattended(thread_id))
+            if thread.tabs_lost and not opens:
+                thread.tabs_lost = False
+                raise BrowserError(TABS_LOST, {})
             await self._note_front()
             playwright: Playwright | None = self._playwright
             thread.last_used = time.monotonic()
@@ -2398,8 +2456,15 @@ class BrowserSession:
             sending_document(request),
             sending_tab(request),
         )
+        allowed: bool = verdict.allowed
+        sender: Page | None = sending_tab(request)
+        if allowed and sender is not None:
+            why: str | None = await self._not_public(sender, request.url)
+            if why is not None:
+                allowed = False
+                self._refuse_non_public(sender, main_page_of(request), request.url, request.resource_type, why)
         try:
-            if verdict.allowed:
+            if allowed:
                 await route.continue_()
             else:
                 await route.abort(_ABORT_REASON)
@@ -2457,6 +2522,31 @@ class BrowserSession:
     def _forget_page(self, page: Page) -> None:
         self._guarded.pop(page, None)
         self._refusals.pop(page, None)
+        self._public_only_pages.discard(page)
+
+    async def _not_public(self, page: Page | None, url: str) -> str | None:
+        """Why a request of ``page`` to ``url`` is refused before it is sent, when the page is one a web tool holds to
+        the public internet (item 1319): the address it names or resolves to is not a public one, or cannot be read (a
+        refusal where the answer is unknown). ``None`` for any other page, so that a page of the browser tools reaches
+        what it reached, and for an address that is public. A host's addresses are looked at once in
+        ``_PUBLIC_HOST_TTL_S``; the connection Chrome made is read again after the page (:meth:`_require_public`)."""
+        if page is None or page not in self._public_only_pages:
+            return None
+        try:
+            parts = urlsplit(url)
+            host: str | None = parts.hostname
+        except ValueError:
+            return "its address could not be read"
+        if parts.scheme.lower() not in _NETWORK_SCHEMES:
+            return None
+        key: str = (host or "").lower()
+        now: float = time.monotonic()
+        known: tuple[float, str | None] | None = self._public_hosts.get(key)
+        if known is not None and known[0] > now:
+            return known[1]
+        why: str | None = await unread_or_non_public(host or "", _PUBLIC_LOOK_TIMEOUT_S)
+        self._public_hosts[key] = (now + _PUBLIC_HOST_TTL_S, why)
+        return why
 
     def _on_paused(self, cdp: CDPSession, page: Page, main: str | None, event: Mapping[str, object]) -> None:
         task: asyncio.Task[None] = asyncio.create_task(self._answer_paused(cdp, page, main, event))
@@ -2479,7 +2569,25 @@ class BrowserSession:
         navigated: Page | None = page if paused.navigation and in_main else None
         sender: str | None = document_of(page.main_frame) if in_main else None
         verdict: UrlVerdict = self._judge(paused.url, paused.navigation, paused.resource_type, navigated, sender, page)
-        await self._answer_hop(cdp, page, paused.request_id, paused.url, verdict.allowed)
+        allowed: bool = verdict.allowed
+        if allowed:
+            why: str | None = await self._not_public(page, paused.url)
+            if why is not None:
+                allowed = False
+                self._refuse_non_public(page, navigated, paused.url, paused.resource_type, why)
+        await self._answer_hop(cdp, page, paused.request_id, paused.url, allowed)
+
+    def _refuse_non_public(self, page: Page, navigated: Page | None, url: str, resource_type: str, why: str) -> None:
+        """Keep and log the refusal of a request to a non-public address (item 1319): a navigation is kept for the error
+        of the call (:meth:`_refused_navigation`), as the refusals of the URL rules are."""
+        if navigated is not None:
+            self._refusals[page] = _Refusal(url=self._shown_to(page, url), reason=why, message=_NOT_PUBLIC_MESSAGE)
+        _log.info(
+            "browser_request_refused",
+            url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS),
+            resource_type=resource_type,
+            reason=f"{why}; {_NOT_PUBLIC_MESSAGE}",
+        )
 
     async def _answer_hop(self, cdp: CDPSession, page: Page, request_id: str, url: str, allowed: bool) -> None:
         """Let the request ``request_id`` go on, or fail it as blocked by the client. A page that closed under its
@@ -2515,9 +2623,9 @@ class BrowserSession:
         refusal: _Refusal | None = self._refusals.pop(page, None)
         if refusal is None:
             return None
-        return ForbiddenUrlError(_FORBIDDEN_MESSAGE, refusal.url, refusal.reason, "document")
+        return ForbiddenUrlError(refusal.message or _FORBIDDEN_MESSAGE, refusal.url, refusal.reason, "document")
 
-    async def _navigate_checked(self, page: Page, url: str, attempts: int) -> int | None:
+    async def _navigate_checked(self, page: Page, url: str, attempts: int) -> Navigation:
         """:func:`navigate`, with a navigation the rules refused on the way reported as such."""
         config: BrowserConfig = self._config
         try:
@@ -2632,7 +2740,7 @@ class BrowserSession:
         config: BrowserConfig = self._config
         tab.status = None
         try:
-            status: int | None = await self._navigate_checked(tab.page, url, config.navigation_attempts)
+            navigation: Navigation = await self._navigate_checked(tab.page, url, config.navigation_attempts)
         except ForbiddenUrlError as refused:
             # The tab shows Chrome's error page for the refused request; it is left as a page the rules forbid is.
             await self._blank(tab.page)
@@ -2642,8 +2750,12 @@ class BrowserSession:
                 refused.reason,
                 refused.resource_type,
             ) from refused
-        if status is not None:
-            tab.status = status
+        if navigation.status is not None:
+            tab.status = navigation.status
+        if navigation.redirected_to is not None:
+            # Chrome cut the navigation off and the tab stands on the page that did it (item 1296): read, with a note.
+            moved_to: str = truncate_middle(self._shown_to(tab.page, navigation.redirected_to), _SHOWN_URL_CHARS)
+            add_note(tab, f"the page redirected to {moved_to}")
         settled: bool = await self._settle_loaded(tab)
         await self._enforce_landing(tab)
         capture: _Capture = (
@@ -2673,16 +2785,26 @@ class BrowserSession:
     # A view the model reads takes ``hide_secrets``: the value of a field the page marks secret then shows as
     # ``[hidden]``, in the page's lines and in a screenshot (item 467); the tools give it in every mode but yolo.
 
-    async def open_url(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
-        """Navigate the current tab of the thread."""
-        async with self._locked(thread_id) as thread:
+    async def open_url(self, thread_id: str, url: str, hide_secrets: bool, *, public_only: bool = False) -> PageView:
+        """Navigate the current tab of the thread. With ``public_only`` (a web tool rendering a page in the run's tab,
+        :func:`dotagent.tools.web._renderer_for`) every request the tab sends meanwhile, redirect hops and the page's
+        own resources included, is refused before it is sent when its address is not a public one or cannot be read
+        (item 1319); in Dot's own Chrome only, where the requests are Dot's to answer. The browser tools never ask."""
+        async with self._locked(thread_id, opens=True) as thread:
             tab: Tab = await self._current_tab(thread)
-            return await self._load(thread, tab, url, hide_secrets)
+            held: bool = public_only and self._config.mode == "own"
+            if held:
+                self._public_only_pages.add(tab.page)
+            try:
+                return await self._load(thread, tab, url, hide_secrets)
+            finally:
+                if held:
+                    self._public_only_pages.discard(tab.page)
 
     async def new_tab(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Open ``url`` in a new tab that becomes the current one."""
         self._require_allowed(url)
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             tab: Tab = await self._create_tab(thread)
             return await self._load(thread, tab, url, hide_secrets)
 
@@ -2869,8 +2991,7 @@ class BrowserSession:
             private = await non_public_address(host) if host else None
         if private is not None:
             raise ForbiddenUrlError(
-                "the page is on a private or local network address; the web tools only reach the public internet "
-                "(web.allow_private_hosts)",
+                _NOT_PUBLIC_MESSAGE,
                 landed,
                 f"it was served from {private}",
                 "document",
@@ -2896,9 +3017,12 @@ class BrowserSession:
         page.on("response", lambda response: _note_main_status(page, response, statuses, documents))
         try:
             if config.mode == "own":
+                if public_only:
+                    self._public_only_pages.add(page)
                 await self._guard_hops(page)
-            first: int | None = await self._navigate_checked(page, url, config.navigation_attempts)
-            if first is None:
+            navigation: Navigation = await self._navigate_checked(page, url, config.navigation_attempts)
+            first: int | None = navigation.status
+            if first is None and navigation.redirected_to is None:
                 raise BrowserError("the address started a download, not a page", {"url": url})
             if first in _CHALLENGE_STATUS:
                 with contextlib.suppress(PlaywrightError):
@@ -2927,8 +3051,15 @@ class BrowserSession:
                     "reading the page failed", {"url": url, "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
                 ) from error
         finally:
-            await self._close_scratch(page)
-        return RenderedDocument(url=landed, status=statuses[-1] if statuses else first, html=html)
+            self._public_only_pages.discard(page)
+            await self._discard_scratch(page)
+        status: int | None = statuses[-1] if statuses else first
+        if status is None:
+            raise BrowserError(
+                "the page redirected and its answer was not seen, so it is not read as a page",
+                {"url": url, "landed": truncate_middle(landed, _LAUNCH_ERROR_CHARS)},
+            )
+        return RenderedDocument(url=landed, status=status, html=html)
 
     async def _background_tab(self, context: BrowserContext) -> Page:
         """A new tab created in the background through CDP. Playwright's ``new_page`` opens in the foreground, which
@@ -3028,6 +3159,36 @@ class BrowserSession:
                     await page.close()
                 raise
         return page
+
+    async def _discard_scratch(self, page: Page) -> None:
+        """Close the tab of a quiet read at the end of the read, in a ``finally``: a close that fails must not raise
+        there, where it would replace the page already read (or the error that ended the read) with "closing a tab
+        failed" (item 1297). It is logged, and the tab is left to the reaper, whose next round closes it again
+        (:meth:`_close_strays`). Only the failures a closing tab has are kept out of the way (Chrome's refusal to
+        close in time, a target already gone); anything else is a bug and is raised."""
+        try:
+            await self._close_scratch(page)
+        except (BrowserError, PlaywrightError) as error:
+            self._stray_scratch.add(page)
+            _log.warning(
+                "browser_scratch_not_closed",
+                url=truncate_middle(self._shown_to(page, page.url), _SHOWN_URL_CHARS),
+                error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
+            )
+
+    async def _close_strays(self) -> None:
+        """Try again to close the tabs of quiet reads that could not be closed; a tab that closed meanwhile (Chrome
+        quit, the page itself) is forgotten, one that still cannot be closed waits for the next round."""
+        for page in list(self._stray_scratch):
+            if page.is_closed():
+                self._stray_scratch.discard(page)
+                continue
+            try:
+                await self._close_scratch(page)
+            except (BrowserError, PlaywrightError) as error:
+                _log.warning("browser_stray_scratch_not_closed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
+                continue
+            self._stray_scratch.discard(page)
 
     async def _close_scratch(self, page: Page) -> None:
         """Close the tab of a quiet read the way it was made, through Chrome's own ``Target.closeTarget``, and wait for
@@ -3252,7 +3413,7 @@ class BrowserSession:
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None or not thread.scripted or not thread.tabs:
             return False
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             tab: Tab | None = self._tab_of(thread_id)
             for other in [one for one in thread.tabs if one is not tab]:
                 await self._close_tab_object(thread, other)
@@ -3294,7 +3455,7 @@ class BrowserSession:
         async with self._teach_lock:
             if self._teaching is not None:
                 raise RunConflict("a task is being recorded already", {"thread_id": self._teaching.thread_id})
-            async with self._locked(thread_id) as thread:
+            async with self._locked(thread_id, opens=True) as thread:
                 tab: Tab = await self._current_tab(thread)
                 if tab.page.url in _BLANK_URLS or tab.page.url.startswith("about:blank"):
                     try:
@@ -4012,7 +4173,7 @@ class BrowserSession:
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None or not thread.scripted:
             return None
-        async with self._locked(thread_id) as thread:
+        async with self._locked(thread_id, opens=True) as thread:
             if not thread.scripted or not thread.tabs:
                 return None
             address: str = thread.tabs[thread.active].page.url
@@ -4025,7 +4186,9 @@ class BrowserSession:
             add_note(fresh, _FRESH_FOR_LOGIN_NOTE)
             if address not in _BLANK_URLS and not address.startswith("about:blank"):
                 try:
-                    fresh.status = await self._navigate_checked(fresh.page, address, self._config.navigation_attempts)
+                    fresh.status = (
+                        await self._navigate_checked(fresh.page, address, self._config.navigation_attempts)
+                    ).status
                 except BrowserError as error:
                     add_note(fresh, f"the page could not be opened again: {error.message}")
             await self._settle(fresh)

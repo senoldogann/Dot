@@ -62,9 +62,9 @@ def test_a_screenshot_reads_the_bundle_id_of_the_windows_it_blacks_out(monkeypat
         capture, "capture_native", lambda area, timeout_s: Image.new("RGB", (100, 100), (255, 255, 255))
     )
     monkeypatch.setattr(apps, "bundle_ids", lambda: {7: "com.apple.passwords"})
-    picture, redacted = shots._picture_of(
-        load_default_config().desktop, Rect(0, 0, 100, 100), (_window(7, "Passwörter"), _window(8, "Notes"))
-    )
+    windows: tuple[WindowInfo, ...] = (_window(7, "Passwörter"), _window(8, "Notes"))
+    monkeypatch.setattr(screen, "windows_on_screen", lambda: windows)
+    picture, redacted = shots._picture_of(load_default_config().desktop, Rect(0, 0, 100, 100), windows)
     assert redacted == 1
     assert picture.getpixel((30, 30)) == (0, 0, 0)
     assert picture.getpixel((80, 80)) == (255, 255, 255)
@@ -102,6 +102,7 @@ def test_a_screenshot_leaves_out_dots_window_while_the_eye_shows_a_secret_and_sa
     monkeypatch.setattr(apps, "bundle_ids", lambda: {1: "dev.dot.desktop"})
     monkeypatch.setattr(shown, "_until", 0.0)
     windows: tuple[WindowInfo, ...] = (_titled(1, "Dot", "Dot"),)
+    monkeypatch.setattr(screen, "windows_on_screen", lambda: windows)
     area: Rect = Rect(0, 0, 100, 100)
     picture, redacted = shots._picture_of(load_default_config().desktop, area, windows)
     assert redacted == 0 and picture.getpixel((30, 30)) == (255, 255, 255)

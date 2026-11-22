@@ -290,12 +290,20 @@ class WebClient:
         visited: list[str] = []
         current: str = url
         for _ in range(_MAX_REDIRECTS + 1):
-            exchange: _Exchange = await self._exchange("GET", current, {}, None, max_bytes)
+            try:
+                exchange: _Exchange = await self._exchange("GET", current, {}, None, max_bytes)
+            except WebError as error:
+                error.hops_followed = len(visited)
+                raise
             if exchange.location is None:
                 return _document(current, exchange, tuple(visited))
             visited.append(current)
             current = urljoin(current, exchange.location)
-        raise WebError("too many redirects", {"url": _shown(url), "redirects": len(visited), "limit": _MAX_REDIRECTS})
+        too_many: WebError = WebError(
+            "too many redirects", {"url": _shown(url), "redirects": len(visited), "limit": _MAX_REDIRECTS}
+        )
+        too_many.hops_followed = len(visited)
+        raise too_many
 
     async def post_form(self, url: str, data: Mapping[str, str], max_bytes: int) -> FetchedDocument:
         """POST a form's fields as ``application/x-www-form-urlencoded`` (item 781). A redirect is not followed, so

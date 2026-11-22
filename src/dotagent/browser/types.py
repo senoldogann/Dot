@@ -302,7 +302,8 @@ class HumanCheckOutcome(FrozenModel):
 
     ``result`` is ``none`` (no check in front of the page), ``passed`` (it is gone or says so), ``challenge`` (it needs
     eyes: an image grid or a drag puzzle, handed back as ``crop``) or ``unfinished`` (it was pressed and did not
-    clear)."""
+    clear). ``unreadable`` is set when the page, or a frame of it that matters, could not be read: the answer is then
+    ``unfinished``, never ``passed``, and the run is told to look at the page (item 1295)."""
 
     result: Literal["none", "passed", "challenge", "unfinished"]
     kind: str
@@ -318,6 +319,7 @@ class HumanCheckOutcome(FrozenModel):
     crop: bytes = b""
     crop_box: CheckBox | None = None
     view: PageView | None = None
+    unreadable: bool = False
 
 
 class TextView(FrozenModel):

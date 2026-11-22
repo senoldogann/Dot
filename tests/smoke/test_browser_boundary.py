@@ -575,7 +575,8 @@ async def test_a_page_read_for_the_web_tools_must_have_come_from_a_public_addres
         with pytest.raises(ForbiddenUrlError) as refused:
             await browser.read_page(url, public_only=True)
         assert "the web tools only reach the public internet" in refused.value.message, refused.value
-        assert refused.value.reason.startswith("it was served from "), refused.value
+        # Refused before the request was sent (item 1319): the reason is the address, not where a page was served from.
+        assert "private or local network address" in refused.value.reason, refused.value
     read = await browser.read_page(f"{site}/", public_only=False)
     assert "Outside" in read.html and read.status == 200
 

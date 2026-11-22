@@ -15,13 +15,17 @@ import asyncio
 import re
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Frame, Page
 
 from dotagent.browser.types import CheckBox, HumanCheckOutcome
 from dotagent.core.images import crop_scaled
+from dotagent.core.logs import get_logger
+from dotagent.core.text import truncate_middle
+
+_log = get_logger("dotagent.browser.human_check")
 
 # How long one probe of one frame may take before the frame is counted as unreadable (a frame that is going away
 # while it is read).
@@ -39,6 +43,51 @@ _CROP_SCALE: float = 2.0
 _CROP_MOST_PX: int = 1024
 # A click on a widget iframe whose inside cannot be read goes where its checkbox sits: the left of the anchor.
 _CHECKBOX_INSET_X: float = 30.0
+# How far a check may sit from where it was read and still be the same check in a hold that is under way.
+_MOVED_PX: float = 12.0
+# How far apart two reads of a check may be for it to count as standing still, and how many more reads a check that was
+# found moving gets to stop before it is given up (a widget with an entrance animation stops within a few).
+_STILL_PX: float = 2.0
+_SETTLE_READS: int = 6
+# How far the box of the element under a pixel may differ from the check's box and still be the check's own element.
+_BOX_SLACK_PX: float = 6.0
+# What a note names of the element that covers a check: enough to know it, not a page's whole text.
+_NAME_CHARS: int = 60
+# A frame whose address says it is a widget of someone else's: one that cannot be read makes the page unreadable.
+_WIDGET_URL: re.Pattern[str] = re.compile(
+    r"hcaptcha\.com|recaptcha|challenges\.cloudflare\.com|turnstile", re.IGNORECASE
+)
+
+# What is under a pixel of a frame: the element the check is drawn by (the first of the stack whose box is the check's)
+# with nothing above it that is not part of it (a label around a checkbox is). Reads the DOM only.
+_UNDER: str = r"""
+([x, y, left, top, width, height, slack]) => {
+  const name = (el) => (el.tagName || '').toLowerCase() + (el.id ? '#' + el.id : '') + ' ' +
+    ((el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30));
+  const stack = document.elementsFromPoint(x, y);
+  const near = (r) => Math.abs(r.left - left) <= slack && Math.abs(r.top - top) <= slack &&
+    Math.abs(r.width - width) <= slack && Math.abs(r.height - height) <= slack;
+  for (let i = 0; i < stack.length; i++) {
+    const el = stack[i];
+    if (!near(el.getBoundingClientRect())) continue;
+    for (let j = 0; j < i; j++) {
+      const above = stack[j];
+      if (!el.contains(above) && !(above.tagName === 'LABEL' && above.contains(el))) return name(above);
+    }
+    return '';
+  }
+  return stack.length ? name(stack[0]) : 'nothing';
+}
+"""
+
+# What is on top at a pixel of the document an <iframe> sits in: the <iframe> itself, or what covers it.
+_FRAME_ON_TOP: str = r"""
+(frame, [x, y]) => {
+  const top = frame.ownerDocument.elementsFromPoint(x, y)[0];
+  if (top === frame) return '';
+  return top ? (top.tagName || '').toLowerCase() + (top.id ? '#' + top.id : '') : 'nothing';
+}
+"""
 
 # The probe that finds the checks of one frame. It reads the DOM only: what is visible, where it is, what it says and
 # whether it already passed. Nothing is pressed here.
@@ -46,13 +95,23 @@ _PROBE: str = r"""
 () => {
   const out = [];
   const seen = new Set();
+  // The most a page's text may hold to be read as one body, and the most nodes of a page looked at for a check of its
+  // own: a page past either is not scanned whole (its first and its last nodes are, where a modal sits).
+  const BODY_CAP = 20000;
+  const NODE_CAP = 3000;
   const vw = window.innerWidth || 1280;
   const vh = window.innerHeight || 800;
   const rectOf = (el) => {
     const r = el.getBoundingClientRect();
     return [r.left, r.top, r.width, r.height];
   };
-  const words = (el) => ((el.innerText || el.textContent || '') + '').replace(/\s+/g, ' ').trim();
+  // The words of an element, read from textContent first: a node whose text is longer than ``cap`` is no label of a
+  // check, and innerText (which makes the browser lay the page out) is never asked of it (item 1295).
+  const words = (el, cap = 600) => {
+    if (!el) return '';
+    if ((el.textContent || '').length > cap) return '';
+    return ((el.innerText || el.textContent || '') + '').replace(/\s+/g, ' ').trim();
+  };
   const shown = (el) => {
     if (!el || el.nodeType !== 1) return false;
     try {
@@ -154,10 +213,12 @@ _PROBE: str = r"""
   // Inside a widget's own document: its checkbox, its challenge, the button that sends one, and its answer. A small
   // embedded document that holds a checkbox of its own or talks of a robot is a widget too, whatever its address.
   const embedded = window.top !== window;
-  const said = words(document.body);
+  const bodyShort = !!document.body && (document.body.textContent || '').length <= BODY_CAP;
+  const said = bodyShort ? words(document.body, BODY_CAP) : '';
   const anchor = document.querySelector('#recaptcha-anchor, #checkbox, [role=checkbox]');
   const promptEl = document.querySelector(WIDGET_PROMPT);
-  const widget = here || (embedded && (!!anchor || (said.length < 600 && (CHECKBOX.test(said) || !!promptEl))));
+  const widget = here || (embedded && (!!anchor || (bodyShort && said.length < 600 &&
+    (CHECKBOX.test(said) || !!promptEl))));
   const kind = here || 'human_check';
   if (widget) {
     const box = anchor || document.querySelector('input[type=checkbox]');
@@ -190,13 +251,16 @@ _PROBE: str = r"""
   // A check drawn by the site itself: a word on something that can be pressed. A paragraph about a captcha beside a
   // link is no check, so only a pressable target counts.
   if (!widget) {
-    for (const el of document.querySelectorAll(CANDIDATES)) {
+    const all = Array.from(document.querySelectorAll(CANDIDATES));
+    const head = Math.floor(NODE_CAP / 3);
+    const nodes = all.length > NODE_CAP ? all.slice(0, head).concat(all.slice(all.length - (NODE_CAP - head))) : all;
+    for (const el of nodes) {
       const text = words(el);
       if (!text || text.length > 120) continue;
       let role = '';
       if (HOLD.test(text)) role = 'hold';
       else if (CHECKBOX.test(text)) role = 'checkbox';
-      else if (WAIT.test(text) && words(document.body).length < 600) role = 'wait';
+      else if (WAIT.test(text) && bodyShort && said.length < 600) role = 'wait';
       if (!role) continue;
       // The control pressed is the one the words are in or the one they are drawn on. A hold is often a bar beside its
       // own words, so a pressable drawn beside them is taken only when it says nothing of its own or says the same
@@ -229,6 +293,10 @@ class Check:
     state: str = ""
     cols: int = 0
     rows: int = 0
+    # The frame whose probe found it and where that frame's viewport sits in the main frame's: what a press is checked
+    # against (item 1295). Not part of what a check is, so they do not take part in comparing two.
+    frame: Frame | None = field(default=None, compare=False, repr=False)
+    offset: tuple[float, float] = field(default=(0.0, 0.0), compare=False, repr=False)
 
     @property
     def passed(self) -> bool:
@@ -250,7 +318,7 @@ def _box_of(value: object) -> CheckBox | None:
     return CheckBox(x=left, y=top, width=width, height=height)
 
 
-def _finding(item: object, offset_x: float, offset_y: float) -> Check | None:
+def _finding(item: object, offset_x: float, offset_y: float, frame: Frame | None = None) -> Check | None:
     if not isinstance(item, dict):
         return None
     box = _box_of(item.get("box"))
@@ -268,45 +336,81 @@ def _finding(item: object, offset_x: float, offset_y: float) -> Check | None:
         state=state if isinstance(state, str) else "",
         cols=int(_as_float(item.get("cols"))),
         rows=int(_as_float(item.get("rows"))),
+        frame=frame,
+        offset=(offset_x, offset_y),
     )
 
 
 async def _offset_of(frame: Frame) -> tuple[float, float] | None:
-    """Where a frame's own viewport sits in the main frame's, from the box of its ``<iframe>`` element."""
+    """Where a frame's own viewport sits in the main frame's, from the box of its ``<iframe>`` element; ``None`` for a
+    frame that is not drawn. A frame that is going away raises, and the caller counts that as unreadable."""
     if frame.parent_frame is None:
         return (0.0, 0.0)
-    try:
-        element = await frame.frame_element()
-        box = await element.bounding_box()
-    except (PlaywrightError, TimeoutError):
-        return None
+    element = await frame.frame_element()
+    box = await element.bounding_box()
     if box is None:
         return None
     return (box["x"], box["y"])
 
 
-async def find_checks(page: Page) -> tuple[dict[str, float], tuple[Check, ...]]:
-    """The checks in front of the page now, and the page's viewport in CSS pixels."""
+@dataclass(frozen=True)
+class Reading:
+    """One read of the page: its viewport, the checks in it, and whether a frame that matters could not be read.
+
+    ``unreadable`` is set when the main frame, a frame that held a check a moment ago or a frame whose address is a
+    captcha widget's did not answer in time or went away while it was read. What such a read lacks is not a check that
+    passed: an empty ``checks`` with ``unreadable`` set says nothing (item 1295)."""
+
+    viewport: dict[str, float]
+    checks: tuple[Check, ...]
+    unreadable: bool = False
+
+
+def _matters(frame: Frame, page: Page, watched: set[Frame]) -> bool:
+    return frame is page.main_frame or frame in watched or _WIDGET_URL.search(frame.url) is not None
+
+
+async def find_checks(page: Page, watched: set[Frame] | None = None) -> Reading:
+    """The checks in front of the page now, and the page's viewport in CSS pixels.
+
+    ``watched`` holds the frames that showed a check earlier in the same call: it is added to here, and a frame in it
+    that cannot be read makes the reading ``unreadable`` as the main frame does."""
+    held: set[Frame] = watched if watched is not None else set()
     readings: list[Check] = []
     viewport: dict[str, float] = {"width": 1280.0, "height": 800.0}
+    unreadable: bool = False
     for frame in page.frames:
         try:
             raw: object = await asyncio.wait_for(frame.evaluate(_PROBE), _PROBE_TIMEOUT_S)
-        except (PlaywrightError, TimeoutError):
+            offset: tuple[float, float] | None = await _offset_of(frame)
+        except (PlaywrightError, TimeoutError) as error:
+            if _matters(frame, page, held):
+                unreadable = True
+                _log.info(
+                    "human_check_frame_unreadable",
+                    frame=truncate_middle(frame.url, _NAME_CHARS * 2),
+                    error=truncate_middle(str(error), _NAME_CHARS * 2),
+                )
             continue
         if not isinstance(raw, dict):
+            unreadable = unreadable or _matters(frame, page, held)
             continue
-        offset: tuple[float, float] | None = await _offset_of(frame)
         if offset is None:
             continue
         if frame is page.main_frame:
             viewport = {"width": _as_float(raw.get("vw")) or 1280.0, "height": _as_float(raw.get("vh")) or 800.0}
         findings = raw.get("findings")
         for item in findings if isinstance(findings, list) else []:
-            check = _finding(item, *offset)
+            check = _finding(item, *offset, frame=frame)
             if check is not None:
                 readings.append(check)
-    return viewport, tuple(readings)
+                held.add(frame)
+    return Reading(viewport, tuple(readings), unreadable)
+
+
+def _settled(reading: Reading) -> bool:
+    """Whether the read shows nothing of a check left, and was whole: an unreadable page is not a cleared one."""
+    return _cleared(reading.checks) and not reading.unreadable
 
 
 # The checks a widget of someone else draws: on a page that has one, the page's own words wait their turn.
@@ -345,30 +449,31 @@ def _cleared(checks: tuple[Check, ...]) -> bool:
     )
 
 
-async def _poll(page: Page, until: float) -> tuple[dict[str, float], tuple[Check, ...]]:
-    """Read the page again every ``_POLL_S`` until it says the check passed or ended, or ``until`` comes."""
-    viewport, checks = await find_checks(page)
+async def _poll(page: Page, until: float, watched: set[Frame]) -> Reading:
+    """Read the page again every ``_POLL_S`` until it says the check passed or ended, or ``until`` comes. A read that
+    could not see a frame that matters is read again, never taken for an end."""
+    reading: Reading = await find_checks(page, watched)
     while True:
-        if _passed(checks):
-            return viewport, checks
-        if _cleared(checks):
+        if _passed(reading.checks):
+            return reading
+        if _settled(reading):
             # A widget that is gone for a blink is a frame being rebuilt, not a check that passed.
             await asyncio.sleep(min(_GONE_SETTLED_S, max(0.0, until - time.monotonic())))
-            viewport, checks = await find_checks(page)
-            if _passed(checks) or _cleared(checks):
-                return viewport, checks
+            reading = await find_checks(page, watched)
+            if _passed(reading.checks) or _settled(reading):
+                return reading
             continue
         left: float = until - time.monotonic()
         if left <= 0:
-            return viewport, checks
+            return reading
         await asyncio.sleep(min(_POLL_S, left))
-        viewport, checks = await find_checks(page)
+        reading = await find_checks(page, watched)
 
 
 async def wait_cleared(page: Page, timeout_s: float) -> bool:
     """Wait for a check that is already working (Turnstile's, Cloudflare's) to clear itself."""
-    _, checks = await _poll(page, time.monotonic() + timeout_s)
-    return _passed(checks) or _cleared(checks)
+    reading: Reading = await _poll(page, time.monotonic() + timeout_s, set())
+    return _passed(reading.checks) or _settled(reading)
 
 
 async def _crop(page: Page, box: CheckBox, viewport: dict[str, float]) -> tuple[bytes, CheckBox] | None:
@@ -389,16 +494,118 @@ async def _crop(page: Page, box: CheckBox, viewport: dict[str, float]) -> tuple[
     )
 
 
+def _still(one: CheckBox, other: CheckBox) -> bool:
+    return abs(one.x - other.x) <= _STILL_PX and abs(one.y - other.y) <= _STILL_PX
+
+
 def _near(one: CheckBox, other: CheckBox) -> bool:
-    return abs(one.x - other.x) < 12 and abs(one.y - other.y) < 12
+    return abs(one.x - other.x) < _MOVED_PX and abs(one.y - other.y) < _MOVED_PX
+
+
+@dataclass(frozen=True)
+class _Press:
+    """A check as it stands just before it is pressed, and the pixel it is pressed at."""
+
+    check: Check
+    point: tuple[float, float]
+
+
+def _press_point(check: Check) -> tuple[float, float]:
+    """Where a check is pressed: the middle of a checkbox or a button, the checkbox's place at the left of a widget
+    whose inside could not be read."""
+    if check.role == "widget":
+        return (check.box.x + min(_CHECKBOX_INSET_X, check.box.width / 2), check.box.y + check.box.height / 2)
+    return check.box.center
+
+
+def _counterpart(checks: tuple[Check, ...], front: Check) -> Check | None:
+    """The check now that is the one read before: of its kind and role, the nearest to where it was."""
+    same = [one for one in checks if one.kind == front.kind and one.role == front.role]
+    if not same:
+        return None
+    cx, cy = front.box.center
+    return min(same, key=lambda one: (one.box.center[0] - cx) ** 2 + (one.box.center[1] - cy) ** 2)
+
+
+async def _covered_by(check: Check, point: tuple[float, float]) -> str:
+    """What stands over ``point`` instead of the check, named; ``""`` when the pixel is the check's own.
+
+    The frame the check lives in is asked what is on top there (``document.elementsFromPoint``), and so is every
+    document its ``<iframe>`` sits in up to the page's, where the ``<iframe>`` itself must be on top: a page that draws
+    something over a widget it cannot read inside is seen from outside. What cannot be read is not the check's."""
+    frame: Frame | None = check.frame
+    if frame is None:
+        return "an unknown element"
+    x, y = point
+    try:
+        left, top = check.box.x - check.offset[0], check.box.y - check.offset[1]
+        covering: object = await asyncio.wait_for(
+            frame.evaluate(
+                _UNDER,
+                [x - check.offset[0], y - check.offset[1], left, top, check.box.width, check.box.height, _BOX_SLACK_PX],
+            ),
+            _PROBE_TIMEOUT_S,
+        )
+        if covering != "":
+            return str(covering)[:_NAME_CHARS] or "an unknown element"
+        while frame.parent_frame is not None:
+            parent: Frame = frame.parent_frame
+            parent_offset: tuple[float, float] | None = await _offset_of(parent)
+            if parent_offset is None:
+                return "a frame that is not drawn"
+            element = await frame.frame_element()
+            over: object = await asyncio.wait_for(
+                element.evaluate(_FRAME_ON_TOP, [x - parent_offset[0], y - parent_offset[1]]), _PROBE_TIMEOUT_S
+            )
+            if over != "":
+                return str(over)[:_NAME_CHARS] or "an unknown element"
+            frame = parent
+    except (PlaywrightError, TimeoutError) as error:
+        _log.info("human_check_pixel_unreadable", error=truncate_middle(str(error), _NAME_CHARS * 2))
+        return "something that could not be read"
+    return ""
+
+
+async def _confirm_press(page: Page, front: Check, watched: set[Frame]) -> tuple[_Press | None, Reading, str]:
+    """Read the page again just before a press (item 1295): the check must be where it was read, or settled in a new
+    place, and be the element under the pixel. Returns what to press, or ``None`` with the reading and why not.
+
+    A widget that is still sliding in is read again until it stands still (``_SETTLE_READS`` reads at most) and is
+    pressed where it stops, not where it was first read; a page whose check stands still costs this one read."""
+    reading: Reading = await find_checks(page, watched)
+    if _passed(reading.checks):
+        return (None, reading, "it passed before it was pressed")
+    now: Check | None = _counterpart(reading.checks, front)
+    reads: int = 0
+    while now is not None and not _still(now.box, front.box):
+        # It is not where it was read: wait for it to stop, and press it where it stops.
+        reads += 1
+        if reads > _SETTLE_READS:
+            return (None, reading, "it kept moving, so nothing was pressed")
+        await asyncio.sleep(_POLL_S)
+        reading = await find_checks(page, watched)
+        if _passed(reading.checks):
+            return (None, reading, "it passed before it was pressed")
+        before: Check = now
+        now = _counterpart(reading.checks, front)
+        if now is not None and _still(now.box, before.box):
+            break
+    if now is None:
+        return (None, reading, "it was gone before it was pressed")
+    point: tuple[float, float] = _press_point(now)
+    covering: str = await _covered_by(now, point)
+    if covering:
+        return (None, reading, f"{covering!r} is over it, so nothing was pressed")
+    return (_Press(now, point), reading, "")
 
 
 async def _hold(
-    page: Page, check: Check, timeout_s: float, guard: PressGuard | None
-) -> tuple[float, str, dict[str, float], tuple[Check, ...]]:
+    page: Page, press: _Press, timeout_s: float, guard: PressGuard | None, watched: set[Frame]
+) -> tuple[float, str, Reading]:
     """Press the button, hold it until the page says it took it, and let go. Returns how long it was held, what told
     the hold to end, and the reading after it."""
-    x, y = check.box.center
+    check: Check = press.check
+    x, y = press.point
     limit: float = min(timeout_s, _HOLD_MOST_S)
     started: float = time.monotonic()
     note: str = "it was held as long as it may be"
@@ -414,9 +621,12 @@ async def _hold(
                 # A widget that watches the pointer for a move while it is down sees one (a still mouse is no mouse).
                 await page.mouse.move(x + 1, y + 1)
                 jiggled = True
-            _, checks = await find_checks(page)
-            now = next((one for one in checks if one.role == "hold" and _near(one.box, check.box)), None)
+            reading: Reading = await find_checks(page, watched)
+            now = next((one for one in reading.checks if one.role == "hold" and _near(one.box, check.box)), None)
             if now is None:
+                if reading.unreadable:
+                    # The page did not answer: the button is not known to be gone, so the hold goes on.
+                    continue
                 note = "the button went away"
                 break
             if now.passed or not _HOLD_WORDS.search(now.text):
@@ -425,8 +635,7 @@ async def _hold(
     finally:
         held: float = time.monotonic() - started
         await page.mouse.up()
-    viewport, checks = await _poll(page, time.monotonic() + timeout_s)
-    return (held, note, viewport, checks)
+    return (held, note, await _poll(page, time.monotonic() + timeout_s, watched))
 
 
 def _with_crop(outcome: HumanCheckOutcome, crop: tuple[bytes, CheckBox] | None) -> HumanCheckOutcome:
@@ -452,15 +661,84 @@ def _challenge(front: Check, checks: tuple[Check, ...], started: float, did: tup
     )
 
 
+_UNREADABLE_NOTE: str = "could not read the page, look at it"
+
+
+def _unreadable(front: Check | None, started: float, did: tuple[str, ...], note: str = "") -> HumanCheckOutcome:
+    """A page that did not answer is not a page that passed: the run is told to look at it (item 1295)."""
+    return HumanCheckOutcome(
+        result="unfinished",
+        kind=front.kind if front is not None else "",
+        role=front.role if front is not None else "",
+        box=front.box if front is not None else None,
+        text=front.text if front is not None else "",
+        seconds=time.monotonic() - started,
+        did=did,
+        note=f"{note}; then the page could not be read, look at it" if note else _UNREADABLE_NOTE,
+        unreadable=True,
+    )
+
+
+async def _read_after(
+    page: Page,
+    check: Check,
+    reading: Reading,
+    started: float,
+    did: tuple[str, ...],
+    passed_note: str,
+    unfinished_note: str,
+) -> HumanCheckOutcome:
+    """What a read after a press (or after a press that was not made because the page had changed) comes to: a
+    challenge that opened, a check that passed or cleared on a read that saw the whole page, a page that could not be
+    read, or a check that is still there."""
+    after: Check | None = _front(reading.checks)
+    if after is not None and after.role == "challenge":
+        return _with_crop(
+            _challenge(after, reading.checks, started, did=did), await _crop(page, after.box, reading.viewport)
+        )
+    if (after is not None and after.passed) or _settled(reading):
+        return HumanCheckOutcome(
+            result="passed",
+            kind=check.kind,
+            role=check.role,
+            box=check.box,
+            text=check.text,
+            seconds=time.monotonic() - started,
+            did=did,
+            note=passed_note,
+        )
+    if reading.unreadable:
+        return _unreadable(after or check, started, did, "" if did else unfinished_note)
+    shown: Check = after or check
+    outcome = HumanCheckOutcome(
+        result="unfinished",
+        kind=shown.kind,
+        role=shown.role,
+        box=shown.box,
+        text=shown.text,
+        seconds=time.monotonic() - started,
+        did=did,
+        note=unfinished_note,
+    )
+    return _with_crop(outcome, await _crop(page, shown.box, reading.viewport))
+
+
 async def pass_human_check(page: Page, timeout_s: float, guard: PressGuard | None = None) -> HumanCheckOutcome:
     """Find the human check in front of the page and pass the part of it a press can pass.
 
     Every press is put to ``guard`` first, with the pixel it would land on: the tool that calls this weighs that
-    pixel by the elements a snapshot shows under it, as ``click_at`` is weighed (item 1252)."""
+    pixel by the elements a snapshot shows under it, as ``click_at`` is weighed (item 1252). Just before it, the page is
+    read again and the pixel is checked to be the check's own element (item 1295).
+
+    A page that could not be read is never a page that passed: after a press it is ``unfinished`` and the run is told
+    to look at it."""
     started: float = time.monotonic()
-    viewport, checks = await find_checks(page)
-    front: Check | None = _front(checks)
+    watched: set[Frame] = set()
+    reading: Reading = await find_checks(page, watched)
+    front: Check | None = _front(reading.checks)
     if front is None:
+        if reading.unreadable:
+            return _unreadable(None, started, ())
         return HumanCheckOutcome(result="none", kind="", role="", box=None, text="", seconds=time.monotonic() - started)
     if front.passed:
         return HumanCheckOutcome(
@@ -473,7 +751,7 @@ async def pass_human_check(page: Page, timeout_s: float, guard: PressGuard | Non
             note="the page already says it passed",
         )
     if front.role == "challenge":
-        return _with_crop(_challenge(front, checks, started), await _crop(page, front.box, viewport))
+        return _with_crop(_challenge(front, reading.checks, started), await _crop(page, front.box, reading.viewport))
     if front.role == "wait":
         waited: bool = await wait_cleared(page, timeout_s)
         return HumanCheckOutcome(
@@ -486,53 +764,49 @@ async def pass_human_check(page: Page, timeout_s: float, guard: PressGuard | Non
             did=("waited for the page's own check to clear",),
             note="the page went on" if waited else "the page is still checking",
         )
+    # A button to hold, a checkbox, or a widget whose inside could not be read: the page is read once more, and the
+    # press goes to where the check stands now if it is the element under that pixel.
+    press, latest, why = await _confirm_press(page, front, watched)
+    if press is None:
+        return await _read_after(page, front, latest, started, (), why, why)
+    check: Check = press.check
     if front.role == "hold":
-        held, note, _, held_after = await _hold(page, front, timeout_s, guard)
-        cleared: bool = _passed(held_after) or _cleared(held_after)
+        held, note, held_after = await _hold(page, press, timeout_s, guard, watched)
+        did: tuple[str, ...] = (f"held it {held:.1f} s at {check.box.words()}",)
+        if _passed(held_after.checks) or _settled(held_after):
+            return HumanCheckOutcome(
+                result="passed",
+                kind=check.kind,
+                role="hold",
+                box=check.box,
+                text=check.text,
+                seconds=time.monotonic() - started,
+                did=did,
+                note=note,
+            )
+        if held_after.unreadable:
+            return _unreadable(check, started, did, note)
         return HumanCheckOutcome(
-            result="passed" if cleared else "unfinished",
-            kind=front.kind,
+            result="unfinished",
+            kind=check.kind,
             role="hold",
-            box=front.box,
-            text=front.text,
+            box=check.box,
+            text=check.text,
             seconds=time.monotonic() - started,
-            did=(f"held it {held:.1f} s at {front.box.words()}",),
-            note=note if cleared else f"{note} and the check is still there",
+            did=did,
+            note=f"{note} and the check is still there",
         )
-    # A checkbox, or a widget whose inside could not be read: one press, then the state read again until it says.
-    point: tuple[float, float]
-    if front.role == "checkbox":
-        point = front.box.center
-    else:
-        point = (front.box.x + min(_CHECKBOX_INSET_X, front.box.width / 2), front.box.y + front.box.height / 2)
+    point: tuple[float, float] = press.point
     if guard is not None:
         await guard(point[0], point[1])
     await page.mouse.click(point[0], point[1])
-    viewport, checks = await _poll(page, time.monotonic() + timeout_s)
-    after: Check | None = _front(checks)
     pressed = f"pressed the check at {point[0]:.0f},{point[1]:.0f}"
-    if after is not None and after.role == "challenge":
-        outcome = _challenge(after, checks, started, did=(pressed,))
-        return _with_crop(outcome, await _crop(page, after.box, viewport))
-    if after is None or after.passed or _cleared(checks):
-        return HumanCheckOutcome(
-            result="passed",
-            kind=front.kind,
-            role=front.role,
-            box=front.box,
-            text=front.text,
-            seconds=time.monotonic() - started,
-            did=(pressed,),
-            note="it cleared",
-        )
-    outcome = HumanCheckOutcome(
-        result="unfinished",
-        kind=after.kind,
-        role=after.role,
-        box=after.box,
-        text=after.text,
-        seconds=time.monotonic() - started,
-        did=(pressed,),
-        note="it did not clear",
+    return await _read_after(
+        page,
+        check,
+        await _poll(page, time.monotonic() + timeout_s, watched),
+        started,
+        (pressed,),
+        "it cleared",
+        "it did not clear",
     )
-    return _with_crop(outcome, await _crop(page, after.box, viewport))

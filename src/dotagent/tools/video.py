@@ -26,7 +26,16 @@ from urllib.parse import SplitResult, urlsplit
 from pydantic import Field
 
 from dotagent.browser.snapshot import fence_untrusted
-from dotagent.core.errors import DotError, InvalidValueError, ToolExecutionError, ToolInputError, VoiceError, WebError
+from dotagent.core.errors import (
+    DotError,
+    InvalidValueError,
+    PrivateHostRefused,
+    ToolExecutionError,
+    ToolInputError,
+    VoiceError,
+    WebError,
+    WebTransportError,
+)
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.llm.types import ImageData
@@ -281,14 +290,57 @@ async def _watch_file(ctx: ToolContext, args: WatchVideoArgs, path: Path) -> _Lo
     return _Look(duration, span, seen.plan, seen.images, transcript, heard_by, path.name)
 
 
+# How much of the link's own answer is read to learn where its redirects end: none of it is wanted.
+_CHAIN_PROBE_BYTES: int = 1
+
+
+async def _hops_are_public(ctx: ToolContext, url: str) -> None:
+    """Follow the redirects of ``url`` through the web client, whose connection to every hop checks the addresses it is
+    about to connect to (item 1319), and refuse the link when any hop is not public. yt-dlp resolves and follows
+    redirects by itself, where nothing can stop one that leads to the local network, so the chain is walked first, in
+    the client the other web tools use. A chain that could not be walked to its end (more hops than the client
+    follows, a hop the address rules turn away, a hop that cannot be reached) is refused: the hop nobody looked at may
+    be the private one, and yt-dlp follows more hops than this client does. Only the link's own first request failing
+    in transit (a timeout, a connection that cannot be made, a handshake this client's does not get through) leaves
+    the link to yt-dlp, logged: no redirect was seen, so there is no hop to judge.
+
+    What this does not cover: the addresses yt-dlp's extractor for the site picks out of the page (the media's own
+    address) are chosen by the site and are not seen here."""
+    if ctx.runtime.config.web.allow_private_hosts:
+        return
+    try:
+        await ctx.runtime.web.get(url, _CHAIN_PROBE_BYTES)
+    except PrivateHostRefused as error:
+        raise ToolExecutionError(
+            "watch_video: the link, or a page it redirects to, is on a private or local network address; the web tools "
+            "only reach the public internet (web.allow_private_hosts)",
+            {"url": url, "addresses": error.context.get("addresses")},
+        ) from error
+    except WebTransportError as error:
+        if error.hops_followed:
+            raise _chain_not_walked(url, error) from error
+        log.info("video_chain_unchecked", url=truncate_middle(url, 200), error=error.message)
+    except WebError as error:
+        raise _chain_not_walked(url, error) from error
+
+
+def _chain_not_walked(url: str, error: WebError) -> ToolExecutionError:
+    return ToolExecutionError(
+        f"watch_video: the link's redirects could not be followed to their end ({error.message}), so the address "
+        "they lead to cannot be checked, and the link is not opened",
+        {"url": url, "hops_followed": error.hops_followed},
+    )
+
+
 async def _watch_link(ctx: ToolContext, args: WatchVideoArgs, url: str) -> _Look:
     sandbox: Sandbox = run_sandbox(ctx)
     env: dict[str, str] = ctx.runtime.shell_env
-    # The host must be on the public internet, as web_fetch's is (yt-dlp connects by itself: a name that answers
-    # otherwise a moment later, or a redirect, is not seen).
+    # The host must be on the public internet, as web_fetch's is, and so must every hop of its redirects: yt-dlp
+    # connects by itself, so what it would follow is looked at before it runs.
     parts: SplitResult = urlsplit(url)
     port: int = parts.port or (443 if parts.scheme == "https" else 80)
     await checked_addresses(parts.hostname or "", port, allow_private_hosts=ctx.runtime.config.web.allow_private_hosts)
+    await _hops_are_public(ctx, url)
     info: VideoInfo = await media.link_info(sandbox.commands, env, url)
     if info.duration is None or info.duration <= 0:
         raise ToolExecutionError("watch_video: the link is a live stream or has no length to watch", {"url": url})
