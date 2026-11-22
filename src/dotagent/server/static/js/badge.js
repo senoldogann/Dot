@@ -22,7 +22,9 @@ export function badgeCode(name) {
   return letters.slice(0, 2).join("").toLocaleUpperCase();
 }
 
-/** The badge of an agent named `name`, hidden from a screen reader: the name beside it says it. */
+/** The badge of an agent named `name`, hidden from a screen reader: the name beside it says it. Its letters are drawn from
+ * `data-code` (shell.css), not set as text: they are a mark of the row, a few letters in a small square, and the name
+ * beside them is what is read, selected and copied. */
 export function badge(name) {
-  return el("span", { class: "side-badge", "aria-hidden": "true" }, badgeCode(name));
+  return el("span", { class: "side-badge", "aria-hidden": "true", dataset: { code: badgeCode(name) } });
 }

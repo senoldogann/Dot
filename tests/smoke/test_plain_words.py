@@ -32,7 +32,6 @@ import httpx
 import pytest
 import pytest_asyncio
 from channel_stand_ins import FakeMacos, Osascript
-from composer_choices import show_choices
 from message_hold import HOLD, HOLD_MS
 from messages_db import MessagesDb
 from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
@@ -452,7 +451,6 @@ async def _context(browser: Browser, served: Served, width: int) -> BrowserConte
     )
     context.set_default_timeout(10_000)
     # The run's choices shown in the box, so that their words are read too (item 833).
-    await show_choices(context)
     return context
 
 

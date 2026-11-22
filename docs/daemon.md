@@ -214,28 +214,27 @@ about; two rows a section (a run without the runs it delegated), then **Show N m
 in place (item 364), and the page scrolls to what does not fit. A section folds on a click of
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
-and `due`. The composer is one frame on an 18 px corner (22 px while it is one line: a phone's box at rest, or a box with the
-run's choices out whose words fit one line), drawn by a ring of half a pixel that grows stronger in focus (no halo)
-with a soft shadow under it (items 833 and 1205): the words on a line of their own, across the box ("Message Miro",
+and `due`. The composer is one rounded box (item 1330, after the reference app's): its corner is the token's (`--radius-composer`, one
+radius whatever the words), its edge a hairline that grows stronger under the pointer and in focus, with no shadow and no
+halo, on the page's own surface, a phone's too. The words stand on top, across the box ("Message Miro",
 the name you call Dot by; "Follow up" in the box of a run; the box's tooltip says that @ opens the apps and / the
-skills and commands), and under them the **+** and the choices at the left, the microphone and the send at the right,
-with the files attached and the picks above it (item 1249: a long message wrapped a few words a line between the **+**
-and the send). On a phone the box is one line of the **+**, the words and the send, on a 22 px corner, until the words
-wrap; then they take the whole line, and the **+** and the send go under them, until the text is shorter than where it
-first wrapped. A file uploads as it
+skills and commands), and under them one bar: the **+** at the left; at the right the model's pill with the reasoning's
+beside it, which read as one control (the provider's mark, the model's name and, for a model that offers a choice of
+reasoning, its level as four bars, as many filled as the level is high among those the model offers; the level's words are
+the tooltip's and a screen reader's), the microphone and the round send. The mode (when one is named) and the context meter
+are quiet pills of the same bar. The files attached and the picks stand above it (item 1249: a long message wrapped a few
+words a line between the **+** and the send). A file uploads as it
 is attached; a picture past a megabyte and 2048 pixels on its longer side goes as a JPEG of 2048 (its clear parts
 white), as a model reads it at about that size (one the browser cannot read fails on its chip, with the browser's
 words); a send pressed while files upload says to wait, once however often it is pressed, as the same toast is never
-shown twice at a time (item 990). On that line the send
-comes beside the microphone once there are words or a file (it stays where the browser cannot listen), and a Stop is
-always in sight. The run's choices wait behind their own **Model and options** button (sliders) beside the **+**,
-which brings them on a bar of their own under the words, with the send, and puts them away again when pressed again
-(it is pressed while they show); the choice is kept in that browser for every box, those open at the time included.
-While they are away, the least-asking approval mode still shows as its pill ("Pay or send"), since the run then asks
-next to nothing (item 860: a payment, a message or a post), and so does the size of the chat once it is near full. A
-phone's box rests quieter, at the owner's ask (item 1120): the "+", the words and the send alone, the approvals' pill
-too out of sight until the words are touched; then the model's pill says the mode and the reasoning, not the
-approvals (item 1163; [Phone](phone.md)), and a phone has no Model and options button. The bar of the choices never wraps: the **+** and the mode at
+shown twice at a time (item 990). On that line the microphone and the round send stand side by side from the start (the microphone stays where the browser can
+listen), the send quiet while the box is empty, and a Stop is always in sight. The run's choices are always in sight: the button
+beside the **+** that showed and hid them, the box's resting state (item 833; a phone's, item 1120) and the browser's memory of
+that choice are gone (item 1330). The approvals, the **Options** pill, stand under the box at its right, quiet words on no
+ground, as the reference app's "Full access" does; on a phone the model's sheet holds them (item 1202) and the open lock of
+**Ask only to pay or send** alone stays in the bar, since the run then asks next to nothing (item 860: a payment, a message or
+a post) and the box must say so, and so does the size of the chat once it is near full. On a phone the model's pill says the
+mode and the reasoning, not the approvals (item 1163; [Phone](phone.md)). The bar of the choices never wraps: the **+** and the mode at
 the left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
 reads, when they ask only to look ("stay read-only", "don't change anything", "just research", "salt okunur kal", "hiçbir
 şeyi değiştirme", "sadece araştır"; "read-only" or "salt okunur" opening a sentence counts, "stay", "remain", "work", "operate",
@@ -256,11 +255,11 @@ empty. The files under the box stand in one row that wraps only when the frame r
 at a thumbnail's size, its name its tooltip and its × at its corner, where another file keeps its icon, its name and its
 size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
-and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
-the bar is still one line. A phone's box shows its choices while it is used, not by the **+** menu: the words take
+and the model's name gives way with an ellipsis, while the reasoning keeps its bars (its words are out of sight), so on a phone
+the bar is still one line. A phone's box is this box (item 1330): the words take
 their own line, and the **+**, the model (which opens the chat's settings, a sheet from the foot of the screen with the models, the
 reasoning, the mode, the approvals and How Dot works, item 1202), the context meter, the microphone and the send stand
-on the line under them ([Phone](phone.md), items 1120, 1121 and 1202). On a phone the bar's buttons are 36 px and answer a
+on the line under them ([Phone](phone.md), items 1121, 1202 and 1330). On a phone the bar's buttons are 36 px and answer a
 finger's 44 px around them (item
 787, as every icon button of the bars and the lists does), and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
@@ -480,7 +479,7 @@ is taken only if the note still calls for it ([Safety](safety.md#safety)).
 The **+** at the left of the box (item 318, after Codex's composer) adds to the message, on every pointer: it opens a
 menu of **Add files**, which opens the file picker (documents, photos and screenshots alike; a phone opens its own
 sheet), and **Teach a task** in a chat (item 423, [Teaching a task](browser-and-computer-use.md#teaching-a-task)); its
-tooltip says so: "Add files or teach a task". The run's choices have their own button beside it (above). On a phone a
+tooltip says so: "Add files or teach a task". On a phone a
 finger's tap of the **+** opens the file picker at once, so the phone's own menu of the photos, the camera, a scan and
 the files comes up with no second tap, and a finger's hold opens the menu (item 1089); **/teach** in the slash menu
 teaches a task too, on every pointer, so that no way in needs the hold. The slash menu picks **Plugins** (the MCP servers with tools) and
@@ -1142,7 +1141,7 @@ test refuses any size, weight, line-height or family in the sheets that is not o
 pages (a card, a settings' group, a tile) has no frame of its own, a surface on a 12 px corner (the same on a phone: one
 design language, item 1324) drawn by a hairline ring of the border colour (`--box-shadow`) rather than a shadow, and the
 contrast setting frames it again; a box within a box is a soft fill; a card holds 16 px of room (the compact density
-keeps 12); only what floats casts a shadow (menus, dialogs, sheets and the composer; a menu's rows are 28 px tall and its
+keeps 12); only what floats casts a shadow (menus, dialogs, sheets and the panel of questions that takes the composer's place; the composer itself is a hairline box and casts none; a menu's rows are 28 px tall and its
 icons of a 1.5 stroke against the interface's 1.75); the radii are a 0.5 rem scale, one token for each kind of box
 (`--radius-*` in `app.css`), and what is fully round takes `--radius-pill`, which is the one place that says what that is;
 the open row of the sidebar and the open tab of Settings are a flat tint of the ink, the row's name a step bolder; a

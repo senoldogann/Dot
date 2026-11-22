@@ -207,7 +207,7 @@ function rowTop(agent, right) {
   return el(
     "span",
     { class: "side-chat-top" },
-    el("span", { class: "side-badge", "aria-hidden": "true" }, agent.code),
+    el("span", { class: "side-badge", "aria-hidden": "true", dataset: { code: agent.code } }),
     el("span", { class: "side-agent" }, agent.name),
     right === null ? null : el("span", { class: "side-chat-meta" }, right),
   );
@@ -1151,7 +1151,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // The rows already drawn take a name that came or changed in place: painting the lists again closes a menu a row opened.
   function relabel() {
     const say = (link, agent) => {
-      setText(link.querySelector(".side-badge"), agent.code);
+      link.querySelector(".side-badge")?.setAttribute("data-code", agent.code);
       setText(link.querySelector(".side-agent"), agent.name);
     };
     for (const chat of chats ?? []) {

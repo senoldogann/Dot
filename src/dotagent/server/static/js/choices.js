@@ -64,6 +64,36 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
   );
 }
 
+const SVG = "http://www.w3.org/2000/svg";
+const BARS = 4;
+
+/** The reasoning level as bars, the pill's mark beside the model's name as the reference app's: four small bars of rising height, as
+ * many of them filled as the level is high among the `levels` the model offers (lowest first); a level not among them
+ * (the model's default, which the daemon names) fills the middle of the bars. A mark of the pill's ink, hidden from a
+ * screen reader: the pill's value says the level in words. */
+function levelBars(level, levels) {
+  const at = level === null ? -1 : levels.indexOf(level);
+  const filled = at < 0 ? BARS / 2 : Math.max(1, Math.round(((at + 1) / levels.length) * BARS));
+  const mark = document.createElementNS(SVG, "svg");
+  mark.setAttribute("class", "icon level-bars");
+  mark.setAttribute("viewBox", "0 0 16 16");
+  mark.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < BARS; index += 1) {
+    const height = 4 + index * 3;
+    const bar = document.createElementNS(SVG, "rect");
+    bar.setAttribute("x", String(1 + index * 4));
+    bar.setAttribute("y", String(15 - height));
+    bar.setAttribute("width", "2");
+    bar.setAttribute("height", String(height));
+    bar.setAttribute("rx", "1");
+    if (index < filled) {
+      bar.setAttribute("data-on", "");
+    }
+    mark.append(bar);
+  }
+  return mark;
+}
+
 /**
  * The pills of a run's choices for the composer `frame` (composer.js), whose frame bounds their menus. `modes` are the
  * modes it offers (`MESSAGE_MODES`, Auto among them, item 495, on an agent's page too since item 513). `kept` is where
@@ -286,7 +316,9 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       const words = boost !== null ? boost.label : choice ? (level === null ? t("choices.default") : levelLabel(level)) : "";
       reasoningShort = fastOn(info) ? (words === "" ? t("choices.fast") : `${words} · ${t("choices.fast")}`) : words;
       reasoningPill.setValue(reasoningShort, "");
-      reasoningPill.setIcon(icon(boost !== null ? boost.icon : fastOn(info) ? "bolt" : "brain"));
+      reasoningPill.setIcon(
+        boost !== null ? icon(boost.icon) : fastOn(info) ? icon("bolt") : choice ? levelBars(level, info.efforts) : icon("brain"),
+      );
       const typed = boost !== null && once === null ? ` ${t("choices.typed")}` : "";
       setTitle(reasoningPill.element, boost === null ? t("choices.reasoningLevel") : `${boost.label}: ${boost.hint}${typed}`);
     } else {

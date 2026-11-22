@@ -1,5 +1,7 @@
-// What the three composers share (the new chat's, the run's dock and the agent's page): one frame with the box that
-// grows with its text, the attached files and the picks under it and a bar of pills; Enter sends and Shift+Enter breaks
+// What the three composers share (the new chat's, the run's dock and the agent's page): one rounded box (the reference app's, item
+// 1330) with the words on top and, under them, one bar: the "+" at the left, at the right the model's pill (its mark, its
+// name and its reasoning as bars), the microphone and the round send; the attached files and the picks stand under the
+// words, and the run's other choices (its mode, its approvals) are quiet pills of the same bar; Enter sends and Shift+Enter breaks
 // a line, or ⌘Enter sends and Enter breaks it, as Settings › General chooses (item 230; on a touch screen Return always
 // breaks the line, item 440); `/`
 // at the start of a word opens the slash menu of commands, skills and MCP tools (slash.js says what it offers; this
@@ -7,8 +9,8 @@
 // closes, letters filter); the "+" opens the menu that adds files and picks plugins and skills for the message (item
 // 318, picks.js); a draft keeps the text, the ready files and the picks in this browser until they are sent. The
 // markdown in the box shows as it reads, its marks quiet (mirror.js, item 207). The "+" adds to the message on every
-// pointer: files, and teaching Dot a task; the run's choices (model, reasoning, options) have a button of their own
-// beside it, and "Teach a task" is /teach in the slash menu too, so that no way in needs a long press.
+// pointer: files, and teaching Dot a task, and "Teach a task" is /teach in the slash menu too, so that no way in needs a
+// long press. The choices are always in sight (item 1330): the box has no resting state that puts them away.
 
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
@@ -32,11 +34,6 @@ const DRAFT_PREFIX = "dot.draft.";
 export const NEW_CHAT_DRAFT = "home";
 // The tallest box of a chat's composer, on its page (views/run.js) and on the curtain while Dot opens (waiting.js).
 export const CHAT_BOX_PX = 160;
-// Whether the boxes show the run's choices on a line of their own (item 833): "shown", or nothing for one line.
-const CHOICES_KEY = "dot.composer.choices";
-// The event that tells every box on the page that the choices were shown or hidden in one of them: the curtain's box
-// while Dot opens (waiting.js) stands beside the page's.
-const CHOICES_EVENT = "dot:composer-choices";
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */
@@ -325,90 +322,6 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
     title: t("composer.boxTitle"),
   });
   const element = el("section", { class: "card composer", "aria-label": label });
-  // The box as one line until the owner asks for the run's choices (item 833): the "+" menu shows and hides them, and
-  // the choice is kept for every box, those on the page at the time included. On a phone the box is one line until it
-  // is used (item 1120, the owner's ask after another app's): a touch in its words or a key typed there brings the
-  // choices, the context meter and the microphone on the line under the words, and a touch elsewhere with the words
-  // left puts them away. The focus alone does not: a page that gives the box its focus as it opens leaves it at rest.
-  let choicesShown = readPref(CHOICES_KEY) === "shown";
-  let engaged = false;
-  // A touch inside the box is under way: the words lose the focus to a pill that iOS does not focus, and the box stays.
-  let pressing = false;
-  function paintQuiet() {
-    element.toggleAttribute("data-quiet", PHONE.matches ? !engaged : !choicesShown);
-  }
-  function engage(on) {
-    if (engaged !== on) {
-      engaged = on;
-      paintQuiet();
-    }
-  }
-  function onPressInside() {
-    pressing = true;
-  }
-  // A touch in the words opens the line once it ended: opened as the finger came down, the line moved the words up and
-  // the touch ended on the model's pill under it. The "+" and the send at rest keep their place for their own press.
-  function onClickInside(event) {
-    if (event.target.closest(".composer-field") !== null) {
-      engage(true);
-    }
-  }
-  function onPressEnded() {
-    setTimeout(() => {
-      pressing = false;
-    }, 0);
-  }
-  // A touch outside the box puts its choices away once it ended (its click), unless the words keep the focus (the
-  // keyboard is up): put away as the finger came down, the line went and moved what stands over the box, a queued
-  // message's Resume among it, from under the finger. A menu of the box's opens inside it, the "+" menu's and a
-  // phone's chat settings (item 1202) over the page, and a touch there is the box's own.
-  let pointerDown = false;
-  function onPressAnywhere() {
-    pointerDown = true;
-  }
-  function onPressAnywhereEnded() {
-    setTimeout(() => {
-      pointerDown = false;
-    }, 0);
-  }
-  // Where the touch was is read from the click's path, fixed as it began: a pick in the model's menu repaints the menu,
-  // and the row touched is no longer in the box by the time the click reaches the page (item 1128).
-  function onClickAnywhere(event) {
-    const path = event.composedPath();
-    if (!engaged || path.includes(element) || path.some((node) => node instanceof Element && node.matches(".menu, .sheet-menu, .sheet")) || textarea === document.activeElement) {
-      return;
-    }
-    engage(false);
-  }
-  // The words losing the focus put the line away, when no touch is under way: the keyboard put down. A touch's own
-  // click decides (onClickAnywhere).
-  function onFocusOut() {
-    setTimeout(() => {
-      // A menu of the box's open, or a phone's chat settings over the page (item 1202), keep the line.
-      const open = element.querySelector(".composer-popover:not([hidden])") !== null || document.querySelector(".sheet:not([hidden])") !== null;
-      if (!pressing && !pointerDown && !open && !element.contains(document.activeElement)) {
-        engage(false);
-      }
-    }, 0);
-  }
-  const onKey = () => engage(true);
-  element.addEventListener("keydown", onKey);
-  element.addEventListener("focusout", onFocusOut);
-  element.addEventListener("pointerdown", onPressInside);
-  element.addEventListener("click", onClickInside);
-  element.addEventListener("pointerup", onPressEnded);
-  element.addEventListener("pointercancel", onPressEnded);
-  document.addEventListener("pointerdown", onPressAnywhere, true);
-  document.addEventListener("pointerup", onPressAnywhereEnded, true);
-  document.addEventListener("pointercancel", onPressAnywhereEnded, true);
-  document.addEventListener("click", onClickAnywhere);
-  PHONE.addEventListener("change", paintQuiet);
-  function choicesChanged() {
-    choicesShown = readPref(CHOICES_KEY) === "shown";
-    choicesButton.setAttribute("aria-pressed", String(choicesShown));
-    paintQuiet();
-  }
-  window.addEventListener(CHOICES_EVENT, choicesChanged);
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
 
   let drafting = true;
@@ -489,29 +402,6 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
     return items;
   }
 
-  // The run's choices (its mode, model, reasoning and options) shown on the box's line or put away (item 833), from a
-  // button of their own beside the "+" on a wider window; a phone's box shows them while it is used (item 1120), and
-  // the button is not drawn there (app.css). A box whose page puts no choices in it has none (app.css).
-  const choicesButton = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only choices-toggle",
-      type: "button",
-      title: t("composer.modelOptions"),
-      "aria-label": t("composer.modelOptions"),
-      "aria-pressed": String(choicesShown),
-      onclick: () => {
-        if (choicesShown) {
-          removePref(CHOICES_KEY);
-        } else {
-          writePref(CHOICES_KEY, "shown");
-        }
-        window.dispatchEvent(new CustomEvent(CHOICES_EVENT));
-      },
-    },
-    icon("sliders"),
-  );
-
   // How the press that clicks the "+" was made: `pointerdown` comes before its `click`.
   let plusPointer = "mouse";
 
@@ -554,7 +444,6 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
       { class: microphone === null ? "composer-bar" : "composer-bar has-mic" },
       plusButton,
       wired.field,
-      choicesButton,
       options,
       microphone?.button,
       microphone?.recorder,
@@ -584,7 +473,6 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
     requestAnimationFrame(wired.autosize);
   }
   paintEmpty();
-  paintQuiet();
   // The box's own height, on the box itself, for the menu that opens above it (item 447): a phone's keyboard leaves only
   // what is above the box, and the box grows with a draft, its chips and its files. It stays on the box rather than the
   // page, where the curtain's composer and a page's live at once (waiting.js) and would write over each other.
@@ -653,12 +541,6 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);
       textarea.removeEventListener("blur", onBlur);
-      window.removeEventListener(CHOICES_EVENT, choicesChanged);
-      document.removeEventListener("pointerdown", onPressAnywhere, true);
-      document.removeEventListener("pointerup", onPressAnywhereEnded, true);
-      document.removeEventListener("pointercancel", onPressAnywhereEnded, true);
-      document.removeEventListener("click", onClickAnywhere);
-      PHONE.removeEventListener("change", paintQuiet);
     },
   };
 }

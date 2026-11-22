@@ -239,11 +239,11 @@ below and 12 at the sides and is rounded 18 px, so one of a line is nearly a pil
 1101 and 1205), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
-keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the
-page's colour behind it, and the conversation scrolls under it, its last line kept clear of the bar however tall the
-composer grows (items 374 and 401). At rest the composer is the "+", the words and the send (item 1120); once its
-words are touched or typed in, the words take their whole line and the line under them holds the "+", the model, the
-context meter, the microphone and the send, each 36 px, and a touch elsewhere puts that line away again. The model's
+keyboard move nothing else. The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
+pane of glass of items 374 and 401 and the quiet resting box of item 1120 are gone), with no band of the page's colour
+behind it, and the conversation scrolls under the dock, its last line kept clear of the bar however tall the composer grows.
+The words always take their whole line, and the line under them holds the "+", the model, the context meter, the microphone
+and the send, each 36 px, from the start: nothing waits for a touch and no touch elsewhere puts the line away. The model's
 pill stands for every choice of the run (item 1121): after the name it says the mode when one is named and the
 reasoning level in small words, not the approvals, which the owner read as a part of the model's name (item 1163); a
 long name gives way to an ellipsis and the level stays whole. A tap on it opens the chat's settings (item 1202), a
