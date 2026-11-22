@@ -1855,7 +1855,7 @@ function buildModels(isDisposed, asked, head) {
       el("span", null, "Each is chosen on its own page: "),
       el("a", { href: "#/settings/schedules" }, "Scheduled tasks"),
       el("span", null, ", "),
-      el("a", { href: "#/agents" }, "Agents"),
+      el("a", { href: "#/settings/agents" }, "Agents"),
       el("span", null, "."),
     );
     usage.hidden = false;

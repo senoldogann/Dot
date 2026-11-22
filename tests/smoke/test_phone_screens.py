@@ -2,7 +2,7 @@
 screen, over a served daemon whose model is a scripted one. The faults are those of the audit of every screen (shot
 screen by screen at that size, light and dark, in WebKit and Chrome):
 
-- Customize › Plugins cut the name of a plugin to "Creative Desi…" with room to spare: WebKit gives a box of its own the
+- Settings › Plugins cut the name of a plugin to "Creative Desi…" with room to spare: WebKit gives a box of its own the
   width of its text with the space of the variable font's regular weight, and draws the bold name wider by a third of a
   pixel a space, so the ellipsis took the last letters of every name of two words;
 - a sentence with a button beside it was squeezed into a column six lines high: the token this browser keeps (General)

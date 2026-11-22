@@ -1,4 +1,4 @@
-"""The life of the learned skills on Customize › Skills in a real browser (item 585): a skill no run read for the days
+"""The life of the learned skills on Settings › Skills in a real browser (item 585): a skill no run read for the days
 the settings name is shown as resting, last in its section, and Wake offers it again; Pin keeps one from resting; the
 merge the nightly reflection proposed waits as a card that shows everything it would write (the name, the description,
 the kind of work, when it fits, the steps and the parameters, each against the first skill), and the owner's yes writes

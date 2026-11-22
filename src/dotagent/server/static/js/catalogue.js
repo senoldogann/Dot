@@ -1,4 +1,4 @@
-// The services Dot works with and where each stands (item 316), for Customize › Connectors (views/connectors.js), where
+// The services Dot works with and where each stands (item 316), for Settings › Connectors (views/connectors.js), where
 // Connect apps leads (item 545): the listings of `GET /plugins`, the applications of `GET /connections` and the MCP
 // servers of `GET /mcp/servers`, the first step each service offers and the steps under way. The steps (items 278 and
 // 279) are macOS's question for an application of the Mac, and after a no the Automation pane of System Settings;

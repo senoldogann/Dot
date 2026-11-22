@@ -163,8 +163,8 @@ function watcherForm({ view, options }) {
   const wordsField = field("What you want to hear of", words, "-");
   const minutesField = field("Minutes", minutes, "-");
   const goalField = field("Goal of the task", goal, "");
-  const noAccounts = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "No Google or Microsoft account is signed in. "), el("a", { href: "#/customize/connectors" }, "Add one"));
-  const noGithub = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "GitHub is not connected: add it in Customize › Connectors with a key from GitHub. For notifications the key must be a classic one with the notifications permission; a fine-grained one cannot read them. "), el("a", { href: "#/customize/connectors" }, "Add it"));
+  const noAccounts = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "No Google or Microsoft account is signed in. "), el("a", { href: "#/settings/connectors" }, "Add one"));
+  const noGithub = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "GitHub is not connected: add it in Settings › Connectors with a key from GitHub. For notifications the key must be a classic one with the notifications permission; a fine-grained one cannot read them. "), el("a", { href: "#/settings/connectors" }, "Add it"));
   const runNote = el(
     "div",
     { class: "note", hidden: true },
@@ -228,7 +228,7 @@ function watcherForm({ view, options }) {
     if ((kind === "mail" || kind === "calendar") && account.value === "") {
       account.focus();
       // The dialog is over the page, and a toast would stand under it: the reason is shown in the dialog.
-      throw new Error("Sign in a Google or Microsoft account first (Customize › Connectors).");
+      throw new Error("Sign in a Google or Microsoft account first (Settings › Connectors).");
     }
     if (kind === "mail" && words.value.trim() === "") {
       words.focus();

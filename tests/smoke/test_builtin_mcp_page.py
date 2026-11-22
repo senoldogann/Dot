@@ -1,4 +1,4 @@
-"""The server that comes with Dot on Customize › Connectors (item 583), in a real browser, wide and on a phone: its tile
+"""The server that comes with Dot on Settings › Connectors (item 583), in a real browser, wide and on a phone: its tile
 says it is built in, shows where it stands and its tools, and has the switch that stops it and starts it again; the
 config file keeps the switch (``[builtin_mcp] web_research``). The server is the real one (the package
 ``dotagent-web-research``), started and never asked to search.

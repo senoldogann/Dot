@@ -1,4 +1,4 @@
-"""Customize › Connectors (items 316 and 542): the directory of the services Dot works with. At least 25, each once,
+"""Settings › Connectors (items 316 and 542): the directory of the services Dot works with. At least 25, each once,
 each saying what Dot does with it; every application and MCP service of Connect apps' catalogues has a listing, so the
 page holds all of them, and every way of a listing is an entry of a catalogue, so none is listed that Dot cannot reach;
 each mark is a logo file (a well-formed SVG that runs nothing and reaches nothing, named in the folder's LICENSE, whose

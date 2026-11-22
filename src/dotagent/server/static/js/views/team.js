@@ -86,7 +86,7 @@ export function mount(root) {
   }
 
   root.append(
-    el("a", { class: "back", href: "#/agents" }, icon("arrowLeft"), "All agents"),
+    el("a", { class: "back", href: "#/settings/agents" }, icon("arrowLeft"), "All agents"),
     pageHead("Handoffs", "Today's messages between Dot and your agents, oldest first.", null),
     holder,
   );

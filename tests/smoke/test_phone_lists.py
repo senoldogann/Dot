@@ -1,7 +1,7 @@
 """Dot's lists on a phone (item 332), in WebKit as the owner's iPhone and as a small one, on a served daemon with a run
 at work and a run it delegated, at work too.
 
-On a phone a card's name stands over the card, out of its surface, on a service's page of Customize › Connectors (as in
+On a phone a card's name stands over the card, out of its surface, on a service's page of Settings › Connectors (as in
 the settings' tabs, item 330); a row of the home's Today strip is its title over one line of facts; Team's empty line
 says what brings messages there. In a Mac's window the cards keep their names inside. Before, the names were inside on a
 phone too, a delegated run's facts ran to three lines and Team's empty line named a tool. The model is a scripted one.
@@ -183,6 +183,8 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
             await page.goto(f"{address}/#/customize/connectors/notion")
             ground = await _ground(page.locator(".plugin-card").first)
-            assert ground["card"] != _CLEAR, ground
+            # A service's page is a page of the settings (item 1336): its cards name themselves over their body on a
+            # desk as on a phone, the settings' cards being drawn alike.
+            assert ground["card"] == _CLEAR and ground["body"] != _CLEAR, ground
         finally:
             await browser.close()

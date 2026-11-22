@@ -312,11 +312,11 @@ says so once ("This schedule asked for medium reasoning, which its model does no
 `schedule_effort_corrected` that once and nothing at the firings after (items 882 and 1307: a chat's `medium` kept in its schedules, which
 DeepSeek does not offer, failed every firing of them to start; a model with no choice leaves the schedule as it is and runs at none); a level chosen for a chat's run is still refused at once. The conversation says so where it happened, in a quiet line of its own (items 665, 1178 and
 1179): the calendar, the schedule's name (cut with an ellipsis on a short line) and when it runs in the words the
-Schedules page uses ("on Mondays at 09:00"; a form the page cannot say in words is "on a repeating schedule", and a
+Scheduled tasks page uses ("on Mondays at 09:00"; a form the page cannot say in words is "on a repeating schedule", and a
 schedule that runs once says its time in few words in the page's language, "today at 18:53", "tomorrow at 10:00",
 "Saturday at 09:00", "17 Nov at 10:00"); its tooltip says "Schedule made",
 in sight when the chat shows only what Dot is doing too, and kept by the turn once the chat goes on. The line leads to
-the Schedules page (`#/schedules?schedule=ID`), whose row of that schedule is marked in the accent's light, fading, and
+Scheduled tasks (`#/settings/schedules?schedule=ID`), whose row of that schedule is marked in the accent's light, fading, and
 scrolled into sight. `/loop 30m <message>` in the box of a run or of a new chat makes such a schedule from the
 composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule wears its mark in the sidebar
 (item 580). The scheduler also fires the nightly reflection at
@@ -352,11 +352,17 @@ list and fires, skips and fails as any schedule does (see [Dot comes to you](pro
 under it (item 571) is not a schedule: it looks at mail, calendar events and GitHub notifications and tells you of what
 you care about.
 
-On Schedules the list is the page and **New schedule** opens the form, in a dialog over the page (item 615), as a
-schedule's **Edit**, in its row's **…** (item 848: the row shows its switch, and the rest is a press away), opens the
-same dialog filled. Past its third schedule, **Your schedules** scrolls inside (item 634):
-it shows the first three and the top of the fourth, and it is never taller than most of the window (a phone's rows are
-taller). Painted again, as a switch or the end of a run paints it, it keeps where it was scrolled to. A schedule is
+**Scheduled tasks** (Settings › Scheduled tasks, `#/settings/schedules`; item 1337: it was the Schedules page of the
+sidebar, `#/schedules`, which leads there) is a list of rows in a card: a schedule's name with its badges (Brief, Loop,
+Taught task, its agent), one line of when it runs, when next and how the last went, and at the right **Run now**,
+**Edit**, its switch (it is active, or paused) and a **…** that holds **Delete**; **Details** under a row hold how its tasks
+start, its goal and its history. The loops of chats (item 281) are a section of their own (**Loops**), and
+`#/settings/schedules?thread=<chat>` shows the loops of that one chat alone. The rows are the page's own, however many (item
+634's box that scrolled inside past the third is gone); painted again, as a switch or the end of a run paints it, the page
+keeps where it was scrolled to. **New schedule** and a schedule's **Edit** open a page of their own, `#/settings/schedules/new`
+and `#/settings/schedules/<id>` (item 615 had a dialog), in the settings' rows and cards (Task, When, How its tasks run,
+What its tasks leave), with the schedule's name in the breadcrumb, **Run now** and **Delete** at the head of an existing one
+and **Cancel** and **Add schedule** or **Save changes** at the foot; saved, it goes back to the list. A schedule is
 created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task or research: a chat that only talks
 schedules tasks), model, reasoning
@@ -367,14 +373,27 @@ configured ones and the standard speed; a `PATCH` that leaves `agent_id` out kee
 makes it Dot's).
 Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
 chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor an agent; one made
-in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. The dialog has a
-cross at its top right and Cancel at its foot; Escape closes it too, and asks first (*Discard your changes?*) when you
-changed a field. A schedule the daemon refuses (a cron that fires every minute) is said inside the dialog, above its
-foot, with what you typed still there; a form made anew for each schedule starts from the defaults, not from the last
-one's choices. On a phone the dialog is a sheet of the window's width whose foot stays in view above the keyboard.
+in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. The editor's page asks
+first (*Discard your changes?*, with **Keep editing**) when you changed a field and then leave it by any change of the
+address inside Dot: a link (**Cancel**, the settings' nav, the breadcrumb), **Back** in a phone's bar, Enter in the
+settings' search, **Connect apps**, the New chat and Appearance shortcuts, the browser's own Back and Forward, and **Run
+now**, which starts the schedule as it is saved (asked before it starts, and not again on the way to the run). The page
+asks through the router, which hears of an address when it has changed already: it puts the change back at once, so that
+the page and its address stay while the question is open, and makes it again when you choose **Discard**. Where the
+browser tells the position in its history (Chrome and a recent Safari), the change is undone and redone as a
+walk in the history, so that no entry is added or lost and a second Back after **Keep editing** goes where it would have
+gone; where it does not, or for an entry that was replaced, the page's address is written over the entry the change made
+(no new entry), and a held browser Back then leaves the page's address in the entry it walked to, so that the next Back
+goes one entry further than it should. The browser asks before the tab closes or reloads; a form you did not change, once
+the models and agents it lists are read, leaves without a question, and so does one that was saved or whose schedule was
+deleted. Not held: an address typed in the bar that loads the page again (the browser's own question for a reload is the
+only one), and a redirect of an old address, which asks nothing because the page it leaves has gone already. A
+schedule the daemon refuses (a cron that fires every minute) is said on the page, above its foot, with what you typed still
+there; a form made anew for each schedule starts from the defaults, not from the last one's choices. On a phone the page is
+the window's width, and **Back** in the bar leads to the list.
 
-**Run now** (in a schedule's row's **…**, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
-once, switched on or off, due or not; the choice says, where the pointer rests on it, that it does real work, as at its time, with the approvals its run
+**Run now** (a button of a schedule's row and at the head of its editor, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
+once, switched on or off, due or not; the row's button says, where the pointer rests on it, that it does real work, as at its time, with the approvals its run
 takes, and the run's page opens, where Stop is. The run goes as a firing goes: unattended, with the schedule's own
 choices (a yolo schedule's run asks nothing in a chat of its own; in one of your chats, with "the same chat", the review
 model judges its messages and posts and a payment is handed to you, item 860), the digest of its earlier runs, in a

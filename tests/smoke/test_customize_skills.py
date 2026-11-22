@@ -1,4 +1,4 @@
-"""Customize › Skills (item 317) end to end, in a scratch home on the scripted model, served by a real server and seen
+"""Settings › Skills (item 317) end to end, in a scratch home on the scripted model, served by a real server and seen
 in a real headless Chrome. Personal holds the owner's own skills (seven, so the section shows six and See 1 more),
 one imported from Claude Code and the learned ones; System the skills that come with Dot and one of a plugin. The
 search finds one skill by its name; the cards stand two a row on a wide page and one on a phone; the settings' old
@@ -166,7 +166,7 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         )
                         await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                         await page.goto(ui_url("127.0.0.1", port, TOKEN))
-                        # The settings' old address leads to Customize › Skills.
+                        # The settings' old address leads to Settings › Skills.
                         await page.goto(f"{served}/#/settings/skills")
                         await expect(page).to_have_url(f"{served}/#/settings/skills")
                         await expect(page.locator("nav.crumbs .crumb-here")).to_have_text("Skills")

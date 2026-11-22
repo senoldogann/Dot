@@ -159,27 +159,27 @@ def words_of(callback: Callback) -> Words:
             return Words(
                 title=f"Back from {name}",
                 lead=f"Dot is finishing the sign-in with {name}. Dot on this Mac shows the server as ready on "
-                "Customize › Connectors when it is done, so you can close this tab.",
+                "Settings › Connectors when it is done, so you can close this tab.",
                 tone="ok",
             )
         case "declined":
             return Words(
                 title=f"Not signed in to {name}",
                 lead=f"You did not say yes on {name}'s page, so nothing was saved. Start the sign-in again from "
-                "Customize › Connectors when you want it.",
+                "Settings › Connectors when you want it.",
                 tone="neutral",
             )
         case "expired":
             return Words(
                 title="This sign-in ran out of time",
                 lead=f"Dot waited more than {WAIT_S / 60:g} minutes for {name}'s page to send you back, then gave up. "
-                "Nothing was saved. Start it again from Customize › Connectors.",
+                "Nothing was saved. Start it again from Settings › Connectors.",
                 tone="neutral",
             )
         case "failed":
             return Words(
                 title=f"Not signed in to {name}",
-                lead=f"The sign-in with {name} did not finish, so nothing was saved. Start it again from Customize › "
+                lead=f"The sign-in with {name} did not finish, so nothing was saved. Start it again from Settings › "
                 f"Connectors; if it fails the same way, check the client you registered with {name}.",
                 tone="bad",
             )
@@ -188,7 +188,7 @@ def words_of(callback: Callback) -> Words:
                 title="This sign-in has ended",
                 lead="Dot no longer waits for it: it may have been used already (a reload shows this), have run out "
                 "of time, or Dot started again since. If you just signed in, Dot already has it. Otherwise start it "
-                "again from Customize › Connectors.",
+                "again from Settings › Connectors.",
                 tone="neutral",
             )
 

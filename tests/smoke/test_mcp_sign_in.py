@@ -1,9 +1,9 @@
-"""MCP servers on Customize › Connectors (items 279 and 316), for real: an MCP server that is its own authorization
+"""MCP servers on Settings › Connectors (items 279 and 316), for real: an MCP server that is its own authorization
 server, served in this process (the MCP library's own, with a provider that says yes to every sign-in), and Dot's own
 server in front of a runtime. Added by its address, the server asks for a sign-in: the page the add answers with is
 followed as a browser would, to Dot's ``/oauth/callback``, and the server is then offered to runs with its tool, kept
 with its sign-in (readable by the owner alone) and connected again at the next start, its token renewed once it ran out.
-A server whose sign-in is gone is left out with words that send the owner to Customize › Connectors; Remove forgets the
+A server whose sign-in is gone is left out with words that send the owner to Settings › Connectors; Remove forgets the
 server and its sign-in. A server open to all is added without a sign-in, and a bad name, a page of another address and a
 stray callback are refused. The Connectors page itself, in a real headless Chrome, wide and light and on a phone and
 dark: the server of Dot's config with its tools and where it is set up, one added by its address, signed in to on the

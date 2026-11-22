@@ -1,4 +1,4 @@
-// Customize › Skills (items 317 and 545), after Codex's page: the head the three tabs of Customize share
+// Settings › Skills (items 317 and 545), after Codex's page: the head the three pages of Connectors, Plugins and Skills share
 // (customizehead.js) with the search, Personal and System, Save from a chat and Import from other apps, and the skills
 // Dot reads, as one list, a row each (item 946), each with its icon in the ink on the quiet tile, name, what it is for
 // and that Dot has it. Personal holds the owner's own skills (Dot's skills folder

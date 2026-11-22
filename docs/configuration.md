@@ -32,7 +32,7 @@ logs), `DOT_CHROME_DIR` (where your own Chrome keeps its profiles, which Dot rea
 | `playbooks/`                                     | the skills Dot learned (`learned-<kind>`) and those you taught it (`taught-<kind>`), the retired ones under `.retired` |
 | `evals/`                                         | the reports of eval runs, one file each                              |
 | `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
-| `connected-servers.json`                         | the MCP servers you added in Customize, by address or command        |
+| `connected-servers.json`                         | the MCP servers you added in Settings › Connectors, by address or command |
 | `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
 | `themes/`                                        | your own themes, one theme file each (Settings › Appearance)         |
@@ -52,14 +52,14 @@ logs), `DOT_CHROME_DIR` (where your own Chrome keeps its profiles, which Dot rea
 | `backups-before-upgrade/`                        | the copy of the database made before a new version changed its tables |
 
 `config.toml` and `.env` may be links to files you keep elsewhere (a dotfiles repository): what Dot changes in them
-(Settings, `dotx auth`, the keys of Customize › Connectors) is written where the link leads, and the link stays (item
+(Settings, `dotx auth`, the keys of Settings › Connectors) is written where the link leads, and the link stays (item
 728). Dot's other files are written in place of whatever stands at their name.
 
 **The MCP server that comes with Dot** (item 583). `[builtin_mcp] web_research` (`true`) says whether the server
 `web-research` is started with Dot's other MCP servers. It starts when its package, `dotagent-web-research`, can be
 imported (every install has it) and no `[[mcp]]` table, plugin or added server has the name `web-research`, which
 replaces it. The setting has a table of its own because `[mcp]` cannot hold a key beside the `[[mcp]]` tables, which
-TOML reads as one array of tables. Customize › Connectors has the same switch and writes it here, `dotx mcp list`
+TOML reads as one array of tables. Settings › Connectors has the same switch and writes it here, `dotx mcp list`
 marks the server `built-in`, and an eval run leaves it out. See [MCP servers](extending.md#mcp-servers).
 
 Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database

@@ -406,7 +406,7 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     its own file tools once the user agrees (item 398):
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
     with the daemon and are given keys from the key store, and so does each server of its record of those added from
-    other agents (item 165) and of its record of those added on Customize › Connectors, the data of the web-research
+    other agents (item 165) and of its record of those added on Settings › Connectors, the data of the web-research
     server that comes with Dot, which starts with the daemon and reads it back (item 583), the folder the daemon builds
     the program that writes recordings down in and runs it from (item 626), the home of the OpenCode
     server it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other
@@ -532,7 +532,7 @@ def _added_servers(config: AppConfig, plugins: PluginCatalog) -> tuple[McpServer
 
 
 def _connected_servers(taken: frozenset[str]) -> tuple[McpServerConfig, ...]:
-    """The MCP servers that the owner added on Customize › Connectors (items 279 and 316). One whose name another server
+    """The MCP servers that the owner added on Settings › Connectors (items 279 and 316). One whose name another server
     has (``taken``) is logged and left out, and so are all of them when the record cannot be read."""
     path: Path = connected_servers_path()
     try:

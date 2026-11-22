@@ -68,7 +68,7 @@ class RealMacos:
 
     def ask(self, bundle_id: str) -> AutomationState:
         """macOS's question for the owner whether the app that runs Dot may control ``bundle_id``, the application
-        started hidden first when it does not run, as Customize › Connectors asks it; blocks until it is answered."""
+        started hidden first when it does not run, as Settings › Connectors asks it; blocks until it is answered."""
         state: AutomationState = mac.automation_state(bundle_id)
         if state == "not_open":
             state = mac.start_hidden(bundle_id)

@@ -1,4 +1,4 @@
-"""Customize › Connectors (items 316 and 542): every service Dot works with, one listing each, in the section the page
+"""Settings › Connectors (items 316 and 542): every service Dot works with, one listing each, in the section the page
 shows it in. A listing names the ways Dot reaches its service, each an entry of the connections' catalogues: an MCP
 service of ``mcp/catalogue.py``, or an application of the Mac, a synced folder or an application of the web of
 ``connections/catalogue.py``; the page reads where it stands from ``GET /connections`` and ``GET /mcp/servers`` and

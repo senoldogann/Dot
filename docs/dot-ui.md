@@ -22,7 +22,7 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   code reviews and iMessage stand as sections of the same look; and at the foot four small buttons: Settings, Connect
   apps, Watch the Mac and Models (there is no account usage page, so the fourth leads to Settings › Models). The agents
   are a menu behind the first button: each its badge, name and how many chats it has, to its conversation else its page,
-  then All agents, New agent and Campaigns. Schedules has no icon here: its page is a row of Settings, beside Connect apps (`settingstabs.js`). The badge's letters
+  then All agents, New agent and Campaigns. Schedules has no icon here: its page is Settings › Scheduled tasks (`#/settings/schedules`, a row of `settingstabs.js`). The badge's letters
   (`badge.js`) are drawn from `data-code`, a mark of the row and no text.
 - **The stage bar** (`shell.js`, `stage.js`, `shell.css`): 52 px, sticky, a hairline under it only once the page has scrolled
   under it (`layout.js`, `data-scrolled`). At the left the sidebar's button (a phone's Back or menu: the edge swipe and the
@@ -49,7 +49,7 @@ Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows
 | One team | `teams.js` | A team's agents, its name and purpose, and a box to message it. |
 | Watch | `watch.js` | The Mac's screen, live, whether a task works or not. |
 | Campaigns | `campaigns.js` | Goals Dot keeps working on in sessions until a check confirms the outcome. |
-| Schedules | `schedules.js` | Goals once or on a cron schedule while the daemon runs. |
+| Scheduled tasks | `schedules.js` | Settings › Scheduled tasks: goals once or on a cron schedule while the daemon runs, a list of rows and a page for the form. |
 | Rules | `rules.js` | What Dot may do on its own, what it asks first, and what it leaves to the owner. |
 | Settings | `settings.js` | The settings shell: the breadcrumb in the bar, the page of the open tab (the nav is in the sidebar, `settingsnav.js`), and on a phone the sheet of the pages. |
 | Appearance | `appearance.js` | Colour schemes as miniatures of Dot's window. |

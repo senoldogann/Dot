@@ -1,4 +1,4 @@
-"""Customize › Plugins, the gallery (item 542), in a real headless Chrome over a real server, wide and light and on a
+"""Settings › Plugins, the gallery (item 542), in a real headless Chrome over a real server, wide and light and on a
 phone and dark. The head with its search; New & noteworthy with the featured plugin and All plugins with every one,
 each card with its mark (its logo, else a skill's puzzle piece on a tile of its kind's colour), the check of a plugin
 from its maker, who publishes it, its kind and its skills; the order and the search. Install puts the plugin in Dot's

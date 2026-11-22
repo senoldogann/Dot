@@ -1,5 +1,5 @@
 """The owner's GitHub notifications (item 571), read with the personal access token Dot keeps when the owner adds GitHub
-on Customize › Connectors: one request for the unread ones, a conditional one after the first (``If-Modified-Since``
+on Settings › Connectors: one request for the unread ones, a conditional one after the first (``If-Modified-Since``
 with what GitHub's last answer called ``Last-Modified``; a 304 costs nothing against GitHub's limits), and no more often
 than GitHub's ``X-Poll-Interval`` says. GitHub's answer is read here, at the edge, into the models below."""
 
@@ -18,7 +18,7 @@ from dotagent.oauth.accounts import Accounts
 
 GITHUB_NAME: str = "GitHub"
 NOTIFICATIONS: str = "https://api.github.com/notifications"
-# The name Dot's ``.env`` keeps the personal access token under when it was given on Customize › Connectors:
+# The name Dot's ``.env`` keeps the personal access token under when it was given on Settings › Connectors:
 # ``MCP_<service>_<name>`` for the service ``github`` and its secret ``GITHUB_PAT`` (``kept_secret_names`` of
 # ``server/routes_mcp.py``, whose result a test holds this to).
 GITHUB_TOKEN_NAME: str = "MCP_GITHUB_GITHUB_PAT"
@@ -86,7 +86,7 @@ def _refusal(response: httpx.Response) -> AccountApiError:
         words = str(body.get("message", ""))
     hint: str = ""
     if response.status_code == httpx.codes.UNAUTHORIZED:
-        hint = ": the token is wrong, expired or revoked; add GitHub again on Customize › Connectors"
+        hint = ": the token is wrong, expired or revoked; add GitHub again on Settings › Connectors"
     elif response.status_code in (httpx.codes.FORBIDDEN, httpx.codes.NOT_FOUND):
         hint = f": {_NOT_READABLE}, and a token needs access to notifications at all"
     return AccountApiError(

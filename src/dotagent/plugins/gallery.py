@@ -1,4 +1,4 @@
-"""Plugins Dot installs from their own repositories (item 542), as Customize › Plugins lists them.
+"""Plugins Dot installs from their own repositories (item 542), as Settings › Plugins lists them.
 
 An entry of the gallery names a repository on GitHub, a commit of it, the skill folders Dot keeps of it and a hash of
 their files. Installing it downloads the archive of that commit, unpacks only those folders into a plugin folder of

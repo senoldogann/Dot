@@ -136,8 +136,8 @@ function skillsSection() {
           "a",
           {
             class: "context-row",
-            href: usage.kind === "skill" ? "#/customize/skills" : "#/customize/connectors",
-            title: `${usage.name} — open ${usage.kind === "skill" ? "Skills" : "Connectors"} in Customize`,
+            href: usage.kind === "skill" ? "#/settings/skills" : "#/settings/connectors",
+            title: `${usage.name} — open ${usage.kind === "skill" ? "Skills" : "Connectors"} in Settings`,
           },
           row(
             usage.kind === "skill" ? "hammer" : "plug",

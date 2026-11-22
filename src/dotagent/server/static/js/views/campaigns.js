@@ -29,7 +29,7 @@ const PREVIEW_CHARS = 220;
 const RESULT_CHARS = 300;
 
 function backLink() {
-  return el("a", { class: "back", href: "#/campaigns" }, icon("arrowLeft"), "All campaigns");
+  return el("a", { class: "back", href: "#/settings/campaigns" }, icon("arrowLeft"), "All campaigns");
 }
 
 function campaignBadge(status) {
@@ -382,7 +382,7 @@ function mountPage(root, ctx, campaignId) {
               type: "button",
               title: "Delete the campaign",
               "aria-label": "Delete the campaign",
-              onclick: () => attempt(() => deleteCampaign(record, () => ctx.navigate("/campaigns"))),
+              onclick: () => attempt(() => deleteCampaign(record, () => ctx.navigate("/settings/campaigns"))),
             },
             icon("trash"),
             el("span", { class: "label" }, "Delete"),

@@ -44,8 +44,6 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TOKEN: str = "phone-settings-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
-# The sheet's rows that open a tab, in order, by the tab each opens (item 995); Connect apps and Schedules (the sidebar
-# has no icon for it, item 1328) stand second.
 # The sheet's rows that open a page, in order, by the page each opens (items 995 and 1336).
 _TABS: dict[str, str] = {
     "general": "General",
@@ -72,7 +70,6 @@ _TABS: dict[str, str] = {
     "diagnostics": "Diagnostics",
     "licences": "Open source licences",
 }
-_ROWS: list[str] = [*list(_TABS.values())[:2], "Connect apps", "Schedules", *list(_TABS.values())[2:]]
 _ROWS: list[str] = list(_TABS.values())
 _NOTES: tuple[str, ...] = (
     "Prefers window seats and morning flights.",
@@ -190,11 +187,14 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/settings")
                 listed: Locator = page.get_by_role("navigation", name="Settings")
-                await expect(listed.get_by_role("heading")).to_have_text(["Agents", "Connections", "Maintenance", "About"])
+                await expect(listed.get_by_role("heading")).to_have_text(
+                    ["Agents", "Connections", "Maintenance", "About"]
+                )
                 rows: Locator = listed.get_by_role("link")
                 await expect(rows.locator(".settings-row-label")).to_have_text(_ROWS)
-                await expect(rows.filter(has_text="Connect apps")).to_have_attribute("href", "#/customize/connectors")
-                await expect(rows.filter(has_text="Schedules")).to_have_attribute("href", "#/schedules")
+                # The sidebar has no Schedules icon (item 1328): the sheet is one way to its page (item 1337).
+                await expect(rows.filter(has_text="Scheduled tasks")).to_have_attribute("href", "#/settings/schedules")
+                await expect(rows.filter(has_text="Connectors")).to_have_attribute("href", "#/settings/connectors")
                 for name, value in _VALUES.items():
                     held: Locator = rows.filter(has=page.locator(".settings-row-label", has_text=name)).locator(
                         ".settings-row-value"

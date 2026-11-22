@@ -13,7 +13,7 @@ ranks by installs but has no interface to read.
 
 Each source gives :class:`Lead` s: a plugin, the repository and the commit it is at, and the folder of it that holds its
 skills. :func:`refusal` is the rules (an open licence, a repository old enough, kept up, starred enough for tier
-``b``); a lead it refuses is not downloaded. GitHub is read with the token of Customize › Connectors when there is
+``b``); a lead it refuses is not downloaded. GitHub is read with the token of Settings › Connectors when there is
 one (5,000 requests an hour) and without one otherwise (60), so a night reads a bounded number of repositories.
 """
 
@@ -293,7 +293,7 @@ class OutOfRequests(GalleryError):
 
 class TokenRefused(GalleryError):
     """GitHub answered 401 to a request sent with the owner's token: the night ends there and the owner is told, since
-    no later request can succeed until the token is renewed in Customize › Connectors (item 1215)."""
+    no later request can succeed until the token is renewed in Settings › Connectors (item 1215)."""
 
 
 class GitHub:

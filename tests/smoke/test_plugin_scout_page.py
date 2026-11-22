@@ -1,4 +1,4 @@
-"""Proposed for you on Customize › Plugins (item 712), in a real headless Chrome over a real server, wide and light
+"""Proposed for you on Settings › Plugins (item 712), in a real headless Chrome over a real server, wide and light
 and on a phone and dark: a proposal's card with its risk, its fit, the review's words in the owner's language and its
 details; Install puts it in Dot's plugins folder and the gallery lists it; Skip takes the other away; what the review
 refused is folded under them; Look now starts a night. The archive is made here: nothing is downloaded, no model is

@@ -234,10 +234,10 @@ run needs, sent where the configuration points:
   through 1Password's servers (see [1Password](extending.md#1password)).
 - **To GitHub, when you install a plugin of the gallery: the request for its archive.** It names the plugin's
   repository and the commit the gallery pins, and carries nothing of yours (see
-  [Customize › Plugins](extending.md#customize--plugins)).
+  [Settings › Plugins](extending.md#settings--plugins)).
 - **To GitHub, each night, for the plugins proposed to you: the requests of the look (item 711).** The catalogues of
   Anthropic's marketplaces, what GitHub says of a repository, its topics' search and the archive of a pinned commit,
-  with the token of Customize › Connectors when there is one; nothing of yours is in them. What a plugin's skills say
+  with the token of Settings › Connectors when there is one; nothing of yours is in them. What a plugin's skills say
   (each `SKILL.md` and the text of its scripts and other files) goes to the review model (`[models] review`, the
   provider your runs already use) as a stranger's text in a fence, never as instructions, with five of the goals you
   gave Dot lately so that it writes in your language; no plugin is installed without your click (see [the nightly
@@ -342,7 +342,7 @@ currency, so list sites that bill in one currency. Empty by default.
    judges its message as a firing's; it is never started for a task that already sent a message or mail, posted,
    uploaded, paid, released or handed work on, nor twice (see [Schedules](memory-and-schedules.md)). No rule
    of yours answers for you. A chat a schedule, a watcher, a notice, the reflection, an eval or Dot's initiative opened is not yours: in `yolo` it asks nothing (a schedule you made on the
-   Schedules page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
+   Scheduled tasks page runs in a chat of its own). A delegated run, an agent's too, is its parent's. Everything else
    (commands, MCP tools, files, the web, a release) runs in `yolo` without a question. In a
    chat Dot opened on its own initiative (item 850): a message, a post and a `release` there wait for your own yes in
    every mode, `yolo`'s and `auto`'s too, never the review model's, and no rule of yours that allows them answers for
@@ -775,7 +775,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   seconds after the eye of Settings › Vault showed a secret (item 621), which `desktop_snapshot` and `desktop_read`
   read no more than a password manager's then; their secure fields are not masked.
 - A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password
-  (Customize › Connectors › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
+  (Settings › Connectors › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
   account token of yours), a run sees the logins' titles and websites (`browser_logins`) and names one with the refs
   of its fields (`browser_fill_login`); the daemon reads the values with `op`, 1Password's command line, and types them
   itself:
@@ -1095,7 +1095,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   with Dot (`web-research`, item 583), the folder the daemon builds the program that writes your recordings down in and
   runs it from (`voice`, item 626), its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
-  of the MCP servers you added from other agents and on Customize › Connectors, the home of the OpenCode server it starts,
+  of the MCP servers you added from other agents and on Settings › Connectors, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
   (`self_change`, item 398), in every approval mode but `yolo`, and neither the review model nor a rule of yours answers
   in your place; OpenCode's own agent, which writes past the journal `dotx undo` reads, is refused, and so is a line
@@ -1107,7 +1107,7 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   the notes folder of the workspace and nothing else: a link at the folder or at the file, which such a line can make,
   is refused, never followed (item 556). A plugin's MCP servers, and those you added, start with the
   daemon and are given keys from the key store: put a plugin or a skill in place yourself, or install one from
-  Customize › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
+  Settings › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
 - A file git runs as code is asked about like Dot's own files when a file tool writes it (item 1301): the `config` of a
   git directory (`.git/config`, `.git/modules/<name>/config`, a bare repository's `config`, `config.worktree`: it can
   name a program for `core.fsmonitor`, `core.sshCommand`, an alias or a filter) and what lies under its `hooks` run the

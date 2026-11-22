@@ -128,7 +128,7 @@ message, and carries the agent's id (item 553). Ask the delegated run to end wit
 command or check it ran and the answer. A report without one, or with one that holds no check (a word or two,
 "none"), is marked as a claim (item 1065), so the sender does not close a plan
 step on trust alone. The run's page names the agent in the bar's breadcrumb, with its badge, the name a link to its page (items 1234 and 1329); its rows in
-the sidebar wear the badge (item 1327) and those on the home's Today strip the face. A schedule can run as one of your agents (its **Agent** on Schedules, item
+the sidebar wear the badge (item 1327) and those on the home's Today strip the face. A schedule can run as one of your agents (its **Agent** in Settings › Scheduled tasks, item
 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its
 learned skills to Dot, and switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent
 named, so that none goes on firing with every tool; one you switch on again runs as Dot, or as the agent you then pick
@@ -180,12 +180,12 @@ the terminal's tools, and the Reviewer names no web at all. Ten templates sugges
 and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid Media every day at 8:00,
 Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00 and 8:00, and Expense
 Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a switch, **Also add its
-schedule; you switch it on on the Schedules page after reading its goal**: on, **Use template** makes the agent and a
+schedule; you switch it on in Settings › Scheduled tasks after reading its goal**: on, **Use template** makes the agent and a
 schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the agent's
 instructions then guide; the schedule is added switched off, so nothing runs before you have read what it will do, and a
 schedule that could not be added leaves the agent made and says why. The switch is for that one Use, not a setting: the
 card is drawn with it off again. An agent's page lists the schedules its runs run as under **Schedules**, each with its
-goal in full, when it runs and its switch, and **Edit** on the Schedules page; an agent with the name of a template that
+goal in full, when it runs and its switch, and **Edit** in Settings › Scheduled tasks; an agent with the name of a template that
 suggests a schedule, and without that schedule (made before, kept by Use team, or its schedule deleted), is offered it
 there, **Suggested by its template** with **Add it**, which adds it switched off (item 722). An agent's page has
 **Export** in its **…**: a file `<name>.dot-agent.json` with the agent's name, role, instructions, what it never does,
@@ -313,7 +313,7 @@ An agent learns for itself. A lesson drawn from an agent's run is the agent's ow
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
 `memory_search` alike; it is offered its own learned skills and Dot's, and another agent's only once you mark that skill
-shared (Customize › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). A skill a run is not
+shared (Settings › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). A skill a run is not
 offered stays out of its reach: the `skill` tool reads only one the run is offered, and asked for another by its name,
 it says that no skill offered to the run is called so and names only those that are. The scores the agent ranks its
 notes by, and the ones its page shows, count its own runs alone. An agent's page lists what it learned ("What it

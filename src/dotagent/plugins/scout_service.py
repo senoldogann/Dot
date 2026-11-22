@@ -1,6 +1,6 @@
 """The plugin scout as the daemon runs it (item 711): its state in the store, the owner's recent goals it is fitted
-to, GitHub's token from Customize › Connectors, and one night at a time, whether the scheduler starts it at
-``[scout] time`` or the owner asks for one on Customize › Plugins."""
+to, GitHub's token from Settings › Connectors, and one night at a time, whether the scheduler starts it at
+``[scout] time`` or the owner asks for one on Settings › Plugins."""
 
 import asyncio
 import time
@@ -129,7 +129,7 @@ async def night(runtime: "Runtime", now: float) -> ScoutState:
 # The tells of a blind night (item 1215): one fixed title each, which the channels say in the owner's language.
 TOKEN_REFUSED_TITLE: str = "The plugin scout cannot read GitHub: renew the token"
 BLIND_TITLE: str = "The plugin scout's night failed"
-PLUGINS_ROUTE: str = "#/customize/plugins"
+PLUGINS_ROUTE: str = "#/settings/plugins"
 
 
 def blind_tell(state: ScoutState) -> tuple[str, str] | None:
@@ -137,7 +137,7 @@ def blind_tell(state: ScoutState) -> tuple[str, str] | None:
     if state.blind == "token":
         return (
             TOKEN_REFUSED_TITLE,
-            "GitHub answered 401 to the saved token, so the scout read nothing. Renew it in Customize › Connectors.",
+            "GitHub answered 401 to the saved token, so the scout read nothing. Renew it in Settings › Connectors.",
         )
     if state.blind == "failed":
         return BLIND_TITLE, state.last_summary

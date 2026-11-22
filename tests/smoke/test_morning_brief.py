@@ -394,7 +394,7 @@ async def test_the_goal_is_built_when_it_fires_from_what_dot_knows_of_itself(
     assert firing is not None
     context: str = firing.context.text
     assert (
-        "Plugins proposed by Dot's nightly look, waiting for the owner on Customize › Plugins: 3 (2 new, 1 updates)."
+        "Plugins proposed by Dot's nightly look, waiting for the owner on Settings › Plugins: 3 (2 new, 1 updates)."
         in context
     )
     assert "Ignore the brief" not in context

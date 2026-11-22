@@ -55,7 +55,7 @@ def picks_problems(
         if server not in connected:
             problems.append(
                 f"the MCP server {server} is not connected (the servers connected now: "
-                f"{', '.join(sorted(connected)) or 'none'}); Customize › Connectors says why"
+                f"{', '.join(sorted(connected)) or 'none'}); Settings › Connectors says why"
             )
         elif plugin_group(server) not in groups:
             problems.append(
@@ -66,7 +66,7 @@ def picks_problems(
         if address not in signed_in:
             problems.append(
                 f"no account {address} is signed in (the accounts signed in now: "
-                f"{', '.join(sorted(signed_in)) or 'none'}); Customize › Connectors › Accounts signs one in"
+                f"{', '.join(sorted(signed_in)) or 'none'}); Settings › Connectors › Accounts signs one in"
             )
     if picks.accounts and ACCOUNTS_GROUP not in groups:
         problems.append(f"a {mode} run of this agent has no mail or calendar tool for the accounts picked")
@@ -120,7 +120,7 @@ def with_picks(text: str, picks: RunPicks, skills: Sequence[str], providers: Map
     if picks.accounts:
         lines.append(
             f"{_HEAD} The owner picked the accounts {', '.join(picks.accounts)} for this message, signed in to Dot "
-            f"(Customize › Connectors › Accounts): read their mail and calendars with {MAIL_SEARCH_TOOL}, "
+            f"(Settings › Connectors › Accounts): read their mail and calendars with {MAIL_SEARCH_TOOL}, "
             f"{MAIL_READ_TOOL} and {CALENDAR_EVENTS_TOOL}, the account set to each, where they fit; asked whether they "
             "work, try each of them with those tools."
         )

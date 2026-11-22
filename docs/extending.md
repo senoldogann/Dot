@@ -1,18 +1,21 @@
 # Apps, MCP servers, skills and plugins
 
-## Customize
+## Settings › Plugins, Skills and Connectors
 
-**Customize** (items 278, 289, 316, 401, 542 and 545), whose Connectors [Connect apps](#connect-apps) opens, has three
-tabs: **Plugins**, the gallery of the plugins Dot installs ([Customize › Plugins](#customize--plugins)); **Skills**, the
-skills it reads ([Skills and plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with ([Customize
-› Connectors](#customize--connectors)). Each opens with the same head (items 545 and 946): the tab's title and a line on
-what it holds on the page's own ground, then its search with its controls beside it on one row. `#/customize` opens
-Plugins. The old address `#/connect` leads to Connectors, and so does a service's page at the address it had before item
-542, `#/customize/plugins/<service>`, since the gallery's plugins took that name; but for the four services whose
-gallery plugin has the same name (Cloudflare, Supabase, MongoDB and Hugging Face), where that address opens the plugin's
-page.
+**Plugins**, **Skills** and **Connectors** (items 278, 289, 316, 401, 542, 545 and 1336; before item 1336 the three tabs of
+a page called **Customize**) are pages of the settings, under **Connections** in their nav: **Plugins**, the gallery of the
+plugins Dot installs ([Settings › Plugins](#settings--plugins)); **Skills**, the skills it reads ([Skills and
+plugins](#skills-and-plugins)); and **Connectors**, the services Dot works with ([Settings ›
+Connectors](#settings--connectors)), which [Connect apps](#connect-apps) in the sidebar's foot opens. Each opens with the
+same head (items 545, 946 and 1336): a line on what the page holds, then its search with its controls beside it on one row;
+its name is the breadcrumb in the bar. The addresses are `#/settings/plugins`, `#/settings/skills` and
+`#/settings/connectors`, and a plugin's or a service's own page is under them (`#/settings/plugins/<id>`,
+`#/settings/connectors/<id>`). The old addresses lead there: `#/customize` and `#/customize/plugins` to Plugins, `#/connect`
+to Connectors, and a service's page at the address it had before item 542, `#/customize/plugins/<service>`, to
+Connectors too, since the gallery's plugins took that name; but for the four services whose gallery plugin has the same
+name (Cloudflare, Supabase, MongoDB and Hugging Face), where that address opens the plugin's page.
 
-## Customize › Plugins
+## Settings › Plugins
 
 **Plugins** (item 542) is the gallery of the plugins Dot installs, after Qoder's page: a head that says what a plugin
 is, with the search (it reads the names, the publishers, the kinds and the names of the skills); **New & noteworthy**,
@@ -69,13 +72,13 @@ same asks as anything else the run does ([Safety](safety.md)).
 
 ### The nightly look: plugins proposed for you
 
-**Proposed for you** (items 710-712) stands at the top of Customize › Plugins: each night, at `[scout] time` (03:30, in
+**Proposed for you** (items 710-712) stands at the top of Settings › Plugins: each night, at `[scout] time` (03:30, in
 `[scheduler] timezone`; `"off"` stops it), Dot looks for plugins worth having and for updates of those it installed,
 checks each, and keeps what passes for you. **Nothing is installed by itself**: each proposal waits for your Install (or
 Update) or Skip. **Look now** starts a look at once. The line under the title says when Dot last looked and what it
 found; what its review refused is folded under the cards with the review's reason. A night that saw nothing it went for
 is told to you the same morning (item 1215): when GitHub refuses the saved token (401, expired or revoked) the night
-ends at its first request, says "GitHub refused the token" and tells you to renew it in Customize › Connectors; when
+ends at its first request, says "GitHub refused the token" and tells you to renew it in Settings › Connectors; when
 its looks failed and GitHub answered none of its requests, it tells you so with the night's line; a night GitHub
 answered is not told, though a lead of it failed (a repository renamed or gone fails every night). The
 tell's title is in your language; its text, like that of Dot's other tells, is still English.
@@ -161,7 +164,7 @@ brief does not quote). `GET /api/plugin-scout` lists the proposals, the refused 
 under way; `POST /api/plugin-scout/look` starts one.
 
 **Limits** (`[scout]`): `leads_per_night` (25) plugins and `updates_per_night` (20) updates a night, `minutes` (30) for
-the whole look, `review_timeout_s` (120) for each review. Without the GitHub token of Customize › Connectors, GitHub
+the whole look, `review_timeout_s` (120) for each review. Without the GitHub token of Settings › Connectors, GitHub
 answers 60 requests an hour: an update looked for takes two, a plugin one, or two when no catalogue pins its commit (a
 look of five took 17 requests and 10 seconds), so a night with many plugins installed can spend them. It reads how many
 are left from each answer and ends when two are, before GitHub refuses one (its summary says "out of GitHub's
@@ -176,7 +179,7 @@ cannot be read is counted as failed, and the others go on.
 Not done: MCP servers (Connectors) are not looked for yet, as they run programs on this Mac; and no update is ever
 installed without you.
 
-## Customize › Connectors
+## Settings › Connectors
 
 **Connectors** lists 156 services with a search, **Connected** and **All** (each with its count) and **Check again** in
 its head, the accounts under it, and the sections as chips (item 545), one showing its section alone: Popular, Password
@@ -250,7 +253,7 @@ same way (`args = ["-y", "some-mcp-server@1.2.3"]`).
 ### Connect apps
 
 **Connect apps** (items 492 and 545), at the foot of the sidebar over your account's row (item 999), on the sidebar's
-own ground, opens Customize › Connectors, which it stands for while it is open, wearing the logos of four
+own ground, opens Settings › Connectors, which it stands for while it is open, wearing the logos of four
 services (three until item 959): those whose servers are ready, the first by name and each service once, the same ones
 while they stay connected (item 853; item 509 turned them every few seconds), only a service's own logo, not the icon
 or the plug of a server with none, nor Dot's own; and while fewer are ready, the services most connect first (Google,
@@ -396,12 +399,12 @@ to (Linear, Postman) lists and connects its tools with that sign-in, so the choi
 command that starts it on this Mac, added as the services are, from the card's **Add connected app** button, which asks the
 name and the address in a dialog (item 615; a name the daemon refuses is said inside it, with what you typed still
 there). Connected lists, besides the services, every server Dot
-has from its config, a plugin or another agent (Customize › Skills › Found on this Mac), with **Ready** and its tools,
+has from its config, a plugin or another agent (Settings › Skills › Found on this Mac), with **Ready** and its tools,
 **Left out** and why, or **Off**.
 
 ## Accounts: Google's and Microsoft's own sign-in
 
-Customize › Connectors opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
+Settings › Connectors opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
 Google Calendar) and Microsoft (Outlook, Microsoft 365), each with its own mark, through their official sign-ins, with
 the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page
 in a new tab; you say yes there, the provider sends the browser back to the daemon's `/oauth/callback` on this Mac's own
@@ -562,7 +565,7 @@ server of your own that replaces it is not checked: its tools are not known to D
 
 It starts when its package can be imported (a checkout that did not install it has no such server),
 `[builtin_mcp] web_research` is on (`true` by default) and no other server has its name. To turn it off, use its
-switch on [Customize › Connectors](#customize--connectors), which stops it at once and writes the setting, or write
+switch on [Settings › Connectors](#settings--connectors), which stops it at once and writes the setting, or write
 `[builtin_mcp] web_research = false`: the table is not `[mcp]`, which TOML cannot have beside the `[[mcp]]` tables.
 To use your own checkout of the server instead, add a `[[mcp]]` table named `web-research`: a server of that name from
 any place (a plugin's, one added from another agent, one added on Connectors before) replaces it, and the built-in
@@ -607,7 +610,7 @@ marks `built-in` (not the ones added on Connectors), and shows the tools each of
 Only tools are used (no resources, prompts or sampling).
 A server at a URL may
 sign in as MCP's authorization asks (OAuth): `oauth = true` has
-Dot send the token it keeps for it, which **Sign in again** on [Customize › Connectors](#customize--connectors) gets, and the servers added
+Dot send the token it keeps for it, which **Sign in again** on [Settings › Connectors](#settings--connectors) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added, removed or has its tools
 chosen on Connectors, for the runs that start after; a server that dies is started again by the next call. A
 server reached at a URL whose session of the older protocol (one with a ping; the modern protocol holds no session to go
@@ -654,9 +657,9 @@ as a read, with no flag; any other counts as one that may change things (`destru
 
 ## Skills and plugins
 
-**Customize › Skills** (items 317 and 545) lists the skills Dot reads as one list, a row each (item 946), each with its
+**Settings › Skills** (items 317 and 545) lists the skills Dot reads as one list, a row each (item 946), each with its
 icon in the theme's ink on the quiet tile every mark stands on, what it is for on one line and that Dot has it, under
-the head of Customize with Personal and System, **Save from a chat** and **Import from other apps**, with a search and,
+the head of Skills with Personal and System, **Save from a chat** and **Import from other apps**, with a search and,
 past a section's first six cards, See N more. **Personal** holds yours (Dot's skills folder and the `[skills] dirs`
 folders), those imported from the Mac's other agents (with Remove) and the learned ones (below, with Share and Drop);
 **System** holds those that come with Dot and those of its plugins. **Save from a chat** writes the skill of a chat that
@@ -743,7 +746,7 @@ with why: a file, a skill whose `SKILL.md` Dot cannot use, a skill named as one 
 second copy reached through a link is not counted), a plugin named as one of another marketplace before it, a server
 that names no command or URL to use, whose command does not start with the name of a program (a URL, or a variable set
 before it), whose URL names no host, or whose entry holds values of the wrong kind (told by their keys).
-`dotx skills list` shows them after Dot's own, with `?` for any character a terminal would act on; Customize › Skills
+`dotx skills list` shows them after Dot's own, with `?` for any character a terminal would act on; Settings › Skills
 shows them under "Found on this Mac", read apart from the learned skills; and `GET /api/skills/elsewhere` returns them.
 Runs do not see them: Dot uses one only once you add it (below), or name its folder in `[skills] dirs` or
 `[plugins] dirs`.
@@ -771,7 +774,7 @@ server whose name does not fit Dot's rule for server names (a lower-case letter,
 hyphens, at most 24 characters) or is taken, or that uses a variable its agent fills in: any `${...}` in its command,
 arguments or URL, or one in its environment or headers other than `${NAME}`, which Dot looks up like an API key.
 
-**Importing several at once.** Import from other apps, at the head of Customize › Skills, opens a checklist of what is
+**Importing several at once.** Import from other apps, at the head of Settings › Skills, opens a checklist of what is
 found that Dot can add: the skills by agent, each with its description, ticked at first, then the MCP servers, each
 with its agent and what it starts or reaches, not ticked, as a server starts a program of this Mac; Choose all ticks
 or clears every one, and a line says how many others Dot has already or cannot add (Found on this Mac says why). The
@@ -846,7 +849,7 @@ record `said`; it is the agent's whose run saved it, or Dot's. Told otherwise la
 skill saved so, of its own agent): a new version, the one before kept, its note `revised` with what the owner wrote in
 the run. A run in a chat where any run has read content third parties can author saves none, nor a run in a chat Dot
 opened on its own initiative (a skill is the owner's instruction to every later run), and the secrets Dot holds are
-masked in it. The owner sees it under Customize › Skills with the others they taught, and changes, pins or drops it
+masked in it. The owner sees it under Settings › Skills with the others they taught, and changes, pins or drops it
 there. Its trust is the owner's words in a chat none of whose runs has read anything others can write (the owner's "go
 on" after a page clears a run's taint, not the page's words, which the chat's history keeps). A skill shown in the
 browser trusts the owner's reading of its draft and nothing else: the steps a page put in front
@@ -864,7 +867,7 @@ one-time code, an e-mail address or a home path in a skill, but only secrets are
 values Dot holds, the value of a key that names a secret and the keys and tokens of known forms are masked before the
 skill is written, and an e-mail address or a home path the model writes anyway is kept as written (a skill from a clean
 run is offered whole; one from a run that read outside content has such lines withheld, found by the one gate for
-learned texts, [The harness](harness.md#one-gate-for-every-text-dot-learns)). Customize › Skills lists the learned skills
+learned texts, [The harness](harness.md#one-gate-for-every-text-dot-learns)). Settings › Skills lists the learned skills
 under Learned (kind, where, the runs, how they fared, Retired on a retired one, an agent's with its name and Share)
 with Drop; `dotx playbooks list` shows them with
 their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. A run is
@@ -907,7 +910,7 @@ record before the file (a disk that fills between the two leaves the older steps
 steps under a record that says they carry less of outside content than they do), and the record notes how each
 version came to be, the run that made it and whether its steps carry the mark of outside
 content, as that version had it: a restore brings back the mark of the version it puts back, and a merge is marked
-when any skill it was made from is. Customize › Skills shows **Versions (N)** on a skill that has more than one:
+when any skill it was made from is. Settings › Skills shows **Versions (N)** on a skill that has more than one:
 a dialog, the newest first, with how each was made, its mark and the steps it changed from the version before it,
 and **Restore**, which asks first and makes the version a new version of its own, so that it too can be taken
 back. `GET /api/skills/learned/{name}/versions`, `POST /api/skills/learned/{name}/restore` (`{"version": 2}`),

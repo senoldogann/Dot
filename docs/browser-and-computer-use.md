@@ -570,7 +570,7 @@ Both modes share what follows.
   interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling (`localhost`,
   `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in there. One page of
   it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`), which macOS may open in
-  Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else of the interface, and a
+  Dot's own Chrome when you sign in from Settings › Connectors; Chrome opens it as a page and nothing else of the interface, and a
   run whose tab lands there still has the tab reset (item 448). A page a run showed passes too, whatever the lists say
   (`/pages/<id>` exactly, at the address `show_page` gives the run, item 601): the run opens it to see what it showed.
   It is sandboxed wherever it opens, so its scripts reach neither the API nor the UI, and anything it loads of the
@@ -658,7 +658,7 @@ chat it was taught in (`POST /api/teach/<chat>/repeat` with the skill's `name` a
 line of what it does, it starts as a schedule a run of that chat makes (the chat's model, reasoning level, speed,
 approvals and goal mode, item 291), and every run of it starts with the taught skill picked, as Run it now's does and as
 a message with the skill picked in the composer does: the skill's instructions are in its first request. The panel then
-says when it repeats ("It repeats on Mondays at 08:30, in this chat") and leads to it on the Schedules page, where its
+says when it repeats ("It repeats on Mondays at 08:30, in this chat") and leads to it in Settings › Scheduled tasks, where its
 row says **Taught task**, and the chat shows each run as any schedule's. The schedule keeps its skill (the `skills` of
 its options) when it is edited there, whose form has no field for it; a name that is no task the owner taught, a chat
 that is not there (404) and a rhythm the scheduler refuses (422) make nothing.

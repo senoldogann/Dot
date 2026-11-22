@@ -1,4 +1,4 @@
-// The changes to learned skills that wait for the owner's yes (item 585, Customize › Skills): each is a card that shows
+// The changes to learned skills that wait for the owner's yes (item 585, Settings › Skills): each is a card that shows
 // everything the yes would write to the first skill (its name, description, kind of work, when it fits, steps and
 // parameters, each against what the skill says now) and what happens to the other, with a yes and a no. Nothing is
 // written to a skill until the yes: the nightly reflection and the owner's reactions only propose. The server lists the

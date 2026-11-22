@@ -1,4 +1,4 @@
-/* The settings page (items 330, 562 and 1338), drawn as T3 Code draws its settings: in a Mac's window the nav is the
+/* The settings page (items 330, 562 and 1338), drawn plainly: in a Mac's window the nav is the
    sidebar's (settingsnav.js, below) and the page is the open page alone, in a column of 800 px: its line, then its
    sections 32 px apart, each a name of 14 px over a bordered card of rows; a row is its title and the muted line under it
    on the left and its control on the right, parted from the next by a hairline. A phone has the list of pages for a page of
@@ -257,9 +257,11 @@
   color: var(--muted);
 }
 
-a.crumb:hover {
-  color: var(--text);
-  text-decoration: none;
+@media (hover: hover) {
+  a.crumb:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
 }
 
 .crumb-here {
@@ -5274,7 +5276,7 @@ a.crumb:hover {
 
 /* ---------- the settings nav (items 562, 999 and 1336) ---------- */
 
-/* The sidebar's settings nav, as T3 Code's: a search at the top, the groups of rows under their small names, each row a
+/* The sidebar's settings nav: a search at the top, the groups of rows under their small names, each row a
    mark of 16 px and a name. The sidebar shows it in place of the chats (shell.css); the phone's sheet uses the search
    and the rows' own look below. */
 .snav-search {
@@ -5430,7 +5432,7 @@ a.crumb:hover {
 
 /* The phone's sheet starts with the same search, full width. */
 .settings-list > .snav-search {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 calc(-1 * var(--space-2));
   padding: 0 var(--space-3);
 }
 
@@ -5620,4 +5622,120 @@ a.crumb:hover {
 .settings-pane .set-row .select,
 .settings-pane .set-row .input:not(.mono) {
   max-width: 100%;
+}
+
+/* ---------- Connectors, Plugins and Skills as lists (item 1339) ---------- */
+
+/* The services, the gallery's plugins and the skills are rows of one frame at every width, a plain list: a
+   mark, a name over what it does on one line, and its button at the right, a hairline between rows. The featured cards
+   and the Popular tiles, which stood up as cards with a gradient, are rows too. */
+.plugin-section > .plugin-grid,
+.plugin-section[data-section="popular"] > .plugin-grid,
+.gallery-grid:has(> .gallery-card),
+:is(.gallery-grid, .gallery-featured) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+/* "Not from the gallery" is a row of the list: the rows' own left edge, and the hairline over it. */
+.gallery-grid > .gallery-others-title {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  border-top: 1px solid var(--border);
+}
+
+.skill-grid {
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.plugin-section > .plugin-grid > .plugin-tile,
+.plugin-section[data-section="popular"] .plugin-tile,
+:is(.gallery-grid, .gallery-featured) > .gallery-card {
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.plugin-section > .plugin-grid > .plugin-tile + .plugin-tile,
+:is(.gallery-grid, .gallery-featured) > .gallery-card + .gallery-card {
+  border-top: 1px solid var(--border);
+}
+
+@media (min-width: 721px) {
+  .plugin-section[data-section="popular"] .plugin-tile {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: transparent;
+  }
+
+  .plugin-section[data-section="popular"] .plugin-tile > .plugin-mark {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+  }
+
+  .plugin-section[data-section="popular"] .plugin-tile > .plugin-add {
+    position: static;
+  }
+
+  .plugin-section[data-section="popular"] .plugin-does {
+    -webkit-line-clamp: 1;
+  }
+}
+
+.plugin-grid .plugin-does {
+  -webkit-line-clamp: 1;
+}
+
+.gallery-featured .gallery-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 0 var(--space-3);
+}
+
+.gallery-featured .gallery-card > .plugin-mark {
+  grid-row: 1 / span 3;
+  align-self: start;
+}
+
+.gallery-featured .gallery-card-main {
+  display: contents;
+}
+
+.gallery-featured .gallery-card-head {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.gallery-featured .gallery-card-by,
+.gallery-featured .gallery-card-does {
+  grid-column: 2 / -1;
+}
+
+.gallery-featured .gallery-action {
+  position: relative;
+  top: auto;
+  right: auto;
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.gallery-featured .gallery-card-does,
+.gallery-grid .gallery-card-does {
+  -webkit-line-clamp: 1;
+}
+
+.gallery-card a.gallery-card-name::after,
+.plugin-tile a.plugin-name::after {
+  border-radius: 0;
 }

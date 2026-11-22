@@ -120,7 +120,7 @@ def websearch_router(ctx: ServerContext) -> APIRouter:
         if engine == "searxng" and not config.web.searxng_url:
             return "a SearXNG address ([web] searxng_url in config.toml)"
         if engine == "web_research" and not web_research_runs(ctx.runtime):
-            return "the web-research server, which is off or did not start (Customize › Connectors)"
+            return "the web-research server, which is off or did not start (Settings › Connectors)"
         if engine == "browser" and not ctx.runtime.browser.human_like:
             return "Dot's own browser (Settings › Browser)"
         return None
