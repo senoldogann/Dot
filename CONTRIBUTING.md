@@ -77,6 +77,8 @@ uvx zizmor@1.31.1 --min-severity low .
   hides a failure is not added.
 - A handler that catches `Exception` raises it again, logs it with its traceback, or says where it goes in a
   `# noqa: BLE001 - <reason>` comment: `ruff check` refuses one that does none of these.
+- A package the code imports directly is declared in `pyproject.toml` with a lower bound taken from `uv.lock` (run
+  `uv lock` after); `tests/unit/test_declared_imports.py` fails for an import that nothing declares (item 1316).
 - A comment or a docstring says what the code does now, not how it came to be.
 - A line of Python is at most 120 characters, and `ruff check` holds it to that; new Markdown prose is wrapped the same
   way.

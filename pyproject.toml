@@ -27,16 +27,23 @@ dependencies = [
     "cryptography>=50.0.2",
     "dotagent-web-research==1.4.9",
     "fastapi>=0.143.0",
+    "httpcore>=1.0.9",
     "httpx[http2]>=0.28.1",
+    "httpx2>=2.13.1",
     "mcp>=2.3.0",
+    "mcp-types>=2.3.0",
     "openpyxl>=3.1.5",
     "pillow>=12.3.0",
     "playwright>=1.62.0",
+    "py-vapid>=1.9.4",
     "pydantic>=2.14.1",
+    "pydantic-core>=2.50.4",
     # PyObjC exists on macOS only. The marker lets the format, lint and type checks and the unit tests install on
     # Linux (gate.yml, item 1270); the package still runs on macOS alone, and the tests that need it stay there.
+    "pyobjc-core>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-applicationservices>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-cocoa>=12.2.2; sys_platform == 'darwin'",
+    "pyobjc-framework-coremedia>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-quartz>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-screencapturekit>=12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-videotoolbox>=12.2.2; sys_platform == 'darwin'",
@@ -46,6 +53,7 @@ dependencies = [
     "pywebpush>=2.5.0",
     "pyyaml>=6.0.3",
     "regex>=2024.11.6",
+    "starlette>=1.7.0",
     "structlog>=26.1.0",
     "uvicorn>=0.54.0",
 ]
@@ -69,6 +77,8 @@ module-name = "dotagent"
 
 [dependency-groups]
 dev = [
+    # tests/unit/test_daemon_http_stack.py imports it: uvicorn's extras (through dotagent-web-research) bring it too.
+    "httptools>=0.9.0",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
