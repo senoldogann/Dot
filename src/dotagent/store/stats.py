@@ -54,11 +54,20 @@ _DAY_S: float = 86_400.0
 _SINCE_SCOPE: str = "r.created_at >= ?"
 _RUN_SCOPE: str = "r.id = ?"
 
-_RUNS_SQL: str = """
-SELECT r.model, r.status, r.result, r.steps, r.input_tokens, r.output_tokens, r.id, r.created_at, r.finished_at,
-       r.harness_version, r.end_reason
-FROM runs r WHERE {scope}
+# The runs, with those whose chats were deleted, as the ledger of item 1323 keeps them (numbers, no answer): a run is in
+# one of the two, never both, as the delete writes its row in the transaction that deletes it.
+_ALL_RUNS: str = """
+(SELECT model, status, result, steps, input_tokens, output_tokens, id, created_at, finished_at, harness_version,
+        end_reason FROM runs
+ UNION ALL
+ SELECT model, status, '', steps, input_tokens, output_tokens, id, created_at, finished_at, harness_version,
+        end_reason FROM run_ledger)
 """
+_RUNS_SQL: str = (
+    "SELECT r.model, r.status, r.result, r.steps, r.input_tokens, r.output_tokens, r.id, r.created_at, r.finished_at,"
+    " r.harness_version, r.end_reason"
+    f" FROM {_ALL_RUNS} AS r WHERE {{scope}}"
+)
 # One row per model call of the runs: the model of its run, the run, what the call was for, its seconds, the tokens the
 # provider served from its cache, whether it got a reply (no error) and its input tokens.
 _CALLS_SQL: str = """
@@ -130,17 +139,24 @@ WHERE {scope} AND e.kind = 'tool_call' AND json_extract(e.data, '$.tool') = 'ski
   AND (json_extract(e.data, '$.args.name') LIKE 'learned-%' OR json_extract(e.data, '$.args.name') LIKE 'taught-%'
        OR json_extract(e.data, '$.args.name') LIKE 'playbook-%')
 """
-# One row per model: the events of its runs, counted. A tool result with ``"ok": false`` is a failed call.
+# One row per model: the events of its runs, counted, with the counts the ledger kept of the runs of deleted chats
+# (item 1323). A tool result with ``"ok": false`` is a failed call.
 _EVENTS_SQL: str = """
-SELECT r.model,
-       COALESCE(SUM(e.kind = 'tool_call'), 0),
-       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0),
-       COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0),
-       COALESCE(SUM(e.kind = 'stall'), 0),
-       COALESCE(SUM(e.kind = 'compacted'), 0)
-FROM runs r JOIN events e ON e.run_id = r.id
-WHERE {scope}
-GROUP BY r.model
+SELECT model, SUM(calls), SUM(errors), SUM(invalid), SUM(stalls), SUM(compactions) FROM (
+    SELECT r.model AS model,
+           COALESCE(SUM(e.kind = 'tool_call'), 0) AS calls,
+           COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0) AS errors,
+           COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0) AS invalid,
+           COALESCE(SUM(e.kind = 'stall'), 0) AS stalls,
+           COALESCE(SUM(e.kind = 'compacted'), 0) AS compactions
+    FROM runs r JOIN events e ON e.run_id = r.id
+    WHERE {scope}
+    GROUP BY r.model
+    UNION ALL
+    SELECT r.model, r.tool_calls, r.tool_errors, r.invalid_arguments, r.stalls, r.compactions FROM run_ledger r
+    WHERE {scope}
+)
+GROUP BY model
 """
 # One row: the newest finished runs of one model and the counts of their events. A failed tool result without a risk was
 # refused before anything ran (an unknown tool, a tool of another mode, arguments that were not JSON or did not fit).
@@ -682,7 +698,9 @@ def _read_rows(database: Path, scope: str, value: float | str) -> _Rows:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
             return _Rows(
                 runs=connection.execute(_RUNS_SQL.format(scope=scope), (value,)).fetchall(),
-                events=connection.execute(_EVENTS_SQL.format(scope=scope), (INVALID_ARGUMENTS_KEY, value)).fetchall(),
+                events=connection.execute(
+                    _EVENTS_SQL.format(scope=scope), (INVALID_ARGUMENTS_KEY, value, value)
+                ).fetchall(),
                 calls=connection.execute(_CALLS_SQL.format(scope=scope), (value, CALL_EVENT)).fetchall(),
                 tools=connection.execute(_TOOLS_SQL.format(scope=scope), (value,)).fetchall(),
                 acts=connection.execute(_ACTS_SQL.format(scope=scope), (value,)).fetchall(),
@@ -1293,7 +1311,8 @@ def collect_spend(database: Path, since: float, limit: int) -> TokenSpend:
     try:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
             total: tuple[object, ...] = connection.execute(
-                "SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM runs WHERE created_at >= ?", (since,)
+                f"SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM {_ALL_RUNS} WHERE created_at >= ?",
+                (since,),
             ).fetchone()
             rows = connection.execute(SPEND_SQL, (since, limit)).fetchall()
     except sqlite3.Error as error:

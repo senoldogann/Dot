@@ -508,7 +508,9 @@ default), `DOT_DESKTOP_BANK_K` the attempts of each task.
 
 How well Dot finishes work is measured, not guessed, in two ways.
 
-**`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), per model: how they
+**`dotx stats [--days N]`** counts the runs that really happened (the last 30 days by default), those of deleted chats
+too as the run ledger keeps them (item 1323; their numbers, endings, tool calls, stalls and compactions count, their times,
+sites and causes of failure are gone with their events), per model: how they
 ended (finished, stopped by you, stopped by the progress watchdog, stopped at its limit, refused by the goal check, cut
 off when the daemon died or shut down, internal error, still active), steps, input and output tokens, tool calls and how
 many of them failed, calls whose arguments were not valid JSON, stalls and compactions. A **Time** table follows, per

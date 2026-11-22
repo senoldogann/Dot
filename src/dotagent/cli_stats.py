@@ -178,7 +178,10 @@ def render_time(stats: Sequence[ModelStats]) -> list[str]:
         )
     untimed: int = sum(entry.runs - entry.time.timed_runs for entry in stats)
     note: list[str] = (
-        [f"  {untimed} runs recorded no model calls (most ran before calls were timed) and are left out of this table."]
+        [
+            f"  {untimed} runs recorded no model calls (they ran before calls were timed, or their chats were deleted"
+            " and the ledger keeps no calls) and are left out of this table."
+        ]
         if untimed
         else []
     )

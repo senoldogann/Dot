@@ -63,7 +63,11 @@ TOML reads as one array of tables. Customize › Connectors has the same switch 
 marks the server `built-in`, and an eval run leaves it out. See [MCP servers](extending.md#mcp-servers).
 
 Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database
-(below). Nothing else is removed by itself, but the notes you forgot (the nightly reflection deletes them from the trash
+(below). Its runs go with their words, but each leaves one row of numbers in the run ledger (item 1323): where it came
+from, its model and effort, how it ended, its steps, tokens and times, its schedule, agent and campaign, the version of
+the harness it took, its tool calls and how many failed or did not parse, its stalls and compactions, and when it was
+deleted; never its goal or answer. `dotx stats`
+counts those runs beside the others, so that tidying chats does not reset what is measured. Nothing else is removed by itself, but the notes you forgot (the nightly reflection deletes them from the trash
 after `[memory] trash_days`, 30) and the loop's own records (each night and each step deletes the versions you set aside, the nights,
 their trials and its experiences after `[harness] keep_days`, 180, but for the version in use and the ones it came from;
 [The harness](harness.md)): old runs and their events stay until their chats are deleted or `dotx prune --apply` finds
