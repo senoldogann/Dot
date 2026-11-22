@@ -2240,7 +2240,7 @@ dialog.modal.file-dialog .file-picture img {
 
 .file-code-language {
   flex: none;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-weight: var(--weight-label);
   text-transform: uppercase;
 }
@@ -2307,7 +2307,7 @@ dialog.modal.file-dialog .file-picture img {
 
 .file-code-number,
 .file-code-literal {
-  color: var(--accent);
+  color: var(--accent-strong);
 }
 
 /* A document's headings, a Markdown file's (item 269) and a slide's title stand out from their text more than an
@@ -3086,7 +3086,7 @@ dialog.computer-full::backdrop {
   box-shadow: var(--shadow-modal);
   outline: none;
   transition: transform var(--motion-quick) var(--ease);
-  /* It rises 32 px into its place as it opens (item 1205), as a message's sheet does. */
+  /* It rises 16 px into its place as it opens (item 1205), as a message's sheet does. */
   animation: sheet-rise var(--motion-sheet) var(--ease);
 }
 

@@ -551,7 +551,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--accent);
+  color: var(--accent-strong);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
   font-weight: var(--weight-label);

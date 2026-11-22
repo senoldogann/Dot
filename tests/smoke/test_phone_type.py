@@ -66,13 +66,15 @@ _FINGER_PX: float = 32.0
 # A page is read once two looks this far apart find the same, and given this long to settle.
 _SETTLE_MS: int = 400
 _SETTLE_S: float = 10.0
-# A Mac's sizes, as before item 329: the seven sizes of the text, the body, and the switch's width and height.
-_MAC_SIZES: list[str] = ["12px", "13px", "14px", "15px", "17px", "20px", "24px"]
+# A Mac's sizes, as before item 329 and as the dense scale since item 1324: the seven sizes of the text, the body,
+# and the switch's width and height.
+_MAC_SIZES: list[str] = ["12px", "13px", "14px", "14px", "16px", "18px", "24px"]
 _MAC_BODY: str = "14px"
-_MAC_SWITCH: list[int] = [34, 20]
-# On a phone the switch's box is a finger's height around a 40 by 24 px track (item 337; iOS's 52 by 32 px before).
+_MAC_SWITCH: list[int] = [32, 18]
+# On a phone the switch's box is a finger's height around the Mac's 32 by 18 px track (items 337 and 1325: one design
+# language; iOS's 52 by 32 px before).
 _PHONE_SWITCH: list[int] = [48, 44]
-_PHONE_TRACK: list[int] = [40, 24]
+_PHONE_TRACK: list[int] = [32, 18]
 _CLEAR: str = "rgba(0, 0, 0, 0)"
 # A switch's track (its ::before) by its size, whether its corners are half its height (a pill), and the box's ground.
 _TRACK: str = """(s) => {
