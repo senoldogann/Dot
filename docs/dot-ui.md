@@ -110,7 +110,9 @@ size, a radius or a duration in a view's sheet, nor a gap off the 4 px grid; tak
   rows), `dialog.modal`, `.toast`, `.empty-state`, `.spinner`. `#/controls` shows every one in light and dark.
 - **Motion**: `--motion-quick` 120 ms, `--motion-base` 160, `--motion-slow` 240 on `--ease`
   (`cubic-bezier(0.4, 0, 0.2, 1)`): a fade, a short rise, never a bounce or an overshoot.
-- **Scrollbars** are 6 px, thin, on no track, where a pointer scrolls; a phone keeps the system's.
+- **Scrollbars** are 6 px, thin, on no track, where a pointer scrolls; a phone keeps the system's. A screen has one
+  scroller: the window on a page, the conversation (edge to edge, its room its own padding) in a chat on a phone, where
+  the window does not scroll or stretch; the dock lets a touch through where nothing of it is drawn (item 1349).
 
 To check a look, open `#/controls`, `#/settings/appearance`, a chat, a menu and a dialog at 1280 and
 390 px wide, in light and dark (`tests/smoke/test_controls.py` and `test_tour.py` photograph them).

@@ -244,7 +244,13 @@ below and 12 at the sides and is rounded 10 px, one of a line and a longer one a
 1324; what Dot says has no box, item 1335), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
-keyboard move nothing else. The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
+keyboard move nothing else. The conversation is that one scroller and it is as wide as the screen (item 1349): the page's
+12 px at its sides and its 16 px under the bar, which scroll nothing, are the conversation's own padding now, so the
+system's scroll bar stands at the screen's edge and a swipe that begins at the edge scrolls; the dock lets a touch through
+where nothing of it is drawn, so the gaps beside the bar and the queue scroll the conversation too, and the way down's
+invisible 4 px ring no longer covers the dock while it shows. The window never scrolls and does not stretch past its ends;
+on the pages that scroll (the chats, Settings, Models, Memory) the window alone scrolls, with no box of the page beside it
+(`tests/smoke/test_chat_one_scroller.py`). The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
 pane of glass of items 374 and 401 and the quiet resting box of item 1120 are gone), with no band of the page's colour
 behind it, and the conversation scrolls under the dock, its last line kept clear of the bar however tall the composer grows.
 The words always take their whole line, and the line under them holds the "+", the model, the context meter, the microphone

@@ -691,6 +691,14 @@
     min-height: 0;
   }
 
+  /* The conversation is the one scroller of a chat and it is as wide as the screen (item 1349): the page's 12 px gutters
+     and 16 px above the thread were page, which scrolls nothing, so a swipe that began in them did nothing and the
+     system's scroll bar, drawn at the scroller's edge, stood 12 px in from the glass. The room is the thread's own
+     padding instead, and the bar is at the screen's edge. */
+  html.chat-shell .page[data-layout="run"] {
+    padding: 0;
+  }
+
   html.chat-shell .run-layout,
   html.chat-shell .run-main {
     flex: 1 1 auto;
@@ -748,13 +756,26 @@
     bottom: 0;
     z-index: 6;
     padding-top: 0;
+    padding-inline: var(--space-3);
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
+  }
+
+  /* The dock lets a touch through where nothing of it is drawn (item 1349): it is as wide as the screen and as tall as
+     its panes and the gaps between them, which lay over the conversation as a pane of glass, so a swipe that began
+     in a gap scrolled nothing, a fifth of the screen of dead glass. What the dock holds, the bar, the queue and the
+     composer, takes the touch as before. */
+  html.chat-shell .dock {
+    pointer-events: none;
+  }
+
+  html.chat-shell .dock > * {
+    pointer-events: auto;
   }
 
   /* The dock floats over the conversation's foot (item 374), so the thread keeps its own height under it, and a
      helper's row, which WebKit can lay a little under its group's own height, still ends above the bar (item 401). */
   html.chat-shell .run-thread {
-    padding-bottom: calc(var(--dock-h, 96px) + var(--space-6));
+    padding: var(--space-4) var(--space-3) calc(var(--dock-h, 96px) + var(--space-6));
   }
 
   /* The opening curtain's dock keeps the room the chat's keeps under the composer, so the composer stands where it
