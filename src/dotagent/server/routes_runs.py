@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
@@ -385,8 +385,13 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         )
 
     @router.get("/runs/{run_id}/events")
-    async def run_events(run_id: str, query: Annotated[EventsQuery, Query()]) -> list[EventRecord]:
+    async def run_events(run_id: str, query: Annotated[EventsQuery, Query()], response: Response) -> list[EventRecord]:
+        """A run's stored events after ``after`` (at most ``limit``), or with ``tail`` its newest that many, oldest
+        first; the header ``X-Dot-Events-Tail`` says a daemon knows ``tail`` (an older one ignores it)."""
         await store.get_run(run_id)
+        if query.tail is not None:
+            response.headers["X-Dot-Events-Tail"] = str(query.tail)
+            return await store.list_events_tail_without(run_id, query.tail, UNREAD_BY_PAGES)
         return await store.list_events_without(run_id, query.after, query.limit, UNREAD_BY_PAGES)
 
     @router.get("/runs/{run_id}/stream")

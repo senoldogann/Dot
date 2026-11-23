@@ -3959,6 +3959,16 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def list_events_tail_without(self, run_id: str, count: int, left_out: tuple[str, ...]) -> list[EventRecord]:
+        """The newest ``count`` events of a run without the kinds ``left_out``, oldest first (item 1371: a client that
+        slept through a long run reads the end of it, not the whole)."""
+        marks: str = ", ".join("?" for _ in left_out)
+        kinds: str = f" AND kind NOT IN ({marks})" if left_out else ""
+        rows = await self._all(
+            f"SELECT * FROM events WHERE run_id = ?{kinds} ORDER BY id DESC LIMIT ?", (run_id, *left_out, count)
+        )
+        return [_event(row) for row in reversed(rows)]
+
     async def turn_tool_steps(self, run_ids: Sequence[str]) -> list[ToolStep]:
         """The tool calls of the runs ``run_ids`` and their results, in the order they were stored, in one read through
         each run's own events (item 650: what the earlier turns of a chat used and read). Only what the Run tab reads
