@@ -675,7 +675,7 @@ export const EN = {
   "automations.lastDone": "Last run done · {when}",
   "automations.lastFailed": "Last run failed · {when}",
   "automations.lastFailedRow": "Last {count} runs failed · latest {when}",
-  "automations.lastSkipped": "Last firing skipped · {when}",
+  "automations.lastSkipped": "Last firing skipped",
   "automations.started": "Started: {name}",
   "automations.unread": "The schedules of this chat could not be read: {problem}",
   "loops.region": "Loops of this chat",

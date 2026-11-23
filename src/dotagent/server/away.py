@@ -144,11 +144,15 @@ async def read_mark(store: Store) -> float | None:
 
 
 async def mark_read(store: Store, until: float, now: float) -> float:
-    """Mark the card read up to ``until`` (never back, nor past ``now``) and say where the mark stands."""
-    current: float | None = await read_mark(store)
+    """Mark the card read up to ``until`` (never back, nor past ``now``) and say where the mark stands. The mark is read
+    and written in one write, so two devices marking at once cannot move it back."""
     moved: float = min(until, now)
-    if current is not None:
-        moved = max(current, moved)
-    if moved != current:
-        await store.kv_set(AWAY_READ_KEY, repr(moved))
-    return moved
+
+    def later(stored: str | None) -> str:
+        try:
+            current: float | None = None if stored is None else float(stored)
+        except ValueError:
+            current = None
+        return repr(moved if current is None else max(current, moved))
+
+    return float(await store.kv_update(AWAY_READ_KEY, later))

@@ -67,8 +67,11 @@ test("a schedule says how its last run ended and when, and how many failed in a 
     NOW,
   );
   assert.match(row.last, /^Last 3 runs failed · latest /);
+  // A skip carries no time of its own, so none is said, and one that has no earlier run says it too.
   const skipped = automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 60, last_status: "skipped: busy" }), false, NOW);
-  assert.match(skipped.last, /^Last firing skipped · /);
+  assert.equal(skipped.last, "Last firing skipped");
+  const first = automationWords(view({ cron: "0 9 * * *", last_run_at: null, last_status: "skipped: the emergency stop" }), false, NOW);
+  assert.equal(first.last, "Last firing skipped");
 });
 
 test("a schedule that never ran, or works now, has no word of its last run", () => {

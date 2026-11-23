@@ -100,7 +100,9 @@ which the model chip follows. The run's reasoning level becomes the nearest one 
 model once at most, in the order of the list, and never goes back to one it left. The goal check of a goal-mode run (and
 a campaign's claim of its outcome) goes down the same list when the review model cannot answer for the same reasons
 (item 1354): a run whose work was done no longer ends failed only because the review model's quota was spent; when no
-model can check, the run still ends failed and its result names each model asked and why it could not. The review of a
+model can check, the run still ends failed and its result names each model asked and why it could not. A model the router holds paused is left out
+while another can be asked. The first standby model is often the run's own, whose check of its own work is the weaker one
+`dotx doctor` warns of; the log's `goal_check_passed_on` says when it happened. The review of a
 run's actions never passes to another model. A standby model that cannot call tools
 while the run offers them, whose window cannot hold the instructions with even the tools a run cannot work without,
 or whose details cannot be read is passed over (a window that holds only some of the tools takes the run over with

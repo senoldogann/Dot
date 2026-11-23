@@ -108,3 +108,30 @@ def test_a_single_model_that_cannot_answer_keeps_its_own_error_unchanged() -> No
 def test_a_check_with_no_model_to_ask_is_refused_where_it_is_built() -> None:
     with pytest.raises(ValueError):
         check_with_standby([], None)
+
+
+def test_a_model_the_router_holds_paused_is_not_asked_while_another_can_be() -> None:
+    asked: list[str] = []
+    chain = check_with_standby(
+        [("anthropic:one", _answers(asked, "one")), ("anthropic:two", _answers(asked, "two"))],
+        None,
+        lambda: {"anthropic:one"},
+    )
+    assert asyncio.run(chain(_REQUEST)) == _ACHIEVED
+    assert asked == ["two"]
+
+
+def test_when_every_model_is_paused_the_first_is_asked_and_the_paused_are_named() -> None:
+    asked: list[str] = []
+    chain = check_with_standby(
+        [
+            ("anthropic:one", _fails(asked, "one", _spent("one"))),
+            ("anthropic:two", _fails(asked, "two", _spent("two"))),
+        ],
+        None,
+        lambda: {"anthropic:one", "anthropic:two"},
+    )
+    with pytest.raises(ProviderRateLimitError) as raised:
+        asyncio.run(chain(_REQUEST))
+    assert asked == ["one"]
+    assert "anthropic:two (paused)" in raised.value.message

@@ -273,5 +273,12 @@ async def test_the_moment_marked_read_is_dots_not_a_browsers_and_only_moves_on(c
     ahead: JsonObject = (await client.post("/api/away/read", json={"until": time.time() + 10_000})).json()
     assert before <= float(ahead["read_at"]) <= time.time()
     assert (await client.get("/api/away/read")).json() == ahead
+    # Two devices marking at once never leave the mark behind the later one.
+    now: float = time.time()
+    both = await asyncio.gather(
+        client.post("/api/away/read", json={"until": now}), client.post("/api/away/read", json={"until": now - 50})
+    )
+    assert all(answer.status_code == 200 for answer in both)
+    assert float((await client.get("/api/away/read")).json()["read_at"]) >= now
     refused: httpx.Response = await client.post("/api/away/read", json={"until": -1})
     assert refused.status_code == 422, refused.text

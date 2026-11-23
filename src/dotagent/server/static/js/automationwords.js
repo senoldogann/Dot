@@ -17,20 +17,23 @@ function sentence(text) {
  * now and a status the panel has no words for. A run that failed says how many in a row did when more than one.
  */
 function lastRun(record, now) {
+  const status = record.last_status ?? "";
+  // A firing skipped before it was claimed (the emergency stop, a paused agent, a task still going, a late one) writes no
+  // time of its own: `last_run_at` is the run before it, so a skip says no time (the chat-busy skip, the one that does
+  // write it, says none either).
+  if (status.startsWith("skipped")) {
+    return t("automations.lastSkipped");
+  }
   if (record.last_run_at === null || record.last_run_at === undefined) {
     return "";
   }
   const when = lastMoment(record.last_run_at, now);
-  const status = record.last_status ?? "";
   if (status.startsWith("done")) {
     return t("automations.lastDone", { when });
   }
   if (status.startsWith("failed")) {
     const row = record.runs_failed_in_row ?? 0;
     return row > 1 ? t("automations.lastFailedRow", { count: row, when }) : t("automations.lastFailed", { when });
-  }
-  if (status.startsWith("skipped")) {
-    return t("automations.lastSkipped", { when });
   }
   return "";
 }
@@ -40,7 +43,7 @@ function lastRun(record, now) {
  * `loop` (whether it is the chat's own loop) and `now` (seconds): `title` (a loop's name without its "Loop: "), `line`
  * (how it repeats or when it runs, then how it stands), `active` (switched on and with a firing left), `done` (a time
  * that ran once and has none left), `failed` (the last run failed while it is on), `running` (a run of it works now) and
- * `last` (how its last run ended and when, "Last run done · 09:00"; "" while it works or when it never ran: item 1355).
+ * `last` (how its last run ended and when, "Last run done · 09:00"; "" while it works or when it never ran: item 1355; a skipped firing says so with no time).
  */
 export function automationWords(view, loop, now) {
   const record = view.record;
