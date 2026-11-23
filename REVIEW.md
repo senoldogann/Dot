@@ -180,6 +180,9 @@ here points at a test that no longer exists.
 - `tests/unit/test_shell_guard_awk.py::test_a_pipe_into_a_shell_is_read_through_the_wrappers_in_front_of_it` — the
   check for an awk pipe into a shell read the first word of the command only, so `print | "env sh"` ran what awk
   printed while `print | "sh"` asked (item 1303).
+- `tests/unit/test_model_refusal.py::test_an_agent_a_campaign_and_a_queued_message_are_judged_by_the_model_they_would_run_on` — the
+  first check covered `start_picked` and the queue's default model only, so a message to an agent, Keep going or a team, and an
+  agent's own message in the queue, still started and failed with "missing API key" (item 1350's review).
 
 ## Evidence and format
 
