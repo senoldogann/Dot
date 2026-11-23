@@ -10,16 +10,15 @@ import { duration, el, setText } from "./dom.js";
 import { t, tCount } from "./i18n.js";
 import { icon } from "./icons.js";
 import { flockState } from "./timeline.js";
-
-// The states of a subagent that the run waits on.
-const LIVE = new Set(["queued", "running", "ending", "blocked"]);
+import { waitCounts } from "./waitcounts.js";
 
 /**
  * The line. A tap on a part calls `onWork()`, `onHelpers()` or `onQueued()`; the plan's part is `plan`,
  * whose popover (planbubble.js) opens on its click. Returns `element`, `plan`, `stopping()` (Stop was pressed: the line
  * says the run stops until it no longer works) and `paint({ status, since, now, plan, helpers, queued })`:
  * the run's status and when it began (seconds), the time now, how many of its plan's steps are done of how many
- * (`{ done, total }`, or null), the statuses of its helpers and the messages queued.
+ * (`{ done, total }`, or null), the statuses of its helpers, the statuses of those it stopped waiting for (`released`)
+ * and the messages queued.
  * `status` is null for a run that no longer works.
  */
 export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
@@ -50,7 +49,7 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
   // Stop was pressed and the run has not ended yet.
   let halting = false;
 
-  function paint({ status, since, now, plan: steps = null, helpers: statuses, helpersNow = [], queued: waiting }) {
+  function paint({ status, since, now, plan: steps = null, helpers: statuses, helpersNow = [], released = [], queued: waiting }) {
     const working = status !== null;
     if (!working) {
       halting = false;
@@ -71,9 +70,15 @@ export function createCapsule({ onWork, onHelpers, onQueued, onStop }) {
       workText,
       halting ? t("capsule.stopping") : blocked ? t("work.waitingForYou") : status === "queued" ? t("work.queued") : t("capsule.working", { took }),
     );
-    const live = statuses.filter((each) => LIVE.has(each)).length;
+    const { live, letGo, waitedFor } = waitCounts(statuses, released);
+    // A helper the run stopped waiting for (the owner wrote to it, or it asked for no wait: item 1351) works in the
+    // background: the line says the run waits only while one of its live helpers is still waited for.
     wait.hidden = !working || live === 0 || halting;
-    setText(waitText, live === 0 ? "" : tCount(live, "capsule.waitOne", "capsule.waitMany"));
+    wait.setAttribute("aria-label", t(waitedFor > 0 ? "capsule.waitLabel" : "capsule.backgroundLabel"));
+    setText(
+      waitText,
+      live === 0 ? "" : waitedFor > 0 ? tCount(waitedFor, "capsule.waitOne", "capsule.waitMany") : tCount(letGo, "capsule.backgroundOne", "capsule.backgroundMany"),
+    );
     const first = helpersNow[0];
     setText(waitNow, first === undefined ? "" : `${first.title}: ${first.words}`);
     helpers.hidden = !working || statuses.length === 0;

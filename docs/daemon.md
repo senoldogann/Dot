@@ -582,7 +582,7 @@ works; "2 done · 1 stopped" after) and the time from the first one's start to t
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
 says **Waiting on 2 subagents** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
-and the subagents with it); the status line under it stays as it was. The line is a pane on the status bar's own ground
+and the subagents with it); the status line under it stays as it was. Once a message of yours has released the task from its wait (item 1351) the line says **2 subagents keep working in the background**, and goes with the last of them. The line is a pane on the status bar's own ground
 and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
 included, and nothing of the history shows through it (item 1347). An approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes

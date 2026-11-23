@@ -138,10 +138,11 @@ the plan reads `(after 1, 2)` and the web UI shows the same, and the result of e
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
 are independent, so the run can hand each to `delegate` in one turn, naming the step (not one with a `brief`, which
 went to its helper already, below: delegated too, its work would be done twice); the delegated run's report then
-closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
+closes the step (done with the report's start as evidence, or failed) without a mark of the run's own, unless the
+call stopped waiting (below): a report that comes late closes nothing, and the run marks the step itself; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
 line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
-run's report. **Fan-out** (item 927) does it by the plan rather than by the model: a step of `update_plan` may carry a
+run's report, or until a message of yours reaches the run ([Delegation](#delegation)). **Fan-out** (item 927) does it by the plan rather than by the model: a step of `update_plan` may carry a
 `brief`, an instruction a run that cannot see the conversation can follow, and when two or more pending steps with one
 wait for nothing open, they run at once as helpers of the run, at most `[agent] fan_out` (3; 0 or 1: none), as
 `delegate` runs them (the run's model and bounds, research for a research run), while the plan shows them in progress;
@@ -867,7 +868,8 @@ in the background pulses, as its end will wake Dot. A command stopped there, clo
 stop tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item
 427): a run that waited for its command and saw it end is not told the same again. A delegated run or a campaign's
 session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends with its run: a
-command in the background lives as long as the daemon.
+command in the background lives as long as the daemon. The end of a helper that a run stopped waiting for tells the chat
+the same way ([Delegation](#delegation), item 1351).
 
 ### Drafts
 
@@ -931,8 +933,8 @@ Their tests run against a stand-in of both providers after a real sign-in into a
 
 ## Delegation
 
-`delegate(goal, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns its
-result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
+`delegate(goal, model?, step?, wait?)` hands a sub-goal to a separate run with a conversation of its own and returns
+its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
 helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)).
 Several calls in one turn run side by side (up to `parallel_tools`; a group chat's lead sends its agents their parts all
 at once, as many as the team has, up to eight, when its reply's calls all send parts, item 831), which is how a plan's
@@ -942,7 +944,29 @@ above). A delegated run cannot delegate again (the depth is one), nor start once
 or consult a helper, does not take one of the `max_concurrent_runs` slots, starts as untrusted as its parent, and ends
 when the parent is cancelled. The parent's result names the model the delegated run ended on. The model cannot choose
 the delegated run's mode: a research run's helper does research and only reads, and any other run's helper, a chat's
-too, is a task run. The helper of a run of one of your agents carries the agent's id (item 553): its tools are those the
+too, is a task run.
+
+**A wait that a message ends (item 1351).** While a run waits for its helpers, a message that reaches it (a steer, a
+queued message sent on, the answer to a question, a note of Dot's) ends the wait of every `delegate` call of that turn
+at once, as a model call gives way to one (item 509): the call returns with the helper's run id and that it keeps
+working in the background, the helper is not stopped, and the run reads the message and goes on. The helper's
+report is not lost. When it ends, its chat is told as a command in the background that ended is (item 229): the run at
+work in the chat reads the report at its next step, in a note of Dot's, and a chat with no run at work gets a run
+started to read it (its source is `helper_report`, with the chat's choices and agent), unless the chat's queue holds or
+waits, its newest run did not end done or the emergency stop is on: the next run of the chat then reads it at its first
+step, so the queue and its order stay as they were. The report is fenced as third-party content when the helper read
+some, marks the run that reads it as that content does, and carries the Verification note. It closes no plan step:
+the note says the step it was started for stays as it is, and the run checks the report and marks it itself. `wait`
+false starts the helper and returns at once, for a run that has other work or nothing left but to say what it waits
+for: it ends its turn, and the chat is woken when the helper ends, with no model call and no blocked tool call
+meanwhile. A chat lets at most eight helpers work in the background. Stop is not changed: a Stop of the run stops
+its helpers too, those it still waited for and those it stopped waiting for, and their ends are stored before its own;
+what a stop ended is told to nobody. A run that ends done leaves its helpers at work; one that fails or is stopped stops them. The
+reports not yet told are kept in the store (the key `detached_helpers`): when the daemon stops, a helper ends with it
+as every run does, and the next start tells its chat what it reported, or that the stop cut it off. The line over the
+composer says "Waiting on N subagents" only while the run is blocked on them, "N subagents keep working in the
+background" once it was released, and nothing when none work. Calls of `fan_out`, `message_agent` and the work orders
+keep waiting as before. The helper of a run of one of your agents carries the agent's id (item 553): its tools are those the
 agent is bound to, as its parent's are, and its prompt holds the agent's instructions. A step it hands to you, or a
 question for your yes, that nobody answers in time is kept where its parent keeps them, with `[policy] unanswered =
 "park"` (item 485, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)): your answer goes to the

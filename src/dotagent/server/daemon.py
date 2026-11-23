@@ -394,6 +394,9 @@ async def run_daemon(config: AppConfig) -> int:
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()
             # A session is never resumed as a run: a campaign whose session the daemon cut off goes on with a new one.
             campaigns: int = await manager.resume_campaigns()
+            # The helpers that worked on without their run when the daemon stopped (item 1351): their chats are told
+            # what they reported, or that the stop cut them off, by the run the chat has now or one started for it.
+            untold: int = await manager.tell_helper_reports()
             # The owner's messaging apps (item 572): a message of theirs reaches its chat only after the runs the last
             # start cut off are resumed, and the channels stop before the manager does.
             channels: Channels = Channels(runtime, manager, host, port)
@@ -438,6 +441,7 @@ async def run_daemon(config: AppConfig) -> int:
                 recovered=recovered,
                 resumed=[run.id for run in resumed],
                 campaigns_planned=campaigns,
+                helper_reports_untold=untold,
             )
             if not stop.is_set():
                 await server.serve(sockets=[listener])

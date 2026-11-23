@@ -53,10 +53,15 @@ class ChatNote:
 
 @dataclass(frozen=True)
 class DelegateOutcome:
-    """A delegated run that has ended, and whether it read content that third parties can author."""
+    """A delegated run, and whether it read content that third parties can author. ``detached`` is set when the caller
+    stopped waiting for it (item 1351): the run is then still at work as of its record, and its report reaches the chat
+    when it ends."""
 
     run: RunRecord
     tainted: bool
+    detached: bool = False
+    # Why the wait was given up, for the words of the result: the owner wrote to the run, or the run asked for no wait.
+    asked_no_wait: bool = False
 
 
 # What ``ask_user`` does in a run (``agent.progress.question_mode``): ``leave`` every question for the user, ``wait``
@@ -87,11 +92,19 @@ class Spawner(Protocol):
         model: str | None,
         agent_id: str | None,
         opening: str | None = None,
+        *,
+        detachable: bool = False,
+        wait: bool = True,
+        plan_step: int | None = None,
     ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model`` (``None``: the parent's model), as a run of the agent
         ``agent_id`` names when one is (item 87: its instructions, its tools and its bounds), wait until it ends and
         report how it ended. ``opening`` is the first message its model reads in place of the goal, when it is more
-        than the goal (item 831: a group chat's conversation); the goal stays what its row and its page name."""
+        than the goal (item 831: a group chat's conversation); the goal stays what its row and its page name.
+
+        With ``detachable`` (item 1351) a message that reaches the caller's run while it waits ends the wait: the run
+        goes on working, and the outcome comes back ``detached``; with ``wait`` false the wait is given up at once.
+        ``plan_step`` is the step the caller named for the run, which a report that comes late does not close."""
         ...
 
     async def hand_reply(self, from_run_id: str, thread_id: str, goal: str, opening: str) -> RunRecord:

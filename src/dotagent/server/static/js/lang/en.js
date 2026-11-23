@@ -37,6 +37,9 @@ export const EN = {
   "capsule.waitLabel": "The task waits for its subagents",
   "capsule.waitOne": "Waiting on {count} subagent",
   "capsule.waitMany": "Waiting on {count} subagents",
+  "capsule.backgroundLabel": "Subagents work in the background",
+  "capsule.backgroundOne": "{count} subagent keeps working in the background",
+  "capsule.backgroundMany": "{count} subagents keep working in the background",
   "capsule.details": "Details",
   "capsule.stop": "Stop",
   // What a send does while a task works (views/run.js).

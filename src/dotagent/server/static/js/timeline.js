@@ -412,7 +412,7 @@ function buildFlock() {
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
  * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
  * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
- * `helperStatuses()` the statuses of the delegated runs, and `draft(record)` paints a draft's card as the draft now
+ * `helperStatuses()` the statuses of the delegated runs, `helperReleased()` those of them the run stopped waiting for, and `draft(record)` paints a draft's card as the draft now
  * stands (item 314: one answered after the run's stream ended). `revealing()` says whether an answer that arrives now
  * ends a run under the reader's eyes, to be read aloud when Settings › General says so, rather than one read again; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
@@ -462,6 +462,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   const cards = new Map();
   // The scopes of the delegated runs that have not ended: their rows count their time on (`tick`).
   const liveChildren = new Set();
+  // The delegated runs the run stopped waiting for (item 1351): they work on in the background.
+  const released = new Set();
   let browserSeen = false;
   const totals = { calls: 0, failed: 0 };
   // The cards of the drafts the runs wrote, by draft id, in the order they came (item 314): a decision repaints its card
@@ -1863,6 +1865,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       onHeld(false);
     },
 
+    // The run stopped waiting for a delegated run, which works on in the background (item 1351).
+    helper_released(_scope, record) {
+      released.add(record.data.run_id);
+    },
+
     // The owner held the run with a ✋ (item 586): it waits at its next step for what they write next, or for the ✋ to be
     // taken back, and stops when nobody writes for as long as a hold may last (`[reactions] hold_minutes`).
     reaction_hold(scope, record) {
@@ -1961,6 +1968,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
   // The statuses of the run's delegated runs, in the order they started.
   const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
+  // The statuses of those the run stopped waiting for (item 1351).
+  const helperReleased = () =>
+    [...scopes.values()].filter((scope) => released.has(scope.runId) && scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
 // What the subagents that work do now, one line each, in the order they started: "Title: Running swift test".
 const helperNow = () =>
   [...liveChildren]
@@ -1974,6 +1984,7 @@ const helperNow = () =>
     knows: (runId) => scopes.has(runId),
     helper,
     helperStatuses,
+    helperReleased,
     helperNow,
     draft: (record) => drafts.get(record.id)?.update(record),
   };

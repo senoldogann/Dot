@@ -10,6 +10,7 @@ from contextlib import AbstractAsyncContextManager, contextmanager, nullcontext,
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
+from typing import Literal
 
 from pydantic import JsonValue
 
@@ -37,6 +38,16 @@ from dotagent.agent.campaign import (
     sessions_without_progress,
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
+from dotagent.agent.helper_reports import (
+    HELPER_RELEASED_EVENT,
+    HELPER_SOURCE,
+    MOST_DETACHED_PER_CHAT,
+    DetachedHelper,
+    forget_detached,
+    keep_detached,
+    kept_detached,
+    late_report_note,
+)
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.learning_health import (
     LearningOutcome,
@@ -253,7 +264,15 @@ _THREAD_INSTRUCTION_RUNS: int = 30
 # code review of item 715: a resume of Dot's own run made its words the owner's), and an agent's first meeting with the
 # owner, whose goal is Dot's words around the agent's name and role, which a run may have written (item 993).
 _NOT_THE_OWNERS_WORDS: frozenset[str] = frozenset(
-    {BACKGROUND_SOURCE, INITIATIVE_SOURCE, RESUME_SOURCE, REPLY_SOURCE, WELCOME_SOURCE, WORK_ORDER_SOURCE}
+    {
+        BACKGROUND_SOURCE,
+        INITIATIVE_SOURCE,
+        RESUME_SOURCE,
+        REPLY_SOURCE,
+        WELCOME_SOURCE,
+        WORK_ORDER_SOURCE,
+        HELPER_SOURCE,
+    }
 )
 # The sources of runs and chats nobody watches or that are Dot's own (item 860): a chat one of them opened is not the
 # owner's, and a run one of them started in the owner's chat has no owner there to answer. Not the run that tells a
@@ -455,6 +474,19 @@ async def _to_its_end[T](work: Coroutine[object, object, T]) -> T:
                 raise
 
 
+@dataclass(frozen=True)
+class _HelperNote:
+    """The note that tells a run a helper ended, and whether the helper read content third parties can author."""
+
+    text: str
+    tainted: bool
+
+
+def handle_ended(handle: "RunHandle") -> bool:
+    """Whether the run of ``handle`` has ended (its record's end was stored or refused, and its waiters released)."""
+    return handle.finished.is_set()
+
+
 def _emergency_marks(raw: str | None) -> dict[str, float]:
     """The runs the emergency stop asked other processes to end (:data:`EMERGENCY_ASKS_KEY`), with when it asked; what
     does not read as that is no mark."""
@@ -537,6 +569,11 @@ class RunManager:
         self._draining: asyncio.Lock = asyncio.Lock()
         # The ends the store refused, by run id, until they are stored (:meth:`store_left_ends`).
         self._left_ends: dict[str, _LeftEnd] = {}
+        # The helpers a run stopped waiting for that still work in this process (item 1351), by helper run id, and
+        # those that ended whose report no run has read yet, by chat (:meth:`_tell_helper_reports`).
+        self._detached: dict[str, DetachedHelper] = {}
+        self._untold: dict[str, list[DetachedHelper]] = {}
+        self._followers: set[asyncio.Task[None]] = set()
         # The claims on queued messages the store refused to end (:meth:`_end_claim`), by chat, with the store's way to
         # end each: its message started (``Store.drop_claimed``) or could not (``Store.hold_claimed``).
         self._left_claims: dict[str, Callable[[str], Awaitable[None]]] = {}
@@ -1611,9 +1648,20 @@ class RunManager:
         opening: str | None = None,
         on_start: Callable[[str], None] | None = None,
         tainted: bool = False,
+        *,
+        detachable: bool = False,
+        wait: bool = True,
+        plan_step: int | None = None,
     ) -> DelegateOutcome:
         """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
         ``None`` (after a switch to a standby model, the standby), and wait until it ends.
+
+        With ``detachable`` (item 1351, the delegate tool) the wait ends early when a message reaches the parent's
+        inbox, which asks its run to give way as a model call does (:meth:`RunInbox.asks`): the helper is not stopped,
+        the outcome comes back ``detached`` with the helper's record as it stands, and the helper's report reaches the
+        parent's chat when it ends (:meth:`_follow_helper`). ``wait`` false gives the wait up at once. ``plan_step`` is
+        the step the parent named for it, which that report does not close. A ``dotx`` command (:meth:`leave_queues`)
+        waits as it always did: it ends with its run, and a helper left behind would end with it unreported.
 
         The delegated run starts as untrusted as its parent is, can do no more than its parent (a research run only
         delegates research) and cannot delegate again. It answers the policy's questions the way its parent does and
@@ -1664,8 +1712,13 @@ class RunManager:
         # Who started it hears the run's id at once (item 902: the owner's Let it help shows the helper at work).
         if on_start is not None:
             on_start(handle.run_id)
+        released: bool = False
         try:
-            await handle.finished.wait()
+            released = (
+                detachable and not self._leaves_queues and await self._released_before_end(handle, parent_run_id, wait)
+            )
+            if not released:
+                await handle.finished.wait()
         except asyncio.CancelledError:
             if handle.run_id in self._handles:
                 self.cancel(handle.run_id)
@@ -1673,6 +1726,8 @@ class RunManager:
             # stored first.
             await _uncancelled(handle.finished.wait())
             raise
+        if released:
+            return await self._detach(handle, parent, plan_step, not wait)
         child: RunRecord = await self._runtime.store.get_run(handle.run_id)
         # A run whose end the store refused stays ``ending``, a working state (its mark was written before the end).
         if child.status in WORKING_STATUSES:
@@ -1681,6 +1736,322 @@ class RunManager:
                 {"run_id": child.id, "stored_status": child.status},
             )
         return DelegateOutcome(run=child, tainted=handle.gate.tainted)
+
+    async def _released_before_end(self, helper: RunHandle, parent_run_id: str, wait: bool) -> bool:
+        """Whether the wait for ``helper`` is given up before it ends (item 1351): it was asked not to wait, or a
+        message reached the inbox of the run that waits, which asks that run to give way (:meth:`RunInbox.asks`). A
+        message that is there already releases it as soon as the helper has started; the helper's own end wins when
+        both come together. The message stays in the inbox for the run's loop to read."""
+        parent: RunHandle | None = self._handles.get(parent_run_id)
+        if not wait:
+            return not handle_ended(helper)
+        if parent is None:
+            return False
+        ended: asyncio.Future[bool] = asyncio.ensure_future(helper.finished.wait())
+        heard: asyncio.Future[None] = asyncio.ensure_future(parent.inbox.arrival())
+        racing: set[asyncio.Future[bool] | asyncio.Future[None]] = {ended, heard}
+        try:
+            await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            ended.cancel()
+            heard.cancel()
+            await asyncio.wait(racing)
+        return not handle_ended(helper)
+
+    async def _detach(
+        self, helper: RunHandle, parent: RunRecord, plan_step: int | None, asked: bool
+    ) -> DelegateOutcome:
+        """Let ``helper`` go on without the run that delegated it: it is kept (in memory and in the store, so that a
+        restart tells its report too), its parent's page hears that it works in the background, and
+        :meth:`_follow_helper` waits for its end. Refused, with the helper stopped, when the chat already lets
+        :data:`MOST_DETACHED_PER_CHAT` helpers go on: the helper is cancelled and the end stored before the refusal, as
+        a stop of its parent would."""
+        if sum(1 for one in self._detached.values() if one.thread_id == parent.thread_id) >= MOST_DETACHED_PER_CHAT:
+            self.cancel(helper.run_id)
+            await _uncancelled(helper.finished.wait())
+            raise RunConflict(
+                f"this chat already has {MOST_DETACHED_PER_CHAT} helpers working in the background: wait for one of "
+                "them to report before starting another",
+                {"run_id": parent.id, "thread_id": parent.thread_id},
+            )
+        entry: DetachedHelper = DetachedHelper(
+            helper_run_id=helper.run_id,
+            parent_run_id=parent.id,
+            thread_id=parent.thread_id,
+            step=plan_step,
+            since=time.time(),
+        )
+        self._detached[helper.run_id] = entry
+        await keep_detached(self._runtime.store, entry)
+        follower: asyncio.Task[None] = asyncio.create_task(
+            self._follow_helper(helper, entry), name=f"follow-{helper.run_id}"
+        )
+        self._followers.add(follower)
+        follower.add_done_callback(self._followers.discard)
+        await self._runtime.bus.emit(
+            parent.id,
+            HELPER_RELEASED_EVENT,
+            {"run_id": helper.run_id, "step": plan_step, "asked": asked},
+            True,
+        )
+        log.info("helper_detached", run_id=helper.run_id, parent_run_id=parent.id, thread_id=parent.thread_id)
+        return DelegateOutcome(
+            run=await self._runtime.store.get_run(helper.run_id),
+            tainted=helper.gate.tainted,
+            detached=True,
+            asked_no_wait=asked,
+        )
+
+    async def _follow_helper(self, helper: RunHandle, entry: DetachedHelper) -> None:
+        """Wait for a helper that works on without its parent, and tell its chat when it ends (item 1351). A helper that
+        its parent's end stopped (:meth:`_stop_detached_of`) is no longer in :attr:`_detached` and tells nothing; so
+        does one the daemon's stop ended, whose report the next start tells (:meth:`tell_helper_reports`). What goes
+        wrong in the telling is logged: nothing awaits this task, and the report stays kept."""
+        await helper.finished.wait()
+        if self._stopping or self._detached.pop(entry.helper_run_id, None) is None:
+            return
+        try:
+            self._untold.setdefault(entry.thread_id, []).append(entry)
+            await self._tell_helper_reports(entry.thread_id)
+        except Exception:
+            log.exception("helper_report_not_told", run_id=entry.helper_run_id, thread_id=entry.thread_id)
+
+    async def _stop_detached_of(self, parent_run_id: str) -> None:
+        """Stop the helpers a run that does not end done let go on, and wait until their ends are stored: the end of a
+        run is stored after the ends of the helpers it started (item 197), the ones it still waited for and the ones it
+        stopped waiting for. Their reports are not told: the run that started them was stopped or failed, and what it
+        had asked is over. A run that ends done leaves its helpers at work: its chat is told when they end."""
+        stopped: list[DetachedHelper] = [one for one in self._detached.values() if one.parent_run_id == parent_run_id]
+        if not stopped:
+            return
+        for entry in stopped:
+            del self._detached[entry.helper_run_id]
+        try:
+            await forget_detached(self._runtime.store, [one.helper_run_id for one in stopped])
+        except DotError as exc:
+            log.error("detached_helpers_not_forgotten", run_id=parent_run_id, error=exc.message, context=exc.context)
+        for entry in stopped:
+            if entry.helper_run_id in self._handles:
+                self.cancel(entry.helper_run_id)
+        await asyncio.gather(
+            *(handle.finished.wait() for one in stopped if (handle := self._handles.get(one.helper_run_id)) is not None)
+        )
+
+    def _top_run_on(self, thread_id: str) -> RunHandle | None:
+        """The run at work in this process in the chat ``thread_id`` that the owner's chat is, not a helper's: the run
+        a note for the chat goes to."""
+        return next(
+            (
+                handle
+                for handle in self._handles.values()
+                if handle.thread_id == thread_id and handle.parent_run_id is None
+            ),
+            None,
+        )
+
+    async def _helper_note(self, entry: DetachedHelper) -> _HelperNote | Literal["gone", "working"]:
+        """The note that tells a run a helper ended, with whether the helper read content third parties can author
+        (:meth:`_ended_tainted`); ``"gone"`` when the helper's record is gone (the chat it was in was deleted): nothing
+        to tell; ``"working"`` when the store still has the helper at work, its end refused and kept to be stored
+        later (:meth:`store_left_ends`): the report is kept, not dropped, and told by the next run of the chat."""
+        try:
+            run: RunRecord = await self._runtime.store.get_run(entry.helper_run_id)
+        except NotFoundError:
+            log.warning("detached_helper_gone", run_id=entry.helper_run_id)
+            return "gone"
+        if run.status in WORKING_STATUSES:
+            log.warning("detached_helper_end_not_stored", run_id=entry.helper_run_id, thread_id=entry.thread_id)
+            return "working"
+        tainted: bool = await self._ended_tainted(run.id)
+        outcome: DelegateOutcome = DelegateOutcome(run=run, tainted=tainted)
+        return _HelperNote(late_report_note(outcome, entry), tainted)
+
+    async def _hand_reports_to_new_run(self, thread_id: str, run_id: str) -> None:
+        """A run starts in a chat whose helpers' reports no run has read (the owner's message after a stop, a queued
+        message, a resumed run): it reads them at its first step. What goes wrong is logged: the run is under way, and
+        the reports stay for the next one."""
+        try:
+            await self._hand_helper_reports(thread_id, run_id)
+        except Exception:
+            log.exception("helper_reports_not_handed", thread_id=thread_id, run_id=run_id)
+
+    def _put_back_untold(self, thread_id: str, entries: Sequence[DetachedHelper]) -> None:
+        """Keep ``entries`` as the helpers of the chat whose report no run has been handed, before any that came
+        meanwhile."""
+        if entries:
+            self._untold[thread_id] = [*entries, *self._untold.get(thread_id, [])]
+
+    async def _hand_helper_reports(self, thread_id: str, run_id: str) -> bool:
+        """Hand the reports of the helpers of the chat that ended to the run ``run_id`` at work in it, as notes of
+        Dot's it reads at its next step, each marking it as the helper's content marks. False when the run takes none
+        (it ended meanwhile): they stay for the chat's next run."""
+        entries: list[DetachedHelper] = self._untold.pop(thread_id, [])
+        # Handed, or with no record left to tell of: no longer kept. A helper whose end the store has not taken yet is
+        # kept, and told by the chat's next run.
+        done: list[str] = []
+        waiting: list[DetachedHelper] = []
+        try:
+            for index, entry in enumerate(entries):
+                found: _HelperNote | Literal["gone", "working"] = await self._helper_note(entry)
+                if found == "working":
+                    waiting.append(entry)
+                    continue
+                if isinstance(found, _HelperNote):
+                    try:
+                        self.note(run_id, found.text, found.tainted)
+                    except RunConflict:
+                        self._put_back_untold(thread_id, [*waiting, *entries[index:]])
+                        return False
+                done.append(entry.helper_run_id)
+        except BaseException:
+            self._put_back_untold(thread_id, [one for one in entries if one.helper_run_id not in done])
+            raise
+        finally:
+            await _uncancelled(forget_detached(self._runtime.store, done))
+        self._put_back_untold(thread_id, waiting)
+        return True
+
+    async def _tell_helper_reports(self, thread_id: str) -> None:
+        """Tell a chat that helpers its run stopped waiting for ended (item 1351), as a command in the background that
+        ended is told (:meth:`_tell_ended_commands`): the run at work in the chat reads each report at its next step,
+        in a note of Dot's; a chat with no run at work gets a run started for it (:meth:`wake_for_helpers`); a chat
+        whose run is ending is told when that run's end moves its queue (:meth:`_follow_queue`)."""
+        if self._stopping or not self._untold.get(thread_id):
+            return
+        target: RunHandle | None = self._top_run_on(thread_id)
+        if target is not None:
+            await self._hand_helper_reports(thread_id, target.run_id)
+            return
+        await self.wake_for_helpers(thread_id)
+
+    async def wake_for_helpers(self, thread_id: str) -> RunRecord | None:
+        """Start the run that tells the chat ``thread_id`` what the helpers it let go on reported, when no run works
+        there (item 1351). It starts as the chat's next message would, with its choices and agent, under the guards
+        of a command that ended in the background (:meth:`_tell_ended_commands`): not while a run works on the chat or
+        ends there, or its queue holds or waits, or after the chat's newest run did not end done (the owner's next
+        run reads the reports instead, at its first step), or under the emergency stop; ``None`` then. The reports
+        are Dot's note (:data:`HELPER_SOURCE`, none of the owner's words), which the run reads first; it starts
+        untrusted when a helper read content third parties can author, or the chat's newest run ended so."""
+        if self._stopping or self._leaves_queues or not self._untold.get(thread_id):
+            return None
+        if await asyncio.to_thread(failsafe_path().exists):
+            return None
+        store: Store = self._runtime.store
+        async with self._draining:
+            if thread_id in self._claimed or self._active_on(thread_id) is not None or self._ending_on(thread_id):
+                return None
+            runs: list[RunRecord] = await store.list_runs(1, thread_id)
+            if not runs:
+                return None
+            newest: RunRecord = runs[0]
+            if newest.status != "done" or newest.parent_run_id is not None or newest.campaign_id is not None:
+                return None
+            if await store.queue_held(thread_id) or await store.list_queued(thread_id):
+                return None
+            entries: list[DetachedHelper] = self._untold.pop(thread_id, [])
+            try:
+                notes: list[str] = []
+                tainted: bool = False
+                told: list[DetachedHelper] = []
+                waiting: list[DetachedHelper] = []
+                for entry in entries:
+                    found: _HelperNote | Literal["gone", "working"] = await self._helper_note(entry)
+                    if found == "working":
+                        waiting.append(entry)
+                        continue
+                    told.append(entry)
+                    if isinstance(found, _HelperNote):
+                        notes.append(found.text)
+                        tainted = tainted or found.tainted
+                if not notes:
+                    await _uncancelled(forget_detached(store, [one.helper_run_id for one in told]))
+                    self._put_back_untold(thread_id, waiting)
+                    return None
+                choices: ChatChoices = await self._choices_of(thread_id, newest)
+                info: ModelInfo = await self._runtime.router.model_info(
+                    parse_model_ref(choices.model if choices.model is not None else self._main_model)
+                )
+                effort: Effort | None = (
+                    choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
+                )
+                text: str = "\n\n".join(notes)
+                goal: str = (
+                    "A helper that worked in the background ended: its report is in this message."
+                    if len(notes) == 1
+                    else f"{len(notes)} helpers that worked in the background ended: their reports are in this message."
+                )
+                opening: RunOpening = RunOpening(
+                    text=text,
+                    files=(),
+                    resumed=None,
+                    once=None,
+                    carried=(newest.id,),
+                    picks=NO_PICKS,
+                    tainted=tainted,
+                )
+                # The mode is read from Dot's own words, not from the reports, which a third party may have written.
+                mode: RunMode = resolved_mode(choices.mode, goal)
+                run, _ = await self._launch(
+                    goal,
+                    "task" if mode == "chat" else mode,
+                    choices.model,
+                    thread_id,
+                    HELPER_SOURCE,
+                    None,
+                    effort,
+                    choices.speed,
+                    choices.approvals,
+                    choices.goal_mode,
+                    opening,
+                    None,
+                    newest.agent_id,
+                )
+            except RunConflict as exc:
+                # A message of the owner's started the chat meanwhile: that run reads the reports at its first step.
+                self._put_back_untold(thread_id, entries)
+                log.info("helper_report_left_to_the_run_that_started", thread_id=thread_id, error=exc.message)
+                return None
+            except BaseException:
+                self._put_back_untold(thread_id, entries)
+                raise
+            await _uncancelled(forget_detached(store, [one.helper_run_id for one in told]))
+            self._put_back_untold(thread_id, waiting)
+        await self._queue_changed(thread_id, run.id, newest.id, None)
+        log.info("helper_report_run_started", thread_id=thread_id, run_id=run.id)
+        return run
+
+    async def tell_helper_reports(self) -> int:
+        """For the daemon, when it starts (item 1351): tell the chats the reports of the helpers that worked on without
+        their run when the daemon last stopped. A helper still at work in a process that lives is left; one that ended
+        (the daemon's stop ended it as it ended its parent) is told from its record. Returns how many reports were
+        left to tell."""
+        store: Store = self._runtime.store
+        kept: list[DetachedHelper] = await kept_detached(store)
+        gone: list[str] = []
+        threads: set[str] = set()
+        for entry in kept:
+            if entry.helper_run_id in self._detached:
+                continue
+            try:
+                run: RunRecord = await store.get_run(entry.helper_run_id)
+            except NotFoundError:
+                gone.append(entry.helper_run_id)
+                continue
+            if run.status in WORKING_STATUSES:
+                continue
+            if all(one.helper_run_id != entry.helper_run_id for one in self._untold.get(entry.thread_id, [])):
+                self._untold.setdefault(entry.thread_id, []).append(entry)
+            threads.add(entry.thread_id)
+        if gone:
+            await forget_detached(store, gone)
+        for thread_id in threads:
+            # A chat that cannot be told now (its model has no key, say) keeps its reports for the chat's next run: it
+            # never keeps the daemon from starting, which the owner needs to fix the key.
+            try:
+                await self._tell_helper_reports(thread_id)
+            except DotError as exc:
+                log.warning("helper_reports_not_told_at_start", thread_id=thread_id, error=exc.message)
+        return sum(len(entries) for entries in self._untold.values())
 
     def at_work_in(self, thread_id: str) -> bool:
         """Whether a run of this process is claimed for, or works in, the chat ``thread_id`` now, before its record
@@ -2511,6 +2882,9 @@ class RunManager:
         for handle in handles:
             self.cancel(handle.run_id)
         await asyncio.gather(*(handle.finished.wait() for handle in handles))
+        # The followers of helpers that worked on without their run see the daemon stop and tell nothing (item 1351).
+        if self._followers:
+            await asyncio.gather(*self._followers, return_exceptions=True)
         # The attempts of work orders, which the stop ended, are written down before the store closes (item 907).
         await self.desk.close()
         if self._asks is not None:
@@ -3433,6 +3807,8 @@ class RunManager:
             self._handles[run.id] = handle
             registered = True
             self._watch_asks()
+            if parent_run_id is None and campaign_id is None and self._untold.get(thread_id):
+                await self._hand_reports_to_new_run(thread_id, run.id)
             # The owner wrote in the chat, and their run is under way: what a deleted run left marked there is theirs
             # to have read now (item 952).
             if _owners_message(parent, source, opening) and await runtime.store.thread_tainted(thread_id):
@@ -3647,6 +4023,10 @@ class RunManager:
         finally:
             runtime.peers.end(run.id)
             inbox.shutdown()
+            if status != "done" and any(one.parent_run_id == run.id for one in self._detached.values()):
+                # Before its own end is stored (item 197): the helpers it stopped waiting for end first. A stop that
+                # comes meanwhile is dropped (:func:`_to_its_end`): the end below must still be recorded.
+                await _to_its_end(self._stop_detached_of(run.id))
             recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         learns: bool = recorded and not self._stopping and not self._learning_dropped
@@ -3807,6 +4187,7 @@ class RunManager:
                 await store.release_hold(run.thread_id, "crash")
             await self._drain(run.thread_id, run.id)
             await self._tell_ended_commands(run.thread_id)
+            await self._tell_helper_reports(run.thread_id)
         elif await store.list_queued(run.thread_id):
             await store.hold_queue(run.thread_id)
             await self._queue_changed(run.thread_id, None, None, None)

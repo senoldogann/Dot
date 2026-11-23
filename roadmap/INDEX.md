@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1351](1351.md) | done | 2026-11-23 | A message ends a run's wait on its helpers, and the helper's report reaches the chat when it ends |
 | [1350](1350.md) | done | 2026-11-23 | A message from the home starts a chat of its own on the model picked, and a message for a model that cannot answer is refused by name |
 | [1349](1349.md) | done | 2026-11-23 | A chat on a phone has one scroller that is as wide as the screen, and the dock lets a touch through |
 | [1348](1348.md) | done | 2026-11-23 | A queued message is moved by an up and a down arrow, not by a drag |

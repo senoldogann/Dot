@@ -90,6 +90,13 @@ class DelegateArgs(ToolArgs):
         ),
     )
     agents_considered: str = Field(default="", description="With a team: the nearest agents, why none fits.")
+    wait: bool = Field(
+        default=True,
+        description=(
+            "false: start it and go on, or end your turn; its report reaches this chat as a note when it ends. true: "
+            "wait; if the owner writes meanwhile the wait ends and it keeps working, its report coming the same way."
+        ),
+    )
 
 
 def default_child_mode(parent: RunMode) -> RunMode:
@@ -141,12 +148,18 @@ async def _unplanned(step: int | None, ctx: ToolContext) -> str | None:
     return unplanned_step_note(plan.steps, step)
 
 
+# What the first line of the result of a delegation that was given up ends with: no report was read, so no step closes.
+_DETACHED_END: str = " keeps working in the background."
+
+
 def closing_step(call_step: JsonValue, result: ToolResult) -> int | None:
     """The plan step a delegate result closes: the step the call named, unless the result's first line says the plan
-    did not have it."""
+    did not have it or that the run still works in the background (its report comes later, and closes nothing)."""
     if not isinstance(call_step, int):
         return None
     first: str = result.text.split("\n", 1)[0]
+    if first.endswith(_DETACHED_END):
+        return None
     return None if first.startswith("Step ") and _UNPLANNED_MARK in first else call_step
 
 
@@ -190,6 +203,26 @@ def render_outcome(outcome: DelegateOutcome, nonce: str, step: int | None, unpla
     return mark_untrusted(result) if outcome.tainted else result
 
 
+def render_detached(outcome: DelegateOutcome, step: int | None, unplanned: str | None) -> ToolResult:
+    """What the delegating run reads back when it stopped waiting for the run: that it was not stopped, still works, and
+    that its report reaches this chat when it ends; and the plan step it was named for stays as it is."""
+    run: RunRecord = outcome.run
+    started: str = f"Delegated run {run.id} on {run.model}{_DETACHED_END}"
+    why: str = (
+        "You asked for no wait."
+        if outcome.asked_no_wait
+        else "The owner wrote to you while you waited, so the wait ended; read their message and go on with it."
+    )
+    lines: list[str] = [
+        started if unplanned is None else f"{unplanned}\n{started}",
+        f"{why} It was not stopped. Its report will reach this chat as a note from Dot when it ends: do not poll for "
+        "it. If you have finished by then, a run is started to read it.",
+    ]
+    if step is not None:
+        lines.append(f"Plan step {step} stays as it is: its report, when it comes, closes nothing by itself.")
+    return ok("\n".join(lines))
+
+
 def _delegate_tool() -> RegisteredTool:
     def classify(args: DelegateArgs, ctx: ToolContext) -> ActionInfo:
         shown: str = truncate_tail(" ".join(args.goal.split()), _SUMMARY_CHARS)
@@ -209,10 +242,19 @@ def _delegate_tool() -> RegisteredTool:
         )
         mode: RunMode = default_child_mode(ctx.mode)
         unplanned: str | None = await _unplanned(args.step, ctx)
-        outcome: DelegateOutcome = await spawner.delegate(
-            ctx.run_id, args.goal, mode, await _model_for(args.model, ctx), None
-        )
         step: int | None = None if unplanned is not None else args.step
+        outcome: DelegateOutcome = await spawner.delegate(
+            ctx.run_id,
+            args.goal,
+            mode,
+            await _model_for(args.model, ctx),
+            None,
+            detachable=True,
+            wait=args.wait,
+            plan_step=step,
+        )
+        if outcome.detached:
+            return render_detached(outcome, step, unplanned)
         return render_outcome(outcome, secrets.token_hex(_NONCE_BYTES), step, unplanned)
 
     return make_tool(
@@ -222,9 +264,9 @@ def _delegate_tool() -> RegisteredTool:
             "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
             "turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is "
-            "that agent's. Do not delegate what one or two tool calls "
-            "can do. Name the plan step the part is (step) and its report closes that step; a step the plan does not "
-            "have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
+            "that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) "
+            "and its report closes that step, unless the part goes on in the background; a step the plan does not have "
+            "runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
             "check and its answer; a report without one is marked as a claim."
         ),
         args_model=DelegateArgs,

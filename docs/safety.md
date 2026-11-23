@@ -610,7 +610,10 @@ for work's among them, a campaign's sessions', item 952) as that chat's last run
 marked until you write in it yourself, and an agent's chat keeps that mark when the chat that sent it the work is
 deleted, whose runs go with it, and the run that
 tells a chat that its command in the background ended as the chat's last run ended: that message is Dot's, not yours,
-and so is the note that tells a run at work of such an end, which clears nothing. The run a watcher starts for a mail,
+and so is the note that tells a run at work of such an end, which clears nothing. The report of a helper the run
+stopped waiting for (item 1351) reaches its chat the same way: Dot's note or the goal of the run started for it, the
+helper's words fenced as third-party content when it read some, the run it starts or the one that reads it marked
+untrusted as the helper ended, and the helper's own run record, not a copy, is what is told, also after a restart. The run a watcher starts for a mail,
 an event or a notification (item 571, see [Dot comes to you](proactive.md#watchers)) starts untrusted whatever it goes
 on from, since what a stranger wrote set it off: its goal is your own words and the item stands in its first message, in
 a fence. So does every firing of a schedule a run made after it had read outside content (`schedule_create`, item

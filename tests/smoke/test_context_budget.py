@@ -107,7 +107,11 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # verification pages - a screenshot, a guessed pixel and a sleep apiece, and a "Press & Hold" never passed): one tool
 # that finds the check in any frame, presses or holds it and waits for it to clear, and hands back its picture at twice
 # its size when it needs eyes (29,891 measured here; tools 21,118, which is 400 more than the 20,850 before it).
-BUDGET_TOKENS: int = 30_050
+# Raised by 200 for the `wait` field of `delegate` and the line of the Delegation section that says a part going on in
+# the background closes no step (item 1351, the owner's ask of 2026-11-23: a message they send while a run waits on a
+# helper makes it go on, and the helper's report comes to the chat when it ends): 30,150 measured here, the rest being
+# room for the longer paths of the gate's runner.
+BUDGET_TOKENS: int = 30_250
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -138,7 +142,8 @@ SYSTEM_BUDGET_TOKENS: int = 8_900
 # Raised by 300 for `watch_video` of item 1212 above (19,472 measured).
 # Raised by 1,350 for the pipeline tools and the parts of an objective's work of item 1227 above (20,808 measured).
 # Raised by 400 with `browser_captcha` of item 1288 above (21,118 measured).
-TOOLS_BUDGET_TOKENS: int = 21_250
+# Raised by 200 with the `wait` field of `delegate` of item 1351 above (21,302 measured).
+TOOLS_BUDGET_TOKENS: int = 21_450
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
