@@ -54,6 +54,7 @@ from dotagent.agent.continuity import (
 from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls, reached_sites
 from dotagent.agent.gate import RunGate
 from dotagent.agent.goal_chain import goal_checker_with_standby
+from dotagent.agent.goal_read import read_written
 from dotagent.agent.helpers import (
     MODEL_SWITCHED_EVENT,
     Roster,
@@ -1553,6 +1554,17 @@ async def _missing_in_answer(agent: AgentRun, answer: str, facts: RunFacts) -> t
     return await asyncio.to_thread(missing_paths, answer_paths(answer), facts.named, agent.runtime.workspace)
 
 
+async def _checked(agent: AgentRun, checker: GoalChecker, request: GoalRequest, facts: RunFacts) -> GoalVerdict:
+    """The checker's verdict (item 1363): a check that cannot tell yet may ask for the lines of files the run wrote,
+    and is asked once more with what they hold. The window is read from the facts alone, so a path the run did not write
+    is never opened."""
+    verdict: GoalVerdict = await checker(request)
+    if verdict.decision != "inspect":
+        return verdict
+    evidence: str = await asyncio.to_thread(read_written, verdict.reads, facts.written, agent.runtime.workspace)
+    return await checker(request.model_copy(update={"evidence": evidence}))
+
+
 async def _ask_checker(
     agent: AgentRun,
     checker: GoalChecker,
@@ -1607,7 +1619,7 @@ async def _ask_checker(
                 unproven_steps=(),
             )
     try:
-        verdict: GoalVerdict = await checker(request)
+        verdict: GoalVerdict = await _checked(agent, checker, request, facts)
     except (ProviderError, MissingSecretError) as error:
         log.error("goal_check_failed", run_id=run.id, error=error.message, context=error.context)
         await agent.runtime.bus.emit(

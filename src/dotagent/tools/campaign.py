@@ -290,6 +290,8 @@ async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolCon
         claimed_success=True,
         # A campaign keeps going by itself: its sessions go on until this check accepts the outcome.
         keep_going=False,
+        # Its sessions have no run's facts to read from, so this check cannot inspect a file (item 1363).
+        inspectable=False,
     )
 
 

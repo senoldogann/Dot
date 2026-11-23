@@ -13,9 +13,10 @@ from pathlib import Path
 
 
 # A folder searched along the way, never followed when it is a link. Read at the call: ``O_SEARCH`` is macOS's, and this
-# module loads where the unit tests run on Linux (item 1270).
+# module loads where the unit tests run on Linux (item 1270), where ``O_DIRECTORY`` and ``O_NOFOLLOW`` alone hold a
+# step.
 def _step_flags() -> int:
-    return os.O_SEARCH | os.O_DIRECTORY | os.O_NOFOLLOW
+    return getattr(os, "O_SEARCH", 0) | os.O_DIRECTORY | os.O_NOFOLLOW
 
 
 # A file read: not followed when it is a link, and opened without waiting for a writer when it is a named pipe.
@@ -30,7 +31,7 @@ def held_folder(path: Path, make: bool = False) -> int:
     """A descriptor of the folder ``path``, which must be absolute and resolved (no link along it), each folder of it
     opened in the one above without following a link; the folders that are not there are made on the way when ``make``.
     Blocking."""
-    folder: int = os.open("/", os.O_SEARCH | os.O_DIRECTORY)
+    folder: int = os.open("/", getattr(os, "O_SEARCH", 0) | os.O_DIRECTORY)
     try:
         for part in path.parts[1:]:
             inner: int = _step(folder, part, make)
