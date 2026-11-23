@@ -43,6 +43,18 @@ final class ChatModel {
     private(set) var run: RunRecord?
     private(set) var pending: [PendingSend] = []
     private(set) var notice: String?
+    /// What the chat's next message starts with (model, reasoning level, mode); `nil` until the daemon has told.
+    private(set) var choices: ChatChoices?
+    /// Whether the daemon may hold runs older than the rows shown, and whether a page of them is being read or failed.
+    private(set) var hasOlder: Bool = false
+    private(set) var loadingOlder: Bool = false
+    private(set) var olderFailed: Bool = false
+    /// The row that was first before older ones were put above it: the transcript scrolls back to it to keep its place.
+    private(set) var olderAnchor: String?
+    private(set) var reactions: [ReactionRecord] = []
+    /// Set when an edit rewound the chat to nothing: its words went to a new chat's box, and this chat has no more to show.
+    private(set) var leaves: Bool = false
+    let dictation: Dictation = Dictation()
     /// True when the chat was drawn from what was held before the network answered (no spinner is shown for it).
     let wasCached: Bool
     private(set) var loaded: Bool = false
@@ -64,6 +76,7 @@ final class ChatModel {
         self.state = warm ?? ChatState()
         self.wasCached = warm != nil
         self.loaded = warm != nil
+        self.draft = store.drafts.text(for: thread.id)
     }
 
     var isWorking: Bool { state.isWorking }
@@ -85,9 +98,12 @@ final class ChatModel {
         }
         Task { await refreshQueue() }
         Task { await refreshAutomations() }
+        Task { await refreshReactions() }
     }
 
     func stop() {
+        dictation.stop()
+        store.drafts.flush()
         reading?.cancel()
         reading = nil
         store.keep(state, for: threadId)
@@ -103,9 +119,12 @@ final class ChatModel {
             store.keep(next, for: threadId)
         case .connection(let feedState):
             connection = feedState
-        case .run(let record, let name):
+        case .run(let record, let name, let kept):
             run = record
+            choices = kept
             if !name.isEmpty { title = name }
+        case .older(let more):
+            hasOlder = more
         case .failed(let words):
             loaded = true
             // What the phone shows may be behind the daemon: say so rather than draw it as current.
@@ -114,6 +133,7 @@ final class ChatModel {
         case .lifecycle(let kind):
             if ["queue_changed", "run_finished", "run_queued"].contains(kind) { Task { await refreshQueue() } }
             if kind == "run_finished" || kind == "run_queued" { Task { await refreshAutomations() } }
+            if kind == "reaction_added" || kind == "reaction_removed" { Task { await refreshReactions() } }
         }
     }
 
@@ -174,7 +194,7 @@ final class ChatModel {
                 ids.append(try await uploader.uploadAttachment(upload, host: store.host, key: store.api.key))
             }
             let shown: QueueView = try await store.api.send(
-                message: Message(text: send.text, key: key, model: nil, attachments: ids), thread: threadId)
+                message: Message(text: send.text, key: key, attachments: ids, choices: messageChoices), thread: threadId)
             queue = shown
             if shown.besideThreadId != nil { notice = "Started in a chat of its own." }
             await session?.refresh()
@@ -285,6 +305,142 @@ final class ChatModel {
                 let jpeg: Data = image.jpegData(compressionQuality: 0.85)
             else { continue }
             images.append(PickedImage(name: "photo-\(images.count + 1).jpg", data: jpeg, preview: image))
+        }
+    }
+
+    // MARK: The chat's model and reasoning level
+
+    /// What each message of this chat carries of the chat's choices, and the agent whose chat it is.
+    var messageChoices: MessageChoices { MessageChoices(choices, agentId: run?.agentId) }
+
+    /// Picks the model the chat's next messages run on (`nil`: the default model); the daemon keeps it with the chat, as
+    /// the web's composer does. A refusal puts the old choice back.
+    func choose(model ref: String?, among providers: [ProviderModels]) {
+        change((choices ?? .fresh).picking(model: ref, among: providers))
+    }
+
+    func choose(effort level: String?) {
+        change((choices ?? .fresh).picking(effort: level))
+    }
+
+    private func change(_ next: ChatChoices) {
+        let before: ChatChoices? = choices
+        choices = next
+        Task {
+            do {
+                try await store.api.keep(choices: next, thread: threadId)
+            } catch {
+                logger.error("the chat's choices were not kept: \(String(describing: error), privacy: .public)")
+                choices = before
+                notice = "The model could not be changed."
+            }
+        }
+    }
+
+    // MARK: Older messages
+
+    /// Reads a page of runs older than the first row and puts them above it, keeping the reader's place.
+    func loadOlder() {
+        guard hasOlder, !loadingOlder, let session else { return }
+        loadingOlder = true
+        olderFailed = false
+        olderAnchor = state.items.first?.id
+        Task {
+            let outcome: OlderOutcome = await session.loadOlder()
+            loadingOlder = false
+            switch outcome {
+            case .failed: olderFailed = true
+            case .loaded(_, let exhausted): hasOlder = !exhausted
+            case .nothing: break
+            }
+            // The anchor is kept for a moment: the rows arrive on the stream, and the screen scrolls back on their arrival.
+            try? await Task.sleep(for: .milliseconds(600))
+            olderAnchor = nil
+        }
+    }
+
+    // MARK: A tool step's detail
+
+    /// The arguments and the result of a tool step, read from its two events (the chat keeps only a line of each). Throws
+    /// when the daemon cannot be reached.
+    func detail(of row: ToolRow) async throws -> ToolDetail {
+        var after: Int = max(0, row.eventId - 1)
+        var call: EventRecord?
+        var result: EventRecord?
+        for _ in 0..<ToolEvents.pages {
+            let page: EventsPage = try await store.api.events(run: row.runId, after: after, limit: ToolEvents.pageSize)
+            call = call ?? ToolEvents.call(row.callId, in: page.events)
+            result = result ?? ToolEvents.result(row.callId, in: page.events)
+            guard result == nil, page.size >= ToolEvents.pageSize, let top: Int = page.topId else { break }
+            after = top
+        }
+        return ToolDetail.make(row: row, call: call, result: result)
+    }
+
+    // MARK: Message actions
+
+    func refreshReactions() async {
+        do {
+            reactions = try await store.api.reactions(thread: threadId)
+        } catch {
+            logger.error("the reactions could not be read: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Puts a reaction on what Dot said, or takes it back when it stands. What the daemon did with it (a follow-up, a
+    /// hold) is said in a line.
+    func toggleReaction(_ name: String, on item: ChatItem) {
+        guard let target: (runId: String, message: String) = MessageActions.reactionTarget(of: item) else { return }
+        let stands: Bool = MessageActions.standing(on: item, among: reactions).contains(name)
+        Task {
+            do {
+                let outcome: ReactionOutcome = stands
+                    ? try await store.api.unreact(run: target.runId, message: target.message, reaction: name)
+                    : try await store.api.react(run: target.runId, message: target.message, reaction: name)
+                reactions.removeAll { $0.runId == target.runId && $0.message == target.message }
+                reactions.append(contentsOf: outcome.reactions)
+                if !outcome.said.isEmpty { notice = outcome.said }
+            } catch {
+                logger.error("a reaction was not taken: \(String(describing: error), privacy: .public)")
+                notice = "The reaction could not be saved."
+            }
+        }
+    }
+
+    /// Edit from here: the chat goes back to before this message of the owner's, the messages after it are taken out (the
+    /// files they changed stay as they are), and the message's words come back to the box. A chat rewound to nothing
+    /// leaves its words in a new chat's box and closes.
+    func editFromHere(_ item: ChatItem) {
+        guard let runId: String = MessageActions.rewindTarget(of: item, chatIsWorking: isWorking) else { return }
+        Task {
+            do {
+                let rewound: RewindResult = try await store.api.rewind(run: runId)
+                await session?.reset()
+                if rewound.backTo == nil {
+                    store.drafts.save(rewound.text, for: Drafts.newChatKey(agent: run?.agentId))
+                    store.drafts.flush()
+                    leaves = true
+                } else {
+                    draft = draft.isEmpty ? rewound.text : draft + "\n" + rewound.text
+                }
+            } catch {
+                logger.error("the chat was not rewound: \(String(describing: error), privacy: .public)")
+                notice = "The chat could not go back to that message."
+            }
+        }
+    }
+
+    // MARK: Drafts and dictation
+
+    /// Keeps what is in the box for the next launch (an empty box keeps nothing).
+    func persistDraft() { store.drafts.save(draft, for: threadId) }
+
+    /// The microphone: listens and shows the words as they are heard after what was typed; pressed again, it stops.
+    func toggleDictation() {
+        let base: String = draft
+        dictation.toggle { [weak self] heard in
+            guard let self else { return }
+            self.draft = DictationText.merged(base: base, heard: heard)
         }
     }
 

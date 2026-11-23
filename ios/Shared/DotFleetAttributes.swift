@@ -37,3 +37,14 @@ struct DotFleetAttributes: ActivityAttributes {
     /// The key the daemon keeps the activity's token under: always `fleet`.
     var fleetId: String
 }
+
+extension DotFleetAttributes.ContentState {
+    /// The run a tap on the card opens: the one that waits for the owner first (it asks something), else one at work, else
+    /// the first row. `nil` for a card with no row yet.
+    var tapRunId: String? {
+        rows.first { $0.status == "waiting" }?.runId ?? rows.first { $0.status == "working" }?.runId ?? rows.first?.runId
+    }
+
+    /// The link a tap on the card opens (`dotagent://run/<id>`).
+    var tapURL: URL? { tapRunId.flatMap { DotDeepLink.url(forRun: $0) } }
+}

@@ -112,21 +112,118 @@ struct Lossy<Value: Decodable & Sendable>: Decodable, Sendable {
 
 // MARK: Routes
 
+/// A message for a chat (`POST /api/threads/{id}/queue`), written as the web composer writes it: the chat's own choices
+/// (model, reasoning level, mode, speed, approvals, goal mode) and the agent whose chat it is ride with it, since the
+/// daemon starts a message on what the message names; a part left out takes the daemon's own.
 struct Message: Encodable, Sendable {
     let text: String
     let key: String
-    let model: String?
     let attachments: [String]
+    let choices: MessageChoices
 
-    enum CodingKeys: String, CodingKey { case text, key, model, attachments }
+    init(text: String, key: String, attachments: [String], choices: MessageChoices = .none) {
+        self.text = text
+        self.key = key
+        self.attachments = attachments
+        self.choices = choices
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case text, key, attachments, mode, model, effort, speed, approvals
+        case goalMode = "goal_mode"
+        case agentId = "agent_id"
+    }
 
     func encode(to encoder: any Encoder) throws {
         var container: KeyedEncodingContainer<CodingKeys> = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(text, forKey: .text)
         try container.encode(key, forKey: .key)
-        try container.encodeIfPresent(model, forKey: .model)
         try container.encode(attachments, forKey: .attachments)
+        try container.encodeIfPresent(choices.mode, forKey: .mode)
+        try container.encodeIfPresent(choices.model, forKey: .model)
+        try container.encodeIfPresent(choices.effort, forKey: .effort)
+        try container.encodeIfPresent(choices.speed, forKey: .speed)
+        try container.encodeIfPresent(choices.approvals, forKey: .approvals)
+        try container.encodeIfPresent(choices.goalMode, forKey: .goalMode)
+        try container.encodeIfPresent(choices.agentId, forKey: .agentId)
     }
+}
+
+/// A message that starts a chat of its own (`POST /api/runs`), as the web's home and an agent's page send it: a message
+/// from the home starts a chat on the model picked (item 1350), one to an agent that has no chat starts the agent's own.
+/// `threadId` stays `nil` for a new chat; the picks are left out when the owner made none (the daemon's own).
+struct NewChat: Encodable, Sendable {
+    let goal: String
+    let key: String
+    let attachments: [String]
+    let choices: MessageChoices
+
+    init(goal: String, key: String, attachments: [String] = [], choices: MessageChoices = MessageChoices(mode: "auto")) {
+        self.goal = goal
+        self.key = key
+        self.attachments = attachments
+        self.choices = choices
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case goal, key, attachments, mode, model, effort, speed, approvals, standing
+        case goalMode = "goal_mode"
+        case agentId = "agent_id"
+        case threadId = "thread_id"
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container: KeyedEncodingContainer<CodingKeys> = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(goal, forKey: .goal)
+        try container.encode(key, forKey: .key)
+        try container.encode(attachments, forKey: .attachments)
+        try container.encode(false, forKey: .standing)
+        try container.encode(choices.mode ?? "auto", forKey: .mode)
+        try container.encodeIfPresent(choices.model, forKey: .model)
+        try container.encodeIfPresent(choices.effort, forKey: .effort)
+        try container.encodeIfPresent(choices.speed, forKey: .speed)
+        try container.encodeIfPresent(choices.approvals, forKey: .approvals)
+        try container.encodeIfPresent(choices.goalMode, forKey: .goalMode)
+        // Null, not left out: a new chat names no chat to go on in, as the web's body does.
+        try container.encodeNil(forKey: .threadId)
+        try container.encodeIfPresent(choices.agentId, forKey: .agentId)
+    }
+}
+
+private struct ChoicesChange: Encodable, Sendable { let choices: ChatChoices }
+private struct Rewinding: Encodable, Sendable { let files: String }
+private struct Reacting: Encodable, Sendable { let reaction: String }
+
+/// A chat rewound to before one of the owner's messages (`POST /api/runs/{id}/rewind`): the message's words, which go
+/// back to the composer.
+struct RewindResult: Decodable, Sendable {
+    let threadId: String
+    let backTo: String?
+    let text: String
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case threadId = "thread_id"
+        case backTo = "back_to"
+    }
+}
+
+/// A reaction standing on a message of Dot's (`GET /api/threads/{id}/reactions`).
+struct ReactionRecord: Codable, Sendable, Hashable {
+    let runId: String
+    let message: String
+    let reaction: String
+
+    enum CodingKeys: String, CodingKey {
+        case message, reaction
+        case runId = "run_id"
+    }
+}
+
+struct ReactionOutcome: Decodable, Sendable {
+    let reactions: [ReactionRecord]
+    let effect: String
+    let said: String
 }
 
 private struct Decision: Encodable, Sendable {
@@ -156,9 +253,36 @@ extension APIClient {
 
     func agents() async throws -> [AgentSummary] { try await get("/api/agents") }
 
-    func runs(thread: String, limit: Int = 12) async throws -> [RunRecord] {
-        try await get(
-            "/api/runs", query: [URLQueryItem(name: "thread_id", value: thread), URLQueryItem(name: "limit", value: String(limit))])
+    /// The newest runs of a chat; with `before`, those that began before that time (item 1360), the page after the one
+    /// whose oldest run began then.
+    func runs(thread: String, limit: Int = 12, before: Double? = nil) async throws -> [RunRecord] {
+        var query: [URLQueryItem] = [URLQueryItem(name: "thread_id", value: thread), URLQueryItem(name: "limit", value: String(limit))]
+        // Written in full: a time rounded up to the microsecond would let the run it was read from through again.
+        if let before { query.append(URLQueryItem(name: "before", value: String(before))) }
+        return try await get("/api/runs", query: query)
+    }
+
+    /// Starts a chat of its own with a message.
+    func start(chat: NewChat) async throws -> RunRecord { try await send("POST", "/api/runs", body: chat) }
+
+    /// Keeps the choices the chat's next message starts with (`PATCH /api/threads/{id}`).
+    func keep(choices: ChatChoices, thread: String) async throws {
+        try await sendVoid("PATCH", "/api/threads/\(thread)", body: ChoicesChange(choices: choices))
+    }
+
+    /// Rewinds the chat to before the message of `run` (Edit from here); the files the runs changed stay as they are.
+    func rewind(run: String) async throws -> RewindResult {
+        try await send("POST", "/api/runs/\(run)/rewind", body: Rewinding(files: "keep"))
+    }
+
+    func reactions(thread: String) async throws -> [ReactionRecord] { try await get("/api/threads/\(thread)/reactions") }
+
+    func react(run: String, message: String, reaction: String) async throws -> ReactionOutcome {
+        try await send("POST", "/api/runs/\(run)/messages/\(message)/reactions", body: Reacting(reaction: reaction))
+    }
+
+    func unreact(run: String, message: String, reaction: String) async throws -> ReactionOutcome {
+        try await send("DELETE", "/api/runs/\(run)/messages/\(message)/reactions/\(reaction)", body: Optional<String>.none)
     }
 
     func detail(run: String) async throws -> RunDetail { try await get("/api/runs/\(run)") }

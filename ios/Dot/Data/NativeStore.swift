@@ -26,6 +26,10 @@ final class NativeStore {
     private(set) var refreshing: Bool = false
     private(set) var lastError: String?
     private(set) var models: ModelChoices?
+    /// Every provider's models, for the pickers; read when a picker opens, and again when asked (`loadProviders`).
+    private(set) var providers: [ProviderModels] = []
+    /// What was typed and not sent, per chat, kept between launches.
+    let drafts: DraftStore
 
     /// Chats read before, as their state: a chat that is here opens drawn, in its first frame.
     @ObservationIgnored private var warm: [String: ChatState] = [:]
@@ -46,6 +50,11 @@ final class NativeStore {
         self.api = APIClient(host: host, key: key, session: session)
         let folder: URL = directory ?? ChatCache.directory(for: host)
         self.cache = ChatCache(directory: folder)
+        self.drafts = DraftStore(directory: folder)
+        #if DEBUG
+        // `-DotClearDrafts 1`: the simulator tests start from no drafts.
+        if UserDefaults.standard.bool(forKey: "DotClearDrafts") { self.drafts.clear() }
+        #endif
         let snapshot: ListSnapshot? = ChatCache.readList(in: folder)
         self.threads = snapshot?.threads ?? []
         self.agents = snapshot?.agents ?? []
@@ -136,6 +145,16 @@ final class NativeStore {
             models = try await api.status().models
         } catch {
             logger.error("the models could not be read: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// The models of every provider, once: a picker draws what is held and asks again only when it holds nothing or `force`.
+    func loadProviders(force: Bool = false) async {
+        if !providers.isEmpty, !force { return }
+        do {
+            providers = try await api.models()
+        } catch {
+            logger.error("the providers' models could not be read: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -255,5 +274,8 @@ final class NativeStore {
     }()
 
     /// Forgets what the disk holds, as when the key is forgotten.
-    func clearCache() async { await cache.clear() }
+    func clearCache() async {
+        drafts.clear()
+        await cache.clear()
+    }
 }

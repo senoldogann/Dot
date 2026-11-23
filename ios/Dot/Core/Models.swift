@@ -48,6 +48,16 @@ struct ThreadSummary: Codable, Sendable, Hashable, Identifiable {
 
     var isWorking: Bool { latestStatus.isActiveRunStatus && latestStatus != "blocked" }
     var isWaitingOnYou: Bool { latestStatus == "blocked" }
+
+    /// The row of a chat the list does not hold yet (a notification or a Live Activity names a run, or a chat was just
+    /// started here), made from the run's own page; the list's next read replaces it.
+    static func opened(from detail: RunDetail) -> ThreadSummary {
+        let run: RunRecord = detail.run
+        return ThreadSummary(
+            id: run.threadId, title: detail.title, source: run.source, updatedAt: run.finishedAt ?? run.createdAt, pinnedAt: nil,
+            runCount: 1, latestRunId: run.id, latestStatus: run.status, latestMode: run.mode, unread: false, actorId: run.agentId,
+            lastMessage: "", lastRole: "", loopCron: nil, loopNextAt: nil)
+    }
 }
 
 /// A run (`GET /api/runs`, and inside a run's detail).
@@ -101,6 +111,54 @@ struct RunDetail: Codable, Sendable, Hashable {
     var children: [RunRecord]
     var active: Bool
     var questions: [ApprovalRecord]
+    /// What the chat's next message starts with (its model, its reasoning level, its mode), as its composer shows it.
+    var choices: ChatChoices?
+}
+
+/// What the next message of a chat starts with (`ChatChoices` of the daemon): `mode` is `auto`, `task`, `chat` or
+/// `research`; a `nil` model, effort, approvals or goal mode takes the daemon's own. Written with every key, null
+/// included: the daemon requires them all (`PATCH /api/threads/{id}`).
+struct ChatChoices: Codable, Sendable, Hashable {
+    var mode: String
+    var model: String?
+    var effort: String?
+    var speed: String
+    var approvals: String?
+    var goalMode: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case mode, model, effort, speed, approvals
+        case goalMode = "goal_mode"
+    }
+
+    init(mode: String, model: String?, effort: String?, speed: String, approvals: String?, goalMode: Bool?) {
+        self.mode = mode
+        self.model = model
+        self.effort = effort
+        self.speed = speed
+        self.approvals = approvals
+        self.goalMode = goalMode
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container: KeyedDecodingContainer<CodingKeys> = try decoder.container(keyedBy: CodingKeys.self)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode) ?? "auto"
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        effort = try container.decodeIfPresent(String.self, forKey: .effort)
+        speed = try container.decodeIfPresent(String.self, forKey: .speed) ?? "standard"
+        approvals = try container.decodeIfPresent(String.self, forKey: .approvals)
+        goalMode = try container.decodeIfPresent(Bool.self, forKey: .goalMode)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container: KeyedEncodingContainer<CodingKeys> = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(model, forKey: .model)
+        try container.encode(effort, forKey: .effort)
+        try container.encode(speed, forKey: .speed)
+        try container.encode(approvals, forKey: .approvals)
+        try container.encode(goalMode, forKey: .goalMode)
+    }
 }
 
 /// One event of a run (`GET /api/runs/{id}/events` and the run's stream). A delta, which is not stored, has id 0.
@@ -255,8 +313,17 @@ struct ModelOption: Codable, Sendable, Hashable, Identifiable {
     var tools: Bool
     var vision: Bool
     var free: Bool
+    /// Its reasoning levels, lowest first; fewer than two: no choice (a daemon that lists none leaves it `nil`).
+    var efforts: [String]?
+    /// The level the configured default effort selects on this model.
+    var defaultEffort: String?
 
     var id: String { ref }
+
+    enum CodingKeys: String, CodingKey {
+        case ref, label, tools, vision, free, efforts
+        case defaultEffort = "default_effort"
+    }
 }
 
 /// The models of one provider, or why it listed none.

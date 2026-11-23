@@ -25,6 +25,8 @@ final class AppModel {
     var debugOpenChat: String?
     var debugInspector: Bool = false
     var debugSchedules: Bool = false
+    /// Debug builds only: `-DotOpenURL dotagent://run/<id>` opens a link at launch, as a Live Activity's tap does.
+    var debugOpenURL: URL?
 
     @ObservationIgnored private let hostStore: HostStore
     @ObservationIgnored private let keyStore: PhoneKeyStore
@@ -51,6 +53,7 @@ final class AppModel {
         self.debugOpenChat = args.string(forKey: "DotOpenChat")
         self.debugInspector = args.bool(forKey: "DotShowInspector")
         self.showsSettings = args.bool(forKey: "DotShowSettings")
+        self.debugOpenURL = args.string(forKey: "DotOpenURL").flatMap(URL.init(string:))
         #endif
         self.isPaired = readIsPaired()
         if let host, isPaired, devKey == nil {
@@ -126,6 +129,18 @@ final class AppModel {
         WKWebsiteDataStore.default().removeData(
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
         ) {}
+    }
+
+    /// Opens what a `dotagent://` link asks (the Live Activity's rows and its tap): the chat of a run. A link that asks
+    /// for nothing this app does is ignored.
+    func open(url: URL) {
+        guard native != nil, let link: DotDeepLink = DotDeepLink.parse(url) else {
+            logger.warning("link refused: scheme=\(url.scheme ?? "", privacy: .public)")
+            return
+        }
+        switch link {
+        case .run(let id): pendingRunId = id
+        }
     }
 
     /// Opens `route` (a path from a notification) in the web view when it is a path on the daemon.

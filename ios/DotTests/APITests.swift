@@ -13,6 +13,7 @@ final class APIClientTests: XCTestCase {
     override func setUp() {
         BodyStub.reply = "{}"
         BodyStub.seen = []
+        BodyStub.respond = nil
     }
 
     private func lastBody() throws -> [String: Any] {
@@ -39,7 +40,7 @@ final class APIClientTests: XCTestCase {
 
     func testAMessageGoesToTheChatsQueueWithItsKey() async throws {
         BodyStub.reply = #"{"held":false,"messages":[]}"#
-        _ = try await api().send(message: Message(text: "hi", key: "0123456789abcdef-key", model: nil, attachments: []), thread: "thr_1")
+        _ = try await api().send(message: Message(text: "hi", key: "0123456789abcdef-key", attachments: []), thread: "thr_1")
         XCTAssertEqual(BodyStub.seen.last?.method, "POST")
         XCTAssertEqual(BodyStub.seen.last?.path, "/api/threads/thr_1/queue")
         let body: [String: Any] = try lastBody()
@@ -96,6 +97,7 @@ final class BodyStub: URLProtocol, @unchecked Sendable {
     struct Seen {
         var method: String
         var path: String
+        var query: String?
         var authorization: String?
         var body: Data?
     }
@@ -103,6 +105,8 @@ final class BodyStub: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var reply: String = "{}"
     nonisolated(unsafe) static var status: Int = 200
     nonisolated(unsafe) static var seen: [Seen] = []
+    /// When set, what a request is answered with (and its status), by what it asked.
+    nonisolated(unsafe) static var respond: (@Sendable (Seen) -> (status: Int, body: String))?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -122,11 +126,12 @@ final class BodyStub: URLProtocol, @unchecked Sendable {
             body = collected
         }
         Self.seen.append(Seen(
-            method: request.httpMethod ?? "", path: request.url?.path ?? "", authorization: request.value(forHTTPHeaderField: "Authorization"),
+            method: request.httpMethod ?? "", path: request.url?.path ?? "", query: request.url?.query, authorization: request.value(forHTTPHeaderField: "Authorization"),
             body: body))
-        let response: HTTPURLResponse = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: "HTTP/1.1", headerFields: nil)!
+        let answer: (status: Int, body: String) = Self.respond?(Self.seen[Self.seen.count - 1]) ?? (Self.status, Self.reply)
+        let response: HTTPURLResponse = HTTPURLResponse(url: request.url!, statusCode: answer.status, httpVersion: "HTTP/1.1", headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(Self.reply.utf8))
+        client?.urlProtocol(self, didLoad: Data(answer.body.utf8))
         client?.urlProtocolDidFinishLoading(self)
     }
 

@@ -8,12 +8,13 @@ struct ChatListView: View {
     @State private var path: [ThreadSummary] = []
     /// Why a tapped notification opened nothing.
     @State private var openFailed: String?
+    @State private var composing: NewChatTarget?
 
     var body: some View {
         NavigationStack(path: $path) {
             List {
                 if !store.agents.isEmpty {
-                    AgentStrip(store: store, onOpen: { path.append($0) })
+                    AgentStrip(store: store, onOpen: { open(agent: $0) })
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
@@ -47,10 +48,21 @@ struct ChatListView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { composing = .home } label: { Image(systemName: "square.and.pencil") }
+                        .accessibilityLabel("New chat")
+                        .accessibilityIdentifier("new-chat")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { model.showsSettings = true } label: { Image(systemName: "gearshape") }
                         .accessibilityLabel("Settings")
                 }
+            }
+            .sheet(item: $composing) { target in
+                NewChatView(store: store, agent: target.agent, onStarted: { path = [$0] })
+                    .tint(Theme.accent)
+                    .preferredColorScheme(.dark)
+                    .presentationBackground(Theme.background)
             }
             .navigationDestination(for: ThreadSummary.self) { thread in
                 ChatView(store: store, thread: thread, inspectorOpen: model.debugInspector)
@@ -66,18 +78,40 @@ struct ChatListView: View {
             }
             .task(id: model.pendingRunId) {
                 guard let runId: String = model.pendingRunId else { return }
-                model.pendingRunId = nil
-                do {
-                    let detail: RunDetail = try await store.api.detail(run: runId)
-                    if let thread: ThreadSummary = store.threads.first(where: { $0.id == detail.run.threadId }) {
-                        path = [thread]
-                    } else {
-                        openFailed = "That chat is not in the list yet. Pull to refresh."
-                    }
-                } catch {
-                    openFailed = "Could not open that run."
-                }
+                // Cleared when the chat is open, not before: this task is keyed on the id, and clearing it first would
+                // cancel the very request that reads the run.
+                await open(runId: runId)
+                if model.pendingRunId == runId { model.pendingRunId = nil }
             }
+        }
+    }
+
+    /// Opens the chat of a run a notification, a Live Activity or a link named. The chat the list does not hold yet (the
+    /// app was just launched from the tap, or the chat is new) is read from the daemon, and failing that drawn from the
+    /// run's own page, so a tap never lands on a refusal while the daemon answers.
+    private func open(runId: String) async {
+        do {
+            let detail: RunDetail = try await store.api.detail(run: runId)
+            var thread: ThreadSummary? = store.threads.first(where: { $0.id == detail.run.threadId })
+            if thread == nil {
+                await store.refreshList()
+                thread = store.threads.first(where: { $0.id == detail.run.threadId })
+            }
+            composing = nil
+            openFailed = nil
+            path = [thread ?? ThreadSummary.opened(from: detail)]
+        } catch {
+            // The task was replaced by a later tap (or the screen went): that is not a failure to open.
+            if Task.isCancelled { return }
+            openFailed = "Could not open that run."
+        }
+    }
+
+    private func open(agent: AgentSummary) {
+        if let home: ThreadSummary = agent.home {
+            path.append(home)
+        } else {
+            composing = .agent(agent)
         }
     }
 
@@ -87,6 +121,24 @@ struct ChatListView: View {
         case .unauthorized: "This phone's key was refused. Pair again in Settings."
         default: nil
         }
+    }
+}
+
+/// What the new-chat sheet is for: a chat of its own from the home, or an agent's first message.
+enum NewChatTarget: Identifiable {
+    case home
+    case agent(AgentSummary)
+
+    var id: String {
+        switch self {
+        case .home: "home"
+        case .agent(let agent): "agent:\(agent.id)"
+        }
+    }
+
+    var agent: AgentSummary? {
+        if case .agent(let agent) = self { return agent }
+        return nil
     }
 }
 
@@ -130,14 +182,14 @@ struct ThreadRow: View {
 /// agent's own chat.
 struct AgentStrip: View {
     let store: NativeStore
-    let onOpen: (ThreadSummary) -> Void
+    let onOpen: (AgentSummary) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 16) {
                 ForEach(store.agents) { agent in
                     Button {
-                        if let home: ThreadSummary = agent.home { onOpen(home) }
+                        onOpen(agent)
                     } label: {
                         VStack(spacing: 5) {
                             Avatar(id: agent.id, name: agent.record.name, size: 44, state: state(of: agent))

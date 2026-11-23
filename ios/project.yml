@@ -62,7 +62,12 @@ targets:
         DotApsEnvironment: $(APS_ENVIRONMENT)
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
-        NSMicrophoneUsageDescription: Dot records your voice when you speak a message to it.
+        NSMicrophoneUsageDescription: Dot listens while you dictate a message, and only then. The words are written on this iPhone; no audio is sent anywhere.
+        NSSpeechRecognitionUsageDescription: Dot turns your voice into the words of a message on this iPhone when you press the microphone.
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.dotagent.phone
+            CFBundleURLSchemes:
+              - dotagent
         NSCameraUsageDescription: Dot uses the camera when you take a photo to send to it.
         NSPhotoLibraryUsageDescription: Dot opens your photos when you choose one to send to it.
         NSPhotoLibraryAddUsageDescription: Dot saves an image to your photos when you ask it to.
@@ -101,6 +106,21 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+
+  # Taps and screenshots in the simulator against a scratch daemon (`/tmp/dot-ui-daemon.json`, see ios/README.md); the
+  # `DotUI` scheme runs them, the `Dot` scheme (the unit tests) does not.
+  DotUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DotUITests
+    dependencies:
+      - target: Dot
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.uitests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: NO
 
@@ -167,3 +187,14 @@ targets:
           - $(AppIdentifierPrefix)dev.dotagent.phone
         com.apple.security.application-groups:
           - group.dev.dotagent.phone
+
+schemes:
+  DotUI:
+    build:
+      targets:
+        Dot: all
+        DotUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - DotUITests

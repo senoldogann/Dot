@@ -5,6 +5,8 @@ import SwiftUI
 struct RunInspector: View {
     let model: ChatModel
     let onModels: () -> Void
+    /// Asks for the sheet's full height (the model picker is a long list).
+    var onExpand: () -> Void = {}
     @Environment(\.dismiss) private var dismiss: DismissAction
 
     var body: some View {
@@ -14,10 +16,19 @@ struct RunInspector: View {
                     Group {
                     row("Status", statusWords)
                     if let run: RunRecord = model.run {
-                        row("Model", run.model)
                         row("Steps", String(run.steps))
                     }
-                    Button("Models…", action: onModels).font(Theme.small)
+                    NavigationLink {
+                        ChatModelPicker(model: model).onAppear { onExpand() }
+                    } label: {
+                        LabeledContent {
+                            Text(modelLine).font(Theme.small).foregroundStyle(Theme.muted)
+                        } label: {
+                            Text("Model for this chat").font(Theme.small).foregroundStyle(Theme.text)
+                        }
+                    }
+                    .accessibilityIdentifier("chat-model")
+                    Button("Default models…", action: onModels).font(Theme.small)
                                     }
                     .listRowBackground(Theme.surface)
                 }
@@ -74,8 +85,18 @@ struct RunInspector: View {
             .navigationTitle("Run")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task { await model.refreshAutomations() }
+            .task {
+                await model.refreshAutomations()
+                await model.store.loadProviders()
+            }
         }
+    }
+
+    /// The model the chat's next message runs on, and its level when one is picked: "opus · High".
+    private var modelLine: String {
+        let words: String = modelWords(model.choices?.model, in: model.store.providers, main: model.store.models?.main)
+        guard let level: String = model.choices?.effort else { return words }
+        return "\(words) · \(effortWords(level))"
     }
 
     private var statusWords: String {
@@ -140,5 +161,17 @@ struct ScheduleRow: View {
         if schedule.record.enabled, let next: String = schedule.nextLocal { parts.append("next \(next)") }
         if let agent: ScheduleAgentRef = schedule.agent { parts.append(agent.name) }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The picker for one chat's model and level: it reads the chat's choices as they stand, and the daemon keeps what is
+/// picked (it is the chat's, not the default).
+struct ChatModelPicker: View {
+    let model: ChatModel
+
+    var body: some View {
+        ModelPickerView(
+            store: model.store, model: model.choices?.model, effort: model.choices?.effort,
+            onModel: { model.choose(model: $0, among: model.store.providers) }, onEffort: { model.choose(effort: $0) })
     }
 }
