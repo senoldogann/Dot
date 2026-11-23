@@ -824,7 +824,9 @@ spent on the wait. It names one condition:
 - a file: it holds when the file is there.
 
 `contains` narrows each one to output, a page or a file that holds a text. The tool checks every `every_s` seconds (2
-to 600, 10 by default) for up to `within_minutes` (60 at most, 10 by default). It says when the condition held and after
+to 600, 10 by default) for up to `within_minutes` (60 at most, 10 by default). It also reads `condition` as the
+command and a `timeout_s` in seconds as `within_minutes` (item 1340): the names a model on the Claude plan guesses
+before it looks the tool up. It says when the condition held and after
 how many checks, or what the last check saw. On the owner's Mac, the runs of one week slept and polled 131 times in 41
 runs (`sleep 60; gh pr checks …`), each poll a model turn.
 

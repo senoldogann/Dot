@@ -238,7 +238,7 @@ def build_shell_tool() -> RegisteredTool:
             "new file or one written whole: their changes go into the undo journal, show in Changes and can be "
             "undone, while what a command writes (sed -i, a heredoc, a script) cannot. Output is capped: filter with "
             "grep/head/tail/jq. Start long-running servers in the background (nohup cmd > log 2>&1 &); wait with "
-            "wait_until, not sleep."
+            "wait_until (command, url or file; every_s, within_minutes), not sleep."
             " A command that ends by itself but takes minutes (an eval, a long build or install) goes to "
             "terminal_open with background when it would run past timeout_s, or when there is other work to do "
             "meanwhile: this chat is told when it ends, and you read its output then. Outside yolo, while the owner "
