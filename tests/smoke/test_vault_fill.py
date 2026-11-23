@@ -118,7 +118,10 @@ class _Handler(BaseHTTPRequestHandler):
 <label>Code <input name="code" autocomplete="one-time-code"></label>
 <button type="submit">Sign in</button>
 </form>
-<iframe title="An advert" src="http://localhost:{port}/frame"></iframe>""",
+<iframe title="An advert" src="http://localhost:{port}/frame"></iframe>
+<iframe title="A sign-in widget" src="http://localhost:{port}/widget"></iframe>""",
+            "/widget": """<!doctype html><title>Widget</title>
+<label>Widget password <input name="pass" type="password"></label>""",
             "/frame": f"""<!doctype html><title>Advert</title>
 <label>Frame password <input name="pass" type="password"></label>
 <script>
@@ -295,7 +298,13 @@ async def _form(ctx: ToolContext, gate: RunGate, site: _Site) -> dict[str, str]:
     """The refs of the form's fields and of the frame's password field, as the page opened shows them."""
     opened: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/login"})
     refs: dict[str, str] = {}
-    for name, label in (("user", "Email"), ("pass", "Password"), ("code", "Code"), ("frame", "Frame password")):
+    for name, label in (
+        ("user", "Email"),
+        ("pass", "Password"),
+        ("code", "Code"),
+        ("frame", "Frame password"),
+        ("widget", "Widget password"),
+    ):
         match: re.Match[str] | None = re.search(rf'"{label}"[^\n]*?\[ref=([^\]]+)\]', opened.text)
         assert match is not None, (name, opened.text)
         refs[name] = match.group(1)
@@ -377,8 +386,13 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
         await _call(ctx, gate, "browser_fill_login", {"login": "i2", "password": refs["pass"]})
     with pytest.raises(BrowserError, match="a password goes only into a password field"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["user"]})
-    with pytest.raises(BrowserError, match="in a frame of another site"):
+    with pytest.raises(BrowserError, match=r"in a frame of another site \(a site Dot could not read\)"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["frame"]})
+    # A sign-in in a frame of another host (App Store Connect's on idmsa.apple.com): the refusal names that host and
+    # what the run does, tell the owner, who may add the host to the login (item 1342).
+    with pytest.raises(BrowserError, match=r"in a frame of another site \(localhost\)") as framed:
+        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["widget"]})
+    assert "tell the owner, in one line, that this site signs in in a frame of localhost" in framed.value.message
     # A script of the run ran in the page: it may have left a listener that copies what is typed, in its page or in a
     # tab it opened, so no tab of the chat gets a login while one of them is open. The fill makes them new itself
     # (item 697): every tab of the chat closes, the page opens again in a new tab, and nothing is filled until the
