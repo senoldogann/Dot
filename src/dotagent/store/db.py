@@ -3458,18 +3458,21 @@ class Store:
         rows = await self._all(f"SELECT * FROM runs WHERE status IN ({_WORKING_SQL}) ORDER BY created_at", ())
         return [_run(row) for row in rows]
 
-    async def list_runs(self, limit: int, thread_id: str | None) -> list[RunRecord]:
+    async def list_runs(self, limit: int, thread_id: str | None, before: float | None = None) -> list[RunRecord]:
         """The latest ``limit`` runs, of the chat ``thread_id`` when it is given, newest first; the runs a rewind
-        took out of their chat (item 282) are left out."""
-        if thread_id is None:
-            rows = await self._all(
-                "SELECT * FROM runs WHERE rewound_at IS NULL ORDER BY created_at DESC LIMIT ?", (limit,)
-            )
-        else:
-            rows = await self._all(
-                "SELECT * FROM runs WHERE thread_id = ? AND rewound_at IS NULL ORDER BY created_at DESC LIMIT ?",
-                (thread_id, limit),
-            )
+        took out of their chat (item 282) are left out. With ``before`` only the runs that began before that time
+        (item 1360): the page after the one whose oldest run began then."""
+        clauses: list[str] = ["rewound_at IS NULL"]
+        params: list[object] = []
+        if thread_id is not None:
+            clauses.append("thread_id = ?")
+            params.append(thread_id)
+        if before is not None:
+            clauses.append("created_at < ?")
+            params.append(before)
+        rows = await self._all(
+            f"SELECT * FROM runs WHERE {' AND '.join(clauses)} ORDER BY created_at DESC LIMIT ?", (*params, limit)
+        )
         return [_run(row) for row in rows]
 
     # ----- while you were away (item 466) ----------------------------------------------------------------------------

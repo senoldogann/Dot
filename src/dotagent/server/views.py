@@ -277,8 +277,13 @@ class PhoneDevicesView(FrozenModel):
 
 
 class RunsQuery(FrozenModel):
+    """``GET /api/runs``: the newest ``limit`` runs, of one chat when ``thread_id`` is given; with ``before``, a time in
+    epoch seconds, only those that began before it (item 1360), so that a client walks back through a long chat a page
+    at a time, the next page starting at the ``created_at`` of the oldest run it holds."""
+
     limit: int = Field(default=50, ge=1, le=200)
     thread_id: str | None = None
+    before: float | None = Field(default=None, gt=0, allow_inf_nan=False)
 
 
 class HarnessQuery(FrozenModel):
