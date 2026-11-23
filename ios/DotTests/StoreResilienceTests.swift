@@ -2,8 +2,7 @@ import XCTest
 @testable import Dot
 
 /// The store as the app lives it: an offline start, the app sent to the background and brought back, a link that goes and
-/// returns, Low Data Mode, one read at a time, and the chat screen's own model with a message typed offline (item 1371,
-/// 1372).
+/// returns, Low Data Mode, one read at a time, and the chat screen's own model with a message typed offline (item 1371).
 @MainActor
 final class StoreResilienceTests: XCTestCase {
     private var folder: URL!
@@ -132,6 +131,19 @@ final class StoreResilienceTests: XCTestCase {
     }
 
     // MARK: Background and foreground
+
+    func testABackgroundRefreshOnADeadLinkSaysItReachedNothingAndOnALiveOneSaysItDid() async throws {
+        await seed()
+        let link: LinkMonitor = LinkMonitor(initial: .down)
+        let store: NativeStore = makeStore(link: link)
+        let asked: Int = daemon.requests.count
+        let dead: Bool = await store.refreshInBackground(seconds: 2)
+        XCTAssertFalse(dead, "nothing was asked, so nothing was reached: the system is told so")
+        XCTAssertEqual(daemon.requests.count, asked)
+        link.report(.up)
+        let alive: Bool = await store.refreshInBackground(seconds: 5)
+        XCTAssertTrue(alive)
+    }
 
     func testTheStreamsCloseAfterTheGraceAndComeBackWithinASecondOfComingToTheFront() async throws {
         let store: NativeStore = makeStore(link: LinkMonitor(initial: .up))

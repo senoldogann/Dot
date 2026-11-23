@@ -86,7 +86,7 @@ actor ChatSession {
     static let publishEvery: Duration = .milliseconds(40)
 
     /// More events than this after the last one held make the gap too large to replay: the newest `tailSize` are read
-    /// instead (item 1371).
+    /// instead (items 1370 and 1371).
     static let gapPage: Int = 500
     static let tailSize: Int = 400
 
@@ -440,7 +440,10 @@ actor ChatSession {
         var after: Int = start
         var first: Bool = true
         while true {
-            let page: EventsPage = try await api.events(run: runId, after: after, limit: first ? Self.gapPage : 2000)
+            // The first page asks for a gap's worth, the rest a full page: a page is the last when it comes short of what
+            // it asked for.
+            let asked: Int = first ? Self.gapPage : 2000
+            let page: EventsPage = try await api.events(run: runId, after: after, limit: asked)
             if first, page.size >= Self.gapPage, let tail: EventsPage = try await api.eventsTail(run: runId, count: Self.tailSize) {
                 logger.info("a gap of \(page.size)+ events of \(runId, privacy: .public) was read as its newest \(tail.events.count)")
                 return EventRead(events: tail.events, droppedIds: tail.droppedIds, top: tail.topId, wasTail: true)
@@ -453,7 +456,7 @@ actor ChatSession {
                 read.top = max(read.top ?? 0, top)
             }
             // A page that said no id at all cannot be walked past: it ends the read rather than ask for it again.
-            if page.size < 2000 || page.topId == nil { return read }
+            if page.size < asked || page.topId == nil { return read }
         }
     }
 

@@ -1,6 +1,6 @@
 import XCTest
 
-/// The phone on a bad link, driven by taps in the simulator (item 1372): a chat that comes back drawn from the disk with no
+/// The phone on a bad link, driven by taps in the simulator (item 1371): a chat that comes back drawn from the disk with no
 /// link, the one line that says the phone is offline, a message typed there that waits and goes by itself when the link is
 /// back, and a chat that opens at once on a link that takes seconds to answer. It needs the scratch daemon of `DotUITests`
 /// and `ios/scripts/flaky_proxy.py` in front of it (`/tmp/dot-ui-res-daemon.json` names the daemon and a phone key,

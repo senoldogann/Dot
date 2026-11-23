@@ -482,9 +482,10 @@ final class NativeStore {
     /// A refresh the system asked for while the app was out of sight (a background refresh, a silent push): the list and the
     /// chats that moved on are read and written, within `seconds`.
     func refreshInBackground(seconds: Double = 20) async -> Bool {
+        // Reached only when the list was read now: a refresh that asked nothing (no link) or failed says so to the system.
+        let began: Date = Date()
         await refreshList()
-        let reached: Bool = lastError == nil
-        guard reached else { return false }
+        guard link.state.online, lastListAt >= began else { return false }
         prefetch(budget: max(1, min(3, link.state.prefetchBudget)))
         let task: Task<Void, Never>? = prefetchTask
         await withTaskGroup(of: Void.self) { group in

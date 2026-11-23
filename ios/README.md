@@ -26,7 +26,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 - `DotTests/`: the unit tests (XCTest) of the reducer, the SSE parser and feed, the cache, the queue order, the link
   style, the requests, and (slice 2) the model and level rules, older runs, a step's detail, a message's actions, drafts,
   dictation's rules and the links.
-- `DotTests/` also holds the harness of item 1370: `FakeDaemon` (a daemon in the test process behind a `URLProtocol`:
+- `DotTests/` also holds the harness of item 1371: `FakeDaemon` (a daemon in the test process behind a `URLProtocol`:
   the routes the app reads and sends, a key kept for a message as `send_once` keeps it, a response that is lost after
   the daemon took the request, latency, a share of requests lost, no link at all; whether a request is lost depends on
   its path and how often that path was asked, so a run is the same twice) and `PerfTests` (time to the first rows and to

@@ -46,7 +46,8 @@ final class ResumeTests: XCTestCase {
     }
 
     func testADaemonThatDoesNotKnowTailIsReadByPagesAsBefore() async throws {
-        daemon.addChat("thr_1", runCount: 2, steps: 5, working: true)
+        // A run that ended: no stream fills in what the pages leave, so every event of the gap must come from them.
+        daemon.addChat("thr_1", runCount: 2, steps: 5, working: false)
         await daemon.warm(folder)
         daemon.supportsTail = false
         daemon.sayMany(900)
@@ -56,6 +57,8 @@ final class ResumeTests: XCTestCase {
         let reading: Task<Void, Never> = await log.follow(chat)
         await expectSoon(10, "every event of the gap was read") { log.lastEventId >= target }
         XCTAssertTrue(eventsRequests().contains { $0.query.contains("tail=") }, "it asked, and found no header to say it was understood")
+        let rows: Int = log.latest?.items.count ?? 0
+        XCTAssertGreaterThanOrEqual(rows, 900, "all 900 steps of the gap are rows: the read did not stop at its first page")
         await chat.stop()
         reading.cancel()
     }

@@ -2,7 +2,7 @@ import XCTest
 @testable import Dot
 
 /// The outbox keeps what the owner did while the Mac could not be reached and sends it when it can: in order, once each,
-/// whatever was lost on the way (item 1372).
+/// whatever was lost on the way (item 1371).
 final class OutboxTests: XCTestCase {
     private var folder: URL!
     private var daemon: FakeDaemon!
@@ -163,6 +163,7 @@ final class OutboxTests: XCTestCase {
         link.report(.up)
         await expectSoon(5) { self.daemon.queuedTexts == ["(photo)"] }
         XCTAssertEqual(daemon.attachments, 1, "the photo was kept once though the message was sent twice")
+        XCTAssertEqual(daemon.requests.first { $0.path == "/api/attachments" }?.timeout, 60, "a photo may stay silent longer than a read")
         await expectSoon(2) { ((try? FileManager.default.contentsOfDirectory(atPath: imageFolder.path)) ?? []).isEmpty }
     }
 

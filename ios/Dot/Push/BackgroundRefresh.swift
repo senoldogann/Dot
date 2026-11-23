@@ -2,7 +2,7 @@ import BackgroundTasks
 import UIKit
 import os
 
-/// The refresh iOS may give the app while it is out of sight (`BGAppRefreshTask`, item 1372): the list and the chats that
+/// The refresh iOS may give the app while it is out of sight (`BGAppRefreshTask`, item 1371): the list and the chats that
 /// moved on are read and written, so that the next time the app opens it shows what the Mac has. iOS decides when (usually
 /// after the owner's habits, not on a clock) and may never; nothing here depends on it, and the simulator does not run it. It
 /// needs no entitlement: the identifier is named in the Info.plist (`BGTaskSchedulerPermittedIdentifiers`) with the

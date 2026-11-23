@@ -266,7 +266,7 @@ actor Outbox {
             // The photos first, each kept once: an id the daemon gave is written into the item before the next step.
             for (number, name) in images.enumerated() where number >= uploaded.count {
                 guard let data: Data = try? Data(contentsOf: imageFolder.appending(path: name)) else { continue }
-                let uploader: DaemonClient = DaemonClient(session: uploadSession, maxAttempts: 1)
+                let uploader: DaemonClient = DaemonClient(session: uploadSession, maxAttempts: 1, timeout: 60)
                 let upload: AttachmentUpload = AttachmentUpload(name: name, mediaType: "image/jpeg", dataB64: data.base64EncodedString())
                 uploaded.append(try await uploader.uploadAttachment(upload, host: api.host, key: api.key))
                 remember(uploaded: uploaded, of: item.id)

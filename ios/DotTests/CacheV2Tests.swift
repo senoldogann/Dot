@@ -1,7 +1,7 @@
 import XCTest
 @testable import Dot
 
-/// The disk cache's promises (item 1370): a write is whole or absent, a file that cannot be read is dropped and not
+/// The disk cache's promises (item 1371): a write is whole or absent, a file that cannot be read is dropped and not
 /// shown, a layout of another version is told apart, and the folder stays within its size with the chats read longest ago
 /// going first.
 final class CacheV2Tests: XCTestCase {

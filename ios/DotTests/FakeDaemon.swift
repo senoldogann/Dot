@@ -31,6 +31,8 @@ final class FakeDaemon: @unchecked Sendable {
         var query: String
         var body: Data?
         var at: Date
+        /// The idle timeout the request asked for.
+        var timeout: TimeInterval = 0
     }
 
     let host: DaemonHost
@@ -317,9 +319,9 @@ final class FakeDaemon: @unchecked Sendable {
         var headers: [String: String] = [:]
     }
 
-    func reply(method: String, path: String, query: [String: String], body: Data?) -> Reply {
+    func reply(method: String, path: String, query: [String: String], body: Data?, timeout: TimeInterval = 0) -> Reply {
         lock.lock()
-        log.append(Seen(method: method, path: path, query: query.map { "\($0)=\($1)" }.sorted().joined(separator: "&"), body: body, at: Date()))
+        log.append(Seen(method: method, path: path, query: query.map { "\($0)=\($1)" }.sorted().joined(separator: "&"), body: body, at: Date(), timeout: timeout))
         lock.unlock()
         let encoder: JSONEncoder = JSONEncoder()
         func json(_ value: some Encodable) -> Reply { Reply(body: (try? encoder.encode(value)) ?? Data("null".utf8)) }
@@ -526,7 +528,7 @@ final class FakeDaemonProtocol: URLProtocol, @unchecked Sendable {
                 respond(Reply2(status: refused.code, body: Data(refused.body.utf8)), url: url)
                 return
             }
-            let answer: FakeDaemon.Reply = found.reply(method: method, path: path, query: query, body: body)
+            let answer: FakeDaemon.Reply = found.reply(method: method, path: path, query: query, body: body, timeout: request.timeoutInterval)
             if answer.loseAnswer {
                 client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
                 return

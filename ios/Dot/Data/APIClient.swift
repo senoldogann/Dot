@@ -350,7 +350,7 @@ extension APIClient {
         return Self.page(of: page, run: run)
     }
 
-    /// The newest `count` stored events of a run, oldest first (item 1371); `nil` from a daemon that does not know `tail` (it
+    /// The newest `count` stored events of a run, oldest first (item 1370); `nil` from a daemon that does not know `tail` (it
     /// would answer with the run's first events, which are no tail), so that the caller reads the pages as before.
     func eventsTail(run: String, count: Int) async throws -> EventsPage? {
         let path: String = "/api/runs/\(run)/events"

@@ -35,7 +35,7 @@ struct StoredChat: Codable, Sendable, Equatable {
     /// How many events of each run did not read, by run id: the chat keeps saying so.
     var unreadable: UnreadableEvents?
     /// What stands beside the transcript, so that a chat opened with no link shows its queue, its schedules and its
-    /// reactions as they were (item 1370); a file written before has none.
+    /// reactions as they were (item 1371); a file written before has none.
     var queue: QueueView?
     var automations: [ThreadAutomation]?
     var reactions: [ReactionRecord]?
@@ -86,7 +86,7 @@ actor ChatCache {
     /// `1...schema` (a record added a field that a file of an older layout lacks: it reads as none) and drops a newer
     /// one, which is then read again from the daemon rather than drawn wrong.
     static let schema: Int = 2
-    /// How many chats and how many bytes the folder keeps (item 1370).
+    /// How many chats and how many bytes the folder keeps (item 1371).
     static let keptChats: Int = 60
     static let byteLimit: Int = 24 * 1024 * 1024
     private let directory: URL
