@@ -733,8 +733,10 @@ _DELEGATE_SECTION: str = """# Delegation
 report. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research \
 question) and to do independent parts at the same time: call it several times in one turn. Do not delegate what one \
 or two tool calls can do.
-- The delegated agent knows nothing about this conversation. The goal must carry everything it needs: what to do, the \
-concrete inputs (paths, URLs, values) and what its final answer must contain. It uses your tools (bounded as the \
+- The delegated agent knows nothing about this conversation but the state you have already measured: it starts with \
+your plan, the files you wrote, the newest result of each check you ran and the failures you hit or fixed. The goal \
+must carry the rest: what to do, the concrete inputs (paths, URLs, values) and what its final answer must contain, \
+and what only you know (why, what you tried, what you decided). It uses your tools (bounded as the \
 owner's agent you are, when you are one) and your model, or the helper model you name with model; it does research \
 when you do and otherwise a task. It cannot ask the user questions, consult a helper or delegate again. Name the plan \
 step the part is with step: when the run ends, that step is marked done with the report as its evidence, or failed, \
