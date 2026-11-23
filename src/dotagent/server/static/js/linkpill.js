@@ -1,16 +1,16 @@
-// A link in a message, as a pill: a short label and the site's own icon, opened in a new window. The desktop
+// A link in a message: a short label, as text in a link's colour (prose.js), opened in a new window. The desktop
 // shell hands that window to the default browser (`on_new_window` in the shell) and never shows the page in its own
-// web view. The icon is this daemon's copy of the site's `/favicon.ico`, never a third-party favicon service.
+// web view.
 
 import { parseBlocks } from "./markdown.js";
 
 // github.com/<owner>/<repo>/pull/<n> or /issues/<n>, whatever follows the number.
 const GITHUB_NUMBER = /^https:\/\/github\.com\/[^/?#]+\/[^/?#]+\/(?:pull|issues)\/(\d+)(?=[/?#]|$)/i;
-// A host the daemon will fetch an icon for: letters, digits and hyphens, at least one dot, no address of a machine.
+// A host a link names: letters, digits and hyphens, at least one dot, no address of a machine.
 const HOST = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/;
 const LABEL_LIMIT = 48;
 
-/** The host of `href` without a leading "www.", or "" when it is not a site the pill can name. */
+/** The host of `href` without a leading "www.", or "" when it is not a site the link can name. */
 function linkHost(href) {
   try {
     const host = new URL(href).hostname.toLowerCase().replace(/^www\./, "");
@@ -20,7 +20,7 @@ function linkHost(href) {
   }
 }
 
-/** Whether `words` are just the address, so the pill names the site or the pull request instead. */
+/** Whether `words` are just the address, so the link names the site or the pull request instead. */
 function bare(words, href) {
   const text = words.trim();
   if (text === "" || text === href) {
@@ -33,7 +33,7 @@ function bare(words, href) {
   }
 }
 
-/** The words on the pill: the link's own words, or `#1001` for a GitHub pull request or issue, or the site. */
+/** The words of the link: the link's own words, or `#1001` for a GitHub pull request or issue, or the site. */
 function linkLabel(words, href) {
   const github = GITHUB_NUMBER.exec(href);
   if (github !== null && bare(words, href)) {
@@ -49,17 +49,14 @@ function linkLabel(words, href) {
 
 /**
  * How one link is drawn and opened. `target` is a new window, which the shell opens in the browser; the page never
- * navigates its own view to it. `favicon` is this daemon's route for the site's icon, or "" when there is no site.
+ * navigates its own view to it.
  * @param {{ value: string, href: string }} part
  */
 export function pillFromPart(part) {
-  const host = linkHost(part.href);
   return {
     label: linkLabel(part.value, part.href),
     href: part.href,
-    host,
-    icon: host === "" ? "link" : "favicon",
-    favicon: host === "" ? "" : `/api/favicons/${host}`,
+    host: linkHost(part.href),
     target: "_blank",
     rel: "noopener noreferrer nofollow",
     external: true,
@@ -98,7 +95,7 @@ function collect(block, out) {
   }
 }
 
-/** The pills of `markdown`, in the order a message draws them. A link inside code is not one. */
+/** The links of `markdown`, in the order a message draws them. A link inside code is not one. */
 export function pillsInMessage(markdown) {
   const out = [];
   for (const block of parseBlocks(markdown)) {

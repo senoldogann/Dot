@@ -104,7 +104,7 @@ function codeSpan(code) {
 // A link to the web in markdown; an address that only repeats its words stays bare, and any other kind leaves only its
 // words (prose.js links nothing else).
 function link(anchor) {
-  const words = inline(anchor.childNodes);
+  const words = anchor.dataset.words ?? inline(anchor.childNodes);
   const href = anchor.getAttribute("href") ?? "";
   if (!WEB_ADDRESS.test(href)) {
     return words;

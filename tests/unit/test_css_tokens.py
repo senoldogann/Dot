@@ -530,3 +530,74 @@ def test_no_sheet_comment_or_doc_lists_what_is_round() -> None:
         if _ROUND_LIST.search(line)
     ]
     assert hits == [], hits
+
+
+def _oklab(hex_colour: str) -> tuple[float, float, float]:
+    def linear(value: int) -> float:
+        c: float = value / 255
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (linear(int(hex_colour[i : i + 2], 16)) for i in (1, 3, 5))
+    long: float = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    medium: float = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    short: float = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    return (
+        0.2104542553 * long + 0.7936177850 * medium - 0.0040720468 * short,
+        1.9779984951 * long - 2.4285922050 * medium + 0.4505937099 * short,
+        0.0259040371 * long + 0.7827717662 * medium - 0.8086757660 * short,
+    )
+
+
+def _mix_oklab(one: str, other: str, share: float) -> str:
+    """``color-mix(in oklab, one share%, other)`` of two hex colours, as a hex colour."""
+    a, b = _oklab(one), _oklab(other)
+    lightness, green, blue = (x * share + y * (1 - share) for x, y in zip(a, b, strict=True))
+    long: float = (lightness + 0.3963377774 * green + 0.2158037573 * blue) ** 3
+    medium: float = (lightness - 0.1055613458 * green - 0.0638541728 * blue) ** 3
+    short: float = (lightness - 0.0894841775 * green - 1.2914855480 * blue) ** 3
+    linear: list[float] = [
+        4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short,
+        -1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short,
+        -0.0041960863 * long - 0.7034186147 * medium + 1.7076147010 * short,
+    ]
+
+    def encode(c: float) -> int:
+        c = min(1.0, max(0.0, c))
+        return round(255 * (12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055))
+
+    return "#" + "".join(f"{encode(c):02x}" for c in linear)
+
+
+@pytest.mark.parametrize("look", [look for look, _ in _LOOKS])
+@pytest.mark.parametrize("scheme", [0, 1], ids=["light", "dark"])
+def test_a_link_in_a_message_has_no_chip_and_reads_at_aa_on_every_ground_it_stands_on(look: str, scheme: int) -> None:
+    """Item 1346: a link in a message is the words round it in a shade tilted toward the accent, with no frame, fill or
+    icon and no line until it is pointed at. Its colour is a mix the sheet writes, and it reads at 4.5:1 on each ground
+    a message has (the page, the card, the agent's and the owner's messages), in both schemes of both looks."""
+    app: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    rule: re.Match[str] | None = re.search(r"^\.prose a\.msg-link \{([^}]*)\}", app, re.M)
+    assert rule is not None
+    for forbidden in ("border:", "background", "padding", "box-shadow", "display: inline-flex"):
+        assert forbidden not in rule.group(1), f"a link in a message takes no {forbidden}"
+    assert "text-decoration: none;" in rule.group(1)
+    shares: list[str] = re.findall(
+        r"color-mix\(in oklab, var\(--accent-strong\) (\d+)%, var\(--text\)\)", rule.group(1)
+    )
+    assert len(shares) == 2, rule.group(1)  # light, then dark
+    pairs: dict[str, tuple[str, str]] = _pairs(look)
+    link: str = _mix_oklab(pairs["--accent-strong"][scheme], pairs["--text"][scheme], int(shares[scheme]) / 100)
+    for ground in ("--bg", "--surface", "--surface-2", "--surface-3"):
+        ratio: float = contrast(link, pairs[ground][scheme])
+        assert ratio >= 4.5, f"a link ({link}) on {ground}: {ratio:.2f} < 4.5"
+    # It is no longer the text's own ink: a shade of difference at the least.
+    assert contrast(link, pairs["--text"][scheme]) >= 1.15, link
+    mine: re.Match[str] | None = re.search(
+        r"^\.bubble\.user \.prose a\.msg-link \{[^}]*"
+        r"color-mix\(in oklab, var\(--accent-strong\) (\d+)%, var\(--on-msg-me\)\)",
+        app,
+        re.M,
+    )
+    assert mine is not None
+    in_bubble: str = _mix_oklab(pairs["--accent-strong"][scheme], pairs["--text"][scheme], int(mine.group(1)) / 100)
+    ratio = contrast(in_bubble, pairs["--surface-3"][scheme])
+    assert ratio >= 4.5, f"a link ({in_bubble}) in the owner's bubble: {ratio:.2f} < 4.5"
