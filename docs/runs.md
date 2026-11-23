@@ -946,6 +946,11 @@ when the parent is cancelled. The parent's result names the model the delegated 
 the delegated run's mode: a research run's helper does research and only reads, and any other run's helper, a chat's
 too, is a task run.
 
+The child's first message is its goal and, under it, the state the parent already measured (item 1362): the parent's plan
+with the evidence of each closed step, the files it wrote or edited, the newest result of each check it ran, and the
+failed calls it left unresolved or resolved, at most 3000 characters. The parent need not write that down in the goal,
+and the child starts from it instead of reading the same files and running the same checks again.
+
 **A wait that a message ends (item 1351).** While a run waits for its helpers, a message that reaches it (a steer, a
 queued message sent on, the answer to a question, a note of Dot's) ends the wait of every `delegate` call of that turn
 at once, as a model call gives way to one (item 509): the call returns with the helper's run id and that it keeps

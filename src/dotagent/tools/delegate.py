@@ -3,17 +3,31 @@
 import secrets
 import time
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from pydantic import Field, JsonValue
 
 from dotagent.agent.helpers import Roster, current_roster, roster_text
-from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanItem, PlanPayload, checked_step_number, plan_from_event
+from dotagent.agent.plan import (
+    EMPTY_PLAN,
+    PLAN_EVENT,
+    PlanItem,
+    PlanPayload,
+    checked_step_number,
+    plan_from_event,
+    render_plan,
+)
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.text import has_verification, truncate_tail, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import AgentRecord, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import DelegateOutcome, Spawner, ToolContext
+
+if TYPE_CHECKING:
+    # Only for annotations: importing the harness here would close a cycle
+    # (delegate → verify → store → team → delegate).
+    from dotagent.agent.verify import CallFact, RunFacts
 
 DELEGATE_TOOL: str = "delegate"
 DELEGATE_SOURCE: str = "delegate"
@@ -139,13 +153,77 @@ def unplanned_step_note(steps: Sequence[PlanItem], step: int) -> str | None:
     return None
 
 
-async def _unplanned(step: int | None, ctx: ToolContext) -> str | None:
-    """The note of a ``step`` the run's plan does not have; ``None`` when none was named or the plan has it."""
-    if step is None:
-        return None
+async def _plan(ctx: ToolContext) -> PlanPayload:
+    """The run's plan as the tool reads it (the empty plan when it kept none)."""
     latest: EventRecord | None = await ctx.runtime.store.last_event(ctx.run_id, PLAN_EVENT)
-    plan: PlanPayload = EMPTY_PLAN if latest is None else plan_from_event(latest)
-    return unplanned_step_note(plan.steps, step)
+    return EMPTY_PLAN if latest is None else plan_from_event(latest)
+
+
+# What a delegated run starts with besides its goal (item 1362): the state the run that handed the work over already
+# measured, so that it does not read the same files, run the same checks and hit the same failures again. Bounded: a
+# hand-over, not a second transcript.
+_PACK_FILES: int = 12
+_PACK_CHECKS: int = 4
+_PACK_FAILURES: int = 4
+_PACK_RESOLVED: int = 3
+_PACK_LINE_CHARS: int = 240
+_PACK_CHARS: int = 3000
+# Each section's own share, so a long plan cannot crowd out the checks and the failures the pack exists for.
+_PACK_PLAN_CHARS: int = 1200
+_PACK_FILES_CHARS: int = 500
+_PACK_CHECKS_CHARS: int = 500
+_PACK_FAILURES_CHARS: int = 400
+_PACK_RESOLVED_CHARS: int = 300
+_PACK_HEAD: str = (
+    "STATE FROM THE RUN THAT HANDED THIS OVER (its own plan, and what the harness measured of its work; it may be "
+    "stale, so check a file before you rely on it):"
+)
+
+
+def _fact_line(fact: "CallFact") -> str:
+    return f"- {fact.tool} {truncate_tail(fact.target, _PACK_LINE_CHARS)}: {fact.result}"
+
+
+def state_pack(facts: "RunFacts", steps: Sequence[PlanItem]) -> str:
+    """What the run that delegates has already measured, for the child's first message (item 1362): its plan with the
+    evidence of each closed step, the files it wrote, the checks it ran with their results, and the failed calls it left
+    unresolved or resolved. Empty when there is nothing to hand over."""
+    sections: list[str] = []
+    plan: str = render_plan(steps) if steps else ""
+    if plan:
+        sections.append(
+            "ITS PLAN (each closed step with the evidence it recorded):\n" + truncate_tail(plan, _PACK_PLAN_CHARS)
+        )
+    if facts.written:
+        files: str = "\n".join(f"- {truncate_tail(path, _PACK_LINE_CHARS)}" for path in facts.written[-_PACK_FILES:])
+        sections.append(
+            "FILES IT WROTE OR EDITED (read one before you rewrite it):\n" + truncate_tail(files, _PACK_FILES_CHARS)
+        )
+    if facts.checks:
+        checks: str = "\n".join(
+            f"- {truncate_tail(fact.target, _PACK_LINE_CHARS)}: {fact.result}" for fact in facts.checks[-_PACK_CHECKS:]
+        )
+        sections.append(
+            "CHECKS IT RAN, WITH THEIR RESULTS (newest last; run one again only if something changed):\n"
+            + truncate_tail(checks, _PACK_CHECKS_CHARS)
+        )
+    if facts.failures:
+        failed: str = "\n".join(_fact_line(fact) for fact in facts.failures[-_PACK_FAILURES:])
+        sections.append(
+            "FAILED CALLS IT LEFT UNRESOLVED (do not repeat one blindly):\n"
+            + truncate_tail(failed, _PACK_FAILURES_CHARS)
+        )
+    if facts.resolved:
+        resolved: str = "\n".join(_fact_line(fact) for fact in facts.resolved[-_PACK_RESOLVED:])
+        sections.append("FAILED CALLS IT RESOLVED (this is how):\n" + truncate_tail(resolved, _PACK_RESOLVED_CHARS))
+    if not sections:
+        return ""
+    return truncate_tail("\n\n".join([_PACK_HEAD, *sections]), _PACK_CHARS)
+
+
+def opening_for(goal: str, pack: str) -> str | None:
+    """The first message a delegated run reads: its goal, then the state the run that handed it over measured."""
+    return f"{goal}\n\n{pack}" if pack else None
 
 
 # What the first line of the result of a delegation that was given up ends with: no report was read, so no step closes.
@@ -241,7 +319,8 @@ def _delegate_tool() -> RegisteredTool:
             "send the part to the agent whose role fits it with message_agent (or assign_work), not to delegate",
         )
         mode: RunMode = default_child_mode(ctx.mode)
-        unplanned: str | None = await _unplanned(args.step, ctx)
+        plan: PlanPayload = await _plan(ctx)
+        unplanned: str | None = None if args.step is None else unplanned_step_note(plan.steps, args.step)
         step: int | None = None if unplanned is not None else args.step
         outcome: DelegateOutcome = await spawner.delegate(
             ctx.run_id,
@@ -249,6 +328,7 @@ def _delegate_tool() -> RegisteredTool:
             mode,
             await _model_for(args.model, ctx),
             None,
+            opening=opening_for(args.goal, state_pack(ctx.facts(), plan.steps)),
             detachable=True,
             wait=args.wait,
             plan_step=step,
@@ -261,7 +341,9 @@ def _delegate_tool() -> RegisteredTool:
         name=DELEGATE_TOOL,
         description=(
             "Run one self-contained part of the work in a separate agent with a clean context and get its final "
-            "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
+            "report back. The run starts with your plan, the files you wrote, the newest result of each check you ran "
+            "and the failures you hit or fixed, so it does not read the same files again; the goal carries the rest. "
+            "Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
             "turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is "
             "that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) "
