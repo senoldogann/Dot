@@ -1,20 +1,42 @@
 import SwiftUI
 
-/// The address screen until a host is saved, then the daemon's web UI full screen.
+/// The address screen until a host is saved, the pairing screen until the phone has a key, then the native app. The
+/// web UI stays one tap away ("Open web UI") as a full-screen fallback.
 struct RootView: View {
     @Bindable var model: AppModel
 
     var body: some View {
         Group {
             if let host: DaemonHost = model.host {
-                WebScreen(model: model, host: host)
-                    .id(host.name)
+                if let store: NativeStore = model.native {
+                    ChatListView(model: model, store: store)
+                        .id(host.name)
+                } else {
+                    PairView(model: model, host: host)
+                }
             } else {
                 AddressView(model: model, onSaved: nil)
             }
         }
+        .preferredColorScheme(.dark)
+        .tint(Theme.accent)
+        .background(Theme.background)
         .sheet(isPresented: $model.showsSettings) {
-            SettingsView(model: model)
+            if let store: NativeStore = model.native {
+                NativeSettingsView(model: model, store: store).tint(Theme.accent).preferredColorScheme(.dark).presentationBackground(Theme.background)
+            } else {
+                SettingsView(model: model)
+            }
+        }
+        .fullScreenCover(isPresented: $model.showsWeb) {
+            if let host: DaemonHost = model.host {
+                ZStack(alignment: .topTrailing) {
+                    WebScreen(model: model, host: host)
+                    Button("Done") { model.showsWeb = false }
+                        .buttonStyle(QuietButtonStyle())
+                        .padding(.top, 54).padding(.trailing, 12)
+                }
+            }
         }
     }
 }

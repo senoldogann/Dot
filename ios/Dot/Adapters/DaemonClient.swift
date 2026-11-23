@@ -78,9 +78,9 @@ enum DaemonRequestError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .status(let path, let code, let body):
-            "POST \(path) answered \(code): \(body.prefix(300))"
+            "\(path) answered \(code): \(body.prefix(300))"
         case .transport(let path, let underlying):
-            "POST \(path) failed: \(underlying.code.rawValue) \(underlying.localizedDescription)"
+            "\(path) failed: \(underlying.code.rawValue) \(underlying.localizedDescription)"
         }
     }
 

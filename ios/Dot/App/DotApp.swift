@@ -7,9 +7,15 @@ import os
 struct DotApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate: AppDelegate
 
+    @Environment(\.scenePhase) private var scenePhase: ScenePhase
+
     var body: some Scene {
         WindowGroup {
             RootView(model: appDelegate.model)
+        }
+        // The app is in front again: every stream reconnects at once, resuming from its last event.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { appDelegate.model.native?.reconnect() }
         }
     }
 }
