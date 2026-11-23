@@ -488,7 +488,7 @@ final class NativeStore {
         let began: Date = Date()
         await refreshList()
         guard link.state.online, lastListAt >= began else { return false }
-        prefetch(budget: max(1, min(3, link.state.prefetchBudget)), force: true)
+        prefetch(budget: min(3, link.state.prefetchBudget), force: true)
         let task: Task<Void, Never>? = prefetchTask
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await task?.value }

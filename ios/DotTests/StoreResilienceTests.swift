@@ -146,6 +146,15 @@ final class StoreResilienceTests: XCTestCase {
         XCTAssertNil(fourth, "three of them: the budget of a refresh the system gave a moment for")
     }
 
+    func testABackgroundRefreshInLowDataModeReadsTheListAndNoChat() async throws {
+        let store: NativeStore = makeStore(link: LinkMonitor(initial: LinkState(online: true, constrained: true, expensive: true)))
+        store.graceSeconds = 60
+        store.enterBackground()
+        let reached: Bool = await store.refreshInBackground(seconds: 5)
+        XCTAssertTrue(reached, "the list was read")
+        XCTAssertEqual(daemon.requests.filter { $0.path == "/api/runs" }.count, 0, "no chat is read ahead on a link the system asks to spare")
+    }
+
     func testTheAppsOwnReadingAheadStopsWhileItIsOutOfSight() async throws {
         let store: NativeStore = makeStore(link: LinkMonitor(initial: .up))
         store.graceSeconds = 60
