@@ -130,6 +130,19 @@ def denial_reason(error: str | None, description: str | None) -> str | None:
     return code if not description else f"{code}: {truncate_middle(description, _DESCRIPTION_CHARS)}"
 
 
+def refresh_advice(provider_id: ProviderId, error: str | None) -> str:
+    """What the owner does about a refresh the provider refused (item 1343). Google's ``invalid_grant`` is a refresh
+    token that ran out or was taken away; a client whose app is still in Testing at Google gets refresh tokens that
+    last 7 days, so a sign-in made that way dies every week until the app is published."""
+    if provider_id == "google" and error == "invalid_grant":
+        return (
+            "(the sign-in ran out or was taken away: a Google client whose app is still in Testing signs in for 7 "
+            "days only, so publish the app at Google Auth Platform › Audience, then sign in again in "
+            "Settings › Connectors)"
+        )
+    return "(sign in again in Settings › Connectors)"
+
+
 def authorize_link(provider: Provider, client_id: str, redirect_uri: str, state: str, challenge: str) -> str:
     """The address of the provider's page that asks the owner for a yes."""
     parameters: dict[str, str] = {
@@ -466,7 +479,13 @@ class Accounts:
                 {"provider": provider.id, "error": type(error).__name__},
             ) from error
         if response.status_code != 200:
-            raise _refused(provider, response, "to refresh the sign-in (sign in again in Settings › Connectors)")
+            refusal: _Refusal = _refused(provider, response, "to refresh the sign-in")
+            raise _Refusal(
+                f"{refusal.message} {refresh_advice(provider.id, refusal.error)}",
+                refusal.context,
+                refusal.error,
+                refusal.description,
+            )
         return tokens_from(_json(provider, response), time.time(), refresh_token)
 
     async def forget(self, provider_id: ProviderId, address: str) -> bool:

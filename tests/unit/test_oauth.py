@@ -10,6 +10,7 @@ import pytest
 from starlette.requests import Request
 
 from dotagent.core.errors import SignInError
+from dotagent.oauth import accounts as accounts_module
 from dotagent.oauth.accounts import authorize_link, client_names
 from dotagent.oauth.keychain import pieces_of, tokens_of, without_pieces
 from dotagent.oauth.pkce import challenge_of, new_state, new_verifier
@@ -104,3 +105,12 @@ def test_what_security_says_keeps_no_piece_of_a_token() -> None:
     said: str = f'security: unknown command "{piece[:400]}"\nSecKeychainItemCreateFromContent: The item already exists.'
     cut: str = without_pieces(said)
     assert piece[:40] not in cut and "[cut]" in cut and "SecKeychainItemCreateFromContent" in cut
+
+
+def test_a_google_refresh_token_that_ran_out_names_the_seven_days_of_testing_and_the_way_out() -> None:
+    """Google's ``invalid_grant`` on a refresh is the 7-day refresh token of an app still in Testing (item 1343): the
+    words say to publish the app before signing in again, else the next sign-in dies the same way a week later."""
+    advice: str = accounts_module.refresh_advice("google", "invalid_grant")
+    assert "Testing" in advice and "7 days" in advice and "Audience" in advice and "Settings › Connectors" in advice
+    assert accounts_module.refresh_advice("google", "invalid_client") == "(sign in again in Settings › Connectors)"
+    assert accounts_module.refresh_advice("microsoft", "invalid_grant") == "(sign in again in Settings › Connectors)"

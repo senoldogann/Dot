@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1343](1343.md) | done | 2026-11-23 | A Google refresh token that ran out says why: an app still in Testing signs in for 7 days |
 | [1342](1342.md) | done | 2026-11-23 | A login refused in a frame of another site names that host and has the run tell the owner |
 | [1341](1341.md) | done | 2026-11-23 | terminal_open and wait_until are in the prompt of a run on the Claude plan from the start |
 | [1340](1340.md) | done | 2026-11-23 | wait_until reads the names a model on the Claude plan guesses for it |

@@ -438,8 +438,12 @@ and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-js
 under [Google Auth Platform › Branding](https://console.cloud.google.com/auth/branding) (App name, and a logo if you
 like: Google's page shows the name of the project's app when you say yes, so a project made for something else asks in
 that name), create a **Desktop app** client at [Google Auth Platform ›
-Clients](https://console.cloud.google.com/auth/clients), and add your address as a test user under
-[Audience](https://console.cloud.google.com/auth/audience); at Microsoft, register an app named **Dot** (the
+Clients](https://console.cloud.google.com/auth/clients), and press **Publish app** under
+[Audience](https://console.cloud.google.com/auth/audience): an app left in Testing (with your address as a test user)
+gets refresh tokens that Google lets run out after 7 days, so every sign-in dies a week later and the account tools
+fail with "Google refused to refresh the sign-in" and Google's `invalid_grant`, which Dot answers with this advice
+(item 1343). A published app Google has not verified works for you all the same: its page warns that Google has not
+verified the app, and **Advanced › Go to Dot** goes on. At Microsoft, register an app named **Dot** (the
 registration's name is what Microsoft's page shows) at [Entra ›
 App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) for any
 organisation's and personal accounts, with `http://localhost/oauth/callback` as a redirect URI of **Mobile and desktop
