@@ -202,6 +202,25 @@ final class EventFeedTests: XCTestCase {
         XCTAssertEqual(unread, [1], "the screen is told which message could not be read, by its id")
     }
 
+    func testAnUnreadFrameIsPassedByAReconnect() async throws {
+        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubProtocol.self]
+        let session: URLSession = URLSession(configuration: configuration)
+        // The stream drops after a frame that does not read; the reconnect must start after it, not at it.
+        StubProtocol.answers = [
+            .init(chunks: [frame(5, "tool_call"), "id: 6\nevent: x\ndata: {not json\n\n"], failsAfter: true),
+            .init(chunks: [frame(7, "run_finished")]),
+        ]
+        let api: APIClient = APIClient(
+            host: DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!), key: "k", session: session)
+        let feed: EventFeed = EventFeed(
+            session: session, after: 4, isFinal: { $0.kind == "run_finished" },
+            open: { after in runStreamRequest(api: api, runId: "run_1", after: after) })
+        for await _ in await feed.start() {}
+        XCTAssertEqual(StubProtocol.requests.count, 2)
+        XCTAssertTrue(StubProtocol.requests[1].url!.absoluteString.hasSuffix("after=6"), "the unread frame 6 is passed")
+    }
+
     func testAKickReconnectsAtOnceWithoutWaiting() async throws {
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]

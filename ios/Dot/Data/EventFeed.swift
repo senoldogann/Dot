@@ -176,6 +176,9 @@ actor EventFeed {
                 line.removeAll(keepingCapacity: true)
                 if messages.isEmpty { continue }
                 var events: [EventRecord] = []
+                // The highest id of the frames, readable or not: an unread frame is still passed, or a reconnect would be
+                // sent it again for as long as the chat stays open.
+                var passed: Int = 0
                 var finished: Bool = false
                 for message in messages {
                     if !wantsEvents || message.event == "resync" {
@@ -196,9 +199,12 @@ actor EventFeed {
                     events.append(event)
                     if isFinal(event) { finished = true }
                 }
+                passed = max(passed, messages.compactMap { $0.id.flatMap { Int($0) } }.max() ?? 0)
                 if !events.isEmpty {
-                    await onEvents(events.map(\.id).max() ?? 0)
+                    await onEvents(max(passed, events.map(\.id).max() ?? 0))
                     out.yield(.events(events))
+                } else if passed > 0 {
+                    await onEvents(passed)
                 }
                 if wantsEvents == false { await onEvents(0) }
                 if finished { return true }
