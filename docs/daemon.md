@@ -822,7 +822,9 @@ open the rows of those that ended. The Task tab holds the same Lineage, compact,
 a subagent, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
 `/loop`, a schedule a run made in the chat, a schedule that fires into it), each a calendar-clock mark with a green dot
 while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
-Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00"), a pencil that opens its editor page in Settings
+Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00") and, under that, how its last run ended and when (item 1355: "Last run done · 09:00",
+"Last run failed · 21 Nov 09:00" in red, "Last 3 runs failed · latest 09:00" when several in a row did, "Last firing skipped · 16:20"
+for one that found its chat busy; none for a schedule that never ran or works now), a pencil that opens its editor page in Settings
 (`#/settings/schedules/<id>`, item 1337), a play that runs it now (a run as at its time; its next time and its switch stay) and a switch that
 pauses it or puts it on again, which the scheduler reads at its next firing; the head's button opens all the schedules
 (`#/settings/schedules`). A chat with none shows no section. Under the Lineage the Agents tab says who

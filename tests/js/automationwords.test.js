@@ -53,3 +53,26 @@ test("a cron that has no words is said plainly, never as the cron", () => {
   const odd = automationWords(view({ cron: "0 9 1 * *" }), false, NOW);
   assert.equal(odd.line, "Repeats on a schedule");
 });
+
+test("a schedule says how its last run ended and when, and how many failed in a row (item 1355)", () => {
+  const ran = automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 3600, last_status: "done" }), false, NOW);
+  assert.match(ran.last, /^Last run done · \d\d:\d\d$/);
+  const older = automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 2 * DAY_S, last_status: "done" }), false, NOW);
+  assert.match(older.last, /^Last run done · \d+ \w+ \d\d:\d\d$/);
+  const failed = automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 3600, last_status: "failed: x" }), false, NOW);
+  assert.match(failed.last, /^Last run failed · /);
+  const row = automationWords(
+    view({ cron: "0 9 * * *", last_run_at: NOW - 3600, last_status: "failed: x", runs_failed_in_row: 3 }),
+    false,
+    NOW,
+  );
+  assert.match(row.last, /^Last 3 runs failed · latest /);
+  const skipped = automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 60, last_status: "skipped: busy" }), false, NOW);
+  assert.match(skipped.last, /^Last firing skipped · /);
+});
+
+test("a schedule that never ran, or works now, has no word of its last run", () => {
+  assert.equal(automationWords(view({ cron: "0 9 * * *", last_run_at: null, last_status: "" }), false, NOW).last, "");
+  assert.equal(automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 5, last_status: "running" }), false, NOW).last, "");
+  assert.equal(automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 5, last_status: "cancelled" }), false, NOW).last, "");
+});

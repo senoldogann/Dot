@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1355](1355.md) | done | 2026-11-23 | A chat's Automations say how each schedule's last run ended |
 | [1354](1354.md) | done | 2026-11-23 | The goal check goes on to a standby model when the review model cannot answer |
 | [1351](1351.md) | done | 2026-11-23 | A message ends a run's wait on its helpers, and the helper's report reaches the chat when it ends |
 | [1350](1350.md) | done | 2026-11-23 | A message from the home starts a chat of its own on the model picked, and a message for a model that cannot answer is refused by name |
