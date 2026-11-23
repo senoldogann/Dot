@@ -1575,6 +1575,27 @@ _READ_ONLY: str = (
 )
 
 
+# A field in a frame the login names no site of (App Store Connect signs in in a frame of idmsa.apple.com, item 1342):
+# the refusal says what the run does, as one on a page of another site does (item 1208), since another fill, another
+# ref or the frame's address opened as a page is refused the same way until the owner adds that host to the login.
+_OTHER_FRAME: str = (
+    "the field is in a frame of another site ({host}): Dot fills a login only on its own site, and the login names no "
+    "site of that frame. Do not fill it another way or type the login yourself: tell the owner, in one line, that "
+    "this site signs in in a frame of {host}, which the login does not name (they may add that address to the "
+    "login's websites), and go on with what needs no sign-in"
+)
+
+
+def _frame_host(address: str | None) -> str:
+    """The host of the frame at ``address`` as a refusal names it: the address itself where it has none
+    (``about:srcdoc``), and "a site Dot could not read" where Playwright named no frame (a script of the frame can make
+    its field name another document)."""
+    if address is None:
+        return "a site Dot could not read"
+    host: str = urlsplit(address).hostname or ""
+    return host or truncate_middle(address, _ERROR_CHARS)
+
+
 def _takes(kind: VaultFieldKind, field: SecretKind | None) -> bool:
     """Whether a field marked ``field`` may take the part ``kind`` of a login."""
     if kind == "password":
@@ -1630,7 +1651,7 @@ async def fill_login_field(
             ) from error
         if frame is None or not fills_on(frame.url):
             raise BrowserError(
-                "the field is in a frame of another site: Dot fills a login only on its own site",
+                _OTHER_FRAME.format(host=_frame_host(None if frame is None else frame.url)),
                 {
                     "ref": ref,
                     "url": page.url,
