@@ -3,12 +3,15 @@ written into Dot: a new model (Fable 5.2) shows up as Claude Code offers it, wit
 whether it has fast mode.
 
 The program says them in its answer to an SDK host's ``initialize`` request on a ``stream-json`` input (measured on
-2.1.330 on 2026-11-23: about 8 s, no prompt sent, no model called). It fetches the full list from Anthropic only while
-its non-essential traffic is allowed: with ``CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`` set it offered five models,
-without it fourteen. The list is kept in Dot's home for :data:`KEEP_S`, so that the models page, a run's check of its
+2.1.330 on 2026-11-23: under a second to 11 s, no prompt sent, no model called). It reads the plan's full list over its
+telemetry channel: with ``CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`` or ``DISABLE_TELEMETRY`` set it offered five
+models, without them fourteen. So this one start of the program, which sends no prompt, goes with its telemetry on
+(:func:`listing_env`); its error reports, its updater and its ``/bug`` stay off, and a run's start keeps them all off.
+The list is kept in Dot's home for :data:`KEEP_S`, so that the models page, a run's check of its
 model and the sync questions (fast mode, a model's name) read it without starting the program again."""
 
 import asyncio
+import contextlib
 import json
 import os
 import signal
@@ -34,8 +37,10 @@ KEEP_S: float = 6 * 3600
 ANSWER_S: float = 60.0
 _REQUEST_ID: str = "dot-models"
 _REQUEST: str = json.dumps({"type": "control_request", "request_id": _REQUEST_ID, "request": {"subtype": "initialize"}})
-# The variable that keeps the program from fetching the plan's full list (see the module's docstring).
+# The variable that keeps the program from fetching the plan's full list (see the module's docstring), and those that
+# turn off, one by one, what it turns off but the telemetry the list comes over.
 _LIST_BLOCKER: str = "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"
+_STILL_OFF: dict[str, str] = {"DISABLE_ERROR_REPORTING": "1", "DISABLE_BUG_COMMAND": "1", "DISABLE_AUTOUPDATER": "1"}
 # Claude Code's reasoning levels as Dot names them.
 _EFFORTS: dict[str, Effort] = {"low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh", "max": "max"}
 # The names Claude Code takes for the newest model of a family; the list names some of them by the model's id instead
@@ -93,6 +98,12 @@ def catalog_argv(program: str) -> tuple[str, ...]:
         "dontAsk",
         "--no-session-persistence",
     )
+
+
+def listing_env(program_env: Mapping[str, str]) -> dict[str, str]:
+    """The environment of the request for the models, from the one a run's program gets: its telemetry on (the list
+    comes over it), its error reports, updater and ``/bug`` off."""
+    return {name: value for name, value in program_env.items() if name != _LIST_BLOCKER} | _STILL_OFF
 
 
 def models_of_line(line: str) -> tuple[PlanModel, ...] | None:
@@ -213,9 +224,7 @@ async def list_plan_models(program: Path, login_env: Mapping[str, str]) -> tuple
     parent: Path = claude_code_dir()
     await asyncio.to_thread(parent.mkdir, mode=0o700, parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="models-", dir=parent) as scratch:
-        env: dict[str, str] = {
-            name: value for name, value in claude_env(login_env, Path(scratch)).items() if name != _LIST_BLOCKER
-        }
+        env: dict[str, str] = listing_env(claude_env(login_env, Path(scratch)))
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
                 *catalog_argv(str(program)),
@@ -238,7 +247,8 @@ async def list_plan_models(program: Path, login_env: Mapping[str, str]) -> tuple
             ) from error
         finally:
             if process.returncode is None:
-                os.killpg(process.pid, signal.SIGKILL)
+                with contextlib.suppress(ProcessLookupError, PermissionError):
+                    os.killpg(process.pid, signal.SIGKILL)
             await process.wait()
 
 

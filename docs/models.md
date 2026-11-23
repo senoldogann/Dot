@@ -341,8 +341,10 @@ answer keeps its words, Ollama's too.
   (item 1367), by the names it gives them: its aliases for the newest of a family (`claude_code:opus`,
   `claude_code:sonnet`, `claude_code:haiku`), the others by their id (`claude_code:claude-fable-5-2`,
   `claude_code:claude-opus-5`, ...), so a new model shows up as Claude Code offers it. Dot asks the program for them
-  (about 8 s) and keeps the list for six hours in `claude_code/models.json` in Dot's home; `claude_code:fable` (and any
-  family's alias the list names by id) still answers, by the newest model of that family it lists. They run on
+  (up to about 10 s; that one start goes with the program's telemetry on, which the full list comes over:
+  [Safety](safety.md)) and keeps the list for six hours in `claude_code/models.json` in Dot's home;
+  `claude_code:fable` (and any family's alias the list names by id) still answers, by the newest model of that family
+  it lists, and a model the list does not hold is still sent to the program, which answers on it or says why not. They run on
   the limits of your Claude Pro or Max plan, at the reasoning level you pick (the levels Claude Code lists for the
   model: Claude Code's `--effort`, item 1014) and, for the models it lists with fast mode (Opus 5.5, Fable 5.2, Opus 5
   and Opus 4.8 on 2026-11-23), in fast mode

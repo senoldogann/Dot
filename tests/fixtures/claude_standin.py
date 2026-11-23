@@ -3,7 +3,7 @@ started with (its arguments, the names of its environment, its folder, the mode 
 first message on its input, and answers as the message says:
 
 - a request for its models (item 1367: no ``--mcp-config``, an ``initialize`` control request on its input): the list
-  Claude Code 2.1.330 gave (``claude_models_response.json``), and nothing more;
+  Claude Code 2.1.330 gave (``claude_models_response.json``), what it was started with in ``listed.json``;
 - ``extra tools``: an init line that lists a tool of Claude Code's own besides the door's, and nothing more;
 - ``limit``: an init line, then a ``rate_limit_event`` whose window refuses calls;
 - ``finish then talk``: as ``talk with me``, its first turn a call of ``finish`` that did not succeed (item 1076's
@@ -181,8 +181,13 @@ async def _work(server: dict[str, object], door: str, said: str) -> None:
     _say({"type": "result", "subtype": "success", "is_error": False, "result": answer, "session_id": SESSION})
 
 
-def _list_models() -> None:
-    """Answer a request for the program's models with the list Claude Code gave, and end."""
+def _list_models(record: Path) -> None:
+    """Answer a request for the program's models with the list Claude Code gave, and end; what it was started with goes
+    to ``listed.json``."""
+    (record / "listed.json").write_text(
+        json.dumps({"args": sys.argv[2:], "env": {name: os.environ[name] for name in os.environ if "DISABLE" in name}}),
+        encoding="utf-8",
+    )
     sys.stdin.readline()
     sys.stdout.write((Path(__file__).parent / "claude_models_response.json").read_text(encoding="utf-8"))
     sys.stdout.flush()
@@ -192,7 +197,7 @@ def main() -> None:
     record: Path = Path(sys.argv[1])
     args: list[str] = sys.argv[2:]
     if "--mcp-config" not in args:
-        _list_models()
+        _list_models(record)
         return
     config_file: Path = Path(_flag(args, "--mcp-config"))
     door: str = _flag(args, "--allowedTools").split(",")[0].removeprefix("mcp__")

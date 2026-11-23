@@ -16,7 +16,7 @@ from pathlib import Path
 from dotagent.claude_code.ask import ask_claude
 from dotagent.claude_code.models import PlanModel, find_model, plan_models
 from dotagent.config import ClaudeCodeConfig
-from dotagent.core.errors import ClaudeCodeMissing, ConfigError
+from dotagent.core.errors import ClaudeCodeMissing
 from dotagent.core.paths import claude_code_command
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
@@ -98,16 +98,13 @@ class ClaudeCodeProvider:
         return await plan_models(await self.program(), self._login_env)
 
     async def _model(self, name: str) -> PlanModel:
-        """The plan's model ``name`` names. Raises :class:`ConfigError` when the program does not list it."""
-        listed: tuple[PlanModel, ...] = await self.models()
-        found: PlanModel | None = find_model(listed, name)
-        if found is None:
-            ids: list[str] = [model.id for model in listed]
-            raise ConfigError(
-                f"Claude Code does not offer the model {name!r} on this plan; pick one of {', '.join(ids)}",
-                {"provider": CLAUDE_CODE_PROVIDER, "model": name, "models": ", ".join(ids)},
-            )
-        return found
+        """The plan's model ``name`` names. One the program does not list is not refused (a chat or a schedule may
+        name a model an older list offered, ``claude-opus-4-5``): it goes to the program, which answers on it or says
+        why not, with Claude Code's levels and no fast mode."""
+        found: PlanModel | None = find_model(await self.models(), name)
+        if found is not None:
+            return found
+        return PlanModel(id=name, resolved=name, label=name, efforts=EFFORTS, fast=False)
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         """A single question of Dot's (item 1017: a review, the harness's roles) answered by the program in one go,
