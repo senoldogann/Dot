@@ -232,7 +232,9 @@ and how many messages wait in the queue at its left, each part opening what it t
 end, in the same bar; it is a row of 40 px, a plain surface on a hairline and the card's corner, with no glass, no shadow
 and no pill (items 352 and 360, drawn so since item 1335; a wider window has the same bar), as wide as its parts and the
 way down and no wider, in the middle of the dock, not across all of it (item 427). While the task waits for its
-subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331).
+subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331): a pane on the bar's own
+ground and hairline, in the dock under the conversation and never in it, so it stays where it is however far the chat is
+scrolled up and no message shows through it (item 1347).
 A list row (Campaigns, Scheduled tasks, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):

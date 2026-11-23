@@ -184,6 +184,14 @@ async def test_the_subagents_are_one_card_with_a_row_each_and_the_task_says_it_w
                     wait: Locator = page.locator(".wait-line")
                     await expect(wait.locator(".wait-line-text")).to_have_text("Waiting on 2 subagents")
                     await expect(wait.locator(".wait-line-now")).to_contain_text("Running sleep 300")
+                    # The line is a pane on a ground of its own, in the dock and not in the conversation (item 1347):
+                    # the history goes by under it and shows nothing through it.
+                    pane: dict[str, object] = await wait.evaluate(
+                        "(e) => ({ inDock: !!e.closest('.dock'), inThread: !!e.closest('.run-thread'),"
+                        " ground: getComputedStyle(e).backgroundColor })"
+                    )
+                    assert pane["inDock"] is True and pane["inThread"] is False, pane
+                    assert str(pane["ground"]).startswith("rgb(") and not str(pane["ground"]).startswith("rgba("), pane
                     await page.screenshot(path=str(tmp_path / f"subagents-{index}.png"))
                     if index == 0:
                         # Details opens the Agents tab.

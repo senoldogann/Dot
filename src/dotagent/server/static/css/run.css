@@ -501,14 +501,21 @@
 }
 
 /* While the task waits for its subagents (item 1331) one quiet line stands over the bar: what it waits on, what the
-   first of them does now, and Details (the Agents tab) and Stop at its end. */
+   first of them does now, and Details (the Agents tab) and Stop at its end. It is a pane on the bar's own ground and
+   hairline, in the dock and never in the conversation: the messages go by under the dock, and on a ground that lets
+   them through the line read as part of what scrolls (item 1347). */
 .wait-line {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: fit-content;
   max-width: 100%;
+  min-height: 40px;
   margin: 0 auto var(--space-1);
-  padding: var(--space-half) var(--space-1);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -603,9 +610,14 @@
   background: none;
 }
 
-/* The way down sits in the bar's right end, not over the conversation (item 401). */
+/* The way down sits in the bar's right end, not over the conversation (item 401). It is positioned from itself
+   (`relative`, its offsets cleared): a touch screen draws a 4 px ring round an icon button from the button's nearest
+   positioned box (app.css, item 787), and a `static` jump left that box the dock, so while the way down showed (the
+   reader had scrolled up) its invisible ring covered the whole dock: the line that waits for the subagents, the queue
+   and the composer took no tap and no swipe (item 1347). */
 .status-bar > .jump {
-  position: static;
+  position: relative;
+  inset: auto;
   flex: none;
   width: 32px;
   height: 32px;

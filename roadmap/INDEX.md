@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1347](1347.md) | done | 2026-11-23 | The line that says the task waits on its subagents is a pane in the dock, and a phone's way down no longer covers the dock |
 | [1346](1346.md) | done | 2026-11-23 | A link in a message is plain words in a brighter shade, with no chip, and a site is asked for no icon |
 | [1345](1345.md) | done | 2026-11-23 | The side panel of a run is an inspector: a head that stays, a body that scrolls and a small sticky head for each section |
 | [1344](1344.md) | done | 2026-11-23 | A file address of a workspace page refused in the browser says the run may open the address show_page gives |
