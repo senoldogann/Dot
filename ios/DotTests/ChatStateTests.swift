@@ -147,6 +147,22 @@ final class ChatStateTests: XCTestCase {
         XCTAssertEqual(state.items.map(\.id), ["u:run_0", "r:run_0"])
     }
 
+    func testAnAnswerThatDidNotReachTheDaemonAsksAgain() {
+        var state: ChatState = started()
+        state.apply(event(2, "run_1", "approval_requested", ["approval_id": .string("a"), "tool": .string("shell"), "summary": .string("x"), "severity": .string("r"), "args": .object([:])]))
+        // The owner pressed Allow: the card shows answered at once, before the daemon says so.
+        state.apply(event(0, "run_1", "approval_decided", ["approval_id": .string("a"), "status": .string("approved")]))
+        XCTAssertTrue(state.pendingApprovals.isEmpty)
+        XCTAssertEqual(state.line, .working(since: 1000))
+        // The request failed: the card has its buttons again and the line says the run waits on the owner.
+        state.reopen(approval: "a")
+        XCTAssertEqual(state.pendingApprovals.map(\.approvalId), ["a"])
+        XCTAssertEqual(state.line, .waitingOnYou(count: 1))
+        XCTAssertEqual(state.runStatus, "blocked")
+        state.reopen(approval: "a")
+        XCTAssertEqual(state.pendingApprovals.count, 1, "asking twice changes nothing")
+    }
+
     func testTheDaemonsListOfOpenQuestionsClosesAndOpensCards() {
         var state: ChatState = started()
         state.apply(event(2, "run_1", "approval_requested", ["approval_id": .string("old"), "tool": .string("shell"), "summary": .string("x"), "severity": .string("r"), "args": .object([:])]))

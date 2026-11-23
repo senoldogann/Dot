@@ -132,14 +132,25 @@ final class NativeStore {
     }
 
     func loadModels() async {
-        models = try? await api.status().models
+        do {
+            models = try await api.status().models
+        } catch {
+            logger.error("the models could not be read: \(String(describing: error), privacy: .public)")
+        }
     }
 
     /// A thread's row after the chat changed it (its unread mark cleared when opened).
     func markSeen(_ id: String) {
         if let at: Int = threads.firstIndex(where: { $0.id == id }), threads[at].unread {
             threads[at].unread = false
-            Task { try? await api.markSeen(thread: id) }
+            Task {
+                do {
+                    try await api.markSeen(thread: id)
+                } catch {
+                    // The mark comes back at the next read of the list; the log keeps why.
+                    logger.error("a chat was not marked seen: \(String(describing: error), privacy: .public)")
+                }
+            }
         }
     }
 

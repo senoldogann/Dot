@@ -119,6 +119,11 @@ actor EventFeed {
             if kicked { continue }
             failures += 1
             let unauthorized: Bool = lastFailureWasAuth
+            if unauthorized {
+                // The daemon refused the phone's key: more tries will not mend it, pairing again will.
+                out.yield(.state(.reconnecting(attempt: failures, unauthorized: true)))
+                break
+            }
             out.yield(.state(.reconnecting(attempt: failures, unauthorized: unauthorized)))
             let wait: Task<Void, Never> = Task { try? await Task.sleep(for: backoffDelay(attempt: failures)) }
             waitTask = wait
@@ -175,7 +180,15 @@ actor EventFeed {
                         out.yield(.notice(message.event ?? "message"))
                         continue
                     }
-                    guard let event: EventRecord = try? JSONDecoder().decode(EventRecord.self, from: Data(message.data.utf8)) else {
+                    let event: EventRecord
+                    do {
+                        event = try JSONDecoder().decode(EventRecord.self, from: Data(message.data.utf8))
+                    } catch {
+                        // The stream goes on (the next events are worth more than a stop), but the screen is told, and the
+                        // log keeps which event it was.
+                        Logger(subsystem: "dev.dotagent.phone", category: "feed").error(
+                            "an event could not be read: id=\(message.id ?? "none", privacy: .public) kind=\(message.event ?? "none", privacy: .public) error=\(String(describing: error), privacy: .public)")
+                        out.yield(.notice("A message of this run could not be read. Reopen the chat to read it again."))
                         continue
                     }
                     events.append(event)

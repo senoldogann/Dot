@@ -356,6 +356,15 @@ struct ChatState: Sendable, Equatable {
         if isRoot, event.runId == rootRunIds.last { runStatus = "blocked" }
     }
 
+    /// An answer that did not reach the daemon: the card asks again (the daemon still lists it as open), and the run
+    /// waits for the owner as it did.
+    mutating func reopen(approval id: String) {
+        guard let at: Int = index["p:\(id)"], case .approval(var card) = items[at].kind, !card.isPending else { return }
+        card.status = "pending"
+        items[at].kind = .approval(card)
+        if runStatus == "running", card.runId == rootRunIds.last { runStatus = "blocked" }
+    }
+
     private mutating func approvalDecided(_ event: EventRecord) {
         guard let id: String = event.data["approval_id"]?.string, let at: Int = index["p:\(id)"],
             case .approval(var card) = items[at].kind

@@ -87,6 +87,12 @@ actor ChatSession {
 
     func refresh() async { await catchUp() }
 
+    /// The answer did not reach the daemon: the card asks again.
+    func reopened(approval id: String) {
+        state.reopen(approval: id)
+        publishNow()
+    }
+
     /// The owner answered an approval card here: it shows answered before the daemon's event says so.
     func answered(approval id: String, status: String, runId: String) {
         state.apply(EventRecord(
@@ -232,8 +238,8 @@ actor ChatSession {
             scheduleSave()
         case .state(let feedState):
             output?.yield(.connection(feedState))
-        case .notice:
-            break
+        case .notice(let words):
+            output?.yield(.failed(words))
         }
     }
 

@@ -164,6 +164,44 @@ final class EventFeedTests: XCTestCase {
         XCTAssertLessThan(started.duration(to: .now), .seconds(3), "the first wait is under a second")
     }
 
+    func testARefusedKeyEndsTheFeedAndIsNotTriedAgain() async throws {
+        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubProtocol.self]
+        let session: URLSession = URLSession(configuration: configuration)
+        StubProtocol.answers = [.init(status: 401), .init(chunks: [frame(1, "run_finished")])]
+        let api: APIClient = APIClient(
+            host: DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!), key: "k", session: session)
+        let feed: EventFeed = EventFeed(
+            session: session, after: 0, isFinal: { $0.kind == "run_finished" },
+            open: { after in runStreamRequest(api: api, runId: "run_1", after: after) })
+        var states: [FeedState] = []
+        for await update in await feed.start() {
+            if case .state(let state) = update { states.append(state) }
+        }
+        XCTAssertTrue(states.contains(.reconnecting(attempt: 1, unauthorized: true)))
+        XCTAssertEqual(StubProtocol.requests.count, 1, "a refused key is not retried every fifteen seconds")
+    }
+
+    func testAnEventThatDoesNotReadIsToldAndTheStreamGoesOn() async throws {
+        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubProtocol.self]
+        let session: URLSession = URLSession(configuration: configuration)
+        StubProtocol.answers = [.init(chunks: ["id: 1\nevent: x\ndata: {not json\n\n", frame(2, "run_finished")])]
+        let api: APIClient = APIClient(
+            host: DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!), key: "k", session: session)
+        let feed: EventFeed = EventFeed(
+            session: session, after: 0, isFinal: { $0.kind == "run_finished" },
+            open: { after in runStreamRequest(api: api, runId: "run_1", after: after) })
+        var ids: [Int] = []
+        var notices: Int = 0
+        for await update in await feed.start() {
+            if case .events(let events) = update { ids += events.map(\.id) }
+            if case .notice = update { notices += 1 }
+        }
+        XCTAssertEqual(ids, [2])
+        XCTAssertEqual(notices, 1, "the screen is told one message could not be read")
+    }
+
     func testAKickReconnectsAtOnceWithoutWaiting() async throws {
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]

@@ -110,38 +110,9 @@ struct ModelsView: View {
         }
     }
 
-    private func options(for role: String) -> [ModelOption] {
-        providers.flatMap(\.models).filter { $0.tools }
-    }
-
     private func picker(_ title: String, current: String?, choose: @escaping (String) async throws -> Void) -> some View {
         NavigationLink {
-            List {
-                ForEach(providers.filter { !$0.models.filter(\.tools).isEmpty }) { provider in
-                    Section(provider.provider) {
-                        ForEach(provider.models.filter(\.tools)) { option in
-                            Button {
-                                Task {
-                                    do {
-                                        try await choose(option.ref)
-                                        await store.loadModels()
-                                    } catch { failure = "The daemon refused that model." }
-                                }
-                            } label: {
-                                HStack {
-                                    Text(option.label).font(Theme.small).foregroundStyle(Theme.text)
-                                    Spacer()
-                                    if option.ref == current { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(Theme.background)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            ModelChoiceList(title: title, providers: providers, current: current, choose: choose, reload: { await store.loadModels() })
         } label: {
             LabeledContent(title) { Text(label(of: current)).font(Theme.small).foregroundStyle(Theme.muted) }
         }
@@ -150,6 +121,54 @@ struct ModelsView: View {
     private func label(of ref: String?) -> String {
         guard let ref else { return "…" }
         return providers.flatMap(\.models).first(where: { $0.ref == ref })?.label ?? ref
+    }
+}
+
+/// The models of every provider that can use tools, one to choose; a refusal is said on this page, where the tap was.
+struct ModelChoiceList: View {
+    let title: String
+    let providers: [ProviderModels]
+    let current: String?
+    let choose: (String) async throws -> Void
+    let reload: () async -> Void
+    @State private var failure: String?
+    @State private var chosen: String?
+
+    var body: some View {
+        List {
+            if let failure { Text(failure).font(Theme.small).foregroundStyle(Theme.bad) }
+            ForEach(providers.filter { !$0.models.filter(\.tools).isEmpty }) { provider in
+                Section(provider.provider) {
+                    Group {
+                        ForEach(provider.models.filter(\.tools)) { option in
+                            Button {
+                                Task {
+                                    do {
+                                        try await choose(option.ref)
+                                        chosen = option.ref
+                                        failure = nil
+                                        await reload()
+                                    } catch {
+                                        failure = "The daemon refused that model."
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(option.label).font(Theme.small).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    if option.ref == (chosen ?? current) { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                                }
+                            }
+                        }
+                    }
+                    .listRowBackground(Theme.surface)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

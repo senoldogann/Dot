@@ -6,6 +6,8 @@ struct ChatListView: View {
     let model: AppModel
     let store: NativeStore
     @State private var path: [ThreadSummary] = []
+    /// Why a tapped notification opened nothing.
+    @State private var openFailed: String?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -15,6 +17,10 @@ struct ChatListView: View {
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
+                }
+                if let words: String = openFailed {
+                    Button { openFailed = nil } label: { Text(words).font(Theme.meta).foregroundStyle(Theme.warn) }
+                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
                 if let line: String = connectionLine {
                     Text(line).font(Theme.meta).foregroundStyle(Theme.warn)
@@ -61,10 +67,15 @@ struct ChatListView: View {
             .task(id: model.pendingRunId) {
                 guard let runId: String = model.pendingRunId else { return }
                 model.pendingRunId = nil
-                if let detail: RunDetail = try? await store.api.detail(run: runId),
-                    let thread: ThreadSummary = store.threads.first(where: { $0.id == detail.run.threadId })
-                {
-                    path = [thread]
+                do {
+                    let detail: RunDetail = try await store.api.detail(run: runId)
+                    if let thread: ThreadSummary = store.threads.first(where: { $0.id == detail.run.threadId }) {
+                        path = [thread]
+                    } else {
+                        openFailed = "That chat is not in the list yet. Pull to refresh."
+                    }
+                } catch {
+                    openFailed = "Could not open that run."
                 }
             }
         }

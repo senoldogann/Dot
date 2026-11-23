@@ -3,20 +3,27 @@ import Observation
 import PhotosUI
 import SwiftUI
 import UIKit
+import os
 
 /// A message sent from here that the daemon has not yet taken.
 struct PendingSend: Identifiable, Equatable {
     let id: String
+    /// What the daemon is sent (a photo with no words is sent as "(photo)").
     let text: String
+    /// What the owner sees in the bubble.
+    let shown: String
+    let images: [PickedImage]
     var failed: Bool = false
 }
 
 /// An image picked for the next message.
-struct PickedImage: Identifiable {
+struct PickedImage: Identifiable, Equatable {
     let id: UUID = UUID()
     let name: String
     let data: Data
     let preview: UIImage
+
+    static func == (left: PickedImage, right: PickedImage) -> Bool { left.id == right.id }
 }
 
 /// An open chat: its state (drawn from the disk or the warm copy in its first frame, then kept up to date by its
@@ -40,6 +47,7 @@ final class ChatModel {
     var draft: String = ""
     var images: [PickedImage] = []
 
+    @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "chat-screen")
     @ObservationIgnored private let token: UUID = UUID()
     @ObservationIgnored private var session: ChatSession?
     @ObservationIgnored private var reading: Task<Void, Never>?
@@ -94,8 +102,11 @@ final class ChatModel {
         case .run(let record, let name):
             run = record
             if !name.isEmpty { title = name }
-        case .failed:
+        case .failed(let words):
             loaded = true
+            // What the phone shows may be behind the daemon: say so rather than draw it as current.
+            logger.info("the chat could not be brought up to date: \(words, privacy: .public)")
+            notice = words.hasPrefix("A message") ? words : "Dot could not be reached. This is what the phone held."
         case .lifecycle(let kind):
             if ["queue_changed", "run_finished", "run_queued"].contains(kind) { Task { await refreshQueue() } }
             if kind == "run_finished" || kind == "run_queued" { Task { await refreshAutomations() } }
@@ -105,11 +116,19 @@ final class ChatModel {
     // MARK: Reading beside the transcript
 
     func refreshQueue() async {
-        if let fresh: QueueView = try? await store.api.queue(thread: threadId) { queue = fresh }
+        do {
+            queue = try await store.api.queue(thread: threadId)
+        } catch {
+            logger.error("the queue could not be read: \(String(describing: error), privacy: .public)")
+        }
     }
 
     func refreshAutomations() async {
-        if let fresh: [ThreadAutomation] = try? await store.api.automations(thread: threadId) { automations = fresh }
+        do {
+            automations = try await store.api.automations(thread: threadId)
+        } catch {
+            logger.error("the schedules could not be read: \(String(describing: error), privacy: .public)")
+        }
     }
 
     // MARK: Doing
@@ -123,37 +142,41 @@ final class ChatModel {
         let sending: [PickedImage] = images
         draft = ""
         images = []
-        pending.append(PendingSend(id: key, text: shown))
-        Task { await deliver(key: key, text: text.isEmpty ? "(photo)" : text, images: sending) }
+        let sent: PendingSend = PendingSend(id: key, text: text.isEmpty ? "(photo)" : text, shown: shown, images: sending)
+        pending.append(sent)
+        Task { await deliver(sent) }
     }
 
     func retry(_ send: PendingSend) {
         guard let at: Int = pending.firstIndex(of: send) else { return }
         pending[at].failed = false
-        Task { await deliver(key: send.id, text: send.text, images: []) }
+        Task { await deliver(send) }
     }
 
     func discard(_ send: PendingSend) {
         pending.removeAll { $0.id == send.id }
-        if draft.isEmpty { draft = send.text }
+        if draft.isEmpty, send.images.isEmpty { draft = send.text }
+        images = send.images + images
     }
 
-    private func deliver(key: String, text: String, images: [PickedImage]) async {
+    private func deliver(_ send: PendingSend) async {
+        let key: String = send.id
         do {
             var ids: [String] = []
             let uploader: DaemonClient = DaemonClient(session: store.api.session, maxAttempts: 2)
-            for image in images {
+            for image in send.images {
                 let upload: AttachmentUpload = AttachmentUpload(
                     name: image.name, mediaType: "image/jpeg", dataB64: image.data.base64EncodedString())
                 ids.append(try await uploader.uploadAttachment(upload, host: store.host, key: store.api.key))
             }
             let shown: QueueView = try await store.api.send(
-                message: Message(text: text, key: key, model: nil, attachments: ids), thread: threadId)
+                message: Message(text: send.text, key: key, model: nil, attachments: ids), thread: threadId)
             queue = shown
             if shown.besideThreadId != nil { notice = "Started in a chat of its own." }
             await session?.refresh()
             pending.removeAll { $0.id == key }
         } catch {
+            logger.error("a message was not sent: \(String(describing: error), privacy: .public)")
             if let at: Int = pending.firstIndex(where: { $0.id == key }) { pending[at].failed = true }
         }
     }
@@ -165,6 +188,7 @@ final class ChatModel {
                 try await store.api.stop(run: id)
                 await session?.stopped(run: id)
             } catch {
+                logger.error("the run was not stopped: \(String(describing: error), privacy: .public)")
                 notice = "Could not stop the run."
             }
         }
@@ -176,8 +200,10 @@ final class ChatModel {
             do {
                 try await store.api.decide(approval: card.approvalId, approve: approve, note: note)
             } catch {
+                logger.error("an answer did not reach the daemon: \(String(describing: error), privacy: .public)")
+                // The card asked and still asks: it shows its buttons again, and the run still waits on the owner.
+                await session?.reopened(approval: card.approvalId)
                 notice = "Your answer did not reach Dot. Try again."
-                await session?.refresh()
             }
         }
     }
@@ -201,9 +227,9 @@ final class ChatModel {
             do {
                 queue = try await store.api.reorderQueue(thread: threadId, ids: order)
             } catch {
+                logger.error("a queued message was not moved: \(String(describing: error), privacy: .public)")
                 queue = before
                 notice = "Could not move the message."
-                await refreshQueue()
             }
         }
     }
@@ -215,6 +241,7 @@ final class ChatModel {
             do {
                 queue = try await store.api.removeQueued(id)
             } catch {
+                logger.error("a queued message was not removed: \(String(describing: error), privacy: .public)")
                 queue = before
                 notice = "Could not remove the message."
             }
@@ -229,6 +256,7 @@ final class ChatModel {
             do {
                 _ = try await store.api.setSchedule(id, on: on)
             } catch {
+                logger.error("a schedule was not switched: \(String(describing: error), privacy: .public)")
                 notice = "Could not switch the schedule."
             }
             await refreshAutomations()

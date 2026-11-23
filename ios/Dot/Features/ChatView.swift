@@ -188,7 +188,7 @@ private struct PendingRow: View {
         VStack(alignment: .trailing, spacing: 4) {
             HStack(spacing: 0) {
                 Spacer(minLength: 56)
-                Text(send.text)
+                Text(send.shown)
                     .font(Theme.body).foregroundStyle(Theme.text.opacity(0.6))
                     .padding(.horizontal, 12).padding(.vertical, 9)
                     .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
@@ -213,7 +213,12 @@ struct StatusLine: View {
     var body: some View {
         switch model.state.line {
         case .idle:
-            if case .reconnecting = model.connection { line(icon: "arrow.triangle.2.circlepath", text: "Reconnecting…", tone: Theme.faint) }
+            if case .reconnecting(_, let unauthorized) = model.connection {
+                line(
+                    icon: unauthorized ? "key" : "arrow.triangle.2.circlepath",
+                    text: unauthorized ? "This phone's key was refused. Pair again in Settings." : "Reconnecting…",
+                    tone: unauthorized ? Theme.warn : Theme.faint)
+            }
         case .working(let since):
             HStack(spacing: 8) {
                 ProgressView().controlSize(.mini).tint(Theme.accent)
