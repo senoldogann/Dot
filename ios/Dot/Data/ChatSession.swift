@@ -36,6 +36,8 @@ actor ChatSession {
     private var catching: Bool = false
     private var again: Bool = false
     private var stopped: Bool = false
+    /// The daemon refused the phone's key (401, 403): nothing is asked again until the app comes back to the front.
+    private var keyRefused: Bool = false
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "chat")
 
     /// How soon after the last change the screen is handed the state again while words stream.
@@ -74,6 +76,7 @@ actor ChatSession {
 
     /// The app is in front again or the network changed: reconnect at once, and read what came after meanwhile.
     func kick() {
+        keyRefused = false
         Task { [feed] in await feed?.kick() }
         scheduleRefresh(after: .zero)
     }
@@ -182,7 +185,11 @@ actor ChatSession {
             scheduleSave()
         } catch {
             logger.info("catch-up failed: \(String(describing: error), privacy: .public)")
-            output?.yield(.failed(String(describing: error)))
+            if case DaemonRequestError.status(_, let code, _) = error, code == 401 || code == 403 {
+                refuse()
+            } else {
+                output?.yield(.failed(String(describing: error)))
+            }
         }
     }
 
@@ -202,7 +209,18 @@ actor ChatSession {
 
     // MARK: Following
 
+    /// The key was refused: the screen says so, and no stream is opened again by this session until a kick.
+    private func refuse() {
+        keyRefused = true
+        feedTask?.cancel()
+        if let feed { Task { await feed.stop() } }
+        feed = nil
+        feedRun = nil
+        output?.yield(.connection(.reconnecting(attempt: 0, unauthorized: true)))
+    }
+
     private func followIfWorking() {
+        guard !keyRefused else { return }
         guard !stopped, let newest: String = state.newestRunId, state.isWorking else {
             if let feed { Task { await feed.stop() }; self.feed = nil; feedRun = nil }
             output?.yield(.connection(.ended))
@@ -237,6 +255,9 @@ actor ChatSession {
             publishSoon()
             scheduleSave()
         case .state(let feedState):
+            if case .reconnecting(_, true) = feedState { keyRefused = true }
+            // After a refused key the feed's own end must not replace the line that says so.
+            if keyRefused, feedState == .ended { break }
             output?.yield(.connection(feedState))
         case .notice(let words):
             output?.yield(.failed(words))
@@ -248,7 +269,7 @@ actor ChatSession {
         feed = nil
         feedRun = nil
         // The run's end was told by its stream; the daemon's record says how it ended and what is left.
-        if !stopped { await catchUp() }
+        if !stopped, !keyRefused { await catchUp() }
     }
 
     /// A session for streams: no timeout on the whole, 45 s on silence (the daemon writes a keepalive every 15 s).

@@ -10,6 +10,8 @@ struct PendingSend: Identifiable, Equatable {
     let id: String
     /// What the daemon is sent (a photo with no words is sent as "(photo)").
     let text: String
+    /// What the owner typed (empty for a photo alone), which Edit puts back in the box.
+    let typed: String
     /// What the owner sees in the bubble.
     let shown: String
     let images: [PickedImage]
@@ -142,7 +144,7 @@ final class ChatModel {
         let sending: [PickedImage] = images
         draft = ""
         images = []
-        let sent: PendingSend = PendingSend(id: key, text: text.isEmpty ? "(photo)" : text, shown: shown, images: sending)
+        let sent: PendingSend = PendingSend(id: key, text: text.isEmpty ? "(photo)" : text, typed: text, shown: shown, images: sending)
         pending.append(sent)
         Task { await deliver(sent) }
     }
@@ -155,7 +157,7 @@ final class ChatModel {
 
     func discard(_ send: PendingSend) {
         pending.removeAll { $0.id == send.id }
-        if draft.isEmpty, send.images.isEmpty { draft = send.text }
+        if draft.isEmpty { draft = send.typed }
         images = send.images + images
     }
 
@@ -201,9 +203,16 @@ final class ChatModel {
                 try await store.api.decide(approval: card.approvalId, approve: approve, note: note)
             } catch {
                 logger.error("an answer did not reach the daemon: \(String(describing: error), privacy: .public)")
-                // The card asked and still asks: it shows its buttons again, and the run still waits on the owner.
-                await session?.reopened(approval: card.approvalId)
-                notice = "Your answer did not reach Dot. Try again."
+                if let failure: DaemonRequestError = error as? DaemonRequestError, !failure.isRetryable {
+                    // A refusal (the Mac answered it, it expired): the daemon's own list says how the card stands.
+                    notice = "Dot no longer asks that."
+                    await session?.refresh()
+                } else {
+                    // Nothing reached the daemon: the card asked and still asks, with its buttons, and the run still
+                    // waits on the owner.
+                    await session?.reopened(approval: card.approvalId)
+                    notice = "Your answer did not reach Dot. Try again."
+                }
             }
         }
     }

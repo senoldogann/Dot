@@ -77,6 +77,15 @@ struct APIClient: Sendable {
     }
 }
 
+/// An element of a page that is left out when it does not decode, rather than failing the page.
+struct Lossy<Value: Decodable & Sendable>: Decodable, Sendable {
+    let value: Value?
+
+    init(from decoder: any Decoder) throws {
+        value = try? Value(from: decoder)
+    }
+}
+
 // MARK: Routes
 
 struct Message: Encodable, Sendable {
@@ -130,10 +139,18 @@ extension APIClient {
 
     func detail(run: String) async throws -> RunDetail { try await get("/api/runs/\(run)") }
 
+    /// A run's stored events after `after`. One that does not read is left out and logged, not the whole page: the
+    /// cursor moves on with the page, so the missing event is said to the owner (see `ChatOutput.failed`).
     func events(run: String, after: Int, limit: Int = 2000) async throws -> [EventRecord] {
-        try await get(
+        let page: [Lossy<EventRecord>] = try await get(
             "/api/runs/\(run)/events",
             query: [URLQueryItem(name: "after", value: String(after)), URLQueryItem(name: "limit", value: String(limit))])
+        let read: [EventRecord] = page.compactMap(\.value)
+        if read.count != page.count {
+            Logger(subsystem: "dev.dotagent.phone", category: "api").error(
+                "\(page.count - read.count) events of \(run, privacy: .public) could not be read and are left out")
+        }
+        return read
     }
 
     /// The approvals and questions waiting for the owner, in every chat (`GET /api/approvals?status=pending`).

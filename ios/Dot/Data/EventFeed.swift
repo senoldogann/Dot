@@ -188,7 +188,7 @@ actor EventFeed {
                         // log keeps which event it was.
                         Logger(subsystem: "dev.dotagent.phone", category: "feed").error(
                             "an event could not be read: id=\(message.id ?? "none", privacy: .public) kind=\(message.event ?? "none", privacy: .public) error=\(String(describing: error), privacy: .public)")
-                        out.yield(.notice("A message of this run could not be read. Reopen the chat to read it again."))
+                        out.yield(.notice("A message of this run could not be read and is missing here. The web UI shows it."))
                         continue
                     }
                     events.append(event)

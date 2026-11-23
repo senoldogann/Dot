@@ -230,3 +230,44 @@ final class EventFeedTests: XCTestCase {
         XCTAssertLessThan(kicked.duration(to: .now), .milliseconds(400), "a kick does not wait out the backoff")
     }
 }
+
+
+/// A chat session whose daemon refuses the phone's key must not ask again and again.
+final class ChatSessionKeyTests: XCTestCase {
+    func testARefusedKeyStopsTheSessionFromOpeningStreamsAndTheLineStaysTheKeysLine() async throws {
+        let directory: URL = FileManager.default.temporaryDirectory.appending(path: "dot-session-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache: ChatCache = ChatCache(directory: directory)
+        // The phone holds a chat whose run was working: the state that makes a session follow a stream.
+        await cache.saveChat(StoredChat(threadId: "thr_1", runs: [makeRun(status: "running")], helpers: [], events: [], savedAt: 1))
+        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BodyStub.self]
+        BodyStub.seen = []
+        BodyStub.status = 401
+        BodyStub.reply = "no"
+        defer { BodyStub.status = 200 }
+        let host: DaemonHost = DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!)
+        let api: APIClient = APIClient(host: host, key: "k", session: URLSession(configuration: configuration))
+        let session: ChatSession = ChatSession(threadId: "thr_1", api: api, cache: cache)
+        let outputs: AsyncStream<ChatOutput> = await session.start()
+        let reader: Task<[FeedState], Never> = Task {
+            var seen: [FeedState] = []
+            for await output in outputs { if case .connection(let state) = output { seen.append(state) } }
+            return seen
+        }
+        try await Task.sleep(for: .seconds(2))
+        await session.stop()
+        let lines: [FeedState] = await reader.value
+        XCTAssertEqual(BodyStub.seen.filter { $0.path == "/api/runs" }.count, 1, "one read, then nothing until the app comes back")
+        XCTAssertFalse(BodyStub.seen.contains { $0.path.hasSuffix("/stream") }, "no stream is opened with a key that was refused")
+        XCTAssertEqual(lines.last, .reconnecting(attempt: 0, unauthorized: true), "the line stays the key's")
+    }
+}
+
+final class LossyTests: XCTestCase {
+    func testAnEventThatDoesNotReadIsLeftOutOfAPageNotTheWholePage() throws {
+        let page: String = #"[{"id":1,"run_id":"r","ts":1,"kind":"a","data":{}},{"id":"bad"},{"id":3,"run_id":"r","ts":1,"kind":"b","data":{}}]"#
+        let read: [Lossy<EventRecord>] = try JSONDecoder().decode([Lossy<EventRecord>].self, from: Data(page.utf8))
+        XCTAssertEqual(read.compactMap(\.value).map(\.id), [1, 3])
+    }
+}
