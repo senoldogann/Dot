@@ -2045,7 +2045,12 @@ class RunManager:
         if gone:
             await forget_detached(store, gone)
         for thread_id in threads:
-            await self._tell_helper_reports(thread_id)
+            # A chat that cannot be told now (its model has no key, say) keeps its reports for the chat's next run: it
+            # never keeps the daemon from starting, which the owner needs to fix the key.
+            try:
+                await self._tell_helper_reports(thread_id)
+            except DotError as exc:
+                log.warning("helper_reports_not_told_at_start", thread_id=thread_id, error=exc.message)
         return sum(len(entries) for entries in self._untold.values())
 
     def at_work_in(self, thread_id: str) -> bool:

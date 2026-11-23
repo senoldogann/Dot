@@ -31,6 +31,7 @@ from dotagent.agent.helper_reports import (
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event
 from dotagent.config import load_default_config
+from dotagent.core.errors import ModelUnavailableError
 from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
@@ -405,6 +406,35 @@ async def test_a_report_not_told_when_the_daemon_stopped_is_told_when_it_starts_
             text: str = await _thread_text(runtime, parent.thread_id)
             assert _NOTE_OPENING in text and f"Delegated run {helper.id}" in text and "ended as cancelled" in text
             assert await kept_detached(runtime.store) == []
+        finally:
+            await again.shutdown()
+
+
+async def test_a_chat_that_cannot_be_told_at_start_keeps_its_report_and_the_start_goes_on(
+    login_env: dict[str, str],
+) -> None:
+    """A chat whose model has no key cannot be woken for a report: the start must not fail on it (the owner has to
+    reach Settings to mend the key), and the report stays kept for the chat's next run."""
+    roles: _Roles = _Roles(
+        main=[ScriptedTurn(text="", calls=(_delegate("long"),)), _finish("Went on.")],
+        helpers=[_turn("shell", {"command": "sleep 60"})],
+    )
+    async with _session(login_env, roles) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+        (helper,) = await _helpers_of(runtime, parent)
+        manager.steer(parent.id, "Stop waiting.", ())
+        assert (await _ended(manager, parent.id)).status == "done"
+        await manager.shutdown()
+        again: RunManager = RunManager(runtime)
+
+        async def refused(thread_id: str) -> None:
+            raise ModelUnavailableError("the chat's model has no key", {"thread_id": thread_id})
+
+        again._tell_helper_reports = refused  # type: ignore[method-assign]
+        try:
+            assert await again.tell_helper_reports() == 1
+            assert [one.helper_run_id for one in await kept_detached(runtime.store)] == [helper.id]
+            assert len(await _runs_of_chat(runtime, parent.thread_id)) == 1
         finally:
             await again.shutdown()
 
