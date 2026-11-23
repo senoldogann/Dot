@@ -296,6 +296,13 @@ CLAUDE_DOOR: str = "dot"
 # message).
 SEARCH_ENV: dict[str, str] = {"ENABLE_TOOL_SEARCH": "true"}
 
+# The door's tools whose definitions are in the prompt from the start, not looked up (item 1341): the ones the shell's
+# own description sends the model to, which it called by their names alone, without a look-up. On the owner's Mac, on
+# claude_code:sonnet, three of seven calls of terminal_open came with no argument, and wait_until's with arguments
+# guessed (item 1340); each was refused and sent again. A probe with Claude Code 2.1.330 showed it: a tool not looked
+# up was called with a name for its argument the model made up.
+LOADED_TOOLS: frozenset[str] = frozenset({"terminal_open", "wait_until"})
+
 
 def dot_tool(tool: str, door: str) -> str | None:
     """The name of Dot's tool a block of a step calls through ``door``, ``None`` for a look-up of one (item 1053), which
@@ -1101,6 +1108,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     door: Door = new_door(
         CLAUDE_DOOR,
         door_specs(tool.spec for tool in tools.tools.values()),
+        LOADED_TOOLS,
         partial(
             _watched_call,
             quiet,
