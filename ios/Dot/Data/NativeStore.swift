@@ -12,14 +12,17 @@ enum Connection: Equatable, Sendable {
 }
 
 /// The native app's state of the daemon: the chat list and the agents (drawn from disk at the first frame, refreshed
-/// after), the lifecycle stream that says when something changed, and the chats open on the screen. One per host and
-/// key; the app makes a new one when either changes.
+/// after), the lifecycle stream that says when something changed, the chats open on the screen, what the owner did that
+/// the Mac has not yet heard (the outbox), and how the link stands. One per host and key; the app makes a new one when
+/// either changes.
 @MainActor
 @Observable
 final class NativeStore {
     let host: DaemonHost
     let api: APIClient
     let cache: ChatCache
+    let link: LinkMonitor
+    let outbox: OutboxModel
     private(set) var threads: [ThreadSummary]
     private(set) var agents: [AgentSummary]
     private(set) var connection: Connection = .connecting
@@ -28,6 +31,11 @@ final class NativeStore {
     private(set) var models: ModelChoices?
     /// Every provider's models, for the pickers; read when a picker opens, and again when asked (`loadProviders`).
     private(set) var providers: [ProviderModels] = []
+    /// The schedules, as last read (from disk before the network has answered).
+    private(set) var schedules: [ScheduleView] = []
+    /// How the phone's link stands, and when the list was last read from the Mac: the banner's words.
+    private(set) var linkState: LinkState
+    private(set) var lastUpdated: Date?
     /// What was typed and not sent, per chat, kept between launches.
     let drafts: DraftStore
 
@@ -37,20 +45,46 @@ final class NativeStore {
     /// (a navigation that settles) must not stop the later one when the earlier goes.
     @ObservationIgnored private var open: [UUID: ChatSession] = [:]
     @ObservationIgnored private let startedAt: Date = Date()
+    @ObservationIgnored private let folder: URL
+    /// The session of the streams: the requests' own configuration (so that the same protocols and proxies apply) with no
+    /// timeout on the whole and 45 s on silence (the daemon writes a keepalive every 15 s).
+    @ObservationIgnored private let streamSession: URLSession
     @ObservationIgnored private var lifecycleFeed: EventFeed?
     @ObservationIgnored private var lifecycleTask: Task<Void, Never>?
     @ObservationIgnored private var listTask: Task<Void, Never>?
-    @ObservationIgnored private var monitor: NWPathMonitor?
+    @ObservationIgnored private var listRefresh: Task<Void, Never>?
+    @ObservationIgnored private var linkTask: Task<Void, Never>?
+    @ObservationIgnored private var outcomeTask: Task<Void, Never>?
+    @ObservationIgnored private var preloadTask: Task<Void, Never>?
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+    @ObservationIgnored private var graceTask: Task<Void, Never>?
+    @ObservationIgnored private let grace: BackgroundGrace = BackgroundGrace()
+    @ObservationIgnored private var inBackground: Bool = false
+    @ObservationIgnored private var feedsClosed: Bool = false
     @ObservationIgnored private var wasDown: Bool = false
     @ObservationIgnored private var lastListAt: Date = .distantPast
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "store")
 
-    init(host: DaemonHost, key: String, session: URLSession = APIClient.makeSession(), directory: URL? = nil) {
+    /// How long the app keeps its streams after it leaves the screen: a call that ends, a message that is answered in
+    /// another app, comes back to a chat that is still live.
+    @ObservationIgnored var graceSeconds: Double = 20
+
+    init(
+        host: DaemonHost, key: String, session: URLSession = APIClient.makeSession(), directory: URL? = nil,
+        link: LinkMonitor = LinkMonitor(watching: true), uploadSession: URLSession = APIClient.makeUploadSession()
+    ) {
         self.host = host
-        self.api = APIClient(host: host, key: key, session: session)
+        self.link = link
+        self.streamSession = APIClient.makeStreamSession(like: session)
+        self.linkState = link.state
+        let client: APIClient = APIClient(host: host, key: key, session: session, link: link)
+        self.api = client
         let folder: URL = directory ?? ChatCache.directory(for: host)
+        self.folder = folder
         self.cache = ChatCache(directory: folder)
         self.drafts = DraftStore(directory: folder)
+        let box: Outbox = Outbox(directory: folder, api: client, link: link, uploadSession: uploadSession)
+        self.outbox = OutboxModel(box: box, initial: Outbox.read(folder.appending(path: "outbox.json")))
         #if DEBUG
         // `-DotClearDrafts 1`: the simulator tests start from no drafts.
         if UserDefaults.standard.bool(forKey: "DotClearDrafts") { self.drafts.clear() }
@@ -58,60 +92,110 @@ final class NativeStore {
         let snapshot: ListSnapshot? = ChatCache.readList(in: folder)
         self.threads = snapshot?.threads ?? []
         self.agents = snapshot?.agents ?? []
+        self.lastUpdated = snapshot.map { Date(timeIntervalSince1970: $0.savedAt) }
+        if let extras: ExtrasSnapshot = ChatCache.readExtras(in: folder) {
+            self.models = extras.models
+            self.providers = extras.providers ?? []
+            self.schedules = extras.schedules ?? []
+        }
+        // The first chats are decoded off the main actor while the screen is being made.
+        preloadTask = Task { [weak self] in await self?.preload() }
     }
 
     var hasList: Bool { !threads.isEmpty || !agents.isEmpty }
+
+    /// The line over the screens, or none: it says the phone is offline (what it shows was saved) or trying again, and never
+    /// stands in the way of reading.
+    func banner(now: Date = Date()) -> ConnectionBanner? {
+        ConnectionBanner.make(link: linkState, connection: connection, lastUpdated: lastUpdated, waiting: outbox.items.count, now: now)
+    }
 
     // MARK: Start
 
     func start() {
         guard lifecycleTask == nil else { return }
-        watchNetwork()
+        feedsClosed = false
+        watchLink()
         startLifecycle()
+        outbox.watch()
+        watchOutcomes()
+        outbox.start()
         Task { await refreshList() }
         Task { await loadModels() }
-        Task { await preload() }
     }
 
     func stop() {
         lifecycleTask?.cancel()
         lifecycleTask = nil
+        linkTask?.cancel()
+        linkTask = nil
+        outcomeTask?.cancel()
+        outcomeTask = nil
+        graceTask?.cancel()
+        prefetchTask?.cancel()
+        listTask?.cancel()
+        listRefresh?.cancel()
+        preloadTask?.cancel()
         let feed: EventFeed? = lifecycleFeed
         Task { await feed?.stop() }
         lifecycleFeed = nil
-        monitor?.cancel()
-        monitor = nil
+        link.stop()
+        outbox.suspend()
+        outbox.stop()
+        grace.end()
         for session in open.values { Task { await session.stop() } }
         open = [:]
     }
 
-    /// The chats the owner is most likely to open, read from disk off the main actor and kept as states.
+    /// The chats the owner is most likely to open, decoded off the main actor, several at once, and kept as states.
     private func preload() async {
         let ids: [String] = threads.prefix(8).map(\.id)
-        let cache: ChatCache = cache
-        let states: [String: ChatState] = await Task.detached(priority: .utility) {
-            var found: [String: ChatState] = [:]
-            for id in ids {
-                if let stored: StoredChat = await cache.loadChat(id) { found[id] = stored.state() }
+        let folder: URL = folder
+        let states: [String: ChatState] = await Task.detached(priority: .userInitiated) {
+            await withTaskGroup(of: (String, ChatState)?.self) { group in
+                for id in ids {
+                    group.addTask {
+                        guard let stored: StoredChat = ChatCache.readChat(id, in: folder) else { return nil }
+                        return (id, stored.state())
+                    }
+                }
+                var found: [String: ChatState] = [:]
+                for await pair in group { if let pair { found[pair.0] = pair.1 } }
+                return found
             }
-            return found
         }.value
         for (id, state) in states where warm[id] == nil { warm[id] = state }
     }
 
     // MARK: List
 
+    /// Reads the list and the agents. A second call while one reads waits for that one (a pull to refresh, a change of
+    /// network and a message of the lifecycle stream arriving together make one request).
     func refreshList() async {
+        if let running: Task<Void, Never> = listRefresh {
+            await running.value
+            return
+        }
+        let task: Task<Void, Never> = Task { await readList() }
+        listRefresh = task
+        await task.value
+        listRefresh = nil
+    }
+
+    private func readList() async {
+        // No link: nothing is asked (the banner says so, and the list the phone holds stays); the link coming back reads it.
+        guard link.state.online else { return }
         refreshing = true
         defer { refreshing = false }
         do {
             async let listed: [ThreadSummary] = api.threads()
             async let people: [AgentSummary] = api.agents()
             let (newThreads, newAgents): ([ThreadSummary], [AgentSummary]) = try await (listed, people)
-            threads = newThreads
-            agents = newAgents
+            if newThreads != threads { threads = newThreads }
+            if newAgents != agents { agents = newAgents }
             lastError = nil
             lastListAt = Date()
+            lastUpdated = lastListAt
             let snapshot: ListSnapshot = ListSnapshot(threads: newThreads, agents: newAgents, savedAt: Date().timeIntervalSince1970)
             let cache: ChatCache = cache
             let keep: [String] = newThreads.map(\.id)
@@ -120,11 +204,13 @@ final class NativeStore {
                 await cache.prune(keeping: keep)
             }
             if connection != .live, connection != .unauthorized { connection = .live }
+            prefetch()
         } catch {
+            if Task.isCancelled { return }
             lastError = String(describing: error)
             if case DaemonRequestError.status(_, let code, _) = error, code == 401 || code == 403 {
                 connection = .unauthorized
-            } else if connection == .live {
+            } else if connection == .live, !RetryPolicy.isNoLink(error) {
                 connection = .reconnecting
             }
             logger.info("the list could not be read: \(String(describing: error), privacy: .public)")
@@ -143,6 +229,7 @@ final class NativeStore {
     func loadModels() async {
         do {
             models = try await api.status().models
+            keepExtras()
         } catch {
             logger.error("the models could not be read: \(String(describing: error), privacy: .public)")
         }
@@ -153,9 +240,28 @@ final class NativeStore {
         if !providers.isEmpty, !force { return }
         do {
             providers = try await api.models()
+            keepExtras()
         } catch {
             logger.error("the providers' models could not be read: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    /// The schedules: what the disk held is on the screen (`schedules`) while this reads, and a read that fails leaves it.
+    func loadSchedules() async {
+        do {
+            schedules = try await api.schedules()
+            keepExtras()
+        } catch {
+            logger.error("the schedules could not be read: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func keepExtras() {
+        let extras: ExtrasSnapshot = ExtrasSnapshot(
+            models: models, providers: providers.isEmpty ? nil : providers, schedules: schedules.isEmpty ? nil : schedules,
+            savedAt: Date().timeIntervalSince1970)
+        let cache: ChatCache = cache
+        Task.detached(priority: .utility) { await cache.saveExtras(extras) }
     }
 
     /// A thread's row after the chat changed it (its unread mark cleared when opened).
@@ -180,7 +286,8 @@ final class NativeStore {
     func keep(_ state: ChatState, for id: String) { warm[id] = state }
 
     func makeSession(for id: String, token: UUID) -> ChatSession {
-        let session: ChatSession = ChatSession(threadId: id, api: api, cache: cache)
+        let session: ChatSession = ChatSession(
+            threadId: id, api: api, cache: cache, link: link, listUpdatedAt: threads.first(where: { $0.id == id })?.updatedAt)
         open[token] = session
         return session
     }
@@ -189,12 +296,44 @@ final class NativeStore {
         if let session: ChatSession = open.removeValue(forKey: token) { Task { await session.stop() } }
     }
 
+    // MARK: Reading ahead
+
+    /// After a read of the list: the chats that moved on past what the phone holds are read once, one after another, so that
+    /// opening one draws what the Mac has. Few on a link that costs, none on one the system asks to spare (Low Data
+    /// Mode), none while the app is out of sight, and never the chat that is open (it reads itself).
+    private func prefetch(budget given: Int? = nil) {
+        prefetchTask?.cancel()
+        let budget: Int = given ?? link.state.prefetchBudget
+        guard budget > 0, !inBackground else { return }
+        let candidates: [ThreadSummary] = threads
+        let openIds: Set<String> = Set(open.values.map(\.threadId))
+        let folder: URL = folder
+        let api: APIClient = api
+        let cache: ChatCache = cache
+        let link: LinkMonitor = link
+        prefetchTask = Task.detached(priority: .utility) { [weak self] in
+            let chosen: [ThreadSummary] = PrefetchRules.chosen(
+                from: candidates, open: openIds, budget: budget, held: { ChatCache.readChat($0, in: folder) })
+            for thread in chosen {
+                if Task.isCancelled || !link.state.online { return }
+                let session: ChatSession = ChatSession(threadId: thread.id, api: api, cache: cache, link: link)
+                if let state: ChatState = await session.warm(listUpdatedAt: thread.updatedAt) {
+                    await self?.warmed(thread.id, state)
+                }
+            }
+        }
+    }
+
+    private func warmed(_ id: String, _ state: ChatState) {
+        if !open.values.contains(where: { $0.threadId == id }) { warm[id] = state }
+    }
+
     // MARK: Lifecycle stream and reconnecting
 
     private func startLifecycle() {
         let api: APIClient = api
         let feed: EventFeed = EventFeed(
-            session: Self.streamSession, after: 0, wantsEvents: false,
+            session: streamSession, after: 0, wantsEvents: false, link: link,
             open: { _ in
                 var request: URLRequest = api.request("GET", "/api/stream")
                 request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -242,40 +381,126 @@ final class NativeStore {
     func reconnect() {
         // The app's first activation is its start, not a return.
         guard Date().timeIntervalSince(startedAt) > 2 else { return }
+        kickAll()
+    }
+
+    private func kickAll() {
         let feed: EventFeed? = lifecycleFeed
         Task { await feed?.kick() }
         for session in open.values { Task { await session.kick() } }
         if Date().timeIntervalSince(lastListAt) > 5 { refreshListSoon() }
+        outbox.start()
     }
 
-    private func watchNetwork() {
-        let monitor: NWPathMonitor = NWPathMonitor()
-        // The first update is the monitor's own start, not a change.
-        let first: OSAllocatedUnfairLock<Bool> = OSAllocatedUnfairLock(initialState: true)
-        monitor.pathUpdateHandler = { [weak self] path in
-            guard path.status == .satisfied else { return }
-            if first.withLock({ (value: inout Bool) -> Bool in
-                let wasFirst: Bool = value
-                value = false
-                return wasFirst
-            }) { return }
-            Task { @MainActor in self?.reconnect() }
+    /// The link changed: the banner follows it at once; a link that came back wakes every stream, the outbox and the list.
+    private func watchLink() {
+        let link: LinkMonitor = link
+        linkTask = Task { [weak self] in
+            var first: Bool = true
+            for await state in link.updates() {
+                guard let self else { return }
+                let before: LinkState = self.linkState
+                self.linkState = state
+                // The first report is the monitor's own start, not a change.
+                if first {
+                    first = false
+                    continue
+                }
+                if state.online, !before.online {
+                    self.logger.info("the link is back")
+                    self.kickAll()
+                }
+            }
         }
-        monitor.start(queue: DispatchQueue(label: "dev.dotagent.phone.network"))
-        self.monitor = monitor
     }
 
-    private static let streamSession: URLSession = {
-        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 45
-        configuration.timeoutIntervalForResource = 24 * 3600
-        configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
-    }()
+    /// What the daemon answered to the owner's doings that were waiting: the screens read their own chats' (a card
+    /// closed, a message delivered); the list and the queue are read again here.
+    private func watchOutcomes() {
+        outcomeTask = Task { [weak self] in
+            guard let box: Outbox = self?.outbox.box else { return }
+            for await _ in await box.outcomes() {
+                guard let self else { return }
+                self.refreshListSoon()
+            }
+        }
+    }
+
+    // MARK: Background and foreground
+
+    /// The app left the screen: what is on its way is let to end and what is held is written; after a few seconds out of
+    /// sight the streams are closed (a socket kept open on a sleeping phone is a drain), and no timer is left running.
+    func enterBackground() {
+        guard !inBackground else { return }
+        inBackground = true
+        prefetchTask?.cancel()
+        for session in open.values { Task { await session.suspend() } }
+        // Time to finish a send and the writes; given back when the streams are closed.
+        grace.begin { [weak self] in self?.closeFeeds() }
+        graceTask?.cancel()
+        graceTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(self?.graceSeconds ?? 0))
+            if Task.isCancelled { return }
+            self?.closeFeeds()
+        }
+    }
+
+    private func closeFeeds() {
+        guard inBackground, !feedsClosed else { return }
+        feedsClosed = true
+        lifecycleTask?.cancel()
+        lifecycleTask = nil
+        let feed: EventFeed? = lifecycleFeed
+        Task { await feed?.stop() }
+        lifecycleFeed = nil
+        outbox.suspend()
+        grace.end()
+        logger.info("the streams are closed while the app is out of sight")
+    }
+
+    /// The app is in front again: what was closed opens, every chat on the screen reads what came after, the list is read,
+    /// and what waited in the outbox goes. The streams are kicked at once; nothing waits for the network before the screen
+    /// shows what it holds.
+    func enterForeground() {
+        guard inBackground else { return }
+        inBackground = false
+        graceTask?.cancel()
+        graceTask = nil
+        grace.end()
+        if feedsClosed {
+            feedsClosed = false
+            wasDown = false
+            startLifecycle()
+            refreshListSoon()
+            for session in open.values { Task { await session.kick() } }
+            outbox.start()
+        } else {
+            kickAll()
+        }
+    }
+
+    /// A refresh the system asked for while the app was out of sight (a background refresh, a silent push): the list and the
+    /// chats that moved on are read and written, within `seconds`.
+    func refreshInBackground(seconds: Double = 20) async -> Bool {
+        await refreshList()
+        let reached: Bool = lastError == nil
+        guard reached else { return false }
+        prefetch(budget: max(1, min(3, link.state.prefetchBudget)))
+        let task: Task<Void, Never>? = prefetchTask
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await task?.value }
+            group.addTask { try? await Task.sleep(for: .seconds(seconds)) }
+            await group.next()
+            group.cancelAll()
+        }
+        prefetchTask?.cancel()
+        return true
+    }
 
     /// Forgets what the disk holds, as when the key is forgotten.
     func clearCache() async {
         drafts.clear()
+        await outbox.clear()
         await cache.clear()
     }
 }

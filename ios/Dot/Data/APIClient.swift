@@ -3,23 +3,64 @@ import os
 
 /// The daemon's HTTP API as the native screens use it: JSON in and out over HTTPS with the phone's key, on the host
 /// and key the app already keeps (`DaemonHost`, `PhoneKeyStore`). Failures are `DaemonRequestError`, as the push
-/// registration's. Nothing here retries: a screen shows what it has (the cache) and tries again at the next
-/// reconnect, so that a request never holds the interface.
+/// registration's. A read is tried again as its `RetryPolicy` says (a few tries with a growing wait, waiting for the
+/// link when there is none), and every read is made off the interface: a screen draws what the cache holds and the
+/// read only brings it up to date. A write is sent once: what the owner did goes through the outbox, which keeps it and
+/// sends it again when the link allows.
 struct APIClient: Sendable {
     let host: DaemonHost
     let key: String
     let session: URLSession
+    /// The phone's link, when the app watches it: a read waits for it instead of spending tries while it is down.
+    let link: LinkMonitor?
+    /// How a read is tried again.
+    let readPolicy: RetryPolicy
+
+    init(host: DaemonHost, key: String, session: URLSession, link: LinkMonitor? = nil, readPolicy: RetryPolicy = .read) {
+        self.host = host
+        self.key = key
+        self.session = session
+        self.link = link
+        self.readPolicy = readPolicy
+    }
 
     private static let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "api")
 
-    /// A session for requests: HTTP/2 over the tailnet, no cache of its own (the app keeps its store), failing in 15 s.
+    /// A session for requests: HTTP/2 over the tailnet, no cache of its own (the app keeps its store). A read gives up
+    /// after 10 s of silence; a request made while there is no link waits for it (`waitsForConnectivity`) up to 45 s in
+    /// all, rather than failing at once and being asked again into the same nothing.
     static func makeSession() -> URLSession {
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 15
-        configuration.waitsForConnectivity = false
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 45
+        configuration.waitsForConnectivity = true
         configuration.httpMaximumConnectionsPerHost = 6
+        configuration.allowsConstrainedNetworkAccess = true
+        configuration.allowsExpensiveNetworkAccess = true
         return URLSession(configuration: configuration)
     }
+
+    /// A session for the event streams, made like `session` (the same protocols, proxies and cookies' rules): no timeout on the
+    /// whole, 45 s on silence, and no waiting for a link (the feed's own retry knows more).
+    static func makeStreamSession(like session: URLSession) -> URLSession {
+        let configuration: URLSessionConfiguration = session.configuration
+        configuration.timeoutIntervalForRequest = 45
+        configuration.timeoutIntervalForResource = 24 * 3600
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }
+
+    /// A session for photos: a base64 photo on a poor link takes minutes, not the 45 s a read is given.
+    static func makeUploadSession() -> URLSession {
+        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 600
+        configuration.waitsForConnectivity = true
+        return URLSession(configuration: configuration)
+    }
+
+    /// Seconds a request of this kind may stay silent: a read is short, a write may carry a photo.
+    static func timeout(for method: String) -> TimeInterval { method == "GET" ? 10 : 30 }
 
     func request(_ method: String, _ path: String, query: [URLQueryItem] = [], body: Data? = nil) -> URLRequest {
         var url: URL = host.url(path: path)
@@ -27,6 +68,7 @@ struct APIClient: Sendable {
         if !query.isEmpty { url.append(queryItems: query) }
         var request: URLRequest = URLRequest(url: url)
         request.httpMethod = method
+        request.timeoutInterval = Self.timeout(for: method)
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body {
@@ -37,7 +79,12 @@ struct APIClient: Sendable {
     }
 
     func get<T: Decodable & Sendable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
-        try decode(try await data(request("GET", path, query: query), path: path), path: path)
+        let built: URLRequest = request("GET", path, query: query)
+        return try await Retrier.run(readPolicy, link: link) {
+            // A phone that knows it has no link does not ask: the retry waits for the link instead.
+            if let link, !link.state.online { throw DaemonRequestError.transport(path: path, underlying: URLError(.notConnectedToInternet)) }
+            return try decode(try await data(built, path: path), path: path)
+        }
     }
 
     func send<T: Decodable & Sendable>(
@@ -60,6 +107,10 @@ struct APIClient: Sendable {
     }
 
     func data(_ request: URLRequest, path: String) async throws -> Data {
+        try await dataAndResponse(request, path: path).0
+    }
+
+    func dataAndResponse(_ request: URLRequest, path: String) async throws -> (Data, HTTPURLResponse) {
         let data: Data
         let response: URLResponse
         do {
@@ -73,7 +124,7 @@ struct APIClient: Sendable {
         guard (200..<300).contains(http.statusCode) else {
             throw DaemonRequestError.status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
         }
-        return data
+        return (data, http)
     }
 }
 
@@ -253,6 +304,9 @@ extension APIClient {
 
     func agents() async throws -> [AgentSummary] { try await get("/api/agents") }
 
+    /// One approval as the daemon stores it: how it stands now (`pending`, `approved`, `denied`, `expired`, `left`).
+    func approval(_ id: String) async throws -> ApprovalRecord { try await get("/api/approvals/\(id)") }
+
     /// The newest runs of a chat; with `before`, those that began before that time (item 1360), the page after the one
     /// whose oldest run began then.
     func runs(thread: String, limit: Int = 12, before: Double? = nil) async throws -> [RunRecord] {
@@ -293,6 +347,23 @@ extension APIClient {
         let page: [LossyEvent] = try await get(
             "/api/runs/\(run)/events",
             query: [URLQueryItem(name: "after", value: String(after)), URLQueryItem(name: "limit", value: String(limit))])
+        return Self.page(of: page, run: run)
+    }
+
+    /// The newest `count` stored events of a run, oldest first (item 1371); `nil` from a daemon that does not know `tail` (it
+    /// would answer with the run's first events, which are no tail), so that the caller reads the pages as before.
+    func eventsTail(run: String, count: Int) async throws -> EventsPage? {
+        let path: String = "/api/runs/\(run)/events"
+        let built: URLRequest = request("GET", path, query: [URLQueryItem(name: "tail", value: String(count))])
+        let (data, response): (Data, HTTPURLResponse) = try await Retrier.run(readPolicy, link: link) {
+            try await dataAndResponse(built, path: path)
+        }
+        guard response.value(forHTTPHeaderField: "X-Dot-Events-Tail") != nil else { return nil }
+        let page: [LossyEvent] = try decode(data, path: path)
+        return Self.page(of: page, run: run)
+    }
+
+    private static func page(of page: [LossyEvent], run: String) -> EventsPage {
         let read: [EventRecord] = page.compactMap(\.event)
         let failed: [LossyEvent] = page.filter { $0.event == nil }
         if !failed.isEmpty {

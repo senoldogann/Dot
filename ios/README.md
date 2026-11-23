@@ -10,9 +10,15 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
   - `Core/`: pure rules and records, no UI: address parsing, navigation policy and bridge validation of the web
     fallback; the daemon's records (`Models`, `JSONValue`); `ChatState`, the reducer that turns runs and events into
     rows; `QueueOrder`; `MessageBlocks`.
-  - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`), `SSEParser` and `EventFeed`
-    (resume from the last event id, backoff, reconnect on foreground and on a change of the network), `ChatCache` (JSON
-    files per host), `ChatSession` (one open chat, an actor), `NativeStore` (the list, the lifecycle stream).
+    Resilience rules live here too (item 1371): `RetryPolicy` (tries, waits, jitter, what is worth repeating),
+    `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
+  - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
+    `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
+    link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
+    absent, within a size), `ChatSession` (one open chat, an actor), `NativeStore` (the list, the lifecycle stream, the
+    link, what is read ahead, background and foreground), `LinkMonitor` (the phone's link, Low Data Mode and cost),
+    `Outbox` and `OutboxModel` (what the owner did with no link, kept on disk and sent once in order), `Retrier` and
+    `Coalescer`, `BackgroundGrace`.
   - `Features/`: the screens: `ChatListView`, `ChatView` with `Composer`, `QueuePanel` and the status line,
     `RunInspector`, `SettingsViews` (models, schedules), `PairView`, `Theme`.
   - `Adapters/` the Keychain, UserDefaults and the push/share HTTP client; `Push/` the token registration;
@@ -20,6 +26,11 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 - `DotTests/`: the unit tests (XCTest) of the reducer, the SSE parser and feed, the cache, the queue order, the link
   style, the requests, and (slice 2) the model and level rules, older runs, a step's detail, a message's actions, drafts,
   dictation's rules and the links.
+- `DotTests/` also holds the harness of item 1370: `FakeDaemon` (a daemon in the test process behind a `URLProtocol`:
+  the routes the app reads and sends, a key kept for a message as `send_once` keeps it, a response that is lost after
+  the daemon took the request, latency, a share of requests lost, no link at all; whether a request is lost depends on
+  its path and how often that path was asked, so a run is the same twice) and `PerfTests` (time to the first rows and to
+  the rows being the Mac's, in the scenarios of the table below).
 - `DotUITests/`: the same screens driven by taps in the simulator (XCUITest, scheme `DotUI`) against a scratch daemon
   with a scripted model; they skip when `/tmp/dot-ui-daemon.json` is missing and write screenshots to `/tmp/dot-ui-shots/`.
 - `DotLiveActivity/`: the widget extension (`dev.dotagent.phone.live`) that draws the Live Activity.
@@ -77,6 +88,73 @@ happen in `ChatSession`, off the main actor, which hands the screen a new `ChatS
 stream. The run's stream is followed with `after=<id>` and `Last-Event-ID: <id>` (item 1352), so a reconnect reads no
 history again; it comes back at once when the app comes to the front or the network changes, and otherwise after 0.5 s,
 1, 2, 4, 8 and 15 s. The transcript follows new words only while the reader is at the bottom.
+
+## On a bad link (items 1370 and 1371)
+
+What was measured, and what each part does now. Numbers are from the iPhone 17 Pro simulator against `FakeDaemon` with
+the profile 2 to 8 s of latency per request and three requests in ten lost (`TEST_RUNNER_DOT_PERF_SCALE=1`); the simulator
+shares the Mac's CPU and disk, so only the shape carries to a phone, and no real cellular network was tested.
+
+| Moment | Before | After |
+| --- | --- | --- |
+| List on the screen at launch (disk) | 0.6 ms | 1.0 ms |
+| Chat on the screen, cold launch or relaunch, any network | 10 to 15 ms | 14 to 20 ms |
+| Chat is the Mac's, relaunch, good network | 24 ms | 22 ms |
+| Chat is the Mac's, relaunch, worst network | not in 60 s | 8.0 s |
+| Chat is the Mac's, foreground after the streams died, worst network | not in 60 s | 8.0 s |
+| A message typed with no link | lost to "Not sent" until Retry | kept, goes by itself once the link is back |
+
+- **The disk cache** (`ChatCache`): `list.json` (list and agents), `extras.json` (models, providers, schedules), one
+  `chat-<id>.json` each (runs, helpers, the last 400 events, the queue, schedules and reactions, the list time it was read
+  up to), `drafts.json` and `outbox.json`. Each is written whole through a temporary file renamed over the old one, and
+  not again when its bytes did not change; a file that does not read, or is of a newer layout, is dropped and read from
+  Dot again (`schema` 2 reads layout 1 too). The folder is kept within 24 MB: past it the chats read or written longest
+  ago go first (a read touches the file). The list is decoded at launch (about a millisecond for a hundred chats) and
+  the first eight chats are decoded off the main actor while the screen is made.
+- **Reading**: `ChatSession` asks together for the chat's list of runs, its helpers, the questions that wait, its newest
+  run's page and the events after the cursors of the runs it holds, and draws the events as they arrive: one round trip
+  on a bad link where it was four in a row. A cursor moves only when the events are in the state, so a read cut short
+  loses none. Past 500 events of a run, the newest 400 are read instead (`?tail=`) and a line says that steps are not
+  shown. A read that failed says "reconnecting", keeps the rows and tries again by itself (0.5 s doubling to 15 s, with
+  jitter), or waits for the link when there is none. A state the screen already has is not handed over again.
+- **Requests** (`APIClient`): reads time out after 10 s, writes after 30 s, a session waits for connectivity up to 45 s
+  (photos 10 minutes), reads are tried three times, a refresh of the list is one request however often it is asked, and
+  leaving a chat cancels its reads. Both the lifecycle stream and a run's stream wait for the link instead of trying.
+- **The outbox**: see the next section.
+- **The line** (`ConnectionBannerView`, wired by one stack in `RootView`): *Offline — showing saved chats · last updated 3
+  min ago*, *Offline — 2 waiting to send*, *Reconnecting…* (only when it lasts 1.5 s), or the key refused; nothing when
+  all is well, and no clock runs while it is not shown.
+- **Background**: after 20 s out of sight the streams are closed and nothing runs; back in front the stream, the open
+  chats and the list are asked at once. `BGAppRefreshTask` (`dev.dotagent.phone.refresh`, mode `fetch`; no entitlement)
+  and a push that says `content-available` read the list and the chats that moved on within 20 s.
+- **Read ahead**: after a list read, the chats the list says moved on past what is held, six at most (three when the
+  link is expensive, none when Low Data Mode is on), one after another, never the chat that is open.
+
+### The outbox
+
+A message, an answer to an approval or a question, a stop, a removal from the queue, a new order of it, and a message's
+photos are written to `outbox.json` (the photos beside it) before anything is asked of the network, and sent in order by
+one loop. A message goes with its own key (`POST /api/threads/{id}/queue`, `key`): the daemon keeps a key for a day and
+answers a repeat with what the first made (`server/sending.py`; 409 while the first is under way, which the loop waits
+out), so an answer lost after the daemon took the message, an app killed while it was sent, and a link that came back
+twice send it once. A message that waited more than a day after a first try is left as "Not sent" for the owner, and
+goes under a new key when asked. An answer that finds its card closed (409 or 404) reads the card and says how it stands
+(*That question had expired when your answer reached Dot, so it was not used.*); a stop or a removal that finds nothing
+to do is done; a change the daemon refuses is told and dropped; a message the daemon refuses stays as "Not sent" with
+its words and does not hold the next one. A failure that may pass (no link, a daemon that is down or busy) keeps the order:
+the message waits and the later ones behind it.
+
+### Running the checks
+
+- `cd ios && xcodegen generate && xcodebuild test -project Dot.xcodeproj -scheme Dot -destination 'id=<simulator>' -configuration Debug CODE_SIGNING_ALLOWED=NO`
+  runs everything of `DotTests`, `PerfTests` at a twentieth of the profile's waits. `TEST_RUNNER_DOT_PERF_SCALE=1` runs the
+  real profile (about 80 s more) and `TEST_RUNNER_DOT_PERF_REPORT=/tmp/perf.txt` writes the lines `PERF <scenario> <metric> <s>`.
+- The simulator run: start the scratch daemon (`/tmp/dot-ui-res-daemon.json`, port 18741), then
+  `python3 ios/scripts/flaky_proxy.py 18742 18741 /tmp/dot-ui-res-mode` (modes `pass`, `bad[:scale]`, `slow`, `down` in
+  that file, read for each request), write `/tmp/dot-ui-res-proxy.json`
+  (`{"origin": "http://127.0.0.1:18742", "mode_file": "/tmp/dot-ui-res-mode", "link_file": "/tmp/dot-ui-res-link"}`) and run
+  `xcodebuild test -scheme DotUI -only-testing:DotUITests/DotUIResilienceTests`. The debug build reads the phone's link from
+  `-DotLinkFile <file>` (`up` or `down`), as the simulator cannot be taken off the Mac's network.
 
 ## Build and install on the iPhone
 

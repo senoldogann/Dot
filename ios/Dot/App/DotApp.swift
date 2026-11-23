@@ -13,9 +13,23 @@ struct DotApp: App {
         WindowGroup {
             RootView(model: appDelegate.model)
         }
-        // The app is in front again: every stream reconnects at once, resuming from its last event.
+        // The app is in front again: every stream reconnects at once, resuming from its last event. Out of sight it keeps what
+        // it holds, closes its streams after a few seconds and asks the system for a refresh now and then.
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { appDelegate.model.native?.reconnect() }
+            switch phase {
+            case .active:
+                if let native: NativeStore = appDelegate.model.native {
+                    native.enterForeground()
+                    native.reconnect()
+                }
+            case .background:
+                appDelegate.model.native?.enterBackground()
+                BackgroundRefresh.schedule()
+            case .inactive:
+                break
+            @unknown default:
+                break
+            }
         }
     }
 }
@@ -48,7 +62,20 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let center: UNUserNotificationCenter = UNUserNotificationCenter.current()
         center.delegate = self
         center.setNotificationCategories([approvalCategory()])
+        BackgroundRefresh.register(model: model)
         return true
+    }
+
+    /// A push that says there is something new (`content-available`) or arrives while the app is open: the list and the chats
+    /// that moved on are read now, within the time iOS gives.
+    func application(
+        _ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        Task { @MainActor in
+            let reached: Bool = await model.native?.refreshInBackground(seconds: 15) ?? false
+            completionHandler(reached ? .newData : .failed)
+        }
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

@@ -230,6 +230,11 @@ struct ChatState: Sendable, Equatable {
         upsert(ChatItem(id: "n:unreadable:\(runId)", kind: .note(words + " The web UI shows them.", .warn), ts: Date().timeIntervalSince1970))
     }
 
+    /// A line of the chat that is no event's (a note), kept once under `id`.
+    mutating func upsertNote(id: String, words: String, ts: Double) {
+        upsert(ChatItem(id: id, kind: .note(words, .plain), ts: ts))
+    }
+
     // MARK: Events
 
     mutating func apply(_ events: [EventRecord]) {

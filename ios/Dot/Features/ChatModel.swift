@@ -5,17 +5,23 @@ import SwiftUI
 import UIKit
 import os
 
-/// A message sent from here that the daemon has not yet taken.
+/// A message sent from here that the daemon has not yet taken: it waits in the outbox (on disk) and goes, in order,
+/// when the link allows.
 struct PendingSend: Identifiable, Equatable {
     let id: String
-    /// What the daemon is sent (a photo with no words is sent as "(photo)").
-    let text: String
     /// What the owner typed (empty for a photo alone), which Edit puts back in the box.
     let typed: String
     /// What the owner sees in the bubble.
     let shown: String
-    let images: [PickedImage]
-    var failed: Bool = false
+    var phase: OutboxItem.Phase
+    /// What to tell the owner when it did not go (the daemon's words, or that it waited too long).
+    var note: String?
+
+    /// Not sent and will not be sent by itself: Retry or Edit.
+    var failed: Bool { phase == .failed }
+    /// Not sent yet (the link is down, or it is not its turn): it goes by itself.
+    var waiting: Bool { phase == .waiting }
+    var sending: Bool { phase == .sending }
 }
 
 /// An image picked for the next message.
@@ -41,7 +47,13 @@ final class ChatModel {
     private(set) var queue: QueueView = QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil)
     private(set) var automations: [ThreadAutomation] = []
     private(set) var run: RunRecord?
-    private(set) var pending: [PendingSend] = []
+    /// What the owner sent from here that the Mac has not yet taken, oldest first (the outbox's messages of this chat).
+    var pending: [PendingSend] {
+        store.outbox.items(for: threadId).compactMap { item in
+            guard case .message(_, _, let typed, let shown, _, _, _) = item.action else { return nil }
+            return PendingSend(id: item.id, typed: typed, shown: shown, phase: item.phase, note: item.note)
+        }
+    }
     private(set) var notice: String?
     /// What the chat's next message starts with (model, reasoning level, mode); `nil` until the daemon has told.
     private(set) var choices: ChatChoices?
@@ -67,6 +79,8 @@ final class ChatModel {
     @ObservationIgnored private let token: UUID = UUID()
     @ObservationIgnored private var session: ChatSession?
     @ObservationIgnored private var reading: Task<Void, Never>?
+    @ObservationIgnored private var outcomes: Task<Void, Never>?
+    @ObservationIgnored private var beside: [Task<Void, Never>] = []
 
     init(thread: ThreadSummary, store: NativeStore) {
         self.threadId = thread.id
@@ -96,9 +110,17 @@ final class ChatModel {
                 self.take(output)
             }
         }
-        Task { await refreshQueue() }
-        Task { await refreshAutomations() }
-        Task { await refreshReactions() }
+        outcomes = Task { [weak self, box = store.outbox.box] in
+            for await outcome in await box.outcomes() {
+                guard let self else { return }
+                await self.take(outcome)
+            }
+        }
+        beside = [
+            Task { [weak self] in await self?.refreshQueue() },
+            Task { [weak self] in await self?.refreshAutomations() },
+            Task { [weak self] in await self?.refreshReactions() },
+        ]
     }
 
     func stop() {
@@ -106,6 +128,11 @@ final class ChatModel {
         store.drafts.flush()
         reading?.cancel()
         reading = nil
+        outcomes?.cancel()
+        outcomes = nil
+        // What was being read for this screen ends with it.
+        for task in beside { task.cancel() }
+        beside = []
         store.keep(state, for: threadId)
         store.release(token: token)
         session = nil
@@ -118,7 +145,8 @@ final class ChatModel {
             loaded = true
             store.keep(next, for: threadId)
         case .connection(let feedState):
-            connection = feedState
+            // With no link the line over the screens says so: the chat does not add "reconnecting" to it.
+            if case .reconnecting(_, false) = feedState, !store.link.state.online { connection = .connecting } else { connection = feedState }
         case .run(let record, let name, let kept):
             run = record
             choices = kept
@@ -134,6 +162,47 @@ final class ChatModel {
             if ["queue_changed", "run_finished", "run_queued"].contains(kind) { Task { await refreshQueue() } }
             if kind == "run_finished" || kind == "run_queued" { Task { await refreshAutomations() } }
             if kind == "reaction_added" || kind == "reaction_removed" { Task { await refreshReactions() } }
+        case .aside(let held, let schedules, let marks):
+            // What the disk held beside the transcript, drawn until the network says better.
+            if let held, queue.messages.isEmpty { queue = held }
+            if let schedules, automations.isEmpty { automations = schedules }
+            if let marks, reactions.isEmpty { reactions = marks }
+        }
+    }
+
+    /// What the Mac answered to something the owner did from here that had to wait (or did not).
+    private func take(_ outcome: OutboxOutcome) async {
+        switch outcome {
+        case .delivered(let item, let shown):
+            guard item.thread == threadId else { return }
+            queue = shown
+            if shown.besideThreadId != nil { notice = "Started in a chat of its own." }
+            await session?.refresh()
+        case .answered(let item, let status):
+            guard item.thread == threadId, case .decision(let approval, let run, _, _, _) = item.action else { return }
+            answering.remove(approval)
+            await session?.answered(approval: approval, status: status, runId: run)
+        case .expired(let item, let status):
+            guard item.thread == threadId, case .decision(let approval, let run, _, _, _) = item.action else { return }
+            answering.remove(approval)
+            await session?.answered(approval: approval, status: status, runId: run)
+            await session?.refresh()
+            notice = status == "expired"
+                ? "That question had expired when your answer reached Dot, so it was not used."
+                : "That question was already answered, so your answer was not used."
+        case .done(let item):
+            guard item.thread == threadId else { return }
+            switch item.action {
+            case .stop(let run, _): await session?.stopped(run: run)
+            default: await refreshQueue()
+            }
+        case .refused(let item, let words):
+            guard item.thread == threadId else { return }
+            if case .decision(let approval, _, _, _, _) = item.action { answering.remove(approval) }
+            if item.isMessage { return }
+            notice = words
+            await refreshQueue()
+            _ = await session?.refresh()
         }
     }
 
@@ -142,6 +211,7 @@ final class ChatModel {
     func refreshQueue() async {
         do {
             queue = try await store.api.queue(thread: threadId)
+            await session?.keep(queue: queue, automations: nil, reactions: nil)
         } catch {
             logger.error("the queue could not be read: \(String(describing: error), privacy: .public)")
         }
@@ -150,6 +220,7 @@ final class ChatModel {
     func refreshAutomations() async {
         do {
             automations = try await store.api.automations(thread: threadId)
+            await session?.keep(queue: nil, automations: automations, reactions: nil)
         } catch {
             logger.error("the schedules could not be read: \(String(describing: error), privacy: .public)")
         }
@@ -157,96 +228,59 @@ final class ChatModel {
 
     // MARK: Doing
 
-    /// Sends the draft: it starts a run when none works here, and is queued behind the one that does.
+    /// Sends the draft: it goes to the outbox (on disk, with the key the daemon starts it once by) and shows at once as
+    /// waiting; it is sent in its turn as soon as the link allows, and starts a run when none works here or is queued
+    /// behind the one that does.
     func send() {
         let text: String = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard canSend else { return }
-        let key: String = newMessageKey()
         let shown: String = text.isEmpty ? "Photo" : text
         let sending: [PickedImage] = images
         draft = ""
         images = []
-        let sent: PendingSend = PendingSend(id: key, text: text.isEmpty ? "(photo)" : text, typed: text, shown: shown, images: sending)
-        pending.append(sent)
-        Task { await deliver(sent) }
+        store.outbox.enqueue(
+            .message(
+                thread: threadId, text: text.isEmpty ? "(photo)" : text, typed: text, shown: shown, choices: messageChoices,
+                images: [], uploaded: []),
+            images: sending.map(\.data))
     }
 
-    func retry(_ send: PendingSend) {
-        guard let at: Int = pending.firstIndex(of: send) else { return }
-        pending[at].failed = false
-        Task { await deliver(send) }
-    }
+    func retry(_ send: PendingSend) { store.outbox.retry(send.id) }
 
+    /// Takes a message back to the box (Edit): its words and its photos.
     func discard(_ send: PendingSend) {
-        pending.removeAll { $0.id == send.id }
-        if draft.isEmpty { draft = send.typed }
-        images = send.images + images
-    }
-
-    private func deliver(_ send: PendingSend) async {
-        let key: String = send.id
-        do {
-            var ids: [String] = []
-            let uploader: DaemonClient = DaemonClient(session: store.api.session, maxAttempts: 2)
-            for image in send.images {
-                let upload: AttachmentUpload = AttachmentUpload(
-                    name: image.name, mediaType: "image/jpeg", dataB64: image.data.base64EncodedString())
-                ids.append(try await uploader.uploadAttachment(upload, host: store.host, key: store.api.key))
+        Task {
+            guard let back: (item: OutboxItem, photos: [Data]) = await store.outbox.discard(send.id) else { return }
+            if draft.isEmpty { draft = send.typed }
+            let restored: [PickedImage] = back.photos.enumerated().compactMap { number, data in
+                UIImage(data: data).map { PickedImage(name: "photo-\(number).jpg", data: data, preview: $0) }
             }
-            let shown: QueueView = try await store.api.send(
-                message: Message(text: send.text, key: key, attachments: ids, choices: messageChoices), thread: threadId)
-            queue = shown
-            if shown.besideThreadId != nil { notice = "Started in a chat of its own." }
-            await session?.refresh()
-            pending.removeAll { $0.id == key }
-        } catch {
-            logger.error("a message was not sent: \(String(describing: error), privacy: .public)")
-            if let at: Int = pending.firstIndex(where: { $0.id == key }) { pending[at].failed = true }
+            images = restored + images
         }
     }
 
     func stopRun() {
         guard let id: String = state.newestRunId else { return }
-        Task {
-            do {
-                try await store.api.stop(run: id)
-                await session?.stopped(run: id)
-            } catch {
-                logger.error("the run was not stopped: \(String(describing: error), privacy: .public)")
-                notice = "Could not stop the run."
-            }
-        }
+        if !store.link.state.online { notice = "Dot will be told to stop when you're back online." }
+        store.outbox.enqueue(.stop(run: id, thread: threadId))
     }
 
-    /// Answers a card. The card changes only when the daemon took the answer (its own reply says how the card stands);
-    /// a refusal is settled by reading the daemon's list of what waits, and the notice says what that list says.
+    /// Answers a card. It is kept (on disk) and sent when the link allows, so an answer given with no link is not lost; the
+    /// card changes when the daemon took the answer (its own reply says how the card stands). An answer that comes too late
+    /// (the question expired or was answered on the Mac) is said in a line.
     func decide(_ card: ApprovalCard, approve: Bool, note: String = "") {
         guard !answering.contains(card.approvalId) else { return }
         answering.insert(card.approvalId)
-        Task {
-            defer { answering.remove(card.approvalId) }
-            do {
-                let record: ApprovalRecord = try await store.api.decide(approval: card.approvalId, approve: approve, note: note)
-                await session?.answered(approval: card.approvalId, status: record.status, runId: card.runId)
-            } catch {
-                logger.error("an answer was not taken by the daemon: \(String(describing: error), privacy: .public)")
-                if let failure: DaemonRequestError = error as? DaemonRequestError, !failure.isRetryable {
-                    let waiting: Set<String> = await session?.refresh() ?? []
-                    notice = waiting.contains(card.approvalId) ? "Dot did not take your answer. Try again." : "Dot no longer asks that."
-                } else {
-                    notice = "Your answer did not reach Dot. Try again."
-                }
-            }
-        }
+        if !store.link.state.online { notice = "Your answer will be sent when you're back online." }
+        store.outbox.enqueue(.decision(approval: card.approvalId, run: card.runId, thread: threadId, approve: approve, note: note))
     }
 
     // MARK: Queue
 
     /// Moves a queued message one place up (`-1`) or down (`+1`): the list changes at once and the daemon is told the
-    /// new order; the daemon's own answer, or its queue when it refuses, is what stays.
+    /// new order (kept and sent when the link allows); the queue is read again when it answered.
     func moveQueued(_ id: String, by step: Int) {
         guard let order: [String] = queueOrder(queue.messages.map(\.id), moving: id, by: step) else { return }
-        let before: QueueView = queue
         var moved: [QueuedMessage] = []
         for (position, orderedId) in order.enumerated() {
             if var message: QueuedMessage = queue.messages.first(where: { $0.id == orderedId }) {
@@ -255,29 +289,12 @@ final class ChatModel {
             }
         }
         queue.messages = moved
-        Task {
-            do {
-                queue = try await store.api.reorderQueue(thread: threadId, ids: order)
-            } catch {
-                logger.error("a queued message was not moved: \(String(describing: error), privacy: .public)")
-                queue = before
-                notice = "Could not move the message."
-            }
-        }
+        store.outbox.enqueue(.reorder(thread: threadId, ids: order))
     }
 
     func removeQueued(_ id: String) {
-        let before: QueueView = queue
         queue.messages.removeAll { $0.id == id }
-        Task {
-            do {
-                queue = try await store.api.removeQueued(id)
-            } catch {
-                logger.error("a queued message was not removed: \(String(describing: error), privacy: .public)")
-                queue = before
-                notice = "Could not remove the message."
-            }
-        }
+        store.outbox.enqueue(.removeQueued(thread: threadId, message: id))
     }
 
     // MARK: Schedules of the chat
@@ -382,6 +399,7 @@ final class ChatModel {
     func refreshReactions() async {
         do {
             reactions = try await store.api.reactions(thread: threadId)
+            await session?.keep(queue: nil, automations: nil, reactions: reactions)
         } catch {
             logger.error("the reactions could not be read: \(String(describing: error), privacy: .public)")
         }

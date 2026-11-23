@@ -51,6 +51,9 @@ actor EventFeed {
     private let session: URLSession
     private let isFinal: @Sendable (EventRecord) -> Bool
     private let wantsEvents: Bool
+    /// The phone's link, when it is watched: while it is down the feed waits for it instead of trying (and failing, and
+    /// waiting longer) against nothing.
+    private let link: LinkMonitor?
     private var lastId: Int
     private var attemptTask: Task<Bool, Never>?
     private var waitTask: Task<Void, Never>?
@@ -63,9 +66,10 @@ actor EventFeed {
     /// `wantsEvents` false is the lifecycle stream: its messages are not event records of one run, they are told as
     /// notices (`event` name) for the reader to refetch what it shows.
     init(
-        session: URLSession, after: Int, wantsEvents: Bool = true, isFinal: @escaping @Sendable (EventRecord) -> Bool = { _ in false },
-        open: @escaping Opener
+        session: URLSession, after: Int, wantsEvents: Bool = true, link: LinkMonitor? = nil,
+        isFinal: @escaping @Sendable (EventRecord) -> Bool = { _ in false }, open: @escaping Opener
     ) {
+        self.link = link
         self.session = session
         self.open = open
         self.lastId = after
@@ -105,6 +109,14 @@ actor EventFeed {
     private func loop(_ out: AsyncStream<FeedUpdate>.Continuation) async {
         while !stopped && !Task.isCancelled {
             kicked = false
+            if let link, !link.state.online {
+                out.yield(.state(.reconnecting(attempt: max(1, failures), unauthorized: false)))
+                let wait: Task<Void, Never> = Task { _ = await link.waitForOnline(timeout: .seconds(30)) }
+                waitTask = wait
+                await wait.value
+                waitTask = nil
+                continue
+            }
             out.yield(.state(.connecting))
             let request: URLRequest = open(lastId)
             let attempt: Task<Bool, Never> = Task { [session, isFinal, wantsEvents] in

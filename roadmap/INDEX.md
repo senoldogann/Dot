@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1371](1371.md) | done as a simulator-tested slice | 2026-11-23 | Dot for iPhone works on the worst network: it draws what it holds first, reads together and tries again, keeps what the owner did with no link and sends it once, and says when it is offline |
 | [1370](1370.md) | done | 2026-11-23 | `GET /api/runs/{id}/events` takes `tail`, so a client that was away through a long run reads the end of it |
 | [1367](1367.md) | done | 2026-11-23 | The Claude plan's models are those Claude Code lists, not a list written into Dot |
 | [1363](1363.md) | done | 2026-11-23 | The goal check may read the lines of a file the run wrote before it decides |
