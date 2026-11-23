@@ -53,6 +53,7 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls, reached_sites
 from dotagent.agent.gate import RunGate
+from dotagent.agent.goal_chain import goal_checker_with_standby
 from dotagent.agent.helpers import (
     MODEL_SWITCHED_EVENT,
     Roster,
@@ -156,7 +157,6 @@ from dotagent.agent.review import (
     ProgressConsultant,
     ProgressRequest,
     checkpoint_judge_for,
-    goal_checker_for,
     goal_digest,
     progress_consultant_for,
     shorten_reason,
@@ -2758,8 +2758,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         shows_outside_lessons=True,
     )
     checker: GoalChecker | None = (
-        goal_checker_for(
-            runtime.router, runtime.roles.review(), config.model_call_timeout_s, f"{run.thread_id}:goal", run.id
+        goal_checker_with_standby(
+            runtime.router,
+            runtime.roles.review(),
+            runtime.roles.standby(),
+            config.model_call_timeout_s,
+            f"{run.thread_id}:goal",
+            run.id,
         )
         if run.goal_mode
         else None
