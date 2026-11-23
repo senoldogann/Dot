@@ -2284,6 +2284,20 @@ class AwayView(FrozenModel):
     drafts: int
 
 
+class AwayRead(FrozenModel):
+    """``GET /away/read``: the moment the owner last marked "while you were away" read, on any of their devices (item
+    1356), in seconds since the epoch; ``None`` before any device marked it."""
+
+    read_at: float | None
+
+
+class AwayMark(FrozenModel):
+    """``POST /away/read``: the moment to mark read (the ``until`` of the card that was shown). It never moves the mark
+    back, nor past now."""
+
+    until: float = Field(ge=0, allow_inf_nan=False)
+
+
 class RuleExample(FrozenModel):
     """A past step a rule tried out fits (item 469): when, in which run, the tool, its summary and target clipped and
     masked, whether it succeeded, and what the policy decided of it then. ``was`` is ``None`` for a step the gate did

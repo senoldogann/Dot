@@ -307,6 +307,11 @@ async def test_the_task_tab_lists_the_chats_schedules_and_loops_and_switches_and
                         await scheduler.drain()
                     after: ScheduleRecord = await runtime.store.get_schedule(once.id)
                     assert after.enabled == before.enabled and after.next_run_at == before.next_run_at
+                    # Its row says how that run ended, and when (item 1355), and a schedule that never ran says none.
+                    await expect(by_name("Reddit comments").locator(".automation-last")).to_contain_text(
+                        re.compile(r"^Last run done · \d\d:\d\d$")
+                    )
+                    await expect(by_name("iPhone build check").locator(".automation-last")).to_have_count(0)
                     # Back on again for the looks that follow.
                     async with httpx.AsyncClient(
                         base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}

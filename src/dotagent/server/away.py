@@ -8,6 +8,9 @@ from dotagent.server.views import AwayDecisionRun, AwayDecisions, AwayRun, AwayV
 from dotagent.store.db import Store
 from dotagent.store.models import WORKING_STATUSES, AutoDecisionCount, UnattendedCount, UnattendedRun
 
+# The row of the store's key/value table that keeps when the owner last marked the card read (item 1356): Dot's, not a
+# browser's, so that a phone and a Mac agree on what is news.
+AWAY_READ_KEY: str = "away.read_at"
 # How far back the card reads at most: a week.
 AWAY_WINDOW_S: float = 7 * 86_400.0
 # The newest runs it lists, and the runs with the most approvals answered for the owner it names.
@@ -127,3 +130,29 @@ async def read_away(store: Store, since: float, now: float) -> AwayView:
         await store.auto_decision_counts(SCHEDULE_SOURCE, start),
         await store.unattended_drafts(SCHEDULE_SOURCE, start),
     )
+
+
+async def read_mark(store: Store) -> float | None:
+    """When the owner last marked the card read on any device, or ``None`` when none did (or the row is not a time)."""
+    stored: str | None = await store.kv_get(AWAY_READ_KEY)
+    if stored is None:
+        return None
+    try:
+        return float(stored)
+    except ValueError:
+        return None
+
+
+async def mark_read(store: Store, until: float, now: float) -> float:
+    """Mark the card read up to ``until`` (never back, nor past ``now``) and say where the mark stands. The mark is read
+    and written in one write, so two devices marking at once cannot move it back."""
+    moved: float = min(until, now)
+
+    def later(stored: str | None) -> str:
+        try:
+            current: float | None = None if stored is None else float(stored)
+        except ValueError:
+            current = None
+        return repr(moved if current is None else max(current, moved))
+
+    return float(await store.kv_update(AWAY_READ_KEY, later))

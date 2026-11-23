@@ -1737,7 +1737,8 @@ button.lineage-row:focus-visible {
 }
 
 .automation-title,
-.automation-line {
+.automation-line,
+.automation-last {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1749,9 +1750,14 @@ button.lineage-row:focus-visible {
   font-weight: var(--weight-label);
 }
 
-.automation-line {
+.automation-line,
+.automation-last {
   color: var(--muted);
   font-size: var(--text-xs);
+}
+
+.automation-last[data-failed="true"] {
+  color: var(--bad);
 }
 
 .automation-row .icon-btn {

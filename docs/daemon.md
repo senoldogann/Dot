@@ -140,8 +140,10 @@ campaign's name, how it ended, when, and the first line of its answer with its s
 model answered for you and those `yolo` let through without asking in those runs and their helpers, by who and how
 many were denied, with the runs that had
 the most, two then **Show N more** too; and the drafts they wrote that wait for you. It carries no summary and no
-arguments of an approval. **Mark as read** moves the moment on, kept in this browser (each device has its own); the
-first visit marks it and shows nothing, so the card never pours out the past, and the server reads a week back at most.
+arguments of an approval. **Mark as read** moves the moment on, and Dot keeps it (item 1356, `GET` and `POST /api/away/read`), so the Mac and the
+phone agree on what is news: marking it on one clears it on the other when it next reads. The first visit from any
+device marks it and shows nothing (a browser that kept its own moment before hands it over once), so the card never pours
+out the past, the mark never moves back nor past now, and the server reads a week back at most.
 A run started with **Run now** is one of them.
 
 Above the chats stand, while they have rows, what waits for you (the approvals and questions runs wait for, those
@@ -822,7 +824,9 @@ open the rows of those that ended. The Task tab holds the same Lineage, compact,
 a subagent, and its Previous agents row opens the Agents tab. The Task tab also holds the chat's **Automations** (item 1334): the schedules and loops that belong to it (a loop made with
 `/loop`, a schedule a run made in the chat, a schedule that fires into it), each a calendar-clock mark with a green dot
 while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
-Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00"), a pencil that opens its editor page in Settings
+Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00") and, under that, how its last run ended and when (item 1355: "Last run done · 09:00",
+"Last run failed · 21 Nov 09:00" (in red while the schedule is on), "Last 3 runs failed · latest 09:00" when several in a row did, "Last firing skipped"
+with no time, as a skip writes none of its own; none for a schedule that never ran or works now), a pencil that opens its editor page in Settings
 (`#/settings/schedules/<id>`, item 1337), a play that runs it now (a run as at its time; its next time and its switch stay) and a switch that
 pauses it or puts it on again, which the scheduler reads at its next firing; the head's button opens all the schedules
 (`#/settings/schedules`). A chat with none shows no section. Under the Lineage the Agents tab says who
@@ -1517,6 +1521,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule; `POST` with `"enabled": false` adds one switched off, its time checked but not the room for one more switched on, which switching it on checks, item 464) |
 | `GET /threads/{id}/automations` | the schedules of a chat, its own loop among them, as the side panel's Automations lists them (item 1333): `[{schedule, loop}]`, `schedule` as `GET /schedules/{id}` gives it, `loop` true for a loop made with `/loop`; switched-on ones first, soonest first; 404 for no chat. Switching one on or off and running it now are the schedule's routes below, read at the next firing |
+| `GET /away` | what schedules and campaigns did since `since` (item 466), clamped to the last week: counts, newest runs, the approvals answered for you, the drafts waiting |
+| `GET /away/read`, `POST /away/read` | when "While you were away" was last marked read on any device (`{read_at}`, `null` before any), and `{until}` that moves it on: never back, never past now (item 1356) |
 | `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |
 | `GET\|PUT /brief` (`{"enabled": true, "time": "08:00", "days": "every"\|"weekdays", "lines": […]}`) | the morning brief (item 570, [Dot comes to you](proactive.md)): its settings and when it fires next and last fired; set it, which makes or changes its schedule (`research`, read-only), shown in `GET /schedules` with `brief: true` (422 for a time that is not `HH:MM`, a line over 300 characters, more than 20 lines, or what the scheduler refuses) |
 | `GET\|POST /watchers`, `PATCH\|DELETE /watchers/{id}`, `POST /watchers/{id}/try`, `GET /watchers/options` | the watchers (item 571, [Dot comes to you](proactive.md#watchers)): each with its choices (`kind` `mail`, `calendar` or `github`, `account`, `words`, `minutes`, `action` `tell` or `run`, `goal`) and how its looks go; make one (201; 422 for what its kind lacks, `minutes` outside 1 to 1440 and past 20 watchers), change the whole of one, delete one; Check now, one look at once (409 for one switched off, while `[watchers] enabled` is false and while the emergency stop is engaged); what the form offers (the accounts signed in, whether GitHub's token is kept, the limits) |

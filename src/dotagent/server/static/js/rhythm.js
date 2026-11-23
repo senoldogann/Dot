@@ -98,6 +98,14 @@ export function nextFiring(at, now) {
   return DAY_KEY.format(when) === DAY_KEY.format(new Date(now * 1000)) ? time : `${WEEKDAY.format(when)} ${time}`;
 }
 
+/** When a schedule last ran (`at`, seconds, in the past), as the sidebar says a moment gone by: the time alone when it
+ * was today ("09:00"), else the date and the time ("21 Nov 09:00"). `now` is in seconds too. */
+export function lastMoment(at, now) {
+  const when = new Date(at * 1000);
+  const time = HOUR_MINUTE.format(when);
+  return DAY_KEY.format(when) === DAY_KEY.format(new Date(now * 1000)) ? time : `${DAY_MONTH.format(when)} ${time}`;
+}
+
 /** When a schedule that runs once runs (`at`, seconds), in few words (items 1178 and 1179), from `now` (seconds too):
  * "today at 18:53", "tomorrow at 10:00", "Saturday at 09:00" within the coming week, else "17 Nov at 10:00", with the
  * year when it is not this one. */

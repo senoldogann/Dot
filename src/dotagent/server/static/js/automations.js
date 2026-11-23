@@ -1,6 +1,7 @@
 // The Automations of a chat (item 1334), a section of the run's side panel: the schedules and loops that belong to this
 // chat, as a developer tool's Automations list shows them. A row is a calendar-clock mark with a green dot while the
-// schedule is on, its title and, under it, how it repeats or when it runs and how it stands ("Every 6 hours · paused");
+// schedule is on, its title and, under it, how it repeats or when it runs and how it stands ("Every 6 hours · paused")
+// and how its last run ended ("Last run done · 09:00", in red when it failed: item 1355);
 // a pencil that opens the schedule's editor on the Schedules page, a play that runs it now, and a switch that pauses it or puts
 // it on again, which the scheduler reads at the schedule's next firing. The head has a way to all the schedules. The
 // daemon tells of no change of a schedule, so the rows are read again when the chat's runs come and go and as the page
@@ -48,6 +49,8 @@ export function automationsPanel({ threadId }) {
     const mark = el("span", { class: "automation-mark" }, icon("calendarClock"), dot);
     const title = el("span", { class: "automation-title" }, clip(words.title, TITLE_CHARS));
     const line = el("span", { class: "automation-line" }, words.line);
+    const last =
+      words.last === "" ? null : el("span", { class: "automation-last", "data-failed": String(words.failed) }, words.last);
     const edit = el(
       "a",
       {
@@ -84,7 +87,7 @@ export function automationsPanel({ threadId }) {
       "li",
       { class: "automation-row", "data-schedule": record.id, "data-loop": String(loop), title: record.name },
       mark,
-      el("span", { class: "automation-text" }, title, line),
+      el("span", { class: "automation-text" }, title, line, last),
       edit,
       play,
       toggle,

@@ -21,9 +21,10 @@ from dotagent.agent.campaign import (
     routes_without_progress,
     sessions_without_progress,
 )
+from dotagent.agent.goal_chain import goal_checker_with_standby
 from dotagent.agent.judge import ClaimJudgment, claim_refused, claim_state, describe_claim
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
-from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for, goal_digest, shorten_reason
+from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_digest, shorten_reason
 from dotagent.agent.verify import RunFacts, checked_facts
 from dotagent.config import AppConfig
 from dotagent.core.errors import ProviderError, ToolExecutionError
@@ -305,9 +306,10 @@ def _achieved_tool() -> RegisteredTool:
         if not campaign.targets:
             return fail("The campaign has no targets yet: record them with campaign_targets, verify them, then claim.")
         config: AppConfig = ctx.runtime.config
-        checker: GoalChecker = goal_checker_for(
+        checker: GoalChecker = goal_checker_with_standby(
             ctx.runtime.router,
             ctx.runtime.roles.review(),
+            ctx.runtime.roles.standby(),
             config.agent.model_call_timeout_s,
             f"{ctx.thread_id}:campaign",
             ctx.run_id,
