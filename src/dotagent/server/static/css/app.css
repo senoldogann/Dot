@@ -322,85 +322,35 @@ a {
   text-decoration: none;
 }
 
-.prose a {
-  text-decoration: underline;
+/* A link in a message (item 1346) reads as the words round it: no frame, no fill and no icon, in the ink of its sentence
+   tilted toward the accent so that it is a shade brighter than the text in dark and a shade more saturated in light
+   (above 4.5:1 on every surface, tests/unit/test_css_tokens.py), with no line under it until it is pointed at or has the
+   focus. The focus keeps the page's ring. */
+.prose a.msg-link {
+  --link: light-dark(
+    color-mix(in oklab, var(--accent-strong) 78%, var(--text)),
+    color-mix(in oklab, var(--accent-strong) 58%, var(--text))
+  );
+  border-radius: var(--radius-joined);
+  color: var(--link);
+  overflow-wrap: anywhere;
+  text-decoration: none;
   text-underline-offset: 2px;
 }
 
-/* A link in a message is a chip: the site's icon and one line of label, on the raised surface, in both schemes.
-   No margin of its own, so the spaces of the sentence are the only room around it. */
-.prose a.link-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: 18em;
-  margin: 0;
-  padding: var(--space-half) var(--space-2) var(--space-half) var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-label);
-  line-height: var(--leading-xs);
-  text-decoration: none;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-/* On a phone a chip takes a finger (test_phone_type: 32 px for what sits in a line), not only a link's line height. */
-@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  .prose a.link-pill {
-    min-height: calc(var(--space-6) + var(--space-2));
-  }
-}
-
-.prose a.link-pill .link-pill-icon,
-.prose a.link-pill .link-pill-fallback {
-  width: var(--space-4);
-  height: var(--space-4);
-  flex: none;
-  overflow: hidden;
-}
-
-.prose a.link-pill .link-pill-icon {
-  border-radius: var(--radius-joined);
-  object-fit: cover;
-}
-
-.prose a.link-pill .link-pill-fallback {
-  color: var(--muted);
-}
-
-.prose a.link-pill .link-pill-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+.prose a.msg-link:focus-visible {
+  text-decoration: underline;
 }
 
 @media (hover: hover) {
-  .prose a.link-pill:hover {
-    text-decoration: none;
-    background: var(--surface-3);
-    border-color: var(--border-strong);
+  .prose a.msg-link:hover {
+    text-decoration: underline;
   }
 }
 
-.bubble.user .prose a.link-pill {
-  background: color-mix(in oklab, var(--on-msg-me) 12%, transparent);
-  border-color: color-mix(in oklab, var(--on-msg-me) 28%, transparent);
-  color: inherit;
-}
-
-.bubble.user .prose a.link-pill .link-pill-fallback {
-  color: inherit;
-}
-
-@media (hover: hover) {
-  .bubble.user .prose a.link-pill:hover {
-    text-decoration: none;
-    background: color-mix(in oklab, var(--on-msg-me) 22%, transparent);
-  }
+/* In a bubble of yours the link takes the bubble's own ink, tilted toward the accent by the same hand. */
+.bubble.user .prose a.msg-link {
+  --link: color-mix(in oklab, var(--accent-strong) 45%, var(--on-msg-me));
 }
 
 @media (hover: hover) {
@@ -5498,10 +5448,6 @@ dialog.modal.versions-dialog {
 .bubble.user .prose .code-block,
 .bubble.user .prose th {
   background: color-mix(in oklab, var(--on-msg-me) 14%, transparent);
-  color: inherit;
-}
-
-.bubble.user .prose a {
   color: inherit;
 }
 

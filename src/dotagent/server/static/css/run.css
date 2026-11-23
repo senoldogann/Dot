@@ -1363,8 +1363,9 @@
 /* ---------- inspector ---------- */
 
 /* The panel stays beside the conversation under the stage bar, whose height layout.js measures into --stagebar-h (the
-   banner and the density change it), to its full height with its own scroll. It is one card on the composer's corner
-   whose sections sit on hairlines (item 121); as a drawer it is the drawer itself. */
+   banner and the density change it), to its full height. It is one card on the composer's corner in two parts: the head
+   with the switch between the tabs, which stays, and the body, which scrolls and holds the sections of the tab chosen,
+   each with a small head that sticks to the top of it (items 121 and 1345); as a drawer it is the drawer itself. */
 .inspector {
   container: inspector / inline-size;
   position: sticky;
@@ -1373,23 +1374,30 @@
   flex-direction: column;
   max-height: calc(100vh - var(--stagebar-h) - 24px);
   max-height: calc(100dvh - var(--stagebar-h) - 24px);
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
-/* The panel's tabs (item 203): one surface at a time, the chosen one in ink over a line,
-   a short count beside a name (the plan's steps done, the screenshots). The strip stays at the top of the panel as it
-   scrolls; beside the conversation the header's button hides the panel, and the drawer keeps its own close button. */
+.inspector-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The panel's tabs (item 203) are a segmented switch (item 1345): a track on the raised surface, the tab chosen lifted
+   out of it in ink, the others quiet, a short count beside a name (the plan's steps done, the screenshots). Beside the
+   conversation the header's button hides the panel, and the drawer keeps its own close button. */
 .inspector-head {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 1;
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px 0;
+  gap: var(--space-2);
+  padding: var(--space-2);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
@@ -1398,7 +1406,10 @@
   display: flex;
   flex: 1;
   min-width: 0;
-  gap: 4px;
+  gap: var(--space-half);
+  padding: var(--space-half);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1407,10 +1418,12 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 4px;
-  padding: 8px;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: calc(var(--control-h) - var(--space-1));
+  padding: 0 var(--space-2);
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -1427,12 +1440,12 @@
 }
 
 .inspector-tab[aria-selected="true"] {
-  border-bottom-color: var(--text);
+  background: light-dark(var(--surface), var(--surface-3));
+  box-shadow: 0 0 0 1px var(--border);
   color: var(--text);
 }
 
 .inspector-tab:focus-visible {
-  border-radius: var(--radius-sm);
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
@@ -1470,11 +1483,11 @@
   }
 }
 
-/* A tab not chosen is its icon alone, 31 px wide: a finger's width on a phone (item 606). */
+/* A tab not chosen is its icon alone, a finger's width on a phone (item 606). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .inspector-tab {
-    min-width: 36px;
-    justify-content: center;
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
   }
 }
 
@@ -1626,19 +1639,21 @@ button.lineage-row:focus-visible {
 .automation-list {
   display: flex;
   flex-direction: column;
-  max-height: calc(4 * 52px);
   margin: 0;
   padding: 0;
   list-style: none;
-  overflow-y: auto;
 }
 
 .automation-row {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 48px;
+  min-height: 40px;
   padding: var(--space-1) 0;
+}
+
+.automation-row + .automation-row {
+  border-top: 1px solid var(--border);
 }
 
 .automation-mark {
@@ -1708,6 +1723,8 @@ button.lineage-row:focus-visible {
 
 .automation-row .icon-btn {
   flex: none;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
 }
 
 .automation-row .icon-btn .icon {
@@ -1853,15 +1870,16 @@ button.lineage-row:focus-visible {
   display: none;
 }
 
-/* A section of a tab: its head (the title, its actions at the right, and under them the line that sums it up) over its
-   body, which is always open. As in a developer tool's details panel (item 1332) the sections are stacked, a hairline
-   between them, each titled by a small quiet label. */
+/* A section of a tab: its head (the title, what sums it up and its actions at the right, on one line) over its body,
+   which is always open. As in an inspector of a developer tool (items 1332 and 1345) the sections are stacked and
+   each is titled by a small head, a quiet band on a hairline that sticks to the top of the panel's scroll while its
+   section is in sight and gives way to the next one's; the body is tight, on the 8 px scale. */
 .panel-section-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
-  padding: 12px 16px 4px;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-1);
   color: var(--muted);
 }
 
@@ -1873,8 +1891,22 @@ button.lineage-row:focus-visible {
   font-weight: var(--weight-label);
 }
 
-.inspector-panel > .panel-section + .panel-section {
-  border-top: 1px solid var(--border);
+.inspector-panel > .panel-section > .panel-section-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex-wrap: nowrap;
+  min-height: calc(var(--control-h) - var(--space-half));
+  padding: var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.inspector-panel > .panel-section > .panel-section-head > .panel-section-title {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-summary {
@@ -1889,23 +1921,53 @@ button.lineage-row:focus-visible {
   font-size: var(--text-sm);
 }
 
+/* In a section's head the sum stands on the title's line, at the right and quiet, and gives way before the title does. */
+.inspector-panel > .panel-section > .panel-section-head > .panel-summary {
+  display: block;
+  flex: 0 1 auto;
+  order: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .panel-summary:empty {
   display: none;
 }
 
-/* Every body sits inside the section's padding, so no text hugs the edge (item 84). */
-.panel-section-body {
-  padding: 4px 16px 16px;
+.inspector-panel > .panel-section > .panel-section-head .icon-btn {
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  margin-block: calc(var(--space-1) * -1);
+  margin-right: calc(var(--space-2) * -1);
 }
 
-/* In a tab of several sections each scrolls on its own once it holds more than a share of the screen (item 544), its
-   head staying over it, so that a long recap or list does not push the sections under it out of sight. A tab of one
-   section has the panel to itself; Dot's computer and the screenshots keep their own size. */
-.inspector-panel:not([data-tab="screen"]) > .panel-section:not(:only-child) > .panel-section-body {
-  max-height: 40vh;
-  max-height: 40dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+.inspector-panel > .panel-section > .panel-section-head .icon-btn .icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* Every body sits inside the section's padding, so no text hugs the edge (item 84). */
+.panel-section-body {
+  padding: var(--space-1) var(--space-4) var(--space-4);
+}
+
+.inspector-panel > .panel-section > .panel-section-body {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+
+/* On a phone a head is a finger tall, and its button is the row's, as the rows under it are. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .inspector-panel > .panel-section > .panel-section-head {
+    min-height: var(--touch-target);
+  }
+
+  .inspector-panel > .panel-section > .panel-section-head .icon-btn {
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
 }
 
 /* The context under the recap (item 539): a row a line, its mark on a tile and its name, with what stands beside them
@@ -3049,7 +3111,7 @@ dialog.modal.file-dialog .file-picture img {
   }
 
   .inspector[data-mode="drawer"] .inspector-head {
-    padding: 24px 8px 0 12px;
+    padding: var(--space-5) var(--space-2) var(--space-2) var(--space-3);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     touch-action: pan-x;
   }
@@ -3195,10 +3257,6 @@ dialog.computer-full::backdrop {
   color: inherit;
   font: inherit;
   font-weight: var(--weight-label);
-}
-
-.panel-fold[data-open="false"] .panel-section-head {
-  padding-bottom: 12px;
 }
 
 /* The Run tab's More (item 452): the run's other facts, then how it was set up and where its time went, each under a

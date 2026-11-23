@@ -63,7 +63,6 @@ from dotagent.server.routes_channels import channels_router
 from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_drafts import drafts_router
-from dotagent.server.routes_favicons import favicons_router
 from dotagent.server.routes_files import files_router, looks_router
 from dotagent.server.routes_gallery import gallery_router
 from dotagent.server.routes_harness import harness_router
@@ -224,7 +223,6 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))
     looks: QuickLook = open_quick_look(looks_dir())
-    app.include_router(favicons_router(ctx))
     app.include_router(files_router(ctx, looks))
     app.include_router(looks_router(looks))
     app.include_router(phone_router(ctx, phones))

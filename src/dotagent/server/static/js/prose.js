@@ -2,13 +2,11 @@
 // become anchors, and the path of a file in code a button that shows the file beside the conversation (item 195). A
 // heading is drawn one level down and keeps the level it was written at in `data-level`, for a copy (item 206).
 
-import { faviconUrl } from "./api.js";
 import { table as tableMarkdown } from "./clipboard.js";
 import { codeBlock } from "./codeblock.js";
 import { copyButton } from "./copybutton.js";
 import { el, requestFile } from "./dom.js";
 import { t } from "./i18n.js";
-import { icon } from "./icons.js";
 import { pillFromPart } from "./linkpill.js";
 import { parseBlocks } from "./markdown.js";
 
@@ -85,41 +83,17 @@ function fileWords(text) {
   return nodes;
 }
 
-/** A link as a pill: the site's icon when this Mac has it, the link icon until then, and the short label. A click
- * opens a new window (`target`), which the desktop shell hands to the browser. */
+/** A link in a message: its short label as plain text in a link's colour, no icon, no frame and no fill. A click opens
+ * a new window (`target`), which the desktop shell hands to the browser. A label that is shorter than the words the
+ * link was written with (an address named by its site, long words cut) keeps them in `data-words`, so that a copy of the
+ * conversation gives back what was written. */
 function linkNode(part) {
   const pill = pillFromPart(part);
-  const mark = icon("link");
-  mark.classList.add("link-pill-fallback");
-  const image = el("img", { class: "link-pill-icon", alt: "", width: "16", height: "16", hidden: true });
-  const anchor = el(
-    "a",
-    {
-      class: "link-pill",
-      href: pill.href,
-      target: pill.target,
-      rel: pill.rel,
-      title: pill.href,
-      dataset: { host: pill.host },
-    },
-    image,
-    mark,
-    el("span", { class: "link-pill-label" }, pill.label),
-  );
-  if (pill.host !== "") {
-    faviconUrl(pill.host).then((url) => {
-      if (url === null || !anchor.isConnected) {
-        return;
-      }
-      image.addEventListener("error", () => {
-        image.remove();
-      });
-      image.src = url;
-      image.hidden = false;
-      mark.remove();
-    });
+  const dataset = { host: pill.host };
+  if (pill.label !== part.value) {
+    dataset.words = part.value;
   }
-  return anchor;
+  return el("a", { class: "msg-link", href: pill.href, target: pill.target, rel: pill.rel, title: pill.href, dataset }, pill.label);
 }
 
 function inlineNode(part) {
