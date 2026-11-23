@@ -7,6 +7,8 @@ enum FeedUpdate: Sendable {
     case events([EventRecord])
     /// A message that is no event of a run (the lifecycle stream's `resync`).
     case notice(String)
+    /// An event of the run that did not read; its id when the frame had one.
+    case unreadable(eventId: Int?)
     /// The connection's state, for the one line that says "reconnecting".
     case state(FeedState)
 }
@@ -188,7 +190,7 @@ actor EventFeed {
                         // log keeps which event it was.
                         Logger(subsystem: "dev.dotagent.phone", category: "feed").error(
                             "an event could not be read: id=\(message.id ?? "none", privacy: .public) kind=\(message.event ?? "none", privacy: .public) error=\(String(describing: error), privacy: .public)")
-                        out.yield(.notice("A message of this run could not be read and is missing here. The web UI shows it."))
+                        out.yield(.unreadable(eventId: message.id.flatMap { Int($0) }))
                         continue
                     }
                     events.append(event)

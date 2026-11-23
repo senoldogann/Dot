@@ -39,8 +39,12 @@ actor ChatSession {
     /// The daemon refused the phone's key (401, 403): nothing is asked again until the app comes back to the front.
     private var keyRefused: Bool = false
     /// How many events of each run did not read (the daemon's page or stream went past them): a row says so.
-    private var unreadable: [String: Int] = [:]
+    private var unreadable: UnreadableEvents = UnreadableEvents()
+    /// Callers waiting for a catch-up that was already reading when they asked.
+    private var waiters: [CheckedContinuation<Void, Never>] = []
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "chat")
+
+    static let unreadableWords: String = "A message of this run could not be read and is missing here. The web UI shows it."
 
     /// How soon after the last change the screen is handed the state again while words stream.
     static let publishEvery: Duration = .milliseconds(40)
@@ -121,8 +125,8 @@ actor ChatSession {
         events = stored.events
         for event in stored.events { cursors[event.runId] = max(cursors[event.runId] ?? 0, event.id) }
         state = stored.state()
-        unreadable = stored.unreadable ?? [:]
-        for (run, count) in unreadable { state.setUnreadable(count, ofRun: run) }
+        unreadable = stored.unreadable ?? UnreadableEvents()
+        for (run, ids) in unreadable.byRun { state.setUnreadable(ids.count, ofRun: run) }
         publishNow()
     }
 
@@ -139,16 +143,22 @@ actor ChatSession {
     /// each followed run's events after its cursor. A second call while one reads is made once more when it ends.
     private func catchUp() async {
         if catching {
+            // One already reads: this call ends when that read has (and the one it makes again for this call), so that
+            // what the caller looks at afterwards is what the daemon said after it asked.
             again = true
+            await withCheckedContinuation { waiters.append($0) }
             return
         }
         catching = true
-        defer { catching = false }
         repeat {
             again = false
             await readDelta()
         } while again && !stopped
+        catching = false
         followIfWorking()
+        let ending: [CheckedContinuation<Void, Never>] = waiters
+        waiters = []
+        for waiter in ending { waiter.resume() }
     }
 
     private func readDelta() async {
@@ -170,7 +180,7 @@ actor ChatSession {
                     if state.rootRunIds.contains(run.id) { state.setStatus(run.status, ofRun: run.id) } else { state.addRun(run) }
                     let fresh: [EventRecord] = try await readEvents(of: run.id)
                     state.apply(fresh)
-                    if let count: Int = unreadable[run.id] { state.setUnreadable(count, ofRun: run.id) }
+                    state.setUnreadable(unreadable.count(run: run.id), ofRun: run.id)
                     events.append(contentsOf: fresh.filter { $0.id > 0 })
                 } else if state.rootRunIds.contains(run.id) {
                     state.setStatus(run.status, ofRun: run.id)
@@ -204,16 +214,17 @@ actor ChatSession {
         while true {
             let page: EventsPage = try await api.events(run: runId, after: after)
             all.append(contentsOf: page.events)
-            if page.dropped > 0 {
-                // The page went past events nobody read: kept, so the row stays after a reopen.
-                unreadable[runId, default: 0] += page.dropped
-                output?.yield(.failed("A message of this run could not be read and is missing here. The web UI shows it."))
+            // The ids that did not read are kept as a set (met again, they are not counted again), and the cursor goes past the
+            // whole page, the unread elements included, so that they are not asked for again.
+            if unreadable.add(page.droppedIds, run: runId) > 0 {
+                output?.yield(.failed(Self.unreadableWords))
             }
-            if let top: Int = page.events.map(\.id).max() {
+            if let top: Int = page.topId {
                 after = top
                 cursors[runId] = max(cursors[runId] ?? 0, top)
             }
-            if page.size < 2000 { return all }
+            // A page that said no id at all cannot be walked past: it ends the read rather than ask for it again.
+            if page.size < 2000 || page.topId == nil { return all }
         }
     }
 
@@ -269,12 +280,16 @@ actor ChatSession {
             // After a refused key the feed's own end must not replace the line that says so.
             if keyRefused, feedState == .ended { break }
             output?.yield(.connection(feedState))
-        case .notice(let words):
-            unreadable[runId, default: 0] += 1
-            state.setUnreadable(unreadable[runId] ?? 1, ofRun: runId)
-            publishSoon()
-            scheduleSave()
-            output?.yield(.failed(words))
+        case .notice:
+            break
+        case .unreadable(let eventId):
+            // Handed over again by a reconnect, it is the same event: counted once.
+            if unreadable.add([eventId ?? UnreadableEvents.unknownId], run: runId) > 0 {
+                state.setUnreadable(unreadable.count(run: runId), ofRun: runId)
+                publishSoon()
+                scheduleSave()
+                output?.yield(.failed(Self.unreadableWords))
+            }
         }
     }
 

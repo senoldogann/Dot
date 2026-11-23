@@ -213,7 +213,7 @@ final class NativeStore {
         case .notice(let kind):
             refreshListSoon()
             for session in open.values { Task { await session.lifecycle(kind) } }
-        case .events:
+        case .events, .unreadable:
             break
         }
     }

@@ -193,13 +193,13 @@ final class EventFeedTests: XCTestCase {
             session: session, after: 0, isFinal: { $0.kind == "run_finished" },
             open: { after in runStreamRequest(api: api, runId: "run_1", after: after) })
         var ids: [Int] = []
-        var notices: Int = 0
+        var unread: [Int?] = []
         for await update in await feed.start() {
             if case .events(let events) = update { ids += events.map(\.id) }
-            if case .notice = update { notices += 1 }
+            if case .unreadable(let eventId) = update { unread.append(eventId) }
         }
         XCTAssertEqual(ids, [2])
-        XCTAssertEqual(notices, 1, "the screen is told one message could not be read")
+        XCTAssertEqual(unread, [1], "the screen is told which message could not be read, by its id")
     }
 
     func testAKickReconnectsAtOnceWithoutWaiting() async throws {
@@ -265,16 +265,65 @@ final class ChatSessionKeyTests: XCTestCase {
 }
 
 final class LossyTests: XCTestCase {
-    func testAnEventThatDoesNotReadIsLeftOutOfAPageNotTheWholePageAndIsCounted() async throws {
+    private func api(reply: String) -> APIClient {
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BodyStub.self]
         BodyStub.status = 200
-        BodyStub.reply = #"[{"id":1,"run_id":"r","ts":1,"kind":"a","data":{}},{"id":"bad"},{"id":3,"run_id":"r","ts":1,"kind":"b","data":{}}]"#
+        BodyStub.reply = reply
         let host: DaemonHost = DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!)
-        let api: APIClient = APIClient(host: host, key: "k", session: URLSession(configuration: configuration))
-        let page: EventsPage = try await api.events(run: "r", after: 0)
+        return APIClient(host: host, key: "k", session: URLSession(configuration: configuration))
+    }
+
+    func testAnEventThatDoesNotReadIsLeftOutOfAPageNotTheWholePageAndIsCounted() async throws {
+        let page: EventsPage = try await api(reply: #"[{"id":1,"run_id":"r","ts":1,"kind":"a","data":{}},{"id":2},{"id":3,"run_id":"r","ts":1,"kind":"b","data":{}}]"#)
+            .events(run: "r", after: 0)
         XCTAssertEqual(page.events.map(\.id), [1, 3])
         XCTAssertEqual(page.size, 3)
-        XCTAssertEqual(page.dropped, 1, "the caller is told, to say it to the owner")
+        XCTAssertEqual(page.droppedIds, [2], "the caller is told which, to say it to the owner once")
+    }
+
+    func testTheCursorGoesPastAnUnreadEventThatEndsThePage() async throws {
+        let page: EventsPage = try await api(reply: #"[{"id":1,"run_id":"r","ts":1,"kind":"a","data":{}},{"id":2,"kind":"broken"}]"#)
+            .events(run: "r", after: 0)
+        XCTAssertEqual(page.events.map(\.id), [1])
+        XCTAssertEqual(page.topId, 2, "the next page starts after the unread event, not before it")
+    }
+
+    func testAnEventWithNoReadableIdIsTheUnknownOne() async throws {
+        let page: EventsPage = try await api(reply: #"[{"id":"x"}]"#).events(run: "r", after: 0)
+        XCTAssertEqual(page.droppedIds, [UnreadableEvents.unknownId])
+        XCTAssertNil(page.topId, "a page that names no id cannot be walked past: the read ends")
+    }
+}
+
+final class UnreadableEventsTests: XCTestCase {
+    func testTheSameEventMetAgainIsCountedOnce() {
+        var log: UnreadableEvents = UnreadableEvents()
+        XCTAssertEqual(log.add([7], run: "r"), 1)
+        XCTAssertEqual(log.add([7], run: "r"), 0, "a reconnect or a later catch-up hands it over again")
+        XCTAssertEqual(log.add([7, 9], run: "r"), 1)
+        XCTAssertEqual(log.count(run: "r"), 2)
+        XCTAssertEqual(log.count(run: "other"), 0)
+    }
+
+    func testEventsWithNoIdAreOneUnknown() {
+        var log: UnreadableEvents = UnreadableEvents()
+        log.add([UnreadableEvents.unknownId], run: "r")
+        log.add([UnreadableEvents.unknownId], run: "r")
+        XCTAssertEqual(log.count(run: "r"), 1)
+    }
+
+    func testItIsKeptWithTheChat() async throws {
+        let directory: URL = FileManager.default.temporaryDirectory.appending(path: "dot-unreadable-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache: ChatCache = ChatCache(directory: directory)
+        var log: UnreadableEvents = UnreadableEvents()
+        log.add([4, 5], run: "run_1")
+        var chat: StoredChat = StoredChat(threadId: "thr_1", runs: [makeRun()], helpers: [], events: [], savedAt: 1)
+        chat.unreadable = log
+        await cache.saveChat(chat)
+        let loaded: StoredChat? = await cache.loadChat("thr_1")
+        let state: ChatState = try XCTUnwrap(loaded).state()
+        XCTAssertTrue(state.items.contains { $0.id == "n:unreadable:run_1" }, "the row is still there after a reopen")
     }
 }

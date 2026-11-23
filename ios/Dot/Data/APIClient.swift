@@ -77,11 +77,28 @@ struct APIClient: Sendable {
     }
 }
 
-/// A page of events: those that read, how many came, and how many did not read.
+/// A page of events: those that read, how many elements came, the ids of those that did not read, and the highest id of
+/// the page whether it read or not (where the next page starts).
 struct EventsPage: Sendable {
     var events: [EventRecord]
     var size: Int
-    var dropped: Int
+    var droppedIds: [Int]
+    var topId: Int?
+
+    var dropped: Int { droppedIds.count }
+}
+
+/// An event of a page that is kept if it reads and, if not, still says its id.
+struct LossyEvent: Decodable, Sendable {
+    let event: EventRecord?
+    let id: Int?
+
+    private enum Keys: String, CodingKey { case id }
+
+    init(from decoder: any Decoder) throws {
+        event = try? EventRecord(from: decoder)
+        id = try? decoder.container(keyedBy: Keys.self).decode(Int.self, forKey: .id)
+    }
 }
 
 /// An element of a page that is left out when it does not decode, rather than failing the page.
@@ -146,18 +163,21 @@ extension APIClient {
 
     func detail(run: String) async throws -> RunDetail { try await get("/api/runs/\(run)") }
 
-    /// A run's stored events after `after`, and how many of the page did not read: those are left out, not the whole
-    /// page, and the caller says so to the owner (a row of the chat).
+    /// A run's stored events after `after`. An element that does not read is left out, not the whole page, and its id (when
+    /// it has one) is kept so that the cursor goes past it once and the caller says it to the owner (a row of the chat).
     func events(run: String, after: Int, limit: Int = 2000) async throws -> EventsPage {
-        let page: [Lossy<EventRecord>] = try await get(
+        let page: [LossyEvent] = try await get(
             "/api/runs/\(run)/events",
             query: [URLQueryItem(name: "after", value: String(after)), URLQueryItem(name: "limit", value: String(limit))])
-        let read: [EventRecord] = page.compactMap(\.value)
-        if read.count != page.count {
+        let read: [EventRecord] = page.compactMap(\.event)
+        let failed: [LossyEvent] = page.filter { $0.event == nil }
+        if !failed.isEmpty {
             Logger(subsystem: "dev.dotagent.phone", category: "api").error(
-                "\(page.count - read.count) events of \(run, privacy: .public) could not be read and are left out")
+                "\(failed.count) events of \(run, privacy: .public) could not be read and are left out")
         }
-        return EventsPage(events: read, size: page.count, dropped: page.count - read.count)
+        return EventsPage(
+            events: read, size: page.count, droppedIds: failed.map { $0.id ?? UnreadableEvents.unknownId },
+            topId: page.compactMap(\.id).max())
     }
 
     /// The approvals and questions waiting for the owner, in every chat (`GET /api/approvals?status=pending`).
