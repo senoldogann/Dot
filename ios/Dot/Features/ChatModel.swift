@@ -50,6 +50,8 @@ final class ChatModel {
     var images: [PickedImage] = []
 
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "chat-screen")
+    /// The cards whose answer is on its way: pressed once, not twice.
+    @ObservationIgnored private var answering: Set<String> = []
     @ObservationIgnored private let token: UUID = UUID()
     @ObservationIgnored private var session: ChatSession?
     @ObservationIgnored private var reading: Task<Void, Never>?
@@ -196,21 +198,22 @@ final class ChatModel {
         }
     }
 
+    /// Answers a card. The card changes only when the daemon took the answer (its own reply says how the card stands);
+    /// a refusal is settled by reading the daemon's list of what waits, and the notice says what that list says.
     func decide(_ card: ApprovalCard, approve: Bool, note: String = "") {
+        guard !answering.contains(card.approvalId) else { return }
+        answering.insert(card.approvalId)
         Task {
-            await session?.answered(approval: card.approvalId, status: approve ? "approved" : "denied", runId: card.runId)
+            defer { answering.remove(card.approvalId) }
             do {
-                try await store.api.decide(approval: card.approvalId, approve: approve, note: note)
+                let record: ApprovalRecord = try await store.api.decide(approval: card.approvalId, approve: approve, note: note)
+                await session?.answered(approval: card.approvalId, status: record.status, runId: card.runId)
             } catch {
-                logger.error("an answer did not reach the daemon: \(String(describing: error), privacy: .public)")
+                logger.error("an answer was not taken by the daemon: \(String(describing: error), privacy: .public)")
                 if let failure: DaemonRequestError = error as? DaemonRequestError, !failure.isRetryable {
-                    // A refusal (the Mac answered it, it expired): the daemon's own list says how the card stands.
-                    notice = "Dot no longer asks that."
-                    await session?.refresh()
+                    let waiting: Set<String> = await session?.refresh() ?? []
+                    notice = waiting.contains(card.approvalId) ? "Dot did not take your answer. Try again." : "Dot no longer asks that."
                 } else {
-                    // Nothing reached the daemon: the card asked and still asks, with its buttons, and the run still
-                    // waits on the owner.
-                    await session?.reopened(approval: card.approvalId)
                     notice = "Your answer did not reach Dot. Try again."
                 }
             }

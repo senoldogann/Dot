@@ -22,11 +22,15 @@ struct StoredChat: Codable, Sendable, Equatable {
     var events: [EventRecord]
     var savedAt: Double
     var schema: Int? = ChatCache.schema
+    /// How many events of each run did not read, by run id: the chat keeps saying so.
+    var unreadable: [String: Int]?
 
     /// The chat's state: the runs oldest first, the newest two followed event by event, the older ones as their
     /// record has them.
     func state() -> ChatState {
-        ChatState.build(runs: runs, helpers: helpers, events: events)
+        var built: ChatState = ChatState.build(runs: runs, helpers: helpers, events: events)
+        for (run, count) in unreadable ?? [:] { built.setUnreadable(count, ofRun: run) }
+        return built
     }
 }
 

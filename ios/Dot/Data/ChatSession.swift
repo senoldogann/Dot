@@ -38,6 +38,8 @@ actor ChatSession {
     private var stopped: Bool = false
     /// The daemon refused the phone's key (401, 403): nothing is asked again until the app comes back to the front.
     private var keyRefused: Bool = false
+    /// How many events of each run did not read (the daemon's page or stream went past them): a row says so.
+    private var unreadable: [String: Int] = [:]
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "chat")
 
     /// How soon after the last change the screen is handed the state again while words stream.
@@ -88,15 +90,15 @@ actor ChatSession {
         scheduleRefresh(after: .milliseconds(150))
     }
 
-    func refresh() async { await catchUp() }
-
-    /// The answer did not reach the daemon: the card asks again.
-    func reopened(approval id: String) {
-        state.reopen(approval: id)
-        publishNow()
+    /// Reads what the daemon has now; the ids of the approvals that still wait on the owner after it.
+    @discardableResult
+    func refresh() async -> Set<String> {
+        await catchUp()
+        return Set(state.pendingApprovals.map(\.approvalId))
     }
 
-    /// The owner answered an approval card here: it shows answered before the daemon's event says so.
+    /// The daemon took the owner's answer to a card (its own answer says how the card now stands): it shows so before
+    /// the stream's event does.
     func answered(approval id: String, status: String, runId: String) {
         state.apply(EventRecord(
             id: 0, runId: runId, ts: Date().timeIntervalSince1970, kind: "approval_decided",
@@ -119,6 +121,8 @@ actor ChatSession {
         events = stored.events
         for event in stored.events { cursors[event.runId] = max(cursors[event.runId] ?? 0, event.id) }
         state = stored.state()
+        unreadable = stored.unreadable ?? [:]
+        for (run, count) in unreadable { state.setUnreadable(count, ofRun: run) }
         publishNow()
     }
 
@@ -166,6 +170,7 @@ actor ChatSession {
                     if state.rootRunIds.contains(run.id) { state.setStatus(run.status, ofRun: run.id) } else { state.addRun(run) }
                     let fresh: [EventRecord] = try await readEvents(of: run.id)
                     state.apply(fresh)
+                    if let count: Int = unreadable[run.id] { state.setUnreadable(count, ofRun: run.id) }
                     events.append(contentsOf: fresh.filter { $0.id > 0 })
                 } else if state.rootRunIds.contains(run.id) {
                     state.setStatus(run.status, ofRun: run.id)
@@ -197,13 +202,18 @@ actor ChatSession {
         var all: [EventRecord] = []
         var after: Int = cursors[runId] ?? 0
         while true {
-            let page: [EventRecord] = try await api.events(run: runId, after: after)
-            all.append(contentsOf: page)
-            if let top: Int = page.map(\.id).max() {
+            let page: EventsPage = try await api.events(run: runId, after: after)
+            all.append(contentsOf: page.events)
+            if page.dropped > 0 {
+                // The page went past events nobody read: kept, so the row stays after a reopen.
+                unreadable[runId, default: 0] += page.dropped
+                output?.yield(.failed("A message of this run could not be read and is missing here. The web UI shows it."))
+            }
+            if let top: Int = page.events.map(\.id).max() {
                 after = top
                 cursors[runId] = max(cursors[runId] ?? 0, top)
             }
-            if page.count < 2000 { return all }
+            if page.size < 2000 { return all }
         }
     }
 
@@ -260,6 +270,10 @@ actor ChatSession {
             if keyRefused, feedState == .ended { break }
             output?.yield(.connection(feedState))
         case .notice(let words):
+            unreadable[runId, default: 0] += 1
+            state.setUnreadable(unreadable[runId] ?? 1, ofRun: runId)
+            publishSoon()
+            scheduleSave()
             output?.yield(.failed(words))
         }
     }
@@ -313,7 +327,7 @@ actor ChatSession {
         guard !runs.isEmpty else { return }
         let chat: StoredChat = StoredChat(
             threadId: threadId, runs: Array(runs.sorted { $0.createdAt > $1.createdAt }.prefix(12)), helpers: Array(helperRuns.prefix(30)), events: events,
-            savedAt: Date().timeIntervalSince1970)
+            savedAt: Date().timeIntervalSince1970, unreadable: unreadable.isEmpty ? nil : unreadable)
         let cache: ChatCache = cache
         Task.detached { await cache.saveChat(chat) }
     }

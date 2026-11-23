@@ -159,7 +159,15 @@ struct ChatState: Sendable, Equatable {
     /// event that asked it was not read), a card the daemon no longer lists as open is closed.
     mutating func setOpenQuestions(_ questions: [ApprovalRecord]) {
         let open: Set<String> = Set(questions.map(\.id))
-        for question in questions where index["p:\(question.id)"] == nil {
+        for question in questions {
+            // The daemon's list is the truth both ways: a card it lists as open asks (again), one it no longer lists is closed.
+            if let at: Int = index["p:\(question.id)"] {
+                if case .approval(var card) = items[at].kind, !card.isPending {
+                    card.status = "pending"
+                    items[at].kind = .approval(card)
+                }
+                continue
+            }
             upsert(ChatItem(
                 id: "p:\(question.id)",
                 kind: .approval(ApprovalCard(
@@ -174,7 +182,18 @@ struct ChatState: Sendable, Equatable {
                 items[at].kind = .approval(card)
             }
         }
-        if runStatus == "blocked", pendingApprovals.isEmpty { runStatus = "running" }
+        if let waiting: ApprovalCard = pendingApprovals.last, runStatus == "running", waiting.runId == rootRunIds.last {
+            runStatus = "blocked"
+        } else if runStatus == "blocked", pendingApprovals.isEmpty {
+            runStatus = "running"
+        }
+    }
+
+    /// Events of a run that could not be read: a row says so, for good (the daemon's page and stream went past them).
+    mutating func setUnreadable(_ count: Int, ofRun runId: String) {
+        guard count > 0 else { return }
+        let words: String = count == 1 ? "1 message of this run could not be shown here." : "\(count) messages of this run could not be shown here."
+        upsert(ChatItem(id: "n:unreadable:\(runId)", kind: .note(words + " The web UI shows them.", .warn), ts: Date().timeIntervalSince1970))
     }
 
     // MARK: Events
@@ -354,15 +373,6 @@ struct ChatState: Sendable, Equatable {
             question: tool == "ask_user" ? args?["question"]?.string : nil, status: "pending")
         upsert(ChatItem(id: "p:\(id)", kind: .approval(card), ts: event.ts))
         if isRoot, event.runId == rootRunIds.last { runStatus = "blocked" }
-    }
-
-    /// An answer that did not reach the daemon: the card asks again (the daemon still lists it as open), and the run
-    /// waits for the owner as it did.
-    mutating func reopen(approval id: String) {
-        guard let at: Int = index["p:\(id)"], case .approval(var card) = items[at].kind, !card.isPending else { return }
-        card.status = "pending"
-        items[at].kind = .approval(card)
-        if runStatus == "running", card.runId == rootRunIds.last { runStatus = "blocked" }
     }
 
     private mutating func approvalDecided(_ event: EventRecord) {

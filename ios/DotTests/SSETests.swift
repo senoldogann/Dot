@@ -265,9 +265,16 @@ final class ChatSessionKeyTests: XCTestCase {
 }
 
 final class LossyTests: XCTestCase {
-    func testAnEventThatDoesNotReadIsLeftOutOfAPageNotTheWholePage() throws {
-        let page: String = #"[{"id":1,"run_id":"r","ts":1,"kind":"a","data":{}},{"id":"bad"},{"id":3,"run_id":"r","ts":1,"kind":"b","data":{}}]"#
-        let read: [Lossy<EventRecord>] = try JSONDecoder().decode([Lossy<EventRecord>].self, from: Data(page.utf8))
-        XCTAssertEqual(read.compactMap(\.value).map(\.id), [1, 3])
+    func testAnEventThatDoesNotReadIsLeftOutOfAPageNotTheWholePageAndIsCounted() async throws {
+        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BodyStub.self]
+        BodyStub.status = 200
+        BodyStub.reply = #"[{"id":1,"run_id":"r","ts":1,"kind":"a","data":{}},{"id":"bad"},{"id":3,"run_id":"r","ts":1,"kind":"b","data":{}}]"#
+        let host: DaemonHost = DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!)
+        let api: APIClient = APIClient(host: host, key: "k", session: URLSession(configuration: configuration))
+        let page: EventsPage = try await api.events(run: "r", after: 0)
+        XCTAssertEqual(page.events.map(\.id), [1, 3])
+        XCTAssertEqual(page.size, 3)
+        XCTAssertEqual(page.dropped, 1, "the caller is told, to say it to the owner")
     }
 }

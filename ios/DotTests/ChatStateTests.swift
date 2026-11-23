@@ -147,20 +147,29 @@ final class ChatStateTests: XCTestCase {
         XCTAssertEqual(state.items.map(\.id), ["u:run_0", "r:run_0"])
     }
 
-    func testAnAnswerThatDidNotReachTheDaemonAsksAgain() {
+    func testTheDaemonsListIsTheTruthBothWaysForACard() {
         var state: ChatState = started()
         state.apply(event(2, "run_1", "approval_requested", ["approval_id": .string("a"), "tool": .string("shell"), "summary": .string("x"), "severity": .string("r"), "args": .object([:])]))
-        // The owner pressed Allow: the card shows answered at once, before the daemon says so.
-        state.apply(event(0, "run_1", "approval_decided", ["approval_id": .string("a"), "status": .string("approved")]))
+        state.apply(event(3, "run_1", "approval_decided", ["approval_id": .string("a"), "status": .string("approved")]))
         XCTAssertTrue(state.pendingApprovals.isEmpty)
-        XCTAssertEqual(state.line, .working(since: 1000))
-        // The request failed: the card has its buttons again and the line says the run waits on the owner.
-        state.reopen(approval: "a")
+        // The daemon still lists the question as open (its answer was refused): the card asks again, and the line says so.
+        let open: ApprovalRecord = ApprovalRecord(id: "a", runId: "run_1", status: "pending", tool: "shell", summary: "x", severity: "r", args: .object([:]))
+        state.setOpenQuestions([open])
         XCTAssertEqual(state.pendingApprovals.map(\.approvalId), ["a"])
         XCTAssertEqual(state.line, .waitingOnYou(count: 1))
-        XCTAssertEqual(state.runStatus, "blocked")
-        state.reopen(approval: "a")
-        XCTAssertEqual(state.pendingApprovals.count, 1, "asking twice changes nothing")
+        // And it is closed when the daemon no longer lists it.
+        state.setOpenQuestions([])
+        XCTAssertTrue(state.pendingApprovals.isEmpty)
+        XCTAssertEqual(state.runStatus, "running")
+    }
+
+    func testMessagesThatCouldNotBeReadLeaveARowThatStays() {
+        var state: ChatState = started()
+        state.setUnreadable(2, ofRun: "run_1")
+        state.setUnreadable(3, ofRun: "run_1")
+        guard case .note(let words, .warn) = state.items.last?.kind else { return XCTFail("a warning row") }
+        XCTAssertEqual(words, "3 messages of this run could not be shown here. The web UI shows them.")
+        XCTAssertEqual(state.items.filter { $0.id == "n:unreadable:run_1" }.count, 1)
     }
 
     func testTheDaemonsListOfOpenQuestionsClosesAndOpensCards() {

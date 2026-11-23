@@ -77,6 +77,13 @@ struct APIClient: Sendable {
     }
 }
 
+/// A page of events: those that read, how many came, and how many did not read.
+struct EventsPage: Sendable {
+    var events: [EventRecord]
+    var size: Int
+    var dropped: Int
+}
+
 /// An element of a page that is left out when it does not decode, rather than failing the page.
 struct Lossy<Value: Decodable & Sendable>: Decodable, Sendable {
     let value: Value?
@@ -139,9 +146,9 @@ extension APIClient {
 
     func detail(run: String) async throws -> RunDetail { try await get("/api/runs/\(run)") }
 
-    /// A run's stored events after `after`. One that does not read is left out and logged, not the whole page: the
-    /// cursor moves on with the page, so the missing event is said to the owner (see `ChatOutput.failed`).
-    func events(run: String, after: Int, limit: Int = 2000) async throws -> [EventRecord] {
+    /// A run's stored events after `after`, and how many of the page did not read: those are left out, not the whole
+    /// page, and the caller says so to the owner (a row of the chat).
+    func events(run: String, after: Int, limit: Int = 2000) async throws -> EventsPage {
         let page: [Lossy<EventRecord>] = try await get(
             "/api/runs/\(run)/events",
             query: [URLQueryItem(name: "after", value: String(after)), URLQueryItem(name: "limit", value: String(limit))])
@@ -150,7 +157,7 @@ extension APIClient {
             Logger(subsystem: "dev.dotagent.phone", category: "api").error(
                 "\(page.count - read.count) events of \(run, privacy: .public) could not be read and are left out")
         }
-        return read
+        return EventsPage(events: read, size: page.count, dropped: page.count - read.count)
     }
 
     /// The approvals and questions waiting for the owner, in every chat (`GET /api/approvals?status=pending`).
@@ -185,8 +192,8 @@ extension APIClient {
     }
 
     /// Answers an approval or a question; `note` is a question's answer. A deny skips it.
-    func decide(approval: String, approve: Bool, note: String = "", remember: Bool = false) async throws {
-        try await sendVoid("POST", "/api/approvals/\(approval)/decision", body: Decision(approve: approve, note: note, remember: remember))
+    func decide(approval: String, approve: Bool, note: String = "", remember: Bool = false) async throws -> ApprovalRecord {
+        try await send("POST", "/api/approvals/\(approval)/decision", body: Decision(approve: approve, note: note, remember: remember))
     }
 
     func markSeen(thread: String) async throws {

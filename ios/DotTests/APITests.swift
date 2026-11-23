@@ -49,7 +49,9 @@ final class APIClientTests: XCTestCase {
     }
 
     func testAnApprovalIsDecidedWithItsNote() async throws {
-        _ = try await api().decide(approval: "apr_1", approve: true, note: "the invoices one")
+        BodyStub.reply = #"{"id":"apr_1","run_id":"run_1","status":"approved","tool":"shell","summary":"x","severity":"r","args":{}}"#
+        let record: ApprovalRecord = try await api().decide(approval: "apr_1", approve: true, note: "the invoices one")
+        XCTAssertEqual(record.status, "approved", "the daemon's own answer says how the card stands")
         XCTAssertEqual(BodyStub.seen.last?.path, "/api/approvals/apr_1/decision")
         let body: [String: Any] = try lastBody()
         XCTAssertEqual(body["approve"] as? Bool, true)
