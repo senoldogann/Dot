@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1356](1356.md) | done | 2026-11-23 | "While you were away" is marked read for every device, not for a browser |
 | [1355](1355.md) | done | 2026-11-23 | A chat's Automations say how each schedule's last run ended |
 | [1354](1354.md) | done | 2026-11-23 | The goal check goes on to a standby model when the review model cannot answer |
 | [1351](1351.md) | done | 2026-11-23 | A message ends a run's wait on its helpers, and the helper's report reaches the chat when it ends |

@@ -1,16 +1,19 @@
-// While you were away (item 466): what your schedules and campaigns did since this browser last marked it read, a card
-// over the Home's Today strip, read from `GET /away` and kept fresh by the lifecycle stream. Its first visit marks the
-// moment and shows nothing, so the card never pours out history; Mark as read moves the moment on.
+// While you were away (item 466): what your schedules and campaigns did since you last marked it read, on any of your
+// devices (item 1356: Dot keeps the moment, `GET` and `POST /away/read`), a card over the Home's Today strip, read from
+// `GET /away` and kept fresh by the lifecycle stream. The first visit from any device marks the moment and shows
+// nothing, so the card never pours out history; Mark as read moves the moment on for every device.
 
 import { LIFECYCLE_KINDS } from "./activityrow.js";
 import { api, query } from "./api.js";
 import { ago, el } from "./dom.js";
 import { awayLine, decidedBy } from "./awaywords.js";
-import { readPref, writePref } from "./prefs.js";
+import { readPref, removePref } from "./prefs.js";
 import { onLifecycle, onStreamBack } from "./state.js";
+import { attempt } from "./ui.js";
 
-// The moment this browser last marked the card read, in seconds since the epoch.
-const READ_KEY = "dot.away.read";
+// The moment this browser marked the card read before Dot kept it (item 1356), in seconds since the epoch: the first
+// mark Dot makes starts from it, and the browser forgets it.
+const OLD_READ_KEY = "dot.away.read";
 // The runs, and the runs with the most decisions, it shows before "Show N more", as the Today strip does (item 364).
 const ROWS_SHOWN = 2;
 const STATUS = {
@@ -65,17 +68,31 @@ export function buildAway() {
   let ticket = 0;
   // The lists whose "Show N more" was pressed: they show all their rows until the page is left.
   const opened = new Set();
-  // The first visit of this browser marks the moment: what came before it is not news here.
-  if (readPref(READ_KEY) === null) {
-    writePref(READ_KEY, String(Date.now() / 1000));
+
+  /**
+   * The moment the card reads from: Dot's, as any device last marked it. The first visit from any device marks it
+   * (from what this browser kept before Dot did, else now), so that what came before is not news.
+   */
+  async function readMoment() {
+    const marked = await api.get("/away/read");
+    if (marked.read_at !== null) {
+      return marked.read_at;
+    }
+    const kept = Number(readPref(OLD_READ_KEY));
+    const first = Number.isFinite(kept) && kept > 0 ? kept : Date.now() / 1000;
+    const set = await api.post("/away/read", { until: first });
+    removePref(OLD_READ_KEY);
+    return set.read_at;
   }
 
-  function markRead() {
+  async function markRead() {
+    if (view === null) {
+      return;
+    }
+    const until = view.until;
     // An answer still on its way was asked from the old moment: it is stale, and must not open the card again.
     ticket += 1;
-    if (view !== null) {
-      writePref(READ_KEY, String(view.until));
-    }
+    await api.post("/away/read", { until });
     view = null;
     element.hidden = true;
     element.replaceChildren();
@@ -111,15 +128,15 @@ export function buildAway() {
               el("ul", { class: "firings-list" }, ...decided.map(decisionRow)),
               moreButton("decisions", view.decision_runs.length - decided.length, () => open("decisions")),
             ),
-        el("div", { class: "row" }, el("span", { class: "spacer" }), el("button", { class: "btn sm", type: "button", onclick: markRead }, "Mark as read")),
+        el("div", { class: "row" }, el("span", { class: "spacer" }), el("button", { class: "btn sm", type: "button", onclick: () => attempt(markRead) }, "Mark as read")),
       ),
     );
   }
 
   async function load() {
     const mine = ++ticket;
-    const since = Number(readPref(READ_KEY));
     try {
+      const since = await readMoment();
       const fresh = await api.get(`/away${query({ since })}`);
       if (!disposed && mine === ticket) {
         view = fresh;

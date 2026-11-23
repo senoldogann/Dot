@@ -42,7 +42,7 @@ from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.activity import current_activity
-from dotagent.server.away import read_away
+from dotagent.server.away import mark_read, read_away, read_mark
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
 from dotagent.server.chatcontext import ChatContext, chat_context
 from dotagent.server.context import ServerContext
@@ -63,7 +63,9 @@ from dotagent.server.views import (
     ApprovalsQuery,
     AsideRequest,
     AttachmentUpload,
+    AwayMark,
     AwayQuery,
+    AwayRead,
     AwayView,
     CampaignChip,
     DecisionRequest,
@@ -558,6 +560,16 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def away(query: Annotated[AwayQuery, Query()]) -> AwayView:
         """What schedules and campaigns did since ``since`` (item 466), for the Home's "while you were away"."""
         return await read_away(store, query.since, time.time())
+
+    @router.get("/away/read")
+    async def away_read() -> AwayRead:
+        """When the owner last marked "while you were away" read, on any device (item 1356)."""
+        return AwayRead(read_at=await read_mark(store))
+
+    @router.post("/away/read")
+    async def away_mark(body: AwayMark) -> AwayRead:
+        """Mark "while you were away" read up to ``until``, for every device (item 1356); never back, never past now."""
+        return AwayRead(read_at=await mark_read(store, body.until, time.time()))
 
     @router.get("/activity/count")
     async def activity_count() -> ActivityCount:

@@ -237,11 +237,41 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                     await expect(card.locator(rows)).to_have_count(3)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"away-{width}-{scheme}.png"), full_page=True)
+                # Another device (a browser of its own, with no storage of this one) sees the same news, since Dot
+                # keeps the moment (item 1356), and none once this one marks it read.
+                other: Page = await browser.new_page(viewport={"width": width, "height": height})
+                await other.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
+                await other.goto(ui_url("127.0.0.1", port, TOKEN))
+                await expect(other.locator(".home-away .away-line")).to_have_text(
+                    "3 scheduled tasks: 3 done · 3 decisions made for you (3 without asking)"
+                )
                 await card.get_by_role("button", name="Mark as read").click()
                 await expect(card).to_be_hidden()
                 await page.reload()
                 await expect(page.locator(".home-today")).to_be_attached()
                 await expect(card).to_be_hidden()
+                await other.reload()
+                await expect(other.locator(".home-today")).to_be_attached()
+                await expect(other.locator(".home-away")).to_be_hidden()
+                await other.close()
                 await page.close()
         finally:
             await browser.close()
+
+
+async def test_the_moment_marked_read_is_dots_not_a_browsers_and_only_moves_on(client: httpx.AsyncClient) -> None:
+    """``GET`` and ``POST /api/away/read`` (item 1356): no mark before a device sets one, a mark never moves back, and
+    one in the future is held at now."""
+    before: float = time.time()
+    first: JsonObject = (await client.get("/api/away/read")).json()
+    if first["read_at"] is None:
+        marked: httpx.Response = await client.post("/api/away/read", json={"until": before - 100})
+        assert marked.status_code == 200, marked.text
+        assert marked.json()["read_at"] == before - 100
+    older: JsonObject = (await client.post("/api/away/read", json={"until": 1.0})).json()
+    assert float(older["read_at"]) >= before - 100
+    ahead: JsonObject = (await client.post("/api/away/read", json={"until": time.time() + 10_000})).json()
+    assert before <= float(ahead["read_at"]) <= time.time()
+    assert (await client.get("/api/away/read")).json() == ahead
+    refused: httpx.Response = await client.post("/api/away/read", json={"until": -1})
+    assert refused.status_code == 422, refused.text
