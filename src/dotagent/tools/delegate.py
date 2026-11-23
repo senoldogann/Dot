@@ -264,9 +264,9 @@ def _delegate_tool() -> RegisteredTool:
             "report back. Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
             "turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is "
-            "that agent's. Do not delegate what one or two tool calls "
-            "can do. Name the plan step the part is (step) and its report closes that step; a step the plan does not "
-            "have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
+            "that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) "
+            "and its report closes that step, unless the part goes on in the background; a step the plan does not have "
+            "runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
             "check and its answer; a report without one is marked as a claim."
         ),
         args_model=DelegateArgs,

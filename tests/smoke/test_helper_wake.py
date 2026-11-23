@@ -546,3 +546,38 @@ async def test_a_helper_whose_end_the_store_has_not_taken_is_kept_and_told_once_
         assert (await _ended(manager, told[1].id)).status == "done"
         assert "Report of late: all good." in await _thread_text(runtime, parent.thread_id)
         assert await kept_detached(runtime.store) == [] and not manager._untold.get(parent.thread_id)
+
+
+async def test_a_helper_whose_end_the_store_has_not_taken_is_kept_by_the_run_at_work_too(
+    login_env: dict[str, str],
+) -> None:
+    """The same with a run at work in the chat: its notes are the way a report reaches it, and a helper the store has
+    still at work is neither noted nor forgotten, so that the report comes once its end is stored."""
+    roles: _Roles = _Roles(main=[_turn("shell", {"command": "sleep 6"}), _finish("Read it.")], helpers=[])
+    async with _session(login_env, roles) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+
+        async def working() -> bool:
+            return len(await runtime.store.events_of_kind(parent.id, "tool_call", 1)) == 1
+
+        await _until(working, "the run is at work")
+        helper_chat: ThreadRecord = await runtime.store.create_thread("helper", "delegate")
+        helper: RunRecord = await runtime.store.create_run(
+            helper_chat.id, f"{_HELPER_GOAL} stored late", "task", SCRIPTED_MODEL, parent.id, "delegate",
+            "medium", "standard", None, "yolo", False, None, None, None,
+        )  # fmt: skip
+        entry: DetachedHelper = DetachedHelper(
+            helper_run_id=helper.id, parent_run_id=parent.id, thread_id=parent.thread_id, step=None, since=1.0
+        )
+        await keep_detached(runtime.store, entry)
+        manager._untold[parent.thread_id] = [entry]
+        await manager._tell_helper_reports(parent.thread_id)
+        assert manager._untold[parent.thread_id] == [entry] and await kept_detached(runtime.store) == [entry]
+        assert "Report of stored: all good." not in await _thread_text(runtime, parent.thread_id)
+        data: JsonObject = {"status": "done", "result": _report("stored"), "needs": ""}
+        assert await runtime.store.end_run(helper.id, "done", _report("stored"), data) is not None
+        await manager._tell_helper_reports(parent.thread_id)
+        assert (await _ended(manager, parent.id)).status == "done"
+        assert "Report of stored: all good." in await _thread_text(runtime, parent.thread_id)
+        assert await kept_detached(runtime.store) == [] and not manager._untold.get(parent.thread_id)
+        assert [run.id for run in await _runs_of_chat(runtime, parent.thread_id)] == [parent.id]
