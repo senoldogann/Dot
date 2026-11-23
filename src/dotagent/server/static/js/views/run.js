@@ -1287,6 +1287,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       plan: steps.length === 0 ? null : { done, total: steps.length },
       helpers: timeline.helperStatuses(),
       helpersNow: timeline.helperNow(),
+      released: timeline.helperReleased(),
       queued: queue.count(),
     });
     // The plan's bubble goes with its part: once the run no longer works, it is not left open over nothing (item 644).
