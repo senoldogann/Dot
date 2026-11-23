@@ -4,6 +4,7 @@ import SwiftUI
 struct ChatRow: View {
     let item: ChatItem
     let onDecide: (ApprovalCard, Bool, String) -> Void
+    var onTool: (ToolRow) -> Void = { _ in }
 
     var body: some View {
         switch item.kind {
@@ -31,7 +32,10 @@ struct ChatRow: View {
                 }
             }
         case .tool(let row):
-            ToolLine(row: row)
+            Button { onTool(row) } label: { ToolLine(row: row) }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tool-\(row.callId)")
+                .accessibilityHint("Shows the step's arguments and result")
         case .approval(let card):
             ApprovalCardView(card: card, onDecide: onDecide)
         case .note(let text, let tone):
@@ -68,7 +72,6 @@ struct MessageText: View {
                 }
             }
         }
-        .textSelection(.enabled)
     }
 }
 
@@ -161,4 +164,8 @@ struct ApprovalCardView: View {
         default: "No longer asked"
         }
     }
+}
+
+extension ToolRow: Identifiable {
+    var id: String { callId }
 }

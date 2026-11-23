@@ -1,6 +1,6 @@
 # Dot for iPhone
 
-A native SwiftUI app for Dot (items 997 and 1353): the chat list with the agents strip, chats that stream, the
+A native SwiftUI app for Dot (items 997, 1353 and 1361): the chat list with the agents strip, chats that stream, the
 approvals and questions a run asks, the helpers it waits for, the queue, the schedules and loops, and the models, all
 over the daemon's own API; plus what a web page cannot do on iOS: remote push and the phone's one Live Activity of the
 owner's runs on the lock screen and in the Dynamic Island. The web UI stays as it is: the app opens it full screen from
@@ -18,7 +18,10 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
   - `Adapters/` the Keychain, UserDefaults and the push/share HTTP client; `Push/` the token registration;
     `Views/` the address screen and the web UI fallback (`DotWebView`).
 - `DotTests/`: the unit tests (XCTest) of the reducer, the SSE parser and feed, the cache, the queue order, the link
-  style and the requests.
+  style, the requests, and (slice 2) the model and level rules, older runs, a step's detail, a message's actions, drafts,
+  dictation's rules and the links.
+- `DotUITests/`: the same screens driven by taps in the simulator (XCUITest, scheme `DotUI`) against a scratch daemon
+  with a scripted model; they skip when `/tmp/dot-ui-daemon.json` is missing and write screenshots to `/tmp/dot-ui-shots/`.
 - `DotLiveActivity/`: the widget extension (`dev.dotagent.phone.live`) that draws the Live Activity.
 - `DotShare/`: the share extension (`dev.dotagent.phone.share`, item 1009): what another app shares goes to Dot as a
   new chat. It reads the host from the app group's defaults and the key from the shared Keychain access group.
@@ -32,9 +35,41 @@ from disk at launch), a chat (messages that stream in, a tool step as one line, 
 and Deny, one line over the composer: working, waiting on you, waiting on N subagents; the queue, each message with an up
 and a down arrow and a remove button; Send queues while a run works, and Stop with an empty box; a photo to attach), the
 run inspector (the run, its plan, its helpers, the chat's schedules and loops with their switches), the Schedules list and
-the models (the default and the review model) in Settings, notifications and the Live Activity. In the web UI: everything
-else (new chats, agents and teams, memory, rules, settings, the vault, older messages, a step's details) until those
-screens come; the plan is in `roadmap/1353.md`.
+the models (the default and the review model) in Settings, notifications and the Live Activity. Slice 2 (item 1361):
+
+- **New chat**: the pencil of the list opens a sheet whose message starts a chat of its own (`POST /api/runs`, `mode`
+  `auto`, `thread_id` null) on the model and reasoning level picked in its pill (none picked: the daemon's own); a model
+  the daemon refuses (422 `ModelUnavailableError`, item 1350) is named with its words and a button sends the same words on
+  the default model. An agent of the strip that has no chat opens the same sheet for it (`agent_id`): its first message
+  starts its chat. A message from the sheet is sent again with the same key when its answer was lost.
+- **Model and level of a chat**: the inspector's **Model for this chat** (reasoning first, as it is the quick change, then
+  the models that use tools by provider) keeps the choice with the chat (`PATCH /api/threads/{id}` with all six `choices`
+  keys, nulls included) and every message of the chat carries the chat's choices and its agent, as the web composer's
+  messages do.
+- **Older messages**: a chat holds its newest twelve runs; reaching the top (or the line's tap) reads twenty more
+  (`GET /api/runs?thread_id&limit=20&before=<created_at of the oldest held, every digit>`), put above the first row with
+  the transcript scrolled back to it (`scrollTo(anchor)`; not measured by a test); the line goes when a page comes short. Older runs come from their records (the
+  message and the answer).
+- **A step's detail**: a tap on a step's line opens its arguments and result, read from the step's two events after its
+  call (`GET /api/runs/{id}/events?after=`), each clipped (2,000 characters an argument, 6,000 all, 8,000 the result) at a
+  character boundary, with the number of characters left out said.
+- **A message's actions** (a hold): Copy, Select text, the seven reactions on what Dot said
+  (`POST/DELETE /api/runs/{id}/messages/{answer|step-n}/reactions`; the ones that stand are small signs under it), Edit
+  from here on your own first message of a run (`POST /api/runs/{id}/rewind` with the files kept; asks first; not while a
+  run works). **Drafts**: what is typed and not sent is kept per chat (and per new chat) in `drafts.json` beside the chat
+  cache, written a moment after the last key, forgotten with the phone's key.
+- **The microphone** (`Dictation`): on a press it asks for the speech and the microphone permissions (not at launch) and
+  listens with Apple's Speech framework, **on the phone only** (`requiresOnDeviceRecognition`; a language with no
+  on-device recognizer says so and does not send the audio away), putting the words heard after what was typed. It ends in
+  a line over the box, never a silent button: a permission off (with a way to Settings), no recognizer now, no microphone.
+  Info.plist has `NSSpeechRecognitionUsageDescription` and `NSMicrophoneUsageDescription`.
+- **Opening a chat from outside**: the Live Activity's card opens the run that waits for you (else one at work, else the
+  first) and each row its own run, as `dotagent://run/<run id>` (`CFBundleURLTypes`; the link is parsed by
+  `DotDeepLink`, a run id that is not plainly an id opens nothing); a notification's tap and its **Open** action (new next
+  to Approve and Deny; it comes to the front) open the chat of the alert's run, reading the run's own page and drawing
+  the chat from it when the list does not hold it yet (a cold launch from the tap).
+
+In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 
 How it stays fast: a chat read before opens from memory in its first frame, otherwise from `ChatCache` (the newest runs
 and the last 400 stored events), then asks only for the events after the last id it holds; reading, reducing and writing
@@ -80,7 +115,22 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1` and `-DotShowSchedules 1` open a screen at launch. These arguments exist in Debug builds only.
+`-DotShowSettings 1` and `-DotShowSchedules 1` open a screen at launch, `-DotOpenURL dotagent://run/<run id>` opens a link as
+a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
+
+Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the
+way `tests/smoke/test_stream_last_event_id.py` does, with the pairing and a few chats; it writes
+`{"origin": "http://127.0.0.1:<port>", "key": "<phone key>"}` to `/tmp/dot-ui-daemon.json`), uninstall the app from the
+simulator once if the daemon is a new one (the cache holds the old one's chats), and run the `DotUI` scheme:
+
+```bash
+xcodebuild test -project Dot.xcodeproj -scheme DotUI -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -configuration Debug CODE_SIGNING_ALLOWED=NO
+```
+
+The simulator has no microphone: with the permissions given, a press of the microphone ends in "Dictation is not
+available now" (the recognizer is not available there), which is the clean failure the tests check; listening needs a
+real iPhone.
 
 ## The `DOT_HOST` build setting
 

@@ -5,12 +5,22 @@ import os
 enum ChatOutput: Sendable {
     case state(ChatState)
     case connection(FeedState)
-    /// The newest run's own record (its model, its status) and the daemon's name for the chat.
-    case run(RunRecord, title: String)
+    /// The newest run's own record (its model, its status), the daemon's name for the chat and the choices its next
+    /// message starts with (its model, reasoning level and mode).
+    case run(RunRecord, title: String, choices: ChatChoices?)
+    /// Whether the daemon may hold runs older than those the chat shows (a page of them is read on request).
+    case older(hasMore: Bool)
     case failed(String)
     /// A moment of the daemon's lifecycle stream (`queue_changed`, `run_finished`, ...), for what the screen keeps
     /// beside the transcript (the queue).
     case lifecycle(String)
+}
+
+/// What reading a page of older runs did.
+enum OlderOutcome: Equatable, Sendable {
+    case nothing
+    case loaded(added: Int, exhausted: Bool)
+    case failed
 }
 
 /// One open chat: it reads what the disk holds and tells it at once, asks the daemon for what came after (a delta,
@@ -40,9 +50,18 @@ actor ChatSession {
     private var keyRefused: Bool = false
     /// How many events of each run did not read (the daemon's page or stream went past them): a row says so.
     private var unreadable: UnreadableEvents = UnreadableEvents()
+    /// Where the next page of older runs starts (the `created_at` of the oldest run read so far); `nil` before any.
+    private var olderCursor: Double?
+    /// Whether the daemon has no run older than the oldest read; `nil` until a read says (a full first page may have more).
+    private var olderExhausted: Bool?
+    private var loadingOlder: Bool = false
     /// Callers waiting for a catch-up that was already reading when they asked.
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "chat")
+
+    /// How many runs the newest page holds (`readDelta`) and how many each older page asks for.
+    static let firstPage: Int = 12
+    static let olderPage: Int = 20
 
     static let unreadableWords: String = "A message of this run could not be read and is missing here. The web UI shows it."
 
@@ -78,6 +97,26 @@ actor ChatSession {
         output?.finish()
         output = nil
         persistNow()
+    }
+
+    /// The chat was rewound (Edit from here): what is held of it is no longer the chat, so it is let go and read again
+    /// from the daemon, whose list no longer holds the runs that were taken out.
+    func reset() async {
+        feedTask?.cancel()
+        if let feed { Task { await feed.stop() } }
+        feed = nil
+        feedRun = nil
+        runs = []
+        helperRuns = []
+        events = []
+        cursors = [:]
+        unreadable = UnreadableEvents()
+        olderCursor = nil
+        olderExhausted = nil
+        state = ChatState()
+        await cache.removeChat(threadId)
+        publishNow()
+        await catchUp()
     }
 
     /// The app is in front again or the network changed: reconnect at once, and read what came after meanwhile.
@@ -128,6 +167,36 @@ actor ChatSession {
         unreadable = stored.unreadable ?? UnreadableEvents()
         for (run, ids) in unreadable.byRun { state.setUnreadable(ids.count, ofRun: run) }
         publishNow()
+        output?.yield(.older(hasMore: hasOlderHint))
+    }
+
+    private var hasOlderHint: Bool { olderExhausted.map { !$0 } ?? (runs.count >= Self.firstPage) }
+
+    /// Reads one page of runs older than those shown, from the daemon's records, and puts them before the rows held (the
+    /// screen keeps the reader's place). It reads on until a page adds a run of its own: a page may hold only helpers'.
+    /// A call while one reads, or after the end was reached, does nothing.
+    func loadOlder() async -> OlderOutcome {
+        guard !loadingOlder, olderExhausted != true, !stopped else { return .nothing }
+        loadingOlder = true
+        defer { loadingOlder = false }
+        var added: Int = 0
+        do {
+            for _ in 0..<5 {
+                guard let cursor: Double = olderCursor ?? runs.map(\.createdAt).min() else { return .nothing }
+                let page: [RunRecord] = try await api.runs(thread: threadId, limit: Self.olderPage, before: cursor)
+                olderCursor = page.map(\.createdAt).min() ?? cursor
+                olderExhausted = page.count < Self.olderPage
+                added += state.prependOlder(page)
+                if added > 0 || olderExhausted == true { break }
+            }
+            if added > 0 { publishNow() }
+            output?.yield(.older(hasMore: hasOlderHint))
+            return .loaded(added: added, exhausted: olderExhausted == true)
+        } catch {
+            logger.info("older runs could not be read: \(String(describing: error), privacy: .public)")
+            if case DaemonRequestError.status(_, let code, _) = error, code == 401 || code == 403 { refuse() }
+            return .failed
+        }
     }
 
     private func scheduleRefresh(after delay: Duration) {
@@ -163,7 +232,9 @@ actor ChatSession {
 
     private func readDelta() async {
         do {
-            let listed: [RunRecord] = try await api.runs(thread: threadId)
+            let listed: [RunRecord] = try await api.runs(thread: threadId, limit: Self.firstPage)
+            // The first page says whether there is more behind it; once older pages were read, they say it.
+            if olderExhausted == nil, listed.count < Self.firstPage { olderExhausted = true }
             for run in listed {
                 if let at: Int = runs.firstIndex(where: { $0.id == run.id }) { runs[at] = run } else { runs.append(run) }
             }
@@ -195,7 +266,8 @@ actor ChatSession {
             let open: [ApprovalRecord] = try await waiting.filter { mine.contains($0.runId) } + shown.questions
             state.setOpenQuestions(open)
             state.setStatus(shown.run.status, ofRun: shown.run.id)
-            output?.yield(.run(shown.run, title: shown.title))
+            output?.yield(.run(shown.run, title: shown.title, choices: shown.choices))
+            output?.yield(.older(hasMore: hasOlderHint))
             publishNow()
             scheduleSave()
         } catch {

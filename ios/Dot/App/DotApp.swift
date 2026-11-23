@@ -96,6 +96,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             await answer(approvalId: approvalId, approve: action == approveAction)
             return
         }
+        // The plain tap on the alert and its Open action both open the run's chat (when the alert names the run).
         guard let route else {
             return
         }
@@ -143,6 +144,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 private let approvalCategoryId: String = "DOT_APPROVAL"
 private let approveAction: String = "DOT_APPROVE"
 private let denyAction: String = "DOT_DENY"
+private let openAction: String = "DOT_OPEN"
 /// The daemon's answer to a decision on an approval no longer open (answered, expired or its run ended).
 private let alreadyDecided: Int = 409
 
@@ -155,6 +157,11 @@ private func approvalCategory() -> UNNotificationCategory {
     let deny: UNNotificationAction = UNNotificationAction(
         identifier: denyAction, title: "Deny", options: [.authenticationRequired, .destructive],
         icon: UNNotificationActionIcon(systemImageName: "xmark"))
+    // Open brings the app to the front on the run's chat, where the step's whole text is: Approve and Deny answer
+    // without opening the app.
+    let open: UNNotificationAction = UNNotificationAction(
+        identifier: openAction, title: "Open", options: [.foreground],
+        icon: UNNotificationActionIcon(systemImageName: "arrow.up.forward.app"))
     return UNNotificationCategory(
-        identifier: approvalCategoryId, actions: [approve, deny], intentIdentifiers: [], options: [])
+        identifier: approvalCategoryId, actions: [approve, deny, open], intentIdentifiers: [], options: [])
 }

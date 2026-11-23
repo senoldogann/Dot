@@ -8,6 +8,8 @@ struct ToolRow: Sendable, Hashable {
     var tool: String
     var line: String
     var state: State
+    /// The id of the step's `tool_call` event (0 when it is not stored): where its detail is read from.
+    var eventId: Int = 0
 }
 
 /// A step or a question the run asks the owner about. `question` is set for `ask_user`.
@@ -146,6 +148,32 @@ struct ChatState: Sendable, Equatable {
         if !run.status.isActiveRunStatus, !result.isEmpty {
             upsert(ChatItem(id: "r:\(run.id)", kind: .answer(text: result, status: run.status), ts: run.finishedAt ?? run.createdAt))
         }
+    }
+
+    /// Older root runs of the chat as their records have them (a page of `GET /api/runs?before=`, newest first): they go
+    /// before every row held, oldest first, so the transcript still reads in order; one already held is skipped. Returns
+    /// how many runs were added.
+    @discardableResult
+    mutating func prependOlder(_ runs: [RunRecord]) -> Int {
+        let held: Set<String> = Set(rootRunIds)
+        let fresh: [RunRecord] = runs.filter { $0.parentRunId == nil && !held.contains($0.id) }
+            .sorted { $0.createdAt < $1.createdAt }
+        guard !fresh.isEmpty else { return 0 }
+        var rows: [ChatItem] = []
+        for run in fresh {
+            if run.followsReaction == nil, !run.goal.isEmpty {
+                rows.append(ChatItem(id: "u:\(run.id)", kind: .user(run.goal), ts: run.createdAt))
+            }
+            let result: String = run.result.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !run.status.isActiveRunStatus, !result.isEmpty {
+                rows.append(ChatItem(id: "r:\(run.id)", kind: .answer(text: result, status: run.status), ts: run.finishedAt ?? run.createdAt))
+            }
+        }
+        let known: Set<String> = Set(items.map(\.id))
+        rootRunIds.insert(contentsOf: fresh.map(\.id), at: 0)
+        items.insert(contentsOf: rows.filter { !known.contains($0.id) }, at: 0)
+        reindex()
+        return fresh.count
     }
 
     /// The helpers of the chat's runs as the daemon lists them: a helper this state has not heard of joins, one it has
@@ -358,7 +386,8 @@ struct ChatState: Sendable, Equatable {
         if quietTools.contains(tool) { return }
         upsert(ChatItem(
             id: "t:\(callId)",
-            kind: .tool(ToolRow(callId: callId, runId: event.runId, tool: tool, line: line, state: .running)), ts: event.ts))
+            kind: .tool(ToolRow(callId: callId, runId: event.runId, tool: tool, line: line, state: .running, eventId: event.id)),
+            ts: event.ts))
     }
 
     private mutating func toolResult(_ event: EventRecord, isRoot: Bool) {

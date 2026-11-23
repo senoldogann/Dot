@@ -92,7 +92,21 @@ code** takes its place. The same by hand:
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one line over
    the composer (working, waiting on you, waiting on N subagents, or N subagents keep working in the background once a message of yours released the run from its wait, item 1351), the queue with an up and a down arrow for each message,
    a run inspector (plan, helpers, the chat's schedules and loops with switches), the Schedules list and the models; the
-   web UI stays as it is and opens full screen from Settings › Open web UI. What it leaves to the web UI for now is in
+   web UI stays as it is and opens full screen from Settings › Open web UI. The second slice (item 1361) adds a new chat
+   (the pencil of the list: a message starts a chat of its own on the model and reasoning level picked, as the web's home
+   does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the
+   message on the default model) and an agent's first message from the strip when it has no chat; the model and level of
+   a chat in the inspector's sheet (**Model for this chat**, kept by the daemon as the web's composer keeps them,
+   `PATCH /api/threads/{id}`, and sent with each message together with the chat's mode and its agent); older messages
+   (reaching the top of a chat reads a page of older runs, `GET /api/runs?before=`, and keeps the reader's place); a
+   tap on a step's line opens its arguments and result (clipped, and it says how much was left out); a hold on a
+   message offers Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message
+   (`POST /api/runs/{id}/rewind`, the files kept as they are; not while a run works); what is typed and not sent is kept
+   for each chat, and for a new chat, across launches; the composer's microphone dictates on the iPhone (Apple's Speech
+   framework, `requiresOnDeviceRecognition`: no audio leaves the phone; it asks for the speech and the microphone
+   permissions when first pressed, and ends in a line, with a way to the app's page in Settings when a permission is
+   off, whenever it cannot start); and the Live Activity, its rows and a notification's Open action open the chat of
+   their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>` route). What it still leaves to the web UI is in
    `roadmap/1353.md`. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
    app's notifications are its own, through APNs: Settings in the app opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in the app). The

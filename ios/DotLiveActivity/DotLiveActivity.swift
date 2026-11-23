@@ -26,6 +26,8 @@ struct DotFleetLiveActivity: Widget {
                 // Clear: the lock screen draws the activity on its own glass, the wallpaper showing through.
                 .activityBackgroundTint(.clear)
                 .activitySystemActionForegroundColor(.white)
+                // A tap on the card opens the chat of the run that waits for the owner, else the one at work.
+                .widgetURL(context.state.tapURL)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -45,7 +47,7 @@ struct DotFleetLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(context.state.rows.prefix(3), id: \.runId) { row in
-                            RowView(row: row)
+                            RunLink(row: row)
                         }
                     }
                     // Kept off the island's rounded lower corners, which cut the line's first letter.
@@ -65,6 +67,7 @@ struct DotFleetLiveActivity: Widget {
                     .padding(2)
             }
             .keylineTint(.yellow)
+            .widgetURL(context.state.tapURL)
         }
     }
 }
@@ -94,13 +97,26 @@ private struct LockScreenView: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(state.rows, id: \.runId) { row in
-                    RowView(row: row)
+                    RunLink(row: row)
                 }
             }
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
+    }
+}
+
+/// A row that opens its own run's chat when tapped (`dotagent://run/<id>`).
+private struct RunLink: View {
+    let row: DotFleetAttributes.Row
+
+    var body: some View {
+        if let url: URL = DotDeepLink.url(forRun: row.runId) {
+            Link(destination: url) { RowView(row: row) }
+        } else {
+            RowView(row: row)
+        }
     }
 }
 

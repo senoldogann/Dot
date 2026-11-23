@@ -18,6 +18,17 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>dev.dotagent.phone</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>dotagent</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>DotApsEnvironment</key>
@@ -27,11 +38,13 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Dot uses the camera when you take a photo to send to it.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Dot records your voice when you speak a message to it.</string>
+	<string>Dot listens while you dictate a message, and only then. The words are written on this iPhone; no audio is sent anywhere.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Dot saves an image to your photos when you ask it to.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Dot opens your photos when you choose one to send to it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Dot turns your voice into the words of a message on this iPhone when you press the microphone.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>

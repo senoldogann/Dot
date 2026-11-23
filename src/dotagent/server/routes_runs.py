@@ -193,7 +193,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/runs")
     async def list_runs(query: Annotated[RunsQuery, Query()]) -> list[RunRecord]:
-        return [ctx.manager.as_shown(run) for run in await store.list_runs(query.limit, query.thread_id)]
+        return [ctx.manager.as_shown(run) for run in await store.list_runs(query.limit, query.thread_id, query.before)]
 
     @router.post("/runs", status_code=201)
     async def start_run(request: StartRunRequest) -> RunRecord:

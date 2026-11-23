@@ -21,6 +21,15 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .tint(Theme.accent)
         .background(Theme.background)
+        .onOpenURL { model.open(url: $0) }
+        .task {
+            // Debug builds: a link given at launch, once the list is on the screen.
+            if let url: URL = model.debugOpenURL {
+                model.debugOpenURL = nil
+                try? await Task.sleep(for: .milliseconds(800))
+                model.open(url: url)
+            }
+        }
         .sheet(isPresented: $model.showsSettings) {
             if let store: NativeStore = model.native {
                 NativeSettingsView(model: model, store: store).tint(Theme.accent).preferredColorScheme(.dark).presentationBackground(Theme.background)

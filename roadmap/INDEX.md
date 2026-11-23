@@ -6,6 +6,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1361](1361.md) | done as a second slice | 2026-11-23 | Dot for iPhone, second slice: new chats, a chat's model and level, older messages, a step's detail, a message's actions, drafts, dictation, and a chat opened from the Live Activity |
+| [1360](1360.md) | done | 2026-11-23 | `GET /api/runs` takes `before`, so a client walks a long chat back a page at a time |
 | [1356](1356.md) | done | 2026-11-23 | "While you were away" is marked read for every device, not for a browser |
 | [1355](1355.md) | done | 2026-11-23 | A chat's Automations say how each schedule's last run ended |
 | [1354](1354.md) | done | 2026-11-23 | The goal check goes on to a standby model when the review model cannot answer |
