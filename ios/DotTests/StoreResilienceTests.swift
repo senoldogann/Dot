@@ -132,6 +132,29 @@ final class StoreResilienceTests: XCTestCase {
 
     // MARK: Background and foreground
 
+    func testABackgroundRefreshReadsTheChatsThatMovedOnEvenThoughTheAppWentToTheBackgroundBefore() async throws {
+        let store: NativeStore = makeStore(link: LinkMonitor(initial: .up))
+        store.graceSeconds = 60
+        store.enterBackground()
+        let reached: Bool = await store.refreshInBackground(seconds: 10)
+        XCTAssertTrue(reached)
+        let first: StoredChat? = await store.cache.loadChat("thr_1")
+        let third: StoredChat? = await store.cache.loadChat("thr_3")
+        let fourth: StoredChat? = await store.cache.loadChat("thr_4")
+        XCTAssertNotNil(first, "the chats the list says moved on were read and written")
+        XCTAssertNotNil(third)
+        XCTAssertNil(fourth, "three of them: the budget of a refresh the system gave a moment for")
+    }
+
+    func testTheAppsOwnReadingAheadStopsWhileItIsOutOfSight() async throws {
+        let store: NativeStore = makeStore(link: LinkMonitor(initial: .up))
+        store.graceSeconds = 60
+        store.enterBackground()
+        await store.refreshList()
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(daemon.requests.filter { $0.path == "/api/runs" }.count, 0)
+    }
+
     func testABackgroundRefreshOnADeadLinkSaysItReachedNothingAndOnALiveOneSaysItDid() async throws {
         await seed()
         let link: LinkMonitor = LinkMonitor(initial: .down)

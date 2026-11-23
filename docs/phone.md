@@ -117,7 +117,7 @@ code** takes its place. The same by hand:
    tried again: a read gives up after 10 seconds, is tried three times with a growing wait and a little chance in it,
    and while the phone has no link at all it waits for the link rather than spending its tries; a second ask for what is
    already being read waits for that one, and leaving a chat cancels what it was reading. A chat that was away through
-   a long run does not read the whole run: after more than 500 events it asks for the newest 400
+   a long run does not read the whole run: at 500 events or more it asks for the newest 400
    (`GET /api/runs/{id}/events?tail=400`; an older Dot answers with the run's first events and no
    `X-Dot-Events-Tail` header, and the app then reads the pages as before) and says that some steps are not shown. One
    thin line under the status bar says when the phone has no link (*Offline — showing saved chats · last updated 3 min

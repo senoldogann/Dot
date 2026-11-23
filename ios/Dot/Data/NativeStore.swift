@@ -301,10 +301,12 @@ final class NativeStore {
     /// After a read of the list: the chats that moved on past what the phone holds are read once, one after another, so that
     /// opening one draws what the Mac has. Few on a link that costs, none on one the system asks to spare (Low Data
     /// Mode), none while the app is out of sight, and never the chat that is open (it reads itself).
-    private func prefetch(budget given: Int? = nil) {
+    /// `force` is for a read the system asked for while the app is out of sight (a background refresh, a silent push): the
+    /// app's own reading ahead stops when it leaves the screen, that one is what the system gave its time for.
+    private func prefetch(budget given: Int? = nil, force: Bool = false) {
         prefetchTask?.cancel()
         let budget: Int = given ?? link.state.prefetchBudget
-        guard budget > 0, !inBackground else { return }
+        guard budget > 0, force || !inBackground else { return }
         let candidates: [ThreadSummary] = threads
         let openIds: Set<String> = Set(open.values.map(\.threadId))
         let folder: URL = folder
@@ -486,7 +488,7 @@ final class NativeStore {
         let began: Date = Date()
         await refreshList()
         guard link.state.online, lastListAt >= began else { return false }
-        prefetch(budget: max(1, min(3, link.state.prefetchBudget)))
+        prefetch(budget: max(1, min(3, link.state.prefetchBudget)), force: true)
         let task: Task<Void, Never>? = prefetchTask
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await task?.value }
