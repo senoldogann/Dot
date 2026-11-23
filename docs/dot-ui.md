@@ -34,7 +34,8 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   the reasoning as bars), the microphone and the round send. The mode (when named) and the context meter are quiet
   pills of the same bar; on a Mac the approvals stand under the box at its right, and on a phone the model's sheet holds
   them (YOLO's lock stays in the bar). The choices are always in sight: there is no resting state and no button that hides
-  them. The queue's sheet over the box is on the box's own ground; the line over it that says the work's state is a quiet pill.
+  them. The queue's sheet over the box is on the box's own ground, a row of it with an up and a down arrow (32 px, 44 on a phone;
+  no drag, item 1348); the line over it that says the work's state is a quiet pill.
 
 Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows.py`, `test_activity.py`,
 `test_side_agents.py` (the agents' menu), `test_chat_menu.py`, `test_connect_apps.py`, `test_phone_layout.py`,
@@ -109,7 +110,9 @@ size, a radius or a duration in a view's sheet, nor a gap off the 4 px grid; tak
   rows), `dialog.modal`, `.toast`, `.empty-state`, `.spinner`. `#/controls` shows every one in light and dark.
 - **Motion**: `--motion-quick` 120 ms, `--motion-base` 160, `--motion-slow` 240 on `--ease`
   (`cubic-bezier(0.4, 0, 0.2, 1)`): a fade, a short rise, never a bounce or an overshoot.
-- **Scrollbars** are 6 px, thin, on no track, where a pointer scrolls; a phone keeps the system's.
+- **Scrollbars** are 6 px, thin, on no track, where a pointer scrolls; a phone keeps the system's. A screen has one
+  scroller: the window on a page, the conversation (edge to edge, its room its own padding) in a chat on a phone, where
+  the window does not scroll or stretch; the dock lets a touch through where nothing of it is drawn (item 1349).
 
 To check a look, open `#/controls`, `#/settings/appearance`, a chat, a menu and a dialog at 1280 and
 390 px wide, in light and dark (`tests/smoke/test_controls.py` and `test_tour.py` photograph them).
@@ -123,7 +126,7 @@ quiet line each. The modules of the conversation and the panel, and what each ho
 | Module | What it draws |
 |---|---|
 | `timeline.js` | The turn by turn flow; a group of subagents is one card (`buildFlock`): faces, "2 subagents", "2 working" in blue, the time, and a row each (`childScope`): the job, what it does now (`callPhrase` of `workstatus.js`), its state in a word beside the time. |
-| `capsule.js` | The bar over the composer, and above it the line "Waiting on 2 subagents" with Details and Stop. |
+| `capsule.js` | The bar over the composer, and above it the line "Waiting on 2 subagents" with Details and Stop, a pane in the dock on the bar's own ground (item 1347). |
 | `inspector.js` | The side panel, closed by default: one rounded card in two parts, a head that stays (the tabs as a segmented switch, and on a phone the grabber and Close) and a body that scrolls (`.inspector-body`), whose sections each have a small sticky head (`.panel-section-head`: title, count, buttons on one line) over tight rows on the 8 px scale. A sheet from the foot on a phone. |
 | `prose.js`, `linkpill.js` | A link in a message (a markdown link or an autolink, in what you wrote and in what Dot says) is plain words: no frame, no fill and no icon, in the text's ink tilted toward the accent (`.msg-link`; a shade brighter in dark, more saturated in light, above 4.5:1 on every ground), underlined only under the pointer and with the focus, which keeps the page's ring. It opens in a new window, and its label is the link's words, `#1001` for a GitHub pull request or issue, or the site's name for a bare address (`data-words` keeps the words as written for a copy). Dot asks no site for an icon. |
 | `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its subagents) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |

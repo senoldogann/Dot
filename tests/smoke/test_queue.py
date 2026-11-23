@@ -662,7 +662,8 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     queue: Locator = page.locator(".dock .queue")
                     rows: Locator = queue.locator(".queue-row")
                     texts: Locator = queue.locator(".queue-text")
-                    grips: Locator = queue.locator(".queue-grip")
+                    ups: Locator = queue.locator(".queue-up")
+                    downs: Locator = queue.locator(".queue-down")
                     await expect(send).to_have_attribute("aria-label", "Stop")
                     await expect(queue).to_be_hidden()
 
@@ -677,23 +678,46 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await expect(texts.nth(0)).to_have_attribute("title", SUMMARY)
                     assert await _texts(runtime, first) == [SUMMARY, MAIL, CLOSE]
 
-                    # The arrow keys move a message by its handle, which keeps the focus; a drag moves it too.
-                    await grips.nth(2).press("ArrowUp")
+                    # Each row has an up and a down arrow (item 1348), disabled at the ends of the queue, named for a
+                    # screen reader, and 32 px square with a pointer and 44 px on a phone. There is no drag.
+                    await expect(ups).to_have_count(3)
+                    await expect(downs).to_have_count(3)
+                    await expect(ups.first).to_have_attribute("aria-label", "Move queued message up")
+                    await expect(downs.first).to_have_attribute("aria-label", "Move queued message down")
+                    await expect(ups.nth(0)).to_be_disabled()
+                    await expect(downs.nth(2)).to_be_disabled()
+                    await expect(ups.nth(1)).to_be_enabled()
+                    await expect(downs.nth(0)).to_be_enabled()
+                    assert await rows.evaluate_all("(rows) => rows.every((row) => !row.draggable)")
+                    side: float = 44 if width <= 720 else 32
+                    box_up = await ups.nth(1).bounding_box()
+                    assert box_up is not None and box_up["width"] == box_up["height"] == side, box_up
+                    # Pressed from the keyboard, an arrow moves the message and keeps the focus on the same message.
+                    await ups.nth(2).focus()
+                    await ups.nth(2).press("Enter")
                     await expect(texts).to_have_text([SUMMARY, CLOSE, MAIL])
-                    await expect(grips.nth(1)).to_be_focused()
-                    await grips.nth(2).drag_to(rows.nth(0), target_position={"x": 60, "y": 4})
+                    await expect(ups.nth(1)).to_be_focused()
+                    await downs.nth(0).press("Space")
+                    await expect(texts).to_have_text([CLOSE, SUMMARY, MAIL])
+                    assert await _texts(runtime, first) == [CLOSE, SUMMARY, MAIL]
+                    # A press at the end the message reaches hands the focus to the row's other arrow.
+                    await ups.nth(1).click()
+                    await expect(texts).to_have_text([SUMMARY, CLOSE, MAIL])
+                    await ups.nth(1).click()
+                    await expect(texts).to_have_text([CLOSE, SUMMARY, MAIL])
+                    await expect(ups.nth(0)).to_be_disabled()
+                    await expect(downs.nth(0)).to_be_focused()
+                    await downs.nth(0).click()
+                    await downs.nth(1).click()
+                    await expect(texts).to_have_text([SUMMARY, MAIL, CLOSE])
+                    await ups.nth(2).click()
+                    await ups.nth(0).dispatch_event("click")  # disabled: it moves nothing
+                    await expect(texts).to_have_text([SUMMARY, CLOSE, MAIL])
+                    await ups.nth(2).click()
+                    await expect(texts).to_have_text([SUMMARY, MAIL, CLOSE])
+                    await ups.nth(1).click()
                     await expect(texts).to_have_text([MAIL, SUMMARY, CLOSE])
                     assert await _texts(runtime, first) == [MAIL, SUMMARY, CLOSE]
-                    # A finger moves a message up by its own button (item 1079), shown only to a touch screen: an
-                    # iPhone drags no row. Its press works as the keys do.
-                    up: Locator = rows.nth(2).locator(".queue-up")
-                    await expect(up).to_have_attribute("aria-label", "Move queued message up")
-                    await expect(up).to_be_hidden()
-                    await expect(rows.nth(0).locator(".queue-up")).to_be_disabled()
-                    await up.dispatch_event("click")
-                    await expect(texts).to_have_text([MAIL, CLOSE, SUMMARY])
-                    await grips.nth(2).press("ArrowUp")
-                    await expect(texts).to_have_text([MAIL, SUMMARY, CLOSE])
 
                     # The pencil edits a message in the composer, whose draft comes back when the edit ends.
                     await box.fill("Half a thought")

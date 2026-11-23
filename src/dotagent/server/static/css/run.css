@@ -501,14 +501,21 @@
 }
 
 /* While the task waits for its subagents (item 1331) one quiet line stands over the bar: what it waits on, what the
-   first of them does now, and Details (the Agents tab) and Stop at its end. */
+   first of them does now, and Details (the Agents tab) and Stop at its end. It is a pane on the bar's own ground and
+   hairline, in the dock and never in the conversation: the messages go by under the dock, and on a ground that lets
+   them through the line read as part of what scrolls (item 1347). */
 .wait-line {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: fit-content;
   max-width: 100%;
+  min-height: 40px;
   margin: 0 auto var(--space-1);
-  padding: var(--space-half) var(--space-1);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -603,9 +610,14 @@
   background: none;
 }
 
-/* The way down sits in the bar's right end, not over the conversation (item 401). */
+/* The way down sits in the bar's right end, not over the conversation (item 401). It is positioned from itself
+   (`relative`, its offsets cleared): a touch screen draws a 4 px ring round an icon button from the button's nearest
+   positioned box (app.css, item 787), and a `static` jump left that box the dock, so while the way down showed (the
+   reader had scrolled up) its invisible ring covered the whole dock: the line that waits for the subagents, the queue
+   and the composer took no tap and no swipe (item 1347). */
 .status-bar > .jump {
-  position: static;
+  position: relative;
+  inset: auto;
   flex: none;
   width: 32px;
   height: 32px;
@@ -679,6 +691,14 @@
     min-height: 0;
   }
 
+  /* The conversation is the one scroller of a chat and it is as wide as the screen (item 1349): the page's 12 px gutters
+     and 16 px above the thread were page, which scrolls nothing, so a swipe that began in them did nothing and the
+     system's scroll bar, drawn at the scroller's edge, stood 12 px in from the glass. The room is the thread's own
+     padding instead, and the bar is at the screen's edge. */
+  html.chat-shell .page[data-layout="run"] {
+    padding: 0;
+  }
+
   html.chat-shell .run-layout,
   html.chat-shell .run-main {
     flex: 1 1 auto;
@@ -736,13 +756,26 @@
     bottom: 0;
     z-index: 6;
     padding-top: 0;
+    padding-inline: var(--space-3);
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
+  }
+
+  /* The dock lets a touch through where nothing of it is drawn (item 1349): it is as wide as the screen and as tall as
+     its panes and the gaps between them, which lay over the conversation as a pane of glass, so a swipe that began
+     in a gap scrolled nothing, a fifth of the screen of dead glass. What the dock holds, the bar, the queue and the
+     composer, takes the touch as before. */
+  html.chat-shell .dock {
+    pointer-events: none;
+  }
+
+  html.chat-shell .dock > * {
+    pointer-events: auto;
   }
 
   /* The dock floats over the conversation's foot (item 374), so the thread keeps its own height under it, and a
      helper's row, which WebKit can lay a little under its group's own height, still ends above the bar (item 401). */
   html.chat-shell .run-thread {
-    padding-bottom: calc(var(--dock-h, 96px) + var(--space-6));
+    padding: var(--space-4) var(--space-3) calc(var(--dock-h, 96px) + var(--space-6));
   }
 
   /* The opening curtain's dock keeps the room the chat's keeps under the composer, so the composer stands where it

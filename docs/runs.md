@@ -357,7 +357,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   (steered) instead. A message starts once, and only after the run at work on the chat has ended, in whichever process
   that run worked: the daemon moves the queue of a chat whose run a `dotx` command drove once it sees that run end, and
   holds it when it starts after such an end. While a message's run is starting, editing it, taking it out or steering it
-  is refused (409). A campaign's chat has no queue: a message there steers its session.
+  is refused (409). A campaign's chat has no queue: a message there steers its session. In the page, a queued message
+  moves a place up or down from its own two arrows, the end ones disabled, which call the same reorder as before
+  (`PUT /threads/{id}/queue`, item 1348); a row is not dragged.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and

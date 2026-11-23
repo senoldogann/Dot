@@ -8546,6 +8546,7 @@ dialog.message-sheet::backdrop {
   margin: 0;
   padding: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
 }
 
@@ -8570,30 +8571,6 @@ dialog.message-sheet::backdrop {
   color: var(--text);
 }
 
-.queue-row.dragging {
-  opacity: 0.5;
-}
-
-/* Where a dragged message would land: a line above the row, or below the last. */
-.queue-row.drop-before::before,
-.queue-row.drop-after::after {
-  content: "";
-  position: absolute;
-  right: var(--space-1);
-  left: var(--space-1);
-  height: 2px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent) 70%, transparent);
-}
-
-.queue-row.drop-before::before {
-  top: 0;
-}
-
-.queue-row.drop-after::after {
-  bottom: 0;
-}
-
 .queue-text {
   flex: 1;
   min-width: 0;
@@ -8616,7 +8593,7 @@ dialog.message-sheet::backdrop {
   gap: var(--space-half);
 }
 
-.queue-grip,
+.queue-arrow,
 .queue-icon,
 .queue-steer,
 .queue-cancel {
@@ -8634,17 +8611,44 @@ dialog.message-sheet::backdrop {
   cursor: pointer;
 }
 
-.queue-grip,
 .queue-icon {
   width: 26px;
 }
 
-.queue-grip {
-  cursor: grab;
+/* The arrows that move a message (item 1348): the hit area is 32 px square with a pointer and 44 px on a phone, and the
+   row grows to hold it; the icon stays 15 px. They replace the drag, which on a phone took the swipe that scrolls. */
+.queue-move {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
 }
 
-.queue-grip:active {
-  cursor: grabbing;
+.queue-arrow {
+  width: 32px;
+  height: 32px;
+}
+
+.queue-arrow > .icon {
+  rotate: -90deg;
+}
+
+.queue-arrow.queue-down > .icon {
+  rotate: 90deg;
+}
+
+@media (pointer: coarse), (max-width: 720px) {
+  .queue-arrow {
+    width: 44px;
+    height: 44px;
+  }
+
+  .queue-row {
+    min-height: 44px;
+  }
+
+  .queue-list {
+    max-height: min(14rem, 30dvh);
+  }
 }
 
 .queue-steer,
@@ -8655,7 +8659,7 @@ dialog.message-sheet::backdrop {
 }
 
 @media (hover: hover) {
-  .queue-grip:hover:not(:disabled),
+  .queue-arrow:hover:not(:disabled),
   .queue-icon:hover:not(:disabled),
   .queue-steer:hover:not(:disabled),
   .queue-cancel:hover {
@@ -8664,7 +8668,7 @@ dialog.message-sheet::backdrop {
   }
 }
 
-.queue-grip:disabled,
+.queue-arrow:disabled,
 .queue-icon:disabled,
 .queue-steer:disabled {
   opacity: 0.45;
@@ -8674,21 +8678,6 @@ dialog.message-sheet::backdrop {
 .queue .icon {
   width: 15px;
   height: 15px;
-}
-
-/* Move up (item 1079): for a finger, which cannot drag a row on an iPhone; a mouse drags. */
-.queue-up {
-  display: none;
-}
-
-.queue-up > .icon {
-  rotate: -90deg;
-}
-
-@media (pointer: coarse) {
-  .queue-up {
-    display: inline-flex;
-  }
 }
 
 .queue button:focus-visible {

@@ -574,7 +574,9 @@ works; "2 done · 1 stopped" after) and the time from the first one's start to t
 one works, and a chevron that folds the rows away; while one works a quiet line in the card says how they work: side by
 side while the chat waits, their answers coming back to it. Over the composer, while the task waits for them, a line
 says **Waiting on 2 subagents** with the first one's step, **Details** (the Agents tab) and **Stop** (stops the task,
-and the subagents with it); the status line under it stays as it was. An approval a helper asks for opens the group. The row is closed from the start;
+and the subagents with it); the status line under it stays as it was. The line is a pane on the status bar's own ground
+and hairline in the dock, and the dock is not the conversation: it stands where it is while the chat is scrolled, a phone's
+included, and nothing of the history shows through it (item 1347). An approval a helper asks for opens the group. The row is closed from the start;
 an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
 again. Its steps are put in the page the first time it opens, by you or by an approval, and stay (item 767): until then
 the row is its line alone, which its events keep up to date, so a chat whose helpers took hundreds of steps opens light
@@ -751,8 +753,9 @@ Settings › General › Messages has it steer the run now, **Add to task**; the
 reader and the box's placeholder say which. The run's choices (its model, reasoning and options) shown from the
 button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
 session, a run a Terminal command drives) the send names that way. A message queued waits above the box: a sheet whose head (Queued
-and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
-its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
+and the count) folds it, with a row per message: an up and a down arrow that move it a place (32 px with a pointer, 44 px on a phone,
+disabled at the ends of the queue, each a button a key presses too; there is no drag, item 1348, which on a phone took
+the swipe that scrolls the chat), its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
 gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
 picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
 **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter sends what the box holds the other way than

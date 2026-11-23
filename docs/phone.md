@@ -146,7 +146,8 @@ history at the same time, to the chat opened before (item 1272; it takes a new b
 Safari's own swipe goes back in the history, which a page cannot turn off, so on a phone's touch screen a link of the sidebar, a notification tapped, the toast's Open and the home after the open chat was deleted take the place of the page left in the history instead of adding one: what it leaves behind is nothing to go back to, and the swipe is Dot's, item 1321; a page opened by a link of a page keeps its place, and Back leads to it); a row of a list and a chat's row darken while pressed, with no grey box of the
 browser, and nothing stays tinted after a tap (item 1086: every style of a pointer resting on something applies only
 where a pointer can rest, `@media (hover: hover)`, which `tests/unit/test_touch_hover.py` holds), and a sheet takes
-the focus itself, so that its first choice is not drawn ringed; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
+the focus itself, so that its first choice is not drawn ringed; a queued message moves a place up or down from its own two 44 px arrows (item 1348: a drag on a row took the swipe
+that scrolls the chat, and is gone). Settings ›
 General › Notifications reads again what the iPhone's Settings allow when you come back to Dot: before, a switch
 turned off by iOS stayed off until the page was loaded again, which a Home Screen app cannot be, and it said to reload.
 
@@ -232,7 +233,9 @@ and how many messages wait in the queue at its left, each part opening what it t
 end, in the same bar; it is a row of 40 px, a plain surface on a hairline and the card's corner, with no glass, no shadow
 and no pill (items 352 and 360, drawn so since item 1335; a wider window has the same bar), as wide as its parts and the
 way down and no wider, in the middle of the dock, not across all of it (item 427). While the task waits for its
-subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331).
+subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331): a pane on the bar's own
+ground and hairline, in the dock under the conversation and never in it, so it stays where it is however far the chat is
+scrolled up and no message shows through it (item 1347).
 A list row (Campaigns, Scheduled tasks, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
@@ -241,7 +244,13 @@ below and 12 at the sides and is rounded 10 px, one of a line and a longer one a
 1324; what Dot says has no box, item 1335), a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
 phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
-keyboard move nothing else. The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
+keyboard move nothing else. The conversation is that one scroller and it is as wide as the screen (item 1349): the page's
+12 px at its sides and its 16 px under the bar, which scroll nothing, are the conversation's own padding now, so the
+system's scroll bar stands at the screen's edge and a swipe that begins at the edge scrolls; the dock lets a touch through
+where nothing of it is drawn, so the gaps beside the bar and the queue scroll the conversation too, and the way down's
+invisible 4 px ring no longer covers the dock while it shows. The window never scrolls and does not stretch past its ends;
+on the pages that scroll (the chats, Settings, Models, Memory) the window alone scrolls, with no box of the page beside it
+(`tests/smoke/test_chat_one_scroller.py`). The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
 pane of glass of items 374 and 401 and the quiet resting box of item 1120 are gone), with no band of the page's colour
 behind it, and the conversation scrolls under the dock, its last line kept clear of the bar however tall the composer grows.
 The words always take their whole line, and the line under them holds the "+", the model, the context meter, the microphone

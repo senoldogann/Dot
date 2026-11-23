@@ -182,7 +182,7 @@ async def test_the_composer_stands_at_the_foot_of_what_is_seen_while_the_convers
             assert facts["sideways"] <= 0
             assert facts["dockPosition"] == "absolute", "the composer floats over the conversation"
             assert facts["dockBackground"] == "none", "no band of the page's colour behind the composer"
-            assert "blur" in str(facts["glass"]), "the composer is a pane of glass"
+            assert "blur" not in str(facts["glass"]), "the composer is a plain box since item 1330, no glass"
             assert facts["threadPaddingBottom"] >= facts["dockHeight"], "the last message clears the composer"
             await phone.screenshot(path=str(tmp_path / "phone-top.png"))
             await phone.evaluate("document.querySelector('.run-thread').scrollTop = 700")
