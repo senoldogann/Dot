@@ -603,10 +603,12 @@ def test_a_link_in_a_message_has_no_chip_and_reads_at_aa_on_every_ground_it_stan
         """The hex of a token of the look for ``scheme``: its own pair, or the token it names with ``var()``."""
         if name in pairs:
             return pairs[name][scheme]
-        themes: str = (_CSS / "themes.css").read_text(encoding="utf-8")
-        named: re.Match[str] | None = re.compile(rf"^\s+{name}: var\((--[a-z0-9-]+)\);", re.M).search(
-            themes, themes.index(dict(_LOOKS)[look])
-        )
+        # The look's own block, and the neutral one it inherits what it does not set from.
+        named: re.Match[str] | None = None
+        for owner in dict.fromkeys((look, "neutral")):
+            named = re.search(rf"^\s+{name}: var\((--[a-z0-9-]+)\);", _block(owner), re.M)
+            if named is not None:
+                break
         assert named is not None, f"{name} is neither a pair of hexes nor a var() of the look {look}"
         return resolved(named.group(1))
 
