@@ -138,10 +138,11 @@ the plan reads `(after 1, 2)` and the web UI shows the same, and the result of e
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
 are independent, so the run can hand each to `delegate` in one turn, naming the step (not one with a `brief`, which
 went to its helper already, below: delegated too, its work would be done twice); the delegated run's report then
-closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
+closes the step (done with the report's start as evidence, or failed) without a mark of the run's own, unless the
+call stopped waiting (below): a report that comes late closes nothing, and the run marks the step itself; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
 line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
-run's report. **Fan-out** (item 927) does it by the plan rather than by the model: a step of `update_plan` may carry a
+run's report, or until a message of yours reaches the run ([Delegation](#delegation)). **Fan-out** (item 927) does it by the plan rather than by the model: a step of `update_plan` may carry a
 `brief`, an instruction a run that cannot see the conversation can follow, and when two or more pending steps with one
 wait for nothing open, they run at once as helpers of the run, at most `[agent] fan_out` (3; 0 or 1: none), as
 `delegate` runs them (the run's model and bounds, research for a research run), while the plan shows them in progress;

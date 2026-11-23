@@ -15,15 +15,23 @@ import asyncio
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
+from typing import Literal
 
 import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Page, async_playwright, expect
 
-from dotagent.agent.helper_reports import HELPER_RELEASED_EVENT, HELPER_SOURCE, kept_detached
+from dotagent.agent.helper_reports import (
+    HELPER_RELEASED_EVENT,
+    HELPER_SOURCE,
+    DetachedHelper,
+    keep_detached,
+    kept_detached,
+)
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
 from dotagent.agent.plan import PLAN_EVENT, plan_from_event
 from dotagent.config import load_default_config
+from dotagent.core.types import JsonObject
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -35,7 +43,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import WORKING_STATUSES, EventRecord, RunRecord
+from dotagent.store.models import WORKING_STATUSES, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -486,7 +494,8 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
         parent: RunRecord = await _start(manager)
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for width, scheme in ((1280, "light"), (390, "dark")):
+            shots: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+            for width, scheme in shots:
                 page: Page = await browser.new_page(
                     viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                 )
@@ -505,3 +514,35 @@ async def test_the_line_over_the_composer_says_the_run_waits_only_while_it_is_bl
             assert (await _ended(manager, parent.id)).status == "cancelled"
         finally:
             await browser.close()
+
+
+async def test_a_helper_whose_end_the_store_has_not_taken_is_kept_and_told_once_it_has(
+    login_env: dict[str, str],
+) -> None:
+    """A helper stored as still at work (its end refused, to be stored later) is not told and not forgotten: its report
+    waits, and is told when the store has the end."""
+    roles: _Roles = _Roles(main=[_finish("Done."), _finish("Told.")], helpers=[])
+    async with _session(login_env, roles) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+        assert (await _ended(manager, parent.id)).status == "done"
+        helper_chat: ThreadRecord = await runtime.store.create_thread("helper", "delegate")
+        helper: RunRecord = await runtime.store.create_run(
+            helper_chat.id, f"{_HELPER_GOAL} stored late", "task", SCRIPTED_MODEL, parent.id, "delegate",
+            "medium", "standard", None, "yolo", False, None, None, None,
+        )  # fmt: skip
+        entry: DetachedHelper = DetachedHelper(
+            helper_run_id=helper.id, parent_run_id=parent.id, thread_id=parent.thread_id, step=None, since=1.0
+        )
+        await keep_detached(runtime.store, entry)
+        manager._untold[parent.thread_id] = [entry]
+        await manager._tell_helper_reports(parent.thread_id)
+        assert [run.id for run in await _runs_of_chat(runtime, parent.thread_id)] == [parent.id]
+        assert manager._untold[parent.thread_id] == [entry] and await kept_detached(runtime.store) == [entry]
+        data: JsonObject = {"status": "done", "result": _report("late"), "needs": ""}
+        assert await runtime.store.end_run(helper.id, "done", _report("late"), data) is not None
+        await manager._tell_helper_reports(parent.thread_id)
+        told: list[RunRecord] = await _runs_of_chat(runtime, parent.thread_id)
+        assert [run.source for run in told][1:] == [HELPER_SOURCE]
+        assert (await _ended(manager, told[1].id)).status == "done"
+        assert "Report of late: all good." in await _thread_text(runtime, parent.thread_id)
+        assert await kept_detached(runtime.store) == [] and not manager._untold.get(parent.thread_id)

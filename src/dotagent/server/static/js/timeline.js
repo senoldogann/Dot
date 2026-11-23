@@ -1865,11 +1865,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       onHeld(false);
     },
 
-    // The owner held the run with a ✋ (item 586): it waits at its next step for what they write next, or for the ✋ to be
-    // taken back, and stops when nobody writes for as long as a hold may last (`[reactions] hold_minutes`).
+    // The run stopped waiting for a delegated run, which works on in the background (item 1351).
     helper_released(_scope, record) {
       released.add(record.data.run_id);
     },
+
+    // The owner held the run with a ✋ (item 586): it waits at its next step for what they write next, or for the ✋ to be
+    // taken back, and stops when nobody writes for as long as a hold may last (`[reactions] hold_minutes`).
     reaction_hold(scope, record) {
       note(scope, record.ts, "hand", t("timeline.held"), "");
       if (scope.runId === rootRunId) {
