@@ -28,7 +28,7 @@ import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 
 from dotagent.core.errors import DotError, PrivateHostRefused, ToolExecutionError, ToolInputError
 from dotagent.core.text import truncate_middle
@@ -53,9 +53,29 @@ _READ_BYTES: int = 1024 * 1024
 _SEEN_CHARS: int = 600
 
 
+def _seconds_as_minutes(data: object) -> object:
+    """``timeout_s`` read as ``within_minutes`` in seconds (item 1340): a model on the Claude plan calls the tool
+    before it looked it up, by its name alone, and gives the wait the shell's ``timeout_s``. A ``timeout_s`` that is
+    not a number, or beside ``within_minutes``, is left as sent, and refused as a name the tool does not take."""
+    if not isinstance(data, dict) or "timeout_s" not in data or "within_minutes" in data:
+        return data
+    seconds: object = data["timeout_s"]
+    if isinstance(seconds, bool) or not isinstance(seconds, int | float | str):
+        return data
+    try:
+        minutes: float = float(seconds) / 60.0
+    except ValueError:
+        return data
+    return {**{name: value for name, value in data.items() if name != "timeout_s"}, "within_minutes": minutes}
+
+
 class WaitArgs(ToolArgs):
+    # Also read as ``condition`` (item 1340), the word of the tool's name a model on the Claude plan guesses before it
+    # looked the tool up: on the owner's Mac each was a call refused and sent again.
     command: str | None = Field(
-        default=None, description="A check that only reads on this Mac (test -f out.zip, grep -q done build.log)."
+        default=None,
+        validation_alias=AliasChoices("command", "condition"),
+        description="A check that only reads on this Mac (test -f out.zip, grep -q done build.log).",
     )
     url: str | None = Field(default=None, description="A public address that must answer 2xx or 3xx.")
     file: str | None = Field(default=None, description="A file that must be there (relative to the workspace).")
@@ -64,6 +84,11 @@ class WaitArgs(ToolArgs):
     )
     every_s: int = Field(default=10, ge=_LEAST_EVERY_S, le=_MOST_EVERY_S, description="Seconds between checks.")
     within_minutes: float = Field(default=10.0, gt=0, le=MOST_MINUTES, description="Most minutes to wait.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _shell_names(cls, data: object) -> object:
+        return _seconds_as_minutes(data)
 
     @model_validator(mode="after")
     def _one_condition(self) -> "WaitArgs":
