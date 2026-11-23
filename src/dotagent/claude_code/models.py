@@ -177,9 +177,12 @@ def kept_models() -> PlanModels | None:
 
 
 def keep_models(models: PlanModels) -> None:
+    """Keep ``models`` whole: written beside the kept file and moved over it, so a reader never meets half of it."""
     path: Path = _models_file()
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    path.write_text(models.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    written: Path = path.with_suffix(".json.new")
+    written.write_text(models.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    os.replace(written, path)
 
 
 def fast_model(name: str) -> bool:

@@ -61,6 +61,8 @@ class ClaudeCodeProvider:
         self._config: ClaudeCodeConfig = config
         self._login_env: dict[str, str] = dict(login_env)
         self._bridge: ToolBridge = bridge
+        # One listing at a time: runs that start together after the kept list aged wait for the one listing.
+        self._listing: asyncio.Lock = asyncio.Lock()
 
     @property
     def name(self) -> str:
@@ -95,7 +97,9 @@ class ClaudeCodeProvider:
 
     async def models(self) -> tuple[PlanModel, ...]:
         """The plan's models as the program lists them (item 1367), once it is found and signed in."""
-        return await plan_models(await self.program(), self._login_env)
+        program: Path = await self.program()
+        async with self._listing:
+            return await plan_models(program, self._login_env)
 
     async def _model(self, name: str) -> PlanModel:
         """The plan's model ``name`` names. One the program does not list is not refused (a chat or a schedule may
@@ -109,11 +113,9 @@ class ClaudeCodeProvider:
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         """A single question of Dot's (item 1017: a review, the harness's roles) answered by the program in one go,
         with no tool but the shape of its answer (:mod:`dotagent.claude_code.ask`); a run goes to it whole instead."""
-        await self._model(request.model)
-        level: Effort | None = effective_effort(EFFORTS, request.effort)
-        return await ask_claude(
-            await self.program(), request, self._login_env, request.model, EFFORTS[0] if level is None else level
-        )
+        model: PlanModel = await self._model(request.model)
+        level: Effort | None = effective_effort(model.efforts, request.effort)
+        return await ask_claude(await self.program(), request, self._login_env, request.model, level)
 
     async def model_info(self, model: str) -> ModelInfo:
         return model_info_of(await self._model(model))

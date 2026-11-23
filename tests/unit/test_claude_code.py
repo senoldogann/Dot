@@ -58,7 +58,7 @@ from dotagent.claude_code.stream import (
 )
 from dotagent.llm.claude_code import model_info_of
 from dotagent.llm.router import ModelRef, offers_fast_mode
-from dotagent.llm.types import ImageData, ToolSpec
+from dotagent.llm.types import Effort, ImageData, ToolSpec
 from dotagent.opencode.bridge import Door, new_door
 from dotagent.repair.claude import window_refused
 from dotagent.store.models import RunPicks
@@ -394,10 +394,18 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
     plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", "p", CONFIG, DOOR, None)
     assert "--settings" not in plain
-    # The configured default goes when the run chose none, rounded to Claude Code's levels, as the composer shows it.
-    assert run_effort(None, "medium") == "medium"
-    assert run_effort("minimal", "medium") == "low" and run_effort("off", "high") == "low"
-    assert run_effort("max", "medium") == "max"
+    # The configured default goes when the run chose none, rounded to the levels Claude Code lists for the model, as
+    # the composer shows it (item 1367): Opus 4.6 has no xhigh, Haiku 4.5 no level, and then no --effort goes.
+    five: tuple[Effort, ...] = ("low", "medium", "high", "xhigh", "max")
+    assert run_effort(five, None, "medium") == "medium"
+    assert run_effort(five, "minimal", "medium") == "low" and run_effort(five, "off", "high") == "low"
+    assert run_effort(five, "max", "medium") == "max"
+    opus_4_6 = find_model(_listed(), "claude-opus-4-6")
+    haiku_4_5 = find_model(_listed(), "claude-haiku-4-5-20251001")
+    assert opus_4_6 is not None and haiku_4_5 is not None
+    assert run_effort(opus_4_6.efforts, None, "xhigh") in ("high", "max")
+    assert run_effort(haiku_4_5.efforts, None, "xhigh") is None
+    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", "p", CONFIG, DOOR, None)
     # Fast mode goes to a model that has it alone, as Claude Code last listed them (item 1367).
     keep_models(PlanModels(fetched_at=0.0, models=_listed()))
     assert run_speed(ModelRef(provider="claude_code", model="sonnet"), "fast") == "standard"
