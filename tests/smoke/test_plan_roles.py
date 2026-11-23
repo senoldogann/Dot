@@ -19,6 +19,7 @@ from model_menu import expect_chosen, model_box, offered, why_not
 from playwright.async_api import Browser, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
+from dotagent.claude_code.models import PlanModel, PlanModels, models_of_line
 from dotagent.config import load_config
 from dotagent.core.paths import config_path
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -30,14 +31,22 @@ from dotagent.server.links import ui_url
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 TOKEN: str = "plan-roles-token"
+MODELS_RESPONSE: Path = Path(__file__).resolve().parents[1] / "fixtures" / "claude_models_response.json"
 
 
 def _lay_out(root: Path) -> tuple[Path, Path, Path]:
-    """Dot's home with its config, the ``claude`` Dot finds (a script that does nothing) and Claude Code's state folder,
-    whose state file says which account is signed in (no secret in it)."""
+    """Dot's home with its config and the plan's models as Claude Code listed them (item 1367, kept as fresh so the
+    program is not asked), the ``claude`` Dot finds (a script that does nothing) and Claude Code's state folder, whose
+    state file says which account is signed in (no secret in it)."""
     home: Path = root / "home"
     home.mkdir()
     (home / "config.toml").write_text("[browser]\nheadless = true", encoding="utf-8")
+    listed: tuple[PlanModel, ...] | None = models_of_line(MODELS_RESPONSE.read_text(encoding="utf-8"))
+    assert listed is not None
+    (home / "claude_code").mkdir()
+    (home / "claude_code" / "models.json").write_text(
+        PlanModels(fetched_at=time.time(), models=listed).model_dump_json(), encoding="utf-8"
+    )
     program: Path = root / "bin" / "claude"
     program.parent.mkdir()
     program.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")

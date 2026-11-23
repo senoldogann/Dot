@@ -33,7 +33,10 @@ run needs, sent where the configuration points:
   which sends Anthropic the goal, what the chat said before on other models, your messages while it works, Dot's
   instructions for the run (your name, an agent's instructions), the descriptions of Dot's tools it is given and what
   each call returned, pictures included. The program's own traffic besides (its updater, telemetry and error reports) is
-  switched off (`DISABLE_AUTOUPDATER`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). Claude Code keeps each session's
+  switched off (`DISABLE_AUTOUPDATER`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`), but for one start: the request for
+  the plan's models (item 1367, at most once in six hours, no prompt and no model called), whose full list comes over
+  the program's telemetry, goes with its telemetry on and its error reports, updater and `/bug` off
+  (`DISABLE_ERROR_REPORTING`, `DISABLE_AUTOUPDATER`, `DISABLE_BUG_COMMAND`). Claude Code keeps each session's
   transcript under `~/.claude/projects/` (it needs it to resume the chat's session at its next message): what the tools
   returned is written there in plain text, outside Dot's store, Dot's undo and Dot's rewind, until you delete it or
   Claude Code's own clean-up does (`cleanupPeriodDays` in your Claude Code settings, 30 days by default). Dot never reads

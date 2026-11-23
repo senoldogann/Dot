@@ -41,6 +41,7 @@ from dotagent.agent.skill_history import (
     wake_playbook,
 )
 from dotagent.agent.skill_proposals import accept_proposal, dismiss_proposal, waiting_proposals
+from dotagent.claude_code.models import model_labels
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, JudgeProvider, ModelsConfig
 from dotagent.config_edit import (
     set_context_size,
@@ -106,8 +107,7 @@ from dotagent.help.elsewhere import (
     found_elsewhere,
 )
 from dotagent.launchd import JobState, inspect_job, service_runs
-from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, model_label
-from dotagent.llm.claude_code import MODELS as CLAUDE_CODE_MODELS
+from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRoles
@@ -205,12 +205,17 @@ def _context_choice(config: AgentConfig, info: ModelInfo, chosen: int | None) ->
 
 
 def _option(
-    provider: str, info: ModelInfo, default_effort: Effort, agent: AgentConfig, sizes: ContextSizes
+    provider: str,
+    info: ModelInfo,
+    default_effort: Effort,
+    agent: AgentConfig,
+    sizes: ContextSizes,
+    labels: dict[str, str],
 ) -> ModelOption:
     ref: ModelRef = ModelRef(provider=provider, model=info.id)
     return ModelOption(
         ref=ref.label,
-        label=model_label(info.id) if provider == CLAUDE_CODE_PROVIDER else info.id,
+        label=labels.get(info.id, info.id),
         vision=info.vision,
         tools=info.tools,
         thinking=info.thinking,
@@ -249,6 +254,8 @@ async def _provider_models(
         infos: tuple[ModelInfo, ...] = await connector.list_models()
     except DotError as exc:
         return ProviderModels(provider=provider, models=[], error=exc.message, problem=_problem(exc))
+    # The names of the plan's models, read once for the provider's list (item 1367); other providers' go by their id.
+    labels: dict[str, str] = await asyncio.to_thread(model_labels) if provider == CLAUDE_CODE_PROVIDER else {}
     retired: list[RetiredModel] = (
         [
             RetiredModel(model=one.model, use=one.use, message=one.message, since=one.since)
@@ -259,7 +266,7 @@ async def _provider_models(
     )
     return ProviderModels(
         provider=provider,
-        models=[_option(provider, info, default_effort, agent, sizes) for info in infos],
+        models=[_option(provider, info, default_effort, agent, sizes, labels) for info in infos],
         error=None,
         problem=None,
         retired=retired,
@@ -393,7 +400,7 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             models=models_now(),
             resume=resume_now(),
             night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
-            model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": model_label(model) for model in CLAUDE_CODE_MODELS},
+            model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": label for model, label in model_labels().items()},
             notifications=ctx.notifications.summary(),
             restart_pending=await restart_pending_of(ctx.runtime, ctx.started_at),
         )
@@ -614,7 +621,8 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             )
         await asyncio.to_thread(set_context_size, config_path(), ref.label, request.tokens)
         ctx.runtime.context_sizes.choose(ref.label, request.tokens)
-        return _option(ref.provider, info, config.models.effort, config.agent, ctx.runtime.context_sizes)
+        labels: dict[str, str] = await asyncio.to_thread(model_labels) if ref.provider == CLAUDE_CODE_PROVIDER else {}
+        return _option(ref.provider, info, config.models.effort, config.agent, ctx.runtime.context_sizes, labels)
 
     @router.get("/models/context")
     async def context_evidence(query: Annotated[ContextEvidenceQuery, Query()]) -> ContextEvidence:

@@ -2,7 +2,9 @@
 was started with (its arguments, its environment's names, the mode of its system prompt file, its input) to the folder
 of its first argument, and answers as the program does, a JSON list of its lines, as the file ``mode`` there says:
 ``propose`` (the structured output of a harness proposal), ``tool`` (the model was given a tool of the program's own),
-``limit`` (the plan's window refused the call) or ``text`` (a text answer)."""
+``limit`` (the plan's window refused the call) or ``text`` (a text answer). A request for its models (item 1367: no
+system prompt file, an ``initialize`` control request on its input) gets the list Claude Code 2.1.330 gave
+(``claude_models_response.json``) and nothing is written."""
 
 import json
 import os
@@ -13,6 +15,11 @@ from pathlib import Path
 
 record: Path = Path(sys.argv[1])
 argv: list[str] = sys.argv[2:]
+if "--system-prompt-file" not in argv:
+    sys.stdin.readline()
+    sys.stdout.write((Path(__file__).parent / "claude_models_response.json").read_text(encoding="utf-8"))
+    sys.stdout.flush()
+    sys.exit(0)
 system_file: Path = Path(argv[argv.index("--system-prompt-file") + 1])
 asked: str = sys.stdin.read()
 (record / "started.json").write_text(

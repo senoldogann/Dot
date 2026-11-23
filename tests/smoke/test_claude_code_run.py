@@ -129,6 +129,11 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
     assert [event.data["tool_calls"] for event in steps] == [["write_file"], []]
     assert steps[0].data["input_tokens"] == 120 and steps[0].data["cached_tokens"] == 20
 
+    # The plan's models were asked for first (item 1367): with the telemetry the list comes over, nothing else of the
+    # program's own traffic.
+    listed: dict[str, object] = await asyncio.to_thread(_json, room.record / "listed.json")
+    assert listed["env"] == {"DISABLE_AUTOUPDATER": "1", "DISABLE_ERROR_REPORTING": "1", "DISABLE_BUG_COMMAND": "1"}
+    assert "--input-format" in listed["args"] and "--mcp-config" not in listed["args"]  # type: ignore[operator]  # JSON
     started: dict[str, object] = await asyncio.to_thread(_json, room.record / "started.json")
     args: list[str] = started["args"]  # type: ignore[assignment]  # what the stand-in wrote
     for flag, value in (

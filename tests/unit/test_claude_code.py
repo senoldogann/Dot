@@ -11,6 +11,14 @@ from pathlib import Path
 from dotagent.agent.limits import LimitReached, RunLimits
 from dotagent.agent.picks import owner_server_groups
 from dotagent.agent.prompt import AgentBrief, team_sections
+from dotagent.claude_code.models import (
+    PlanModel,
+    PlanModels,
+    find_model,
+    keep_models,
+    model_labels,
+    models_of_line,
+)
 from dotagent.claude_code.run import (
     LOADED_TOOLS,
     answered_all,
@@ -48,9 +56,9 @@ from dotagent.claude_code.stream import (
     read_line,
     user_line,
 )
-from dotagent.llm.claude_code import FAST_MODELS, MODELS, model_info_of, model_label
+from dotagent.llm.claude_code import model_info_of
 from dotagent.llm.router import ModelRef, offers_fast_mode
-from dotagent.llm.types import ImageData, ToolSpec
+from dotagent.llm.types import Effort, ImageData, ToolSpec
 from dotagent.opencode.bridge import Door, new_door
 from dotagent.repair.claude import window_refused
 from dotagent.store.models import RunPicks
@@ -386,18 +394,28 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
     plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", "p", CONFIG, DOOR, None)
     assert "--settings" not in plain
-    # The configured default goes when the run chose none, rounded to Claude Code's levels, as the composer shows it.
-    assert run_effort(None, "medium") == "medium"
-    assert run_effort("minimal", "medium") == "low" and run_effort("off", "high") == "low"
-    assert run_effort("max", "medium") == "max"
-    # Fast mode goes to a model that has it alone.
+    # The configured default goes when the run chose none, rounded to the levels Claude Code lists for the model, as
+    # the composer shows it (item 1367): Opus 4.6 has no xhigh, Haiku 4.5 no level, and then no --effort goes.
+    five: tuple[Effort, ...] = ("low", "medium", "high", "xhigh", "max")
+    assert run_effort(five, None, "medium") == "medium"
+    assert run_effort(five, "minimal", "medium") == "low" and run_effort(five, "off", "high") == "low"
+    assert run_effort(five, "max", "medium") == "max"
+    opus_4_6 = find_model(_listed(), "claude-opus-4-6")
+    haiku_4_5 = find_model(_listed(), "claude-haiku-4-5-20251001")
+    assert opus_4_6 is not None and haiku_4_5 is not None
+    assert run_effort(opus_4_6.efforts, None, "xhigh") in ("high", "max")
+    assert run_effort(haiku_4_5.efforts, None, "xhigh") is None
+    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", "p", CONFIG, DOOR, None)
+    # Fast mode goes to a model that has it alone, as Claude Code last listed them (item 1367).
+    keep_models(PlanModels(fetched_at=0.0, models=_listed()))
     assert run_speed(ModelRef(provider="claude_code", model="sonnet"), "fast") == "standard"
     assert run_speed(ModelRef(provider="claude_code", model="opus"), "fast") == "fast"
     assert offers_fast_mode(ModelRef(provider="claude_code", model="opus"))
     assert not offers_fast_mode(ModelRef(provider="claude_code", model="sonnet"))
-    assert model_info_of("fable").efforts == ("low", "medium", "high", "xhigh", "max")
+    fable = find_model(_listed(), "fable")
+    assert fable is not None and model_info_of(fable).efforts == ("low", "medium", "high", "xhigh", "max")
     # Haiku is one of the plan's models too (item 1018), without fast mode.
-    assert "haiku" in MODELS
+    assert find_model(_listed(), "haiku") is not None
     assert not offers_fast_mode(ModelRef(provider="claude_code", model="haiku"))
 
 
@@ -454,18 +472,32 @@ def test_a_look_up_of_a_tool_is_not_a_call_of_dots() -> None:
     assert dot_tool("mcp__other__list_dir", DOOR) is None
 
 
-def test_the_plans_models_are_named_as_people_know_them() -> None:
-    """Item 1054: an alias by the model Claude Code took it for, an older model by its family and version, and only
-    the models of Anthropic's API that have fast mode have it."""
-    assert [
-        model_label(model) for model in ("opus", "fable", "claude-opus-4-7", "claude-opus-4-0", "claude-haiku-4-5")
-    ] == [
-        "Opus 5.5",
-        "Fable 5.1",
-        "Opus 4.7",
-        "Opus 4",
-        "Haiku 4.5",
-    ]
-    assert model_label("default") == "default"
-    assert {"opus", "claude-opus-4-7", "claude-sonnet-4-6"} <= set(MODELS)
-    assert {"opus", "claude-opus-5"} == FAST_MODELS
+def _listed() -> tuple[PlanModel, ...]:
+    """The models Claude Code 2.1.330 listed on 2026-11-23, its answer recorded in the fixtures."""
+    line: str = (Path(__file__).parent.parent / "fixtures" / "claude_models_response.json").read_text(encoding="utf-8")
+    listed: tuple[PlanModel, ...] | None = models_of_line(line)
+    assert listed is not None
+    return listed
+
+
+def test_the_plans_models_are_those_claude_code_lists() -> None:
+    """Item 1367: the plan's models are read from Claude Code's own list, so a new one (Fable 5.2) shows up with its
+    name, its levels and its fast mode; its "default" entry is left out, an older model without levels has none, a
+    family's alias the list names by id answers by the newest of that family, and another program's line is not it."""
+    listed: tuple[PlanModel, ...] = _listed()
+    ids: list[str] = [model.id for model in listed]
+    assert "default" not in ids and "claude-fable-5-2" in ids and "opus" in ids
+    assert {model.id for model in listed if model.fast} == {
+        "opus",
+        "claude-fable-5-2",
+        "claude-opus-5",
+        "claude-opus-4-8",
+    }
+    haiku_4_5 = find_model(listed, "claude-haiku-4-5-20251001")
+    assert haiku_4_5 is not None and haiku_4_5.efforts == () and haiku_4_5.label == "Haiku 4.5"
+    fable = find_model(listed, "fable")
+    assert fable is not None and fable.id == "fable" and fable.label == "Fable 5.2" and fable.fast
+    assert find_model(listed, "claude-opus-4-0") is None
+    assert models_of_line('{"type": "result"}') is None and models_of_line("not json") is None
+    keep_models(PlanModels(fetched_at=0.0, models=listed))
+    assert model_labels()["claude-fable-5-2"] == "Fable 5.2" and model_labels()["fable"] == "Fable 5.2"

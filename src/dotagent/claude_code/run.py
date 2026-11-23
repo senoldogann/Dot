@@ -134,7 +134,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import claude_code_dir
 from dotagent.core.text import redact_known, truncate_middle
 from dotagent.core.types import JsonObject
-from dotagent.llm.claude_code import EFFORTS, FAST_SETTINGS, ClaudeCodeProvider
+from dotagent.llm.claude_code import FAST_SETTINGS, ClaudeCodeProvider
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
@@ -334,7 +334,7 @@ def write_mcp_config(folder: Path, config: JsonObject) -> Path:
 def claude_argv(
     program: str,
     model: str,
-    effort: Effort,
+    effort: Effort | None,
     speed: Speed,
     prompt: str,
     config_file: Path,
@@ -342,12 +342,13 @@ def claude_argv(
     resume: str | None,
 ) -> tuple[str, ...]:
     """The command of a run: ``model`` (Claude Code's alias) at ``effort`` (``--effort``, a level of
-    :data:`~dotagent.llm.claude_code.EFFORTS`, :func:`run_effort`) and ``speed`` (fast mode through ``--settings``, the
+    :func:`run_effort`; none for a model without levels) and ``speed`` (fast mode through ``--settings``, the
     one settings source a run reads, item 1014; :func:`run_speed`), with ``prompt`` after Claude Code's own system
     prompt, the door ``door`` of ``config_file`` as its only MCP server and its tools as the only ones, in the session
     ``resume`` names or a new one; its input and output are lines of JSON."""
     again: tuple[str, ...] = () if resume is None else ("--resume", resume)
     fast: tuple[str, ...] = ("--settings", FAST_SETTINGS) if speed == "fast" else ()
+    level: tuple[str, ...] = () if effort is None else ("--effort", effort)
     return (
         program,
         "-p",
@@ -360,8 +361,7 @@ def claude_argv(
         "--verbose",
         "--model",
         model,
-        "--effort",
-        effort,
+        *level,
         *fast,
         "--append-system-prompt",
         prompt,
@@ -964,12 +964,13 @@ def dot_finish(stop_reason: str) -> str:
     return _DOT_FINISH.get(stop_reason, stop_reason)
 
 
-def run_effort(chosen: Effort | None, configured: Effort) -> Effort:
+def run_effort(levels: tuple[Effort, ...], chosen: Effort | None, configured: Effort) -> Effort | None:
     """The level a run of the plan thinks at (item 1014): the run's own, else the configured default, rounded to the
-    nearest of Claude Code's (``off`` and ``minimal`` to the lowest, ``max`` the highest), as Dot's own loop rounds a
-    level to a model's (:func:`dotagent.llm.traits.effective_effort`); what the composer shows is what goes."""
-    level: Effort | None = effective_effort(EFFORTS, configured if chosen is None else chosen)
-    return EFFORTS[0] if level is None else level
+    nearest of the levels Claude Code lists for the model (``levels``, item 1367; ``off`` and ``minimal`` to the
+    lowest, ``max`` the highest), as Dot's own loop rounds a level to a model's
+    (:func:`dotagent.llm.traits.effective_effort`); what the composer shows is what goes. ``None`` (no ``--effort``)
+    for a model without levels."""
+    return effective_effort(levels, configured if chosen is None else chosen)
 
 
 def run_speed(ref: ModelRef, speed: Speed) -> Speed:
@@ -1140,7 +1141,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             argv: tuple[str, ...] = claude_argv(
                 str(program),
                 ref.model,
-                run_effort(run.effort, runtime.config.models.effort),
+                run_effort(info.efforts, run.effort, runtime.config.models.effort),
                 run_speed(ref, run.speed),
                 prompt,
                 config_file,

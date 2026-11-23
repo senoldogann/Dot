@@ -132,7 +132,9 @@ def answer_schema(parameters: JsonObject) -> JsonObject:
     return {**parameters, "properties": {name: _nullable(field) for name, field in fields.items()}}
 
 
-def ask_argv(program: str, model: str, effort: Effort, system_file: Path, schema: JsonObject | None) -> tuple[str, ...]:
+def ask_argv(
+    program: str, model: str, effort: Effort | None, system_file: Path, schema: JsonObject | None
+) -> tuple[str, ...]:
     """The command of a call: ``model`` (the program's alias) at ``effort``, the system prompt of ``system_file`` in
     place of the program's own, no tool but the structured output of ``schema`` (none: text), no settings file, MCP
     server, slash command or kept session; the question comes on its input, the answer as one JSON document."""
@@ -145,8 +147,7 @@ def ask_argv(program: str, model: str, effort: Effort, system_file: Path, schema
         "--verbose",
         "--model",
         model,
-        "--effort",
-        effort,
+        *(() if effort is None else ("--effort", effort)),
         "--system-prompt-file",
         str(system_file),
         "--tools",
@@ -337,9 +338,10 @@ def _kill(pid: int) -> None:
 
 
 async def ask_claude(
-    program: Path, request: ChatRequest, login_env: Mapping[str, str], model: str, effort: Effort
+    program: Path, request: ChatRequest, login_env: Mapping[str, str], model: str, effort: Effort | None
 ) -> ModelReply:
-    """Ask the plan's ``model`` the single question ``request`` is, at ``effort``, through ``program``. A
+    """Ask the plan's ``model`` the single question ``request`` is, at ``effort`` (none: the model has no levels),
+    through ``program``. A
     cancellation (the caller's time limit) kills the program and its group."""
     question: Question = question_of(request)
     async with _private_folder() as folder:

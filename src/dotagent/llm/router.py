@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequenc
 from contextlib import asynccontextmanager, suppress
 
 from dotagent.agent.sizes import ContextSizes
+from dotagent.claude_code.models import fast_model
 from dotagent.config import AppConfig
 from dotagent.core.errors import (
     ConfigError,
@@ -25,7 +26,6 @@ from dotagent.llm.anthropic import FAST_MODE_MODELS, AnthropicProvider
 from dotagent.llm.antigravity import AntigravityProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, ClaudeCodeProvider
-from dotagent.llm.claude_code import FAST_MODELS as CLAUDE_FAST_MODELS
 from dotagent.llm.google import GoogleProvider
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
@@ -77,9 +77,9 @@ def parse_model_ref(text: str) -> ModelRef:
 
 def offers_fast_mode(ref: ModelRef) -> bool:
     """Whether the model ``ref`` names has fast mode (item 223): some of Anthropic's, as its page names them, and Opus
-    on the owner's Claude plan (item 1014)."""
+    on the owner's Claude plan that Claude Code lists with it (items 1014 and 1367)."""
     if ref.provider == CLAUDE_CODE_PROVIDER:
-        return ref.model in CLAUDE_FAST_MODELS
+        return fast_model(ref.model)
     return ref.provider == "anthropic" and ref.model in FAST_MODE_MODELS
 
 
