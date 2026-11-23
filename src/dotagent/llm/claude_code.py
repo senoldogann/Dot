@@ -1,9 +1,10 @@
-"""The owner's Claude plan as Dot's model picker lists it (item 1013), provider ``claude_code``: Claude Code's own model
-aliases, ``opus`` and ``sonnet``, listed once the ``claude`` program is found and signed in. They answer Claude Code
-alone, so a run on one goes to that program whole (:func:`dotagent.claude_code.run.run_in_claude_code`), and a single
-question of Dot's (a review, the harness's roles, item 1017) goes to it as one call with no tool of its own
-(:mod:`dotagent.claude_code.ask`); a call of a conversation is refused. The program gets Dot's own tools, and only
-those, through the provider's bridge (:mod:`dotagent.opencode.bridge`).
+"""The owner's Claude plan as Dot's model picker lists it (item 1013), provider ``claude_code``: the models the
+``claude`` program itself lists (item 1367, :mod:`dotagent.claude_code.models`), once it is found and signed in. They
+answer Claude Code alone, so a run on one goes to that program whole
+(:func:`dotagent.claude_code.run.run_in_claude_code`), and a single question of Dot's (a review, the harness's
+roles, item 1017) goes to it as one call with no tool of its own (:mod:`dotagent.claude_code.ask`); a call of a
+conversation is refused. The program gets Dot's own tools, and only those, through the provider's bridge
+(:mod:`dotagent.opencode.bridge`).
 
 Whose plan it is is read from ``~/.claude.json``'s ``oauthAccount`` (:func:`dotagent.repair.claude.read_account`): an
 address and an organisation, no secret. Dot never reads Claude Code's credentials nor its Keychain item."""
@@ -13,6 +14,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from dotagent.claude_code.ask import ask_claude
+from dotagent.claude_code.models import PlanModel, find_model, plan_models
 from dotagent.config import ClaudeCodeConfig
 from dotagent.core.errors import ClaudeCodeMissing, ConfigError
 from dotagent.core.paths import claude_code_command
@@ -23,39 +25,8 @@ from dotagent.opencode.server import find_program
 from dotagent.repair.claude import ClaudeAccount, claude_state, read_account
 
 CLAUDE_CODE_PROVIDER: str = "claude_code"
-# Claude Code's own aliases for the newest of each family, and the model each named (item 1054: its first line,
-# ``system``/``init``, says the model; measured on 2.1.319 on 2026-11-08). The alias stays what a run names, so that a
-# choice of "the newest Opus" follows Claude Code; the model it names gives its name on the page.
-ALIASES: dict[str, str] = {
-    "fable": "claude-fable-5-1",
-    "opus": "claude-opus-5-5",
-    "sonnet": "claude-sonnet-5-5",
-    "haiku": "claude-haiku-5-5",
-}
-# The older models the plan answers on (item 1054): each asked once with `--model` at the lowest and the highest
-# effort on 2.1.319 on 2026-11-08, and each answered; Sonnet 4.5 and 4, Haiku 5 and the Claude 3 models did not.
-LEGACY: tuple[str, ...] = (
-    "claude-fable-5",
-    "claude-opus-5",
-    "claude-opus-4-7",
-    "claude-opus-4-6",
-    "claude-opus-4-5",
-    "claude-opus-4-1",
-    "claude-opus-4-0",
-    "claude-sonnet-5",
-    "claude-sonnet-4-6",
-    "claude-haiku-4-5",
-)
-# The models a run may name: the newest of each family by its alias, then the older ones (item 1054).
-MODELS: tuple[str, ...] = (*ALIASES, *LEGACY)
 # How hard a run thinks, as Claude Code's `--effort` takes it (item 1014), lowest first.
 EFFORTS: tuple[Effort, ...] = ("low", "medium", "high", "xhigh", "max")
-# The models of the plan that have fast mode (Claude Code's `fastMode` setting, item 1014): those of Anthropic's API
-# that have it (:data:`dotagent.llm.anthropic.FAST_MODE_MODELS`), Opus 5.5 by its alias and Opus 5 (item 1054). A
-# plan without extra usage runs it at the standard speed (measured: every model answered ``extra_usage_disabled``).
-FAST_MODELS: frozenset[str] = frozenset({"opus", "claude-opus-5"})
-# The families of Claude's models, by the word their names carry.
-_FAMILIES: tuple[str, ...] = ("fable", "opus", "sonnet", "haiku")
 # The settings that turn fast mode on, given to a run's program with `--settings`.
 FAST_SETTINGS: str = '{"fastMode":true}'
 NOT_INSTALLED: str = (
@@ -67,30 +38,18 @@ NOT_SIGNED_IN: str = (
 )
 
 
-def model_label(model: str) -> str:
-    """The name of one of Claude Code's models as people know it (item 1054): an alias by the model it names, "Opus
-    5.5"; a model's id by its family and version, ``claude-opus-4-7`` "Opus 4.7", ``claude-opus-4-0`` "Opus 4". An id
-    that is neither is shown as it is."""
-    named: str = ALIASES.get(model, model)
-    parts: list[str] = named.removeprefix("claude-").split("-")
-    if not parts or parts[0] not in _FAMILIES or not all(part.isdigit() for part in parts[1:]) or len(parts) < 2:
-        return model
-    version: list[str] = parts[1:-1] if len(parts) > 2 and parts[-1] == "0" else parts[1:]
-    return f"{parts[0].capitalize()} {'.'.join(version)}"
-
-
-def model_info_of(model: str) -> ModelInfo:
-    """What one of Claude Code's models offers Dot: it sees, calls tools and thinks; its window is Claude Code's to
-    manage, so Dot names none; its reasoning levels are Claude Code's (:data:`EFFORTS`, item 1014)."""
+def model_info_of(model: PlanModel) -> ModelInfo:
+    """What one of the plan's models offers Dot: it sees, calls tools and thinks; its window is Claude Code's to
+    manage, so Dot names none; its reasoning levels are those Claude Code lists for it (item 1367)."""
     return ModelInfo(
-        id=model,
+        id=model.id,
         vision=True,
         tools=True,
         thinking=True,
         context_length=None,
         own_context_length=None,
         window_source=None,
-        efforts=EFFORTS,
+        efforts=model.efforts,
         free=False,
     )
 
@@ -134,33 +93,38 @@ class ClaudeCodeProvider:
         """The account ``claude`` is signed in with, read from its state file (no secret), or ``None``."""
         return await asyncio.to_thread(read_account, claude_state(self._login_env))
 
+    async def models(self) -> tuple[PlanModel, ...]:
+        """The plan's models as the program lists them (item 1367), once it is found and signed in."""
+        return await plan_models(await self.program(), self._login_env)
+
+    async def _model(self, name: str) -> PlanModel:
+        """The plan's model ``name`` names. Raises :class:`ConfigError` when the program does not list it."""
+        listed: tuple[PlanModel, ...] = await self.models()
+        found: PlanModel | None = find_model(listed, name)
+        if found is None:
+            ids: list[str] = [model.id for model in listed]
+            raise ConfigError(
+                f"Claude Code does not offer the model {name!r} on this plan; pick one of {', '.join(ids)}",
+                {"provider": CLAUDE_CODE_PROVIDER, "model": name, "models": ", ".join(ids)},
+            )
+        return found
+
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         """A single question of Dot's (item 1017: a review, the harness's roles) answered by the program in one go,
         with no tool but the shape of its answer (:mod:`dotagent.claude_code.ask`); a run goes to it whole instead."""
-        if request.model not in MODELS:
-            raise ConfigError(
-                f"Claude Code offers Dot its {', '.join(MODELS)} models only; pick one of them",
-                {"provider": CLAUDE_CODE_PROVIDER, "model": request.model, "models": list(MODELS)},
-            )
+        await self._model(request.model)
         level: Effort | None = effective_effort(EFFORTS, request.effort)
         return await ask_claude(
             await self.program(), request, self._login_env, request.model, EFFORTS[0] if level is None else level
         )
 
     async def model_info(self, model: str) -> ModelInfo:
-        if model not in MODELS:
-            raise ConfigError(
-                f"Claude Code offers Dot its {', '.join(MODELS)} models only; pick one of them",
-                {"provider": CLAUDE_CODE_PROVIDER, "model": model, "models": list(MODELS)},
-            )
-        await self.program()
-        return model_info_of(model)
+        return model_info_of(await self._model(model))
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
-        """Claude Code's models, once the program is found and signed in. Raises :class:`ClaudeCodeMissing` before,
+        """The plan's models, once the program is found and signed in. Raises :class:`ClaudeCodeMissing` before,
         which the models page shows as the usual state of a provider the owner does not use."""
-        await self.program()
-        return tuple(model_info_of(model) for model in MODELS)
+        return tuple(model_info_of(model) for model in await self.models())
 
     async def aclose(self) -> None:
         await self._bridge.aclose()

@@ -41,6 +41,7 @@ from dotagent.agent.skill_history import (
     wake_playbook,
 )
 from dotagent.agent.skill_proposals import accept_proposal, dismiss_proposal, waiting_proposals
+from dotagent.claude_code.models import model_labels
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, JudgeProvider, ModelsConfig
 from dotagent.config_edit import (
     set_context_size,
@@ -106,8 +107,7 @@ from dotagent.help.elsewhere import (
     found_elsewhere,
 )
 from dotagent.launchd import JobState, inspect_job, service_runs
-from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, model_label
-from dotagent.llm.claude_code import MODELS as CLAUDE_CODE_MODELS
+from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRoles
@@ -210,7 +210,7 @@ def _option(
     ref: ModelRef = ModelRef(provider=provider, model=info.id)
     return ModelOption(
         ref=ref.label,
-        label=model_label(info.id) if provider == CLAUDE_CODE_PROVIDER else info.id,
+        label=model_labels().get(info.id, info.id) if provider == CLAUDE_CODE_PROVIDER else info.id,
         vision=info.vision,
         tools=info.tools,
         thinking=info.thinking,
@@ -393,7 +393,7 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             models=models_now(),
             resume=resume_now(),
             night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
-            model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": model_label(model) for model in CLAUDE_CODE_MODELS},
+            model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": label for model, label in model_labels().items()},
             notifications=ctx.notifications.summary(),
             restart_pending=await restart_pending_of(ctx.runtime, ctx.started_at),
         )
