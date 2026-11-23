@@ -438,9 +438,16 @@ final class ChatModel {
     /// The microphone: listens and shows the words as they are heard after what was typed; pressed again, it stops.
     func toggleDictation() {
         let base: String = draft
+        let written: DictationWritten = DictationWritten()
         dictation.toggle { [weak self] heard in
             guard let self else { return }
-            self.draft = DictationText.merged(base: base, heard: heard)
+            // Typing while it listens stops it, and what was typed stays.
+            guard let next: String = DictationText.update(current: self.draft, lastWritten: written.text, base: base, heard: heard) else {
+                self.dictation.stop()
+                return
+            }
+            written.text = next
+            self.draft = next
         }
     }
 

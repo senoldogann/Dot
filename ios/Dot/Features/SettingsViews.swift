@@ -14,34 +14,34 @@ struct NativeSettingsView: View {
             List {
                 Section {
                     Group {
-                    NavigationLink("Models", value: "models")
-                    NavigationLink("Schedules", value: "schedules")
-                                    }
+                        NavigationLink("Models", value: "models")
+                        NavigationLink("Schedules", value: "schedules")
+                    }
                     .listRowBackground(Theme.surface)
                 }
                 Section("Phone") {
                     Group {
-                    LabeledContent("Mac") { Text(store.host.name).font(Theme.small).foregroundStyle(Theme.muted) }
-                    LabeledContent("Connection") { Text(connectionWords).font(Theme.small).foregroundStyle(Theme.muted) }
-                    Button("Notifications") {
-                        // The iPhone's own page of this app's settings, where its notifications are switched.
-                        if let url: URL = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        LabeledContent("Mac") { Text(store.host.name).font(Theme.small).foregroundStyle(Theme.muted) }
+                        LabeledContent("Connection") { Text(connectionWords).font(Theme.small).foregroundStyle(Theme.muted) }
+                        Button("Notifications") {
+                            // The iPhone's own page of this app's settings, where its notifications are switched.
+                            if let url: URL = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                        Button("Change address") { changingAddress = true }
+                        Button("Forget this phone's key", role: .destructive) {
+                            model.forgetKey()
+                            dismiss()
+                        }
                     }
-                    Button("Change address") { changingAddress = true }
-                    Button("Forget this phone's key", role: .destructive) {
-                        model.forgetKey()
-                        dismiss()
-                    }
-                                    }
                     .listRowBackground(Theme.surface)
                 }
                 Section {
                     Group {
-                    Button("Open web UI") {
-                        dismiss()
-                        model.showsWeb = true
+                        Button("Open web UI") {
+                            dismiss()
+                            model.showsWeb = true
+                        }
                     }
-                                    }
                     .listRowBackground(Theme.surface)
                 } footer: {
                     Text("The web UI is the full Dot on this Mac's address. This app is the phone's own front for chats, approvals, helpers and schedules.")
@@ -86,13 +86,13 @@ struct ModelsView: View {
             if let failure { Text(failure).font(Theme.small).foregroundStyle(Theme.bad) }
             Section {
                 Group {
-                picker("Main model", current: store.models?.main) { ref in
-                    try await store.api.chooseMain(model: ref)
+                    picker("Main model", current: store.models?.main) { ref in
+                        try await store.api.chooseMain(model: ref)
+                    }
+                    picker("Review model", current: store.models?.review) { ref in
+                        try await store.api.chooseRole("review", model: ref)
+                    }
                 }
-                picker("Review model", current: store.models?.review) { ref in
-                    try await store.api.chooseRole("review", model: ref)
-                }
-                            }
                 .listRowBackground(Theme.surface)
             } footer: {
                 Text("The main model answers new messages. The review model checks runs and draws lessons.").font(Theme.meta)

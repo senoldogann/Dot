@@ -72,4 +72,16 @@ enum DictationText {
         let separator: String = base.hasSuffix("\n") ? "" : " "
         return base.trimmingCharacters(in: CharacterSet(charactersIn: " ")) + separator + spoken
     }
+
+    /// What the box should hold now, or `nil` when the owner changed it since dictation last wrote to it (what it wrote, or
+    /// what the box held when it began): dictation then stops and keeps the owner's typing, it never writes over it.
+    static func update(current: String, lastWritten: String?, base: String, heard: String) -> String? {
+        guard current == (lastWritten ?? base) else { return nil }
+        return merged(base: base, heard: heard)
+    }
+}
+
+/// What a go of dictation last wrote to the box.
+final class DictationWritten {
+    var text: String?
 }

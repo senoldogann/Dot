@@ -405,6 +405,16 @@ final class DictationRulesTests: XCTestCase {
         XCTAssertEqual(DictationText.merged(base: "Hi", heard: "the invoices"), "Hi the invoices")
     }
 
+    func testTypingWhileItListensStopsItAndIsNeverWrittenOver() {
+        // Nothing typed since it began, or since it last wrote: it writes the words heard so far over its own.
+        XCTAssertEqual(DictationText.update(current: "Hi", lastWritten: nil, base: "Hi", heard: "the"), "Hi the")
+        XCTAssertEqual(DictationText.update(current: "Hi the", lastWritten: "Hi the", base: "Hi", heard: "the invoices"), "Hi the invoices")
+        // A letter typed before the first word, or after one: nil, and the box keeps it.
+        XCTAssertNil(DictationText.update(current: "Hi!", lastWritten: nil, base: "Hi", heard: "the"))
+        XCTAssertNil(DictationText.update(current: "Hi the, ", lastWritten: "Hi the", base: "Hi", heard: "the invoices"))
+        XCTAssertNil(DictationText.update(current: "", lastWritten: "Hi the", base: "Hi", heard: "the invoices"), "a cleared box stays cleared")
+    }
+
     func testTheStateKnowsWhenItListens() {
         XCTAssertTrue(DictationState.starting.isActive)
         XCTAssertTrue(DictationState.listening.isActive)

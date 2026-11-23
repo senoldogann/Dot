@@ -51,7 +51,17 @@ final class NewChatModel {
 
     func toggleDictation() {
         let base: String = draft
-        dictation.toggle { [weak self] heard in self?.draft = DictationText.merged(base: base, heard: heard) }
+        let written: DictationWritten = DictationWritten()
+        dictation.toggle { [weak self] heard in
+            guard let self else { return }
+            // Typing while it listens stops it, and what was typed stays.
+            guard let next: String = DictationText.update(current: self.draft, lastWritten: written.text, base: base, heard: heard) else {
+                self.dictation.stop()
+                return
+            }
+            written.text = next
+            self.draft = next
+        }
     }
 
     func pick(_ items: [PhotosPickerItem]) async {

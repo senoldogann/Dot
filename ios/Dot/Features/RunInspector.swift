@@ -14,69 +14,69 @@ struct RunInspector: View {
             List {
                 Section("Run") {
                     Group {
-                    row("Status", statusWords)
-                    if let run: RunRecord = model.run {
-                        row("Steps", String(run.steps))
-                    }
-                    NavigationLink {
-                        ChatModelPicker(model: model).onAppear { onExpand() }
-                    } label: {
-                        LabeledContent {
-                            Text(modelLine).font(Theme.small).foregroundStyle(Theme.muted)
-                        } label: {
-                            Text("Model for this chat").font(Theme.small).foregroundStyle(Theme.text)
+                        row("Status", statusWords)
+                        if let run: RunRecord = model.run {
+                            row("Steps", String(run.steps))
                         }
+                        NavigationLink {
+                            ChatModelPicker(model: model).onAppear { onExpand() }
+                        } label: {
+                            LabeledContent {
+                                Text(modelLine).font(Theme.small).foregroundStyle(Theme.muted)
+                            } label: {
+                                Text("Model for this chat").font(Theme.small).foregroundStyle(Theme.text)
+                            }
+                        }
+                        .accessibilityIdentifier("chat-model")
+                        Button("Default models…", action: onModels).font(Theme.small)
                     }
-                    .accessibilityIdentifier("chat-model")
-                    Button("Default models…", action: onModels).font(Theme.small)
-                                    }
                     .listRowBackground(Theme.surface)
                 }
                 if !model.state.plan.isEmpty {
                     Section("Plan") {
                         Group {
-                        ForEach(Array(model.state.plan.enumerated()), id: \.offset) { _, step in
-                            HStack(alignment: .top, spacing: 8) {
-                                Image(systemName: icon(for: step.status)).font(.system(size: 11))
-                                    .foregroundStyle(color(for: step.status)).frame(width: 14).padding(.top, 3)
-                                Text(step.text).font(Theme.small).foregroundStyle(step.status == "done" ? Theme.muted : Theme.text)
+                            ForEach(Array(model.state.plan.enumerated()), id: \.offset) { _, step in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: icon(for: step.status)).font(.system(size: 11))
+                                        .foregroundStyle(color(for: step.status)).frame(width: 14).padding(.top, 3)
+                                    Text(step.text).font(Theme.small).foregroundStyle(step.status == "done" ? Theme.muted : Theme.text)
+                                }
                             }
                         }
-                                            }
                         .listRowBackground(Theme.surface)
                     }
                 }
                 Section("Helpers") {
                     Group {
-                    if model.state.helpers.isEmpty {
-                        Text("No helpers in this chat.").font(Theme.small).foregroundStyle(Theme.faint)
-                    }
-                    ForEach(model.state.helpers) { helper in
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text(shortened(helper.goal, 80)).font(Theme.small).foregroundStyle(Theme.text).lineLimit(2)
-                                Spacer()
-                                Text(helper.status).font(Theme.meta).foregroundStyle(helper.isLive ? Theme.accent : Theme.faint)
-                            }
-                            if helper.isLive, let words: String = helper.words {
-                                Text(words).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(1)
+                        if model.state.helpers.isEmpty {
+                            Text("No helpers in this chat.").font(Theme.small).foregroundStyle(Theme.faint)
+                        }
+                        ForEach(model.state.helpers) { helper in
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack {
+                                    Text(shortened(helper.goal, 80)).font(Theme.small).foregroundStyle(Theme.text).lineLimit(2)
+                                    Spacer()
+                                    Text(helper.status).font(Theme.meta).foregroundStyle(helper.isLive ? Theme.accent : Theme.faint)
+                                }
+                                if helper.isLive, let words: String = helper.words {
+                                    Text(words).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(1)
+                                }
                             }
                         }
                     }
-                                    }
                     .listRowBackground(Theme.surface)
                 }
                 Section("Schedules and loops") {
                     Group {
-                    if model.automations.isEmpty {
-                        Text("None bound to this chat.").font(Theme.small).foregroundStyle(Theme.faint)
+                        if model.automations.isEmpty {
+                            Text("None bound to this chat.").font(Theme.small).foregroundStyle(Theme.faint)
+                        }
+                        ForEach(model.automations) { automation in
+                            ScheduleRow(
+                                schedule: automation.schedule, isLoop: automation.loop,
+                                onChange: { model.setAutomation(automation.id, on: $0) })
+                        }
                     }
-                    ForEach(model.automations) { automation in
-                        ScheduleRow(
-                            schedule: automation.schedule, isLoop: automation.loop,
-                            onChange: { model.setAutomation(automation.id, on: $0) })
-                    }
-                                    }
                     .listRowBackground(Theme.surface)
                 }
             }
