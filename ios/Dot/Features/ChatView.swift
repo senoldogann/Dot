@@ -77,8 +77,11 @@ private struct ScrollMetrics: Equatable {
 private struct Transcript: View {
     let model: ChatModel
     @Binding var atBottom: Bool
-    private let bottomId: String = "bottom"
     @State private var viewport: CGFloat = 0
+    private let bottomId: String = "bottom"
+    /// The reader's finger is on the list (or it is still coasting): only then is a distance from the end the reader's doing.
+    @State private var userScrolling: Bool = false
+    @State private var latest: ScrollMetrics = ScrollMetrics(fromBottom: 0, contentHeight: 0, viewport: 0)
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -112,23 +115,26 @@ private struct Transcript: View {
                         - (geometry.contentOffset.y + geometry.contentInsets.top)).rounded(),
                     contentHeight: geometry.contentSize.height.rounded(),
                     viewport: geometry.containerSize.height.rounded())
-            } action: { old, now in
+            } action: { _, now in
                 if abs(now.viewport - viewport) > 1 { viewport = now.viewport }
-                // Content that grew under the reader (words streaming in) is not the reader leaving the bottom.
-                if now.contentHeight == old.contentHeight { atBottom = now.fromBottom <= 32 }
+                latest = now
+                // Content that grew under the reader (words streaming in) is not the reader leaving the bottom: only
+                // the reader's own scrolling says where they are.
+                if userScrolling { atBottom = now.fromBottom <= 32 }
+            }
+            .onScrollPhaseChange { old, new in
+                let touching: Bool = new == .interacting || new == .decelerating || new == .tracking
+                if old != .idle, new == .idle, userScrolling { atBottom = latest.fromBottom <= 32 }
+                userScrolling = touching
             }
             .onChange(of: scrollToken) {
-                if atBottom { proxy.scrollTo(bottomId, anchor: .bottom) }
+                if atBottom { settle(proxy) }
             }
-            .onAppear {
-                // A chat opens at its end. (Not `defaultScrollAnchor`: it pads the top of a short chat by an inset the
-                // scroll metrics then count as distance from the bottom.)
-                proxy.scrollTo(bottomId, anchor: .bottom)
-                DispatchQueue.main.async { proxy.scrollTo(bottomId, anchor: .bottom) }
-            }
+            .onAppear { settle(proxy) }
             .overlay(alignment: .bottomTrailing) {
                 if !atBottom {
                     Button {
+                        atBottom = true
                         withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(bottomId, anchor: .bottom) }
                     } label: {
                         Image(systemName: "arrow.down")
@@ -141,6 +147,17 @@ private struct Transcript: View {
                     .padding(12)
                     .accessibilityLabel("Jump to the newest message")
                 }
+            }
+        }
+    }
+
+    /// Scrolls to the end, and again a moment later and once more: a lazy list guesses the height of rows it has not
+    /// drawn, so the first scroll lands near the end and the passes that follow, with the rows now drawn, reach it.
+    private func settle(_ proxy: ScrollViewProxy) {
+        proxy.scrollTo(bottomId, anchor: .bottom)
+        for delay in [0.05, 0.2] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if atBottom { proxy.scrollTo(bottomId, anchor: .bottom) }
             }
         }
     }
