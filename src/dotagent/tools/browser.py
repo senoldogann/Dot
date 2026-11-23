@@ -151,6 +151,9 @@ _SCRIPT_SUMMARY_CHARS: int = 160
 # The elements one script may be given, by their refs (item 738).
 _SCRIPT_REFS: int = 20
 
+# The tool that opens a page in the browser, named in the refusal of a file address, which the web tools give too.
+_OPEN_TOOL: str = "browser_open"
+
 _REF_HELP: str = "Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes."
 
 
@@ -171,7 +174,8 @@ def _local_file_hint(url: str) -> str:
     """What to do instead of opening ``url``, a ``file:`` address (item 596): the browser opens no file of this Mac,
     since a page opened from disk could lead it to any other (a key, a password store) past the rules on reading files.
     A file is read with read_file, which those rules judge. A page Dot made in its workspace is shown by its path with
-    show_page (item 598), sandboxed in the conversation, whose Open shows it full size in the owner's browser; any other
+    show_page (item 598), sandboxed in the conversation, whose Open shows it full size in the owner's browser, and whose
+    address the run's own browser opens to look at it (item 601, said here since item 1344); any other
     file of the workspace reaches the owner by its path, written in code in the answer, which the panel beside the
     conversation shows. Nothing here serves a folder on this Mac's own address: a server of the Mac opens as any site,
     and a folder named by a page would bring the files around it within reach (item 596's review). Empty for an address
@@ -189,7 +193,9 @@ def _local_file_hint(url: str) -> str:
             f" To show the owner this page, give its path to {SHOW_PAGE_TOOL} ({USE_TOOLS_TOOL} with the group"
             f" {group_of(SHOW_PAGE_TOOL)} turns it on): it is drawn in the conversation with the files beside it that"
             " it names written in (item 600), and its Open shows it full size in the owner's browser. What its scripts"
-            f" load by themselves does not load, but for libraries from {', '.join(LIBRARY_HOSTS)}."
+            f" load by themselves does not load, but for libraries from {', '.join(LIBRARY_HOSTS)}. To look at it"
+            f" yourself (a screenshot, a script, another width), open the address {SHOW_PAGE_TOOL} answers with in"
+            f" {_OPEN_TOOL}: that page opens in the browser."
         )
     return words + (
         f" To show the owner a file made in the workspace, write its path in code in the answer (`{path}`): the panel"
@@ -247,14 +253,14 @@ class OpenArgs(ToolArgs):
 
 def _open_tool() -> RegisteredTool:
     def classify(args: OpenArgs, ctx: ToolContext) -> ActionInfo:
-        return _navigate_action("browser_open", checked_url(args.url, ctx.runtime.config))
+        return _navigate_action(_OPEN_TOOL, checked_url(args.url, ctx.runtime.config))
 
     async def run(args: OpenArgs, ctx: ToolContext) -> ToolResult:
         url: str = checked_url(args.url, ctx.runtime.config)
         return _page_result(await ctx.browser.open_url(ctx.thread_id, url, hides_secrets(ctx.approvals)), ctx)
 
     return make_tool(
-        name="browser_open",
+        name=_OPEN_TOOL,
         description=(
             "Open a web page in the current tab of a real Chrome and return what is on screen: a compact list of "
             "elements, each with a ref you can act on. Use it for any web task. " + _REF_HELP
