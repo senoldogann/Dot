@@ -115,6 +115,11 @@ be, and when none can, the run's lessons say who was asked and why. With one pro
 run's own model is the one that writes them. What these questions carry (a run's digest, the notes, the owner's section,
 a skill), its secrets masked, then goes to that model's provider too, a standby's among them.
 
+A message for a model that cannot answer at all (no key for its provider, its program not installed, or retired by
+Ollama's service) is refused before a run or a chat is made (item 1350, `ModelUnavailableError`, HTTP 422): the error
+names the model, why, and the default model to send it on, and the pages keep the words in the box with a button that
+sends them on it. A model its provider only does not list is not refused.
+
 A model is left out of both lists while its provider has no key (an Ollama model needs none), and after such an error
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a
 new key of its provider is saved. A model the plan of its provider does not include (HTTP 402, "not in the plan") and

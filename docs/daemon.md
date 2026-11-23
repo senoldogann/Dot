@@ -77,7 +77,8 @@ app's): the **agents' menu**, the **+** that makes a new agent (item 1259, where
 dialog of its face (shape and colour) and its name, then its page, whose box starts its conversation; its instructions, model
 and actions start at the defaults and are set with Edit) and a **message to Dot** (the home with the cursor in its box). Dot is
 one conversation, as each agent is. The agents' menu lists Dot and your agents, each its badge, its name and how many chats it
-has, to its conversation (item 1245 for Dot: its home chat, the owner's newest with Dot, else the home; item 1233 for an agent:
+has, to its conversation (item 1245 for Dot: its home chat, the owner's newest with Dot, else the home, which a message from the home
+does not go on in since item 1350; item 1233 for an agent:
 its home chat, where a message to it goes on, the chat bound to it ever after; its page while it has none), and under them
 **All agents** (the page of every agent and team), **New agent** and **Campaigns** (Settings › Campaigns since item 1336). Until item
 1328 Dot and the agents stood as faces under the search, and Campaigns and Schedules as icons in the head (item 855); there is
@@ -186,14 +187,21 @@ many (item 507; until item 1327 small faces, three at most), and the row's name 
 progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, the time it has worked and an **open** link to
 the run's own page.
 
-The home, **Chat** in the tab's title (it read New chat before item 1279), goes on in Dot's conversation (item 1245): a message sent there goes on in
-Dot's home chat (as the daemon names it, `home` of Dot in `GET /api/agents`: the chat of the latest activity whose
-latest run is Dot's and that the pages or `dotx run` started, not a schedule's, a watcher's, Dot's initiative's, a
-team's, a campaign's or a chat that is an agent's), to the run at work there while there is one, queued or steered as Settings › General ›
-Messages says, and that chat opens; with an agent picked, in that agent's (item 1233). Under the box, **Open your chat
-with Dot** leads back into it. There is no New chat on the home (item 1279, your one chat per agent: Dot has one
-conversation, as each agent has); only Keep going and a `/loop` start a chat of their own. Before the first chat with
-Dot the home starts it.
+The home, **Chat** in the tab's title (it read New chat before item 1279), starts a chat of its own for every message to
+Dot (item 1350; items 1245 and 1279 had it go on in Dot's home chat, the one of the latest activity, which was any old
+chat left over, whatever model and files it held, while the box looked new): the run takes the model picked in the box,
+which its record keeps. A chat is gone on in from its own page, which **Open your chat with Dot** under the box leads
+to, or from a chat you opened in the sidebar, where the box is that chat's. With an agent picked the message goes on in
+that agent's one chat (item 1233), to the run at work there while there is one, queued or steered as Settings › General ›
+Messages says, and that chat opens. Keep going and a `/loop` start a chat of their own too. A message sent to a run
+that works keeps the model that run works on, and says so when the box named another: a steer cannot change it.
+
+A message whose model cannot answer at all (its provider has no key, the program it runs on is not installed, or the
+service retired the model) is refused before anything starts, from the home, a chat's box, the queue and a phone's: the
+words name the model and why, the words stay in the box, and a button sends the message on the default model, when that
+can answer. No chat, run or queued message is made by a refusal (`ModelUnavailableError`, HTTP 422, with `model`,
+`problem` and `fallback`); a model its provider merely does not list is not refused. The Share sheet's message starts as
+before, on the default model, and gets the same refusal when that cannot answer.
 
 The home is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame

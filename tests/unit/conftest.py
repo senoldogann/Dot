@@ -20,6 +20,7 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_edit_file_ambiguous.py",
     "test_goal_mode_default.py",
     "test_kernel_paths.py",
+    "test_model_refusal.py",
     "test_notes_file.py",
     "test_open_plan_finish.py",
     "test_page_by_path.py",

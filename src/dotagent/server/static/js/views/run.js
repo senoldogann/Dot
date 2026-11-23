@@ -58,6 +58,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFail
 import { createTimeline } from "../timeline.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
+import { attemptWithFallback } from "../modelrefused.js";
 import { t, tCount } from "../i18n.js";
 import { stopReading } from "../voice.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
@@ -965,6 +966,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // so a second press must be refused here, or a follow-up would start two runs on one thread.
   let sending = false;
   const keys = messageKeys();
+  // The model a message is sent on in place of the box's, when its refusal's button sends it on the default; null otherwise.
+  let modelInstead = null;
 
   // `other` sends the message the other way than the send does (⌘⇧Enter): see `steers`.
   async function submit(other) {
@@ -1013,13 +1016,23 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     sending = true;
     send.disabled = true;
     try {
-      await attempt(async () => {
-        const next = await deliver(text, files, other);
-        frame.clear();
-        if (next !== null) {
-          goOn(`/runs/${next}`);
-        }
-      });
+      await attemptWithFallback(
+        async () => {
+          const next = await deliver(text, files, other);
+          frame.clear();
+          if (next !== null) {
+            goOn(`/runs/${next}`);
+          }
+        },
+        async (fallback) => {
+          modelInstead = fallback;
+          try {
+            await submit(other);
+          } finally {
+            modelInstead = null;
+          }
+        },
+      );
     } finally {
       sending = false;
       send.disabled = false;
@@ -1082,7 +1095,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       const body = {
         text,
         mode: chosen.mode,
-        model: chosen.model,
+        model: modelInstead ?? chosen.model,
         effort: chosen.effort,
         speed: chosen.speed,
         once: chosen.once,
@@ -1105,6 +1118,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       if (other && (choices.value().once !== null || frame.picks.count() > 0)) {
         toast("ok", t("intent.leftForNext"));
       }
+      // The model picked in the box is not the one the run works on: a steer cannot change it, and says so.
+      const picked = choices.value().model;
+      if (picked !== null && picked !== run.model) {
+        toast("ok", t("intent.keepsModel", { model: modelName(run.model), picked: modelName(picked) }));
+      }
       const entry = holdMessage(text);
       const body = { text, attachments: files };
       try {
@@ -1122,7 +1140,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const body = {
       goal: text,
       mode: chosen.mode,
-      model: chosen.model,
+      model: modelInstead ?? chosen.model,
       effort: chosen.effort,
       speed: chosen.speed,
       once: chosen.once,

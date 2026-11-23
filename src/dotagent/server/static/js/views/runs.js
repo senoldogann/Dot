@@ -31,6 +31,7 @@ import { setStageGlass } from "../stage.js";
 import { getSnapshot, loadModels, onChange } from "../state.js";
 import { attempt, toast } from "../ui.js";
 import { WORKING_STATES } from "../runstates.js";
+import { attemptWithFallback } from "../modelrefused.js";
 import { sendToWork } from "../sendwork.js";
 
 const MAX_GOAL_PX = 320;
@@ -107,13 +108,16 @@ function placeholderFor(name) {
 }
 
 /**
- * Where a message from the home goes (item 1245): Dot is one conversation, as each agent is (item 1233), so a message
- * to Dot or to the agent picked goes on in its home chat as the daemon names it (`home` of `GET /api/agents`), and
- * reaches the run at work there; a chat of its own only when Keep going or a loop starts work of its own, or before
- * the owner had a chat with it. The home has no New chat (item 1279, the owner's one chat per agent): an agent's
- * conversation is left by the "…" of its page, Dot's, which has no such page, by deleting the chat.
+ * Where a message from the home goes: a message to Dot starts a chat of its own, as the home's box says. Only an agent
+ * the owner picked has one lasting chat (items 1233 and 1279), which a message to it goes on in, to the run at work
+ * there while there is one (items 898 and 1245). The chat of the latest activity is never taken for the owner's own:
+ * it may be any old one (a project's left over), with the model of another day, so Dot's own chat opens from "Open
+ * your chat with Dot", where the box is that chat's.
  */
 function whereTo(summaries, actorId) {
+  if (actorId === DOT_ID) {
+    return { threadId: null, working: null };
+  }
   const home = summaries.find((summary) => summary.record.id === actorId)?.home ?? null;
   if (home === null) {
     return { threadId: null, working: null };
@@ -283,6 +287,8 @@ function buildComposer(ctx, listener) {
   const keys = messageKeys();
   // The approval mode a send from outside the box asks for, in place of the box's choice; null otherwise.
   let sentApprovals = null;
+  // The model a message is sent on in place of the box's, when its refusal's button sends it on the default; null otherwise.
+  let modelInstead = null;
 
   async function submit() {
     if (starting) {
@@ -309,7 +315,7 @@ function buildComposer(ctx, listener) {
     frame.sendButton.disabled = true;
     listener.sending();
     try {
-      await attempt(async () => {
+      await attemptWithFallback(async () => {
         // A kept reasoning level is checked against the model's own, so the models are known first.
         await choices.ready();
         // The conversation as the daemon names it now (item 1245): its run may have ended, or the chat gone, since the
@@ -320,11 +326,15 @@ function buildComposer(ctx, listener) {
             ? unsent.where
             : loop !== null || standing.value()
               ? { threadId: null, working: null }
-              : whereTo(await api.get("/agents"), agentId === "" ? DOT_ID : agentId);
+              : whereTo(agentId === "" ? [] : await api.get("/agents"), agentId === "" ? DOT_ID : agentId);
         unsent = { text, where };
         const owner = { agent_id: agentId === "" ? null : agentId };
         const opening = { ...ctx, steered: (runId) => ctx.navigate(`/runs/${runId}`), queued: (runId) => ctx.navigate(`/runs/${runId}`) };
-        if (await sendToWork({ where, text, choices, frame, owner, keys, ctx: opening })) {
+        const used =
+          modelInstead === null
+            ? choices
+            : { ready: () => choices.ready(), value: () => ({ ...choices.value(), model: modelInstead }), sent: () => choices.sent() };
+        if (await sendToWork({ where, text, choices: used, frame, owner, keys, ctx: opening })) {
           unsent = null;
           removePref(HOME_CHOICES_KEY);
           return;
@@ -333,7 +343,7 @@ function buildComposer(ctx, listener) {
         const body = {
           goal: loop === null ? text : loop.message,
           mode: chosen.mode,
-          model: chosen.model,
+          model: modelInstead ?? chosen.model,
           effort: chosen.effort,
           speed: chosen.speed,
           once: chosen.once,
@@ -354,6 +364,13 @@ function buildComposer(ctx, listener) {
         unsent = null;
         removePref(HOME_CHOICES_KEY);
         ctx.navigate(`/runs/${created.id}`);
+      }, async (fallback) => {
+        modelInstead = fallback;
+        try {
+          await submit();
+        } finally {
+          modelInstead = null;
+        }
       });
     } finally {
       starting = false;

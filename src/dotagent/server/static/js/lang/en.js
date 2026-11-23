@@ -817,7 +817,9 @@ export const EN = {
   "settings.busyHint": "What a message does by default while a task works: it waits and starts the next task once this one has ended, or it is added to the task at once. The send's name and the box's placeholder say which, a queued message's Steer adds it to the task, and ⌘⇧Enter sends the other way. A campaign's session is always added to.",
   "settings.busyQueueHint": "The message waits and starts the next task.",
   "settings.busySteerHint": "The message goes to the task at work at once.",
+  "modelRefused.sendOn": "Send on {model}",
   // The note after a steer sent with the shortcut.
+  "intent.keepsModel": "Added to the task, which keeps the model it works on, {model}: {picked} waits for your next message.",
   "intent.leftForNext": "Added to the task, which keeps its level and what it works with: Ultrathink, Ultracode, skills, plugins and Plan first wait for your next message.",
   "outcome.message": "Message",
   // The Continue line of a task that was cut off (views/run.js).

@@ -151,3 +151,21 @@ export function serviceFailure(line) {
   const cause = serviceCause(status, found[2] ?? "");
   return { status, short: t(cause.short), next: t(cause.next), details: line.trim() };
 }
+
+/**
+ * The model a refused message named and the one the daemon offers instead (null when none can answer), or null when
+ * `error` is no such refusal.
+ * @param {unknown} error
+ * @returns {{ model: string, fallback: string | null } | null}
+ */
+export function refusedModel(error) {
+  const known = /** @type {{ name?: unknown, status?: unknown, context?: { model?: unknown, problem?: unknown, fallback?: unknown } }} */ (error);
+  if (known === null || typeof known !== "object" || known.name !== "ApiError" || known.status !== 422) {
+    return null;
+  }
+  const { model, problem, fallback } = known.context ?? {};
+  if (typeof model !== "string" || typeof problem !== "string") {
+    return null;
+  }
+  return { model, fallback: typeof fallback === "string" ? fallback : null };
+}
