@@ -1,4 +1,4 @@
-"""`GET /runs/{id}/events?tail=N` (item 1371): the newest N events of a run, oldest first, without the loop's snapshots,
+"""`GET /runs/{id}/events?tail=N` (item 1370): the newest N events of a run, oldest first, without the loop's snapshots,
 and the header that says a daemon knows `tail` (a phone that slept through a long run reads the end of it and not the
 run from its first event). A daemon without it would answer the run's first events, so the header is how a client tells
 the two. The API of a real in-process server over a runtime in a throw-away home; no model is called."""

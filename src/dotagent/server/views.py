@@ -322,7 +322,7 @@ class TerminalView(FrozenModel):
 
 
 class EventsQuery(FrozenModel):
-    """``tail`` reads the newest that many events instead of the ones after ``after`` (item 1371): a client that was
+    """``tail`` reads the newest that many events instead of the ones after ``after`` (item 1370): a client that was
     away through a long run reads the end of it, and the answer says it knew ``tail`` in the ``X-Dot-Events-Tail``
     header."""
 
