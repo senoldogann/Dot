@@ -30,6 +30,12 @@ class MissingSecretError(ConfigError):
     """A secret, such as the API key of a provider, is set in none of the places Dot reads secrets from."""
 
 
+class ModelUnavailableError(ConfigError):
+    """A message was asked to start on a model that cannot answer it now (its provider has no key or is not installed,
+    or the service retired it): refused before anything starts. The context names the ``model``, the ``problem`` and
+    the ``fallback`` the owner may send it on instead (the default model, ``None`` when that cannot answer either)."""
+
+
 class JsonParseError(DotError):
     """A payload that must be a JSON object was not."""
 

@@ -108,11 +108,15 @@ from dotagent.claude_code.run import run_in_claude_code
 from dotagent.config import ResumeMode
 from dotagent.core.errors import (
     BrowserError,
+    ClaudeCodeMissing,
     ConfigError,
     DotError,
     FailSafeTriggered,
     InvalidValueError,
+    MissingSecretError,
+    ModelUnavailableError,
     NotFoundError,
+    OpenCodeMissing,
     PolicyDenied,
     RunAlreadyEnded,
     RunCancelled,
@@ -128,11 +132,13 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.evals import EVAL_SOURCE
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER
+from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
     ONE_MESSAGE_LEVELS,
     WHOLE_RUN_AGENTS,
+    ChatProvider,
     Effort,
     ModelInfo,
     OneMessage,
@@ -954,6 +960,7 @@ class RunManager:
         message when it is not the goal (a handoff note in front of the owner's words); ``resumed`` carries the plan
         of the run it goes on from."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        await self.check_model_answers(ref)
         _check_speed(ref, speed)
         if effort is not None:
             await self._check_effort(ref, effort)
@@ -1923,6 +1930,7 @@ class RunManager:
         the run at work is held by a ✋ lets it go on: the owner has written, and their message waits in the queue as
         any does."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        await self.check_model_answers(ref)
         _check_speed(ref, speed)
         await self._check_once(ref, once)
         store: Store = self._runtime.store
@@ -3509,6 +3517,45 @@ class RunManager:
                 "the model does not offer that reasoning effort",
                 {"model": ref.label, "effort": effort, "offered": list(info.efforts)},
             )
+
+    async def check_model_answers(self, ref: ModelRef) -> None:
+        """Refuse a message for the model ``ref`` while its provider cannot be used at all: no key is set for it, the
+        program it runs on is not installed, or the service retired the model. Nothing is started or queued, so the
+        message stays where the owner typed it, and the error names the model and the default model they may send it
+        on instead; the default's own trouble is not told here, its run says it. A model the provider merely does not
+        list is not refused: a list can lag behind what the provider answers."""
+        problem: str | None = await self._model_problem(ref)
+        if problem is None:
+            return
+        fallback: ModelRef = parse_model_ref(self._main_model)
+        offered: str | None = (
+            None if fallback == ref or await self._model_problem(fallback) is not None else fallback.label
+        )
+        instead: str = (
+            ""
+            if offered is None
+            else f" Send it on {offered}, the default model, or fix the model in Settings › Models."
+        )
+        raise ModelUnavailableError(
+            f"{ref.label} cannot answer this message: {problem}.{instead}",
+            {"model": ref.label, "problem": problem, "fallback": offered},
+        )
+
+    async def _model_problem(self, ref: ModelRef) -> str | None:
+        """Why ``ref``'s provider cannot answer at all, in plain words, or ``None``."""
+        try:
+            connector: ChatProvider = await self._runtime.router.provider(ref.provider)
+        except MissingSecretError:
+            return f"no {ref.provider} key is set"
+        except (OpenCodeMissing, ClaudeCodeMissing) as error:
+            return f"{ref.provider} is not installed or not signed in ({error.message})"
+        if isinstance(connector, OllamaProvider):
+            for retirement in connector.retired():
+                if retirement.model == ref.model:
+                    return "the service retired it" + (
+                        "" if retirement.use is None else f"; it suggests {retirement.use}"
+                    )
+        return None
 
     async def _check_once(self, ref: ModelRef, once: OneMessage | None) -> None:
         """A choice for one message (item 251) is offered by a model that has the level it asks for."""

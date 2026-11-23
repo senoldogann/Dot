@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { explain, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
+import { explain, refusedModel, serviceFailure, serviceWords, UNREACHABLE } from "../../src/dotagent/server/static/js/errors.js";
 
 class ApiError extends Error {
   constructor(status, message, context = {}) {
@@ -95,4 +95,19 @@ test("a 402 for credits held by requests still running reads as a limit reached,
   assert.equal(held?.short, "Stopped: the AI service's limit was reached");
   const spent = serviceFailure("provider answered HTTP 402: This request requires more credits, or fewer max_tokens.");
   assert.equal(spent?.short, "Stopped: the AI service's balance or plan");
+});
+
+test("a message refused for its model names the model and the default model it may go on, and no other refusal is one", () => {
+  const refusal = new ApiError(422, "openai:gpt-5.5 cannot answer this message: no openai key is set.", {
+    model: "openai:gpt-5.5",
+    problem: "no openai key is set",
+    fallback: "ollama:gpt-oss",
+  });
+  assert.deepEqual(refusedModel(refusal), { model: "openai:gpt-5.5", fallback: "ollama:gpt-oss" });
+  const nowhere = new ApiError(422, "x", { model: "openai:gpt-5.5", problem: "no openai key is set", fallback: null });
+  assert.deepEqual(refusedModel(nowhere), { model: "openai:gpt-5.5", fallback: null });
+  assert.equal(refusedModel(new ApiError(422, "the model does not offer fast mode", { model: "x:y" })), null);
+  assert.equal(refusedModel(new ApiError(500, "x", { model: "a:b", problem: "p" })), null);
+  assert.equal(refusedModel(new Error("x")), null);
+  assert.equal(refusedModel(null), null);
 });

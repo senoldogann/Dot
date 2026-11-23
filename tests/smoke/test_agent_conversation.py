@@ -1,7 +1,8 @@
 """An agent is one conversation (item 1233, the owner's word of 2026-11-19 after Grok Bot): its face in the sidebar
 opens its chat, its page's box goes on in that chat rather than starting a new one each time, New chat in its page's
 "…" starts the next message afresh, and its name in the chat's bar opens its page (item 1234). Dot is one
-conversation too (item 1245): the home's box goes on in Dot's chat. The "+" makes a new agent, whose conversation opens
+conversation in its way (item 1245): its entry opens its home chat, and the home's box starts a chat of its own for each
+message (item 1350). The "+" makes a new agent, whose conversation opens
 next, and a phone lists the agents as rows of the list (item 1259). A real server on a scripted model, in Chrome."""
 
 import asyncio
@@ -242,17 +243,18 @@ async def test_dot_is_one_conversation(served: tuple[RunManager, httpx.AsyncClie
             await expect(await _entry(page, "Dot")).to_have_attribute("aria-current", "true")
             await page.keyboard.press("Escape")
 
-            # The home's next message goes on in that chat, rather than starting a new one.
+            # The home's next message starts a chat of its own (item 1350), not the chat of the latest activity, which
+            # may be any old one; that chat is left as it was, and the way back into it is under the box.
             await page.goto(home)
             await expect(page.get_by_role("link", name="Open your chat with Dot")).to_have_attribute(
                 "href", f"#/runs/{first}"
             )
             second: str = await _sent_from_home(manager, page, "And add the gym on Friday")
             assert second != first
-            assert (await client.get(f"/api/runs/{second}")).json()["run"]["thread_id"] == thread
+            assert (await client.get(f"/api/runs/{second}")).json()["run"]["thread_id"] != thread
 
-            # No New chat under the box (item 1279, the owner's one chat per agent): the way back into the chat is all
-            # the home offers, and Dot's entry leads to the newest run of the same chat.
+            # No New chat under the box (item 1279): the way back into the chat is all the home offers, and Dot's entry
+            # leads to the newest run of the chat of the latest activity.
             await page.goto(home)
             await expect(page.get_by_role("link", name="Open your chat with Dot")).to_be_visible()
             await expect(page.get_by_role("button", name="New chat")).to_have_count(0)
