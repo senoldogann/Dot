@@ -149,6 +149,13 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event, which the conversation
 does not show (items 1098 and 1112): the answer says what came of the work.
+
+**The check may look at the work itself** (item 1363). The digest says that a file was written, never what it holds; so
+a check that cannot tell whether the goal is reached from the digest and the facts answers `inspect`, naming in `reads`
+at most two files that the facts list among the files the run wrote, with the lines it wants. Dot reads them (only a file
+the run wrote is opened at all, at most 120 lines, 4000 characters, with secrets masked as the facts are) and asks the
+check once more with what they hold. A second inspect is refused and a decision names no file: the window is one look at
+the work, not a second read of the run.
 An answer that ends by offering to do a part of the goal that is not done yet, which the run could do with its own
 tools, is `continue`, so that the part is done instead of offered; an offer of work the goal did not ask for (a fix when
 only a diagnosis was asked) changes nothing, and what needs you (a decision, a credential) may stay an offer.

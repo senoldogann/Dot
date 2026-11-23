@@ -111,7 +111,10 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # the background closes no step (item 1351, the owner's ask of 2026-11-23: a message they send while a run waits on a
 # helper makes it go on, and the helper's report comes to the chat when it ends): 30,150 measured here, the rest being
 # room for the longer paths of the gate's runner.
-BUDGET_TOKENS: int = 30_250
+# Raised by 150 for the hand-over line of the Delegation section and `delegate`'s description (item 1362: a delegated
+# run starts with the plan, the files, the checks and the failures its parent already measured, so it does not read the
+# same files again): 30,305 measured on the gate's runner, system 8,758, tools 21,377.
+BUDGET_TOKENS: int = 30_400
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
