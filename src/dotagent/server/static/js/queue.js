@@ -296,7 +296,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     paused.hidden = !held;
     resume.disabled = busy;
     // The rows are drawn anew, on every change of the queue from any page: the control that has the focus hands it to
-    // its like in the new rows (a handle moved from the keyboard to its new place), or to the box once that is gone.
+    // its like in the new rows (the arrow pressed moved with its message), or to the box once that is gone.
     const active = document.activeElement;
     const focused = active instanceof HTMLElement && list.contains(active) ? active : null;
     list.replaceChildren(...messages.map(row));
