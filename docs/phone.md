@@ -146,7 +146,8 @@ history at the same time, to the chat opened before (item 1272; it takes a new b
 Safari's own swipe goes back in the history, which a page cannot turn off, so on a phone's touch screen a link of the sidebar, a notification tapped, the toast's Open and the home after the open chat was deleted take the place of the page left in the history instead of adding one: what it leaves behind is nothing to go back to, and the swipe is Dot's, item 1321; a page opened by a link of a page keeps its place, and Back leads to it); a row of a list and a chat's row darken while pressed, with no grey box of the
 browser, and nothing stays tinted after a tap (item 1086: every style of a pointer resting on something applies only
 where a pointer can rest, `@media (hover: hover)`, which `tests/unit/test_touch_hover.py` holds), and a sheet takes
-the focus itself, so that its first choice is not drawn ringed; a queued message goes up a place from its own button (a finger cannot drag a row on an iPhone). Settings ›
+the focus itself, so that its first choice is not drawn ringed; a queued message moves a place up or down from its own two 44 px arrows (item 1348: a drag on a row took the swipe
+that scrolls the chat, and is gone). Settings ›
 General › Notifications reads again what the iPhone's Settings allow when you come back to Dot: before, a switch
 turned off by iOS stayed off until the page was loaded again, which a Home Screen app cannot be, and it said to reload.
 

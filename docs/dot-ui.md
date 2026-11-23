@@ -34,7 +34,8 @@ the tokens of `themes.css` and `app.css`, never a literal (`tests/unit/test_css_
   the reasoning as bars), the microphone and the round send. The mode (when named) and the context meter are quiet
   pills of the same bar; on a Mac the approvals stand under the box at its right, and on a phone the model's sheet holds
   them (YOLO's lock stays in the bar). The choices are always in sight: there is no resting state and no button that hides
-  them. The queue's sheet over the box is on the box's own ground; the line over it that says the work's state is a quiet pill.
+  them. The queue's sheet over the box is on the box's own ground, a row of it with an up and a down arrow (32 px, 44 on a phone;
+  no drag, item 1348); the line over it that says the work's state is a quiet pill.
 
 Smoke tests of the shell: `tests/smoke/test_side_working.py`, `test_working_rows.py`, `test_activity.py`,
 `test_side_agents.py` (the agents' menu), `test_chat_menu.py`, `test_connect_apps.py`, `test_phone_layout.py`,

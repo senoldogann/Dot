@@ -753,8 +753,9 @@ Settings › General › Messages has it steer the run now, **Add to task**; the
 reader and the box's placeholder say which. The run's choices (its model, reasoning and options) shown from the
 button beside the "+" stand at the right, by the microphone and the send, on every page. Where one way alone is open (a held run, a campaign's
 session, a run a Terminal command drives) the send names that way. A message queued waits above the box: a sheet whose head (Queued
-and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
-its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
+and the count) folds it, with a row per message: an up and a down arrow that move it a place (32 px with a pointer, 44 px on a phone,
+disabled at the ends of the queue, each a button a key presses too; there is no drag, item 1348, which on a phone took
+the swipe that scrolls the chat), its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
 gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
 picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
 **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter sends what the box holds the other way than

@@ -1,6 +1,6 @@
 // The queue of a chat (item 148): what is sent while a run works waits above the composer and starts
 // as the chat's next run, one message after the other, once the run before it has ended done. A message can be moved
-// (its handle is dragged, or takes the arrow keys), edited in the composer, sent to the run at work now (Steer) or
+// (its up and down arrows, which a finger, a pointer and the keys press alike), edited in the composer, sent to the run at work now (Steer) or
 // taken out. A stop, a failure or a crash of the daemon holds the queue until Resume; a run that a stop of the daemon
 // cut leaves it to go on once the run, continued, ends done. The daemon keeps the queue, so it goes on with no page
 // open, and every open page shows it as it changes; a queue the page could not read says so, with Read again.
@@ -44,10 +44,6 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   let editingId = null;
   let draft = "";
   let draftFiles = [];
-  // The row whose handle was pressed, which alone may be dragged; the row dragged and where it would land.
-  let armedId = null;
-  let draggedId = null;
-  let dropIndex = null;
 
   const element = el("section", { class: "queue", role: "region", "aria-live": "polite", hidden: true });
   const toggleIcon = icon("chevron");
@@ -202,32 +198,42 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     onEdit();
   }
 
-  function row(message, index) {
-    const editing = message.id === editingId;
-    const grip = el(
+  /** The arrow that moves `message` a place up or down; `disabled` at the end it points away from. */
+  function moveButton(message, way, disabled) {
+    const up = way === "up";
+    const button = el(
       "button",
       {
-        class: "queue-grip",
+        class: `queue-arrow queue-${way}`,
         type: "button",
         "data-id": message.id,
-        "data-part": "grip",
-        "aria-label": "Reorder queued message (drag, or press the arrow keys)",
-        disabled: messages.length < 2,
+        "data-part": way,
+        "aria-label": up ? "Move queued message up" : "Move queued message down",
+        title: up ? "Move up" : "Move down",
+        disabled,
       },
-      icon("grip"),
+      icon("chevron"),
     );
-    grip.addEventListener("pointerdown", () => {
-      armedId = message.id;
-    });
-    grip.addEventListener("keydown", (event) => {
-      const step = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
-      const to = index + step;
-      if (step === 0 || to < 0 || to >= messages.length) {
-        return;
+    button.addEventListener("click", () => {
+      const from = messages.findIndex((other) => other.id === message.id);
+      const to = from + (up ? -1 : 1);
+      if (from >= 0 && to >= 0 && to < messages.length) {
+        order(moved(message.id, to));
       }
-      event.preventDefault();
-      order(moved(message.id, to));
     });
+    return button;
+  }
+
+  function row(message, index) {
+    const editing = message.id === editingId;
+    // The two arrows move the message a place; there is no drag, which on a phone took the swipe that scrolls the chat
+    // (item 1348). An arrow at an end of the queue is disabled.
+    const move = el(
+      "span",
+      { class: "queue-move" },
+      moveButton(message, "up", index === 0),
+      moveButton(message, "down", index === messages.length - 1),
+    );
 
     const words = oneLine(message.text);
     const text = el("span", { class: "queue-text", title: message.text }, words);
@@ -266,83 +272,17 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         icon("x"),
       );
       remove.addEventListener("click", () => act(() => api.del(`/queue/${message.id}`)));
-      // A finger cannot drag a row on an iPhone (item 1079): the row goes up a place from its own button there.
-      const up = el(
-        "button",
-        { class: "queue-icon queue-up", type: "button", "data-id": message.id, "data-part": "up", "aria-label": "Move queued message up", title: "Move up", disabled: index === 0 },
-        icon("chevron"),
-      );
-      up.addEventListener("click", () => order(moved(message.id, index - 1)));
-      actions = el("span", { class: "queue-actions" }, up, edit, steerButton, remove);
+      actions = el("span", { class: "queue-actions" }, edit, steerButton, remove);
     }
 
-    const item = el("li", { class: "queue-row", draggable: String(messages.length > 1) }, grip, text, clip, actions);
+    const item = el("li", { class: "queue-row" }, move, text, clip, actions);
     if (editing) {
       item.setAttribute("aria-current", "true");
     }
-    item.addEventListener("dragstart", (event) => {
-      if (armedId !== message.id) {
-        event.preventDefault();
-        return;
-      }
-      event.dataTransfer.setData("text/plain", message.id);
-      event.dataTransfer.effectAllowed = "move";
-      draggedId = message.id;
-      item.classList.add("dragging");
-    });
-    item.addEventListener("dragend", () => {
-      armedId = null;
-      draggedId = null;
-      dropIndex = null;
-      paint();
-    });
-    item.addEventListener("dragover", (event) => {
-      if (draggedId === null) {
-        return;
-      }
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      const box = item.getBoundingClientRect();
-      const at = event.clientY < box.top + box.height / 2 ? index : index + 1;
-      if (at !== dropIndex) {
-        dropIndex = at;
-        markDrop();
-      }
-    });
-    item.addEventListener("drop", (event) => {
-      if (draggedId === null || dropIndex === null) {
-        return;
-      }
-      event.preventDefault();
-      const from = messages.findIndex((other) => other.id === draggedId);
-      // Taking the row out first moves every place after it up by one.
-      const to = dropIndex > from ? dropIndex - 1 : dropIndex;
-      const id = draggedId;
-      draggedId = null;
-      dropIndex = null;
-      if (to !== from) {
-        order(moved(id, to));
-      } else {
-        paint();
-      }
-    });
     return item;
   }
 
-  /** Mark where the dragged message would land, on the rows as they are. */
-  function markDrop() {
-    const items = [...list.children];
-    items.forEach((item, index) => {
-      item.classList.toggle("drop-before", index === dropIndex);
-      item.classList.toggle("drop-after", dropIndex === items.length && index === items.length - 1);
-    });
-  }
-
   function paint() {
-    // A drag keeps the rows it started on, which are drawn anew once it ends.
-    if (draggedId !== null) {
-      return;
-    }
     element.hidden = messages.length === 0 && problem === null;
     head.hidden = messages.length === 0;
     unread.hidden = problem === null;
@@ -361,10 +301,13 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     const focused = active instanceof HTMLElement && list.contains(active) ? active : null;
     list.replaceChildren(...messages.map(row));
     if (focused !== null) {
-      const like = /** @type {HTMLButtonElement | HTMLTextAreaElement | null} */ (
-        list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${focused.dataset.part}"]`)
-      );
-      (like !== null && !like.disabled ? like : frame.textarea).focus();
+      // The arrow pressed has moved with its message; at the end of the queue it is disabled, and the focus goes to the
+      // other arrow of the row, or to its pencil, before it goes to the box.
+      const parts = [focused.dataset.part, focused.dataset.part === "up" ? "down" : "up", "edit"];
+      const next = parts
+        .map((part) => /** @type {HTMLButtonElement | null} */ (list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${part}"]`)))
+        .find((button) => button !== null && !button.disabled);
+      (next ?? frame.textarea).focus();
     }
     onCount(messages.length);
   }
