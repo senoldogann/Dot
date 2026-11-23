@@ -226,6 +226,10 @@ def test_a_file_of_this_mac_is_refused_with_what_to_do_instead(tmp_path: Path, m
     assert "with the files beside it that it names written in" in made
     assert "but for libraries from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh" in made
     assert "write its path" not in made
+    # Item 1344: a run that wanted to look at its page itself was told only how to show the owner, and served the
+    # folder on a port of this Mac instead; the address show_page answers with opens in its own browser (item 601).
+    # The tool is named, as the web tools, which fetch no page of this Mac, give the same refusal.
+    assert "open the address show_page answers with in browser_open: that page opens in the browser." in made
     for other in ("site/About.HTM", "site/feed.xhtml", "chart.svg"):
         assert "give its path to show_page" in _refusal((workspace / other).as_uri(), config)
     # Another file of the workspace: its path in code, which makes it the answer's button to the file in the panel.

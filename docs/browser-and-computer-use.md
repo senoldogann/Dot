@@ -581,8 +581,9 @@ Both modes share what follows.
   A file of this Mac (`file:`) opens in neither browser: a page opened from disk could lead the browser to any other
   file, past the rules on reading files. The refusal tells the model what to do instead (item 596): read the file with
   `read_file`, which those rules judge; show a page it made in its workspace with `show_page`, which draws it in the
-  conversation and whose Open shows it full size in your browser (item 598, [Runs](runs.md)); and write the path of any
-  other file of its workspace in code in the answer, which the panel beside the conversation shows. In Dot's own Chrome
+  conversation and whose Open shows it full size in your browser (item 598, [Runs](runs.md)); look at that page itself
+  by opening the address `show_page` answers with in `browser_open` (item 1344); write the path of any other file of
+  its workspace in code in the answer, which the panel beside the conversation shows. In Dot's own Chrome
   every request is checked as Chrome sends it, not only the address a tool opens: a page (in a tab, and each hop of a
   redirect) must pass both lists, and anything a page loads (a script, a picture, a fetch, a worker) must be neither a
   blocked host nor Dot's interface, so a page of an allowed site still loads its parts from wherever it keeps them; what
