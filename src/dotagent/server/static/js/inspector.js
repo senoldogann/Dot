@@ -106,12 +106,9 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   // A phone's sheet has a grabber over its tabs (run.css).
   const grabber = el("div", { class: "inspector-grabber", "aria-hidden": "true" });
   const head = el("div", { class: "inspector-head" }, grabber, tabList, closeButton);
-  const element = el(
-    "aside",
-    { class: "inspector", "aria-label": "Task details", hidden: true },
-    head,
-    tabNodes.map((tab) => tab.panel),
-  );
+  // The head stays where it is and the tab under it scrolls, each section's own head sticking to the top of that scroll.
+  const body = el("div", { class: "inspector-body" }, tabNodes.map((tab) => tab.panel));
+  const element = el("aside", { class: "inspector", "aria-label": "Task details", hidden: true }, head, body);
 
   function show(id) {
     for (const tab of tabNodes) {

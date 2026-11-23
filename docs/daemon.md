@@ -796,9 +796,14 @@ model and its reasoning level, the approval mode, goal mode when it is on, the c
 (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as compactions,
 reviews and the goal check), the compactions once there is one, the duration, and the run's mode, its start and its id
 (with a copy button); its other tabs hold the files the chat changed (Changes), the
-plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). The panel is drawn as a developer tool's details panel (item 1332): one rounded card on a hairline, the tabs small
-and quiet over a hairline, and the sections of a tab stacked, a hairline between them, each titled by a small muted
-label. The Agents tab opens on the **Lineage** (item 1332), titled "Lineage · 2 running": the task that leads and, under
+plan, the agents of the chat and the screen (Dot's computer and the latest screenshots). The panel is drawn as an inspector (items 1332 and 1345) and stays closed until you open it: one rounded
+card on a hairline in two parts. Its head, which stays, holds the tabs as a segmented switch (a track with the tab
+chosen lifted out of it, its name and the others' icons and counts; on a phone the grabber stands over it and Close
+beside it), and under it the chosen tab scrolls as one, its sections stacked, each under a small head, a quiet band on a
+hairline with its title, what sums it up (a count) and its buttons on one line, which sticks to the top of the scroll
+while its section is in sight and gives way to the next one's; the rows are tight, on the 8 px scale. Beside the
+conversation it is a column at the window's right; on a narrower window a drawer, and on a phone a sheet from the foot,
+nine tenths of what is seen. The Agents tab opens on the **Lineage** (item 1332), titled "Lineage · 2 running": the task that leads and, under
 it, its subagents that work, each a mark, its title, how long it has worked ("8m") and a dot for how it stands (blue
 while it works, amber waiting for you, green done, red failed; the row is the way to its page, and what it does now
 is its tooltip), and a **Previous agents** row with how many failed ("1 failed") and how many there are, which folds

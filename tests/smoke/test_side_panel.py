@@ -198,10 +198,10 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                     ["Recap", "More"]
                 )
                 await expect(shown.locator("#panel-run-skills")).to_be_hidden()
-                # Each section of the tab scrolls on its own once it holds more than its share of the screen.
-                scrolling: Locator = shown.locator("#panel-run-more")
+                # The tab scrolls as one under the panel's head, each section's head sticking to its top (item 1345).
+                scrolling: Locator = panel.locator(".inspector-body")
                 assert await scrolling.evaluate("(body) => getComputedStyle(body).overflowY") == "auto"
-                assert await scrolling.evaluate("(body) => getComputedStyle(body).maxHeight") != "none"
+                assert await scrolling.evaluate("(body) => getComputedStyle(body).maxHeight") == "none"
                 more: Locator = shown.get_by_role("button", name="More")
                 if index == 0:
                     await expect(more).to_have_attribute("aria-expanded", "false")

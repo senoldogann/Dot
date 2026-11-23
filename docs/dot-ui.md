@@ -114,7 +114,7 @@ size, a radius or a duration in a view's sheet, nor a gap off the 4 px grid; tak
 To check a look, open `#/controls`, `#/settings/appearance`, a chat, a menu and a dialog at 1280 and
 390 px wide, in light and dark (`tests/smoke/test_controls.py` and `test_tour.py` photograph them).
 
-## The run page's conversation and panel (items 1331 to 1335)
+## The run page's conversation and panel (items 1331 to 1335 and 1345)
 
 The run page is drawn as a developer tool draws a thread, plain and professional, the same language on a Mac and on a
 phone: what you wrote is a raised, rounded box; what Dot says is plain text with no bubble; the steps of a turn are one
@@ -124,7 +124,7 @@ quiet line each. The modules of the conversation and the panel, and what each ho
 |---|---|
 | `timeline.js` | The turn by turn flow; a group of subagents is one card (`buildFlock`): faces, "2 subagents", "2 working" in blue, the time, and a row each (`childScope`): the job, what it does now (`callPhrase` of `workstatus.js`), its state in a word beside the time. |
 | `capsule.js` | The bar over the composer, and above it the line "Waiting on 2 subagents" with Details and Stop. |
-| `inspector.js` | The side panel: one rounded card on a hairline, small quiet tabs, sections stacked on hairlines. |
+| `inspector.js` | The side panel, closed by default: one rounded card in two parts, a head that stays (the tabs as a segmented switch, and on a phone the grabber and Close) and a body that scrolls (`.inspector-body`), whose sections each have a small sticky head (`.panel-section-head`: title, count, buttons on one line) over tight rows on the 8 px scale. A sheet from the foot on a phone. |
 | `agentlist.js` | The **Lineage** ("Lineage · 2 running": the task that leads and its subagents) and the fold of the previous agents; the Task tab has it compact, the Agents tab in full. |
 | `automations.js`, `automationwords.js` | The **Automations** of the chat in the Task tab: its schedules and loops, each with a pencil (`#/settings/schedules/<id>`, the schedule's editor page), a play and a switch, from `GET /api/threads/{id}/automations`. |
 
