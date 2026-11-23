@@ -97,6 +97,14 @@ _QUEUED: str = "run_queued"
 _PARENT_KEY: str = "parent_run_id"
 
 
+def resume_after(after: int, last_event_id: str | None) -> int:
+    """The event id a stream goes on after: the later of the ``after`` the client asked for and the ``Last-Event-ID`` it
+    sent (item 1352), which a client that reconnects an event stream by the standard sends and a native client
+    sends beside ``after``. A header that is not a plain number is no id (the stream is not refused for it)."""
+    sent: str = "" if last_event_id is None else last_event_id.strip()
+    return max(after, int(sent)) if sent.isascii() and sent.isdigit() and len(sent) <= 18 else after
+
+
 def encode_event(event: EventRecord) -> bytes:
     """One event as a server-sent event frame."""
     identifier: str = f"id: {event.id}\n" if event.id > 0 else ""

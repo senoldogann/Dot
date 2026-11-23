@@ -87,7 +87,22 @@ targets:
         outputFiles:
           - $(DERIVED_FILE_DIR)/app_bound_domains.stamp
     scheme:
-      testTargets: []
+      testTargets:
+        - DotTests
+
+  # Unit tests of the native app's pure parts (event reducer, SSE parser, cache, queue order, link style).
+  DotTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: DotTests
+    dependencies:
+      - target: Dot
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
 
   DotLiveActivity:
     type: app-extension

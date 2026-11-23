@@ -87,14 +87,20 @@ code** takes its place. The same by hand:
    the phone is removed, as its APNs device does; one made with the Mac's token belongs to none and stays. Settings ›
    General › Notifications off drops the subscription.
 
-4. Dot's iPhone app (item 997, `ios/`, installed from Xcode for now) is the same web UI in a native shell, which adds
-   what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
-   app's notifications are its own, through APNs: in the app Settings › General › Notifications says so and opens the
-   iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in its web view). The
+4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now) is a native SwiftUI app over the daemon's own
+   API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
+   after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one line over
+   the composer (working, waiting on you, waiting on N subagents, or N subagents keep working in the background once a message of yours released the run from its wait, item 1351), the queue with an up and a down arrow for each message,
+   a run inspector (plan, helpers, the chat's schedules and loops with switches), the Schedules list and the models; the
+   web UI stays as it is and opens full screen from Settings › Open web UI. What it leaves to the web UI for now is in
+   `roadmap/1353.md`. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   app's notifications are its own, through APNs: Settings in the app opens the
+   iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in the app). The
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with
-   a code as a browser is. Once the daemon has proven the phone's own key, the page hands it to the app (one
-   `dot.paired` message, taken from the daemon's own page alone), which keeps it in its Keychain and registers what
-   Apple gives it with it: `POST /api/phone/apns` (the device token and the environment; the token that would start a
+   a code as a browser is: the code of Settings › Phone typed in the app, which trades it for the phone's own key
+   (`POST /api/phone/pair`, no token needed) and keeps it in its Keychain (or the web UI's page hands the key over, one
+   `dot.paired` message, taken from the daemon's own page alone). It registers what
+   Apple gives it with the key: `POST /api/phone/apns` (the device token and the environment; the token that would start a
    Live Activity by push is no longer sent, item 1096) and, for the Live Activity once opened, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
    away, and when the app opens with none). Only a phone's own key registers
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside

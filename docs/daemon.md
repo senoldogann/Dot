@@ -162,6 +162,7 @@ is back every page that follows it, the run's page and its queue among them, rea
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
 showed and says so. A stream from which nothing came for 45 seconds, not even the keepalive the daemon writes every 15,
 has stopped without closing (a network that changed, a Mac that slept): the page cuts it and makes it again (item 200).
+A run's stream goes on after the event id the client sends as `after` or as the standard `Last-Event-ID` header, the later of the two (item 1352; the iPhone app sends both).
 On a phone, a page back in view after two seconds or more away makes its streams again at once, from the last event it
 saw (a Mac keeps the 20 seconds of silence, as a tab switched from keeps its network): a phone put away for a moment can come back to a connection that stays open and passes nothing (a VPN that woke anew), and a
 question to you showed only once the 45 seconds had passed (item 1152).

@@ -9,6 +9,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1356](1356.md) | done | 2026-11-23 | "While you were away" is marked read for every device, not for a browser |
 | [1355](1355.md) | done | 2026-11-23 | A chat's Automations say how each schedule's last run ended |
 | [1354](1354.md) | done | 2026-11-23 | The goal check goes on to a standby model when the review model cannot answer |
+| [1353](1353.md) | done as a first slice | 2026-11-23 | Dot for iPhone is a native SwiftUI app: chats, approvals, helpers, the queue and schedules (first slice), with the web UI one tap away |
+| [1352](1352.md) | done | 2026-11-23 | A run's stream goes on after the `Last-Event-ID` a client sends, as it does after `after` |
 | [1351](1351.md) | done | 2026-11-23 | A message ends a run's wait on its helpers, and the helper's report reaches the chat when it ends |
 | [1350](1350.md) | done | 2026-11-23 | A message from the home starts a chat of its own on the model picked, and a message for a model that cannot answer is refused by name |
 | [1349](1349.md) | done | 2026-11-23 | A chat on a phone has one scroller that is as wide as the screen, and the dock lets a touch through |

@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
@@ -56,6 +56,7 @@ from dotagent.server.stream import (
     follow_run,
     follow_runs,
     follow_screencast,
+    resume_after,
 )
 from dotagent.server.views import (
     ActivityCount,
@@ -305,7 +306,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         return SavedSkill(name=name, updated=updated)
 
     @router.get("/runs/streams")
-    async def runs_stream(query: Annotated[RunsStreamQuery, Query()]) -> StreamingResponse:
+    async def runs_stream(
+        query: Annotated[RunsStreamQuery, Query()], last_event_id: Annotated[str | None, Header()] = None
+    ) -> StreamingResponse:
         """Several runs' events on one stream (item 889): a browser keeps six connections to a server, and a stream for
         each working agent of the office filled them. Each run must be one; at most ``MOST_FOLLOWED_RUNS``."""
         run_ids: frozenset[str] = frozenset(part.strip() for part in query.ids.split(",") if part.strip())
@@ -313,7 +316,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             raise InvalidValueError(f"name between 1 and {MOST_FOLLOWED_RUNS} runs", {"runs": str(len(run_ids))})
         for run_id in run_ids:
             await store.get_run(run_id)
-        return event_stream(follow_runs(ctx, run_ids, query.after))
+        return event_stream(follow_runs(ctx, run_ids, resume_after(query.after, last_event_id)))
 
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
@@ -387,9 +390,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         return await store.list_events_without(run_id, query.after, query.limit, UNREAD_BY_PAGES)
 
     @router.get("/runs/{run_id}/stream")
-    async def run_stream(run_id: str, query: Annotated[StreamQuery, Query()]) -> StreamingResponse:
+    async def run_stream(
+        run_id: str, query: Annotated[StreamQuery, Query()], last_event_id: Annotated[str | None, Header()] = None
+    ) -> StreamingResponse:
+        """A run's events from the id ``after`` (or the ``Last-Event-ID`` header, whichever is later, item 1352)."""
         await store.get_run(run_id)
-        return event_stream(follow_run(ctx, run_id, query.after, query.stored))
+        return event_stream(follow_run(ctx, run_id, resume_after(query.after, last_event_id), query.stored))
 
     @router.post("/runs/{run_id}/steer", status_code=202)
     async def steer_run(run_id: str, request: SteerRequest) -> RunDetail:
