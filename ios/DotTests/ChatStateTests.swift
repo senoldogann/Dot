@@ -98,6 +98,19 @@ final class ChatStateTests: XCTestCase {
         XCTAssertEqual(state.line, .working(since: 1000))
     }
 
+    func testAHelperTheRunStoppedWaitingForWorksOnInTheBackground() {
+        var state: ChatState = started()
+        state.apply(event(2, "run_2", "run_queued", ["parent_run_id": .string("run_1"), "goal": .string("Read the folder")]))
+        state.apply(event(3, "run_2", "run_started", ["model": .string("m"), "parent_run_id": .string("run_1")]))
+        XCTAssertEqual(state.line, .waitingOnSubagents(count: 1, now: nil))
+        state.apply(event(4, "run_1", "helper_released", ["run_id": .string("run_2")]))
+        XCTAssertEqual(state.line, .helpersInBackground(count: 1))
+        state.apply(event(4, "run_1", "helper_released", ["run_id": .string("run_2")]))
+        XCTAssertEqual(state.line, .helpersInBackground(count: 1), "applied again, the same state")
+        state.apply(event(5, "run_2", "run_finished", ["status": .string("done"), "result": .string("ok")]))
+        XCTAssertEqual(state.line, .working(since: 1000))
+    }
+
     func testTheAnswerIsShownOnceWhenAReplySaidTheSameWords() {
         var state: ChatState = started()
         state.apply(event(2, "run_1", "assistant", ["step": .int(1), "text": .string("All done."), "tool_calls": .array([])]))

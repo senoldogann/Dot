@@ -90,7 +90,7 @@ code** takes its place. The same by hand:
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now) is a native SwiftUI app over the daemon's own
    API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one line over
-   the composer (working, waiting on you, waiting on N subagents), the queue with an up and a down arrow for each message,
+   the composer (working, waiting on you, waiting on N subagents, or N subagents keep working in the background once a message of yours released the run from its wait, item 1351), the queue with an up and a down arrow for each message,
    a run inspector (plan, helpers, the chat's schedules and loops with switches), the Schedules list and the models; the
    web UI stays as it is and opens full screen from Settings › Open web UI. What it leaves to the web UI for now is in
    `roadmap/1353.md`. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The

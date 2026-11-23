@@ -235,6 +235,15 @@ struct StatusLine: View {
             .padding(.horizontal, 16).frame(height: 28)
         case .waitingOnYou(let count):
             line(icon: "bell", text: count == 1 ? "Waiting on you" : "Waiting on you · \(count)", tone: Theme.warn)
+        case .helpersInBackground(let count):
+            HStack(spacing: 8) {
+                Image(systemName: "circle.dashed").font(.system(size: 11)).foregroundStyle(Theme.faint)
+                Text(count == 1 ? "1 subagent keeps working in the background" : "\(count) subagents keep working in the background")
+                    .font(Theme.meta).foregroundStyle(Theme.muted)
+                Spacer()
+                Button("Details", action: onDetails).font(Theme.meta).foregroundStyle(Theme.muted)
+            }
+            .padding(.horizontal, 16).frame(height: 28)
         case .waitingOnSubagents(let count, let now):
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {

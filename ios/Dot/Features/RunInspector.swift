@@ -84,6 +84,7 @@ struct RunInspector: View {
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
         case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
+        case .helpersInBackground(let count): "\(count) subagent\(count == 1 ? "" : "s") in the background"
         }
     }
 

@@ -65,6 +65,8 @@ enum RunLine: Sendable, Hashable {
     case working(since: Double?)
     case waitingOnYou(count: Int)
     case waitingOnSubagents(count: Int, now: String?)
+    /// The run went on after a message of the owner's, and its helpers work on without it (item 1351).
+    case helpersInBackground(count: Int)
 }
 
 /// A chat as the phone draws it, built from the runs of a chat and their events by applying each in order. Applying
@@ -80,6 +82,8 @@ struct ChatState: Sendable, Equatable {
     /// The newest root run's status and when it started.
     private(set) var runStatus: RunStatus?
     private(set) var runStartedAt: Double?
+    /// The helpers the run stopped waiting for (the `helper_released` event of item 1351): they work on without it.
+    private var released: Set<String> = []
     private var index: [String: Int] = [:]
 
     var newestRunId: String? { rootRunIds.last }
@@ -98,11 +102,13 @@ struct ChatState: Sendable, Equatable {
         let asking: Int = pendingApprovals.count
         if asking > 0 { return .waitingOnYou(count: asking) }
         let live: [Helper] = liveHelpers
-        if !live.isEmpty {
-            let first: Helper = live[0]
+        let waitedFor: [Helper] = live.filter { !released.contains($0.id) }
+        if !waitedFor.isEmpty {
+            let first: Helper = waitedFor[0]
             let now: String? = first.words.map { "\(shortened(first.goal, 40)): \($0)" }
-            return .waitingOnSubagents(count: live.count, now: now)
+            return .waitingOnSubagents(count: waitedFor.count, now: now)
         }
+        if !live.isEmpty { return .helpersInBackground(count: live.count) }
         return .working(since: runStartedAt)
     }
 
@@ -254,6 +260,8 @@ struct ChatState: Sendable, Equatable {
                     return PlanStep(text: text, status: step["status"]?.string ?? "pending")
                 }
             }
+        case "helper_released":
+            if let id: String = data["run_id"]?.string { released.insert(id) }
         case "schedule_made":
             if isRoot {
                 upsert(ChatItem(
