@@ -464,4 +464,12 @@ final class DeepLinkTests: XCTestCase {
         XCTAssertEqual(runId(inRoute: "#/runs/run_7"), "run_7")
         XCTAssertNil(runId(inRoute: "#/settings"))
     }
+
+    func testAChatThatWasStartedOpensEvenWhenItsPageCouldNotBeRead() {
+        let run: RunRecord = makeRun("run_9", thread: "thr_9", goal: "plan my week")
+        let thread: ThreadSummary = ThreadSummary.started(run: run, detail: nil)
+        XCTAssertEqual(thread.id, "thr_9")
+        XCTAssertEqual(thread.latestRunId, "run_9")
+        XCTAssertEqual(thread.title, "plan my week")
+    }
 }

@@ -51,6 +51,13 @@ struct ThreadSummary: Codable, Sendable, Hashable, Identifiable {
 
     /// The row of a chat the list does not hold yet (a notification or a Live Activity names a run, or a chat was just
     /// started here), made from the run's own page; the list's next read replaces it.
+    /// The chat a message just started: from the run's page when it was read, else from the run the daemon answered the
+    /// start with, so a failed read of the page never hides a chat that is running.
+    static func started(run: RunRecord, detail: RunDetail?) -> ThreadSummary {
+        opened(from: detail ?? RunDetail(
+            run: run, title: String(run.goal.prefix(60)), children: [], active: true, questions: [], choices: nil))
+    }
+
     static func opened(from detail: RunDetail) -> ThreadSummary {
         let run: RunRecord = detail.run
         return ThreadSummary(

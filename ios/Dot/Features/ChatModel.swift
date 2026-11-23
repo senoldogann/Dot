@@ -435,10 +435,22 @@ final class ChatModel {
     /// Keeps what is in the box for the next launch (an empty box keeps nothing).
     func persistDraft() { store.drafts.save(draft, for: threadId) }
 
+    /// What the box held when dictation began, and what it wrote since: a key the owner types while it listens ends it at
+    /// once (the words they typed stay), not at the next word it hears.
+    @ObservationIgnored private var dictationBase: String = ""
+    @ObservationIgnored private var dictationWritten: DictationWritten = DictationWritten()
+
+    func draftChanged() {
+        persistDraft()
+        if dictation.state.isActive, draft != (dictationWritten.text ?? dictationBase) { dictation.stop() }
+    }
+
     /// The microphone: listens and shows the words as they are heard after what was typed; pressed again, it stops.
     func toggleDictation() {
         let base: String = draft
         let written: DictationWritten = DictationWritten()
+        dictationBase = base
+        dictationWritten = written
         dictation.toggle { [weak self] heard in
             guard let self else { return }
             // Typing while it listens stops it, and what was typed stays.

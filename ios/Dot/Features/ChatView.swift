@@ -414,7 +414,7 @@ struct Composer: View {
             .padding(.horizontal, 10)
         }
         .padding(.vertical, 8)
-        .onChange(of: model.draft) { model.persistDraft() }
+        .onChange(of: model.draft) { model.draftChanged() }
         .onChange(of: picks) {
             let chosen: [PhotosPickerItem] = picks
             picks = []

@@ -37,6 +37,16 @@ final class NewChatModel {
 
     func persistDraft() { store.drafts.save(draft, for: draftKey) }
 
+    /// What the box held when dictation began, and what it wrote since: a key the owner types while it listens ends it at
+    /// once (the words they typed stay), not at the next word it hears.
+    @ObservationIgnored private var dictationBase: String = ""
+    @ObservationIgnored private var dictationWritten: DictationWritten = DictationWritten()
+
+    func draftChanged() {
+        persistDraft()
+        if dictation.state.isActive, draft != (dictationWritten.text ?? dictationBase) { dictation.stop() }
+    }
+
     func choose(model ref: String?) {
         model = ref
         if let level: String = effort, let option: ModelOption = store.providers.option(ref ?? store.models?.main),
@@ -52,6 +62,8 @@ final class NewChatModel {
     func toggleDictation() {
         let base: String = draft
         let written: DictationWritten = DictationWritten()
+        dictationBase = base
+        dictationWritten = written
         dictation.toggle { [weak self] heard in
             guard let self else { return }
             // Typing while it listens stops it, and what was typed stays.
@@ -98,9 +110,11 @@ final class NewChatModel {
             draft = ""
             images = []
             store.drafts.remove(draftKey)
-            let detail: RunDetail = try await store.api.detail(run: started.id)
+            // The daemon has the run now: a failed read of its page is no failure to start. The chat opens from the run
+            // the daemon answered with, and its own session reads the rest.
+            let detail: RunDetail? = try? await store.api.detail(run: started.id)
             Task { await store.refreshList() }
-            return ThreadSummary.opened(from: detail)
+            return ThreadSummary.started(run: started, detail: detail)
         } catch {
             logger.error("a chat was not started: \(String(describing: error), privacy: .public)")
             if let refused: ModelRefusal = ModelRefusal.from(error) {
@@ -187,7 +201,7 @@ struct NewChatView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Theme.background)
             }
-            .onChange(of: model.draft) { model.persistDraft() }
+            .onChange(of: model.draft) { model.draftChanged() }
             .onChange(of: picks) {
                 let chosen: [PhotosPickerItem] = picks
                 picks = []
