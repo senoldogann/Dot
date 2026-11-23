@@ -80,11 +80,13 @@ type CallRunner = Callable[[ToolCall], Awaitable[ToolResult]]
 @dataclass(frozen=True)
 class Door:
     """One chat's way in while a run of it works: the name OpenCode knows its tools by, the secret its requests carry,
-    the tools of Dot's it offers, and how a call of one runs (the run's own gate, as in Dot's loop)."""
+    the tools of Dot's it offers, the names of those whose definitions are always in the model's prompt (``loaded``,
+    :func:`loaded_mcp_tool`), and how a call of one runs (the run's own gate, as in Dot's loop)."""
 
     name: str
     secret: str
     specs: tuple[ToolSpec, ...]
+    loaded: frozenset[str]
     run: CallRunner
 
 
@@ -101,10 +103,11 @@ def door_name(thread_id: str) -> str:
     return f"{DOOR_PREFIX}{hashlib.sha256(thread_id.encode()).hexdigest()[:_DOOR_DIGITS]}"
 
 
-def new_door(name: str, specs: tuple[ToolSpec, ...], run: CallRunner) -> Door:
+def new_door(name: str, specs: tuple[ToolSpec, ...], loaded: frozenset[str], run: CallRunner) -> Door:
     """A door named ``name`` (:func:`door_name` for OpenCode, whose one server holds the doors of every chat side by
-    side), with a secret of its own, which is what lets its requests in."""
-    return Door(name=name, secret=secrets.token_urlsafe(32), specs=specs, run=run)
+    side), with a secret of its own, which is what lets its requests in; the tools ``loaded`` names are listed with
+    :func:`loaded_mcp_tool`."""
+    return Door(name=name, secret=secrets.token_urlsafe(32), specs=specs, loaded=loaded, run=run)
 
 
 def session_rules(name: str) -> list[JsonValue]:
@@ -134,6 +137,17 @@ def server_config(url: str, door: Door) -> JsonObject:
 
 def mcp_tool(spec: ToolSpec) -> Tool:
     return Tool(name=spec.name, description=spec.description, input_schema=dict(spec.parameters))
+
+
+# The mark that keeps an MCP tool's definition in Claude Code's prompt while its search of tools is on (item 1341):
+# Claude Code 2.1.330 reads it per tool from a server's list, as its API's ``defer_loading: false``.
+ALWAYS_LOAD: str = "anthropic/alwaysLoad"
+
+
+def loaded_mcp_tool(spec: ToolSpec) -> Tool:
+    """``spec`` as :func:`mcp_tool`, marked to be always in the prompt of a model whose tools are looked up (item 1341):
+    a model that calls a tool it only knows the name of guesses its arguments, or sends none."""
+    return mcp_tool(spec).model_copy(update={"meta": {ALWAYS_LOAD: True}})
 
 
 def mcp_result(result: ToolResult) -> CallToolResult:
@@ -187,7 +201,11 @@ class ToolBridge:
 
     async def _list(self, ctx: ServerRequestContext[object], params: PaginatedRequestParams | None) -> ListToolsResult:
         door: Door | None = self._door_of(ctx.request)
-        return ListToolsResult(tools=[] if door is None else [mcp_tool(spec) for spec in door.specs])
+        if door is None:
+            return ListToolsResult(tools=[])
+        return ListToolsResult(
+            tools=[loaded_mcp_tool(spec) if spec.name in door.loaded else mcp_tool(spec) for spec in door.specs]
+        )
 
     async def _call(self, ctx: ServerRequestContext[object], params: CallToolRequestParams) -> CallToolResult:
         door: Door | None = self._door_of(ctx.request)

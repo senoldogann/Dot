@@ -62,8 +62,8 @@ async def test_a_doors_requests_run_its_tools_and_nothing_else_reaches_it() -> N
         return ok(f"opened {call.arguments['url']}")
 
     bridge: ToolBridge = ToolBridge()
-    door: Door = new_door("thread-a", (_SPEC,), run)
-    other: Door = new_door("thread-b", (_SPEC,), run)
+    door: Door = new_door("thread-a", (_SPEC,), frozenset(), run)
+    other: Door = new_door("thread-b", (_SPEC,), frozenset(), run)
     try:
         async with bridge.opened(door) as url:
             async with _client(url, door.secret) as client:
@@ -102,7 +102,7 @@ async def test_a_call_that_outlasts_a_ping_tells_the_client_it_is_still_at_work(
         heard.append(value)
 
     bridge: ToolBridge = ToolBridge()
-    door: Door = new_door("thread-a", (_SPEC,), slow)
+    door: Door = new_door("thread-a", (_SPEC,), frozenset(), slow)
     try:
         async with bridge.opened(door) as url, _client(url, door.secret) as client:
             result: CallToolResult = await client.call_tool(
@@ -112,3 +112,24 @@ async def test_a_call_that_outlasts_a_ping_tells_the_client_it_is_still_at_work(
         await bridge.aclose()
     assert not result.is_error
     assert len(heard) >= 3, heard
+
+
+async def test_the_tools_a_door_loads_are_marked_to_stay_in_the_prompt() -> None:
+    """Item 1341: Claude Code keeps a tool's definition in its prompt, not behind its search of tools, when the
+    server's list marks it ``anthropic/alwaysLoad``; the door marks the tools it loads, and those alone."""
+    shell: ToolSpec = ToolSpec(name="terminal_open", description="Open a terminal.", parameters={"type": "object"})
+
+    async def opened(call: ToolCall) -> ToolResult:
+        return ok("")
+
+    bridge: ToolBridge = ToolBridge()
+    door: Door = new_door("thread-a", (_SPEC, shell), frozenset({"terminal_open"}), opened)
+    try:
+        async with bridge.opened(door) as url, _client(url, door.secret) as client:
+            listed: ListToolsResult = await client.list_tools()
+        assert [(tool.name, tool.meta) for tool in listed.tools] == [
+            ("browser_open", None),
+            ("terminal_open", {"anthropic/alwaysLoad": True}),
+        ]
+    finally:
+        await bridge.aclose()

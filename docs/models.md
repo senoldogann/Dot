@@ -358,7 +358,10 @@ answer keeps its words, Ollama's too.
   program is started with no tool of its own but `ToolSearch` (`--tools ToolSearch`, item 1053: the door's tools are
   named in the prompt and the model looks one up as it needs it: with 296 tools a new chat wrote 10,800 tokens to the
   cache rather than 99,000, and its first word came in 1.2 s; it reaches nothing but the door's list; the prompt tells
-  the model to look a tool up before its first call of it rather than guess its parameters, item 1201), no settings
+  the model to look a tool up before its first call of it rather than guess its parameters, item 1201; `terminal_open`
+  and `wait_until`, which the shell's description sends the model to, are in the prompt whole from the start, marked
+  `anthropic/alwaysLoad` in the door's list, as the model called them by their names alone, with no arguments or
+  guessed ones, item 1341), no settings
   file of yours, a project's or the workspace's
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
   (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door and the search do

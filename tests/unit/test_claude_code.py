@@ -12,6 +12,7 @@ from dotagent.agent.limits import LimitReached, RunLimits
 from dotagent.agent.picks import owner_server_groups
 from dotagent.agent.prompt import AgentBrief, team_sections
 from dotagent.claude_code.run import (
+    LOADED_TOOLS,
     answered_all,
     claude_argv,
     claude_env,
@@ -54,6 +55,7 @@ from dotagent.opencode.bridge import Door, new_door
 from dotagent.repair.claude import window_refused
 from dotagent.store.models import RunPicks
 from dotagent.tools.base import ToolResult, ok
+from dotagent.tools.shell import build_shell_tool
 
 DOOR: str = "dot_1a2b3c4d"
 CONFIG: Path = Path("/private/dot/claude_code/runs/run-x/mcp.json")
@@ -65,7 +67,7 @@ async def _run(call: object) -> ToolResult:
 
 def _door() -> Door:
     spec: ToolSpec = ToolSpec(name="notify", description="Tell the owner.", parameters={"type": "object"})
-    return new_door("thread-1", (spec,), _run)
+    return new_door("thread-1", (spec,), frozenset(), _run)
 
 
 def _value(argv: tuple[str, ...], flag: str) -> str:
@@ -168,6 +170,14 @@ def test_the_prompt_tells_the_model_to_look_a_tool_up_before_it_calls_it() -> No
     prompt: str = system_prompt("Dot", DOOR, ["browser_find"], Path("/w"), "Friday", "", [])
     assert f"{SEARCH_TOOL} (select:mcp__{DOOR}__<tool>, several at once" in prompt
     assert "before your first call of it" in prompt and "never guess" in prompt
+
+
+def test_the_tools_in_the_prompt_from_the_start_are_door_tools_the_shell_sends_the_model_to() -> None:
+    """Item 1341: the shell's description sends the model to ``terminal_open`` and ``wait_until``, and it called them by
+    their names alone, with no arguments or guessed ones; their definitions are in the prompt from the start."""
+    shell: str = build_shell_tool().spec.description
+    assert {"terminal_open", "wait_until"} == LOADED_TOOLS
+    assert all(name in shell and door_tool(name, False) and door_tool(name, True) for name in LOADED_TOOLS)
 
 
 def test_the_prompt_names_finish_only_to_a_run_that_has_it() -> None:

@@ -880,6 +880,8 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     door: Door = new_door(
         door_name(run.thread_id),
         tuple(tool.spec for tool in tools.tools.values()),
+        # OpenCode puts every tool of a server in its prompt: none is looked up.
+        frozenset(),
         partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools)), agent.gate),
     )
     async with server.hold():
