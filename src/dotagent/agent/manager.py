@@ -1292,6 +1292,7 @@ class RunManager:
         ``picks`` are as for :meth:`start_picked`: a server the agent's bounds leave out is refused."""
         bounds: AgentBounds = agent_bounds(agent, model, effort, approvals)
         agent_ref: ModelRef = parse_model_ref(bounds.model if bounds.model is not None else self._main_model)
+        await self.check_model_answers(agent_ref)
         _check_speed(agent_ref, speed)
         if bounds.effort is not None:
             await self._check_effort(agent_ref, bounds.effort)
@@ -1347,6 +1348,7 @@ class RunManager:
                 "the team has no agent now: add one to it before you message it", {"team_id": team.id}
             )
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        await self.check_model_answers(ref)
         _check_speed(ref, speed)
         if effort is not None:
             await self._check_effort(ref, effort)
@@ -1403,6 +1405,7 @@ class RunManager:
             )
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else self._main_model
+        await self.check_model_answers(parse_model_ref(model_ref))
         _check_speed(parse_model_ref(model_ref), speed)
         if effort is not None:
             await self._check_effort(parse_model_ref(model_ref), effort)
@@ -1930,7 +1933,6 @@ class RunManager:
         the run at work is held by a ✋ lets it go on: the owner has written, and their message waits in the queue as
         any does."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
-        await self.check_model_answers(ref)
         _check_speed(ref, speed)
         await self._check_once(ref, once)
         store: Store = self._runtime.store
@@ -1940,6 +1942,7 @@ class RunManager:
         runs_on: ModelRef = (
             parse_model_ref(agent.model) if model is None and agent is not None and agent.model != "" else ref
         )
+        await self.check_model_answers(runs_on)
         await self._check_picks(
             picks, mode, runs_on, agent_id, self._runtime.config.policy.approvals if asked is None else asked, source
         )
@@ -3021,6 +3024,7 @@ class RunManager:
             if agent_id is not None:
                 bounds: AgentBounds = agent_bounds(await runtime.store.get_agent(agent_id), model, effort, approvals)
                 model, effort, approvals = bounds.model, bounds.effort, bounds.approvals
+                await self.check_model_answers(parse_model_ref(model if model is not None else self._main_model))
         model_ref: str = model if model is not None else self._main_model
         runs_on: ModelRef = parse_model_ref(model_ref)
         level: Effort = runtime.config.models.effort if effort is None else effort

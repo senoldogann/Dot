@@ -799,6 +799,7 @@ export const TR = {
   "settings.busyHint": "Bir görev çalışırken mesajın varsayılan olarak ne yapacağı: bekleyip bu görev bitince sonraki görevi başlatır ya da hemen göreve eklenir. Gönder düğmesinin adı ve kutunun yer tutucusu hangisi olduğunu söyler; sıradaki bir mesajın Steer düğmesi onu göreve ekler; ⌘⇧Enter diğer yoldan gönderir. Bir kampanyanın oturumuna her zaman eklenir.",
   "settings.busyQueueHint": "Mesaj bekler ve sonraki görevi başlatır.",
   "settings.busySteerHint": "Mesaj çalışan göreve hemen gider.",
+  "modelRefused.sendOn": "{model} ile gönder",
   "intent.keepsModel": "Göreve eklendi; görev çalıştığı modeli ({model}) korur: {picked} sonraki mesajınızı bekler.",
   "intent.leftForNext": "Göreve eklendi; görev kendi seviyesini ve çalıştığı şeyleri korur: Ultrathink, Ultracode, beceriler, eklentiler ve Önce plan sonraki mesajınızı bekler.",
   "outcome.message": "Mesaj",

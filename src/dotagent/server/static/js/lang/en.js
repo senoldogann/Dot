@@ -818,6 +818,7 @@ export const EN = {
   "settings.busyQueueHint": "The message waits and starts the next task.",
   "settings.busySteerHint": "The message goes to the task at work at once.",
   // The note after a steer sent with the shortcut.
+  "modelRefused.sendOn": "Send on {model}",
   "intent.keepsModel": "Added to the task, which keeps the model it works on, {model}: {picked} waits for your next message.",
   "intent.leftForNext": "Added to the task, which keeps its level and what it works with: Ultrathink, Ultracode, skills, plugins and Plan first wait for your next message.",
   "outcome.message": "Message",

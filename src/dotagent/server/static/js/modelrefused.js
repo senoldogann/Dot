@@ -4,6 +4,7 @@
 
 import { modelName } from "./dom.js";
 import { refusedModel } from "./errors.js";
+import { t } from "./i18n.js";
 import { attempt, toast, toastError } from "./ui.js";
 
 /**
@@ -27,7 +28,7 @@ export async function attemptWithFallback(action, resend) {
       if (fallback === null) {
         toastError(error);
       } else {
-        toast("error", words, { label: `Send on ${modelName(fallback)}`, run: () => void resend(fallback) });
+        toast("error", words, { label: t("modelRefused.sendOn", { model: modelName(fallback) }), run: () => void resend(fallback) });
       }
     }
   });

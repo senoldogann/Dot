@@ -114,3 +114,54 @@ async def test_no_default_is_offered_when_the_default_cannot_answer_either() -> 
     assert refused.value.context["fallback"] is None
     assert "Send it on" not in refused.value.message
     assert default.value.context["fallback"] is None
+
+
+@pytest.mark.asyncio
+async def test_an_agent_a_campaign_and_a_queued_message_are_judged_by_the_model_they_would_run_on() -> None:
+    with scratch_home() as home, eval_environment(home, {}), _no_openai_key():
+        runtime: Runtime = await open_runtime(_config(), {})
+        manager: RunManager = RunManager(runtime)
+        try:
+            await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, ()))
+            manager.set_main_model(SCRIPTED_MODEL)
+            store = runtime.store
+            keyless = await store.create_agent("Scout", "Finds", "", _KEYLESS, None, None, [], None, None)
+            working = await store.create_agent("Lena", "Writes", "", SCRIPTED_MODEL, None, None, [], None, None)
+            first: RunRecord = await _started(manager, SCRIPTED_MODEL)
+            # An agent whose own model has no key, a campaign on one, and a message to the agent's own chat.
+            with pytest.raises(ModelUnavailableError) as agent_start:
+                await manager.start_for_agent(
+                    keyless, "Hi", "chat", None, None, "ui", None, "standard", None, None, None, (), NO_PICKS
+                )
+            with pytest.raises(ModelUnavailableError) as campaign:
+                await manager.start_campaign(
+                    "Do it", "task", _KEYLESS, None, "ui", None, "standard", None, None, None, (), None
+                )
+            with pytest.raises(ModelUnavailableError) as queued:
+                await manager.queue(
+                    first.thread_id,
+                    "Hi",
+                    (),
+                    "chat",
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    NO_PICKS,
+                    None,
+                    None,
+                    keyless.id,
+                    "ui",
+                )
+            # The default has no key but the agent works on a model that has one: not refused.
+            manager.set_main_model(_KEYLESS)
+            started: RunRecord = await manager.start_for_agent(
+                working, "Hi", "chat", None, None, "ui", None, "standard", None, None, None, (), NO_PICKS
+            )
+        finally:
+            await manager.shutdown()
+            await close_runtime(runtime)
+    assert agent_start.value.context["model"] == _KEYLESS
+    assert campaign.value.context["model"] == _KEYLESS
+    assert queued.value.context["model"] == _KEYLESS
+    assert started.model == SCRIPTED_MODEL
