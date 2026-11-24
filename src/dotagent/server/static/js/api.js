@@ -5,6 +5,7 @@ import { claim, forget, keepList, keptList } from "./datacache.js";
 import { UNREACHABLE } from "./errors.js";
 import { noteCopy, noteReached, noteUnreachable } from "./linkfacts.js";
 import { nextStep, READ_TIMEOUT_MS } from "./retryrules.js";
+import { CONNECT_TIMEOUT_MS, createParser, IDLE_TIMEOUT_MS, reconnectWait } from "./sseframes.js";
 import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
@@ -12,18 +13,18 @@ const TOKEN_KEY = "dot.token";
 // server/guard.py): a program that took the daemon's port while it was down cannot, and is sent nothing.
 const PROOF_LABEL = "dot daemon proof\n";
 const NONCE_BYTES = 32;
-const RECONNECT_MIN_MS = 500;
-const RECONNECT_MAX_MS = 8000;
 // The daemon writes a keepalive into every stream at least every 15 s (`_KEEPALIVE_S` in server/stream.py): a stream
-// silent for three of them has stopped without closing (a network that changed, a Mac that slept) and is cut, to be
-// followed again (item 200).
-const STALL_MS = 45000;
+// silent for two of them and a little more (sseframes.js `IDLE_TIMEOUT_MS`, 35 s; 45 s before item 1522) has stopped
+// without closing (a network that changed, a Mac that slept) and is cut, to be followed again (item 200), and a
+// connection that answered nothing in `CONNECT_TIMEOUT_MS` (8 s) is dropped the same way. A read that is made once (a
+// chat's stored steps) is given the old 45 s: it has no stream to go on after.
+const ONE_SHOT_PATIENCE_MS = 45000;
 // A page back in view whose stream has been silent for longer than a keepalive takes was put away (a phone that locked,
-// a Mac that slept): its stream is cut at once and followed again, rather than after the rest of `STALL_MS` (item 286).
+// a Mac that slept): its stream is cut at once and followed again, rather than after the rest of the idle time (item 286).
 const BACK_SILENCE_MS = 20000;
 // A page back in view after being put away this long is followed again too, however recently its stream spoke: a phone
 // put away for a few seconds (a glance at a notification) can come back to a connection that stays open and passes
-// nothing, as a VPN that woke anew leaves it, which only `STALL_MS` would cut (item 1152). The cost is one request that
+// nothing, as a VPN that woke anew leaves it, which only the idle time would cut (item 1152). The cost is one request that
 // starts after the last event seen, so only a stream that is followed again from there (`follow`) is cut so; a bounded
 // read with no retry (a chat's stored steps) would end in an error. It is the phone's: iOS puts a page away with its
 // network, while a Mac keeps both for a tab or an app the owner switched from (⌘-Tab), whose return would make every
@@ -718,40 +719,30 @@ export function query(params) {
   return text === "" ? "" : `?${text}`;
 }
 
-function parseBlock(block) {
-  let id = 0;
-  let event = "message";
-  const data = [];
-  for (const line of block.split("\n")) {
-    if (line === "" || line.startsWith(":")) {
-      continue;
-    }
-    const colon = line.indexOf(":");
-    const field = colon === -1 ? line : line.slice(0, colon);
-    const value = colon === -1 ? "" : line.slice(colon + 1).replace(/^ /, "");
-    if (field === "id") {
-      id = Number(value) || 0;
-    } else if (field === "event") {
-      event = value;
-    } else if (field === "data") {
-      data.push(value);
-    }
-  }
-  return data.length === 0 ? null : { id, event, data: JSON.parse(data.join("\n")) };
-}
+/**
+ * What a read made once (a chat's stored steps) is given: the 45 seconds a stream was given before item 1522, since it has
+ * no stream to go on after.
+ */
+export const ONE_SHOT = { connectMs: ONE_SHOT_PATIENCE_MS, idleMs: ONE_SHOT_PATIENCE_MS };
 
 /**
- * Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL. `onOpen` is
- * called once the server has taken the stream, before its first event. A stream from which nothing came for
- * `STALL_MS`, not even a keepalive, is cut: the read fails, as for a stream that broke; so is one silent for
- * `BACK_SILENCE_MS`, or whose page was put away for `awayMs` (`Infinity`: however long), when the page comes back into
- * view.
+ * Read a server-sent event stream with fetch, so the bearer token travels in a header and not in the URL, and so that the
+ * keepalive, a comment line an `EventSource` cannot see, tells a quiet stream from a dead one (item 1522, sseframes.js).
+ * `onOpen` is called once the server has taken the stream, before its first event. A connection that has answered
+ * nothing in `options.connectMs` (8 s), and a stream from which nothing came for `options.idleMs` (35 s), not even a
+ * keepalive, is cut: the read fails, as for a stream that broke; so is one silent for `BACK_SILENCE_MS`, or whose page
+ * was put away for `awayMs` (`Infinity`: however long), when the page comes back into view. `options.lastId` is the id of
+ * the last event the reader has, sent as `Last-Event-ID` beside the `after` of the path, so that a stream made again reads
+ * no history again. A frame that is cut by a drop is not an event.
  * @param {string} path
  * @param {AbortSignal} signal
  * @param {() => void} onOpen
  * @param {number} awayMs
+ * @param {{ connectMs?: number, idleMs?: number, lastId?: number }} [options]
  */
-export async function* sse(path, signal, onOpen, awayMs) {
+export async function* sse(path, signal, onOpen, awayMs, options = {}) {
+  const connectMs = options.connectMs ?? CONNECT_TIMEOUT_MS;
+  const idleMs = options.idleMs ?? IDLE_TIMEOUT_MS;
   await proven();
   const cut = new AbortController();
   const stop = () => cut.abort();
@@ -762,10 +753,11 @@ export async function* sse(path, signal, onOpen, awayMs) {
   let silence = null;
   let heardAt = Date.now();
   let awayAt = document.visibilityState === "visible" ? null : Date.now();
-  const watch = () => {
+  /** Cut the stream after `ms` of silence, with `why`; the clock starts again each time it is called. */
+  const watch = (ms, why) => {
     heardAt = Date.now();
     clearTimeout(silence);
-    silence = setTimeout(() => cut.abort(new ApiError(0, "Dot stopped sending updates.", { path })), STALL_MS);
+    silence = setTimeout(() => cut.abort(new ApiError(0, why, { path })), ms);
   };
   const back = () => {
     if (document.visibilityState !== "visible") {
@@ -781,32 +773,33 @@ export async function* sse(path, signal, onOpen, awayMs) {
   document.addEventListener("visibilitychange", back);
   let reader = null;
   try {
-    watch();
-    const response = await fetch(`/api${path}`, {
-      headers: { ...authHeaders(), Accept: "text/event-stream" },
-      signal: cut.signal,
-      cache: "no-store",
-    });
+    watch(connectMs, "Dot did not answer in time.");
+    const headers = { ...authHeaders(), Accept: "text/event-stream" };
+    if (options.lastId !== undefined && options.lastId > 0) {
+      headers["Last-Event-ID"] = String(options.lastId);
+    }
+    const response = await fetch(`/api${path}`, { headers, signal: cut.signal, cache: "no-store" });
     if (!response.ok) {
       throw await errorOf(response, path);
     }
     onOpen();
     reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = "";
+    const parser = createParser();
     for (;;) {
-      watch();
+      watch(idleMs, "Dot stopped sending updates.");
       const { done, value } = await reader.read();
+      clearTimeout(silence);
+      // A frame cut by the end of the stream is no event: the stream is made again after the last whole one.
+      for (const frame of done ? parser.end() : parser.push(decoder.decode(value, { stream: true }))) {
+        if ("bad" in frame) {
+          console.warn("a frame of the stream was not JSON, and is skipped", { path, id: frame.id, event: frame.event });
+        } else {
+          yield { id: frame.id, event: frame.event, data: frame.data };
+        }
+      }
       if (done) {
         return;
-      }
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-      for (let cut = buffer.indexOf("\n\n"); cut !== -1; cut = buffer.indexOf("\n\n")) {
-        const message = parseBlock(buffer.slice(0, cut));
-        buffer = buffer.slice(cut + 2);
-        if (message !== null) {
-          yield message;
-        }
       }
     }
   } finally {
@@ -922,14 +915,14 @@ export function tellOutOfDate(text, details = "") {
  */
 export async function follow({ path, after, signal, onMessage, onState, isFinished }) {
   let lastId = after;
-  let pause = RECONNECT_MIN_MS;
+  let breaks = 0;
   while (!signal.aborted) {
     try {
       const opened = () => {
-        pause = RECONNECT_MIN_MS;
+        breaks = 0;
         onState("live");
       };
-      for await (const message of sse(withAfter(path, lastId), signal, opened, BACK_AWAY_MS)) {
+      for await (const message of sse(withAfter(path, lastId), signal, opened, BACK_AWAY_MS, { lastId })) {
         lastId = Math.max(lastId, message.id);
         try {
           onMessage(message);
@@ -953,8 +946,8 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
       return;
     }
     onState("reconnecting");
-    await untilRetry(pause, signal);
-    pause = Math.min(pause * 2, RECONNECT_MAX_MS);
+    await untilRetry(reconnectWait(breaks), signal);
+    breaks += 1;
   }
 }
 
@@ -966,7 +959,7 @@ export async function follow({ path, after, signal, onMessage, onState, isFinish
  * one event is told as in `follow`.
  */
 export async function watchInView({ path, signal, onMessage }) {
-  let pause = RECONNECT_MIN_MS;
+  let breaks = 0;
   while (!signal.aborted) {
     await untilInView(signal);
     if (signal.aborted) {
@@ -984,7 +977,7 @@ export async function watchInView({ path, signal, onMessage }) {
     document.addEventListener("visibilitychange", hide);
     try {
       const opened = () => {
-        pause = RECONNECT_MIN_MS;
+        breaks = 0;
       };
       // Closed while the page is away, so its return never finds it open.
       for await (const message of sse(path, seen.signal, opened, Infinity)) {
@@ -1010,8 +1003,8 @@ export async function watchInView({ path, signal, onMessage }) {
       signal.removeEventListener("abort", close);
       document.removeEventListener("visibilitychange", hide);
     }
-    await untilRetry(pause, signal);
-    pause = Math.min(pause * 2, RECONNECT_MAX_MS);
+    await untilRetry(reconnectWait(breaks), signal);
+    breaks += 1;
   }
 }
 

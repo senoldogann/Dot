@@ -127,7 +127,9 @@ the copy while Dot cannot be reached, and `js/linkfacts.js` says that what is sh
 worker stays the shell's alone. Its reads are made as the iPhone app makes them (item 1521, `js/retryrules.js`: 10 s a
 try, three tries, a wait that grows with chance in it, none spent while there is no link; a read is shared with the same
 read on its way and ends when its page is left), and a chat that was away through 500 events or more of a run reads the
-newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`). See
+newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`). Its streams are read by
+`js/sseframes.js` (item 1522: a connection that answers nothing in 8 s and a stream that says nothing in 35 s are dropped
+and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-Event-ID`). See
 [On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)

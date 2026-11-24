@@ -58,8 +58,8 @@ _PAGE: bytes = b"<!doctype html><title>Cast</title><h1>A page to cast</h1><p>It 
 _BREAK: str = "break"
 _SILENT: str = "silent"
 _ASK_WAIT_S: float = 10.0
-# How far the view's test moves the page's clock while a stream is silent: past the 45 s after which the page cuts a
-# stream that sent nothing (``STALL_MS`` in api.js), as a phone put away and taken up again does.
+# How far the view's test moves the page's clock while a stream is silent: past the 35 s after which the page cuts a
+# stream that sent nothing (``IDLE_TIMEOUT_MS`` in sseframes.js), as a phone put away and taken up again does.
 _STALL_PAST_MS: int = 46_000
 # Every toast the page draws, kept on the page: an error toast goes after a few seconds, and the view's test moves the
 # clock past that.

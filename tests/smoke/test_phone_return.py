@@ -513,8 +513,8 @@ async def test_a_phone_back_after_a_few_seconds_on_connections_left_dead_catches
 ) -> None:
     """Item 1152: a phone put away for a few seconds (a glance at a notification) may come back to connections that
     stay open and pass nothing, as a VPN that woke anew leaves them. Back in view, the page follows its streams again at
-    once, rather than after a stalled stream's silence (`STALL_MS`, 45 s): what the run did meanwhile, a question to the
-    owner ("Waiting for you") among it, shows in moments, and the chat does not move."""
+    once, rather than after a stalled stream's silence (`IDLE_TIMEOUT_MS`, 35 s): what the run did meanwhile, a question
+    to the owner ("Waiting for you") among it, shows in moments, and the chat does not move."""
     async with _served(own_home) as (runtime, manager, proxy, _asked, _named), async_playwright() as playwright:
         run, earlier = await _at_work(runtime, manager)
         browser: Browser = await playwright.webkit.launch(headless=True)

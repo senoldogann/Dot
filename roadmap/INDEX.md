@@ -9,6 +9,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1562](1562.md) | done | 2026-11-24 | The review guards the freedom contract on every push |
 | [1561](1561.md) | done | 2026-11-24 | The freedom contract is a test: a table of every kind of tool decided under yolo and free mode, every tool and every place that asks seen |
 | [1560](1560.md) | done | 2026-11-24 | The freedom contract is one page: what yolo and free mode guarantee, the exact exceptions and the code that makes each |
+| [1522](1522.md) | done in part by what was there | 2026-11-24 | The page's streams drop a connection that answers nothing in 8 seconds and a stream that says nothing in 35, and go on from the last event |
 | [1521](1521.md) | done | 2026-11-24 | A phone's reads give up after 10 seconds, try three times, wait for the link instead of spending their tries, and share what is asked twice |
 | [1520](1520.md) | done | 2026-11-24 | The web app keeps what it read of the chats, so that it opens with them drawn on a link that is bad or gone |
 | [1503](1503.md) | done | 2026-11-24 | Code mode's checks: the doctor's row, the settings in the docs and the threat model of the first pull request, tried whole |

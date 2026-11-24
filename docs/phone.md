@@ -512,6 +512,17 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   kept, and that missed 500 events or more of its run, reads the newest 400 (`GET /api/runs/{id}/events?tail=400`,
   header `X-Dot-Events-Tail`, item 1370; a daemon without it is ignored and the stream replays what was missed), says
   *Some steps are not shown*, and its stream goes on after the last event it read.
+- **A stream that is never silent without being noticed (item 1522).** The page reads its streams with `fetch` and a
+  stream reader, not with `EventSource`, which cannot see the comment lines that are Dot's `: open` and its `: keepalive`
+  every 15 seconds, and so could tell a quiet stream from a dead socket by nothing. A small parser (`js/sseframes.js`)
+  reads them: chunks cut anywhere, `\n`, `\r\n` and `\r` line ends, comments, `data` over several lines, ids, a frame cut by
+  a drop (it is no event) and a frame whose data is not JSON (told of and skipped). A connection that has answered
+  nothing in 8 seconds, and a stream that has said nothing, a keepalive included, for 35 seconds (it was 45), are dropped
+  and made again; a drop is not shown as a failure, the note and the pill come after their usual quiet time. The stream
+  goes on after the last event read, in the address (`after`) and in the standard header `Last-Event-ID`, so that no
+  history is read again; it is made again at once when the page comes back into view and when the phone is back on the
+  network, and otherwise after 0.5, 1, 2, 4, 8 and then every 15 seconds. A chat's stored steps, read once when it
+  opens, keep the 45 seconds they had.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 

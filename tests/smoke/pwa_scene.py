@@ -107,3 +107,60 @@ async def until_kept(page: Page, chats: int = 1, lists: int = 1) -> None:
             return
         assert time.monotonic() < deadline, f"the page kept {held}"
         await asyncio.sleep(0.2)
+
+
+class Network:
+    """A TCP proxy in front of a daemon, standing for the phone's network (the same as ``test_phone_return.Proxy``,
+    reduced to what these tests need): ``forget()`` leaves every connection open and passing nothing, as a half-open
+    connection does, and new ones pass at once; ``sleep()`` drops the bytes of every connection until ``wake()``."""
+
+    def __init__(self, target_port: int) -> None:
+        self.target: int = target_port
+        self.port: int = 0
+        self.asleep: bool = False
+        self._open: set[asyncio.StreamWriter] = set()
+        self._dead: set[asyncio.StreamWriter] = set()
+        self._server: asyncio.Server | None = None
+
+    @property
+    def address(self) -> str:
+        return f"http://127.0.0.1:{self.port}"
+
+    async def start(self) -> None:
+        self._server = await asyncio.start_server(self._carry, "127.0.0.1", 0)
+        self.port = self._server.sockets[0].getsockname()[1]
+
+    def close(self) -> None:
+        assert self._server is not None
+        self._server.close()
+        for writer in list(self._open):
+            writer.close()
+
+    def forget(self) -> None:
+        self._dead |= self._open
+        self._open = set()
+        self.asleep = False
+
+    def sleep(self) -> None:
+        self.asleep = True
+
+    def wake(self) -> None:
+        self.asleep = False
+
+    async def _carry(self, client: asyncio.StreamReader, to_client: asyncio.StreamWriter) -> None:
+        self._open.add(to_client)
+        upstream, to_upstream = await asyncio.open_connection("127.0.0.1", self.target)
+        self._open.add(to_upstream)
+        await asyncio.gather(self._pass(client, to_upstream), self._pass(upstream, to_client))
+
+    async def _pass(self, source: asyncio.StreamReader, sink: asyncio.StreamWriter) -> None:
+        try:
+            while chunk := await source.read(65_536):
+                if self.asleep or sink in self._dead:
+                    continue
+                sink.write(chunk)
+                await sink.drain()
+        except ConnectionError:
+            pass
+        finally:
+            sink.close()
