@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1756](1756.md) | done | 2026-11-25 | DotNext streams a step's thinking and words, its capsule clock ticks on its own and says what the run does |
+| [1752](1752.md) | done | 2026-11-25 | On a phone a note's tags stand at the height of the badge beside them again |
 | [1751](1751.md) | done | 2026-11-25 | An offline test does not read the owner's Antigravity login |
 | [1750](1750.md) | done | 2026-11-25 | The code review's model is named "Code review model", apart from the review model of the roles |
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
