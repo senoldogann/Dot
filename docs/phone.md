@@ -440,7 +440,9 @@ Body:
 
 - `state`: `foreground` or `background`. `background` ends the lease at once.
 - `chat` (optional): the thread id on screen, 1 to 64 characters; `null` or left out when the app shows no chat (the
-  list, Settings). While the lease holds the end of a run is not sent to the phone, for this chat or for another.
+  list, Settings). The daemon only records it with the lease and says it back: while the lease holds the end of a run is
+  not sent to the phone for this chat or for another, so it changes nothing yet; the app sends it so that a rule for the
+  chat on screen can come without a new contract.
 - `ttl_s` (optional): how many seconds the lease holds, more than 0; 45 when left out, and values over 90 are taken as 90.
 
 Reply, 200:

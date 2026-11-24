@@ -255,7 +255,8 @@ class LiveActivityRegistration(FrozenModel):
 class ActivityRequest(FrozenModel):
     """What the iPhone app says of itself (item 1420): ``foreground`` (with the chat on screen, a thread id, when it
     shows one, and for how many seconds this holds: 45 when it names none, at most 90) or ``background``, which ends the
-    lease at once."""
+    lease at once. The daemon only records ``chat`` with the lease and says it back: the quiet holds for every chat, so
+    it changes nothing yet."""
 
     state: LeaseState
     chat: str | None = Field(default=None, min_length=1, max_length=64)
