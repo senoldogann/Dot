@@ -184,10 +184,11 @@ private struct DotProminentGlass<S: Shape>: ViewModifier {
 }
 
 extension View {
-    /// A call to action floating over content (the new-chat button): the accent as glass.
+    /// A call to action floating over content: the accent as glass (no screen uses it now; the compose button is a plain
+    /// glass button of the title bar).
     func dotProminentGlass<S: Shape>(in shape: S) -> some View { modifier(DotProminentGlass(shape: shape)) }
 
-    /// Floating chrome (the composer, the status line, a round button, a chip): glass on iOS 26, a material before.
+    /// Floating chrome (the composer, the capsule over it, a round button, a chip): glass on iOS 26, a material before.
     /// Never on message text or on a long list.
     func dotGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(DotGlass(shape: shape, tint: tint, interactive: interactive))
@@ -306,18 +307,16 @@ struct GlassCircleButton: View {
 
 // MARK: - Surfaces
 
-/// A surface with a hairline border, the 12-point radius, and in the light a breath of shadow.
+/// A surface with a hairline border and the 12-point radius, flat in both looks (no shadow, no gradient: one card recipe).
 struct Card: ViewModifier {
     var fill: Color = Theme.surface
     var radius: CGFloat = Radius.m
-    @Environment(\.colorScheme) private var scheme: ColorScheme
     @Environment(\.colorSchemeContrast) private var contrast: ColorSchemeContrast
 
     func body(content: Content) -> some View {
         content
             .background(fill, in: RoundedRectangle(cornerRadius: radius))
             .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(contrast == .increased ? Theme.hairlineStrong : Theme.hairline, lineWidth: 1))
-            .shadow(color: scheme == .light ? Color.black.opacity(0.04) : .clear, radius: 6, y: 1)
     }
 }
 
@@ -505,10 +504,12 @@ struct StateRing: View {
                     lineWidth: 2.5
                 )
                 .rotationEffect(.degrees(turning ? 360 : 0))
-                .onAppear {
-                    guard !reduceMotion else { return }
-                    withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { turning = true }
-                }
+                .animation(turning ? .linear(duration: 1.4).repeatForever(autoreverses: false) : nil, value: turning)
+                // It turns every time the chat comes back to work (a ring that left with the state starts again) and it
+                // follows Reduce Motion while it turns.
+                .onAppear { turning = !reduceMotion }
+                .onDisappear { turning = false }
+                .onChange(of: reduceMotion) { _, still in turning = !still }
         case .waiting:
             Circle().strokeBorder(Theme.warn, lineWidth: 2.5)
                 .shadow(color: Theme.warn.opacity(0.45), radius: 3)

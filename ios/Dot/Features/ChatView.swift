@@ -2,14 +2,18 @@ import PhotosUI
 import SwiftUI
 
 /// A chat: the transcript in one scroller (it keeps to the bottom only while the reader is at the bottom), and over its
-/// foot, floating on glass, the queue, the one line of the run's status and the composer. The transcript runs under
-/// them, softened at its edge, so that nothing is cut off by a bar.
+/// foot, floating on glass, one capsule (the run's status, its helpers, its loops, its queue; item 1390) and the
+/// composer. The transcript runs under them, softened at its edge, so that nothing is cut off by a bar.
 struct ChatView: View {
     let store: NativeStore
     let thread: ThreadSummary
     @State private var model: ChatModel
     @State private var atBottom: Bool = true
     @State private var showsInspector: Bool = false
+    @State private var inspectorFocus: RunInspector.Focus?
+    @State private var showsQueue: Bool = false
+    /// Counts the taps on the round button beside the capsule; the transcript scrolls to its end when it changes.
+    @State private var jump: Int = 0
     @State private var showsModels: Bool = false
     @State private var detent: PresentationDetent = .medium
     @State private var toolRow: ToolRow?
@@ -27,7 +31,7 @@ struct ChatView: View {
 
     var body: some View {
         Transcript(
-            model: model, atBottom: $atBottom, onTool: { toolRow = $0 }, onSelect: { selecting = $0 },
+            model: model, atBottom: $atBottom, jump: jump, onTool: { toolRow = $0 }, onSelect: { selecting = $0 },
             onEdit: { editing = $0 }
         )
         .dotScrollEdges()
@@ -42,19 +46,17 @@ struct ChatView: View {
                     .buttonStyle(.plain)
                     .dotGlass(in: Capsule(), tint: Theme.warn.opacity(0.2))
                 }
-                QueuePanel(model: model).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                StatusLine(model: model, onDetails: { showsInspector = true }).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                dock
                 Composer(model: model).dynamicTypeSize(...DynamicTypeSize.accessibility2)
             }
             .padding(.horizontal, Space.s + 2)
             .padding(.bottom, Space.xs)
             .padding(.top, Space.xs)
-            .dotAnimation(Motion.snappy, value: model.queue.messages.count)
         }
         .dotScreenBackground()
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
-        .dotSubtitle(subtitle)
+        .dotSubtitle(subtitle, tone: subtitleTone)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showsInspector = true } label: { Image(systemName: "info.circle") }
@@ -63,10 +65,16 @@ struct ChatView: View {
         }
         .sheet(isPresented: $showsInspector) {
             RunInspector(
-                model: model, onModels: { showsInspector = false; showsModels = true }, onExpand: { detent = .large }
+                model: model, focus: inspectorFocus, onModels: { showsInspector = false; showsModels = true },
+                onExpand: { detent = .large }
             )
             .dotSheet()
             .presentationDetents([.medium, .large], selection: $detent)
+        }
+        .sheet(isPresented: $showsQueue) {
+            QueueSheet(model: model)
+                .dotSheet()
+                .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showsModels) {
             NavigationStack { ModelsView(store: store) }
@@ -100,20 +108,61 @@ struct ChatView: View {
         .onDisappear { model.stop() }
     }
 
+    /// The capsule over the composer, and beside it the round button that goes to the newest message when the reader is
+    /// not at the end. Both are glass of one piece, so they blend as they come near each other.
+    private var dock: some View {
+        let summary: DockSummary = DockSummary.make(
+            line: model.state.line, connection: model.connection, queue: model.queue, automations: model.automations)
+        return DotGlassGroup(spacing: Space.m) {
+            HStack(spacing: Space.s) {
+                DockCapsule(summary: summary, onOpen: openDock)
+                if !atBottom {
+                    GlassCircleButton(symbol: "arrow.down", label: "Jump to the newest message") {
+                        atBottom = true
+                        jump += 1
+                    }
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .dotAnimation(Motion.snappy, value: summary)
+        .dotAnimation(Motion.bouncy, value: atBottom)
+    }
+
+    /// The subtitle's colour: the warm one while the run waits on the owner, as the capsule's.
+    private var subtitleTone: Color? {
+        if case .waitingOnYou = model.state.line { return Theme.warn }
+        return nil
+    }
+
+    private func openDock(_ kind: DockSummary.Kind) {
+        switch kind {
+        case .queue: showsQueue = true
+        case .status: inspectorFocus = nil; showsInspector = true
+        case .helpers: inspectorFocus = .helpers; showsInspector = true
+        case .loops: inspectorFocus = .loops; showsInspector = true
+        }
+    }
+
     /// The line under the title (iOS 26): how the run stands.
     private var subtitle: String {
         switch model.state.line {
-        case .idle: ""
+        case .idle:
+            DurationWords.subtitle(status: model.run?.status ?? "", finishedAt: model.run?.finishedAt) ?? ""
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
-        case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
-        case .helpersInBackground(let count): "\(count) subagent\(count == 1 ? "" : "s") in the background"
+        case .waitingOnSubagents(let count, _): "Waiting on \(count) helper\(count == 1 ? "" : "s")"
+        case .helpersInBackground(let count): "\(count) helper\(count == 1 ? "" : "s") in the background"
         }
     }
 }
 
 /// How far the reader is from the end of the transcript, and how tall it is.
 private struct ScrollMetrics: Equatable {
+    /// What floats over the foot of the list (the capsule and the composer): it grows when a segment comes.
+    var bottomInset: CGFloat = 0
     var fromBottom: CGFloat
     var contentHeight: CGFloat
     var viewport: CGFloat
@@ -124,6 +173,8 @@ private struct ScrollMetrics: Equatable {
 private struct Transcript: View {
     let model: ChatModel
     @Binding var atBottom: Bool
+    /// Changes when the owner taps the round button: the transcript goes to its end.
+    let jump: Int
     let onTool: (ToolRow) -> Void
     let onSelect: (String) -> Void
     let onEdit: (ChatItem) -> Void
@@ -161,6 +212,11 @@ private struct Transcript: View {
                             .padding(.top, 20)
                             .id(send.id)
                     }
+                    if let words: String = model.finishedWords {
+                        Text(words).font(Theme.meta).foregroundStyle(Theme.faint)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, Space.m)
+                            .accessibilityIdentifier("run-finished")
+                    }
                     Color.clear.frame(height: 1).id(bottomId)
                 }
                 .padding(.horizontal, Space.l)
@@ -174,13 +230,18 @@ private struct Transcript: View {
                 // already scrolled (the offset is measured from the top inset), and the inset at the foot (the
                 // composer floats over it) is not a distance the reader has to scroll.
                 ScrollMetrics(
+                    bottomInset: geometry.contentInsets.bottom.rounded(),
                     fromBottom: (geometry.contentSize.height - geometry.containerSize.height
                         - (geometry.contentOffset.y + geometry.contentInsets.top)).rounded(),
                     contentHeight: geometry.contentSize.height.rounded(),
                     viewport: geometry.containerSize.height.rounded())
             } action: { _, now in
                 if abs(now.viewport - viewport) > 1 { viewport = now.viewport }
+                let insetGrew: Bool = now.bottomInset - latest.bottomInset > 1
                 latest = now
+                // A segment of the capsule came while the reader was at the end: the foot is taller, and the last row is
+                // brought up above it instead of left under it.
+                if insetGrew, atBottom, !userScrolling, model.olderAnchor == nil { settle(proxy) }
                 // Content that grew under the reader (words streaming in) is not the reader leaving the bottom: only
                 // the reader's own scrolling says where they are.
                 if userScrolling { atBottom = now.fromBottom <= 32 }
@@ -203,18 +264,9 @@ private struct Transcript: View {
                 }
             }
             .onAppear { settle(proxy) }
-            .overlay(alignment: .bottomTrailing) {
-                ZStack {
-                    if !atBottom {
-                        GlassCircleButton(symbol: "arrow.down", label: "Jump to the newest message") {
-                            atBottom = true
-                            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(bottomId, anchor: .bottom) }
-                        }
-                        .padding(Space.m)
-                        .transition(.scale(scale: 0.6).combined(with: .opacity))
-                    }
-                }
-                .dotAnimation(Motion.bouncy, value: atBottom)
+            .onChange(of: jump) {
+                atBottom = true
+                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(bottomId, anchor: .bottom) }
             }
         }
     }
@@ -279,157 +331,6 @@ private struct PendingRow: View {
     }
 }
 
-/// The one line over the composer, on glass: how long the run has worked, that it waits for the owner, or that it waits
-/// for its subagents (with what the first does now). It stands outside the transcript, so it never scrolls with it.
-struct StatusLine: View {
-    let model: ChatModel
-    let onDetails: () -> Void
-
-    var body: some View {
-        Group {
-            switch model.state.line {
-            case .idle:
-                if case .reconnecting(_, let unauthorized) = model.connection {
-                    pill(
-                        symbol: unauthorized ? "key" : "arrow.triangle.2.circlepath",
-                        text: unauthorized ? "This phone's key was refused. Pair again in Settings." : "Reconnecting…",
-                        tone: unauthorized ? Theme.warn : Theme.muted, tint: unauthorized ? Theme.warn.opacity(0.2) : nil)
-                }
-            case .working(let since):
-                workingPill(since: since)
-            case .waitingOnYou(let count):
-                pill(
-                    symbol: "bell.fill", text: count == 1 ? "Waiting on you" : "Waiting on you · \(count)", tone: Theme.warn,
-                    tint: Theme.warn.opacity(0.22), bounce: true)
-            case .helpersInBackground(let count):
-                HStack(spacing: Space.s) {
-                    Image(systemName: "circle.dashed").font(.system(size: 12)).foregroundStyle(Theme.muted)
-                    Text(count == 1 ? "1 subagent keeps working in the background" : "\(count) subagents keep working in the background")
-                        .font(Theme.meta).foregroundStyle(Theme.muted).lineLimit(2)
-                    Spacer(minLength: Space.xs)
-                    Button("Details", action: onDetails).font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.accent)
-                }
-                .padding(.horizontal, Space.m).frame(minHeight: 36)
-                .dotGlass(in: RoundedRectangle(cornerRadius: Radius.l))
-            case .waitingOnSubagents(let count, let now):
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: Space.s) {
-                        Image(systemName: "circle.dashed").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
-                            .symbolEffect(.pulse, options: .repeating)
-                        Text(count == 1 ? "Waiting on 1 subagent" : "Waiting on \(count) subagents")
-                            .font(Theme.small.weight(.semibold)).foregroundStyle(Theme.text)
-                        Spacer(minLength: Space.xs)
-                        Button("Details", action: onDetails).font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.accent)
-                            .frame(minHeight: 32)
-                        Button("Stop") { model.stopRun() }.font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.muted)
-                            .frame(minHeight: 32)
-                    }
-                    if let now {
-                        Text(now).font(Theme.meta).foregroundStyle(Theme.muted).lineLimit(1).padding(.leading, 21)
-                    }
-                }
-                .padding(.horizontal, Space.m).padding(.vertical, Space.s)
-                .dotGlass(in: RoundedRectangle(cornerRadius: Radius.l))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .dotAnimation(Motion.snappy, value: lineKey)
-    }
-
-    private var lineKey: String {
-        switch model.state.line {
-        case .idle: "idle"
-        case .working: "working"
-        case .waitingOnYou(let count): "waiting\(count)"
-        case .waitingOnSubagents(let count, _): "subagents\(count)"
-        case .helpersInBackground(let count): "background\(count)"
-        }
-    }
-
-    private func workingPill(since: Double?) -> some View {
-        HStack(spacing: Space.s) {
-            Image(systemName: "waveform")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.accent)
-                .symbolEffect(.variableColor.iterative.reversing, options: .repeating)
-            if let since {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text("Working · \(elapsed(since, now: context.date))")
-                        .font(Theme.meta.weight(.medium).monospacedDigit()).foregroundStyle(Theme.text)
-                }
-            } else {
-                Text("Working").font(Theme.meta.weight(.medium)).foregroundStyle(Theme.text)
-            }
-            if case .reconnecting = model.connection {
-                Text("· Reconnecting…").font(Theme.meta).foregroundStyle(Theme.muted)
-            }
-        }
-        .padding(.horizontal, Space.m).frame(minHeight: 32)
-        .dotGlass(in: Capsule())
-        .accessibilityElement(children: .combine)
-    }
-
-    private func pill(symbol: String, text: String, tone: Color, tint: Color? = nil, bounce: Bool = false) -> some View {
-        HStack(spacing: Space.s) {
-            Image(systemName: symbol).font(.system(size: 12, weight: .semibold)).foregroundStyle(tone)
-                .symbolEffect(.bounce, options: .repeat(2), isActive: bounce)
-            Text(text).font(Theme.meta.weight(.medium)).foregroundStyle(tone == Theme.muted ? Theme.text : tone)
-        }
-        .padding(.horizontal, Space.m).frame(minHeight: 32)
-        .dotGlass(in: Capsule(), tint: tint)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func elapsed(_ since: Double, now: Date) -> String {
-        let seconds: Int = max(0, Int(now.timeIntervalSince1970 - since))
-        return seconds < 60 ? "\(seconds)s" : "\(seconds / 60)m \(seconds % 60)s"
-    }
-}
-
-/// The queue, on glass: each message waiting to run, numbered, with an up and a down arrow to move it and a button to
-/// remove it. There is no drag.
-struct QueuePanel: View {
-    let model: ChatModel
-
-    var body: some View {
-        let messages: [QueuedMessage] = model.queue.messages
-        if !messages.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                Label(model.queue.held ? "Queued · paused" : "Queued · \(messages.count)", systemImage: model.queue.held ? "pause.circle" : "list.number")
-                    .font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.muted)
-                    .padding(.horizontal, Space.m).padding(.top, Space.s + 2).padding(.bottom, 2)
-                ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                    HStack(spacing: 2) {
-                        Text("\(index + 1)").font(Theme.meta.monospacedDigit()).foregroundStyle(Theme.faint).frame(width: 18)
-                        Text(message.text).font(Theme.small).foregroundStyle(Theme.text).lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        arrow("chevron.up", label: "Move up", enabled: index > 0) { model.moveQueued(message.id, by: -1) }
-                        arrow("chevron.down", label: "Move down", enabled: index < messages.count - 1) { model.moveQueued(message.id, by: 1) }
-                        arrow("xmark", label: "Remove", enabled: true) { model.removeQueued(message.id) }
-                    }
-                    .padding(.leading, Space.m).padding(.trailing, 2)
-                }
-            }
-            .padding(.bottom, Space.xs)
-            .dotGlass(in: RoundedRectangle(cornerRadius: Radius.xl - 2))
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-            .sensoryFeedback(.selection, trigger: messages.map(\.id))
-        }
-    }
-
-    private func arrow(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(enabled ? Theme.muted : Theme.faint.opacity(0.45))
-                .frame(width: 40, height: 40)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .accessibilityLabel(label)
-    }
-}
-
 /// The composer, one floating bar of glass: + (a photo), the text, the microphone (dictation on the phone), and a
 /// button that is Send, or Queue while a run works, or Stop with an empty box. The button changes by morphing its symbol.
 struct Composer: View {
@@ -460,7 +361,7 @@ struct Composer: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Attach a photo")
-                TextField(model.isWorking ? "Queue a message" : "Message Dot", text: $model.draft, axis: .vertical)
+                TextField("", text: $model.draft, prompt: Text(placeholder).foregroundStyle(Theme.muted), axis: .vertical)
                     .font(Theme.body)
                     .lineLimit(1...6)
                     .focused($focused)
@@ -486,6 +387,16 @@ struct Composer: View {
 
     private var showsStop: Bool { model.isWorking && !model.canSend }
 
+    /// The run waits on the owner: the card above asks, and the one thing the box can do meanwhile is queue a note.
+    private var waitingOnYou: Bool {
+        if case .waitingOnYou = model.state.line { return true }
+        return false
+    }
+
+    private var placeholder: String {
+        waitingOnYou ? "Answer above, or queue a note" : (model.isWorking ? "Queue a message" : "Message Dot")
+    }
+
     /// One round button for all three: the arrow, the queue mark, the stop square. Its symbol is replaced in place.
     private var actionButton: some View {
         Button {
@@ -499,13 +410,18 @@ struct Composer: View {
         } label: {
             Image(systemName: showsStop ? "stop.fill" : (model.isWorking ? "text.append" : "arrow.up"))
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(showsStop ? Theme.background : (model.canSend ? Theme.onAccent : Theme.faint))
+                .foregroundStyle(showsStop ? (waitingOnYou ? Theme.text : Theme.background) : (model.canSend ? Theme.onAccent : Theme.muted))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 36, height: 36)
                 .background {
+                    // The white disc of Stop is the loudest thing on the screen: while the run waits on a decision it is a
+                    // quiet tonal one, so that the card is.
                     Circle().fill(
-                        showsStop ? AnyShapeStyle(Theme.text) : (model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
+                        showsStop
+                            ? (waitingOnYou ? AnyShapeStyle(Theme.raised) : AnyShapeStyle(Theme.text))
+                            : (model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
                 }
+                .overlay { if showsStop && waitingOnYou { Circle().strokeBorder(Theme.hairline, lineWidth: 1) } }
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }

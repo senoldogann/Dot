@@ -3,7 +3,11 @@ import SwiftUI
 /// The run inspector, a bottom sheet: the run's status, its plan, its helpers (subagents) and the schedules and loops
 /// of the chat with a switch each.
 struct RunInspector: View {
+    /// The part of the sheet a segment of the dock's capsule asks for: it is scrolled to when the sheet opens.
+    enum Focus: String { case helpers, loops }
+
     let model: ChatModel
+    var focus: Focus?
     let onModels: () -> Void
     /// Asks for the sheet's full height (the model picker is a long list).
     var onExpand: () -> Void = {}
@@ -11,6 +15,7 @@ struct RunInspector: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.xl) {
                     statusCard
@@ -40,6 +45,7 @@ struct RunInspector: View {
                             HelperRow(helper: helper)
                         }
                     }
+                    .id(Focus.helpers)
                     CardGroup(title: "Schedules and loops") {
                         if model.automations.isEmpty {
                             EmptyRow(symbol: "clock.arrow.circlepath", words: "None bound to this chat.")
@@ -51,6 +57,7 @@ struct RunInspector: View {
                                 onChange: { model.setAutomation(automation.id, on: $0) })
                         }
                     }
+                    .id(Focus.loops)
                 }
                 .padding(Space.l)
             }
@@ -61,6 +68,14 @@ struct RunInspector: View {
             .task {
                 await model.refreshAutomations()
                 await model.store.loadProviders()
+            }
+            .task(id: focus) {
+                // A segment of the dock's capsule asked for a part of the sheet: it is brought to the top, once the
+                // sheet is on the screen.
+                guard let focus else { return }
+                try? await Task.sleep(for: .milliseconds(250))
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(focus, anchor: .top) }
+            }
             }
         }
     }
@@ -89,7 +104,7 @@ struct RunInspector: View {
         .padding(Space.l)
         .background {
             RoundedRectangle(cornerRadius: Radius.l)
-                .fill(LinearGradient(colors: [statusTone.opacity(0.14), statusTone.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(statusTone.opacity(0.08))
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
         }
         .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.hairline, lineWidth: 1))
@@ -165,8 +180,8 @@ struct RunInspector: View {
         case .idle: (model.state.runStatus ?? "Idle").capitalizedFirst
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
-        case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
-        case .helpersInBackground(let count): "\(count) subagent\(count == 1 ? "" : "s") in the background"
+        case .waitingOnSubagents(let count, _): "Waiting on \(count) helper\(count == 1 ? "" : "s")"
+        case .helpersInBackground(let count): "\(count) helper\(count == 1 ? "" : "s") in the background"
         }
     }
 

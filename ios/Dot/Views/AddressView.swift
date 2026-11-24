@@ -19,7 +19,7 @@ struct AddressView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.top, Space.xxl)
-                TextField("mac.your-tailnet.ts.net", text: $input)
+                TextField("", text: $input, prompt: Text("mac.your-tailnet.ts.net").foregroundStyle(Theme.muted))
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)

@@ -13,6 +13,7 @@ struct DesignGallery: View {
                 switch page {
                 case 2: components
                 case 3: states
+                case 4: dock
                 default: rows
                 }
             }
@@ -91,6 +92,50 @@ struct DesignGallery: View {
                 swatch(Theme.background, "bg"); swatch(Theme.surface, "surface"); swatch(Theme.raised, "raised")
                 swatch(Theme.accentFill, "accent"); swatch(Theme.warn, "warn"); swatch(Theme.bad, "bad"); swatch(Theme.good, "ok")
             }
+        }
+    }
+
+    /// The capsule over the composer in each state it has (item 1390), each with the round jump button beside it as the
+    /// chat draws it.
+    private var dock: some View {
+        let now: Double = Date().timeIntervalSince1970
+        func messages(_ count: Int, held: Bool = false) -> QueueView {
+            QueueView(
+                held: held, messages: (0..<count).map { QueuedMessage(id: "q\($0)", position: $0, text: "m\($0)", createdAt: 1) },
+                besideRunId: nil, besideThreadId: nil)
+        }
+        func loops(_ whens: [String]) -> [ThreadAutomation] {
+            whens.enumerated().compactMap { index, when in
+                let json: String = """
+                    {"schedule": {"record": {"id": "s\(index)", "name": "n", "cron": "*/10 * * * *", "run_at": null, "goal": "g",
+                      "enabled": true, "next_run_at": null, "last_run_at": null, "thread_id": "t", "last_status": ""},
+                      "when": "\(when)", "next_local": "03:50", "agent": null, "brief": false}, "loop": true}
+                    """
+                return try? JSONDecoder().decode(ThreadAutomation.self, from: Data(json.utf8))
+            }
+        }
+        func row(_ caption: String, _ line: RunLine, queue: QueueView = messages(0), connection: FeedState = .live, automations: [ThreadAutomation] = []) -> some View {
+            VStack(alignment: .leading, spacing: Space.s) {
+                Text(caption).font(Theme.meta).foregroundStyle(Theme.faint)
+                DotGlassGroup(spacing: Space.m) {
+                    HStack(spacing: Space.s) {
+                        DockCapsule(
+                            summary: DockSummary.make(line: line, connection: connection, queue: queue, automations: automations), onOpen: { _ in })
+                        GlassCircleButton(symbol: "arrow.down", label: "Jump to the newest message") {}
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        return VStack(alignment: .leading, spacing: Space.xl) {
+            row("Working, a loop, three queued", .working(since: now - 129), queue: messages(3), automations: loops(["every 10 minutes"]))
+            row("Waiting on you, one queued", .waitingOnYou(count: 1), queue: messages(1))
+            row("Waiting on two helpers", .waitingOnSubagents(count: 2, now: "Reads the receipts folder"), automations: loops(["every 10 minutes", "every hour"]))
+            row("Helpers in the background, the queue held", .helpersInBackground(count: 2), queue: messages(2, held: true))
+            row("Working while the stream reconnects, twelve queued", .working(since: now - 20), queue: messages(12), connection: .reconnecting(attempt: 2, unauthorized: false))
+            row("The stream cannot connect", .idle, connection: .reconnecting(attempt: 2, unauthorized: false))
+            row("This phone's key was refused", .idle, connection: .reconnecting(attempt: 1, unauthorized: true))
+            row("Only the queue", .idle, queue: messages(4))
         }
     }
 

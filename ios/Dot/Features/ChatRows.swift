@@ -120,15 +120,20 @@ struct ToolLine: View {
 
     var body: some View {
         let words: (verb: String, rest: String) = ToolGlyph.split(row.line)
-        HStack(spacing: Space.s) {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
             Image(systemName: ToolGlyph.symbol(for: row.tool))
-                .font(.system(size: 12, weight: .medium))
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(row.state == .running ? Theme.accent : Theme.faint)
                 .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
                 .frame(width: 18)
-            line(words)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 1) {
+                line(words)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if row.state == .failed, let why: String = row.failure {
+                    Text("Failed · \(why)").font(Theme.meta).foregroundStyle(Theme.bad).lineLimit(1)
+                }
+            }
             Spacer(minLength: Space.xs)
             Group {
                 switch row.state {
@@ -144,10 +149,11 @@ struct ToolLine: View {
             .contentTransition(.symbolEffect(.replace))
         }
         .frame(minHeight: 28)
-        .contentShape(Rectangle())
+        // The line is 28 points tall and quiet; a finger gets 44 (it reaches over the gap above and below).
+        .contentShape(Rectangle().inset(by: -8))
         .dotAnimation(Motion.snappy, value: row.state)
         .accessibilityElement(children: .combine)
-        .accessibilityValue(row.state == .running ? "running" : row.state == .failed ? "failed" : "done")
+        .accessibilityValue(row.state == .running ? "running" : row.state == .failed ? "failed" + (row.failure.map { ": " + $0 } ?? "") : "done")
     }
 
     private func line(_ words: (verb: String, rest: String)) -> Text {
@@ -163,6 +169,7 @@ struct ApprovalCardView: View {
     let card: ApprovalCard
     let onDecide: (ApprovalCard, Bool, String) -> Void
     @State private var answer: String = ""
+    @State private var expanded: Bool = false
 
     var body: some View {
         Group {
@@ -175,11 +182,13 @@ struct ApprovalCardView: View {
 
     // MARK: Waiting
 
+    private var presentation: ApprovalPresentation { ApprovalPresentation.make(tool: card.tool, summary: card.summary) }
+
     private var pending: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             HStack(spacing: Space.m) {
                 Image(systemName: symbol)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(Theme.warn)
                     .symbolEffect(.bounce, options: .repeat(2), value: card.approvalId)
                     .frame(width: 36, height: 36)
@@ -187,27 +196,39 @@ struct ApprovalCardView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.question != nil ? "Dot has a question" : "Waiting for your OK")
                         .font(.caption.weight(.semibold)).foregroundStyle(Theme.warn)
-                    Text(card.question != nil ? "Your answer" : stepName)
-                        .font(.headline).foregroundStyle(Theme.text).lineLimit(1)
+                    if card.question == nil {
+                        Text(presentation.title).font(.headline).foregroundStyle(Theme.text).lineLimit(2)
+                    }
                 }
                 Spacer(minLength: 0)
             }
-            if card.question != nil {
-                Text(card.question ?? "").font(Theme.body).foregroundStyle(Theme.text).frame(maxWidth: .infinity, alignment: .leading)
+            if let question: String = card.question {
+                // The question is the headline: it is what the owner has to read, so it is not in a box.
+                Text(question).font(.headline).foregroundStyle(Theme.text).frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                Text(card.summary)
-                    .font(Theme.mono)
-                    .foregroundStyle(Theme.text)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Space.m - 2)
-                    .background(Theme.codeFill, in: RoundedRectangle(cornerRadius: Radius.s))
+                Button { expanded.toggle() } label: {
+                    Text(presentation.command)
+                        .font(Theme.mono)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(expanded ? nil : 4)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Space.m - 2)
+                        .background(Theme.codeFill, in: RoundedRectangle(cornerRadius: Radius.s))
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(expanded ? "Shows less" : "Shows all of it")
+                if let why: String = presentation.why {
+                    Text("Why Dot asks: \(why)").font(Theme.meta).foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             actions
         }
         .padding(Space.l)
         .background {
             RoundedRectangle(cornerRadius: Radius.l)
-                .fill(LinearGradient(colors: [Theme.warn.opacity(0.12), Theme.warn.opacity(0.03)], startPoint: .top, endPoint: .bottom))
+                .fill(Theme.warn.opacity(0.09))
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
         }
         .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.45), lineWidth: 1))
@@ -223,7 +244,7 @@ struct ApprovalCardView: View {
             Button { onDecide(card, false, "") } label: { Text("Skip").frame(maxWidth: .infinity) }
                 .dotButton(.glass).controlSize(.large)
         } else if card.question != nil {
-            TextField("Your answer", text: $answer, axis: .vertical)
+            TextField("", text: $answer, prompt: Text("Type your answer").foregroundStyle(Theme.muted), axis: .vertical)
                 .font(Theme.body)
                 .padding(Space.m)
                 .background(Theme.background, in: RoundedRectangle(cornerRadius: Radius.m))
@@ -251,7 +272,7 @@ struct ApprovalCardView: View {
     }
 
     private var answerButton: some View {
-        Button { onDecide(card, true, answer) } label: { Text("Answer").lineLimit(1).frame(maxWidth: .infinity) }
+        Button { onDecide(card, true, answer) } label: { Text("Send answer").lineLimit(1).frame(maxWidth: .infinity) }
             .dotButton(.prominent)
             .disabled(answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
@@ -261,7 +282,7 @@ struct ApprovalCardView: View {
     }
 
     private var allow: some View {
-        Button { onDecide(card, true, "") } label: { Text("Allow").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.prominent)
+        Button { onDecide(card, true, "") } label: { Text("Allow once").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.prominent)
     }
 
     // MARK: Answered
@@ -273,9 +294,9 @@ struct ApprovalCardView: View {
                 .foregroundStyle(resolutionTone)
                 .frame(width: 18, height: 20)
             VStack(alignment: .leading, spacing: 2) {
-                Text(resolution + (card.question != nil ? "" : " · " + stepName))
+                Text(resolution + (card.question != nil ? "" : " · " + presentation.title))
                     .font(Theme.small.weight(.medium)).foregroundStyle(Theme.muted)
-                Text(card.question ?? card.summary)
+                Text(card.question ?? presentation.command)
                     .font(card.question != nil ? Theme.small : Theme.mono)
                     .foregroundStyle(Theme.faint)
                     .lineLimit(2)
@@ -290,8 +311,6 @@ struct ApprovalCardView: View {
         if card.severity == "secret" { return "lock.shield.fill" }
         return card.question != nil ? "questionmark.bubble.fill" : "hand.raised.fill"
     }
-
-    private var stepName: String { card.tool.replacingOccurrences(of: "_", with: " ").capitalizedFirst }
 
     private var resolution: String {
         switch card.status {

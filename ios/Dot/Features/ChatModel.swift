@@ -47,6 +47,12 @@ final class ChatModel {
     private(set) var queue: QueueView = QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil)
     private(set) var automations: [ThreadAutomation] = []
     private(set) var run: RunRecord?
+
+    /// "Done · 3 steps · 1m 12s", under the last message of a run that ended well; nil while it works or when it did not.
+    var finishedWords: String? {
+        guard let run, !isWorking else { return nil }
+        return DurationWords.finished(status: run.status, steps: run.steps, startedAt: run.createdAt, finishedAt: run.finishedAt)
+    }
     /// What the owner sent from here that the Mac has not yet taken, oldest first (the outbox's messages of this chat).
     var pending: [PendingSend] {
         store.outbox.items(for: threadId).compactMap { item in
@@ -295,6 +301,28 @@ final class ChatModel {
     func removeQueued(_ id: String) {
         queue.messages.removeAll { $0.id == id }
         store.outbox.enqueue(.removeQueued(thread: threadId, message: id))
+    }
+
+    /// Hands a queued message to the run at work now (it is taken out of the queue; the daemon refuses with 409 when no
+    /// run works here, and the queue is read again then).
+    func steerQueued(_ id: String) {
+        guard isWorking else { return }
+        queue.messages.removeAll { $0.id == id }
+        store.outbox.enqueue(.steerQueued(thread: threadId, message: id))
+    }
+
+    /// Lets a held queue go on. It needs the link at once (a tap on Resume is a thing to see happen), so it says when it
+    /// could not.
+    func resumeQueue() {
+        Task {
+            do {
+                queue = try await store.api.resumeQueue(thread: threadId)
+                await session?.keep(queue: queue, automations: nil, reactions: nil)
+            } catch {
+                logger.error("the queue was not resumed: \(String(describing: error), privacy: .public)")
+                notice = "Could not resume the queue."
+            }
+        }
     }
 
     // MARK: Schedules of the chat

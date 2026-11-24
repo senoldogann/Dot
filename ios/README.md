@@ -19,7 +19,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     link, what is read ahead, background and foreground), `LinkMonitor` (the phone's link, Low Data Mode and cost),
     `Outbox` and `OutboxModel` (what the owner did with no link, kept on disk and sent once in order), `Retrier` and
     `Coalescer`, `BackgroundGrace`.
-  - `Features/`: the screens: `ChatListView`, `ChatView` with `Composer`, `QueuePanel` and the status line,
+  - `Features/`: the screens: `ChatListView`, `ChatView` with `Composer`, `Dock` (the capsule over the composer and the queue's sheet; `Core/DockSummary` says what it holds),
     `RunInspector`, `SettingsViews` (models, schedules), `PairView`, `NewChatView`, `ModelPicker`, and the design system
     (`Theme`, `Chrome`, `ToolGlyph`, `DesignGallery` in debug builds); `Shared/DotPalette.swift` is its colour tokens.
   - `Adapters/` the Keychain, UserDefaults and the push/share HTTP client; `Push/` the token registration;
@@ -46,8 +46,13 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 
 Native: pairing with the code of Settings › Phone, the chat list (working, waiting on you, unread; pull to refresh; drawn
 from disk at launch), a chat (messages that stream in, a tool step as one line, approval and question cards with Allow
-and Deny, one line over the composer: working, waiting on you, waiting on N subagents; the queue, each message with an up
-and a down arrow and a remove button; Send queues while a run works, and Stop with an empty box; a photo to attach), the
+and Deny, and over the composer ONE capsule of glass (item 1390) whose segments are the
+run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background,
+the chat's loops ("every 10 min") and the queue ("3 queued"), divided by hairlines, each opening its own sheet and none
+stacked; a segment exists only while it has something to say, so a chat at rest has no capsule; the queue's sheet gives
+each message an up and a down arrow, Send now (to the run at work) and Remove, and Resume when a stop held the queue;
+the round button to the newest message stands beside the capsule; Send queues while a run works, and Stop with an empty
+box; a photo to attach), the
 run inspector (the run, its plan, its helpers, the chat's schedules and loops with their switches), the Schedules list and
 the models (the default and the review model) in Settings, notifications and the Live Activity. Slice 2 (item 1361):
 
@@ -92,7 +97,15 @@ stream. The run's stream is followed with `after=<id>` and `Last-Event-ID: <id>`
 history again; it comes back at once when the app comes to the front or the network changes, and otherwise after 0.5 s,
 1, 2, 4, 8 and 15 s. The transcript follows new words only while the reader is at the bottom.
 
-## On a bad link (items 1370 and 1371)
+## On a bad link (items 1370, 1371 and 1391)
+
+A socket that is dead and does not say so (item 1391): a phone back on a path that died while it slept, or one whose Wi-Fi gave
+way to the cellular link, holds a connection the system believes in for 45 s. The feed (`EventFeed`) does not wait for that:
+a connection that has answered nothing within 8 s (`connectTimeout`) and an open stream that says nothing for 35 s
+(`idleTimeout`; the daemon writes a keepalive every 15 s, so two missed and a little more) are dropped and the feed goes on,
+from the last event it read, on a new one (`SilentSocketTests`: the silence, the connection that never answers, the keepalives
+that keep a stream, the kick that still reconnects at once). Other phone apps do the same with a probe; Dot needs no probe
+because its stream writes its own heartbeat.
 
 What was measured, and what each part does now. Numbers are from the iPhone 17 Pro simulator against `FakeDaemon` with
 the profile 2 to 8 s of latency per request and three requests in ten lost (`TEST_RUNNER_DOT_PERF_SCALE=1`); the simulator
@@ -170,11 +183,11 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   in both looks, and the Live Activity draws with the same values.
 - **Type** is SF through the system's text styles (`Theme.body` is `.callout`, `small` `.footnote`, `meta` `.caption`) so
   everything follows Dynamic Type; code is SF Mono. Rows and cards re-lay out at the accessibility sizes, and floating
-  chrome (the composer, the queue, the chips, the new-chat button) is capped at a size where it still fits.
+  chrome (the composer, the capsule, the chips) is capped at a size where it still fits.
 - **Space and radius** are two scales (`Space` 2 to 32; `Radius` 4, 8, 12, 16, 24): controls 8, cards 12, the owner's
   message and the approval card 16, the floating bar 26.
-- **Glass is for floating chrome only**: the composer bar, the status and queue panels, the agents' chips, the
-  new-chat button, the jump-to-newest button, the approval card's Allow and Deny, the pairing field. `dotGlass(in:)`
+- **Glass is for floating chrome only**: the composer bar, the capsule over it, the agents' chips, the
+  the compose and settings buttons of the title bar (iOS 26 draws them as glass), the jump-to-newest button, the approval card's Allow once and Deny, the pairing field. `dotGlass(in:)`
   is Liquid Glass (`glassEffect`) on iOS 26 and a thin material with a hairline before it; `dotButton(.glass|.prominent)`
   are `.glass` and `.glassProminent` on iOS 26 and capsule buttons before it; `DotGlassGroup` is a
   `GlassEffectContainer`. Message text, tool lines and long lists are never glass. With Reduce Transparency it is a solid
@@ -185,7 +198,7 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
   approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
   folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).
-- **Debug-only aids**: `-DotGallery 1|2|3` shows the pieces on one screen with made-up data (a step that asks, a
+- **Debug-only aids**: `-DotGallery 1|2|3|4` shows the pieces on one screen with made-up data (a step that asks, a
   secret, a failed step, the buttons, the empty states), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
   look an iOS 18 phone gets, on an iOS 26 simulator.
 
@@ -233,7 +246,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1` and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1` and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the

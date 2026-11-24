@@ -54,6 +54,11 @@ actor EventFeed {
     /// The phone's link, when it is watched: while it is down the feed waits for it instead of trying (and failing, and
     /// waiting longer) against nothing.
     private let link: LinkMonitor?
+    /// How long the daemon may take to answer with its first headers (a phone coming back on a path that died while it
+    /// slept answers nothing, and the system's own timeout is 45 s), and how long a stream that was open may say nothing
+    /// (the daemon writes a keepalive every 15 s, so two missed ones and a little more is a socket that is dead).
+    private let connectTimeout: Duration
+    private let idleTimeout: Duration
     private var lastId: Int
     private var attemptTask: Task<Bool, Never>?
     private var waitTask: Task<Void, Never>?
@@ -67,9 +72,12 @@ actor EventFeed {
     /// notices (`event` name) for the reader to refetch what it shows.
     init(
         session: URLSession, after: Int, wantsEvents: Bool = true, link: LinkMonitor? = nil,
+        connectTimeout: Duration = .seconds(8), idleTimeout: Duration = .seconds(35),
         isFinal: @escaping @Sendable (EventRecord) -> Bool = { _ in false }, open: @escaping Opener
     ) {
         self.link = link
+        self.connectTimeout = connectTimeout
+        self.idleTimeout = idleTimeout
         self.session = session
         self.open = open
         self.lastId = after
@@ -119,9 +127,10 @@ actor EventFeed {
             }
             out.yield(.state(.connecting))
             let request: URLRequest = open(lastId)
-            let attempt: Task<Bool, Never> = Task { [session, isFinal, wantsEvents] in
+            let attempt: Task<Bool, Never> = Task { [session, isFinal, wantsEvents, connectTimeout, idleTimeout] in
                 await Self.connect(
                     request: request, session: session, wantsEvents: wantsEvents, isFinal: isFinal, out: out,
+                    connectTimeout: connectTimeout, idleTimeout: idleTimeout,
                     onLive: { [weak self] in await self?.live() },
                     onEvents: { [weak self] top in await self?.read(top) },
                     onFailure: { [weak self] error in await self?.failed(error) })
@@ -165,69 +174,142 @@ actor EventFeed {
         logger.info("feed dropped: \(String(describing: error), privacy: .public)")
     }
 
+    /// When the last line of a stream came: the watchdog of a stream reads it.
+    private final class Silence: @unchecked Sendable {
+        private let lock: NSLock = NSLock()
+        private var last: ContinuousClock.Instant = .now
+
+        func touch() {
+            lock.lock()
+            last = .now
+            lock.unlock()
+        }
+
+        func exceeds(_ limit: Duration) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return last.duration(to: .now) > limit
+        }
+    }
+
+    /// What a request answered, carried across a task boundary (an `AsyncBytes` is read by one task only).
+    private struct Opened: @unchecked Sendable {
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+    }
+
+    /// The stream's first headers, within `timeout`: a path that died while the phone slept takes the system 45 s to
+    /// give up on, and a fresh connection a moment (a daemon that is there answers at once).
+    private static func opened(_ request: URLRequest, session: URLSession, timeout: Duration) async throws -> Opened {
+        try await withThrowingTaskGroup(of: Opened?.self) { group in
+            group.addTask {
+                let (bytes, response): (URLSession.AsyncBytes, URLResponse) = try await session.bytes(for: request)
+                return Opened(bytes: bytes, response: response)
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                return nil
+            }
+            defer { group.cancelAll() }
+            guard let first: Opened? = try await group.next() else { throw CancellationError() }
+            guard let answered: Opened = first else { throw URLError(.timedOut) }
+            return answered
+        }
+    }
+
     /// One connection, until it ends. True when the feed is over (an event said so); false when the stream ended or
-    /// failed and the feed should try again.
+    /// failed and the feed should try again. A connection that answers nothing within `connectTimeout`, and one that
+    /// says nothing for `idleTimeout` once open, is dropped as a dead socket is: the feed tries again on a new one.
     private static func connect(
-        request: URLRequest, session: URLSession, wantsEvents: Bool, isFinal: @Sendable (EventRecord) -> Bool,
-        out: AsyncStream<FeedUpdate>.Continuation, onLive: @Sendable () async -> Void, onEvents: @Sendable (Int) async -> Void, onFailure: @Sendable (any Error) async -> Void
+        request: URLRequest, session: URLSession, wantsEvents: Bool, isFinal: @escaping @Sendable (EventRecord) -> Bool,
+        out: AsyncStream<FeedUpdate>.Continuation, connectTimeout: Duration, idleTimeout: Duration,
+        onLive: @Sendable () async -> Void, onEvents: @escaping @Sendable (Int) async -> Void, onFailure: @Sendable (any Error) async -> Void
     ) async -> Bool {
         do {
-            let (bytes, response): (URLSession.AsyncBytes, URLResponse) = try await session.bytes(for: request)
-            guard let http: HTTPURLResponse = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+            let answered: Opened = try await opened(request, session: session, timeout: connectTimeout)
+            guard let http: HTTPURLResponse = answered.response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
             guard http.statusCode == 200 else {
                 throw DaemonRequestError.status(path: request.url?.path ?? "", code: http.statusCode, body: "")
             }
             out.yield(.state(.live))
             await onLive()
-            var parser: SSEParser = SSEParser()
-            var line: [UInt8] = []
-            for try await byte in bytes {
-                line.append(byte)
-                guard byte == 0x0A else { continue }
-                let messages: [SSEMessage] = parser.feed(line)
-                line.removeAll(keepingCapacity: true)
-                if messages.isEmpty { continue }
-                var events: [EventRecord] = []
-                // The highest id of the frames, readable or not: an unread frame is still passed, or a reconnect would be
-                // sent it again for as long as the chat stays open.
-                var passed: Int = 0
-                var finished: Bool = false
-                for message in messages {
-                    if !wantsEvents || message.event == "resync" {
-                        out.yield(.notice(message.event ?? "message"))
-                        continue
-                    }
-                    let event: EventRecord
-                    do {
-                        event = try JSONDecoder().decode(EventRecord.self, from: Data(message.data.utf8))
-                    } catch {
-                        // The stream goes on (the next events are worth more than a stop), but the screen is told, and the
-                        // log keeps which event it was.
-                        Logger(subsystem: "dev.dotagent.phone", category: "feed").error(
-                            "an event could not be read: id=\(message.id ?? "none", privacy: .public) kind=\(message.event ?? "none", privacy: .public) error=\(String(describing: error), privacy: .public)")
-                        out.yield(.unreadable(eventId: message.id.flatMap { Int($0) }))
-                        continue
-                    }
-                    events.append(event)
-                    if isFinal(event) { finished = true }
+            let silence: Silence = Silence()
+            return try await withThrowingTaskGroup(of: Bool?.self) { group in
+                group.addTask {
+                    try await Self.read(
+                        answered.bytes, wantsEvents: wantsEvents, isFinal: isFinal, out: out, silence: silence, onEvents: onEvents)
                 }
-                passed = max(passed, messages.compactMap { $0.id.flatMap { Int($0) } }.max() ?? 0)
-                if !events.isEmpty {
-                    await onEvents(max(passed, events.map(\.id).max() ?? 0))
-                    out.yield(.events(events))
-                } else if passed > 0 {
-                    await onEvents(passed)
+                group.addTask {
+                    while !Task.isCancelled {
+                        try await Task.sleep(for: min(idleTimeout / 4, .seconds(2)))
+                        if silence.exceeds(idleTimeout) { return nil }
+                    }
+                    return nil
                 }
-                if wantsEvents == false { await onEvents(0) }
-                if finished { return true }
+                defer { group.cancelAll() }
+                guard let first: Bool? = try await group.next(), let ended: Bool = first else {
+                    // Nothing came for too long: the socket is dead, whatever the system still believes of it.
+                    throw URLError(.timedOut)
+                }
+                return ended
             }
-            // The server closed the stream: for a run's stream that is its end only when an event said so.
-            return false
         } catch is CancellationError {
             return false
         } catch {
             await onFailure(error)
             return false
         }
+    }
+
+    /// The lines of an open stream, until it ends: true when an event said the feed is over.
+    private static func read(
+        _ bytes: URLSession.AsyncBytes, wantsEvents: Bool, isFinal: @Sendable (EventRecord) -> Bool,
+        out: AsyncStream<FeedUpdate>.Continuation, silence: Silence, onEvents: @Sendable (Int) async -> Void
+    ) async throws -> Bool {
+        var parser: SSEParser = SSEParser()
+        var line: [UInt8] = []
+        for try await byte in bytes {
+            line.append(byte)
+            guard byte == 0x0A else { continue }
+            silence.touch()
+            let messages: [SSEMessage] = parser.feed(line)
+            line.removeAll(keepingCapacity: true)
+            if messages.isEmpty { continue }
+            var events: [EventRecord] = []
+            // The highest id of the frames, readable or not: an unread frame is still passed, or a reconnect would be
+            // sent it again for as long as the chat stays open.
+            var passed: Int = 0
+            var finished: Bool = false
+            for message in messages {
+                if !wantsEvents || message.event == "resync" {
+                    out.yield(.notice(message.event ?? "message"))
+                    continue
+                }
+                let event: EventRecord
+                do {
+                    event = try JSONDecoder().decode(EventRecord.self, from: Data(message.data.utf8))
+                } catch {
+                    // The stream goes on (the next events are worth more than a stop), but the screen is told, and the
+                    // log keeps which event it was.
+                    Logger(subsystem: "dev.dotagent.phone", category: "feed").error(
+                        "an event could not be read: id=\(message.id ?? "none", privacy: .public) kind=\(message.event ?? "none", privacy: .public) error=\(String(describing: error), privacy: .public)")
+                    out.yield(.unreadable(eventId: message.id.flatMap { Int($0) }))
+                    continue
+                }
+                events.append(event)
+                if isFinal(event) { finished = true }
+            }
+            passed = max(passed, messages.compactMap { $0.id.flatMap { Int($0) } }.max() ?? 0)
+            if !events.isEmpty {
+                await onEvents(max(passed, events.map(\.id).max() ?? 0))
+                out.yield(.events(events))
+            } else if passed > 0 {
+                await onEvents(passed)
+            }
+            if wantsEvents == false { await onEvents(0) }
+            if finished { return true }
+        }
+        // The server closed the stream: for a run's stream that is its end only when an event said so.
+        return false
     }
 }
