@@ -297,6 +297,28 @@ final class ChatModel {
         store.outbox.enqueue(.removeQueued(thread: threadId, message: id))
     }
 
+    /// Hands a queued message to the run at work now (it is taken out of the queue; the daemon refuses with 409 when no
+    /// run works here, and the queue is read again then).
+    func steerQueued(_ id: String) {
+        guard isWorking else { return }
+        queue.messages.removeAll { $0.id == id }
+        store.outbox.enqueue(.steerQueued(thread: threadId, message: id))
+    }
+
+    /// Lets a held queue go on. It needs the link at once (a tap on Resume is a thing to see happen), so it says when it
+    /// could not.
+    func resumeQueue() {
+        Task {
+            do {
+                queue = try await store.api.resumeQueue(thread: threadId)
+                await session?.keep(queue: queue, automations: nil, reactions: nil)
+            } catch {
+                logger.error("the queue was not resumed: \(String(describing: error), privacy: .public)")
+                notice = "Could not resume the queue."
+            }
+        }
+    }
+
     // MARK: Schedules of the chat
 
     func setAutomation(_ id: String, on: Bool) {

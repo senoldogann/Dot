@@ -95,4 +95,40 @@ final class GlassShotsTests: XCTestCase {
             shot("question-typing")
         }
     }
+
+    /// The capsule over the composer in a chat that works with messages queued (item 1390), and the queue's sheet.
+    func testDockAndQueueSheet() throws {
+        app.launchArguments += ["-DotOpenChat", "demo:stream"]
+        app.launch()
+        let queued: XCUIElement = app.buttons["dock-queue"]
+        guard queued.waitForExistence(timeout: 25) else { throw XCTSkip("the scratch daemon's stream chat has no queue any more") }
+        sleep(2)
+        shot("dock-working-queued")
+        queued.tap()
+        XCTAssertTrue(app.staticTexts["Next up"].waitForExistence(timeout: 10))
+        sleep(1)
+        shot("dock-queue-sheet")
+        let down: XCUIElement = app.buttons["Move down"].firstMatch
+        if down.exists { down.tap() }
+        sleep(1)
+        shot("dock-queue-sheet-moved")
+        app.buttons["Done"].tap()
+        let status: XCUIElement = app.buttons["dock-status"]
+        if status.waitForExistence(timeout: 5) {
+            status.tap()
+            XCTAssertTrue(app.buttons["chat-model"].waitForExistence(timeout: 10))
+            sleep(1)
+            shot("dock-status-inspector")
+        }
+    }
+
+    /// The capsule of a run that waits on the owner: warm, and the approval card above it.
+    func testDockWaitingOnYou() throws {
+        app.launchArguments += ["-DotOpenChat", "demo:approve"]
+        app.launch()
+        let status: XCUIElement = app.buttons["dock-status"]
+        guard status.waitForExistence(timeout: 25) else { throw XCTSkip("the scratch daemon's approval is no longer pending") }
+        sleep(2)
+        shot("dock-waiting-on-you")
+    }
 }

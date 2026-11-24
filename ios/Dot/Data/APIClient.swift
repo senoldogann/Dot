@@ -402,6 +402,11 @@ extension APIClient {
         try await send("POST", "/api/queue/\(id)/steer", body: Optional<String>.none)
     }
 
+    /// Lets a held queue go on (`POST /api/threads/{id}/queue/resume`): its next message starts now when no run works.
+    func resumeQueue(thread: String) async throws -> QueueView {
+        try await send("POST", "/api/threads/\(thread)/queue/resume", body: Optional<String>.none)
+    }
+
     func stop(run: String) async throws {
         try await sendVoid("POST", "/api/runs/\(run)/cancel")
     }
