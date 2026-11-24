@@ -14,14 +14,16 @@ contract, and `tests/unit/test_freedom_contract.py` is what makes it executable.
   every hand-off, each with the reason it would have asked for: the question that outside content raises, the one about
   Dot's own files (`_OWN_FILES_REASON`), money and credentials, a login filled from a vault (`_VAULT_REASON`), a message
   or a post in the owner's name, a pre-approved spend, the preset's and the owner's `ask` rules', and the refusal of a
-  read of their secrets or of data sent out. The step runs and its record says what it would have asked.
+  read of their secrets or of data sent out; all but the exceptions of the first two rows of the table below. The step
+  runs and its record says what it would have asked.
 - **Free mode** (`[policy] free = true`, Settings › Rules › How Dot asks, `PUT /api/policy/free`, item 922): the same
   for every run of every chat, whatever its own approval mode, from its next step on, and the payment, the message or
   mail sent for the owner, the public post and the release too (the gate's `held` is empty while it is on).
 
-**Freedom costs no speed.** The gate of such a run is one policy decision and one record; it awaits no answer, no kept
-step and no pace sleep, and a call's `tool_result` event keeps `waited_s`, the time it spent at the gate. A change that
-puts a wait in that path breaks the contract as an ask does.
+**Freedom costs no speed.** The gate of such a run is one policy decision and one record; it awaits no answer and no kept
+step (the pace the owner set for a site, which spaces the public actions of the browser, is the one wait left, and is
+theirs), and a call's `tool_result` event keeps `waited_s`, the time it spent at the gate. A change that puts a wait in
+that path breaks the contract as an ask does.
 
 ## The exceptions, with the code that makes each
 
