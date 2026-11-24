@@ -467,6 +467,7 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
     so an event may come twice: a client keeps one per id. Ends when the chat is deleted or the daemon stops."""
     store: Store = ctx.runtime.store
     async with ctx.runtime.bus.subscribe(None) as feed:
+        opened: float = time.time()
         family: set[str] = await _members(ctx, thread_id, cursors)
         sent: SentEvents = SentEvents()
         sent.newest.update(cursors)
@@ -524,6 +525,9 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
                 # The start of a run of the chat, or of a helper, may be among what was lost: the members are found
                 # again, as at the start, and the helpers of every run followed (as ``follow_run`` widens its family).
                 family.update(await _members(ctx, thread_id, {}))
+                # And a run of the chat that started and ended while the events were lost.
+                recent, _ = await store.thread_runs_window(thread_id, MOST_RUNS, None)
+                family.update(run.id for run in recent if run.created_at >= opened)
                 for member in tuple(family):
                     family.update(child.id for child in await store.list_child_runs(member))
                 caught: bytes = await stored() + await changed_now()
