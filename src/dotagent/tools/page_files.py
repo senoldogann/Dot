@@ -29,7 +29,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from dotagent.agent.pages import PAGE_MAX_CHARS
+from dotagent.agent.pages import LIBRARY_HOSTS, PAGE_MAX_CHARS
 from dotagent.core.errors import PolicyDenied
 from dotagent.policy.paths import classify_path, expand_path
 from dotagent.tools.third_party import holds_third_party
@@ -545,3 +545,47 @@ def with_its_files(
         )
     found.html = whole
     return found
+
+
+def _remote(url: str) -> bool:
+    """Whether ``url`` is a web address (``http:``, ``https:`` or one without a scheme that names a host)."""
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:
+        return False
+    return parts.scheme.lower() in ("http", "https") or (not parts.scheme and bool(parts.netloc))
+
+
+def _styled(css: str) -> Iterator[str]:
+    """The web addresses a style names that a shown page does not load: those of a host other than the libraries',
+    whose sheets and fonts it loads (``PAGE_HEADERS``); a picture of a style is taken for a font there."""
+    for match in _CSS_URL.finditer(css):
+        url: str = match["url"] or match["sheet"]
+        if _remote(url) and (urlsplit(url.strip()).hostname or "") not in LIBRARY_HOSTS:
+            yield url
+
+
+def remote_media(html: str) -> tuple[str, ...]:
+    """The web addresses of the pictures, sounds and videos ``html`` names in its tags, its ``srcset`` and its icon,
+    and those of its styles not on a library's host, each once, in the order named. A shown page loads none of them
+    (its policy loads pictures, sound and video only from ``data:`` and ``blob:``), so each would stand empty (item
+    1721)."""
+    tags: _Tags = _Tags(html)
+    tags.feed(html)
+    tags.close()
+    found: list[str] = []
+    for _start, _end, tag, attrs, _closed in tags.tags:
+        named: dict[str, str | None] = dict(attrs)
+        shown: tuple[str, ...] = _SHOWN.get(tag, ())
+        if tag == "link" and _is_icon(named.get("rel")):
+            shown = ("href",)
+        found.extend(value for name in shown if (value := named.get(name)))
+        srcset: str | None = named.get("srcset")
+        if srcset:
+            found.extend(srcset[start:end] for start, end in _srcset_urls(srcset))
+        style: str | None = named.get("style")
+        if style:
+            found.extend(_styled(style))
+    for start, end in tags.styles:
+        found.extend(_styled(html[start:end]))
+    return tuple(dict.fromkeys(url.strip() for url in found if _remote(url)))

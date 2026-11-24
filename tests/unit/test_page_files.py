@@ -636,3 +636,26 @@ def test_the_answer_of_a_page_the_time_cut_says_so() -> None:
     assert shown_words(page_shown, "http://127.0.0.1:8765/pages/page_x", files).endswith(
         " Writing the files in took more than 10 seconds, so ..."
     )
+
+
+def test_the_web_addresses_of_a_pages_media_are_found_and_the_rest_are_not() -> None:
+    """Item 1721: pictures, sound and video by a web address stand empty in a shown page; a file beside the page, a
+    data: address, a link and a library's sheet or font do not."""
+    html: str = (
+        '<img src="https://a.example/1.png" srcset="https://a.example/2.png 2x, local.png 1x">'
+        '<video poster="//b.example/p.jpg"><source src="http://127.0.0.1:9/v.mp4"></video>'
+        '<audio src="data:audio/wav;base64,AAAA"></audio><img src="shot.png"><a href="https://a.example/page">x</a>'
+        '<link rel="icon" href="https://a.example/favicon.ico"><div style="background:url(https://c.example/bg.png)">'
+        "</div><style>@import url(https://cdn.jsdelivr.net/npm/x@1/x.css); .f{src:url(https://unpkg.com/f.woff2)}"
+        " .g{background:url('https://d.example/g.png')}</style><img src=\"https://a.example/1.png\">"
+    )
+    assert page_files.remote_media(html) == (
+        "https://a.example/1.png",
+        "https://a.example/2.png",
+        "//b.example/p.jpg",
+        "http://127.0.0.1:9/v.mp4",
+        "https://a.example/favicon.ico",
+        "https://c.example/bg.png",
+        "https://d.example/g.png",
+    )
+    assert page_files.remote_media("<p>No media</p>") == ()

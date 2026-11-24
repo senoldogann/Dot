@@ -108,7 +108,7 @@ async def test_a_page_made_in_the_workspace_is_shown_by_its_path_as_a_read_of_it
         ("notes.md", "is no page"),
         ("gone.html", "there is no page at"),
         ("empty.html", "is empty"),
-        ("long.html", "is longer than a page may be"),
+        ("long.html", "longer than a page may be .* JPEG or WebP"),
     ],
 )
 async def test_a_path_that_is_no_page_the_run_made_is_refused(tmp_path: Path, named: str, refused: str) -> None:
@@ -161,10 +161,25 @@ async def test_a_page_given_as_html_has_the_workspaces_pictures_it_names_written
     (home / "workspace" / "keys").mkdir()
     (home / "workspace" / "keys" / "secret.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     ctx: SimpleNamespace = _context(home, protected=(home / "workspace" / "keys",))
-    html: str = '<img src="cv/shot.png" alt="CV"><img src="keys/secret.png"><img src="https://example.com/a.png">'
+    html: str = '<img src="cv/shot.png" alt="CV"><img src="keys/secret.png">'
     result: ToolResult = await _shown(ctx, {"title": "CV", "html": html})
     kept: str = ctx.runtime.store.kept["CV"]
     assert 'src="data:image/png;base64,' in kept
-    assert "keys/secret.png" in kept and "https://example.com/a.png" in kept
+    assert "keys/secret.png" in kept
     assert "Written into it: cv/shot.png." in result.text
     assert "keys/secret.png" in result.text
+
+
+async def test_a_page_given_as_html_too_long_is_refused_with_how_to_make_it_shorter(tmp_path: Path) -> None:
+    """Item 1721: the refusal says how long it is and how to shrink it, not only the limit."""
+    with pytest.raises(ToolInputError, match=r"is 500,001 characters.*fewer pixels"):
+        await _prepared(_context(_home(tmp_path)), {"title": "Page", "html": "x" * (PAGE_MAX_CHARS + 1)})
+
+
+async def test_a_page_that_names_a_picture_by_a_web_address_is_refused_and_not_kept(tmp_path: Path) -> None:
+    """Item 1721: a shown page loads no picture or video of the web, so it would stand empty."""
+    ctx: SimpleNamespace = _context(_home(tmp_path))
+    html: str = '<img src="http://127.0.0.1:50899/a.png"><video src="https://example.com/v.mp4"></video>'
+    with pytest.raises(ToolInputError, match=r"not shown.*http://127\.0\.0\.1:50899/a\.png, https://example\.com/v"):
+        await _shown(ctx, {"title": "Media", "html": html})
+    assert ctx.runtime.store.kept == {}
