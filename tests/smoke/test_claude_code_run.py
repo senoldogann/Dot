@@ -511,7 +511,9 @@ async def test_a_run_on_the_plan_is_told_dots_own_system_prompt_and_the_skills_o
     assert ended.status == "done", ended.result
     started: dict[str, object] = await asyncio.to_thread(_json, room.record / "started.json")
     args: list[str] = started["args"]  # type: ignore[assignment]  # what the stand-in wrote
-    prompt: str = args[args.index("--append-system-prompt") + 1]
+    # In a 0600 file of the run's private folder, never in the arguments (the pre-push review of item 1691).
+    prompt: str = str(started["prompt"])
+    assert started["prompt_mode"] == stat.S_IRUSR | stat.S_IWUSR and "--append-system-prompt" not in args
     for said in (
         "# How to work",
         "keep a short plan with update_plan",

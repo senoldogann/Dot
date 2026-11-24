@@ -148,13 +148,14 @@ _CUT_SHORT: frozenset[str] = frozenset({"length", "other"})
 # The steps that end after the agent was told that the run's limit is reached before one that goes on ends the run:
 # the step that was under way when the note arrived has not read it.
 _LIMIT_GRACE_STEPS: int = 2
-# What the agent is told when the run's limit is reached (the note of Dot's own loop asks for a call of finish, which
-# the agent does not have).
+# What the agent is told when the run's limit is reached: in a mode with finish (bridged since item 1695) to call it, as
+# Dot's own loop's note asks, else to write its answer.
 _LIMIT_NOTE: str = (
-    "[system note] The limit of this run is reached: it has used {spent}. Stop now, in this reply: write your final "
-    "answer with what was reached (the numbers), what is missing and how to go on. Call no more tools: the run ends "
-    "after this reply."
+    "[system note] The limit of this run is reached: it has used {spent}. Stop now, in this reply: {ending} with what "
+    "was reached (the numbers), what is missing and how to go on. Call no other tool: the run ends after this reply."
 )
+_LIMIT_FINISH: str = "call finish with success false and your final answer"
+_LIMIT_REPLY: str = "write your final answer"
 # What the agent is told when it asks for a subagent: the subagent's session would not be the run's, which Dot follows.
 NO_SUBAGENT_NOTE: str = "Subagents are not available here: do this part of the work yourself, with your own tools."
 # What the agent is told when it makes the same call a third time in a row (OpenCode asks ``doom_loop`` then): Dot's own
@@ -513,8 +514,10 @@ class _Follow:
     told: LimitReached | None = None
     since_told: int = 0
     over: LimitReached | None = None
-    # Dot's system prompt for the run (item 1695), sent with every prompt: OpenCode keeps a prompt's system to its turn.
+    # Dot's system prompt for the run (item 1695), sent with every prompt: OpenCode keeps a prompt's system to its turn;
+    # and whether the agent has Dot's finish (a mode that ends with one).
     system: str = ""
+    finishes: bool = False
     # What the agent's finish said (item 1695), ``None`` until it calls it, and again after a later call of Dot's tools.
     finished: FinishArgs | None = None
     # How the newest step ended, in OpenCode's words.
@@ -723,7 +726,8 @@ class _Follow:
         self.told = reached
         log.info("opencode_limit_reached", run_id=self.agent.run.id, spent=limit_spent(reached))
         await self.emit(LIMIT_EVENT, limit_event_data(reached), True)
-        await self.prompt(_LIMIT_NOTE.format(spent=limit_spent(reached)), ())
+        ending: str = _LIMIT_FINISH if self.finishes else _LIMIT_REPLY
+        await self.prompt(_LIMIT_NOTE.format(spent=limit_spent(reached), ending=ending), ())
 
     def ask(self, event: PermissionAsked) -> None:
         """Decide the permission in a task of its own: the owner may take a while, and the run reads on meanwhile."""
@@ -999,6 +1003,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             started=started,
             limits=limits_of(runtime.config.agent, run.mode),
             system=system,
+            finishes=FINISH_TOOL in tools.tools,
         )
         async with _dot_tools(provider.bridge, server, directory, door), server.events(directory) as stream:
             pumps: tuple[asyncio.Task[None], ...] = (
@@ -1022,7 +1027,10 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
                 if not ended:
                     await asyncio.shield(_stop_agent(server, chat.session_id, directory))
                 await let_go(runtime, run.id, tuple(follow.asks))
-        await runtime.store.append_messages(run.thread_id, [assistant_message(answer, None, ())])
+        # The chat keeps the answer of the agent's finish when it called one, as a run on the plan's does: a line it
+        # wrote after it is often empty, and a later run would read nothing of the answer (the pre-push review).
+        closing: str = finished[-1].answer if finished else answer
+        await runtime.store.append_messages(run.thread_id, [assistant_message(closing, None, ())])
         await asyncio.to_thread(
             write_chat,
             _chat_path(run.thread_id),

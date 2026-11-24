@@ -195,7 +195,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill
-from dotagent.store.endings import PREFIX_CUT_SHORT
+from dotagent.store.endings import PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
 from dotagent.store.models import NO_PICKS, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
@@ -462,10 +462,20 @@ def mcp_config(door: Door, url: str) -> JsonObject:
 
 def write_mcp_config(folder: Path, config: JsonObject) -> Path:
     """Write ``config`` to a new file only the owner reads (0600) in ``folder``. Blocking."""
-    path: Path = folder / "mcp.json"
+    return _write_private(folder / "mcp.json", dumps_compact(config))
+
+
+def write_prompt(folder: Path, prompt: str) -> Path:
+    """Write the run's system prompt to a new file only the owner reads (0600) in ``folder``: since item 1691 it is
+    Dot's whole prompt (what Dot knows of the owner, the team, the skills), which the program's arguments, shown by
+    ``ps`` to every process of the owner, must not carry (the pre-push review). Blocking."""
+    return _write_private(folder / "prompt.md", prompt)
+
+
+def _write_private(path: Path, text: str) -> Path:
     descriptor: int = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, _SECRET_FILE)
     with os.fdopen(descriptor, "w", encoding="utf-8") as written:
-        written.write(dumps_compact(config))
+        written.write(text)
     return path
 
 
@@ -474,16 +484,17 @@ def claude_argv(
     model: str,
     effort: Effort | None,
     speed: Speed,
-    prompt: str,
+    prompt_file: Path,
     config_file: Path,
     door: str,
     resume: str | None,
 ) -> tuple[str, ...]:
     """The command of a run: ``model`` (Claude Code's alias) at ``effort`` (``--effort``, a level of
     :func:`run_effort`; none for a model without levels) and ``speed`` (fast mode through ``--settings``, the
-    one settings source a run reads, item 1014; :func:`run_speed`), with ``prompt`` after Claude Code's own system
-    prompt, the door ``door`` of ``config_file`` as its only MCP server and its tools as the only ones, in the session
-    ``resume`` names or a new one; its input and output are lines of JSON."""
+    one settings source a run reads, item 1014; :func:`run_speed`), with what ``prompt_file`` holds after Claude Code's
+    own system prompt (at every start: the program records it with the session, which a resume sends as recorded until
+    a compaction renders it again), the door ``door`` of ``config_file`` as its only MCP server and its tools as the
+    only ones, in the session ``resume`` names or a new one; its input and output are lines of JSON."""
     again: tuple[str, ...] = () if resume is None else ("--resume", resume)
     fast: tuple[str, ...] = ("--settings", FAST_SETTINGS) if speed == "fast" else ()
     level: tuple[str, ...] = () if effort is None else ("--effort", effort)
@@ -501,8 +512,8 @@ def claude_argv(
         model,
         *level,
         *fast,
-        "--append-system-prompt",
-        prompt,
+        "--append-system-prompt-file",
+        str(prompt_file),
         "--tools",
         SEARCH_TOOL,
         "--setting-sources",
@@ -626,6 +637,8 @@ class _Record:
     def called(self, outcome: ToolOutcome, result: ToolResult) -> None:
         """A call of Dot's tool ended with ``result`` (its ``outcome``'s, with what Dot added to it)."""
         self.used_tools = True
+        # A step that acts starts the count of replies told to finish again, as in Dot's own loop.
+        self.nudges = 0
         self.history.extend((assistant_message("", None, (outcome.call,)), tool_message(outcome.call, result.text, ())))
         self.facts = with_outcomes(self.facts, (outcome,))
 
@@ -858,8 +871,13 @@ class _Follow:
             record.nudges += 1
             await self.note(NO_TOOL_NOTE if self.last_text else EMPTY_NOTE)
             return False
+        if finished is None and record.used_tools and not self.last_text:
+            # Empty again and again: the run ends failed, as Dot's own loop ends it (the pre-push review).
+            record.settled = RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs="")
+            return True
         ended: RunOutcome = (
-            RunOutcome(status="done", result=self.answer, needs="")
+            # The reply that ended the turn is the answer, not an earlier step's words (the pre-push review).
+            RunOutcome(status="done", result=self.last_text or self.answer, needs="")
             if finished is None
             else RunOutcome(
                 status="done" if finished.success else "failed",
@@ -871,6 +889,7 @@ class _Follow:
         unclosed: tuple[int, ...] = open_steps(plan.steps)
         if unclosed and record.plan_reminders < config.stall_limit:
             record.plan_reminders += 1
+            record.nudges = 0
             await self.emit("plan_reminder", {"open_steps": list(unclosed)}, True)
             await self.note(plan_note(unclosed))
             return False
@@ -1035,6 +1054,8 @@ class _Follow:
         self.session_id = event.session_id or self.session_id
         if event.text.strip():
             self.answer = event.text.strip()
+            # The turn's own answer, which its last step may have left out of its words.
+            self.last_text = event.text.strip()
         return answered_all(self.taken, self.sent, self.taken_since_step)
 
     @property
@@ -1124,6 +1145,8 @@ class _Follow:
         # nothing of the work.
         if sent.reaction != "hold":
             self.quiet.finished = None
+            if self.record is not None:
+                self.record.nudges = 0
         # Whatever is sent (a message, a note, a second ✋) starts a turn of the program's: it is at work, not resting,
         # so the hold's time stops and the silence counts from now (the pre-push review).
         self.quiet.resting_since = None
@@ -1437,7 +1460,7 @@ class _Launch:
     program: Path
     ref: ModelRef
     info: ModelInfo
-    prompt: str
+    prompt_file: Path
     config_file: Path
     door: str
     folder: Path
@@ -1455,7 +1478,7 @@ class _Launch:
             self.ref.model,
             run_effort(self.info.efforts, run.effort, runtime.config.models.effort),
             run_speed(self.ref, run.speed),
-            self.prompt,
+            self.prompt_file,
             self.config_file,
             self.door,
             resume,
@@ -1773,12 +1796,13 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     try:
         async with provider.bridge.opened(door) as url, _private_folder() as folder:
             config_file: Path = await asyncio.to_thread(write_mcp_config, folder, mcp_config(door, url))
+            prompt_file: Path = await asyncio.to_thread(write_prompt, folder, prompt)
             launch: _Launch = _Launch(
                 agent=agent,
                 program=program,
                 ref=ref,
                 info=info,
-                prompt=prompt,
+                prompt_file=prompt_file,
                 config_file=config_file,
                 door=door.name,
                 folder=folder,
