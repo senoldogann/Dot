@@ -36,6 +36,10 @@ final class NativeStore {
     /// How the phone's link stands, and when the list was last read from the Mac: the banner's words.
     private(set) var linkState: LinkState
     private(set) var lastUpdated: Date?
+    /// How many helpers of a chat the daemon last said are live, for the chat's row in the list (item 1466). The daemon's list of
+    /// chats says nothing of helpers, so this is what a read of a chat's own helpers found, in this run of the app: a chat read before
+    /// is not here, and one whose count was read at an older newest run is not trusted (`ListHelpers`).
+    private(set) var helperCounts: [String: HelperCount] = [:]
     /// What was typed and not sent, per chat, kept between launches.
     let drafts: DraftStore
     /// What the phone knows of Dot's awareness of the owner: the push switches (item 1441), later what waits on them and what
@@ -333,9 +337,25 @@ final class NativeStore {
 
     func keep(_ state: ChatState, for id: String) { warm[id] = state }
 
+    /// What a chat's row in the list says of its helpers: how many are live as last read (`ListHelpers`).
+    func helpersLive(in thread: ThreadSummary) -> Int { ListHelpers.live(helperCounts[thread.id], thread: thread) }
+
+    /// A session read the helpers of a chat (item 1466): the row of the chat says how many are live.
+    private func helpersReported(_ thread: String, live: Int, newestRun: String?) {
+        let next: HelperCount? = live > 0 ? HelperCount(live: live, newestRun: newestRun) : nil
+        if helperCounts[thread] != next { helperCounts[thread] = next }
+    }
+
+    private func helpersReport() -> HelpersReported {
+        { [weak self] thread, live, newestRun in
+            Task { @MainActor in self?.helpersReported(thread, live: live, newestRun: newestRun) }
+        }
+    }
+
     func makeSession(for id: String, token: UUID) -> ChatSession {
         let session: ChatSession = ChatSession(
-            threadId: id, api: api, cache: cache, link: link, listUpdatedAt: threads.first(where: { $0.id == id })?.updatedAt)
+            threadId: id, api: api, cache: cache, link: link, listUpdatedAt: threads.first(where: { $0.id == id })?.updatedAt,
+            helpersReported: helpersReport())
         open[token] = session
         openOrder.removeAll { $0 == token }
         openOrder.append(token)
@@ -385,12 +405,13 @@ final class NativeStore {
         let api: APIClient = api
         let cache: ChatCache = cache
         let link: LinkMonitor = link
+        let report: HelpersReported = helpersReport()
         prefetchTask = Task.detached(priority: .utility) { [weak self] in
             let chosen: [ThreadSummary] = PrefetchRules.chosen(
                 from: candidates, open: openIds, budget: budget, held: { ChatCache.readChat($0, in: folder) })
             for thread in chosen {
                 if Task.isCancelled || !link.state.online { return }
-                let session: ChatSession = ChatSession(threadId: thread.id, api: api, cache: cache, link: link)
+                let session: ChatSession = ChatSession(threadId: thread.id, api: api, cache: cache, link: link, helpersReported: report)
                 if let state: ChatState = await session.warm(listUpdatedAt: thread.updatedAt) {
                     await self?.warmed(thread.id, state)
                 }

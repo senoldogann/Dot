@@ -91,7 +91,10 @@ code** takes its place. The same by hand:
    API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
-   waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351),
+   waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
+   or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
+   "Done · 1 min ago", and the chat's row in the list, item 1466; while the chat is open the app asks for the list of helpers
+   every 8 seconds as long as one is live, and keeps the last count, dimmed, with no link),
    the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
    a run inspector (plan, helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the

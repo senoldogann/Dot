@@ -39,8 +39,11 @@ struct DockCapsule: View {
 
     private func label(_ segment: DockSummary.Segment, fit: Fit) -> some View {
         let short: Bool = fit == .compact || (fit == .mixed && segment.kind != .status)
-        // What is at work breathes: the working mark, the helpers waited for, a stream that reconnects.
-        let alive: Bool = segment.kind == .status && [.audioWaveform, .circleDashed, .refresh].contains(segment.icon)
+        // What is at work breathes: the working mark, the helpers waited for, a stream that reconnects, and the helpers at work in
+        // the background (not while their count is only the last one read).
+        let alive: Bool =
+            (segment.kind == .status && [.audioWaveform, .circleDashed, .refresh].contains(segment.icon))
+            || (segment.kind == .helpers && !segment.dimmed)
         return HStack(spacing: Space.s - 2) {
             DotIcon(segment.icon, size: 16, pulse: alive, relativeTo: .footnote)
                 .foregroundStyle(tone(segment.tone))
@@ -60,6 +63,7 @@ struct DockCapsule: View {
         }
         .padding(.horizontal, Space.m)
         .frame(minHeight: 44)
+        .opacity(segment.dimmed ? 0.5 : 1)
         .contentShape(Rectangle())
     }
 
@@ -72,7 +76,7 @@ struct DockCapsule: View {
     }
 
     private func accessibilityLabel(_ segment: DockSummary.Segment) -> String {
-        [segment.words, segment.detail].compactMap { $0 }.joined(separator: ", ")
+        [segment.words, segment.detail, segment.dimmed ? "last known" : nil].compactMap { $0 }.joined(separator: ", ")
     }
 
     private func hint(_ kind: DockSummary.Kind) -> String {

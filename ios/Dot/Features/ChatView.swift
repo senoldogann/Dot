@@ -112,7 +112,8 @@ struct ChatView: View {
     /// not at the end. Both are glass of one piece, so they blend as they come near each other.
     private var dock: some View {
         let summary: DockSummary = DockSummary.make(
-            line: model.state.line, connection: model.connection, queue: model.queue, automations: model.automations)
+            line: model.state.line, connection: model.connection, queue: model.queue, automations: model.automations,
+            offline: model.offline)
         return DotGlassGroup(spacing: Space.m) {
             HStack(spacing: Space.s) {
                 DockCapsule(summary: summary, onOpen: openDock)
@@ -154,7 +155,7 @@ struct ChatView: View {
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
         case .waitingOnSubagents(let count, _): "Waiting on \(count) helper\(count == 1 ? "" : "s")"
-        case .helpersInBackground(let count): "\(count) helper\(count == 1 ? "" : "s") in the background"
+        case .helpersInBackground(let count): HelperWords.header(count: count, runWorking: model.isWorking)
         }
     }
 }

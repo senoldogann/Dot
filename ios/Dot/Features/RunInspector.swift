@@ -201,7 +201,7 @@ struct RunInspector: View {
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
         case .waitingOnSubagents(let count, _): "Waiting on \(count) helper\(count == 1 ? "" : "s")"
-        case .helpersInBackground(let count): "\(count) helper\(count == 1 ? "" : "s") in the background"
+        case .helpersInBackground(let count): HelperWords.header(count: count, runWorking: model.state.isWorking)
         }
     }
 

@@ -26,6 +26,10 @@ enum OlderOutcome: Equatable, Sendable {
     case failed
 }
 
+/// What a chat session tells the store after it read its helpers (item 1466): the chat, how many of them are live, and the id of the
+/// chat's newest run when it was read (a row of the list that sees a newer run knows the count is out of date).
+typealias HelpersReported = @Sendable (_ thread: String, _ live: Int, _ newestRun: String?) -> Void
+
 /// One open chat: it reads what the disk holds and tells it at once, asks the daemon for what came after (a delta,
 /// by event id), then follows the newest run's stream while it works, resuming where it stopped after a drop. It lives
 /// off the main actor: decoding, reducing and writing to disk never wait for a frame, and the screen is handed one
@@ -48,6 +52,10 @@ actor ChatSession {
     private var refreshTask: Task<Void, Never>?
     private var startTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
+    /// The watch of the helpers (item 1466): asks for their list every `HelperWatch.seconds` while one is live.
+    private var watchTask: Task<Void, Never>?
+    private let watchEvery: Duration
+    private let helpersReported: HelpersReported?
     /// Bumped whenever a read succeeds or the chat is kicked: a retry that was waiting for its turn finds it changed and
     /// gives way.
     private var retryGeneration: Int = 0
@@ -90,11 +98,16 @@ actor ChatSession {
     static let gapPage: Int = 500
     static let tailSize: Int = 400
 
-    init(threadId: String, api: APIClient, cache: ChatCache, link: LinkMonitor? = nil, listUpdatedAt: Double? = nil) {
+    init(
+        threadId: String, api: APIClient, cache: ChatCache, link: LinkMonitor? = nil, listUpdatedAt: Double? = nil,
+        helpersReported: HelpersReported? = nil, watchEvery: Duration = HelperWatch.interval
+    ) {
         self.threadId = threadId
         self.api = api
         self.cache = cache
         self.link = link
+        self.helpersReported = helpersReported
+        self.watchEvery = watchEvery
         self.streamSession = APIClient.makeStreamSession(like: api.session)
         self.listUpdatedAt = listUpdatedAt
     }
@@ -119,6 +132,8 @@ actor ChatSession {
         refreshTask?.cancel()
         retryTask?.cancel()
         startTask?.cancel()
+        watchTask?.cancel()
+        watchTask = nil
         Task { [feed] in await feed?.stop() }
         feed = nil
         output?.finish()
@@ -130,6 +145,8 @@ actor ChatSession {
     /// from the daemon, whose list no longer holds the runs that were taken out.
     func reset() async {
         feedTask?.cancel()
+        watchTask?.cancel()
+        watchTask = nil
         if let feed { Task { await feed.stop() } }
         feed = nil
         feedRun = nil
@@ -162,6 +179,8 @@ actor ChatSession {
         retryGeneration += 1
         refreshTask?.cancel()
         retryTask?.cancel()
+        watchTask?.cancel()
+        watchTask = nil
         feedTask?.cancel()
         if let feed { Task { await feed.stop() } }
         feed = nil
@@ -292,6 +311,7 @@ actor ChatSession {
         } while again && !stopped
         catching = false
         followIfWorking()
+        watchHelpers()
         let ending: [CheckedContinuation<Void, Never>] = waiters
         waiters = []
         for waiter in ending { waiter.resume() }
@@ -365,6 +385,7 @@ actor ChatSession {
             readSucceeded()
             publishNow()
             scheduleSave()
+            tellHelpers()
             return true
         } catch {
             if stopped || Task.isCancelled || (error as? DaemonRequestError).map({ RetryPolicy.isCancellation($0) }) == true { return false }
@@ -559,6 +580,75 @@ actor ChatSession {
         feedRun = nil
         // The run's end was told by its stream; the daemon's record says how it ended and what is left.
         if !stopped, !keyRefused { await catchUp() }
+    }
+
+    // MARK: Helpers at work (item 1466)
+
+    /// A run that ends done leaves its helpers at work and its stream ends with it, so nothing says when one of them ends. While
+    /// the chat is open and a helper is live this asks the daemon for the list of helpers every `HelperWatch.seconds` (one small
+    /// request, nothing with no link), and stops when none is live. The app coming to the front and a message of the
+    /// lifecycle stream read the chat at once (`kick`, `lifecycle`), as they always did, and that read starts this again.
+    private func watchHelpers() {
+        guard !stopped, !keyRefused, HelperWatch.goesOn(live: state.liveHelpers.count) else {
+            watchTask?.cancel()
+            watchTask = nil
+            return
+        }
+        guard watchTask == nil else { return }
+        let every: Duration = watchEvery
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: every)
+                if Task.isCancelled { return }
+                guard await self?.watchTick() == true else { return }
+            }
+        }
+    }
+
+    /// One tick of the watch: the list of helpers is asked for and drawn, and when a helper that was live has ended the chat is read
+    /// whole (its report may have started a run here, which `catchUp` then follows). False ends the watch.
+    private func watchTick() async -> Bool {
+        guard !stopped, !keyRefused else {
+            watchTask = nil
+            return false
+        }
+        let before: Set<String> = Set(state.liveHelpers.map(\.id))
+        guard HelperWatch.goesOn(live: before.count) else {
+            watchTask = nil
+            return false
+        }
+        // With no link nothing is asked: the count stays as last read (the capsule draws it dimmed).
+        guard HelperWatch.asks(live: before.count, online: link?.state.online ?? true) else { return true }
+        do {
+            let listed: [RunRecord] = try await api.helpers(thread: threadId)
+            // A read of the whole chat that is under way will say the same and more.
+            guard !stopped, !catching else { return !stopped }
+            helperRuns = listed
+            state.setHelpers(listed)
+            publishNow()
+            scheduleSave()
+            tellHelpers()
+            if HelperWatch.readsWhole(live: before, then: Set(state.liveHelpers.map(\.id))) { await catchUp() }
+        } catch {
+            if stopped || Task.isCancelled { return false }
+            if case DaemonRequestError.status(_, let code, _) = error, code == 401 || code == 403 {
+                refuse()
+                watchTask = nil
+                return false
+            }
+            // The last count stays; the next tick asks again.
+            logger.info("the helpers could not be read: \(String(describing: error), privacy: .public)")
+        }
+        if !HelperWatch.goesOn(live: state.liveHelpers.count) {
+            watchTask = nil
+            return false
+        }
+        return true
+    }
+
+    /// Tells the store how many helpers of this chat are live as the daemon last said (what the chat's row in the list says).
+    private func tellHelpers() {
+        helpersReported?(threadId, state.liveHelpers.count, state.newestRunId)
     }
 
     // MARK: Telling and keeping
