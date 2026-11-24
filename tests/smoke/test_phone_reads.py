@@ -68,6 +68,29 @@ async def test_a_read_that_is_lost_is_tried_again_three_times_in_all(resting: Sc
             await browser.close()
 
 
+async def test_a_link_that_carries_nothing_as_dot_opens_gives_up_after_the_time_a_read_has(resting: Scene) -> None:
+    """The proof Dot gives before the first read, and that read, are made before Dot has answered the page once. On a
+    phone they give up after 10 seconds like every read, where they waited for the browser's own timeout and the page
+    for them: the screen of a Dot out of reach, which tries again by itself, is there in a little more than 10."""
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            context: BrowserContext = await phone(browser, playwright, workers="block")
+            held: list[str] = []
+
+            async def carry_nothing(route: Route) -> None:
+                held.append(route.request.url)
+
+            await context.route("**/api/**", carry_nothing)
+            page: Page = await context.new_page()
+            await page.goto(ui_url("127.0.0.1", resting.port, resting.token))
+            await expect(page.get_by_text("This page tries again by itself")).to_be_visible(timeout=15_000)
+            assert held, "the page asked Dot for nothing"
+            await context.close()
+        finally:
+            await browser.close()
+
+
 async def test_a_read_that_is_refused_is_asked_once(resting: Scene) -> None:
     async with async_playwright() as playwright:
         browser: Browser = await playwright.webkit.launch(headless=True)
