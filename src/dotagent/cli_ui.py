@@ -236,6 +236,19 @@ class ResumedCallPayload(Payload):
     repeatable: bool
 
 
+class ContinuedPayload(Payload):
+    """The run's Claude Code program was cut off from outside and Dot started it again in the same run (item 1581): when
+    it was cut, which continuation this is of how many, whether it is a new session, and how the program ended."""
+
+    cut_at: str
+    attempt: int
+    of: int
+    fresh_session: bool
+    signal: str | None = None
+    returncode: int | None = None
+    said: str = ""
+
+
 class ResumedPayload(Payload):
     """A run that goes on from where the run before it was cut off: that run, how it was cut off, whether the daemon
     resumed it on its own, and how each call of the step it was in ended."""
@@ -509,6 +522,21 @@ class TerminalUi:
                 self._line(self._paint(f"  ✎ {NotePayload.model_validate(data).text}", "35"))
             case "resumed":
                 self._on_resumed(ResumedPayload.model_validate(data))
+            case "claude_code_continued":
+                continued = ContinuedPayload.model_validate(data)
+                how: str = continued.signal or (
+                    f"exit code {continued.returncode}"
+                    if continued.returncode is not None
+                    else continued.said or "ended by Dot"
+                )
+                session: str = "in a new session" if continued.fresh_session else "in its session"
+                self._line(
+                    self._paint(
+                        f"  ↺ the program was cut off at {continued.cut_at} ({how}); Dot continued the run {session} "
+                        f"({continued.attempt} of {continued.of})",
+                        "33",
+                    )
+                )
             case "model_switched":
                 switched = ModelSwitchedPayload.model_validate(data)
                 self._line(

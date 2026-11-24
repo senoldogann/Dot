@@ -7,20 +7,26 @@ done); the run ends done with the program's answer and keeps its session for the
 that is not Dot's, and a plan whose window is used up, end the run failed with why. No model is called."""
 
 import asyncio
+import contextlib
 import dataclasses
 import json
 import os
+import re
 import stat
 import sys
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
+from dotagent.claude_code import cut as cut_module
+from dotagent.claude_code import run as run_module
+from dotagent.claude_code.cut import EndedTogether
 from dotagent.claude_code.run import chat_path
 from dotagent.config import load_config
 from dotagent.core.errors import FailSafeTriggered, InvalidValueError
@@ -643,3 +649,495 @@ async def test_an_agent_whose_tools_leave_out_notify_is_told_so_before_its_progr
     ):
         again: RunRecord = await _run_as(room, goal, source, chat.id)
         assert again.status == "done", (goal, source, again.result)
+
+
+@pytest.fixture
+def ends(monkeypatch: pytest.MonkeyPatch) -> Iterator[EndedTogether]:
+    """The count of programs cut together (item 1580) as a test's own, with a window no test outlasts, so that the cuts
+    of one test never join those of another in the line of the daemon's own."""
+    together: EndedTogether = EndedTogether(window_s=60.0)
+    monkeypatch.setattr(cut_module, "ENDED_TOGETHER", together)
+    yield together
+    together.flush()
+
+
+async def _failed_context(room: Room, ended: RunRecord) -> dict[str, object]:
+    """The context of the error that ended the run, as its ``run_finished`` event keeps it."""
+    (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
+    error: object = finished.data["error"]
+    assert isinstance(error, dict) and error["kind"] == "passing", error
+    context: object = error["context"]
+    assert isinstance(context, dict)
+    return context
+
+
+@pytest.mark.parametrize(
+    ("goal", "returncode", "named", "stderr_says"),
+    [
+        ("Please die by sigkill.", -9, "SIGKILL", ""),
+        ("Please die by sigterm.", -15, "SIGTERM", ""),
+        ("Please die with exit 1.", 1, None, "stand-in crashed: out of memory"),
+    ],
+)
+async def test_a_program_that_ends_before_its_result_says_how_it_ended(
+    room: Room,
+    ends: EndedTogether,
+    monkeypatch: pytest.MonkeyPatch,
+    goal: str,
+    returncode: int,
+    named: str | None,
+    stderr_says: str,
+) -> None:
+    """Item 1580: a program killed from outside ended its run with "Claude Code ended before it answered", its stderr
+    empty and nothing else. The error's context and a log line now carry its exit code and signal, the end of its error
+    stream, that it had said what the model has, the steps it took and the seconds since its last line. (Continuing the
+    run is off here, item 1581's own tests have it on: the run ends with the cut, as it did.)"""
+    await _continuing(room, monkeypatch, 0)
+    with capture_logs() as logs:
+        ended: RunRecord = await _run(room, goal)
+    assert ended.status == "failed" and ended.result == "Claude Code ended before it answered", ended.result
+    context: dict[str, object] = await _failed_context(room, ended)
+    assert context["returncode"] == returncode and context["signal"] == named and context["exited"] is True
+    assert context["inited"] is True and context["steps"] == 1
+    assert re.fullmatch(r"ses-cut-[0-9a-f]{8}", str(context["claude_session"])), context["claude_session"]
+    assert context["continued"] == 0 and "continue_cut = 0" in str(context["not_continued"])
+    assert isinstance(context["stderr"], str) and stderr_says in context["stderr"]
+    # The key the program printed in its crash is masked, as everything Dot stores or logs is.
+    assert "sk-ant" not in context["stderr"] and ("***" in context["stderr"]) is (returncode == 1)
+    assert isinstance(context["silent_s"], float) and 0 <= context["silent_s"] < 30
+    assert isinstance(context["cut_at"], str) and len(context["cut_at"]) == len("10:44:04")
+    cuts: list[dict[str, object]] = [line for line in logs if line["event"] == "claude_code_program_cut"]
+    assert len(cuts) == 1 and cuts[0]["run_id"] == ended.id and cuts[0]["returncode"] == returncode
+    assert cuts[0]["signal"] == named and cuts[0]["steps"] == 1 and "sk-ant" not in str(cuts[0]["stderr"])
+    # The run's own line says the same: its context is in the log (item 1580), where the cause was missing before.
+    failed: list[dict[str, object]] = [line for line in logs if line["event"] == "run failed"]
+    assert failed and failed[0]["context"]["returncode"] == returncode  # type: ignore[index]  # a dict by the lines above
+
+
+async def test_programs_cut_together_are_said_in_one_line(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1580: five programs ended within 20 ms of each other and nothing said so. Two runs whose programs are cut
+    in the same window are one line, ``claude_code_programs_ended_together``, with their run ids and signals."""
+    await _continuing(room, monkeypatch, 0)
+    with capture_logs() as logs:
+        first, second = await asyncio.gather(_run(room, "Please die by sigkill."), _run(room, "Please die by sigterm."))
+        assert not [line for line in logs if line["event"] == "claude_code_programs_ended_together"]
+        ends.flush()
+    (line,) = [line for line in logs if line["event"] == "claude_code_programs_ended_together"]
+    assert sorted(line["run_ids"]) == sorted([first.id, second.id])  # type: ignore[type-var]  # a list of ids
+    assert sorted(line["signals"], key=str) == ["SIGKILL", "SIGTERM"]  # type: ignore[type-var]  # a list of names
+    assert line["programs"] == 2
+
+
+async def test_a_stop_that_ends_the_program_is_no_cut(room: Room, ends: EndedTogether) -> None:
+    """Item 1580: Dot's own ends are marked and never counted: the program a Stop ends is no cut, and is no part of a
+    mass cut however many runs are stopped together."""
+    with capture_logs() as logs:
+        started: RunRecord = await room.manager.start(
+            "Run the slow command.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+        )
+        deadline: float = time.monotonic() + 30
+        while not await room.runtime.store.events_of_kind(started.id, "tool_call", 5):
+            assert time.monotonic() < deadline, "the program never called its command"
+            await asyncio.sleep(0.1)
+        room.manager.cancel(started.id)
+        async with asyncio.timeout(30):
+            ended: RunRecord = await room.manager.wait(started.id)
+        ends.flush()
+    assert ended.status == "cancelled", ended.result
+    assert not [
+        line for line in logs if line["event"] in ("claude_code_program_cut", "claude_code_programs_ended_together")
+    ]
+
+
+async def _continuing(room: Room, monkeypatch: pytest.MonkeyPatch, count: int, wait_s: float = 0.05) -> None:
+    """How often a cut run is continued (``[providers.claude_code] continue_cut``) for this test, and how long Dot waits
+    before it starts the program again (2 s and 10 s in the owner's Dot)."""
+    provider = await room.runtime.router.provider("claude_code")
+    monkeypatch.setattr(provider, "_config", provider.config.model_copy(update={"continue_cut": count}))
+    monkeypatch.setattr(cut_module, "CONTINUE_AFTER_S", (wait_s, wait_s))
+
+
+def _starts(room: Room) -> list[dict[str, object]]:
+    """The programs the stand-in started, in order, each with the session it resumed (``None`` for a new one) and the
+    one it is in."""
+    path: Path = room.record / "starts.log"
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def _forget_starts(room: Room) -> None:
+    for name in ("starts.log", "continued.json", "fresh-died"):
+        (room.record / name).unlink(missing_ok=True)
+
+
+async def _start(room: Room, goal: str, approvals: str = "yolo") -> RunRecord:
+    return await room.manager.start(
+        goal,
+        "task",
+        MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        approvals,
+        False,
+        (),  # type: ignore[arg-type]
+    )
+
+
+async def _finished(room: Room, started: RunRecord, seconds: float = 60) -> RunRecord:
+    async with asyncio.timeout(seconds):
+        return await room.manager.wait(started.id)
+
+
+async def _continued_events(room: Room, run_id: str) -> list[EventRecord]:
+    return await room.runtime.store.events_of_kind(run_id, "claude_code_continued", 10)
+
+
+@pytest.mark.parametrize(
+    ("how", "returncode", "named"),
+    [("sigkill", -9, "SIGKILL"), ("sigterm", -15, "SIGTERM"), ("exit 1", 1, None)],
+)
+async def test_a_cut_run_is_continued_in_place_and_ends_done(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch, how: str, returncode: int, named: str | None
+) -> None:
+    """Items 1581 and 1582: the program of a run is killed (or crashes) after a step, with nothing of Dot's doing. The
+    run is not lost: Dot starts the program again with ``--resume`` of its session in the SAME run (one run record, its
+    id, its events go on), tells it it was cut off and to look at the real state, and the run ends done."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    verb: str = "die with exit 1" if how == "exit 1" else f"die by {how}"
+    with capture_logs() as logs:
+        started: RunRecord = await _start(room, f"Please {verb} once.")
+        ended: RunRecord = await _finished(room, started)
+    assert ended.id == started.id and ended.status == "done" and ended.result == "Continued.", ended.result
+    # The steps of both programs are the run's, and the chat has the one run.
+    assert ended.steps == 2
+    assert [run.id for run in await room.runtime.store.list_runs(10, ended.thread_id)] == [ended.id]
+    starts: list[dict[str, object]] = _starts(room)
+    assert [one["resume"] is not None for one in starts] == [False, True], starts
+    assert starts[1]["resume"] == starts[0]["session"] == starts[1]["session"]
+    (event,) = await _continued_events(room, ended.id)
+    data: JsonObject = event.data
+    assert (data["attempt"], data["of"], data["fresh_session"]) == (1, 2, False)
+    assert data["returncode"] == returncode and data["signal"] == named and data["steps"] == 1
+    assert data["inited"] is True and data["claude_session"] == starts[0]["session"]
+    assert isinstance(data["cut_at"], str) and re.fullmatch(r"\d\d:\d\d:\d\d", data["cut_at"])
+    steps: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "assistant", 10)
+    assert [step.data["step"] for step in steps] == [1, 2]
+    for kind in ("run_started", "run_finished"):
+        assert len(await room.runtime.store.events_of_kind(ended.id, kind, 10)) == 1, kind
+    # The program that went on was told what happened, in the words of the brief.
+    went_on: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    note: str = str(went_on["messages"][-1])  # type: ignore[index]  # a list of what it read
+    assert f"was cut off at {data['cut_at']} by something outside this run" in note
+    assert "may be lost" in note and "look at the real state" in note and "go on from where your plan says" in note
+    assert "--resume" in went_on["args"]  # type: ignore[operator]  # the arguments it was started with
+    # The run's log says it too, and the chat keeps the session at the clean end.
+    assert [line["attempt"] for line in logs if line["event"] == "claude_code_run_continued"] == [1]
+    kept: dict[str, object] = await asyncio.to_thread(_json, chat_path(ended.thread_id))
+    assert kept["session_id"] == starts[0]["session"]
+
+
+async def test_a_second_cut_ends_the_run_when_one_continuation_is_allowed(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Items 1581 and 1582: ``continue_cut = 1``: the program that went on is cut too, and the run fails, with both
+    exits in its context and what was done about the first."""
+    await _continuing(room, monkeypatch, 1)
+    _forget_starts(room)
+    ended: RunRecord = await _finished(room, await _start(room, "Please die by sigkill."))
+    assert ended.status == "failed" and ended.result == "Claude Code ended before it answered", ended.result
+    assert len(_starts(room)) == 2
+    context: dict[str, object] = await _failed_context(room, ended)
+    assert context["continued"] == 1 and "as often as allowed" in str(context["not_continued"])
+    cuts: object = context["cuts"]
+    assert isinstance(cuts, list) and [cut["returncode"] for cut in cuts] == [-9, -9]  # type: ignore[index]
+    assert len(await _continued_events(room, ended.id)) == 1
+    assert not await asyncio.to_thread(chat_path(ended.thread_id).exists)
+
+
+async def test_a_run_is_continued_twice_and_the_third_cut_ends_it(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: ``continue_cut`` is 2 by default, after 2 s and after 10 s: the third cut ends the run, with the exits
+    of all three in its context."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    ended: RunRecord = await _finished(room, await _start(room, "Please die by sigterm."))
+    assert ended.status == "failed", ended.result
+    assert len(_starts(room)) == 3
+    context: dict[str, object] = await _failed_context(room, ended)
+    assert context["continued"] == 2 and isinstance(context["cuts"], list) and len(context["cuts"]) == 3
+    assert [event.data["attempt"] for event in await _continued_events(room, ended.id)] == [1, 2]
+
+
+async def test_a_stop_while_dot_waits_to_start_the_program_again_ends_the_run_stopped(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Items 1581 and 1582: the owner's Stop is never continued, and it cuts the wait short: the run ends cancelled at
+    once and the program is not started again."""
+    await _continuing(room, monkeypatch, 2, wait_s=30.0)
+    _forget_starts(room)
+    with capture_logs() as logs:
+        started: RunRecord = await _start(room, "Please die by sigkill once.")
+        deadline: float = time.monotonic() + 30
+        while not any(line["event"] == "claude_code_program_cut" for line in logs):
+            assert time.monotonic() < deadline, "the program was never cut"
+            await asyncio.sleep(0.05)
+        await asyncio.sleep(0.3)
+        room.manager.cancel(started.id)
+        ended: RunRecord = await _finished(room, started, 10)
+    assert ended.status == "cancelled", ended.result
+    assert len(_starts(room)) == 1 and not await _continued_events(room, ended.id)
+    assert not await asyncio.to_thread(chat_path(ended.thread_id).exists)
+
+
+async def test_a_stop_that_comes_with_the_death_wins_and_nothing_is_continued(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Items 1581 and 1582: a Stop racing the death. The run's stop is set as the program's exit is read (what the Stop
+    sets that the task's own cancellation does not reach: the event the gate and the pumps read): the run ends stopped,
+    not failed and not continued."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    real = run_module.exit_seen
+
+    async def stopped_with_the_death(process: asyncio.subprocess.Process, wait_s: float = 2.0) -> int | None:
+        for handle in room.manager._handles.values():
+            handle.cancel.set()
+        return await real(process, wait_s)
+
+    monkeypatch.setattr(run_module, "exit_seen", stopped_with_the_death)
+    ended: RunRecord = await _finished(room, await _start(room, "Please die by sigkill once."))
+    assert ended.status == "cancelled", ended.result
+    assert len(_starts(room)) == 1 and not await _continued_events(room, ended.id)
+
+
+async def test_a_plan_limit_is_not_continued(room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Items 1581 and 1582: the plan's window used up is an error of its own that ends the run saying when it resets: no
+    second program is started, the same window would refuse it."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    ended: RunRecord = await _finished(room, await _start(room, "Hit the limit."))
+    assert ended.status == "failed" and "usage limit is reached" in ended.result
+    assert len(_starts(room)) == 1 and not await _continued_events(room, ended.id)
+
+
+@contextlib.asynccontextmanager
+async def _outward_shell(room: Room, free: bool, slow: bool) -> AsyncIterator[None]:
+    """Dot's ``shell`` as an action the policy keeps for the owner (a message sent for them), slow or quick; with the
+    owner's free mode on or off, which decides whether the gate asks about it."""
+    registry = room.runtime.registry
+    shell: RegisteredTool = registry.tools["shell"]
+
+    async def sending(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
+        prepared: PreparedCall = await shell.prepare(arguments, ctx)
+
+        async def sent(_: ToolContext) -> ToolResult:
+            await asyncio.sleep(30 if slow else 0)
+            return ToolResult(text="sent", images=(), is_error=False)
+
+        mail = prepared.action.model_copy(update={"kind": "message", "flags": ("message_send", "external_send")})
+        return dataclasses.replace(prepared, action=mail, run=sent)
+
+    registry.tools["shell"] = dataclasses.replace(shell, prepare=sending)
+    room.runtime.approvals.switch_free(free)
+    try:
+        yield
+    finally:
+        room.runtime.approvals.switch_free(False)
+        registry.tools["shell"] = shell
+
+
+@pytest.mark.parametrize("free", [False, True])
+async def test_a_call_that_may_have_sent_something_for_the_owner_is_not_continued(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch, free: bool
+) -> None:
+    """Items 1581 and 1582: the program is cut while a call of an action the policy keeps for the owner (a message or
+    mail sent for them, a payment, a public post) is in flight: nobody knows whether it was sent, and a program told to
+    go on could send it twice. The run ends failed with the full context, the call named; the owner's free mode, which
+    asks nothing, changes nothing here."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    async with _outward_shell(room, free=free, slow=True):
+        ended: RunRecord = await _finished(room, await _start(room, "Please die while sending."))
+    assert ended.status == "failed" and ended.result == "Claude Code ended before it answered", ended.result
+    assert len(_starts(room)) == 1 and not await _continued_events(room, ended.id)
+    context: dict[str, object] = await _failed_context(room, ended)
+    assert context["continued"] == 0 and context["signal"] == "SIGKILL"
+    assert "outward action was in flight (shell)" in str(context["not_continued"])
+
+
+async def test_a_call_whose_result_the_model_read_does_not_stop_the_continuation(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: only what began since the model's last step counts as in flight. A message was sent, the model took
+    the result in (a step began after it) and the program was cut later: the run goes on, which stays the model's to do
+    with the real state in front of it."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    async with _outward_shell(room, free=True, slow=False):
+        ended: RunRecord = await _finished(room, await _start(room, "Please die after sending."))
+    assert ended.status == "done" and ended.result == "Continued.", ended.result
+    assert len(_starts(room)) == 2 and len(await _continued_events(room, ended.id)) == 1
+
+
+async def test_the_words_of_the_step_the_cut_interrupted_are_dropped_from_the_page(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: the program was cut in the middle of a step, after half a sentence the page already showed. The step
+    never closed and the program that goes on begins its own as step 1 again, so Dot sends the page a ``reset`` for the
+    interrupted one, as it does for a step it sends back: the half sentence is not glued to the new words."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    async with room.runtime.bus.subscribe_kinds(frozenset({"delta"})) as deltas:
+        ended: RunRecord = await _finished(room, await _start(room, "Please die in a step."))
+    shown: list[tuple[object, object]] = []
+    while not deltas.queue.empty():
+        event: EventRecord = deltas.queue.get_nowait()
+        if event.run_id == ended.id:
+            shown.append((event.data["kind"], event.data["step"]))
+    assert ended.status == "done" and ended.steps == 1, (ended.status, ended.result)
+    assert ("text", 1) in shown and ("reset", 1) in shown, shown
+    assert shown.index(("reset", 1)) > shown.index(("text", 1))
+    assert len(_starts(room)) == 2
+
+
+async def test_a_program_cut_after_the_models_finish_ends_the_run_as_the_finish_said(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: the model called ``finish`` and the program was cut before it said more: the work is done and its
+    answer is Dot's, so the run ends as the finish said (done, with that answer), not failed with "ended before it
+    answered", and it is not continued. The chat does not keep a session that never ended clean."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    ended: RunRecord = await _finished(room, await _start(room, "Please die after finishing."))
+    assert ended.status == "done" and ended.result == "Everything is checked.", ended.result
+    assert len(_starts(room)) == 1 and not await _continued_events(room, ended.id)
+    assert not await asyncio.to_thread(chat_path(ended.thread_id).exists)
+
+
+async def test_a_helper_that_is_cut_gives_its_parent_the_final_result_of_the_continued_run(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Items 1581 and 1582: the run is continued in place, so who waits for it is not told it failed: a delegated
+    helper whose program is cut once gives its parent the end of the continued run, the same run record."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    parent: RunRecord = await _start(room, "Please talk with me.")
+    try:
+        async with asyncio.timeout(60):
+            outcome = await room.manager.delegate(parent.id, "Please die by sigkill once.", "task", None, None)
+        helper: RunRecord = outcome.run
+        assert helper.status == "done" and helper.result == "Continued." and helper.parent_run_id == parent.id
+        assert helper.steps == 2 and len(await _continued_events(room, helper.id)) == 1
+        assert [one["resume"] is not None for one in _starts(room)][1:] == [False, True]
+    finally:
+        room.manager.cancel(parent.id)
+        await _finished(room, parent, 30)
+
+
+async def test_a_resume_the_api_refuses_is_met_with_a_new_session_that_is_told_what_was_done(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: if the resume of the cut session fails with an API error (the kind that says the session cannot be
+    taken up again), the next program is a NEW session, with the run's goal, what the chat said and a note of what the
+    cut one had done, from Dot's record of the run. (Claude Code 2.1.331 did not refuse a resume of a session cut in a
+    call: measured. This is for another version, or a session file that is gone.)"""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    ended: RunRecord = await _finished(room, await _start(room, "Please die by sigkill and refuse the resume."))
+    assert ended.status == "done" and ended.result == "Continued in a new session.", ended.result
+    starts: list[dict[str, object]] = _starts(room)
+    assert [one["resume"] is not None for one in starts] == [False, True, False]
+    events: list[EventRecord] = await _continued_events(room, ended.id)
+    assert [(event.data["attempt"], event.data["fresh_session"]) for event in events] == [(1, False), (2, True)]
+    # What the refused program printed before it failed is masked, in the event as everywhere (the pre-push review).
+    refused: object = events[1].data["stderr"]
+    assert isinstance(refused, str) and "resume failed" in refused and "sk-ant" not in refused
+    # The refused program was running when it said so and Dot ended it: no exit of its own, and what it said instead.
+    assert events[1].data["returncode"] is None and events[1].data["exited"] is False
+    assert "API Error: 400" in str(events[1].data["said"]) and "sk-ant" not in str(events[1].data["said"])
+    fresh: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    first: str = str(fresh["messages"][0])  # type: ignore[index]  # what the new session read
+    assert "refuse the resume" in first and "What the cut session had done" in first
+    assert "Its first words" in first and "Looking into it." in first and "could not be taken up again" in first
+    assert "--resume" not in fresh["args"]  # type: ignore[operator]  # a new session
+    # The new session ended clean, so the chat keeps it.
+    kept: dict[str, object] = await asyncio.to_thread(_json, chat_path(ended.thread_id))
+    assert kept["session_id"] == starts[2]["session"] != starts[0]["session"]
+
+
+async def test_a_new_session_cut_before_it_took_in_its_brief_is_given_the_brief_again(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581 (the pre-push review): the brief of a new session is sent once; a program that began (it said what the
+    model has) and was cut before it took the brief in has heard nothing of the run, so the next program is a new
+    session again, with the brief, not a resume of a session that has no goal."""
+    await _continuing(room, monkeypatch, 3)
+    _forget_starts(room)
+    goal: str = "Please die by sigkill and refuse the resume and the new session dies first."
+    ended: RunRecord = await _finished(room, await _start(room, goal))
+    assert ended.status == "done" and ended.result == "Continued in a new session.", ended.result
+    assert [one["resume"] is not None for one in _starts(room)] == [False, True, False, False]
+    events: list[EventRecord] = await _continued_events(room, ended.id)
+    assert [(event.data["attempt"], event.data["fresh_session"]) for event in events] == [
+        (1, False),
+        (2, True),
+        (3, True),
+    ]
+    last: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    brief: str = str(last["messages"][0])  # type: ignore[index]  # what the last program read
+    assert "the new session dies first" in brief and "What the cut session had done" in brief
+    assert "--resume" not in last["args"]  # type: ignore[operator]  # a new session
+
+
+async def test_a_message_that_comes_while_dot_waits_is_not_lost_when_the_next_program_is_cut_too(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581 (the pre-push review): the owner writes while Dot waits to start the program again. The new program
+    takes in the note about the cut, not that message, and is cut again before it reads it: the one after it must be
+    sent the message, which a note counted as taken in place of it once lost."""
+    await _continuing(room, monkeypatch, 2, wait_s=1.0)
+    _forget_starts(room)
+    with capture_logs() as logs:
+        started: RunRecord = await _start(room, "Please die by sigkill twice.")
+        deadline: float = time.monotonic() + 30
+        while not any(line["event"] == "claude_code_program_cut" for line in logs):
+            assert time.monotonic() < deadline, "the program was never cut"
+            await asyncio.sleep(0.05)
+        room.manager.steer(started.id, "Also look in the second folder.", ())
+        ended: RunRecord = await _finished(room, started)
+    assert ended.status == "done" and ended.result == "Continued.", ended.result
+    assert len(_starts(room)) == 3 and len(await _continued_events(room, ended.id)) == 2
+    last: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    messages: list[str] = [str(one) for one in last["messages"]]  # type: ignore[attr-defined]  # a list of text
+    assert len(messages) == 2 and "Also look in the second folder." in messages[0], messages
+    assert "was cut off at" in messages[1]
+
+
+async def test_what_the_owner_sent_that_the_cut_program_never_took_in_is_sent_to_the_next(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: a message the owner sent while the program worked, which it had not taken in when it was cut, would be
+    lost with it. The program that goes on is sent it first, as sent, and then the note about the cut."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    started: RunRecord = await _start(room, "Please die with a message waiting.")
+    deadline: float = time.monotonic() + 30
+    while not await room.runtime.store.events_of_kind(started.id, "tool_call", 5):
+        assert time.monotonic() < deadline, "the program never called its command"
+        await asyncio.sleep(0.05)
+    room.manager.steer(started.id, "Also look in the second folder.", ())
+    ended: RunRecord = await _finished(room, started)
+    assert ended.status == "done" and ended.result == "Continued.", ended.result
+    went_on: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    messages: list[str] = [str(one) for one in went_on["messages"]]  # type: ignore[attr-defined]  # a list of text
+    assert len(messages) == 2 and "Also look in the second folder." in messages[0]
+    assert "was cut off at" in messages[1]

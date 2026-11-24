@@ -18,6 +18,28 @@ first message on its input, and answers as the message says:
   a ``result`` (item 1076);
 - ``slow command``: an init line, then a call of ``shell`` that sleeps before it writes ``late.txt`` in the workspace,
   for a Stop to cut short (item 1076);
+- ``die by sigkill``, ``die by sigterm``, ``die with exit 1``: an init line, one step of the model, then the program
+  ends before any result, as the words say: killed by SIGKILL or SIGTERM (it signals itself), or crashed with a line on
+  its error stream and exit code 1 (item 1580). Each program of such a goal has a session of its own (``ses-cut-...``)
+  and every start is a line of ``starts.log``. A program started with ``--resume`` of such a session goes on after the
+  cut (item 1581): it reads the messages that come (the note about the cut ends them), writes them to
+  ``continued.json`` and finishes with ``Continued.``, but dies as the first did when the goal says ``die ... twice``
+  (the first two programs die, the note about the cut is taken in late so that what the owner sent after it is sent
+  first) or has no number (every program dies), or answers an API error of the kind that says the session cannot be
+  taken up again when the goal says ``refuse the resume`` (the new session that follows, which has no ``--resume`` and
+  is told so, finishes with ``Continued in a new session.``; with ``the new session dies first`` the first of them is
+  killed before it takes its message in);
+- ``die while sending``: a step that calls ``shell`` through the door, and a SIGKILL half a second into the call, which
+  the test makes slow and an action the policy keeps for the owner (item 1581: a call of that kind in flight is not
+  continued);
+- ``die in a step``: a step of the model that has said half a sentence, then a SIGKILL, so that the step is never closed
+  (item 1581: the page drops the half sentence);
+- ``die after finishing``: a call of ``finish`` that succeeded, then a SIGKILL before the program says anything more
+  (item 1581: the run ends as the finish said, it is not a cut to go on from);
+- ``die after sending``: the same call, which returns, then a step that says it went, then a SIGKILL: the model had
+  read the result of the call, so nothing of it is in flight (item 1581: that is continued);
+- ``die with a message waiting``: a call of ``shell`` that sleeps 2 s, then a SIGKILL before the program reads its
+  input again, so that a message sent meanwhile is never taken in (item 1581: the next program is sent it again);
 - anything else: an init line naming the door's tools, a step that calls ``write_file`` twice through the door's MCP
   endpoint with the config file it was given (once into the workspace's ``.claude`` folder, once into ``notes.txt``),
   a step that answers with what the calls said, and a ``result``; then it waits for its input to close.
@@ -27,8 +49,12 @@ It calls no model and reaches nothing but Dot's bridge on this Mac."""
 import asyncio
 import json
 import os
+import secrets
+import signal
 import stat
 import sys
+import threading
+import time
 from pathlib import Path
 
 import httpx2
@@ -37,6 +63,8 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.types import CallToolResult, ListToolsResult, TextContent
 
 SESSION: str = "ses-standin-1"
+# The folder the test reads what the program was started with from (the first argument).
+RECORD: Path = Path(".")
 
 
 def _say(item: dict[str, object]) -> None:
@@ -91,7 +119,81 @@ def _init(door: str, tools: list[str]) -> None:
     )
 
 
-async def _work(server: dict[str, object], door: str, said: str) -> None:
+def _how_of(said: str) -> str:
+    """How a program of a ``die`` goal ends: ``sigkill``, ``sigterm`` or ``exit``."""
+    if "die by sigkill" in said:
+        return "sigkill"
+    return "sigterm" if "die by sigterm" in said else "exit"
+
+
+def _die(how: str) -> None:
+    """End this program before any result (item 1580): SIGKILL or SIGTERM sent to itself, or a crash that says why on
+    the error stream and exits 1."""
+    if how == "sigkill":
+        os.kill(os.getpid(), signal.SIGKILL)
+    if how == "sigterm":
+        os.kill(os.getpid(), signal.SIGTERM)
+    sys.stderr.write("stand-in crashed: out of memory (key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789)\n")
+    sys.stderr.flush()
+    os._exit(1)
+
+
+def _read_message() -> str | None:
+    """The next message on the input, taken in as the real program takes it (it says so), as JSON text."""
+    line: str = sys.stdin.readline()
+    if not line:
+        return None
+    message: dict[str, object] = json.loads(line)["message"]  # type: ignore[assignment]  # Dot's user line
+    if "--replay-user-messages" in sys.argv:
+        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
+    return json.dumps(message["content"])
+
+
+def _starts_of(session: str) -> int:
+    """How many programs of the session were started, this one included."""
+    lines: list[str] = (RECORD / "starts.log").read_text(encoding="utf-8").splitlines()
+    return sum(1 for line in lines if json.loads(line)["session"] == session)
+
+
+def _go_on(plan: dict[str, object], said: str, resumed: bool) -> None:
+    """A program that goes on after a cut (item 1581), once its init line is said: it reads what is sent up to the note
+    about the cut, then dies again, refuses the resume or finishes, as the plan of its goal says."""
+    seen: list[str] = [said]
+    while "was cut off at" not in seen[-1]:
+        more: str | None = _read_message()
+        if more is None:
+            break
+        seen.append(more)
+    (RECORD / "continued.json").write_text(
+        json.dumps({"args": sys.argv[2:], "messages": seen, "session": SESSION}), encoding="utf-8"
+    )
+    if plan["refuse"] and resumed:
+        sys.stderr.write("resume failed (key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789)\n")
+        sys.stderr.flush()
+        _say(
+            {
+                "type": "result",
+                "subtype": "error_during_execution",
+                "is_error": True,
+                "result": (
+                    "API Error: 400 invalid_request_error: `tool_use` ids were found without `tool_result` "
+                    "(key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789)"
+                ),
+                "session_id": SESSION,
+            }
+        )
+        return
+    if _starts_of(SESSION) <= int(str(plan["times"])):
+        _step([("text", "Trying again.")], "end_turn")
+        _die(str(plan["how"]))
+    _step([("text", "Picking up where it was cut.")], "end_turn")
+    words: str = "Continued." if resumed else "Continued in a new session."
+    _say({"type": "result", "subtype": "success", "is_error": False, "result": words, "session_id": SESSION})
+
+
+async def _work(
+    server: dict[str, object], door: str, said: str, plan: dict[str, object] | None, resumed: str | None
+) -> None:
     """Connect to the door as Claude Code would, say what the model has, then work as ``said`` asks."""
     headers: dict[str, str] = server["headers"]  # type: ignore[assignment]  # the config Dot wrote
     async with (
@@ -100,6 +202,45 @@ async def _work(server: dict[str, object], door: str, said: str) -> None:
     ):
         listed: ListToolsResult = await client.list_tools()
         _init(door, [f"mcp__{door}__{tool.name}" for tool in listed.tools])
+        if plan is not None and plan.get("silent_first"):
+            os.kill(os.getpid(), signal.SIGKILL)
+        if plan is not None and plan["after_cut"]:
+            _go_on(plan, said, resumed is not None)
+            return
+        if "die in a step" in said:
+            _event(
+                {"type": "message_start", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 20}}}
+            )
+            _event({"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}})
+            _event(
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": "Half a sentence of"},
+                }
+            )
+            os.kill(os.getpid(), signal.SIGKILL)
+        if "die after finishing" in said:
+            _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+            await client.call_tool("finish", {"answer": "Everything is checked.", "success": True})
+            os.kill(os.getpid(), signal.SIGKILL)
+        if "die after sending" in said:
+            _step([("text", "Sending it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
+            await client.call_tool("shell", {"command": "echo sent"})
+            _step([("text", "It went.")], "end_turn")
+            os.kill(os.getpid(), signal.SIGKILL)
+        if "die while sending" in said:
+            _step([("text", "Sending it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
+            threading.Timer(0.6, os.kill, (os.getpid(), signal.SIGKILL)).start()
+            await client.call_tool("shell", {"command": "echo sent"})
+            return
+        if "die with a message waiting" in said:
+            _step([("text", "Working."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
+            await client.call_tool("shell", {"command": "sleep 2"})
+            os.kill(os.getpid(), signal.SIGKILL)
+        if plan is not None:
+            _step([("text", "Looking into it.")], "end_turn")
+            _die(str(plan["how"]))
         if "limit" in said:
             refused: dict[str, object] = {"status": "rejected", "rateLimitType": "five_hour", "resetsAt": 1_900_000_000}
             _say({"type": "rate_limit_event", "rate_limit_info": refused})
@@ -193,8 +334,48 @@ def _list_models(record: Path) -> None:
     sys.stdout.flush()
 
 
+def _times_of(said: str) -> int:
+    """How many programs of a session die: the first, and after it as many as ``twice`` says; a goal of ``die by ...``
+    or ``die with exit 1`` with no number dies every time; the other modes cut the first program once."""
+    if " twice" in said:
+        return 2
+    every_time: bool = ("die by" in said or "die with exit" in said) and " once" not in said
+    return 10**6 if every_time and "refuse the resume" not in said else 1
+
+
+def _plan_of(record: Path, said: str, resumed: str | None) -> dict[str, object] | None:
+    """What a program of a ``die`` goal does, and the session it is in (item 1581): the first program of the goal makes
+    a session of its own and writes its plan beside it; the program that goes on after a cut, started with ``--resume``
+    of that session (or a new one, told that the resume was refused), reads it. ``None`` for a goal that has none."""
+    global SESSION
+    if resumed is not None and (record / f"plan-{resumed}.json").exists():
+        SESSION = resumed
+        return {**json.loads((record / f"plan-{resumed}.json").read_text(encoding="utf-8")), "after_cut": True}
+    if "could not be taken up again" in said:
+        SESSION = f"ses-cut-{secrets.token_hex(4)}"
+        # ``the new session dies first``: the first new session is killed before it takes its message in.
+        silent: bool = "the new session dies first" in said and not (record / "fresh-died").exists()
+        if silent:
+            (record / "fresh-died").write_text("", encoding="utf-8")
+        return {"times": 0, "refuse": False, "how": "sigkill", "after_cut": True, "silent_first": silent}
+    if "die by" not in said and "die with" not in said and "die after" not in said and "die in a step" not in said:
+        return None
+    SESSION = f"ses-cut-{secrets.token_hex(4)}"
+    plan: dict[str, object] = {
+        "times": _times_of(said),
+        "refuse": "refuse the resume" in said,
+        "how": _how_of(said),
+        # ``twice``: the note about the cut is taken in late, so that what the owner sent after it is sent first.
+        "slow_taken": " twice" in said,
+    }
+    (record / f"plan-{SESSION}.json").write_text(json.dumps(plan), encoding="utf-8")
+    return {**plan, "after_cut": False}
+
+
 def main() -> None:
+    global RECORD
     record: Path = Path(sys.argv[1])
+    RECORD = record
     args: list[str] = sys.argv[2:]
     if "--mcp-config" not in args:
         _list_models(record)
@@ -220,16 +401,22 @@ def main() -> None:
     )
     first: dict[str, object] = json.loads(sys.stdin.readline())
     message: dict[str, object] = first["message"]  # type: ignore[assignment]  # Dot's user line
-    # As the real program does with --replay-user-messages: it says it took the message in.
-    if "--replay-user-messages" in sys.argv:
-        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
     said: str = json.dumps(message["content"])
+    resumed: str | None = _flag(args, "--resume") if "--resume" in args else None
+    plan: dict[str, object] | None = _plan_of(record, said, resumed)
+    # As the real program does with --replay-user-messages: it says it took the message in.
+    if "--replay-user-messages" in sys.argv and not (plan is not None and plan.get("silent_first")):
+        if plan is not None and plan.get("slow_taken") and plan.get("after_cut"):
+            time.sleep(0.4)
+        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
+    with (record / "starts.log").open("a", encoding="utf-8") as starts:
+        starts.write(json.dumps({"resume": resumed, "session": SESSION}) + "\n")
     (record / "first.json").write_text(json.dumps(message["content"]), encoding="utf-8")
     if "extra tools" in said:
         _init(door, ["Bash", f"mcp__{door}__notify"])
     else:
         server: dict[str, object] = json.loads(config_file.read_text(encoding="utf-8"))["mcpServers"][door]
-        asyncio.run(_work(server, door, said))
+        asyncio.run(_work(server, door, said, plan, resumed))
     # Dot closes the input once each message has its result, or ends the program.
     sys.stdin.read()
 
