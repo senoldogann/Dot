@@ -3,7 +3,7 @@ import UIKit
 
 // MARK: - Tokens
 
-/// The app's look (items 1380 to 1382; made professional by items 1640 to 1647): ONE neutral graphite family from the web app's
+/// The app's look (items 1380 to 1382; made professional by items 1640 to 1644): ONE neutral graphite family from the web app's
 /// Graphite theme, flat surfaces with hairlines, no accent hue, no gradient, no shadow, no coloured tile. Colour is for two
 /// states only: amber for what waits on the owner, a muted red for what failed. The primary action is the ink itself.
 /// Colours come from `DotPalette` (also read by the Live Activity and measured by `DotPaletteTests`); they follow the system's

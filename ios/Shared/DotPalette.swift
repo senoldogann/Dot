@@ -32,7 +32,7 @@ struct DotRGB: Equatable, Sendable {
     var spread: Double { max(red, green, blue) - min(red, green, blue) }
 }
 
-/// The colour tokens of the iPhone app, in its two looks (items 1640 to 1647, the owner's order of 2026-11-24: a professional,
+/// The colour tokens of the iPhone app, in its two looks (items 1640 to 1644, the owner's order of 2026-11-24: a professional,
 /// calm, adult look). ONE neutral graphite family, taken from the web app's Graphite theme (`static/js/appearance/palettes-more.js`):
 /// a ground, a surface one step above it, a raised step; the ink in three tiers; the primary action is the ink itself (a light
 /// pill with a dark label on the dark ground, a dark pill with a light label on the light one). There is no accent hue. Colour
