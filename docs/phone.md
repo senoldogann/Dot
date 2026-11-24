@@ -575,7 +575,9 @@ for a lost link would hold what the owner sends.
   with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
   of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
   one line on a phone 390 px wide and two at 320 px, in the light and the dark look, and the one thing in it that is
-  pressed is 44 px tall. While it says the link is down, a request that got no answer shows no toast over the chat.
+  pressed is 44 px tall. While it says the link is down, a request that got no answer shows no toast over the chat. The line is the
+  phone's: a page that is not a phone's touch screen shows none, and keeps its toasts (the Dot it talks to is on the
+  same Mac, where a network that is down takes nothing away).
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 

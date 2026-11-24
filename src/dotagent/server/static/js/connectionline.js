@@ -4,7 +4,7 @@
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
-import { linkFacts, onLinkFacts } from "./linkfacts.js";
+import { linkFacts, onLinkFacts, phoneScreen } from "./linkfacts.js";
 import { lineOf } from "./linewords.js";
 import { breakToldAt, getSnapshot, onChange } from "./state.js";
 
@@ -18,6 +18,11 @@ const ICONS = { offline: "cloud", reconnecting: "refresh", refused: "alert" };
  * @param {{ onPair?: () => void }} [options]
  */
 export function createConnectionLine(options = {}) {
+  if (!phoneScreen()) {
+    // A Mac's page talks to a Dot on the same Mac, which a network that is down does not take away: a line that said
+    // "Offline" there would be wrong, and the bar's pill and the chat's note say what they always said.
+    return { element: el("div", { class: "link-line", hidden: true }), dispose() {} };
+  }
   const words = el("span", { class: "link-line-text" });
   const mark = el("span", { class: "link-line-mark", "aria-hidden": "true" });
   const action = el("button", { class: "btn sm link-line-action", type: "button", hidden: true });

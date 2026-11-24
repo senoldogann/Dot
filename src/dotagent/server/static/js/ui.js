@@ -5,7 +5,7 @@ import { t } from "./i18n.js";
 import { explain, UNREACHABLE } from "./errors.js";
 import { createFormFlow, firstFieldOf, stateOfControls } from "./formflow.js";
 import { icon } from "./icons.js";
-import { linkFacts } from "./linkfacts.js";
+import { linkFacts, phoneScreen } from "./linkfacts.js";
 import { openViewer } from "./viewer.js";
 
 const TOAST_MS = 3500;
@@ -105,7 +105,7 @@ export async function attempt(action) {
     console.error("action failed", error);
     // A request that got no answer while the line under the bar says so (offline, reconnecting) says nothing more: a toast
     // over the chat would cover what the phone keeps for the owner to read (item 1524).
-    if (!(isUnreachable(error) && linkFacts().unreachable)) {
+    if (!(phoneScreen() && isUnreachable(error) && linkFacts().unreachable)) {
       toastError(error);
     }
   }
