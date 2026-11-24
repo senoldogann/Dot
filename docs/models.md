@@ -389,8 +389,9 @@ answer keeps its words, Ollama's too.
   it; a built-in a later version brings ends the run until it is measured). That line must also list the tools the run
   cannot do its job without (item 1400): `finish`, where the run's mode has it, and `notify`, when the run is a
   schedule's firing, which nobody reads as it ends, and its goal asks for a notification ("notify me", "send me a
-  notification", "show a notification", Turkish "bildirim gönder", Finnish "lähetä ilmoitus"; a goal that only mentions
-  one, or says not to send one, asks for none). A run short of one ends failed at once, before its model says a word,
+  notification", "show me a notification", Turkish "bildirim gönder" and "bana bildir", Finnish "lähetä ilmoitus" and
+  "ilmoita minulle"; a goal that only mentions one, names another's ("a notification email to the leads") or says not
+  to send one asks for none). A run short of one ends failed at once, before its model says a word,
   and its result says which tool and why: an agent whose own list of tools leaves `notify` out is named before the
   program starts (add the tool to the agent; no try again follows, and the chat keeps its session), and a bridge's list
   that came up short is a passing failure, which a schedule tries once more. That is all the check is: a run that
