@@ -152,6 +152,34 @@ async def test_a_database_that_never_answers_does_not_hold_up_what_is_sent(login
             await browser.close()
 
 
+async def test_a_mac_page_with_its_network_down_still_sends_to_the_dot_on_the_same_mac(
+    login_env: dict[str, str],
+) -> None:
+    """``navigator.onLine`` is false on a Mac with no network while the Dot on it answers. What the outbox, the copies
+    and the line do on a bad link is the phone's alone: a page with a pointer that hovers sends at once and says nothing
+    of a link."""
+    async with scene(login_env, "work") as working, async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(
+            channel=working.runtime.config.browser.channel, headless=True
+        )
+        try:
+            context: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 800})
+            await context.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await context.add_init_script("Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false })")
+            page: Page = await open_chat(context, working.address, working.token, working.run.id)
+            await expect(page.locator(".composer textarea").first).to_be_visible(timeout=20_000)
+            await page.wait_for_timeout(1500)
+            before: list[str] = await _queued(working)
+            await _send(page, _WORDS)
+            await _until_queued(working, len(before) + 1)
+            assert await _queued(working) == [*before, _WORDS]
+            assert await page.locator(".outbox-row").count() == 0
+            assert await page.locator(".link-line:not([hidden])").count() == 0
+            await context.close()
+        finally:
+            await browser.close()
+
+
 async def test_a_message_whose_answer_was_lost_after_the_daemon_took_it_is_one_message(
     login_env: dict[str, str],
 ) -> None:
@@ -243,7 +271,9 @@ async def test_an_answer_given_with_no_link_to_a_question_answered_meanwhile_say
                 decided = await client.post(f"/approvals/{pending[0].id}/decision", json={"approve": True, "note": ""})
                 assert decided.status_code == 200, decided.text
             await context.set_offline(False)
-            await expect(page.locator(".toast")).to_contain_text("was answered already", timeout=20_000)
+            await expect(page.locator(".toast")).to_contain_text(
+                "was already answered when your answer reached Dot", timeout=20_000
+            )
             await context.close()
         finally:
             await browser.close()

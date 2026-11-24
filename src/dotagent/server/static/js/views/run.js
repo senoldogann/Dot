@@ -724,6 +724,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
           onSettled: (decided) => attempt(() => questionDecided(decided)),
           leftNote: detail.campaign === null ? LEFT_IN_RUN : LEFT_IN_CAMPAIGN,
           onUseHere: null,
+          chat: detail.run.thread_id,
         });
         questionCards.set(question.id, card.node);
         asks.add(card.node);
@@ -1929,6 +1930,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // one was put or taken back, here or on another screen.
   const reactions = createReactions({ threadId: run.thread_id, signal });
   const timeline = createTimeline({
+    // What is answered here with no link is kept under this chat, in order with what else is done in it (item 1523).
+    chat: run.thread_id,
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
     startedAt: run.created_at,

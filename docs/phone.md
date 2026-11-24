@@ -556,10 +556,14 @@ for a lost link would hold what the owner sends.
   a second send with 409 while the first is under way, which is waited out), so an answer that was lost after Dot took the
   message, a page killed while it sent and a link that came back twice send it once; the daemon is not changed. A message
   that waited more than a day is *Not sent*: Dot has forgotten its key, so it is the owner's to **Send again** (under a
-  new key), **Edit** or **Discard**; a message Dot refuses stays with Dot's words and does not hold the next. An answer
-  to a question that had expired when it arrived says so (*That question had expired when your answer reached Dot, so it
-  was not used.*), and so does one answered on the Mac meanwhile; a Stop or a queue change that finds nothing to do is
-  done. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
+  new key), **Edit** or **Discard**; a message Dot refuses stays with Dot's words and does not hold the next (a 409 on a
+  message is waited out only when it says that the message is being sent already, the first sending still under way,
+  `server/sending.py`; any other, a run that has ended or a chat with a run at work, is Dot's refusal). An answer to a
+  question that had expired when it arrived says so (*That question had expired when your answer reached Dot, so it was
+  not used.*), and so does one answered already, on the Mac, on another screen or by its own first send whose reply was
+  lost; a Stop or a queue change that finds nothing to do is done, and an answer, a Stop or a change that Dot refuses is
+  told and let go, since no row holds it. An answer made with no link is kept under the chat it was made in (its thread,
+  not its run), so that it goes in order with what else was done there. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
   could not reach Dot and the words stay in the box.
 - **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
   last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Reconnecting…*
