@@ -64,7 +64,7 @@ _SIGNALS: dict[int, str] = {
 _EXTENSIONS: dict[str, str] = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 
 DESCRIPTION: str = (
-    "Run Python 3.13 in a sandbox: no network, no programs, no files but its scratch folder (its working folder, kept "
+    "Run Python 3 in a sandbox: no network, no programs, no files but its scratch folder (its working folder, kept "
     "between code_runs). Use it for many tool calls, a lot of data, a loop or a poll: call the tools from the code, "
     "filter and count in Python, and print only what you need (a count and at most 5 rows, never the raw dump): only "
     "what the code prints reaches you, with the number of tool calls and the time.\n"
@@ -82,7 +82,7 @@ class CodeRunArgs(ToolArgs):
     code: str = Field(
         min_length=1,
         max_length=MAX_CODE_CHARS,
-        description="The Python 3.13 source. Everything it prints (stdout and stderr) is what you read.",
+        description="The Python source. Everything it prints (stdout and stderr) is what you read.",
     )
     title: str = Field(min_length=1, max_length=TITLE_CHARS, description="One line saying what the code is for.")
     timeout_s: int | None = Field(
