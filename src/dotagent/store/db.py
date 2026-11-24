@@ -4516,6 +4516,16 @@ class Store:
         )
         return 0 if row is None else int(row["n"])
 
+    async def tool_results_without_text(self, run_id: str, after_id: int, limit: int) -> list[EventRecord]:
+        """The newest ``limit`` ``tool_result`` events of a run with an id after ``after_id``, oldest first, each
+        without its text (item 1745): what a run's account reads of its calls, not what they returned."""
+        rows = await self._all(
+            "SELECT * FROM (SELECT id, run_id, ts, kind, json_remove(data, '$.text') AS data FROM events"
+            " WHERE run_id = ? AND kind = 'tool_result' AND id > ? ORDER BY id DESC LIMIT ?) ORDER BY id",
+            (run_id, after_id, limit),
+        )
+        return [_event(row) for row in rows]
+
     async def events_of_kinds(self, run_id: str, kinds: Sequence[str], limit: int) -> list[EventRecord]:
         """The newest ``limit`` events of a run that are of any of ``kinds``, oldest first."""
         marks: str = ",".join("?" * len(kinds))
