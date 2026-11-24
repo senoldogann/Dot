@@ -967,7 +967,7 @@ async def test_a_plugin_none_of_whose_skills_loads_is_unusable_and_recorded_once
     bad: bytes = _archive(
         "partner/skills",
         sha,
-        {"plugins/twilio/skills/twilio/SKILL.md": "# Twilio\nNo frontmatter here.\n"},
+        {"plugins/twilio/skills/twilio/SKILL.md": "---\nname: twilio\nThe frontmatter is not closed.\n"},
     )
     downloads: list[str] = []
 
@@ -1015,15 +1015,17 @@ def test_loadable_skills_keep_the_skills_a_run_loads_and_say_why_the_others_cann
             {
                 "skills/good/SKILL.md": _skill("good", "A good skill"),
                 "skills/no-front/SKILL.md": "# just markdown\n",
+                "skills/open/SKILL.md": "---\nname: open\n",
                 "skills/empty/SKILL.md": "---\nname: empty\ndescription: x\n---\n\n",
                 "skills/lead/SKILL.md": "\n\n" + _skill("lead", "Starts with blank lines"),
             },
         )
     )
     kept, left = loadable_skills(
-        archive, ("skills/good", "skills/no-front", "skills/empty", "skills/lead", "skills/missing")
+        archive, ("skills/good", "skills/no-front", "skills/open", "skills/empty", "skills/lead", "skills/missing")
     )
-    assert kept == ("skills/good", "skills/lead")
-    assert "does not start with the --- line" in left["skills/no-front"]
+    # A skill without a frontmatter loads as Claude Code loads it (item 1723).
+    assert kept == ("skills/good", "skills/no-front", "skills/lead")
+    assert "not closed by a --- line" in left["skills/open"]
     assert "no instructions" in left["skills/empty"]
     assert left["skills/missing"] == "SKILL.md is not in the archive"

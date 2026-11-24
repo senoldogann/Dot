@@ -109,8 +109,8 @@ work.
 2. **The files**: the archive of the pinned commit is downloaded and its skill folders unpacked as Install unpacks them
    (no link, nothing outside the plugin, within the size limit), and the hash of the files taken. A skill folder inside
    another skill is the outer skill's; a catalogue that names a skill folder without a `SKILL.md` has it left out, and
-   so has a skill whose `SKILL.md` the skills parser a run loads it with refuses (no `---` line that opens the
-   frontmatter, no name or description, no instructions; item 1305): a plugin none of whose skills loads is unusable and
+   so has a skill whose `SKILL.md` the skills parser a run loads it with refuses (a frontmatter not closed or not valid,
+   no instructions; item 1305; one with no frontmatter at all loads, named for its folder, item 1723): a plugin none of whose skills loads is unusable and
    is not proposed.
 3. **The scan** of exactly those files: invisible or direction-changing characters and long base64, where an instruction
    can hide from you and still reach a model, text that tells a model to set aside its instructions or to keep something
@@ -697,8 +697,12 @@ unchanged: Dot reads only `name`, `description` and its own `icon` of the frontm
 map under `metadata`, a list of `allowed-tools`) do not leave a skill out, and neither does a `name` other than
 its folder's (a plugin's `canva-brand-check` in `brand-check`: the skill goes by its frontmatter's name, as Claude Code
 takes it) nor a description past the specification's 1,024 characters (cut there with an ellipsis; item 948). Dot's
-own learned and taught skills still carry their folders' names, by which they are kept. A `SKILL.md` may begin with blank lines before its opening `---` line; anything else there leaves the skill out.
-A skill left out is logged once while its file stays as it is (`skill_skipped`, item 1305), not at every run; Doctor's
+own learned and taught skills still carry their folders' names, by which they are kept. A `SKILL.md` may begin with blank lines before its opening `---` line. One of yours or a plugin's with no frontmatter at all (its first line is
+not `---`) loads as Claude Code loads it (item 1723): named for its folder, the whole file its instructions, its first
+line of words that is no heading its description (a Twilio plugin's `twilio-agent-connect` opens with a title); Dot's own
+learned and taught skills still need their frontmatter.
+A skill left out is logged once while its file stays as it is (`skill_skipped`, item 1305), not at every run, with what
+to do (`fix`: correct the SKILL.md as the reason says, or remove its folder or plugin; item 1723); Doctor's
 `skills` row, `dotx skills list` and Settings › Skills (Left out, item 1405) keep saying so, each with the file and the
 reason. To use your own, put `dirs =
 ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be
