@@ -1203,6 +1203,7 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             from_outside=bool(row["from_outside"]),
         ),
         runs_failed_in_row=row["runs_failed_in_row"],
+        skipped_in_row=row["skipped_in_row"],
     )
 
 
@@ -1329,6 +1330,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("skills", "TEXT"),
     # Made by a run that had read outside content (the review of 2026-11-01): its firings start tainted.
     ("from_outside", "INTEGER NOT NULL DEFAULT 0"),
+    # How many firings in a row were skipped with no run (item 1401); 0 for every schedule from before.
+    ("skipped_in_row", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 
@@ -6793,15 +6796,15 @@ class Store:
         next_run_at: float | None,
     ) -> ScheduleRecord:
         """Replace what a schedule does and when; its history (last run, thread, status) stays, its row of failed runs
-        starts afresh, and one switched on no longer says it was switched off for them (item 458), as the form's switch
-        is this way and not ``enable``'s."""
+        and its row of skipped firings (item 1401) start afresh, and one switched on no longer says it was switched off
+        for them (item 458), as the form's switch is this way and not ``enable``'s."""
         on: int = 1 if enabled else 0
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
             " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
             " stop_after_failures = ?, notify = ?, agent_id = ?, skills = ?, from_outside = ?, enabled = ?,"
             " next_run_at = ?,"
-            " runs_failed_in_row = 0,"
+            " runs_failed_in_row = 0, skipped_in_row = 0,"
             " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
             " WHERE id = ?",
             (name, cron, run_at, goal, mode, *_option_values(options), on, next_run_at, on, schedule_id),
@@ -6931,11 +6934,12 @@ class Store:
 
     @_writing
     async def record_schedule_skip(self, schedule_id: str, due: float, next_run_at: float | None, status: str) -> bool:
-        """A firing due at ``due`` that did not start a run: move on to ``next_run_at`` (``None`` ends the schedule).
-        Only while the schedule is still due at ``due`` (item 1047): an edit of its times or a switch made while the
-        firing was weighed is kept, and nothing moves. Whether it moved on."""
+        """A firing due at ``due`` that did not start a run: move on to ``next_run_at`` (``None`` ends the schedule) and
+        count it among the firings skipped in a row (item 1401). Only while the schedule is still due at ``due`` (item
+        1047): an edit of its times or a switch made while the firing was weighed is kept, and nothing moves. Whether
+        it moved on."""
         cursor = await self._db.execute(
-            "UPDATE schedules SET next_run_at = ?, last_status = ?,"
+            "UPDATE schedules SET next_run_at = ?, last_status = ?, skipped_in_row = skipped_in_row + 1,"
             " enabled = CASE WHEN ? IS NULL THEN 0 ELSE enabled END WHERE id = ? AND next_run_at IS ?",
             (next_run_at, status, next_run_at, schedule_id, due),
         )
@@ -6944,6 +6948,29 @@ class Store:
             log.info("schedule_skip_not_written", schedule_id=schedule_id, due=due, status=status)
             return False
         return True
+
+    @_writing
+    async def count_schedule_skip(self, schedule_id: str, status: str) -> int | None:
+        """A firing that was claimed and then did not start a run (its chat was busy, item 723): ``status`` says why as
+        the schedule's last status, and it counts among the firings skipped in a row (item 1401), as one that
+        :meth:`record_schedule_skip` moved on does. The row after the write; ``None`` when the schedule was deleted
+        meanwhile."""
+        row = await self._one(
+            "UPDATE schedules SET last_status = ?, skipped_in_row = skipped_in_row + 1 WHERE id = ?"
+            " RETURNING skipped_in_row",
+            (status, schedule_id),
+        )
+        await self._db.commit()
+        return None if row is None else int(row["skipped_in_row"])
+
+    @_writing
+    async def clear_schedule_skips(self, schedule_id: str) -> None:
+        """A firing of the schedule started its run: the firings skipped in a row (item 1401) are over. Nothing is
+        written while the schedule has none."""
+        await self._db.execute(
+            "UPDATE schedules SET skipped_in_row = 0 WHERE id = ? AND skipped_in_row != 0", (schedule_id,)
+        )
+        await self._db.commit()
 
     @_writing
     async def mark_schedule_running(self, schedule_id: str, run_id: str) -> bool:
@@ -6970,15 +6997,16 @@ class Store:
 
     @_writing
     async def set_schedule_enabled(self, schedule_id: str, enabled: bool, next_run_at: float | None) -> None:
-        """Switch a schedule on or off; one switched on starts its row of failed runs afresh, and no longer says it was
-        switched off for them (item 458)."""
+        """Switch a schedule on or off; one switched on starts its row of failed runs and its row of skipped firings
+        (item 1401) afresh, and no longer says it was switched off for them (item 458)."""
         on: int = 1 if enabled else 0
         await self._db.execute(
             "UPDATE schedules SET enabled = ?, next_run_at = ?,"
             " runs_failed_in_row = CASE WHEN ? = 1 THEN 0 ELSE runs_failed_in_row END,"
+            " skipped_in_row = CASE WHEN ? = 1 THEN 0 ELSE skipped_in_row END,"
             " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
             " WHERE id = ?",
-            (on, next_run_at, on, on, schedule_id),
+            (on, next_run_at, on, on, on, schedule_id),
         )
         await self._db.commit()
 

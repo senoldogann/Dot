@@ -14,7 +14,8 @@ function sentence(text) {
 
 /**
  * How the schedule's last run ended and when (item 1355), from its record: "" for one that never ran, one that works
- * now and a status the panel has no words for. A run that failed says how many in a row did when more than one.
+ * now and a status the panel has no words for. A run that failed says how many in a row did when more than one, and a
+ * firing that was skipped how many in a row were (item 1401).
  */
 function lastRun(record, now) {
   const status = record.last_status ?? "";
@@ -22,7 +23,9 @@ function lastRun(record, now) {
   // time of its own: `last_run_at` is the run before it, so a skip says no time (the chat-busy skip, the one that does
   // write it, says none either).
   if (status.startsWith("skipped")) {
-    return t("automations.lastSkipped");
+    // How many in a row were skipped (item 1401), from two on: one is the plain word, as before.
+    const skipped = record.skipped_in_row ?? 0;
+    return skipped > 1 ? t("automations.lastSkippedRow", { count: skipped }) : t("automations.lastSkipped");
   }
   if (record.last_run_at === null || record.last_run_at === undefined) {
     return "";

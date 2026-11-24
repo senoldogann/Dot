@@ -250,6 +250,7 @@ async def test_a_paused_agents_repeating_schedule_is_skipped_counting_nothing_an
     assert schedule.id not in scheduler._in_flight
     skipped: ScheduleRecord = await runtime.store.get_schedule(schedule.id)
     assert skipped.last_status == "skipped: Scout is paused"
+    assert skipped.skipped_in_row == 1
     assert skipped.enabled and skipped.next_run_at is not None and skipped.next_run_at > schedule.next_run_at
     assert skipped.runs_failed_in_row == 0
     assert len(await runtime.store.list_threads(1000)) == chats_before

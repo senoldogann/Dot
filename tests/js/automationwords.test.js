@@ -74,6 +74,23 @@ test("a schedule says how its last run ended and when, and how many failed in a 
   assert.equal(first.last, "Last firing skipped");
 });
 
+test("firings skipped one after the other say how many in a row, from two on, and a run after them says its own end (item 1401)", () => {
+  const skipped = (count) =>
+    automationWords(view({ cron: "*/10 * * * *", last_run_at: NOW - 60, last_status: "skipped: busy", skipped_in_row: count }), false, NOW).last;
+  assert.equal(skipped(1), "Last firing skipped");
+  assert.equal(skipped(2), "Skipped 2 in a row");
+  assert.equal(skipped(27), "Skipped 27 in a row");
+  // An older daemon sends no count: the plain word, as before.
+  assert.equal(skipped(undefined), "Last firing skipped");
+  // The count is the firings' own: a status that is no skip says how its run ended, whatever the count was.
+  const done = automationWords(
+    view({ cron: "*/10 * * * *", last_run_at: NOW - 60, last_status: "done", skipped_in_row: 4 }),
+    false,
+    NOW,
+  );
+  assert.match(done.last, /^Last run done · /);
+});
+
 test("a schedule that never ran, or works now, has no word of its last run", () => {
   assert.equal(automationWords(view({ cron: "0 9 * * *", last_run_at: null, last_status: "" }), false, NOW).last, "");
   assert.equal(automationWords(view({ cron: "0 9 * * *", last_run_at: NOW - 5, last_status: "running" }), false, NOW).last, "");
