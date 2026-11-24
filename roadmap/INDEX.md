@@ -26,6 +26,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1741](1741.md) | done | 2026-11-24 | A hop count across agents: a runaway chain of hand-offs is stopped for a run that asks, and reported in yolo and free mode |
 | [1740](1740.md) | done | 2026-11-24 | `search_chats`: a run finds what was said in any chat, by its words |
 | [1731](1731.md) | done | 2026-11-24 | What a task will cost is shown, and caps the owner sets pause a task and ask the owner, in every mode |
+| [1728](1728.md) | done | 2026-11-24 | A memory benchmark: does a search find the newest fact when a fact changed (`dotx eval memory`) |
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
 | [1726](1726.md) | done | 2026-11-24 | DotNext's chat, whole: the work log, the ask dock in the composer's place, the composer, the queue and its edit, the inspector |
 | [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |

@@ -17,6 +17,7 @@ from dotagent.cli_commands import (
     EvalCheckCommand,
     EvalFromRunCommand,
     EvalListCommand,
+    EvalMemoryCommand,
     EvalReportCommand,
     EvalRunCommand,
     EvalSpeedCommand,
@@ -28,6 +29,14 @@ from dotagent.core.paths import db_path, evals_dir, screenshots_dir
 from dotagent.evals.audit import catalog_problems, task_problems
 from dotagent.evals.catalog import all_tasks, select_tasks
 from dotagent.evals.drafts import draft_from_run, save_draft
+from dotagent.evals.memory_bench import (
+    CaseResult as MemoryCaseResult,
+)
+from dotagent.evals.memory_bench import (
+    play_configured_here,
+    play_scripted_here,
+    render_results,
+)
 from dotagent.evals.reports import load_report, save_report
 from dotagent.evals.results import EvalReport, EvalSettings, TaskOutcome
 from dotagent.evals.runner import (
@@ -348,6 +357,16 @@ async def cmd_eval_tools(command: EvalToolsCommand) -> int:
     return 0 if all(result.passed for result in results) else 1
 
 
+async def cmd_eval_memory(command: EvalMemoryCommand) -> int:
+    """The memory benchmark (item 1728), in a scratch folder: nothing of the owner's notes is read or written."""
+    app: AppConfig = load_default_config() if command.embeddings == "scripted" else load_user_config()
+    results: list[MemoryCaseResult] = (
+        await play_scripted_here(app.memory) if command.embeddings == "scripted" else await play_configured_here(app)
+    )
+    _write(render_results(command.embeddings, results))
+    return 0
+
+
 async def cmd_eval_from_run(command: EvalFromRunCommand) -> int:
     """Write the draft of a task from a run's goal, ending and failed tools; nothing is played."""
     store: Store = await Store.open(db_path(), screenshots_dir())
@@ -379,5 +398,7 @@ async def dispatch(command: Command) -> int:
             return await cmd_eval_speed(command)
         case EvalToolsCommand():
             return await cmd_eval_tools(command)
+        case EvalMemoryCommand():
+            return await cmd_eval_memory(command)
         case _:
             raise InvalidValueError("not a command of this module", {"name": command.name})
