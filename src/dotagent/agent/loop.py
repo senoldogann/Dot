@@ -2538,7 +2538,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
     remembered: tuple[MemoryRecord, ...] = recalled.records
     await count_start_notes(runtime, run, recalled, memory_seen_at)
-    can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
+    # Free mode (item 922) asks no run's owner anything; a Plan first, the owner's own word for this message, stands
+    # (item 1563).
+    can_ask: bool = can_ask_user(
+        run.source, run.parent_run_id, run.approvals, runtime.approvals.free and not opening.picks.plan_first
+    )
     asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
     # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
     # wait for the answer whatever it says (item 508).

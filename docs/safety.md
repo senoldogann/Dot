@@ -1313,7 +1313,7 @@ that asks (item 429), money and credentials are handed to you on a card in the c
 name waits there for your yes in `supervised` and `ask`, for the review model's in `auto`. In a chat Dot opened on its
 own initiative, a message, a post or a release waits for your own yes in every mode, `yolo` and `auto` too (item 850),
 but free mode (below).
-A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer; one it can
+A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer (not in free mode, which asks no run's owner anything: item 1563); one it can
 go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
