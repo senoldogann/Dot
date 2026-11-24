@@ -32,10 +32,13 @@ from dotagent.evals.results import Cut
 from dotagent.evals.runner import _supervise, ended_by_plan_limit
 from dotagent.evals.types import EvalTask
 from dotagent.memory.service import SavedMemory, save_memory, update_memory_note, words_only
+from dotagent.opencode.bridge import Door, ToolBridge
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.notices import said_nothing_new
+from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule
+from dotagent.scheduler.runner import Scheduler
 from dotagent.store.endings import PREFIX_EMERGENCY_STOP
-from dotagent.store.models import EventRecord, RunPicks, RunRecord
+from dotagent.store.models import AgentRecord, EventRecord, RunPicks, RunRecord, ScheduleRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
 
@@ -507,3 +510,136 @@ async def test_an_eval_tells_a_run_the_plans_window_refused_from_its_end(room: R
     ended: RunRecord = await _run(room, "Hit the limit.")
     events: list[EventRecord] = await room.runtime.store.list_events(ended.id, 0, 500)
     assert ended_by_plan_limit(events), ended.result
+
+
+def _short_bridge(monkeypatch: pytest.MonkeyPatch, left_out: str) -> None:
+    """Fake the bridge's list: the door Dot's bridge answers a program with has all its tools but ``left_out``. (The
+    bridge's server holds its ``_list`` from its first start, so the door each request finds is what is replaced.)"""
+    whole = ToolBridge._door_of
+
+    def short(self: ToolBridge, request: object) -> Door | None:
+        door: Door | None = whole(self, request)
+        if door is None:
+            return None
+        return dataclasses.replace(door, specs=tuple(spec for spec in door.specs if spec.name != left_out))
+
+    monkeypatch.setattr(ToolBridge, "_door_of", short)
+
+
+_NOTIFY_GOAL: str = "Send me a notification that the course starts at 16:00."
+
+
+async def _run_as(room: Room, goal: str, source: str, thread_id: str | None = None) -> RunRecord:
+    """``goal`` as a run of ``source`` (``schedule`` for a firing, ``test`` for one the owner asked), waited for."""
+    started: RunRecord = await room.manager.start(
+        goal, "task", MODEL, thread_id, source, None, None, "standard", None, "auto", False, ()
+    )
+    async with asyncio.timeout(30):
+        return await room.manager.wait(started.id)
+
+
+async def test_a_firing_whose_bridge_lists_no_notify_ends_failed_at_once_when_its_goal_asks_for_a_notification(
+    room: Room, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1400: a reminder ended done with "I couldn't send the notification: the Dot tools (including notify) are no
+    longer available to me". The program is told what its bridge lists (here a list that lacks notify) and the run ends
+    failed at once, before its model says a word, with the tool and the cause in its result; nothing was sent. The
+    session is not kept, and the failure may pass: a schedule tries its task once more."""
+    _short_bridge(monkeypatch, "notify")
+    await asyncio.to_thread((room.record / "started.json").unlink, missing_ok=True)
+    ended: RunRecord = await _run_as(room, _NOTIFY_GOAL, "schedule")
+    assert ended.status == "failed", ended.result
+    assert ended.result.startswith("Dot ended this task before it began: it needs Dot's notify tool, and Claude Code")
+    assert "did not list it among the tools Dot's bridge gave it" in ended.result and "notify" not in ended.result[150:]
+    # The program started and listed what the bridge gave it; no step of its model was taken.
+    assert await asyncio.to_thread((room.record / "started.json").exists)
+    assert await room.runtime.store.events_of_kind(ended.id, "assistant", 5) == []
+    assert not await asyncio.to_thread(chat_path(ended.thread_id).exists)
+    (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
+    error: object = finished.data["error"]
+    assert isinstance(error, dict) and error["kind"] == "passing" and error["context"]["why"] == "not_listed"
+
+
+async def test_the_same_goal_runs_on_the_whole_list_and_the_check_is_no_rule_about_tool_calls(
+    room: Room, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1400: the bridge's whole list lets a firing that asks for a notification run; on a list without notify a
+    firing that only mentions one, a goal that is an answer and a run the owner watches (who reads its answer) run
+    all the same, as a run that calls no tool at all would."""
+    whole: RunRecord = await _run_as(room, f"{_NOTIFY_GOAL} Write a note in the workspace.", "schedule")
+    assert whole.status == "done", whole.result
+    _short_bridge(monkeypatch, "notify")
+    for goal, source in (
+        ("Review the push notification settings screen. Write a note in the workspace.", "schedule"),
+        ("Write a note in the workspace.", "schedule"),
+        (f"{_NOTIFY_GOAL} Write a note in the workspace.", "test"),
+    ):
+        ended: RunRecord = await _run_as(room, goal, source)
+        assert ended.status == "done", (goal, source, ended.result)
+
+
+async def test_a_schedule_whose_run_lacks_notify_says_failed_in_its_row_and_why_in_its_history(room: Room) -> None:
+    """Item 1400: before, the row of the schedule said ``done``. Dot's own list for the run leaves notify out (here the
+    registry has none), the run ends failed before the program starts, the row says failed and counts it, and the
+    History's line for the firing is the reason, which no try again follows: it needs a change."""
+    registry = room.runtime.registry
+    notify: RegisteredTool = registry.tools.pop("notify")
+    scheduler: Scheduler = Scheduler(room.runtime, room.manager)
+    await asyncio.to_thread((room.record / "started.json").unlink, missing_ok=True)
+    try:
+        options = UNSET_OPTIONS.model_copy(update={"model": MODEL})
+        request: ScheduleRequest = ScheduleRequest(
+            name="Course reminder", goal=_NOTIFY_GOAL, cron="30 15 * * *", at=None, mode="task", options=options
+        )
+        record: ScheduleRecord = await create_schedule(
+            room.runtime.store, room.runtime.config.scheduler, room.runtime.schedule_zone, request, time.time(), None
+        )
+        run: RunRecord = await scheduler.fire_by_hand(record.id, time.time())
+        async with asyncio.timeout(30):
+            ended: RunRecord = await room.manager.wait(run.id)
+            await scheduler.drain()
+    finally:
+        registry.tools["notify"] = notify
+        await scheduler.stop()
+    assert ended.status == "failed", ended.result
+    assert ended.result.startswith(
+        "Dot ended this task before it began: it needs Dot's notify tool, and this run was not"
+    )
+    assert "The tools Dot gives a task run (its mode and Settings decide them) do not include it." in ended.result
+    row: ScheduleRecord = await room.runtime.store.get_schedule(record.id)
+    assert row.last_status == "failed" and row.runs_failed_in_row == 1
+    # The program never started, and nothing says the run will be tried again.
+    assert not await asyncio.to_thread((room.record / "started.json").exists)
+    assert await room.runtime.store.events_of_kind(ended.id, "schedule_retry", 5) == []
+    (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
+    error: object = finished.data["error"]
+    assert isinstance(error, dict) and error["kind"] == "lasting"
+
+
+async def test_an_agent_whose_tools_leave_out_notify_is_told_so_before_its_program_starts(room: Room) -> None:
+    """Item 1400: an agent's own list of tools keeps the core ones (finish, ask_user, ...) and what it names, and notify
+    is not core, so a reminder in its chat had no way to notify. The result names the agent and what to change, the
+    chat keeps its session (the program never touched it), and the agent's other work goes on: a firing that only
+    mentions notifications, and a run the owner asked, which they read."""
+    store = room.runtime.store
+    tools: list[str] = ["read_file", "write_file"]
+    ada: AgentRecord = await store.create_agent("Ada", "Reminders", "", MODEL, None, None, tools, None, None)
+    chat: ThreadRecord = await store.create_thread("Ada's chat", "ui", agent_id=ada.id)
+    first: RunRecord = await _run_as(room, "Write a note in the workspace.", "test", chat.id)
+    assert first.status == "done", first.result
+    assert await asyncio.to_thread(chat_path(chat.id).exists)
+    await asyncio.to_thread((room.record / "started.json").unlink, missing_ok=True)
+    ended: RunRecord = await _run_as(room, _NOTIFY_GOAL, "schedule", chat.id)
+    assert ended.status == "failed", ended.result
+    assert (
+        "The tools of the agent Ada are a list of their own that leaves it out: add it to the agent's tools"
+        in ended.result
+    )
+    assert not await asyncio.to_thread((room.record / "started.json").exists)
+    assert await asyncio.to_thread(chat_path(chat.id).exists)
+    for goal, source in (
+        ("Review the push notification settings screen.", "schedule"),
+        (_NOTIFY_GOAL, "test"),
+    ):
+        again: RunRecord = await _run_as(room, goal, source, chat.id)
+        assert again.status == "done", (goal, source, again.result)

@@ -97,7 +97,16 @@ def test_the_ends_a_try_helps_are_a_cut_a_passing_error_a_stall_and_the_plans_li
     assert retry_why("empty_replies", None) == "stalled"
     assert retry_why("failed", "passing") == "passing_error"
     assert retry_why("failed", "plan_limit") == "plan_limit"
-    for ending in ("stopped", "emergency_stop", "limit", "goal_check_refused", "internal_error", "finished"):
+    # A check that could not run is no end a try helps either: the work was done, and a try would do it again.
+    for ending in (
+        "stopped",
+        "emergency_stop",
+        "limit",
+        "goal_check_refused",
+        "goal_check_unavailable",
+        "internal_error",
+        "finished",
+    ):
         assert retry_why(ending, None) is None
     assert retry_why("failed", "lasting") is None
     assert retry_why("failed", None) is None

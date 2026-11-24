@@ -30,11 +30,16 @@ from dotagent.claude_code.run import (
     dot_tool,
     ended_clean,
     fast_off_words,
+    goal_asks_notification,
     mcp_config,
+    missing_tools,
     opened_bounds,
     run_effort,
     run_speed,
     system_prompt,
+    tools_needed,
+    tools_not_given,
+    tools_not_listed,
     write_mcp_config,
 )
 from dotagent.claude_code.stream import (
@@ -53,9 +58,11 @@ from dotagent.claude_code.stream import (
     limit_message,
     limit_resets,
     limit_said,
+    listed_tools,
     read_line,
     user_line,
 )
+from dotagent.core.errors import ClaudeCodeBroke, ClaudeCodeError, failure_kind
 from dotagent.llm.claude_code import model_info_of
 from dotagent.llm.router import ModelRef, offers_fast_mode
 from dotagent.llm.types import Effort, ImageData, ToolSpec
@@ -501,3 +508,121 @@ def test_the_plans_models_are_those_claude_code_lists() -> None:
     assert models_of_line('{"type": "result"}') is None and models_of_line("not json") is None
     keep_models(PlanModels(fetched_at=0.0, models=listed))
     assert model_labels()["claude-fable-5-2"] == "Fable 5.2" and model_labels()["fable"] == "Fable 5.2"
+
+
+def test_the_tools_a_run_lists_are_the_names_dot_gave_them_whatever_else_the_line_holds() -> None:
+    """Item 1400: what the program was given from the bridge, read from its first line by the door's prefix."""
+    init: Init = _init(
+        ["ToolSearch", f"mcp__{DOOR}__finish", f"mcp__{DOOR}__notify", "mcp__dot_99999999__shell"],
+        [{"name": DOOR, "status": "connected"}],
+        {},
+    )
+    assert listed_tools(init, DOOR) == {"finish", "notify"}
+    assert listed_tools(_init([], [{"name": DOOR, "status": "failed"}], {}), DOOR) == frozenset()
+
+
+def test_a_goal_that_asks_for_a_notification_is_told_in_the_owners_three_languages() -> None:
+    for goal in (
+        "Send me a notification that the course starts at 16:00.",
+        "Send a push notification at 15:30: the course starts at 16:00.",
+        "Send the owner a notification when the build is done.",
+        "Send me notifications when the build is done.",
+        "Send a notification to me at 15:30.",
+        "Send me a notification to remind me that the course starts at 16:00.",
+        "Send me a notification to my phone at 15:30.",
+        "Send me a notification for the dentist appointment at 15:00.",
+        "Send the owner a notification for the build.",
+        "Show me a notification when it is time.",
+        "Show a macOS notification with the title Course.",
+        "Display a notification to the user at 15:30.",
+        "Notify me when the build is done.",
+        "Use notify to tell me the course starts.",
+        "Gönder: kurs 16:00'da, bana bildirim gönder.",
+        "Saat 15:30'da bildirim at.",
+        "Saat 15:30'da bana bildir.",
+        "Lähetä ilmoitus puhelimeeni kello 15.30.",
+        "Lähetä minulle ilmoitus kun kurssi alkaa.",
+        "Näytä minulle ilmoitus kello 15.30.",
+        "Ilmoita minulle kello 15.30.",
+    ):
+        assert goal_asks_notification(goal), goal
+
+
+def test_a_goal_that_only_mentions_a_notification_or_refuses_one_asks_for_none() -> None:
+    """Item 1400's review: a goal that merely names a notification (a screen to review, a job ad, a sale listing), names
+    a thing that is none (an email, a badge), or says not to send one, must not make a run fail for want of ``notify``,
+    in any of the owner's three languages."""
+    for goal in (
+        "Review the push notification settings screen.",
+        "Explain how notifications work on macOS.",
+        "Write the notification text for the release.",
+        "Show the notification settings to the team.",
+        "Display a notification badge on the app icon.",
+        "Send a notification email to the leads.",
+        "I was notified twice already; do not notify again.",
+        "Do not send a notification before 08:00.",
+        "Don't send me a notification, just write the report.",
+        "Never show me a notification for this task.",
+        "Bildirim ekranını incele.",
+        "Bildirim verilerini ve yapılandırmasını kontrol et.",
+        "Bildirim gönderme, sadece raporu yaz.",
+        "Bana bildirme, sadece raporu yaz.",
+        "Lue tämä ilmoitus ja tee hakemus.",
+        "Tarkista myynti-ilmoitus ja vastaa siihen.",
+        "Lähetä hakemus tähän ilmoitukseen.",
+        "Anna palaute ilmoituksesta.",
+        "Näytä ilmoitus ja kerro mitä se vaatii.",
+        "Älä lähetä ilmoitusta, kirjoita vain raportti.",
+        "Remind me about the course at 16:00.",
+        "Register for the course (ilmoittautua).",
+        "",
+    ):
+        assert not goal_asks_notification(goal), goal
+
+
+def test_a_run_needs_finish_where_its_mode_has_it_and_notify_when_a_schedules_goal_asks_for_one() -> None:
+    """Item 1400: two tools and no other rule. A run that calls no tool is not a failed run: a goal that is only an
+    answer needs neither, a chat, which ends with its last reply, has no finish to need, and a run the owner watches is
+    not held to ``notify``: they read its answer."""
+    task_tools: tuple[str, ...] = ("finish", "notify", "read_file")
+    chat_tools: tuple[str, ...] = ("notify", "read_file")
+    ask: str = "Send me a notification at 15:30."
+    assert tools_needed(task_tools, "Write the weekly report.", "schedule") == ("finish",)
+    assert tools_needed(task_tools, ask, "schedule") == ("finish", "notify")
+    assert tools_needed(task_tools, ask, "ui") == ("finish",)
+    assert tools_needed(task_tools, ask, "cli") == ("finish",)
+    assert tools_needed(chat_tools, "How are you?", "schedule") == ()
+    assert tools_needed(chat_tools, "Notify me at 15:30.", "schedule") == ("notify",)
+    assert tools_needed((), "Notify me at 15:30.", "schedule") == ("notify",)
+
+
+def test_the_tools_a_run_lacks_are_those_needed_that_are_not_there() -> None:
+    assert missing_tools(("finish", "notify"), ["finish", "notify", "shell"]) == ()
+    assert missing_tools(("finish", "notify"), iter(["finish", "shell"])) == ("notify",)
+    assert missing_tools(("finish", "notify"), []) == ("finish", "notify")
+    assert missing_tools((), []) == ()
+
+
+def test_a_run_short_of_a_tool_says_which_and_why_and_a_bridge_that_came_up_short_is_tried_again() -> None:
+    """Item 1400: the words end up as the run's result, on the schedule's History and in the notice of its end. Dot's
+    own list leaving a tool out is no passing fault (the agent or Settings must change: no try again); the program's
+    line not listing a tool Dot offered is (a schedule tries its task once more)."""
+    agent: ClaudeCodeError = tools_not_given(("notify",), "task", "Ada", {"run_id": "run_1"})
+    assert not isinstance(agent, ClaudeCodeBroke) and failure_kind(agent) == "lasting"
+    assert agent.message.startswith(
+        "Dot ended this task before it began: it needs Dot's notify tool, and this run was not"
+    )
+    assert (
+        "The tools of the agent Ada are a list of their own that leaves it out: add it to the agent's tools"
+        in agent.message
+    )
+    assert agent.context["needed_missing"] == ["notify"] and agent.context["why"] == "not_given"
+    mode: ClaudeCodeError = tools_not_given(("finish", "notify"), "chat", None, {"run_id": "run_1"})
+    assert "needs Dot's finish and notify tools" in mode.message and "leaves them out" not in mode.message
+    assert "do not include them" in mode.message
+    bridge: ClaudeCodeBroke = tools_not_listed(("notify",), ["shell", "finish"], {"run_id": "run_1"})
+    assert failure_kind(bridge) == "passing"
+    assert (
+        "Claude Code did not list it among the tools Dot's bridge gave it (it listed: finish, shell)" in bridge.message
+    )
+    assert tools_not_listed(("finish",), [], {}).message.count("it listed: none") == 1

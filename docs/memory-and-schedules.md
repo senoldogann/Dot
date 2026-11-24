@@ -435,7 +435,8 @@ earlier runs.
   way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).
 - A schedule's task is tried once more on its own (item 1206, `scheduler/recovery.py`) when Dot's restart or crash cut
   it off, an error of the model service that may pass ended it (a broken connection, a 429 or 5xx, an answer out of
-  form, a Claude Code session that broke off or went silent), or it stopped without getting anywhere (the progress
+  form, a Claude Code session that broke off or went silent, or whose bridge listed fewer tools than the task needs:
+  item 1400), or it stopped without getting anywhere (the progress
   watchdog, empty replies): 15 seconds after its end, or at the next start of Dot. One the Claude plan's usage limit
   stopped starts again a minute after the plan's reset, when that is at most 12 hours away. The schedule says
   `retrying at …` meanwhile. The try is a new task of the schedule, started as a firing is, with its own choices, in
@@ -487,6 +488,13 @@ earlier runs.
 - A repeating schedule whose chat is busy when it comes due (with "the same chat", your message in it still being
   worked on) skips that firing, saying "skipped: a run is already active on this thread" in amber, and counts no
   failure (item 723). A firing that started no run for another reason says "failed to start", in red.
+- A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a busy chat's,
+  a task still going, a paused agent's, the emergency stop's and a late one, as the loop that merges pull requests was
+  skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
+  with Run now) or firing that fails to start ends the count, and switching the schedule on again or changing it starts
+  it afresh. From two on, and while the last status is a skip, its row on the Schedules page and its line in a chat's
+  Automations say "Skipped 5 in a row" beside the last status, and `dotx schedule list` and the model's `schedule_list`
+  add "(5 skipped in a row)" to its last result; one skip is the last status's to say.
 - How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
   `[scheduler] notify` (`always`, every end, by default, but one that found nothing new: a run told it is a schedule's
   says so when nothing changed for you since its last run, with `nothing_new` in its finish, and that end, done and

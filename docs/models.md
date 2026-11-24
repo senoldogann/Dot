@@ -100,7 +100,10 @@ which the model chip follows. The run's reasoning level becomes the nearest one 
 model once at most, in the order of the list, and never goes back to one it left. The goal check of a goal-mode run (and
 a campaign's claim of its outcome) goes down the same list when the review model cannot answer for the same reasons
 (item 1354): a run whose work was done no longer ends failed only because the review model's quota was spent; when no
-model can check, the run still ends failed and its result names each model asked and why it could not. A model the router holds paused is left out
+model can check, the run still ends failed and its result names each model asked and why it could not, and says the
+answer is not verified. `dotx stats` counts such a run as "goal check could not run (answer not verified)" and keeps
+"refused by the goal check" for a check that judged the end and did not accept it (item 1402); a schedule does not try
+it again, as its work may be done and a try would do it twice. A model the router holds paused is left out
 while another can be asked. The first standby model is often the run's own, whose check of its own work is the weaker one
 `dotx doctor` warns of; the log's `goal_check_passed_on` says when it happened. The review of a
 run's actions never passes to another model. A standby model that cannot call tools
@@ -386,8 +389,20 @@ answer keeps its words, Ollama's too.
   them (`ToolSearch`) is ended failed at once, but the four plugins the
   program comes with (`cc-plugin-sec-default`, `-agents-md`, `-privacy`, `-plugin-authoring`, by name: measured on
   2.1.318 with the flags above, they gave the model no tool, command or skill, and no `CLAUDE.md` or `AGENTS.md` reached
-  it; a built-in a later version brings ends the run until it is measured). The door's secret is in a
-  file only you can read in a folder of the run's own, removed as the run ends, never in the program's arguments. The
+  it; a built-in a later version brings ends the run until it is measured). That line must also list the tools the run
+  cannot do its job without (item 1400): `finish`, where the run's mode has it, and `notify`, when the run is a
+  schedule's firing, which nobody reads as it ends, and its goal asks for a notification ("notify me", "send me a
+  notification", "show me a notification", Turkish "bildirim gönder" and "bana bildir", Finnish "lähetä ilmoitus" and
+  "ilmoita minulle"; a goal that only mentions one, names a thing that is none ("a notification email") or refuses one
+  right before the verb ("do not send me a notification") asks for none; it is a list of phrases, not a reading of
+  the goal). A run short of one ends failed at
+  once, before its model says a word, and its result says which tool and why: an agent whose own list of tools leaves
+  `notify` out is named before the
+  program starts (add the tool to the agent; no try again follows, and the chat keeps its session), and a bridge's list
+  that came up short is a passing failure, which a schedule tries once more. That is all the check is: a run that
+  calls no tool is not a failed run, and a schedule's row says `failed`, not `done`, for one that ended so.
+  The door's secret is in a file only you can read in a folder of the run's own, removed as the run ends, never in the
+  program's arguments. The
   timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
   window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
   composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first

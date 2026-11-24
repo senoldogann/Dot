@@ -6,6 +6,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1402](1402.md) | done | 2026-11-24 | A run whose goal check could not run has an ending of its own, and is no longer "refused" |
+| [1401](1401.md) | done | 2026-11-24 | A schedule counts the firings skipped in a row, and says it where the owner looks |
+| [1400](1400.md) | done | 2026-11-24 | A run on the Claude plan that lacks a tool it cannot work without ends failed at once, and says which |
 | [1394](1394.md) | done | 2026-11-24 | Dot for iPhone: a failed step says why, and the cards are one flat recipe |
 | [1393](1393.md) | done | 2026-11-24 | Dot for iPhone: a run that ended well says so, and the list's compose button is in the title bar |
 | [1392](1392.md) | done | 2026-11-24 | Dot for iPhone: an approval says what Dot wants to do, and the box does not outshout it |

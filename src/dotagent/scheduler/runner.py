@@ -794,7 +794,8 @@ class Scheduler:
             return
         paused: AgentRecord | None = await self._paused_agent(record)
         if paused is not None:
-            # A pause is the owner's: neither a failure nor a missed firing, so nothing counts it and nobody is told.
+            # A pause is the owner's: not a failure, so nobody is told. The firing it skips is counted (item 1401),
+            # so the count of firings skipped in a row grows for as long as the pause lasts.
             if one_time:
                 waiting: str = f"waiting: {paused.name} is paused"
                 if record.last_status != waiting:
@@ -1113,12 +1114,15 @@ class Scheduler:
                 # A run going on in a recurring schedule's own chat (the owner's message in it, item 257) is no
                 # failure: the firing is skipped, as one under the emergency stop is, and nobody is told of a fault
                 # (item 723). A one-time schedule's is kept as a failure, whose wait spaces its next try.
-                log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message)
-                await store.set_schedule_status(record.id, f"skipped: {exc.message}")
+                # Counted with the firings skipped in a row (item 1401), so that where the owner looks it says how many.
+                skipped: int | None = await store.count_schedule_skip(record.id, f"skipped: {exc.message}")
+                log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message, skipped_in_row=skipped)
                 return
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
             await store.set_schedule_status(record.id, failed)
+            # A firing that failed to start is no skip: the skips in a row (item 1401) are over.
+            await store.clear_schedule_skips(record.id)
             await record_firing_failure(store, record.id, now, failed)
             await self._tell_missed(record, failed)
             return
@@ -1139,6 +1143,8 @@ class Scheduler:
             await self._tell_missed(record, missed_status(missed, occurrence, late, zone))
         try:
             await store.mark_schedule_running(record.id, run.id)
+            # The firings skipped in a row are over (item 1401), whether or not the run is still at work.
+            await store.clear_schedule_skips(record.id)
             await record_firing_started(store, record.id)
             # The firing's run does the task: a try of an earlier one waiting for the schedule is dropped (item 1206).
             await supersede_stored(store, record.id)

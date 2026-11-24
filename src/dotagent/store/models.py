@@ -855,6 +855,11 @@ class ScheduleRecord(FrozenModel):
     # How many of its runs in a row ended failed (item 458): a run that ends done sets it to 0, one cancelled leaves it,
     # and switching the schedule on again or changing it starts it afresh.
     runs_failed_in_row: int
+    # How many of its firings in a row were skipped, whatever the reason, with no run (item 1401): a busy chat, a task
+    # still going, a paused agent, the emergency stop, a late one. A task that starts (a firing's or one by hand) and a
+    # firing that fails to start set it to 0, and so does switching the schedule on again or changing it. 0 for every
+    # schedule before the column.
+    skipped_in_row: int = 0
 
 
 class StepRow(FrozenModel):

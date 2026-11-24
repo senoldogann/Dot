@@ -11,7 +11,10 @@ the door of Dot's bridge (``--strict-mcp-config``, :mod:`dotagent.opencode.bridg
 mode that refuses whatever the door and the search do not name (``dontAsk`` with ``--allowedTools
 mcp__<door>,ToolSearch``). Its first line (``system``/``init``) says what the model has; a run whose model has anything
 else ends failed at once
-(:func:`dotagent.claude_code.stream.init_problem`). Each call of a tool of Dot's runs as a call of Dot's own loop
+(:func:`dotagent.claude_code.stream.init_problem`). So does a run short of a tool it cannot do its job without
+(:func:`tools_needed`: ``finish`` where its mode has it, ``notify`` for a goal that asks for a notification), whether
+Dot's own list for it leaves the tool out (checked before the program starts) or the program's first line does not list
+it (item 1400); the run's result says which tool and why. Each call of a tool of Dot's runs as a call of Dot's own loop
 (:func:`dotagent.agent.handover.bridged_call`: the run's gate, the tool's time limit, the run's timeline under the
 tool's own name). The door's secret is in a 0600 file of a private folder of the run, removed as it ends, never in the
 program's arguments, which ``ps`` shows every process of the owner.
@@ -36,6 +39,7 @@ import asyncio
 import base64
 import contextlib
 import os
+import re
 import shutil
 import signal
 import tempfile
@@ -117,6 +121,7 @@ from dotagent.claude_code.stream import (
     limit_message,
     limit_resets,
     limit_said,
+    listed_tools,
     read_line,
     tool_prefix,
     user_line,
@@ -155,11 +160,12 @@ from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
 from dotagent.opencode.run import meanwhile
 from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import NO_PICKS, AgentRecord, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, AgentRecord, RunMode, RunRecord, ThreadRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
@@ -168,6 +174,7 @@ from dotagent.tools.groups import group_of
 from dotagent.tools.meta import (
     FINISH_TOOL,
     MARK_PLAN_STEP_TOOL,
+    NOTIFY_TOOL,
     REACT_TOOL,
     UPDATE_PLAN_TOOL,
     USE_TOOLS_TOOL,
@@ -276,6 +283,118 @@ def door_tools(registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] |
             for tool in tools_for_mode(registry, run.mode)
             if door_tool(tool.spec.name, delegated) and (bounded is None or tool.spec.name in bounded)
         }
+    )
+
+
+# What makes a goal a request for a notification to the owner (item 1400), in the owner's three languages: "notify
+# me", "send me a notification", "show me a notification", "use notify"; Turkish "bildirim gönder/at/yap/ver", "bana
+# bildir"; Finnish "lähetä ilmoitus", "ilmoita minulle". A goal that only mentions one ("review the notification
+# settings", "lue tämä ilmoitus"), names a thing that is none ("a notification email", "a notification badge") or
+# refuses one ("do not send a notification", "älä lähetä ilmoitusta"; a Turkish refusal is the verb with a suffix,
+# which the word's end leaves out) is none. "Remind me" is not here: a reminder may as well be the run's own answer,
+# which the schedule's notice carries. This is a list of phrases, not a reading of the goal: one it does not know asks
+# for nothing (the run is as it was), and one it reads wrongly (a notification sent to another) fails with a result that
+# names the tool and what to change.
+_NOT_REFUSED: str = r"(?<!not )(?<!n't )(?<!never )"
+_NOT_REFUSED_FI: str = r"(?<!älä )(?<!ei )"
+_OWNER: str = r"(?:me|us|the\s+(?:owner|user))"
+# Finnish: who is told ("minulle", "meille", the owner, the user), and the notification's own forms (ilmoitus,
+# ilmoitusta, ilmoituksen, ilmoituksia).
+_TOLD_FI: str = r"(?:minulle|meille|omistajalle|käyttäjälle)"
+_FI_NOTIFICATION: str = r"ilmoitu(?:s|sta|ksen|ksia)"
+# What follows "a notification" when it names another thing ("notification email"), not the notification itself.
+_NOT_A_THING: str = (
+    r"(?!\s+(?:e-?mails?|badges?|settings?|screens?|banners?|cent(?:er|re)s?|templates?|texts?|preferences?"
+    r"|permissions?)\b)"
+)
+_NOTIFICATION_REQUESTS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        _NOT_REFUSED + r"\bnotify\s+" + _OWNER + r"\b",
+        _NOT_REFUSED + r"\b(?:use|call)\s+(?:the\s+)?notify\b",
+        _NOT_REFUSED
+        + r"\b(?:send|give|push)\s+(?:(?:me|us|him|her|them|the\s+(?:owner|user))\s+)?"
+        + r"(?:an?\s+(?:\w+\s+)?notifications?|notifications)\b"
+        + _NOT_A_THING,
+        _NOT_REFUSED
+        + r"\b(?:show|display)\s+(?:"
+        + _OWNER
+        + r"\s+an?\s+(?:\w+\s+)?notifications?\b"
+        + r"|an?\s+(?:\w+\s+)?notifications?\s+(?:to\s+"
+        + _OWNER
+        + r"\b|at\s+\d|with\s+(?:the\s+)?title\b))",
+        r"\bbildirim\w*\s+(?:gönder(?:in|iniz|mek)?|at|atın|yap(?:ın|mak)?|ver(?:in|mek)?|göster(?:in|mek)?"
+        r"|yolla(?:yın|mak)?)\b",
+        r"\bbana\s+bildir(?:in|iniz)?\b",
+        # "ilmoitus" is also an ad ("hakemus tähän ilmoitukseen": an application to this ad): only the
+        # notification's own forms (not the ad's "ilmoitukseen", "ilmoituksesta"), and only right after the verb or
+        # after the one who is told, name a notification.
+        _NOT_REFUSED_FI + r"\blähetä\s+(?:" + _TOLD_FI + r"\s+)?" + _FI_NOTIFICATION + r"\b",
+        _NOT_REFUSED_FI + r"\b(?:näytä|anna)\s+" + _TOLD_FI + r"\s+" + _FI_NOTIFICATION + r"\b",
+        _NOT_REFUSED_FI + r"\bilmoita\s+(?:minulle|meille)\b",
+    )
+)
+
+
+def goal_asks_notification(goal: str) -> bool:
+    """Whether ``goal`` asks for a notification to the owner (:data:`_NOTIFICATION_REQUESTS`)."""
+    return any(request.search(goal) is not None for request in _NOTIFICATION_REQUESTS)
+
+
+def tools_needed(mode_tools: Iterable[str], goal: str, source: str) -> tuple[str, ...]:
+    """The tools of Dot's a run cannot do its job without (item 1400): ``finish``, which the model ends the run with,
+    where its mode has it (``mode_tools``: a chat has none and ends with its last reply), and ``notify`` when the run
+    is a schedule's firing (``source``) whose ``goal`` asks for a notification: nobody is there to read an answer, so
+    a notification is how the owner is told, and a run that could not send one has not done its job. A run the owner
+    watches is not held to it. No other rule: a run that calls no tool is a run that answered."""
+    offered: frozenset[str] = frozenset(mode_tools)
+    needed: list[str] = [FINISH_TOOL] if FINISH_TOOL in offered else []
+    if source == SCHEDULE_SOURCE and goal_asks_notification(goal):
+        needed.append(NOTIFY_TOOL)
+    return tuple(needed)
+
+
+def missing_tools(needed: Iterable[str], present: Iterable[str]) -> tuple[str, ...]:
+    """The ``needed`` tools that are not among those ``present``, in the order of ``needed``."""
+    held: frozenset[str] = frozenset(present)
+    return tuple(name for name in needed if name not in held)
+
+
+def _tools_named(names: Sequence[str]) -> str:
+    return f"Dot's {' and '.join(names)} tool{'s' if len(names) > 1 else ''}"
+
+
+def tools_not_given(missing: Sequence[str], mode: RunMode, agent: str | None, context: JsonObject) -> ClaudeCodeError:
+    """What ends a run at its start when Dot's own list for it (its mode, its agent's tools, Settings) leaves out a tool
+    it cannot work without (item 1400). The owner reads it as the run's result, on the schedule's History and in the
+    notice of its end: what is missing, why, and what to change. A change is needed, so no try again follows
+    (:func:`dotagent.core.errors.failure_kind`: a plain :class:`ClaudeCodeError` lasts). ``agent`` is the name of the
+    agent whose tools are a list of their own and name none of ``missing``, else ``None``."""
+    these: str = "them" if len(missing) > 1 else "it"
+    cause: str = (
+        f"The tools of the agent {agent} are a list of their own that leaves {these} out: add {these} to the agent's "
+        "tools, then run the task again."
+        if agent is not None
+        else f"The tools Dot gives a {mode} run (its mode and Settings decide them) do not include {these}."
+    )
+    return ClaudeCodeError(
+        f"Dot ended this task before it began: it needs {_tools_named(missing)}, and this run was not given {these}, "
+        f"so it could not do its job. {cause} Nothing was done.",
+        {**context, "needed_missing": list(missing), "why": "not_given"},
+    )
+
+
+def tools_not_listed(missing: Sequence[str], listed: Iterable[str], context: JsonObject) -> ClaudeCodeBroke:
+    """What ends a run at its start when Claude Code's first line lists none of a tool Dot's bridge offered it and the
+    run cannot work without (item 1400). The program's own session came up short, which may not happen again, so a
+    schedule tries its task once more (:func:`dotagent.core.errors.failure_kind`: a :class:`ClaudeCodeBroke` passes)."""
+    these: str = "them" if len(missing) > 1 else "it"
+    names: str = ", ".join(sorted(listed)) or "none"
+    return ClaudeCodeBroke(
+        f"Dot ended this task before it began: it needs {_tools_named(missing)}, and Claude Code did not list {these} "
+        f"among the tools Dot's bridge gave it (it listed: {names}), so the model could not have used {these}. "
+        "Nothing was done.",
+        {**context, "needed_missing": list(missing), "why": "not_listed"},
     )
 
 
@@ -514,6 +633,8 @@ class _Follow:
     finish: str = ""
     window: LimitWindow | None = None
     added: int = 0
+    # The tools of Dot's the run cannot work without (:func:`tools_needed`), which the init line must list.
+    needed: tuple[str, ...] = ()
     stream: StreamMask = field(init=False)
 
     def __post_init__(self) -> None:
@@ -584,6 +705,12 @@ class _Follow:
                         f"Claude Code gave the model more than Dot's tools, so Dot ended the run: {problem}",
                         {"run_id": self.agent.run.id, "tools": list(event.tools)},
                     )
+                # Before the model's first word (item 1400): a bridge that came up short, the run is over before it can
+                # answer that its tools are gone.
+                listed: frozenset[str] = listed_tools(event, self.door)
+                absent: tuple[str, ...] = missing_tools(self.needed, listed)
+                if absent:
+                    raise tools_not_listed(absent, listed, {"run_id": self.agent.run.id, "tools": list(event.tools)})
                 self.inited = True
                 self.session_id = event.session_id or self.session_id
             case LimitSeen(window=window):
@@ -1027,6 +1154,15 @@ async def _bounds_of(agent: AgentRun) -> frozenset[str] | None:
     return opened_bounds(bounded, owner_server_groups(agent.opening.picks, picked_before), runtime.registry.tools)
 
 
+async def _agent_leaving_out(agent: AgentRun, bounds: frozenset[str] | None, missing: Sequence[str]) -> str | None:
+    """The name of the agent whose own list of tools (``bounds``) leaves out one of the ``missing`` tools, ``None`` when
+    the run's agent has no list or names them all: what leaves them out is then Dot's mode or Settings."""
+    agent_id: str | None = agent.run.agent_id
+    if bounds is None or agent_id is None or all(name in bounds for name in missing):
+        return None
+    return (await agent.runtime.store.get_agent(agent_id)).name
+
+
 def opened_bounds(bounded: frozenset[str], opened: frozenset[str], names: Iterable[str]) -> frozenset[str]:
     """``bounded``, an agent's tools, with those of ``names`` in the groups ``opened`` to it by the owner's picks."""
     return bounded | frozenset(name for name in names if group_of(name) in opened)
@@ -1101,8 +1237,10 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     # What the message came with stands under it at once, as in Dot's own loop (item 967).
     if agent.opening.picks != NO_PICKS:
         await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
-    tools: ToolRegistry = await _withheld_out(
-        runtime, run, door_tools(runtime.registry, run, await _bounds_of(agent)), ref
+    bounds: frozenset[str] | None = await _bounds_of(agent)
+    tools: ToolRegistry = await _withheld_out(runtime, run, door_tools(runtime.registry, run, bounds), ref)
+    needed: tuple[str, ...] = tools_needed(
+        (tool.spec.name for tool in tools_for_mode(runtime.registry, run.mode)), run.goal, run.source
     )
     queue: asyncio.Queue[_Item] = asyncio.Queue()
     quiet: _Quiet = _Quiet(heard=time.monotonic(), queue=queue)
@@ -1130,6 +1268,11 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     noted: Message = user_message(await _notes_for(agent, info, carried), ())
     await runtime.store.append_messages(run.thread_id, [goal, noted])
     prompt: str = await _prompt_of(agent, door)
+    # Before the program starts (item 1400): what Dot itself left out of the run's tools is known already. Outside the
+    # try below, whose end lets the chat's session go: the program never touched it.
+    lacking: tuple[str, ...] = missing_tools(needed, tools.tools)
+    if lacking:
+        raise tools_not_given(lacking, run.mode, await _agent_leaving_out(agent, bounds, lacking), {"run_id": run.id})
     # The chat's session is kept only when this run ended clean and its count of what the session saw was written:
     # a run that failed, was stopped by the owner or was cut at its limits after the program took its messages leaves
     # that count behind, and resumed, the session would hear them again (a stopped goal read as a new ask). Whatever
@@ -1176,6 +1319,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 started=started,
                 limits=limits_of(runtime.config.agent, run.mode),
                 quiet=quiet,
+                needed=needed,
             )
             tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr")
             pumps: tuple[asyncio.Task[None], ...] = (

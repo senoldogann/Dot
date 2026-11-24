@@ -41,6 +41,8 @@ from dotagent.tools.groups import CORE_GROUP, groups_of, tools_in
 _log = get_logger(__name__)
 
 FINISH_TOOL: str = "finish"
+# Shows the owner a notification: the one way a run nobody watches reaches them before it ends (item 1400).
+NOTIFY_TOOL: str = "notify"
 ASK_USER_TOOL: str = "ask_user"
 # Asks the owner for a key, a token or a password on a card of its own (item 857); the value never reaches the run.
 ASK_SECRET_TOOL: str = "ask_secret"
@@ -282,14 +284,14 @@ class NotifyArgs(ToolArgs):
 
 def _notify_tool() -> RegisteredTool:
     def classify(args: NotifyArgs, ctx: ToolContext) -> ActionInfo:
-        return _meta_action("notify", f"Show a notification: {args.title}")
+        return _meta_action(NOTIFY_TOOL, f"Show a notification: {args.title}")
 
     async def run(args: NotifyArgs, ctx: ToolContext) -> ToolResult:
         await ctx.runtime.notify(args.title, args.message)
         return ok("Notification shown.")
 
     return make_tool(
-        name="notify",
+        name=NOTIFY_TOOL,
         description="Show a macOS notification to the user, e.g. when a long task needs attention.",
         args_model=NotifyArgs,
         modes=ALL_MODES,
