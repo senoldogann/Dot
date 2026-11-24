@@ -356,7 +356,12 @@ async def test_a_run_and_a_helper_that_start_while_the_bus_drops_events_still_jo
         async with aclosing(follow_thread(context, chat.id, {})) as stream:
             async with asyncio.timeout(_WAIT_S):
                 assert b"event: synchronized" in await anext(stream)
-            # Unread meanwhile: the run starts in the chat, starts a helper, and another chat's run fills the queue.
+            # Unread meanwhile: a run of the chat starts and ends, the next one starts and starts a helper, and another
+            # chat's run fills the queue.
+            brief: RunRecord = await _run(store, chat.id, None)
+            await bus.emit(brief.id, "run_queued", {"goal": "goal", "parent_run_id": None}, True)
+            said: EventRecord = await bus.emit(brief.id, "assistant", {"step": 1, "text": "done"}, True)
+            await store.finish_run(brief.id, "done", "ok")
             late: RunRecord = await _run(store, chat.id, None)
             working.add(late.id)
             await bus.emit(late.id, "run_queued", {"goal": "goal", "parent_run_id": None}, True)
@@ -365,6 +370,7 @@ async def test_a_run_and_a_helper_that_start_while_the_bus_drops_events_still_jo
             for number in range(10):
                 await bus.emit(busy.id, "assistant", {"step": number}, True)
             wanted: set[int] = {
+                said.id,
                 (await bus.emit(late.id, "tool_call", {"tool": "shell"}, True)).id,
                 (await bus.emit(helper.id, "tool_call", {"tool": "read_file"}, True)).id,
             }
