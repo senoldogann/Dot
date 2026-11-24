@@ -192,6 +192,16 @@ def test_only_a_watched_run_whose_user_wants_questions_can_ask(
     assert can_ask_user(source, parent, approvals) is asks
 
 
+@pytest.mark.parametrize("approvals", ["supervised", "ask", "auto", "yolo"])
+def test_no_run_can_ask_while_free_mode_is_on_whatever_its_own_mode(approvals: ApprovalMode) -> None:
+    """Item 1563 (item 922: free mode, "no run asks anything, whatever its mode"): a watched run in a mode that asks
+    was the one place the question still waited for the owner; the same run with free mode off still can."""
+    assert can_ask_user(UI_SOURCE, None, approvals, free=True) is False
+    assert can_ask_user(UI_SOURCE, None, approvals, free=False) is (approvals != "yolo")
+    # What a run that cannot ask does with its question is [agent] questions, as for a yolo run.
+    assert question_mode("leave", can_ask_user(UI_SOURCE, None, approvals, free=True), True) == "leave"
+
+
 def test_a_run_of_the_daemon_a_person_answers_chooses_for_each_question_whether_to_wait() -> None:
     """Item 508: where the answer reaches the run while it works, the run chooses; a dotx command's run waits; a run
     nobody answers during it does what ``[agent] questions`` says."""
