@@ -31,6 +31,23 @@ export function planStep(step) {
 }
 
 /**
+ * What the plan's bubble and a phone's sheet of it (item 1383) hold: how far the plan has come (unless `head` is false:
+ * the sheet's own title says it), its targets, its steps as the Plan tab draws them, and the way to that tab, a button
+ * that calls `openTab()`.
+ */
+export function planContent({ steps, targets, openTab, head = true }) {
+  const done = steps.filter((step) => step.status === "done").length;
+  return [
+    ...(head
+      ? [el("div", { class: "plan-popover-head" }, el("span", { class: "plan-popover-title" }, "Plan"), el("span", { class: "plan-popover-count" }, `${done} / ${steps.length}`))]
+      : []),
+    ...(targets === "" ? [] : [planTargets(targets)]),
+    el("div", { class: "plan-list plan-popover-steps" }, ...steps.map(planStep)),
+    el("button", { class: "plan-popover-open", type: "button", onclick: openTab }, "Open in the side panel", icon("chevron")),
+  ];
+}
+
+/**
  * The plan over the composer (item 644): a click on `anchor` (the capsule's plan part) opens it as a bubble in `frame`
  * (the dock), with how far the plan has come, its targets, its steps as the Plan tab draws them, and the way to that tab
  * (`onOpenTab()`); a second click, Escape or a click outside closes it. It follows the plan while it is open. Returns
@@ -42,18 +59,14 @@ export function planBubble({ anchor, frame, onOpenTab }) {
   const popover = anchoredPopover({ anchor, frame, label: "Plan", build });
 
   function build() {
-    const done = steps.filter((step) => step.status === "done").length;
-    const openTab = () => {
-      popover.close();
-      onOpenTab();
-    };
-    const count = el("span", { class: "plan-popover-count" }, `${done} / ${steps.length}`);
-    return [
-      el("div", { class: "plan-popover-head" }, el("span", { class: "plan-popover-title" }, "Plan"), count),
-      ...(targets === "" ? [] : [planTargets(targets)]),
-      el("div", { class: "plan-list plan-popover-steps" }, ...steps.map(planStep)),
-      el("button", { class: "plan-popover-open", type: "button", onclick: openTab }, "Open in the side panel", icon("chevron")),
-    ];
+    return planContent({
+      steps,
+      targets,
+      openTab: () => {
+        popover.close();
+        onOpenTab();
+      },
+    });
   }
 
   return {

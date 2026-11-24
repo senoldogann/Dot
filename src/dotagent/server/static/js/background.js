@@ -20,9 +20,10 @@ function took(session, now) {
 
 /**
  * The line of the commands at work in the chat `threadId`, which goes right above the composer. Returns `{ element,
- * dispose() }`.
+ * dispose() }`. `onChange({ count, problem })` hears of every read: how many commands are at work, and whether they
+ * could not be read; the phone's capsule says it (item 1383).
  */
-export function backgroundWork({ threadId }) {
+export function backgroundWork({ threadId, onChange }) {
   const list = el("ul", { class: "background-list" });
   const problem = el("span", null);
   const unread = el(
@@ -78,6 +79,7 @@ export function backgroundWork({ threadId }) {
     shown = [];
     list.replaceChildren(...sessions.map((session) => row(session, now)));
     element.hidden = sessions.length === 0 && unread.hidden;
+    onChange({ count: sessions.length, problem: false });
     if (shown.length > 0 && ticker === null) {
       ticker = setInterval(tick, TICK_MS);
     } else if (shown.length === 0 && ticker !== null) {
@@ -95,6 +97,7 @@ export function backgroundWork({ threadId }) {
       problem.textContent = `The commands at work could not be read: ${error.message}`;
       unread.hidden = false;
       element.hidden = false;
+      onChange({ count: shown.length, problem: true });
     }
   }
 

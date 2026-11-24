@@ -12,7 +12,7 @@ import { clip, debounce, el, setText } from "./dom.js";
 import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
-import { loopRhythm, nextFiring } from "./rhythm.js";
+import { loopRhythm, nextFiring, shortRhythm } from "./rhythm.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, confirmDialog } from "./ui.js";
 
@@ -44,9 +44,12 @@ function rhythmWords(view) {
 
 /**
  * The line of the loops of the chat `threadId`, which goes right above the composer. Returns `{ element, refresh(),
- * dispose() }`: `refresh()` reads the loops again (after "/loop" made one).
+ * present(on), dispose() }`: `refresh()` reads the loops again (after "/loop" made one), and `present(on)` shows the
+ * rows whatever the head's fold says, for as long as they stand in a phone's sheet (item 1383), where no head is drawn.
+ * `onChange({ count, rhythm, problem })` hears of every read: how many loops there are, how often the one repeats (in
+ * few words, null for several) and whether the loops could not be read; the phone's capsule says it.
  */
-export function chatLoops({ threadId }) {
+export function chatLoops({ threadId, onChange }) {
   const list = el("ul", { class: "background-list", id: `chat-loops-${threadId}` });
   const count = el("span", { class: "chat-loops-count" });
   const soonest = el("span", { class: "chat-loops-next" });
@@ -61,6 +64,10 @@ export function chatLoops({ threadId }) {
     soonest,
   );
   let folded = readPref(FOLD_KEY) !== "open";
+  // The rows stand in a phone's sheet, which has no head to fold them: they show, as the pane's own fold was kept.
+  let presented = false;
+  // What the last read found: how many loops there are, and how often the one repeats.
+  let found = { count: 0, rhythm: null };
   // What the folded head says of the loops: how often the one repeats, or how many there are.
   let summary = t("loops.title");
   const problem = el("span", null);
@@ -83,7 +90,7 @@ export function chatLoops({ threadId }) {
   function paintFold() {
     toggle.setAttribute("aria-expanded", String(!folded));
     toggle.title = folded ? t("loops.show") : t("loops.hide");
-    list.hidden = folded;
+    list.hidden = folded && !presented;
     setText(title, folded ? summary : t("loops.title"));
     count.hidden = folded;
     soonest.hidden = !folded || soonest.textContent === "";
@@ -127,10 +134,13 @@ export function chatLoops({ threadId }) {
       setText(soonest, times.length === 0 ? "" : t("loops.next", { when: nextFiring(Math.min(...times), Date.now() / 1000) }));
       paintFold();
       element.hidden = loops.length === 0;
+      found = { count: loops.length, rhythm: loops.length === 1 ? shortRhythm(loops[0].record.cron ?? "") ?? loops[0].when : null };
+      onChange({ ...found, problem: false });
     } catch (error) {
       problem.textContent = t("loops.unread", { problem: error.message });
       unread.hidden = false;
       element.hidden = false;
+      onChange({ ...found, problem: true });
     }
   }
 
@@ -164,6 +174,10 @@ export function chatLoops({ threadId }) {
   return {
     element,
     refresh: load,
+    present: (on) => {
+      presented = on;
+      paintFold();
+    },
     dispose: () => {
       stopLifecycle();
       stopBack();
