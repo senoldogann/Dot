@@ -48,7 +48,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 
 ## What the native app does, and what it leaves to the web UI
 
-Native: pairing with the code of Settings › Phone, the chat list (working, waiting on you, unread; pull to refresh; drawn
+Native: pairing with the code of Settings › Phone, the chat list (working, waiting on you, unread; the pre-push hook's code reviews
+folded in a **Code reviews** section of their own at its foot, item 1664, `Core/ChatSections`; pull to refresh; drawn
 from disk at launch), a chat (messages that stream in, a tool step as one line, approval and question cards with Allow
 and Deny, and over the composer ONE capsule of glass (item 1390) whose segments are the
 run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background
