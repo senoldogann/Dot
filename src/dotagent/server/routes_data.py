@@ -35,12 +35,14 @@ from dotagent.memory.service import (
     MemoryIndex,
     OwnerSection,
     SavedMemory,
+    drop_proposed_change,
     forget_memory,
     owner_section,
     recall,
     recent_scores,
     resting,
     save_memory,
+    take_proposed_change,
     update_memory_note,
 )
 from dotagent.memory.service import (
@@ -80,6 +82,7 @@ from dotagent.server.views import (
     OwnerLinesRequest,
     PinRequest,
     ProposalOutcome,
+    ProposalRequest,
     RuleDraftRequest,
     RuleEnabledRequest,
     RuleMoveRequest,
@@ -267,6 +270,10 @@ def rules_router(ctx: ServerContext) -> APIRouter:
     return router
 
 
+# The most notes with a change proposed by a run that the Memory page lists at once.
+_MOST_PROPOSALS: int = 200
+
+
 def memories_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     index: MemoryIndex = ctx.runtime.memory
@@ -378,7 +385,12 @@ def memories_router(ctx: ServerContext) -> APIRouter:
     async def search_memories(query: Annotated[SearchQuery, Query()]) -> list[MemoryHit]:
         return await recall(index, query.q, query.limit)
 
-    # After the routes above: "owner", "learning" and "search" are not ids.
+    @router.get("/memories/proposed")
+    async def proposed_changes() -> list[MemoryRecord]:
+        """The owner's notes a run proposed a change of that waits for them, the newest proposal first."""
+        return await index.store.memories_with_proposals(_MOST_PROPOSALS)
+
+    # After the routes above: "owner", "learning", "search" and "proposed" are not ids.
     @router.get("/memories/{memory_id}")
     async def get_memory(memory_id: str) -> MemoryRecord:
         return await index.store.get_memory(memory_id)
@@ -391,6 +403,17 @@ def memories_router(ctx: ServerContext) -> APIRouter:
     @router.patch("/memories/{memory_id}")
     async def edit_memory(memory_id: str, request: MemoryRequest) -> MemoryRecord:
         return await update_memory_note(index, memory_id, request.content, request.tags)
+
+    @router.post("/memories/{memory_id}/proposal/take")
+    async def take_proposal(memory_id: str, request: ProposalRequest) -> MemoryRecord:
+        """Take the change a run proposed for the owner's note: the note gets its words as the owner's own correction
+        (409 when the proposal is not the one shown)."""
+        return await take_proposed_change(index, memory_id, request.at)
+
+    @router.post("/memories/{memory_id}/proposal/drop")
+    async def drop_proposal(memory_id: str, request: ProposalRequest) -> MemoryRecord:
+        """Drop the change a run proposed for the owner's note; the note stays (409 when it is not the one shown)."""
+        return await drop_proposed_change(index, memory_id, request.at)
 
     @router.delete("/memories/{memory_id}")
     async def delete_memory(memory_id: str) -> MemoryRecord:

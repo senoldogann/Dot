@@ -9,7 +9,7 @@
 import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { orderControl, proposedSection, trashSection } from "../memorylife.js";
+import { changesSection, orderControl, proposedSection, trashSection } from "../memorylife.js";
 import { moreButton } from "../menu.js";
 import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
@@ -175,6 +175,10 @@ function memoryRow({ record, similarity, score, rested }, actions) {
   const badges = () => [
     match,
     pinned ? el("span", { class: "badge b-muted", title: "A pinned note never rests." }, icon("pin"), "Pinned") : null,
+    // A pinned note a task saved while reading outside content is handed to no task until the owner vouches for its words.
+    pinned && record.tainted
+      ? el("span", { class: "badge b-warn", title: "Tasks are not handed this note: a task that had read outside content wrote it. Edit and save it to vouch for its words." }, "Not handed to tasks")
+      : null,
     // A run's core note goes to every run only once the owner pins it; till then it goes where it fits (item 613).
     !pinned && record.source_run !== null && record.tags.includes("core")
       ? el(
@@ -187,6 +191,7 @@ function memoryRow({ record, similarity, score, rested }, actions) {
         )
       : null,
     mergedBadge(record),
+    record.proposed ? el("span", { class: "badge b-muted", title: "A task proposed new words for this note: see Changes tasks proposed." }, "Change proposed") : null,
     record.tainted
       ? el("span", { class: "badge b-warn", title: "The task that saved it had read content other people can write." }, icon("alert"), "From outside content")
       : null,
@@ -731,10 +736,11 @@ export function mount(root, ctx) {
       }
     },
   };
+  const changes = changesSection(lifeHooks);
   const proposed = proposedSection(lifeHooks);
   const trash = trashSection(lifeHooks);
   async function refreshLife() {
-    await Promise.all([proposed.load(), trash.load()]);
+    await Promise.all([changes.load(), proposed.load(), trash.load()]);
   }
   const narrowing = segmented(FILTERS, filter, (id) => {
     filter = id;
@@ -875,7 +881,7 @@ export function mount(root, ctx) {
   learningSection.classList.add("learning-section");
 
   ctx.head.setLead("Notes Dot keeps between tasks. It recalls the ones that fit the task at hand.");
-  root.append(asked, el("div", { class: "set-sections" }, composer, proposed.element, notesSection, trash.element, ownerSection, learningSection));
+  root.append(asked, el("div", { class: "set-sections" }, composer, changes.element, proposed.element, notesSection, trash.element, ownerSection, learningSection));
   attempt(reload);
   attempt(refreshLife);
   attempt(loadAsked);

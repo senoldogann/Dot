@@ -123,9 +123,9 @@ async def test_a_rewrite_keeps_the_new_text_without_a_vector_when_the_embedder_i
         saved: SavedMemory = await save_memory(index, NOTE, ["pets"], "run_1", None, None, False)
         assert await index.store.all_memory_vectors() != []
         embedder.down = True
-        rewritten: MemoryRecord = await rewrite_memory_note(
-            index, saved.record.id, REWRITTEN, ["pets"], "run_1", False, None
-        )
+        rewritten: MemoryRecord = (
+            await rewrite_memory_note(index, saved.record.id, REWRITTEN, ["pets"], "run_1", False, None)
+        ).record
         vectors: list[tuple[str, tuple[float, ...]]] = await index.store.all_memory_vectors()
     assert rewritten.content == REWRITTEN
     assert rewritten.id == saved.record.id

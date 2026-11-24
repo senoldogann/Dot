@@ -1,5 +1,5 @@
-// The life of the notes on Settings › Memory (item 584): the notes proposed to be forgotten, the trash of the ones the
-// owner forgot, and the choice of the order the notes are listed in. Nothing here deletes a note on its own: a note that
+// The life of the notes on Settings › Memory (item 584): the changes runs proposed for the owner's notes, the notes
+// proposed to be forgotten, the trash of the ones the owner forgot, and the choice of the order the notes are listed in. Nothing here deletes a note on its own: a note that
 // rested for [memory] forget_after_days is only proposed, and the owner's Forget moves it to the trash, where it waits
 // [memory] trash_days and Restore brings it back.
 
@@ -180,6 +180,81 @@ export function proposedSection(hooks) {
 
   async function load() {
     view = await api.get("/memories/proposals");
+    paint();
+  }
+
+  return { element: section, load };
+}
+
+/**
+ * The changes runs proposed for the owner's notes: a note the owner wrote, pinned or corrected keeps their words, and a
+ * run's rewrite of it waits here, the note as runs are handed it above the proposed words, marked when the run had read
+ * content other people can write. Use it makes the proposed words the owner's own (they vouch for them); Drop leaves the
+ * note as it is. Each decision names when the change was proposed, so that a newer one is never taken unseen.
+ * `hooks.noteText(content)` draws a note's words; `hooks.onDecided()` runs after a decision. Returns the section, hidden
+ * while no change waits, and `load()`.
+ */
+export function changesSection(hooks) {
+  let notes = [];
+  const count = el("span", { class: "life-count" });
+  const rows = el("div", { class: "note-rows note-proposed-rows" });
+  const section = setSection({
+    title: ["Changes tasks proposed", count],
+    lead: "These are your notes: tasks are handed them as they stand, and a task's change of one waits here for you.",
+    body: setCard(rows),
+  });
+  section.classList.add("notes-changes");
+  section.dataset.changes = "";
+  section.hidden = true;
+
+  async function decide(record, action, words) {
+    try {
+      await api.post(`/memories/${encodeURIComponent(record.id)}/proposal/${action}`, { at: record.proposed.at });
+      toast("ok", words);
+    } finally {
+      await load();
+      hooks.onDecided();
+    }
+  }
+
+  function paint() {
+    if (notes.length === 0) {
+      section.hidden = true;
+      return;
+    }
+    count.textContent = String(notes.length);
+    rows.replaceChildren(
+      ...notes.map((record) => {
+        const change = record.proposed;
+        const use = el("button", { class: "btn ghost sm", type: "button", title: "Make the proposed words your note's: tasks are handed them from now on" }, icon("check"), "Use it");
+        use.addEventListener("click", () => attempt(() => decide(record, "take", "The note now says what the task proposed.")));
+        const drop = el("button", { class: "btn ghost sm", type: "button", title: "Drop the proposed words: the note stays as it is" }, icon("x"), "Drop");
+        drop.addEventListener("click", () => attempt(() => decide(record, "drop", "Dropped the proposed change; the note stays.")));
+        const outside = change.tainted
+          ? el("span", { class: "badge b-warn", title: "The task that proposed it had read content other people can write." }, icon("alert"), "From outside content")
+          : null;
+        const proposedAt = el("span", { title: dateTimeFull(change.at) }, ["Proposed ", ago(change.at), " by ", el("a", { href: `#/runs/${change.run_id}` }, "a task")]);
+        return el(
+          "div",
+          { class: "note-row", dataset: { decided: record.id } },
+          el(
+            "div",
+            { class: "note-main" },
+            el("div", { class: "muted" }, "Now"),
+            hooks.noteText(clip(record.content, PREVIEW_CHARS)),
+            el("div", { class: "muted" }, "Proposed"),
+            hooks.noteText(clip(change.content, PREVIEW_CHARS)),
+            el("div", { class: "note-meta" }, change.tags.map((tag) => el("span", { class: "chip" }, tag)), outside, el("span", { class: "note-when" }, proposedAt)),
+          ),
+          el("div", { class: "note-actions note-decide" }, use, drop),
+        );
+      }),
+    );
+    section.hidden = false;
+  }
+
+  async function load() {
+    notes = await api.get("/memories/proposed");
     paint();
   }
 

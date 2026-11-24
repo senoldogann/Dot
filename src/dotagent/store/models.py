@@ -689,6 +689,19 @@ class MergedSource(FrozenModel):
 OWNER_EDIT: str = "owner"
 
 
+class ProposedChange(FrozenModel):
+    """A run's rewrite of a note the owner wrote or approved, kept beside the note for the owner to take or drop on the
+    Memory page (item D1 of the 2026-11-24 audit): the note runs are handed keeps the owner's words until then.
+    ``run_id`` is the run that proposed it, ``tainted`` whether that run had read content third parties can author,
+    ``at`` when it was proposed (the page sends it back, so that it takes or drops the change it showed)."""
+
+    content: str
+    tags: tuple[str, ...]
+    run_id: str
+    tainted: bool
+    at: float
+
+
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
@@ -699,7 +712,8 @@ class MemoryRecord(FrozenModel):
     The fields with a default are NULL in a note written before them (item 584): ``merged_from`` names the notes a
     merged note was made of, ``merged_into`` the merged note a resting one was merged into, ``pinned_at`` is when the
     owner pinned the note (it never rests) and ``rested_at`` when it began to rest. ``edited_by`` is
-    :data:`OWNER_EDIT` when the owner later corrected a note a run wrote."""
+    :data:`OWNER_EDIT` when the owner later corrected a note a run wrote. ``proposed`` is a run's rewrite of a note the
+    owner wrote or approved, which waits for them."""
 
     id: str
     content: str
@@ -721,6 +735,17 @@ class MemoryRecord(FrozenModel):
     # that saved the note is still handed the correction. A run's own rewrite clears it. NULL on a note the owner
     # has not rewritten, including every note stored before the column.
     edited_by: str | None = None
+    # A run's rewrite that waits for the owner, when the note is the owner's (written, pinned or corrected by them);
+    # ``None`` otherwise, and on every note stored before the columns.
+    proposed: ProposedChange | None = None
+
+
+class MemoryRewrite(FrozenModel):
+    """What a run's rewrite of a note did: the note as it stands, and whether the rewrite only waits beside it for the
+    owner (``proposed``) because the note is the owner's."""
+
+    record: MemoryRecord
+    proposed: bool
 
 
 class ResultStep(FrozenModel):

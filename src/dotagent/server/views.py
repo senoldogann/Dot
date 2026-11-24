@@ -1566,6 +1566,13 @@ class PinRequest(FrozenModel):
     pinned: StrictBool
 
 
+class ProposalRequest(FrozenModel):
+    """Take or drop the change a run proposed for one of the owner's notes: ``at`` is when it was proposed, as the
+    Memory page showed it, so that a newer proposal is never taken unseen."""
+
+    at: float
+
+
 class UnmergeView(FrozenModel):
     """A merge taken back (item 584): the merged note, now in the trash, and the notes that woke."""
 

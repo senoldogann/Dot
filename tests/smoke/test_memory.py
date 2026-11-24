@@ -548,17 +548,25 @@ async def test_the_model_can_save_search_and_forget_notes(runtime: Runtime) -> N
 
 
 @requires_embedder
-async def test_a_note_the_owner_wrote_becomes_the_runs_once_a_run_rewrites_it(runtime: Runtime) -> None:
+async def test_a_run_rewrite_of_a_note_the_owner_wrote_waits_for_the_owner(runtime: Runtime) -> None:
+    """Audit 2026-11-24, D1: a run's rewrite of the owner's note no longer makes it the run's; it waits beside the
+    note as a proposal, which the tool says, and the note keeps the owner's words."""
     owners: SavedMemory = await save_memory(runtime.memory, DENTIST, [], None, None, None, False)
     assert owners.record.source_run is None
     rewritten: str = "The user's dentist is now Dr. Korhonen, near the station."
     updated, _ = await _call(
         runtime, "memory_update", {"memory_id": owners.record.id, "content": rewritten, "tags": []}
     )
-    # The text is the model's now, so it no longer reads as a statement of the owner.
-    assert "(you saved it, " in updated.text, updated.text
+    assert not updated.is_error, updated.text
+    assert updated.text.startswith("Proposed: "), updated.text
     record: MemoryRecord = await runtime.store.get_memory(owners.record.id)
-    assert (record.content, record.source_run, record.agent_id) == (rewritten, "memory-test", None)
+    assert (record.content, record.source_run, record.agent_id) == (DENTIST, None, None)
+    assert record.proposed is not None
+    assert (record.proposed.content, record.proposed.run_id, record.proposed.tainted) == (
+        rewritten,
+        "memory-test",
+        False,
+    )
 
 
 async def test_the_policy_gates_what_the_model_may_remember(runtime: Runtime) -> None:
