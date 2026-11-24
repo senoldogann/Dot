@@ -3,7 +3,8 @@
 ## Memory
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
-`memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
+`memory_search` and `memory_forget` are tools of the agent (`memory_save` and `memory_update` name the longest note,
+`[memory] max_chars`, 600, in their description: item 1690); you manage the same notes with `dotx memory` and in the web
 UI, where Settings › Memory (items 373 and 566) is the box that adds a note at its head (its tags beside it, one fact
 per note, **Remember** or ⌘Enter; on a phone the tags have a line of their own and **Remember** stands at the right of
 the line under them, and a touch screen is not offered the key, item 576), then **Notes** with how many there are, a

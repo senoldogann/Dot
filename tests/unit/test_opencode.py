@@ -295,7 +295,7 @@ def _registry() -> ToolRegistry:
             (build_shell_tool(),),
             build_web_tools(),
             build_browser_tools(),
-            build_memory_tools(),
+            build_memory_tools(600),
             build_schedule_tools(),
             build_delegate_tools(),
             build_meta_tools(),
