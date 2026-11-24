@@ -173,6 +173,11 @@ async def test_the_way_down_is_a_round_button_beside_the_capsule_and_takes_the_r
             await page.evaluate(
                 """() => {
                   const thread = document.querySelector('.run-thread');
+                  thread.addEventListener('scroll', () => {
+                    requestAnimationFrame(() => requestAnimationFrame(() => {
+                      thread.dataset.testBottomScroll = 'observed';
+                    }));
+                  }, { once: true });
                   for (let i = 0; i < 40; i++) {
                     const p = document.createElement('p');
                     p.textContent = 'earlier message ' + i + ' ' + 'lorem ipsum '.repeat(12);
@@ -181,8 +186,11 @@ async def test_the_way_down_is_a_round_button_beside_the_capsule_and_takes_the_r
                   thread.scrollTop = thread.scrollHeight;
                 }"""
             )
-            await page.wait_for_function("() => document.querySelector('.run-thread').scrollTop > 0")
-            await page.wait_for_timeout(200)
+            await page.wait_for_function(
+                "() => { const t = document.querySelector('.run-thread');"
+                " return t.dataset.testBottomScroll === 'observed'"
+                " && t.scrollTop > 0 && t.scrollTop + t.clientHeight >= t.scrollHeight - 2; }"
+            )
             await page.evaluate("() => { document.querySelector('.run-thread').scrollTop = 0; }")
             await expect(end).to_be_visible()
             await expect(end).to_have_attribute("aria-label", "Jump to latest")

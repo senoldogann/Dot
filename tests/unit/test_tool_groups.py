@@ -101,6 +101,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "replies",
         "recon",
         "pages",
+        "appearance",
         "skills",
         "vault",
         "meetings",
@@ -121,6 +122,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "replies",
         "recon",
         "pages",
+        "appearance",
         "skills",
         "meetings",
         "video",
@@ -187,6 +189,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "memory_admin",
         "office",
         "pages",
+        "appearance",
         "pipeline",
         "recon",
         "replies",
@@ -273,6 +276,7 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "(recon, security_scan)",
         "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "
         "(show_page)",
+        "- appearance: read or change Dot’s theme when the owner asks (theme_read, theme_apply, theme_undo)",
         "- skills: saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way "
         "(skill_save)",
         "- vault: the owner's saved contact details (name, address, phone, email) to type into forms (vault_contacts)",

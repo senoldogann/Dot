@@ -28,7 +28,7 @@ enum MessageActions {
         case .user(let text), .assistant(let text, _), .answer(let text, _): text.isEmpty ? nil : text
         case .tool(let row): row.line
         case .note(let text, _): text
-        case .approval: nil
+        case .approval, .shownPage: nil
         }
     }
 

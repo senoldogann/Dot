@@ -630,6 +630,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Team            | `create_agent`, `create_team` (a team of agents, item 864), `message_agent`, `assign_work`, `work_orders`, `review_work` (work orders the agents work on without the lead waiting, item 907) |
 | Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890), `chats`, `read_chat` (the chats of this Mac, found and read, item 953), `send_to_chat` (a note to the run at work in one, item 957) |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
+| Appearance      | `theme_read`, `theme_apply`, `theme_undo` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
@@ -999,3 +1000,16 @@ agent is bound to, as its parent's are, and its prompt holds the agent's instruc
 question for your yes, that nobody answers in time is kept where its parent keeps them, with `[policy] unanswered =
 "park"` (item 485, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)): your answer goes to the
 parent, or to a run that goes on from it.
+
+## Changing Dot's appearance from a chat
+
+Describe the look you want, then ask Dot to refine or undo it. The `appearance` tool group composes light and dark
+palettes from named sRGB roles, validates contrast, and can use a raster image from the chat workspace as artwork.
+Quiet Forest is one bundled example. Both palettes travel with the theme so every connected device keeps its own
+light or dark preference. Web and desktop use the same roles as the native iPhone conversation.
+
+The daemon stores the current theme and its predecessor together. An out-of-date revision is refused so two changes
+cannot silently overwrite each other. Visible clients refresh the look while keeping the conversation open. The user
+can undo the last change or return to the device's preferences from the chat or from Appearance on web and desktop.
+With free mode off, each change requested in chat asks for your approval in every mode except `yolo`.
+Only you can answer it.

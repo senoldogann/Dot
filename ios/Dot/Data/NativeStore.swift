@@ -28,6 +28,7 @@ final class NativeStore {
     private(set) var connection: Connection = .connecting
     private(set) var refreshing: Bool = false
     private(set) var lastError: String?
+    private(set) var sharedAppearance: CachedAppearance?
     private(set) var models: ModelChoices?
     /// Every provider's models, for the pickers; read when a picker opens, and again when asked (`loadProviders`).
     private(set) var providers: [ProviderModels] = []
@@ -108,6 +109,15 @@ final class NativeStore {
             })
         let folder: URL = directory ?? ChatCache.directory(for: host)
         self.folder = folder
+        let appearanceFile: URL = folder.appending(path: "shared-appearance.json")
+        if FileManager.default.fileExists(atPath: appearanceFile.path) {
+            do {
+                self.sharedAppearance = try JSONDecoder().decode(CachedAppearance.self, from: Data(contentsOf: appearanceFile))
+            } catch {
+                Logger(subsystem: "dev.dotagent.phone", category: "store")
+                    .warning("Could not read the cached appearance: \(error.localizedDescription, privacy: .public)")
+            }
+        }
         let chatCache: ChatCache = ChatCache(directory: folder)
         self.cache = chatCache
         self.drafts = DraftStore(directory: folder)
@@ -137,6 +147,41 @@ final class NativeStore {
     /// stands in the way of reading.
     func banner(now: Date = Date()) -> ConnectionBanner? {
         ConnectionBanner.make(link: linkState, connection: connection, lastUpdated: lastUpdated, waiting: outbox.items.count, now: now)
+    }
+
+    /// Keep the last appearance during a network outage and catch up as soon as the foreground view returns.
+    func followSharedAppearance() async {
+        while !Task.isCancelled {
+            do {
+                let appearance: SharedAppearance = try await api.get("/api/active-theme")
+                try Task.checkCancellation()
+                if appearance != sharedAppearance?.selection {
+                    var artwork: Data?
+                    if appearance.active?.artwork == "custom" {
+                        let reply: SharedAppearance.Artwork = try await api.get(
+                            "/api/active-theme/artwork", query: [URLQueryItem(name: "revision", value: String(appearance.revision))])
+                        artwork = reply.jpeg
+                    }
+                    try Task.checkCancellation()
+                    let updated: CachedAppearance = CachedAppearance(selection: appearance, artwork: artwork)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try JSONEncoder().encode(updated).write(to: folder.appending(path: "shared-appearance.json"), options: .atomic)
+                    sharedAppearance = updated
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                logger.debug("Could not refresh the shared appearance: \(error.localizedDescription, privacy: .public)")
+            }
+            do {
+                try await Task.sleep(for: .seconds(3))
+            } catch is CancellationError {
+                return
+            } catch {
+                logger.debug("Could not wait to refresh the shared appearance: \(error.localizedDescription, privacy: .public)")
+                return
+            }
+        }
     }
 
     // MARK: Start

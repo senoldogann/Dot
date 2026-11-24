@@ -60,6 +60,7 @@ struct ChatItem: Sendable, Hashable, Identifiable {
         case tool(ToolRow)
         case approval(ApprovalCard)
         case note(String, Tone)
+        case shownPage(id: String, title: String)
     }
 
     let id: String
@@ -291,6 +292,12 @@ struct ChatState: Sendable, Equatable {
         case "assistant":
             guard isRoot else { return }
             assistant(event)
+        case "page_shown":
+            guard isRoot else { return }
+            if let page: String = data["page_id"]?.string, page.wholeMatch(of: /page_[A-Za-z0-9_-]{24}/) != nil,
+               let title: String = data["title"]?.string, !title.isEmpty {
+                upsert(ChatItem(id: "page:\(page)", kind: .shownPage(id: page, title: title), ts: event.ts))
+            }
         case "tool_call":
             toolCall(event, isRoot: isRoot)
         case "tool_result":

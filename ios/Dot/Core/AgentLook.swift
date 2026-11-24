@@ -52,7 +52,7 @@ enum SpeakerRule {
             switch earlier.kind {
             case .user: return true
             case .assistant, .answer: return false
-            case .tool, .approval, .note: continue
+            case .tool, .approval, .note, .shownPage: continue
             }
         }
         return true
@@ -64,7 +64,7 @@ extension ChatItem.Kind {
     var isAgentLine: Bool {
         switch self {
         case .assistant, .answer: true
-        case .user, .tool, .approval, .note: false
+        case .user, .tool, .approval, .note, .shownPage: false
         }
     }
 }

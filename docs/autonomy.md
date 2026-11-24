@@ -63,9 +63,9 @@ strictest first (item 398). The composer's Options menu lists them with their ic
 
 What `yolo` and free mode guarantee, the exact exceptions and the test that keeps them: [Freedom](freedom.md).
 
-In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
-[Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
-Allowed, the run makes the change with the file tools; a command line never makes it, and neither does OpenCode's own
+In every mode but `yolo`, Dot asks you before a run changes its code, plugins, skills, playbooks, shared appearance or
+emergency stop. Only you can approve those changes. [Safety](safety.md#safety)
+For approved file edits, the run uses the file tools; a command line never makes them, and neither does OpenCode's own
 agent, which writes past the journal `dotx undo` reads (item 398). So is a login filled from your 1Password (item 493)
 or from Dot's own vault (item 621): the review model never answers it, and a rule of yours can only hand it to you.
 

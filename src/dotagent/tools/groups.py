@@ -60,6 +60,9 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "read_chat": "office",
     "send_to_chat": "office",
     "show_page": "pages",
+    "theme_read": "appearance",
+    "theme_apply": "appearance",
+    "theme_undo": "appearance",
     # The owner's saved contact details (item 621).
     "vault_contacts": "vault",
     # Dot's own list of work for later (item 715).
@@ -81,6 +84,7 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "watch_video": "video",
 }
 _PURPOSES: dict[str, str] = {
+    "appearance": "read or change Dot’s theme when the owner asks",
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
     "meetings": "the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes",
     "phone": "the owner's iPhone over WebDriverAgent: whether it answers and whether it is locked",

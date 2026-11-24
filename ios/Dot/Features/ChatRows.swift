@@ -4,6 +4,12 @@ import UIKit
 /// One row of the conversation. Dot's words are plain text on the ground (no bubble); the owner's words are a raised
 /// rounded box; a tool step is a quiet line; a step that needs the owner is a card that asks.
 struct ChatRow: View {
+    @Environment(\.shownPageHost) private var host
+    @Environment(\.sharedAppearancePalette) private var palette
+
+    private var ink: Color { palette?.color(\.text, fallback: Theme.text) ?? Theme.text }
+    private var bubble: Color { palette?.color(\.raised, fallback: Theme.raised) ?? Theme.raised }
+
     let item: ChatItem
     let onDecide: (ApprovalCard, Bool, String) -> Void
     var onTool: (ToolRow) -> Void = { _ in }
@@ -15,11 +21,11 @@ struct ChatRow: View {
                 Spacer(minLength: 48)
                 Text(LinkStyle.styled(text))
                     .font(Theme.body)
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(ink)
                     .tint(Theme.text)
                     .padding(.horizontal, Space.l)
                     .padding(.vertical, Space.m - 1)
-                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.l + 2))
+                    .background(bubble, in: RoundedRectangle(cornerRadius: Radius.l + 2))
                     .overlay(RoundedRectangle(cornerRadius: Radius.l + 2).strokeBorder(Theme.hairline, lineWidth: 1))
             }
         case .assistant(let text, _):
@@ -40,6 +46,10 @@ struct ChatRow: View {
                 .accessibilityHint("Shows the step's arguments and result")
         case .approval(let card):
             ApprovalCardView(card: card, onDecide: onDecide)
+        case .shownPage(let id, let title):
+            if let host {
+                ShownPageRow(title: title, url: host.url(path: "/pages/\(id)"))
+            }
         case .note(let text, let tone):
             Text(text)
                 .font(Theme.meta)
@@ -53,6 +63,7 @@ struct ChatRow: View {
 /// Dot's words: prose with inline markdown and plain bright links, fenced code in a block of its own.
 struct MessageText: View {
     let text: String
+    @Environment(\.sharedAppearancePalette) private var palette
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
@@ -61,8 +72,8 @@ struct MessageText: View {
                 case .prose(let prose):
                     Text(LinkStyle.styled(prose))
                         .font(Theme.body)
-                        .foregroundStyle(Theme.text)
-                        .tint(Theme.text)
+                        .foregroundStyle(palette?.color(\.text, fallback: Theme.text) ?? Theme.text)
+                        .tint(palette?.color(\.accent, fallback: Theme.text) ?? Theme.text)
                         .lineSpacing(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 case .code(let code):

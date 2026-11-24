@@ -56,6 +56,7 @@ import {
   showInspector,
   WORK_SHOWN,
 } from "../layout.js";
+import { applySharedAppearance, readSharedAppearance } from "../sharedappearance.js";
 import { choiceSetting, rangeSetting, switchSetting } from "../panels.js";
 import {
   SCHEMES,
@@ -874,6 +875,29 @@ function typeCard() {
   return { element };
 }
 
+function sharedAppearanceCard() {
+  /** @param {"forest" | "undo" | "local"} choice */
+  async function apply(choice) {
+    const current = await readSharedAppearance(undefined);
+    await applySharedAppearance(current.revision, choice);
+  }
+  return section(
+    "Shared appearance",
+    el(
+      "div",
+      { class: "card-pad" },
+      el("p", { class: "hint" }, "Ask Dot in chat to create or adjust a theme. Your shared appearance follows you across connected clients."),
+      el(
+        "div",
+        { class: "row shared-appearance-actions" },
+        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("forest")) }, "Use Quiet Forest"),
+        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("undo")) }, "Undo appearance change"),
+        el("button", { class: "btn", type: "button", onclick: () => attempt(() => apply("local")) }, "Use device theme"),
+      ),
+    ),
+  );
+}
+
 /** Draw the Appearance tab into `root`. Returns the function that stops its listeners. */
 export function mount(root, ctx) {
   const schemes = schemeCards();
@@ -881,6 +905,7 @@ export function mount(root, ctx) {
   const motion = motionCard();
   const others = [
     section("Colour scheme", el("div", { class: "card-pad" }, schemes.element)),
+    sharedAppearanceCard(),
     typeCard().element,
     look.element,
     motion.element,
