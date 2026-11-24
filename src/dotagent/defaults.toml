@@ -167,6 +167,11 @@ models_ttl_s = 3600.0
 # tools works for it is ended, and the run fails.
 command = "claude"
 silence_s = 600.0
+# A program that ends before its result with nobody ending it (killed from outside, crashed) is started again with
+# --resume in the same run, after 2 s and after 10 s, at most this many times in a run (item 1581), told that it was
+# cut off and to look at the real state before it repeats anything; never after a call that sent a message or mail for
+# you, paid or posted in your name was in flight, nor after your Stop. 0 turns it off: the run then fails as it did.
+continue_cut = 2
 
 [providers.opencode_go]
 base_url = "https://opencode.ai/zen/go/v1"

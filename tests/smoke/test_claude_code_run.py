@@ -10,6 +10,7 @@ import asyncio
 import dataclasses
 import json
 import os
+import re
 import stat
 import sys
 import time
@@ -677,17 +678,27 @@ async def _failed_context(room: Room, ended: RunRecord) -> dict[str, object]:
     ],
 )
 async def test_a_program_that_ends_before_its_result_says_how_it_ended(
-    room: Room, ends: EndedTogether, goal: str, returncode: int, named: str | None, stderr_says: str
+    room: Room,
+    ends: EndedTogether,
+    monkeypatch: pytest.MonkeyPatch,
+    goal: str,
+    returncode: int,
+    named: str | None,
+    stderr_says: str,
 ) -> None:
     """Item 1580: a program killed from outside ended its run with "Claude Code ended before it answered", its stderr
     empty and nothing else. The error's context and a log line now carry its exit code and signal, the end of its error
-    stream, that it had said what the model has, the steps it took and the seconds since its last line."""
+    stream, that it had said what the model has, the steps it took and the seconds since its last line. (Continuing the
+    run is off here, item 1581's own tests have it on: the run ends with the cut, as it did.)"""
+    await _continuing(room, monkeypatch, 0)
     with capture_logs() as logs:
         ended: RunRecord = await _run(room, goal)
     assert ended.status == "failed" and ended.result == "Claude Code ended before it answered", ended.result
     context: dict[str, object] = await _failed_context(room, ended)
     assert context["returncode"] == returncode and context["signal"] == named and context["exited"] is True
-    assert context["inited"] is True and context["steps"] == 1 and context["claude_session"] == "ses-standin-1"
+    assert context["inited"] is True and context["steps"] == 1
+    assert re.fullmatch(r"ses-cut-[0-9a-f]{8}", str(context["claude_session"])), context["claude_session"]
+    assert context["continued"] == 0 and "continue_cut = 0" in str(context["not_continued"])
     assert isinstance(context["stderr"], str) and stderr_says in context["stderr"]
     assert isinstance(context["silent_s"], float) and 0 <= context["silent_s"] < 30
     assert isinstance(context["cut_at"], str) and len(context["cut_at"]) == len("10:44:04")
@@ -699,9 +710,12 @@ async def test_a_program_that_ends_before_its_result_says_how_it_ended(
     assert failed and failed[0]["context"]["returncode"] == returncode  # type: ignore[index]  # a dict by the lines above
 
 
-async def test_programs_cut_together_are_said_in_one_line(room: Room, ends: EndedTogether) -> None:
+async def test_programs_cut_together_are_said_in_one_line(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Item 1580: five programs ended within 20 ms of each other and nothing said so. Two runs whose programs are cut
     in the same window are one line, ``claude_code_programs_ended_together``, with their run ids and signals."""
+    await _continuing(room, monkeypatch, 0)
     with capture_logs() as logs:
         first, second = await asyncio.gather(_run(room, "Please die by sigkill."), _run(room, "Please die by sigterm."))
         assert not [line for line in logs if line["event"] == "claude_code_programs_ended_together"]
@@ -731,3 +745,11 @@ async def test_a_stop_that_ends_the_program_is_no_cut(room: Room, ends: EndedTog
     assert not [
         line for line in logs if line["event"] in ("claude_code_program_cut", "claude_code_programs_ended_together")
     ]
+
+
+async def _continuing(room: Room, monkeypatch: pytest.MonkeyPatch, count: int, wait_s: float = 0.05) -> None:
+    """How often a cut run is continued (``[providers.claude_code] continue_cut``) for this test, and how long Dot waits
+    before it starts the program again (2 s and 10 s in the owner's Dot)."""
+    provider = await room.runtime.router.provider("claude_code")
+    monkeypatch.setattr(provider, "_config", provider.config.model_copy(update={"continue_cut": count}))
+    monkeypatch.setattr(cut_module, "CONTINUE_AFTER_S", (wait_s, wait_s))

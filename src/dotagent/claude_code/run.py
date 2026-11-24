@@ -46,7 +46,7 @@ import tempfile
 import time
 from collections.abc import AsyncIterator, Iterable, Sequence
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -103,7 +103,21 @@ from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
-from dotagent.claude_code.cut import ProgramExit, ended_by_dot, exit_seen, mark_ended, note_cut
+from dotagent.claude_code.cut import (
+    CONTINUED_EVENT,
+    ProgramExit,
+    continuation_note,
+    continue_after_s,
+    continued_event_data,
+    ended_by_dot,
+    exit_seen,
+    mark_ended,
+    note_cut,
+    outward,
+    resume_refused,
+    run_refusal,
+    why_not_continued,
+)
 from dotagent.claude_code.env import claude_env
 from dotagent.claude_code.stream import (
     SEARCH_TOOL,
@@ -167,10 +181,11 @@ from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import NO_PICKS, AgentRecord, RunMode, RunRecord, ThreadRecord
-from dotagent.tools.base import ToolResult
+from dotagent.store.models import NO_PICKS, AgentRecord, EventRecord, RunMode, RunRecord, ThreadRecord
+from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
+from dotagent.tools.context import ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import group_of
 from dotagent.tools.meta import (
@@ -533,6 +548,10 @@ class _Quiet:
     # When the program last wrote a line (``heard`` also moves when a call of Dot's tool ends): a cut says how long it
     # had been silent (item 1580).
     wrote: float = field(default_factory=time.monotonic)
+    # The tools whose call, since the last step began, was an action the policy keeps for the owner even in yolo (a
+    # message or mail sent for them, a payment, a public post): a program cut now may have done it without the model
+    # reading its result, and the run is not continued (item 1581). A step that begins says the model read the results.
+    outward: list[str] = field(default_factory=list)
     # What the model's finish said (item 1076): how the run ends, its answer and what it needs from the owner.
     finished: FinishArgs | None = None
     # Since when the owner holds the run with a ✋ (item 1076), None while they do not. ``resting_since`` is when its
@@ -565,6 +584,24 @@ async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolR
     finally:
         quiet.working -= 1
         quiet.heard = time.monotonic()
+
+
+def _noting_outward(quiet: _Quiet, tools: ToolRegistry) -> ToolRegistry:
+    """``tools`` as they are, but a call whose action is one the policy keeps for the owner even in yolo (a message or
+    mail sent for them, a payment, a public post) is noted in ``quiet`` as the tool classifies it, which is how the gate
+    sees it too (item 1581): a call made inside another's (``code_run``'s) is noted all the same, as it goes through the
+    same registry. Nothing waits, asks or refuses here."""
+
+    def noting(tool: RegisteredTool) -> RegisteredTool:
+        async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
+            prepared: PreparedCall = await tool.prepare(arguments, ctx)
+            if outward(prepared.action):
+                quiet.outward.append(tool.spec.name)
+            return prepared
+
+        return replace(tool, prepare=prepare)
+
+    return ToolRegistry(tools={name: noting(tool) for name, tool in tools.tools.items()})
 
 
 @dataclass
@@ -629,6 +666,10 @@ class _Follow:
     # waits for a turn of its own; one taken before a step is that step's to answer).
     taken: int = 0
     taken_since_step: bool = False
+    # The messages sent to the program that it has not taken in yet, in the order sent, which a program that is cut
+    # never will (item 1581): the next one is sent them again. And how many steps the run had when this program began.
+    pending: list[tuple[str, tuple[ImageData, ...]]] = field(default_factory=list)
+    steps_before: int = 0
     # Why fast mode was off though the run asked for it, said with its answer (item 1014); "" when it was not.
     fast_off: str = ""
     answer: str = ""
@@ -655,9 +696,12 @@ class _Follow:
     async def emit(self, kind: str, data: JsonObject, persisted: bool) -> None:
         await self.runtime.bus.emit(self.agent.run.id, kind, data, persisted)
 
-    async def send(self, text: str, images: tuple[ImageData, ...]) -> None:
-        """A message to the model, on the program's input."""
+    async def send(self, text: str, images: tuple[ImageData, ...], keep: bool = True) -> None:
+        """A message to the model, on the program's input. ``keep`` says it is sent again to the program that goes on
+        when this one is cut before it takes the message in (item 1581): not a note of Dot's about the cut."""
         self.sent += 1
+        if keep:
+            self.pending.append((text, images))
         try:
             self.stdin.write(user_line(text, images).encode("utf-8"))
             await self.stdin.drain()
@@ -730,6 +774,8 @@ class _Follow:
             case Taken():
                 self.taken += 1
                 self.taken_since_step = True
+                if self.pending:
+                    del self.pending[0]
                 return False
             case Result():
                 return await self.result(event)
@@ -746,6 +792,8 @@ class _Follow:
         match event:
             case StepBegan():
                 self.taken_since_step = False
+                # The model read the results of the calls before this step: none of them is in flight now (item 1581).
+                self.quiet.outward.clear()
                 self.stream.begin(await asyncio.to_thread(known_secrets, filled=True))
                 self.step = _Step(
                     started=time.monotonic(), input_tokens=event.input_tokens, cached_tokens=event.cached_tokens
@@ -822,6 +870,30 @@ class _Follow:
         if event.text.strip():
             self.answer = event.text.strip()
         return answered_all(self.taken, self.sent, self.taken_since_step)
+
+    @property
+    def began_a_step(self) -> bool:
+        """Whether the program at work has begun a step of its own: the model answered something in it."""
+        return self.step is not None or self.steps > self.steps_before
+
+    async def restart(self, stdin: asyncio.StreamWriter) -> list[tuple[str, tuple[ImageData, ...]]]:
+        """Go on with a new program in the same run (item 1581): what the cut one had of its own (its input, the
+        messages it took in, the step it was in, what it said of the model's tools) is gone; what the run has is not
+        (its steps, its answer so far, its session, its limits). The page drops the words of the step that was
+        streaming, as it does for a step it sends back. Returns the messages the cut program had not taken in."""
+        if self.step is not None:
+            await self.stream(StreamDelta(kind="reset", text=""))
+        lost: list[tuple[str, tuple[ImageData, ...]]] = self.pending
+        self.pending = []
+        self.stdin = stdin
+        self.sent = self.taken = 0
+        self.taken_since_step = False
+        self.inited = False
+        self.step = None
+        self.steps_before = self.steps
+        self.quiet.outward.clear()
+        self.quiet.heard = self.quiet.wrote = time.monotonic()
+        return lost
 
     async def keep_to_limits(self) -> None:
         """Read the run's limits after a step that the model goes on from, as the loop reads them between its steps
@@ -1226,6 +1298,260 @@ async def _picked_opening(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> st
     return await opening_text(agent.opening, offered, scaffold.tool_output_chars, playbook_root(runtime.config), {})
 
 
+type _Outgoing = tuple[str, tuple[ImageData, ...], bool]
+
+
+@dataclass
+class _Program:
+    """One start of the ``claude`` program in a run: its process and input, the end of its error stream and the pumps of
+    what it says and of its silence. ``continuing`` is whether it was started to go on after a cut (item 1581)."""
+
+    process: asyncio.subprocess.Process
+    stdin: asyncio.StreamWriter
+    tail: asyncio.Task[str]
+    pumps: tuple[asyncio.Task[None], ...]
+    continuing: bool = False
+
+
+@dataclass(frozen=True)
+class _Launch:
+    """What starts the program of a run, and starts it again after a cut (item 1581)."""
+
+    agent: AgentRun
+    program: Path
+    ref: ModelRef
+    info: ModelInfo
+    prompt: str
+    config_file: Path
+    door: str
+    folder: Path
+    queue: asyncio.Queue[_Item]
+    quiet: _Quiet
+    silence_s: float
+
+    async def start(self, resume: str | None, continuing: bool) -> _Program:
+        """Start the program in the session ``resume`` names, or in a new one when it is ``None``."""
+        run: RunRecord = self.agent.run
+        runtime: Runtime = self.agent.runtime
+        argv: tuple[str, ...] = claude_argv(
+            str(self.program),
+            self.ref.model,
+            run_effort(self.info.efforts, run.effort, runtime.config.models.effort),
+            run_speed(self.ref, run.speed),
+            self.prompt,
+            self.config_file,
+            self.door,
+            resume,
+        )
+        try:
+            process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+                *argv,
+                cwd=str(runtime.workspace),
+                env={**claude_env(runtime.shell_env, self.folder), **SEARCH_ENV},
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
+                limit=_LINE_LIMIT,
+            )
+        except OSError as error:
+            raise ClaudeCodeError(
+                "Claude Code could not be started", {"program": str(self.program), "error": str(error)}
+            ) from error
+        assert process.stdin is not None and process.stdout is not None and process.stderr is not None
+        log.info(
+            "claude_code_run_started",
+            run_id=run.id,
+            pid=process.pid,
+            model=self.ref.model,
+            resume=resume is not None,
+            continuing=continuing,
+        )
+        return _Program(
+            process=process,
+            stdin=process.stdin,
+            tail=asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr"),
+            pumps=(
+                asyncio.create_task(_pump_lines(process.stdout, self.queue, self.quiet), name="claude-code-lines"),
+                asyncio.create_task(_watch(self.quiet, self.silence_s, self.queue), name="claude-code-watch"),
+            ),
+            continuing=continuing,
+        )
+
+
+async def _retire(program: _Program) -> None:
+    """Let go of a program that was cut (item 1581): its pumps, its input, whose pipe is broken, and what is left of its
+    group. Its error stream was read already (:func:`_cut_of`)."""
+    for task in program.pumps:
+        task.cancel()
+    await asyncio.gather(*program.pumps, return_exceptions=True)
+    await _close_input(program.stdin)
+    await asyncio.shield(_end_program(program.process))
+    program.tail.cancel()
+    await asyncio.gather(program.tail, return_exceptions=True)
+
+
+async def _pause(cancel: asyncio.Event, seconds: float, run_id: str) -> None:
+    """Wait ``seconds`` before the program is started again (item 1581), which a Stop that comes meanwhile ends at once:
+    the run then ends as stopped, never continued."""
+    try:
+        async with asyncio.timeout(seconds):
+            await cancel.wait()
+    except TimeoutError:
+        return
+    raise RunCancelled("the run was stopped", {"run_id": run_id})
+
+
+def _drop_stale(queue: asyncio.Queue[_Item]) -> None:
+    """Take out of the run's queue what a program that is gone left in it, its end and its silence, which would end the
+    run of the one that goes on; the owner's messages, a stop and the error of a call wait where they are."""
+    kept: list[_Item] = []
+    while not queue.empty():
+        item: _Item = queue.get_nowait()
+        if not isinstance(item, _Ended | _Silent):
+            kept.append(item)
+    for item in kept:
+        queue.put_nowait(item)
+
+
+# What a new session that goes on in place of a cut one is told of it (item 1581): how many steps and calls of the run's
+# record it is given, and how much of each.
+_BRIEF_STEPS: int = 400
+_BRIEF_CALLS: int = 40
+_BRIEF_WORDS: int = 700
+_BRIEF_LINE: int = 200
+
+
+async def _what_was_done(runtime: Runtime, run_id: str, steers: Sequence[str]) -> str:
+    """What the program that was cut had done, from Dot's record of the run, for the new session that goes on in its
+    place when the cut one could not be resumed (item 1581): its first words, which are its plan, the last calls it made
+    and how each ended, its last words, and what the owner wrote while it worked."""
+    steps: list[EventRecord] = await runtime.store.events_of_kind(run_id, "assistant", _BRIEF_STEPS)
+    calls: list[EventRecord] = await runtime.store.events_of_kind(run_id, "tool_result", _BRIEF_CALLS)
+    spoken: list[str] = [text for text in (str(event.data.get("text") or "").strip() for event in steps) if text]
+    parts: list[str] = [
+        "What the cut session had done, from Dot's record of this run (its steps are not in your session):"
+    ]
+    if spoken:
+        parts.append(f'Its first words: "{truncate_middle(spoken[0], _BRIEF_WORDS)}"')
+    if calls:
+        lines: list[str] = []
+        for call in calls:
+            said: str = " ".join(str(call.data.get("summary") or call.data.get("text") or "").split())
+            ended: str = "worked" if call.data.get("ok") is True else "failed"
+            lines.append(f"- {call.data.get('tool')}: {truncate_middle(said, _BRIEF_LINE)} ({ended})")
+        parts.append(f"Its last {len(calls)} calls, oldest first:\n" + "\n".join(lines))
+    if len(spoken) > 1:
+        parts.append(f'Its last words: "{truncate_middle(spoken[-1], _BRIEF_WORDS)}"')
+    if steers:
+        written: str = "\n".join(f"- {truncate_middle(steer.strip(), _BRIEF_WORDS)}" for steer in steers)
+        parts.append(f"What the owner wrote while it worked:\n{written}")
+    return "\n\n".join(parts)
+
+
+@dataclass
+class _Cuts:
+    """How a run meets the cuts of its program (item 1581): the exits so far, how often it went on, and what it does
+    about the next one."""
+
+    agent: AgentRun
+    follow: _Follow
+    launch: _Launch
+    allowed: int
+    earlier: list[Message]
+    opening: str
+    pictures: tuple[ImageData, ...]
+    exits: list[ProgramExit] = field(default_factory=list)
+    continued: int = 0
+    # Whether the program was cut after the model's finish: the run ends as the finish says, with nothing continued.
+    at_finish: bool = False
+
+    async def after(self, error: ClaudeCodeError, current: _Program) -> tuple[_Program, list[_Outgoing]] | None:
+        """What the run does when ``error`` ended the program ``current`` before its result: the program that goes on,
+        with what it is sent first, when the run is continued; ``None`` when the program was cut after the model's
+        finish, which ends the run as the finish says; otherwise it raises: ``error`` with what the cuts were
+        (``continued``, ``not_continued``, ``cuts``), or :class:`RunCancelled` when the run was stopped meanwhile, which
+        wins over a cut. A program that was itself a continuation and fails before any step of its own with what says
+        its session could not be taken up again is met with a new session."""
+        follow: _Follow = self.follow
+        run_id: str = self.agent.run.id
+        fresh: bool
+        refusal: str | None
+        if isinstance(error, ClaudeCodeCut):
+            program: ProgramExit = await _cut_of(follow, current)
+            error.context.update(program.context())
+            self.exits.append(program)
+            if follow.quiet.finished is not None:
+                self.at_finish = True
+                return None
+            fresh = current.continuing and not program.inited
+            refusal = why_not_continued(
+                program=program,
+                resumed=current.continuing,
+                cancelled=self.agent.cancel.is_set(),
+                outward_calls=tuple(follow.quiet.outward),
+                continued=self.continued,
+                allowed=self.allowed,
+            )
+        else:
+            error.context["stderr"] = await _stderr_now(current.tail, current.process)
+            fresh = (
+                isinstance(error, ClaudeCodeBroke)
+                and current.continuing
+                and not follow.began_a_step
+                and resume_refused(error.message)
+            )
+            if not fresh:
+                raise error
+            program = ProgramExit(
+                run_id=run_id,
+                returncode=None,
+                stderr=str(error.context["stderr"]),
+                inited=follow.inited,
+                steps=follow.steps,
+                silent_s=round(time.monotonic() - follow.quiet.wrote, 1),
+                session_id=follow.session_id,
+                at=time.time(),
+            )
+            self.exits.append(program)
+            refusal = run_refusal(cancelled=self.agent.cancel.is_set(), continued=self.continued, allowed=self.allowed)
+        if refusal is not None:
+            if self.agent.cancel.is_set():
+                raise RunCancelled("the run was stopped", {"run_id": run_id}) from error
+            error.context["continued"] = self.continued
+            error.context["not_continued"] = refusal
+            if len(self.exits) > 1:
+                error.context["cuts"] = [one.context() for one in self.exits]
+            raise error
+        return await self._go_on(program, current, fresh)
+
+    async def _go_on(self, program: ProgramExit, current: _Program, fresh: bool) -> tuple[_Program, list[_Outgoing]]:
+        """Start the program again after ``program`` ended: in the session it had (told it was cut and to look at the
+        real state), or in a new one when ``fresh``; the run's page gets its line."""
+        follow: _Follow = self.follow
+        agent: AgentRun = self.agent
+        waited: float = continue_after_s(self.continued)
+        await _retire(current)
+        _drop_stale(self.launch.queue)
+        await _pause(agent.cancel, waited, agent.run.id)
+        self.continued += 1
+        started: _Program = await self.launch.start(None if fresh else follow.session_id, continuing=True)
+        lost: list[tuple[str, tuple[ImageData, ...]]] = await follow.restart(started.stdin)
+        data: JsonObject = continued_event_data(program, self.continued, self.allowed, fresh, waited)
+        log.warning("claude_code_run_continued", run_id=agent.run.id, **data)
+        await follow.emit(CONTINUED_EVENT, data, True)
+        note: str = continuation_note(program, fresh)
+        if not fresh:
+            # What the owner sent that the cut program never took in goes to the new one first, as sent.
+            return started, [*((text, shown, True) for text, shown in lost), (note, (), False)]
+        runtime: Runtime = agent.runtime
+        sent: list[Message] = await runtime.store.load_messages(agent.run.thread_id, 0)
+        steers: list[str] = [message.content for message in sent[len(self.earlier) + 2 :] if message.role == "user"]
+        briefing: str = await _what_was_done(runtime, agent.run.id, steers)
+        text: str = f"{meanwhile(self.opening, self.earlier)}\n\n{briefing}\n\n{note}"
+        return started, [(text, self.pictures, False)]
+
+
 async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     """Run ``agent``'s run in Claude Code on the owner's plan (module docstring)."""
     started: float = time.monotonic()
@@ -1258,7 +1584,12 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         partial(
             _watched_call,
             quiet,
-            partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools)), agent.gate),
+            partial(
+                bridged_call,
+                _noting_outward(quiet, tools),
+                await tool_context(agent, ref, info, frozenset(tools.tools)),
+                agent.gate,
+            ),
         ),
     )
     chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))
@@ -1288,38 +1619,24 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     try:
         async with provider.bridge.opened(door) as url, _private_folder() as folder:
             config_file: Path = await asyncio.to_thread(write_mcp_config, folder, mcp_config(door, url))
-            argv: tuple[str, ...] = claude_argv(
-                str(program),
-                ref.model,
-                run_effort(info.efforts, run.effort, runtime.config.models.effort),
-                run_speed(ref, run.speed),
-                prompt,
-                config_file,
-                door.name,
-                None if chat is None else chat.session_id,
+            launch: _Launch = _Launch(
+                agent=agent,
+                program=program,
+                ref=ref,
+                info=info,
+                prompt=prompt,
+                config_file=config_file,
+                door=door.name,
+                folder=folder,
+                queue=queue,
+                quiet=quiet,
+                silence_s=provider.config.silence_s,
             )
-            try:
-                process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-                    *argv,
-                    cwd=str(runtime.workspace),
-                    env={**claude_env(runtime.shell_env, folder), **SEARCH_ENV},
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    start_new_session=True,
-                    limit=_LINE_LIMIT,
-                )
-            except OSError as error:
-                raise ClaudeCodeError(
-                    "Claude Code could not be started", {"program": str(program), "error": str(error)}
-                ) from error
-            assert process.stdin is not None and process.stdout is not None and process.stderr is not None
-            log.info(
-                "claude_code_run_started", run_id=run.id, pid=process.pid, model=ref.model, resume=chat is not None
-            )
+            pictures: tuple[ImageData, ...] = await asyncio.to_thread(_images, agent.opening.files, info.vision)
+            current: _Program = await launch.start(None if chat is None else chat.session_id, continuing=False)
             follow: _Follow = _Follow(
                 agent=agent,
-                stdin=process.stdin,
+                stdin=current.stdin,
                 door=door.name,
                 vision=info.vision,
                 queue=queue,
@@ -1328,37 +1645,48 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 quiet=quiet,
                 needed=needed,
             )
-            tail: asyncio.Task[str] = asyncio.create_task(_read_tail(process.stderr), name="claude-code-stderr")
             pumps: tuple[asyncio.Task[None], ...] = (
-                asyncio.create_task(_pump_lines(process.stdout, queue, quiet), name="claude-code-lines"),
                 asyncio.create_task(_pump_inbox(agent.inbox, queue), name="claude-code-inbox"),
                 asyncio.create_task(_pump_stop(agent.cancel, queue), name="claude-code-stop"),
-                asyncio.create_task(_watch(quiet, provider.config.silence_s, queue), name="claude-code-watch"),
+            )
+            opening: str = f"{goal.content}\n\n{noted.content}"
+            cuts: _Cuts = _Cuts(
+                agent=agent,
+                follow=follow,
+                launch=launch,
+                allowed=provider.config.continue_cut,
+                earlier=earlier,
+                opening=opening,
+                pictures=pictures,
             )
             clean: bool = False
             try:
-                opening: str = meanwhile(
-                    f"{goal.content}\n\n{noted.content}", earlier[0 if chat is None else chat.seen :]
-                )
-                try:
-                    await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
-                    answer: str = await follow.follow()
-                except ClaudeCodeCut as cut:
-                    cut.context.update((await _cut_of(follow, process, tail)).context())
-                    raise
-                except ClaudeCodeError as error:
-                    error.context["stderr"] = await _stderr_now(tail, process)
-                    raise
-                clean = ended_clean(follow.over, follow.finish)
-                await _close_input(process.stdin)
+                outgoing: list[_Outgoing] = [
+                    (meanwhile(opening, earlier[0 if chat is None else chat.seen :]), pictures, True)
+                ]
+                # A program that is cut goes on in place (item 1581): the same run, the same session, the same events.
+                while True:
+                    try:
+                        for text, shown, keep in outgoing:
+                            await follow.send(text, shown, keep)
+                        answer: str = await follow.follow()
+                        break
+                    except ClaudeCodeError as error:
+                        gone: tuple[_Program, list[_Outgoing]] | None = await cuts.after(error, current)
+                        if gone is None:
+                            answer = follow.answer
+                            break
+                        current, outgoing = gone
+                clean = ended_clean(follow.over, follow.finish) and not cuts.at_finish
+                await _close_input(current.stdin)
                 if clean:
                     with contextlib.suppress(TimeoutError):
                         async with asyncio.timeout(_EXIT_WAIT_S):
-                            await process.wait()
+                            await current.process.wait()
             finally:
-                for task in pumps:
+                for task in (*pumps, *current.pumps):
                     task.cancel()
-                await asyncio.gather(*pumps, return_exceptions=True)
+                await asyncio.gather(*pumps, *current.pumps, return_exceptions=True)
                 # What the owner sent that the program never took in (a message in the run's last seconds) goes back
                 # to the run's inbox, where Dot keeps it as it keeps one a run of its own loop did not read (item 1076).
                 # Ahead of what reached the inbox meanwhile, so that they keep the order they were sent in.
@@ -1369,9 +1697,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                         agent.inbox.put_nowait(unread)
                 for sent_later in later:
                     agent.inbox.put_nowait(sent_later)
-                await asyncio.shield(_end_program(process))
-                tail.cancel()
-                await asyncio.gather(tail, return_exceptions=True)
+                await asyncio.shield(_end_program(current.process))
+                current.tail.cancel()
+                await asyncio.gather(current.tail, return_exceptions=True)
                 await let_go(runtime, run.id, ())
         # The chat keeps the run's answer, its finish's when it called one (the pre-push review: the reply after a
         # finish is often empty, and a later run read nothing of the answer).
@@ -1403,16 +1731,16 @@ async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Proce
         return ""
 
 
-async def _cut_of(follow: _Follow, process: asyncio.subprocess.Process, tail: asyncio.Task[str]) -> ProgramExit:
+async def _cut_of(follow: _Follow, current: _Program) -> ProgramExit:
     """How the program ended that ended before its result (item 1580): its exit code, which it is given a moment to have
     (:func:`exit_seen`; a program still running then is one Dot ends itself, with no exit of its own to report), the
     end of its error stream, whether it had said what the model has, the steps it took and the seconds since its last
     line. One log line says it (``claude_code_program_cut``), and a program that ended by itself is counted for a mass
     cut (``claude_code_programs_ended_together``), unless Dot had ended it already."""
     silent_s: float = round(time.monotonic() - follow.quiet.wrote, 1)
-    returncode: int | None = await exit_seen(process)
-    ours: bool = ended_by_dot(process)
-    stderr: str = await _stderr_now(tail, process)
+    returncode: int | None = await exit_seen(current.process)
+    ours: bool = ended_by_dot(current.process)
+    stderr: str = await _stderr_now(current.tail, current.process)
     program: ProgramExit = ProgramExit(
         run_id=follow.agent.run.id,
         returncode=returncode,
