@@ -166,7 +166,7 @@ async def _extras(
             f"/runs/{run.id}/loop", json={"every": LOOP_EVERY, "text": LOOP_MESSAGE}
         )
         assert made.status_code == 201, made.text
-    await runtime.terminals.open(run.thread_id, BACKGROUND_COMMAND, (), home, True)
+    await runtime.terminals.open(run.thread_id, BACKGROUND_COMMAND, (), home, True, run.id)
 
 
 @asynccontextmanager
