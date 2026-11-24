@@ -162,6 +162,8 @@ def test_a_skill_without_a_frontmatter_is_read_as_claude_code_reads_it_but_none_
     assert skill.body == text.strip()
     titled: Skill = parse_others_skill(tmp_path / "only-title" / "SKILL.md", "# Only a title\n", "home")
     assert titled.description == "Only a title"
+    tabled: str = "# Kit\n\n| Name | Value |\n|---|---|\n\n```bash\nkit run\n```\n\n- a list\n\nRuns the kit.\n"
+    assert parse_others_skill(tmp_path / "kit" / "SKILL.md", tabled, "home").description == "Runs the kit."
     assert parse_others_skill(tmp_path / "tidy" / "SKILL.md", _simple("tidy"), "home") == parse_skill(
         tmp_path / "tidy" / "SKILL.md", _simple("tidy"), "home"
     )

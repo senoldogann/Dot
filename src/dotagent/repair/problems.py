@@ -277,7 +277,7 @@ def run_sightings(run_id: str, events: Iterable[EventRecord]) -> list[Sighting]:
     alert."""
     sightings: dict[str, Sighting] = {}
     for event in events:
-        if event.kind == "tool_result" and event.data.get("ok") is False:
+        if event.kind == "tool_result" and event.data.get("ok") is False and event.data.get("steered") is not True:
             tool: object = event.data.get("tool")
             text: object = event.data.get("text")
             if not isinstance(tool, str) or not isinstance(text, str) or not is_defect(text):

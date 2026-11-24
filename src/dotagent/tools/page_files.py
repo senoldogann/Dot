@@ -567,9 +567,10 @@ def _styled(css: str) -> Iterator[str]:
 
 def remote_media(html: str) -> tuple[str, ...]:
     """The web addresses of the pictures, sounds and videos ``html`` names in its tags, its ``srcset`` and its icon,
-    and those of its styles not on a library's host, each once, in the order named. A shown page loads none of them
-    (its policy loads pictures, sound and video only from ``data:`` and ``blob:``), so each would stand empty (item
-    1721)."""
+    and the style sheets and fonts it names (a linked sheet, an ``@import``, a ``url()`` of a style) not on a
+    library's host, each once, in the order named. A shown page loads none of them (its policy loads pictures, sound
+    and video only from ``data:`` and ``blob:``, sheets and fonts only from the libraries' hosts), so each would stand
+    empty (item 1721)."""
     tags: _Tags = _Tags(html)
     tags.feed(html)
     tags.close()
@@ -580,6 +581,9 @@ def remote_media(html: str) -> tuple[str, ...]:
         if tag == "link" and _is_icon(named.get("rel")):
             shown = ("href",)
         found.extend(value for name in shown if (value := named.get(name)))
+        sheet: str | None = named.get("href") if tag == "link" else None
+        if sheet and "stylesheet" in (named.get("rel") or "").lower().split():
+            found.extend(_styled(f"@import url({sheet});"))
         srcset: str | None = named.get("srcset")
         if srcset:
             found.extend(srcset[start:end] for start, end in _srcset_urls(srcset))

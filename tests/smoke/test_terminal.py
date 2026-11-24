@@ -413,8 +413,8 @@ async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime
     assert not isinstance(failed.value, ToolSteer)
     assert runtime.terminals.sessions(ctx.thread_id) == []
 
-    # Item 1722: as the executor records them, the first is steered, not failed, and the model reads it as an error;
-    # the second is a failure.
+    # Item 1722: as the executor records them, both did nothing (``ok`` false, and the model reads an error), the first
+    # steered: the counts of failed calls leave it out, the second they count.
     call: ToolCall = ToolCall(id="call_1", name="terminal_open", arguments=background)
     for run_id, steered in ((helper.id, True), (ctx.run_id, False)):
         outcomes: list[ToolOutcome] = await execute_calls(
@@ -422,7 +422,8 @@ async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime
         )
         assert outcomes[0].result.is_error and outcomes[0].result.steered is steered
         recorded: list[EventRecord] = await runtime.store.events_of_kind(run_id, "tool_result", 5)
-        assert (recorded[-1].data["ok"], recorded[-1].data["steered"]) == (steered, steered)
+        assert (recorded[-1].data["ok"], recorded[-1].data["steered"]) == (False, steered)
+    assert await runtime.store.tool_errors_of([helper.id, ctx.run_id]) == {ctx.run_id: 1}
 
 
 async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(runtime: Runtime) -> None:
