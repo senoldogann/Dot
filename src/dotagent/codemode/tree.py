@@ -20,6 +20,23 @@ _FOLDER: int = 0o700
 _FILE: int = 0o644
 
 
+def _empty(folder: int) -> None:
+    """Remove what is in the folder ``folder`` (a descriptor), each folder in it opened from this one without following
+    a link."""
+    with os.scandir(folder) as listing:
+        entries: list[os.DirEntry[str]] = list(listing)
+    for entry in entries:
+        if entry.is_dir(follow_symlinks=False):
+            inside: int = os.open(entry.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=folder)
+            try:
+                _empty(inside)
+            finally:
+                os.close(inside)
+            os.rmdir(entry.name, dir_fd=folder)
+        else:
+            os.unlink(entry.name, dir_fd=folder)
+
+
 class Tree:
     """The workspace ``root`` as a handle for writing below it: use as a context manager; names are given as parts."""
 
@@ -39,21 +56,47 @@ class Tree:
             os.close(descriptor)
         self._opened = {}
 
-    def folder(self, parts: tuple[str, ...]) -> int:
-        """The descriptor of the folder ``parts`` below the root, made (``0700``) where it is missing. A link, a file or
-        a folder of another owner at one of the names is an :class:`OSError`."""
+    def folder(self, parts: tuple[str, ...], create: bool = True) -> int:
+        """The descriptor of the folder ``parts`` below the root, made (``0700``) where it is missing unless ``create``
+        is false (then a missing one is a :class:`FileNotFoundError`). A link, a file or a folder of another owner at
+        one of the names is an :class:`OSError`."""
         known: int | None = self._opened.get(parts)
         if known is not None:
             return known
-        parent: int = self.folder(parts[:-1])
-        with contextlib.suppress(FileExistsError):
-            os.mkdir(parts[-1], _FOLDER, dir_fd=parent)
+        parent: int = self.folder(parts[:-1], create)
+        if create:
+            with contextlib.suppress(FileExistsError):
+                os.mkdir(parts[-1], _FOLDER, dir_fd=parent)
         descriptor: int = os.open(parts[-1], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
         if os.fstat(descriptor).st_uid != os.getuid():
             os.close(descriptor)
             raise PermissionError(f"{'/'.join(parts)} is a folder of another user")
         self._opened[parts] = descriptor
         return descriptor
+
+    def remove(self, parts: tuple[str, ...]) -> None:
+        """Remove the folder ``parts`` below the root and everything in it, following no link: a link in it is removed
+        and what it led to is not touched, and a link in the place of the folder is removed as the link it is. A folder
+        that is not there is nothing to remove."""
+        try:
+            parent: int = self.folder(parts[:-1], create=False)
+        except FileNotFoundError:
+            return
+        for known in [path for path in self._opened if path[: len(parts)] == parts]:
+            os.close(self._opened.pop(known))
+        try:
+            inside: int = os.open(parts[-1], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+        except FileNotFoundError:
+            return
+        except OSError:
+            # A link or a file where the folder was: what is removed is the name, never what a link leads to.
+            os.unlink(parts[-1], dir_fd=parent)
+            return
+        try:
+            _empty(inside)
+        finally:
+            os.close(inside)
+        os.rmdir(parts[-1], dir_fd=parent)
 
     def write(self, parts: tuple[str, ...], data: bytes, mode: int = _FILE) -> None:
         """Write ``data`` as the file ``parts`` below the root: whole or not at all, over whatever file is there."""

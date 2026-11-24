@@ -203,3 +203,40 @@ def test_a_stale_staging_file_from_a_cut_write_does_not_stop_the_next(tmp_path: 
         tree.write(("a", "b.txt"), b"two")
     assert (root / "a" / "b.txt").read_bytes() == b"two"
     assert [path.name for path in (root / "a").iterdir()] == ["b.txt"]
+
+
+def test_a_folder_is_removed_with_what_is_in_it_and_a_link_in_it_or_in_its_place_is_never_entered(
+    tmp_path: Path,
+) -> None:
+    root: Path = Path(os.path.realpath(tmp_path))
+    victim: Path = root / "victim"
+    victim.mkdir()
+    (victim / "file.txt").write_text("not the run's", encoding="utf-8")
+    with Tree(root) as tree:
+        for name in ("a.py", "b.py"):
+            tree.write(("run", "servers", "github", name), b"x")
+        tree.write(("run", "servers", "__init__.py"), b"")
+        os.symlink(victim, root / "run" / "servers" / "github" / "link")
+        os.symlink(victim / "file.txt", root / "run" / "servers" / "filelink")
+        tree.remove(("run", "servers"))
+        assert not (root / "run" / "servers").exists()
+        tree.remove(("run", "servers"))
+        tree.remove(("nothing", "here"))
+        # A link where the folder was: the link goes, and what it led to stays.
+        os.symlink(victim, root / "run" / "servers")
+        tree.remove(("run", "servers"))
+    assert not os.path.lexists(root / "run" / "servers")
+    assert (victim / "file.txt").read_text(encoding="utf-8") == "not the run's"
+    assert [path.name for path in victim.iterdir()] == ["file.txt"]
+
+
+def test_the_tools_of_an_earlier_start_are_not_left_to_be_imported(tmp_path: Path) -> None:
+    layout: Layout = _layout(Path(os.path.realpath(tmp_path)))
+    install.install(layout, {("dot_tools", "servers", "github", "class_.py"): b"x = 1\n"})
+    stale: Path = layout.tools / "dot_tools" / "servers" / "github" / "class_.py"
+    assert stale.is_file()
+    # Tools that are written again replace what was; the same tools (nothing to write) leave it be.
+    install.install(layout, {})
+    assert stale.is_file()
+    install.install(layout, {("dot_tools", "servers", "github", "other.py"): b"x = 2\n"})
+    assert not stale.exists() and (stale.parent / "other.py").is_file()
