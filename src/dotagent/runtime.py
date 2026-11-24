@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.approvals import ApprovalBroker
+from dotagent.agent.budget import Budget
 from dotagent.agent.gate import SiteLocks
 from dotagent.agent.held_secrets import held_dir, mask_all_held
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
@@ -199,6 +200,8 @@ class Runtime:
     store: Store
     bus: EventBus
     approvals: ApprovalBroker
+    # The caps of what the runs spend and what the owner let past them (item 1731, ``[budget]``).
+    budget: Budget
     # The gates' locks per site (pace and spending), shared by every run of this process.
     site_locks: SiteLocks
     router: ModelRouter
@@ -631,6 +634,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             store=store,
             bus=bus,
             approvals=approvals,
+            budget=Budget(config.budget),
             site_locks=SiteLocks(),
             awake=KeepAwake("-s"),
             work_awake=KeepAwake("-i"),

@@ -20,6 +20,7 @@ from dotagent.config import (
     SHOWN_NAME,
     AfterRun,
     BrowserProfileName,
+    BudgetConfig,
     DebugPort,
     JudgeProvider,
     ModelReference,
@@ -73,6 +74,7 @@ from dotagent.store.models import (
     RunRecord,
     RunStatus,
     ScheduleRecord,
+    SourceSpend,
     TeamRecord,
     ThreadSummary,
     WorkOrderRecord,
@@ -366,6 +368,15 @@ class EventsQuery(FrozenModel):
     after: int = Field(default=0, ge=0)
     limit: int = Field(default=500, ge=1, le=2000)
     tail: int | None = Field(default=None, ge=1, le=2000)
+
+
+class BudgetView(FrozenModel):
+    """``GET /api/budget`` (item 1731): the owner's caps of what the runs spend as they stand, and the tokens of
+    the runs that began today, in all and by source, the most first."""
+
+    caps: BudgetConfig
+    today: int
+    by_source: tuple[SourceSpend, ...]
 
 
 class UsageQuery(FrozenModel):

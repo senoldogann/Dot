@@ -41,6 +41,7 @@ type ConfigTable = Literal[
     "agent",
     "assistant",
     "browser",
+    "budget",
     "builtin_mcp",
     "channels",
     "code_review",
@@ -73,6 +74,25 @@ type BrowserSetting = Literal[
     "appearance",
     "zoom",
 ]
+type BudgetSetting = Literal[
+    "run_tokens",
+    "day_tokens",
+    "ui_day_tokens",
+    "schedule_day_tokens",
+    "initiative_day_tokens",
+    "review_day_tokens",
+    "delegate_day_tokens",
+]
+# Every cap of ``[budget]``, in the order Settings shows them (item 1731).
+BUDGET_SETTINGS: tuple[BudgetSetting, ...] = (
+    "run_tokens",
+    "day_tokens",
+    "ui_day_tokens",
+    "schedule_day_tokens",
+    "initiative_day_tokens",
+    "review_day_tokens",
+    "delegate_day_tokens",
+)
 type BuiltinMcpSetting = Literal["web_research"]
 type HarnessSetting = Literal["proposer", "composer", "selector", "experience"]
 type InitiativeSetting = Literal["look_model"]
@@ -89,6 +109,7 @@ type SettingKey = (
     AgentSetting
     | AssistantSetting
     | BrowserSetting
+    | BudgetSetting
     | BuiltinMcpSetting
     | ChannelsSetting
     | CodeReviewSetting

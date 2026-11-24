@@ -433,6 +433,23 @@ class WorkingRun(FrozenModel):
     owner: str
 
 
+class BudgetSpent(FrozenModel):
+    """What the caps of ``[budget]`` hold one run to (item 1731): its source, and the tokens (input and output) of
+    the run with the runs started on its behalf, of every run that began today, and of today's runs of its source."""
+
+    source: str
+    run: int
+    day: int
+    source_day: int
+
+
+class SourceSpend(FrozenModel):
+    """The tokens (input and output) the runs of one source that began today used (item 1731)."""
+
+    source: str
+    tokens: int
+
+
 class ApprovalRecord(FrozenModel):
     """A question a run asked: of the policy, of the agent itself, or one answered without a person. A step kept for the
     owner (item 482) also has ``digest``, the fingerprint of its action that keeps it once in its chat, and

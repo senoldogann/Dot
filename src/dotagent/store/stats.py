@@ -443,6 +443,30 @@ class PlanWindowSeen(FrozenModel):
     seen_at: float
 
 
+class RunEstimate(FrozenModel):
+    """What a run like this one usually spends with its helpers: the median and the 90th percentile of ``runs`` ended
+    runs of the same model, mode and source."""
+
+    runs: int
+    median: int
+    p90: int
+
+
+class RunBudget(FrozenModel):
+    """A run against its caps (``GET /runs/{id}/stats``, item 1731): what it is expected to spend (``None``
+    without enough runs like it), what it and its helpers spent, its cap as it stands (0: none), and today's tokens
+    against the day's cap and those of its source against its source's cap (0: none)."""
+
+    estimate: RunEstimate | None
+    spent: int
+    cap: int
+    source: str
+    day: int
+    day_cap: int
+    source_day: int
+    source_day_cap: int
+
+
 class RunCosts(FrozenModel):
     """What one run cost and where it went: its minutes of wall time (to its end, or to now while it works), the numbers
     of its model (as :class:`ModelStats` counts them for one run), its tool calls' seconds and the part spent at the
@@ -459,6 +483,8 @@ class RunCosts(FrozenModel):
     tools: tuple[ToolStats, ...]
     harness_version: str | None = None
     plan_window: PlanWindowSeen | None = None
+    # The run against the owner's caps and what like runs spent (item 1731), given by the route that has the caps.
+    budget: RunBudget | None = None
 
 
 class UsageDay(FrozenModel):
@@ -474,13 +500,32 @@ class UsageDay(FrozenModel):
     minutes: float
 
 
+class TopRun(FrozenModel):
+    """One of the runs that used the most tokens in the period of :class:`Usage` (item 1731): its id and chat,
+    the start of its goal, its source, model, status and steps, its tokens (input and output, its own: a helper is a run
+    of its own) and when it began."""
+
+    run_id: str
+    thread_id: str
+    goal: str
+    source: str
+    model: str
+    status: str
+    steps: int
+    tokens: int
+    created_at: float
+
+
 class Usage(FrozenModel):
     """What the owner's runs used over the last days (item 1403, ``GET /api/usage``): one :class:`UsageDay` for each day
-    from the oldest to today, a day with no run among them with zeros, and the last window of the Claude plan each kind
-    of window was seen in (the newest step that recorded one in the period), the newest first."""
+    from the oldest to today, a day with no run among them with zeros, the last window of the Claude plan each kind of
+    window was seen in (the newest step that recorded one in the period), the newest first, and the runs that used the
+    most."""
 
     days: tuple[UsageDay, ...]
     windows: tuple[PlanWindowSeen, ...]
+    # The runs of the period that used the most tokens, the most first (item 1731).
+    top_runs: tuple[TopRun, ...] = ()
 
 
 class HarnessUse(FrozenModel):
@@ -1494,6 +1539,16 @@ _USAGE_SQL: str = (
 )
 
 
+# The runs that used the most tokens since a moment, the most first (item 1731); a deleted chat's runs are gone.
+_TOP_RUNS_SQL: str = (
+    "SELECT id, thread_id, substr(goal, 1, ?), source, model, status, steps, input_tokens + output_tokens AS tokens,"
+    " created_at FROM runs WHERE created_at >= ? ORDER BY tokens DESC LIMIT ?"
+)
+# How many of them the usage lists, and how much of each one's goal.
+TOP_RUNS: int = 5
+_TOP_GOAL_CHARS: int = 80
+
+
 def local_day_start(now: float, days_back: int) -> float:
     """The start of the local day ``days_back`` days before the day of ``now``, in epoch seconds."""
     today = datetime.fromtimestamp(now).date()
@@ -1508,6 +1563,7 @@ def collect_usage(database: Path, days: int, now: float) -> Usage:
     try:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
             rows = connection.execute(_USAGE_SQL, (now, since)).fetchall()
+            top = connection.execute(_TOP_RUNS_SQL, (_TOP_GOAL_CHARS, since, TOP_RUNS)).fetchall()
     except sqlite3.Error as error:
         raise StoreError("the usage could not be read", {"database": str(database), "error": str(error)}) from error
     used: dict[str, tuple[object, ...]] = {str(row[0]): row for row in rows}
@@ -1532,4 +1588,21 @@ def collect_usage(database: Path, days: int, now: float) -> Usage:
     # Two steps of one kind at the same moment are both selected: the first, the later step, stands.
     for window in _read_windows(database, _NEWEST_WINDOWS_SQL, (since,)):
         newest.setdefault(window.kind, window)
-    return Usage(days=tuple(listed), windows=tuple(sorted(newest.values(), key=lambda window: -window.seen_at)))
+    return Usage(
+        days=tuple(listed),
+        windows=tuple(sorted(newest.values(), key=lambda window: -window.seen_at)),
+        top_runs=tuple(
+            TopRun(
+                run_id=str(row[0]),
+                thread_id=str(row[1]),
+                goal=" ".join(str(row[2]).split()),
+                source=str(row[3]),
+                model=str(row[4]),
+                status=str(row[5]),
+                steps=int(str(row[6])),
+                tokens=int(str(row[7])),
+                created_at=float(str(row[8])),
+            )
+            for row in top
+        ),
+    )

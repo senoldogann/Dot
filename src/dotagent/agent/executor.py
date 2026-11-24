@@ -9,9 +9,11 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from dotagent.agent.authorization import Authorization, StepDecision
+from dotagent.agent.budget import keep_to_budget
 from dotagent.agent.failure_lessons import LessonsNote, hand_failure_lessons
 from dotagent.agent.gate import RunGate, hold_note, masked_action
 from dotagent.agent.held_secrets import all_held_values
+from dotagent.agent.limits import LIMIT_TOOLS
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.agent.sites import hand_outside_site_lessons
 from dotagent.agent.yolo_log import note_checkpoint
@@ -690,6 +692,15 @@ async def execute_calls(
         for index, call in enumerate(calls[:-1])
         if call.name == FINISH_TOOL
     }
+    # The run is held to the owner's caps of what it spends (item 1731) before anything of the step runs; a step
+    # that only finishes or closes its plan is not held. Past a cap the owner stopped at, every call is refused and the
+    # run's stop is set.
+    if any(call.name not in LIMIT_TOOLS for call in calls):
+        stopped: str | None = await keep_to_budget(
+            ctx.runtime.budget, ctx.runtime.store, ctx.runtime.approvals, ctx.run_id, ctx.cancel
+        )
+        if stopped is not None:
+            refused = {id(call): stopped for call in calls}
     slots: asyncio.Semaphore = asyncio.Semaphore(parallelism)
 
     async def one(call: ToolCall) -> ToolOutcome:

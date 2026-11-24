@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
+from dotagent.agent.budget import loosens, run_budget
 from dotagent.agent.campaign import session_number
 from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secret, save_secret
 from dotagent.agent.keep_going import keep_going_ask
@@ -30,9 +31,11 @@ from dotagent.agent.rewind import (
 )
 from dotagent.browser.remote_input import InputBatch, InputResult
 from dotagent.coding_work import CODING_WORK_EVENT, CodingWork
+from dotagent.config import BudgetConfig
+from dotagent.config_edit import BUDGET_SETTINGS, set_setting
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import workspace_dir
+from dotagent.core.paths import config_path, workspace_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.notify.needs_you import NeedsYou, read_needs_you
 from dotagent.notify.owner import tell_owner
@@ -48,7 +51,7 @@ from dotagent.server.away import mark_read, read_away, read_mark
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
 from dotagent.server.chatcontext import ChatContext, chat_context
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import local_hosts
+from dotagent.server.guard import local_hosts, refuse_from_a_phone
 from dotagent.server.sending import send_once
 from dotagent.server.stream import (
     MOST_FOLLOWED_RUNS,
@@ -70,6 +73,7 @@ from dotagent.server.views import (
     AwayQuery,
     AwayRead,
     AwayView,
+    BudgetView,
     CampaignChip,
     DecisionRequest,
     EventsQuery,
@@ -105,11 +109,12 @@ from dotagent.store.models import (
     RunRecord,
     ScheduleOptions,
     ScheduleRecord,
+    SourceSpend,
     TeamRecord,
     ThreadRecord,
     chat_team,
 )
-from dotagent.store.stats import RunCosts, Usage
+from dotagent.store.stats import RunCosts, Usage, local_day_start
 from dotagent.tools.schedule import chat_options, schedule_mode
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -196,6 +201,8 @@ async def run_detail(ctx: ServerContext, run_id: str) -> RunDetail:
 
 def runs_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
+    # One change of the caps at a time: a second one waits for the first and finds what it did.
+    changing_budget: asyncio.Lock = asyncio.Lock()
     store: Store = ctx.runtime.store
 
     async def detail(run_id: str) -> RunDetail:
@@ -340,9 +347,11 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/runs/{run_id}/stats")
     async def run_stats(run_id: str) -> RunCosts:
-        """What the run cost and where it went (item 53), as ``dotx stats --run`` reads it."""
-        await store.get_run(run_id)
-        return await store.run_costs(run_id)
+        """What the run cost and where it went (item 53), as ``dotx stats --run`` reads it, with the run against the
+        owner's caps and what like runs spent (item 1731)."""
+        run: RunRecord = await store.get_run(run_id)
+        costs: RunCosts = await store.run_costs(run_id)
+        return costs.model_copy(update={"budget": await run_budget(ctx.runtime.budget, store, run)})
 
     @router.get("/usage")
     async def usage(query: Annotated[UsageQuery, Query()]) -> Usage:
@@ -350,6 +359,37 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         their steps, the tokens in and out and their minutes, and the last window of the Claude plan each kind of
         window was seen in. Time and tokens are what Dot records; it holds no price per model, so it shows no money."""
         return await store.usage(query.days)
+
+    @router.get("/budget")
+    async def budget_view() -> BudgetView:
+        """The owner's caps of what the runs spend as they stand (item 1731), with today's tokens in all and by
+        source."""
+        return await _budget_view()
+
+    @router.put("/budget")
+    async def change_budget(request: BudgetConfig, http: Request) -> BudgetView:
+        """Change the caps: each that changed is written to the config file (a file that cannot be changed leaves the
+        caps as they were), and the runs are held to them from their next step on. A phone may lower or set a cap, not
+        raise or take one off (item 678)."""
+        async with changing_budget:
+            before: BudgetConfig = ctx.runtime.budget.config
+            if loosens(before, request):
+                refuse_from_a_phone(http.scope, "raise or take off a cap of what the tasks spend")
+            for key in BUDGET_SETTINGS:
+                value: int = getattr(request, key)
+                if value != getattr(before, key):
+                    await asyncio.to_thread(set_setting, config_path(), "budget", key, value)
+            ctx.runtime.budget.apply(request)
+        return await _budget_view()
+
+    async def _budget_view() -> BudgetView:
+        since: float = local_day_start(time.time(), 0)
+        by_source: list[SourceSpend] = await store.spent_by_source_since(since)
+        return BudgetView(
+            caps=ctx.runtime.budget.config,
+            today=sum(spend.tokens for spend in by_source),
+            by_source=tuple(by_source),
+        )
 
     async def actions(run_id: str) -> RunActions:
         run: RunRecord = await store.get_run(run_id)

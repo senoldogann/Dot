@@ -148,6 +148,12 @@ KNOWN_ASKS: dict[tuple[str, str], str] = {
         "meeting_leave: a run that read outside content asks the owner before it leaves a meeting, in yolo; free mode "
         "does not ask (item 1138)"
     ),
+    ("agent/budget.py", "keep_to_budget"): (
+        "budget: a run past a cap of what it spends that the owner set in [budget] (a run with its helpers, a day, a "
+        "source's day) waits and asks them, Continue or Stop, in every mode, free mode included: the owner's own word "
+        "of 2026-11-24, a new ask by their own setting (item 1731). The default caps are above everything measured "
+        "on a busy Mac, so that only a runaway reaches them; 0 turns each off. Below them nothing asks or waits"
+    ),
     ("tools/meta.py", "_ask_user_tool.run"): (
         "ask_user: the agent's own question. A yolo run, and every run while free mode is on, leaves it on the chat "
         "and goes on (item 1563); a watched run in a mode that asks, with free mode off, may wait for the answer"
@@ -955,7 +961,8 @@ def test_every_row_has_a_name_of_its_own_and_every_kind_of_tool_is_in_the_table(
 
 _BROKER_METHODS: frozenset[str] = frozenset({"request", "keep", "leave"})
 # The modules that import the approval broker's class: the gate, the meeting desk and the runtime that makes it.
-BROKER_IMPORTERS: frozenset[str] = frozenset({"agent/gate.py", "meetings/desk.py", "runtime.py"})
+# The budget takes the broker for the card of a cap of the owner's (item 1731, KNOWN_ASKS).
+BROKER_IMPORTERS: frozenset[str] = frozenset({"agent/budget.py", "agent/gate.py", "meetings/desk.py", "runtime.py"})
 
 
 def _names_the_broker(receiver: str) -> bool:
@@ -1044,7 +1051,7 @@ def test_the_walk_sees_a_call_a_method_taken_as_a_value_and_a_getattr_of_the_bro
     assert _asks_in("def k(client):\n    return client.request('GET', 'https://example.invalid')\n") == {}
 
 
-def test_no_module_but_the_gate_the_meeting_desk_and_the_runtime_takes_the_approval_broker() -> None:
+def test_no_module_but_the_gate_the_meeting_desk_the_budget_and_the_runtime_takes_the_approval_broker() -> None:
     assert _broker_importers() == BROKER_IMPORTERS
 
 
