@@ -4,10 +4,17 @@ It serves the real app (routes, stores, streams, the revision watch) on 127.0.0.
 that replies by a script instead of a service, so no model is called and nothing leaves this Mac. The owner's words
 choose the script:
 
-- "helper: ...": the run starts a helper (``delegate``, wait false) that waits 20 s, then ends;
-- "wait: ...": the run waits 25 s in ``wait_until`` (a steer meanwhile shows "read after this step");
+- "helper: ...": the run starts a helper (``delegate``, wait false) that waits 90 s, then ends;
+- "wait: ...": the run waits 2 min in ``wait_until`` (a steer meanwhile shows "read after this step", and ends it);
 - "slow: ...": the reply takes 8 s (a run at work, for the queue);
+- "approve: ...": the run touches a file in /tmp with the shell, which the supervised mode asks the owner about;
+- "question: ...": the run asks the owner a question with options and waits for the answer (``ask_user``);
+- "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
+- "tools: ...": the run reads two files and keeps a plan, so a finished run folds its steps;
+- "fail: ...": the model fails, so the run fails with one line of cause;
 - anything else: an answer at once, after a few words streamed.
+
+The home's approval mode is ``supervised``, so every acting step asks (reads do not).
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
@@ -92,7 +99,7 @@ class ScriptProvider:
                 ToolCall(
                     id=f"call_{self._calls}",
                     name="wait_until",
-                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 0.34},
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
                 ),
             )
         elif latest.startswith("wait:"):
@@ -100,9 +107,58 @@ class ScriptProvider:
                 ToolCall(
                     id=f"call_{self._calls}",
                     name="wait_until",
-                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 0.42},
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 2},
                 ),
             )
+        elif latest.startswith("approve:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}", name="shell", arguments={"command": "touch /tmp/dotnext-e2e-approved"}
+                ),
+            )
+        elif latest.startswith("question:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="ask_user",
+                    arguments={
+                        "question": "Which day suits you for the test?",
+                        "options": [{"label": "Monday", "recommended": True}, {"label": "Tuesday"}],
+                        "wait": True,
+                    },
+                ),
+            )
+        elif latest.startswith("secret:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="ask_secret",
+                    arguments={
+                        "name": "DOTNEXT_E2E_TOKEN",
+                        "label": "A test token",
+                        "why": "The e2e check gives a made-up value.",
+                    },
+                ),
+            )
+        elif latest.startswith("tools:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}a",
+                    name="update_plan",
+                    arguments={
+                        "steps": [
+                            {"text": "Read the notes", "status": "in_progress"},
+                            {"text": "Answer", "status": "pending"},
+                        ]
+                    },
+                ),
+                ToolCall(id=f"call_{self._calls}b", name="read_file", arguments={"path": "/etc/hosts"}),
+                ToolCall(
+                    id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
+                ),
+            )
+        elif latest.startswith("fail:"):
+            raise RuntimeError("the scripted model failed on purpose")
         elif latest.startswith("slow:"):
             await asyncio.sleep(8)
             text = f"Slowly: {owner[:60]}"
@@ -147,7 +203,10 @@ async def serve(port: int) -> None:
         if name not in os.environ:
             raise SystemExit(f"{name} must name a throwaway folder")
     ensure_layout()
-    (home / "config.toml").write_text(f'[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n', encoding="utf-8")
+    (home / "config.toml").write_text(
+        f'[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n\n[policy]\napprovals = "supervised"\n',
+        encoding="utf-8",
+    )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register("ollama", ScriptProvider())
     manager: RunManager = RunManager(runtime)

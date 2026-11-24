@@ -1,3 +1,4 @@
+import DotEngine
 #if DEBUG
 import SwiftUI
 
@@ -249,9 +250,9 @@ private struct ChromeGallery: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.groupedGutter) {
                 Text(String(localized: "Composer at rest", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerShell(text: $empty, placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), modelTitle: String(localized: "Default · medium", comment: "Component gallery (debug builds): a heading or sample text"), send: {})
+                ComposerView(text: $empty, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !empty.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
                 Text(String(localized: "Composer expanded", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerShell(text: $long, placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), modelTitle: String(localized: "Default · medium", comment: "Component gallery (debug builds): a heading or sample text"), send: {})
+                ComposerView(text: $long, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
                 Text(String(localized: "Floating control", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
                 FloatingWorkingControl(
                     summary: WorkingSummary(status: .working, elapsed: Duration.seconds(192).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated)), queued: 2, helpers: 3),
@@ -343,7 +344,7 @@ struct SampleChatScreen: View {
             switch panel {
             case .agents: AgentsSheet(runs: Samples.helperRuns(now: .now), close: { self.panel = nil })
             case .background: BackgroundWorkSheet(items: Samples.backgroundWork, close: { self.panel = nil })
-            case .files:
+            case .files, .queue, .inspector:
                 EmptyState(
                     title: String(localized: "No changes yet", comment: "Changes panel empty state"), systemImage: "folder",
                     detail: String(localized: "Files the run changes show here.", comment: "Changes panel empty state detail"),
@@ -371,7 +372,7 @@ struct SampleChatScreen: View {
                     showsScrollToBottom: true, openStatus: { panel = .background }, openQueue: {}, openHelpers: { panel = .agents },
                     scrollToBottom: {})
                     .frame(maxWidth: .infinity, alignment: .center)
-                ComposerShell(text: $draft, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), modelTitle: String(localized: "Default · medium", comment: "Composer model chip: the model and the reasoning effort"), send: {})
+                ComposerView(text: $draft, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
             }
             .frame(maxWidth: proseWidth)
             .padding(.horizontal, Space.s)

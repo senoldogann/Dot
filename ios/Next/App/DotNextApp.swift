@@ -17,13 +17,19 @@ struct DotNextApp: App {
         }
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
+        // The iPad's floating tab bar does not read the layout appearances above; it reads the item's own colour (§19).
+        UITabBarItem.appearance().badgeColor = .dynamic(\.warn)
+        UITabBarItem.appearance().setBadgeTextAttributes([.foregroundColor: UIColor.dynamic(\.ground)], for: .normal)
     }
 
     var body: some Scene {
         WindowGroup {
             RootView(launch: LaunchOptions.read(UserDefaults.standard))
                 .environment(model)
-                .onAppear { model.load() }
+                .onAppear {
+                    // A fixture scene draws its own snapshot: no engine starts beneath it to replace it (debug only).
+                    if !LaunchOptions.read(UserDefaults.standard).drawsFixture { model.load() }
+                }
         }
         .onChange(of: scenePhase) { _, phase in model.scene(phase) }
     }
@@ -45,6 +51,8 @@ enum LaunchScene: Equatable, Sendable {
         case gallery(GalleryPage)
         /// The sample chat of the gallery's fixtures.
         case sampleChat(ChatPanel?)
+        /// The real chat screen drawn from a fixture (wave N2).
+        case chatFixture(ChatFixture)
     #endif
     case tab(AppTab)
     /// The live chat list with its first chat open.
@@ -54,6 +62,7 @@ enum LaunchScene: Equatable, Sendable {
     static var names: [String] {
         #if DEBUG
             GalleryPage.allCases.map(\.rawValue) + AppTab.allCases.map(\.rawValue) + ["chat", "chat-agents", "chat-background", "live-chat"]
+                + ChatFixture.allCases.map(\.rawValue)
         #else
             AppTab.allCases.map(\.rawValue) + ["live-chat"]
         #endif
@@ -63,6 +72,7 @@ enum LaunchScene: Equatable, Sendable {
     static func named(_ name: String) -> LaunchScene? {
         #if DEBUG
             if let page = GalleryPage(rawValue: name) { return .gallery(page) }
+            if let fixture = ChatFixture(rawValue: name) { return .chatFixture(fixture) }
             switch name {
             case "chat": return .sampleChat(nil)
             case "chat-agents": return .sampleChat(.agents)
@@ -79,6 +89,14 @@ enum LaunchScene: Equatable, Sendable {
 struct LaunchOptions: Equatable, Sendable {
     let scene: LaunchScene?
     let sceneName: String?
+
+    /// Whether the scene is a chat fixture (wave N2), which draws without a daemon.
+    var drawsFixture: Bool {
+        #if DEBUG
+            if case .chatFixture = scene { return true }
+        #endif
+        return false
+    }
 
     static func read(_ defaults: UserDefaults) -> LaunchOptions {
         #if DEBUG
@@ -100,6 +118,11 @@ struct RootView: View {
             #if DEBUG
                 case .gallery(let page): NavigationStack { GalleryPageView(page: page) }
                 case .sampleChat(let panel): NavigationStack { SampleChatScreen(chat: Samples.chats[0], initialPanel: panel) }
+                case .chatFixture(let fixture):
+                    NavigationStack {
+                        ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
+                    }
+                    .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
             #endif
             case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false))
             case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true))

@@ -2,7 +2,7 @@ import DotEngine
 import SwiftUI
 
 // The N0 screens wired to the engine (wave N1-client, plan §14): the chat list, one chat's transcript, the helpers and
-// background sheets, pairing. The full chat UX (work log groups, ask dock, composer modes, inspector) is wave N2.
+// background sheets, pairing. The chat itself is `ChatScreen.swift` (wave N2).
 
 // MARK: Words
 
@@ -86,21 +86,6 @@ func failureWords(_ failure: OutboxItem.Failure) -> String {
     case .runEnded: String(localized: "Not sent: the run had ended", comment: "Under a message meant for a run that ended before it arrived")
     case .tooOld: String(localized: "Not sent: it waited more than a day", comment: "Under an owner's message too old to send again safely")
     case .unreadable: String(localized: "Not sent: the Mac's answer could not be read", comment: "Under an owner's message whose answer was unreadable")
-    }
-}
-
-/// The glyph of a tool call by its tool.
-func toolSymbol(_ tool: String) -> String {
-    if tool.hasPrefix("browser") { return "globe" }
-    if tool.hasPrefix("screen") || tool.hasPrefix("computer") { return "cursorarrow.click" }
-    switch tool {
-    case "shell", "terminal", "run_command": return "terminal"
-    case "read_file", "read": return "doc.text"
-    case "write_file", "edit_file", "edit": return "pencil"
-    case "search", "grep", "web_search": return "magnifyingglass"
-    case "wait_until": return "hourglass"
-    case "delegate": return "person.2"
-    default: return "wrench.and.screwdriver"
     }
 }
 
@@ -203,7 +188,7 @@ struct ChatsTab: View {
         AdaptiveSplit(selection: $selection) {
             list
         } detail: { thread in
-            ChatScreen(thread: thread)
+            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
         } placeholder: {
             EmptyState(
                 title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",
@@ -390,6 +375,7 @@ struct ChatRow: View {
 struct NewChatSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var text: String = ""
+    @State private var attachments: [ComposerAttachment] = []
     let close: () -> Void
 
     var body: some View {
@@ -398,208 +384,22 @@ struct NewChatSheet: View {
             Text(String(localized: "What should Dot work on?", comment: "New chat sheet: the prompt above the composer"))
                 .textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
             Spacer()
-            ComposerShell(text: $text, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), modelTitle: String(localized: "Default model", comment: "Composer model menu: use the daemon's default model")) {
-                let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !words.isEmpty else { return }
-                Task {
-                    await model.startChat(words)
-                    close()
-                }
-            }
+            ComposerView(
+                text: $text, attachments: $attachments, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"),
+                buttons: composerButtons(hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
+                perform: { _ in
+                    let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !words.isEmpty else { return }
+                    let photos: [Data] = attachments.map(\.jpeg)
+                    Task {
+                        await model.startChat(words, photos: photos)
+                        close()
+                    }
+                }, model: nil, models: [:], chooseModel: nil, suggestions: .none)
             .padding(Space.s)
         }
         .padding(Space.gutter)
         .inspectorSheet(title: String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), close: close)
-    }
-}
-
-// MARK: One chat
-
-struct ChatScreen: View {
-    let thread: String
-    @Environment(AppModel.self) private var model: AppModel
-    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
-    @AppStorage("responseStreaming") private var streaming: Bool = true
-    @State private var draft: String = ""
-    @State private var panel: ChatPanel?
-    @State private var expanded: Set<String> = []
-    @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
-
-    private var chat: ChatProjection? { model.snapshot.chats[thread] }
-    private var view: ThreadView? { chat?.view }
-    private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
-    private var helpers: [HelperView] { view?.helpers ?? [] }
-    private var mode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .showAll }
-
-    private var items: [TranscriptItem] {
-        guard let chat else { return [] }
-        return transcript(of: chat, pending: model.snapshot.pending(in: thread), mode: mode, streaming: streaming)
-    }
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: Space.m) {
-                if chat?.freshness == .deleted {
-                    Notice(tone: .info, message: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), dismiss: nil)
-                }
-                if let unreadable = chat?.unreadable, unreadable > 0 {
-                    Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
-                }
-                ForEach(items) { item in row(item) }
-            }
-            .frame(maxWidth: proseWidth)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, Space.gutter)
-            .padding(.vertical, Space.m)
-        }
-        .overlay {
-            if items.isEmpty, chat?.freshness != .deleted {
-                LoadingState(message: String(localized: "Syncing…", comment: "Chat subtitle: the chat is being brought up to date"))
-            }
-        }
-        .defaultScrollAnchor(.bottom)
-        .scrollDismissesKeyboard(.interactively)
-        .background(Tone.ground)
-        .navigationTitle(view?.thread.title ?? model.snapshot.list.rows.first { $0.summary.id == thread }?.summary.title ?? "")
-        .navigationSubtitle(subtitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                if activeRun != nil {
-                    Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), systemImage: "stop.fill") {
-                        if let run = activeRun { model.perform(.stop(run: run.id, thread: thread)) }
-                    }
-                }
-                Button(String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers"), systemImage: "person.2") { panel = .agents }
-            }
-        }
-        .sheet(item: $panel) { panel in
-            switch panel {
-            case .agents:
-                LiveAgentsSheet(thread: thread, close: { self.panel = nil })
-            case .background:
-                BackgroundWorkSheet(
-                    items: (view?.background ?? []).map { work in
-                        BackgroundWork(id: work.id, title: work.title, kind: work.kind == "command" ? .command : work.kind == "loop" ? .loop : .subagent)
-                    }, close: { self.panel = nil })
-            case .files, .screen:
-                EmptyState(
-                    title: String(localized: "No changes yet", comment: "Changes panel empty state"), systemImage: "folder",
-                    detail: String(localized: "Files the run changes show here.", comment: "Changes panel empty state detail"), actionTitle: nil, action: {}
-                )
-                .inspectorSheet(title: String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"), close: { self.panel = nil })
-            }
-        }
-        .safeAreaInset(edge: .bottom) {
-            VStack(alignment: .trailing, spacing: Space.xs) {
-                FloatingWorkingControl(
-                    summary: WorkingSummary(
-                        status: activeRun == nil ? nil : .working, elapsed: elapsed, queued: view?.queue.messages.count ?? 0,
-                        helpers: helpers.filter { helperState($0.status).isLive }.count),
-                    showsScrollToBottom: false, openStatus: { panel = .background }, openQueue: {}, openHelpers: { panel = .agents }, scrollToBottom: {})
-                    .frame(maxWidth: .infinity, alignment: .center)
-                ComposerShell(
-                    text: $draft, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"),
-                    modelTitle: String(localized: "Default model", comment: "Composer model menu: use the daemon's default model"),
-                    send: { send(steer: false) }, steer: activeRun == nil ? nil : { send(steer: true) })
-                // A deleted chat takes nothing more.
-                .disabled(chat?.freshness == .deleted)
-            }
-            .frame(maxWidth: proseWidth)
-            .padding(.horizontal, Space.s)
-            .padding(.bottom, Space.xs)
-        }
-        .onAppear { model.open(thread) }
-        .onDisappear { model.close(thread) }
-        .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
-        .task { await LatencyProbe.run(thread: thread, model: model) }
-    }
-
-    private func send(steer: Bool) {
-        let words: String = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { return }
-        draft = ""
-        Task { await model.send(words, thread: thread, steerInto: steer ? activeRun?.id : nil) }
-    }
-
-    private var subtitle: String {
-        if let chat, let line = freshnessLine(
-            freshness: chat.freshness, transport: model.snapshot.transport, savedAt: model.snapshot.savedAt[thread], workingAt: model.snapshot.workingAt[thread], now: .now)
-        {
-            return line
-        }
-        return [String(localized: "Dot", comment: "The assistant's name in a chat's subtitle"), model.host?.name].compactMap { $0 }.joined(separator: " · ")
-    }
-
-    private var elapsed: String? {
-        guard let run = activeRun else { return nil }
-        return elapsedWords(from: Date(timeIntervalSince1970: run.createdAt), to: .now)
-    }
-
-    @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
-        switch item {
-        case .owner(let id, let text, let delivery):
-            VStack(alignment: .trailing, spacing: Space.xxs) {
-                UserBubble(text: text)
-                if let delivery {
-                    HStack(spacing: Space.xs) {
-                        Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(isRejected(delivery) ? Tone.failure : Tone.tertiary)
-                        if case .rejected(let failure) = delivery {
-                            let key: String = String(id.dropFirst(2))
-                            if case .runEnded = failure {
-                                Button(String(localized: "Send as a new message", comment: "Under a steer refused because its run ended")) { model.sendAsMessage(key) }
-                                    .textRole(.label)
-                            } else {
-                                Button(String(localized: "Edit", comment: "Under a refused message: puts its words back in the composer")) {
-                                    Task { if let words = await model.takeBack(key) { draft = words } }
-                                }
-                                .textRole(.label)
-                                Button(String(localized: "Try again", comment: "Under a refused message: sends it again")) { model.retry(key) }.textRole(.label)
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        case .note(_, let text):
-            Text(text).textRole(.footnote).foregroundStyle(Tone.secondary).frame(maxWidth: .infinity, alignment: .leading)
-        case .answer(_, let text, let writing):
-            AnswerText(text: (try? answerText(markdown: text)) ?? AttributedString(text)).opacity(writing ? 0.85 : 1)
-        case .tool(let id, let tool, let target, let state):
-            ToolCallRow(
-                call: ToolCall(id: id, symbol: toolSymbol(tool), label: target.isEmpty ? tool : target, state: toolState(state), detail: nil),
-                isExpanded: Binding(get: { expanded.contains(id) }, set: { if $0 { expanded.insert(id) } else { expanded.remove(id) } }))
-        case .ended(_, let status, let detail):
-            Notice(tone: status == "failed" ? .failure : .info, message: endedWords(status, detail), dismiss: nil)
-        }
-    }
-
-    private func isRejected(_ delivery: Delivery) -> Bool {
-        if case .rejected = delivery { return true }
-        return false
-    }
-
-    private func toolState(_ state: DotEngine.ToolState) -> ToolState {
-        switch state {
-        case .running: .running
-        case .done: .done
-        case .failed: .failed
-        }
-    }
-
-    private func endedWords(_ status: String, _ detail: String) -> String {
-        switch status {
-        case "failed": String(localized: "The run failed", comment: "Notice at the end of a failed run")
-        case "cancelled": String(localized: "The run was stopped", comment: "Notice at the end of a stopped run")
-        default: String(localized: "The run ended", comment: "Notice at the end of a run that ended another way")
-        }
-    }
-
-    private var proseWidth: CGFloat? {
-        guard sizeClass == .regular else { return nil }
-        return ProseColumn.width(charactersPerLine: ProseColumn.target, font: ProseColumn.bodyFont(dynamicTypeSize))
     }
 }
 
@@ -640,7 +440,7 @@ struct LiveAgentsSheet: View {
         var state: HelperState = helperState(helper.status)
         if stopping.contains(helper.runId), state.isLive { state = .stopping }
         return HelperRun(
-            id: helper.runId, title: helper.title, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
+            id: helper.runId, title: helper.shortTitle, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
             endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper))
     }
 }
@@ -664,7 +464,7 @@ enum LatencyProbe {
                 }
                 let text: String = "probe \(number) \(UUID().uuidString.prefix(6))"
                 model.probeSent[text] = Date()
-                await model.send(text, thread: thread, steerInto: nil)
+                await model.send(text, thread: thread, steerInto: nil, photos: [])
                 for _ in 0..<200 where model.probeSent[text] != nil { try? await Task.sleep(for: .milliseconds(100)) }
                 try? await Task.sleep(for: .milliseconds(300))
             }
