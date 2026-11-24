@@ -40,6 +40,7 @@ class _Server:
         variant: str | None,
         text: str,
         files: tuple[PromptFile, ...],
+        system: str,
     ) -> None:
         self.prompts.append(text)
 

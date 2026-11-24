@@ -368,9 +368,16 @@ answer keeps its words, Ollama's too.
   (`run_max_minutes`, `run_max_tokens`) bind the agent as they bind Dot's own loop (item 552): the first step that ends
   past one while the agent goes on tells it to stop and answer, and an agent that goes on two steps after that is
   stopped and the run ends failed. A reply that stopped at the model's output limit ends the run failed too ("the
-  model's replies were cut short"), not done with half an answer. A run here that ended is asked for its lessons as
-  Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own runs bring
-  besides (the memory recalled at the start, the checks of a finish and playbooks) a run here does not have,
+  model's replies were cut short"), not done with half an answer. Since item 1695 the agent is told Dot's own system
+  prompt, the one Dot's own loop builds for the run (its character, how to work, trust and safety, the plan, what Dot
+  knows of you, the skills), in each prompt's `system`, after OpenCode's own, then which of OpenCode's tools stand for
+  the ones it names (Zen's free tier answered with it on Big Pickle and DeepSeek V4.1 Flash Free, measured 2026-11-24
+  on OpenCode 1.19.5; before, the agent heard nothing of Dot's but your words); under your message come how the run
+  was started, the notes of Dot's memory recalled for it and the skills that fit its goal; and it has Dot's `finish`,
+  `update_plan` and `mark_plan_step`, so it keeps Dot's plan and the run ends as its `finish` says (done only when it
+  succeeded, with what it needs from you; a later call of Dot's tools drops it). A run here that ended is asked for its
+  lessons as Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own runs bring
+  besides (the goal check of a finish and playbooks) a run here does not have,
   and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
   apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models
   (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models. The free tier is Zen's to give: it

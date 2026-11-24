@@ -10,12 +10,16 @@ last reply was cut short (the model's output limit) and when it goes on past the
 ``run_max_tokens``), which it is told of once.
 
 The agent has Dot's own tools besides its own (item 284): every one a run on Claude Code gets but those of what
-OpenCode's own tools do and finish (:data:`OPENCODE_OWN`, item 1720), served by Dot's bridge
-(:mod:`dotagent.opencode.bridge`) at the chat's door while the run works. A call of one runs as a call of Dot's own
-loop (:func:`dotagent.agent.executor.execute_calls`: the run's gate, the tool's time limit, the run's timeline under the
-tool's own name), and the session keeps to its own chat's door. A run here has none of the
-rest of what Dot's own runs bring (Dot's own prompt, the memory recalled at the start, the checks of a finish, the
-lessons and playbooks)."""
+OpenCode's own tools do (:data:`OPENCODE_OWN`, item 1720), served by Dot's bridge (:mod:`dotagent.opencode.bridge`) at
+the chat's door while the run works. A call of one runs as a call of Dot's own loop
+(:func:`dotagent.agent.executor.execute_calls`: the run's gate, the tool's time limit, the run's timeline under the
+tool's own name), and the session keeps to its own chat's door.
+
+Since item 1695 the agent is told Dot's own system prompt, with each prompt's ``system`` (after OpenCode's own; Zen's
+free tier answered with it, measured on 2026-11-24), then which of OpenCode's tools stand for Dot's; its first message
+carries how the run was started, the notes recalled for it and the skills that fit its goal; it keeps Dot's plan and
+ends with Dot's finish, which the run ends as. A run here has none of the rest of what Dot's own runs bring (the goal
+check of a finish, the lessons drawn from a record of the run, and playbooks)."""
 
 import asyncio
 import time
@@ -44,7 +48,9 @@ from dotagent.agent.handover import (
     agent_tools,
     bridged_call,
     door_tool,
+    handed_notes,
     let_go,
+    prompt_facts,
     read_chat,
     tool_context,
     withheld_out,
@@ -60,7 +66,16 @@ from dotagent.agent.limits import (
     limit_spent,
     limits_of,
 )
-from dotagent.agent.loop import AgentRun, RunEnd, RunOutcome
+from dotagent.agent.loop import (
+    AgentRun,
+    PromptFacts,
+    RunEnd,
+    RunOutcome,
+    free_mode_line,
+    run_prompt_inputs,
+    turn_skills,
+)
+from dotagent.agent.prompt import PromptInputs, build_system_prompt
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
 from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
 from dotagent.core.errors import (
@@ -79,9 +94,9 @@ from dotagent.core.text import redact_json, redact_known, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
-from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, assistant_message
+from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, ToolCall, assistant_message, user_message
 from dotagent.llm.wire import get_obj, get_str
-from dotagent.opencode.bridge import Door, ToolBridge, door_name, new_door, server_config, session_rules
+from dotagent.opencode.bridge import CallRunner, Door, ToolBridge, door_name, new_door, server_config, session_rules
 from dotagent.opencode.events import (
     MessageSeen,
     PartSeen,
@@ -104,10 +119,11 @@ from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.endings import PREFIX_CUT_SHORT
 from dotagent.store.models import RunRecord
+from dotagent.tools.base import ToolResult
 from dotagent.tools.channels import Channel
 from dotagent.tools.files import read_action, write_action
 from dotagent.tools.groups import BROWSER_GROUP, group_of
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import FINISH_TOOL, FinishArgs
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.web.addresses import is_public_address
 
@@ -154,10 +170,9 @@ LOCAL_TARGET_NOTE: str = (
 _WEB_TOOLS: frozenset[str] = frozenset({"webfetch", "websearch", "codesearch"})
 # Dot's tools the agent does not get although a run on Claude Code does (:func:`dotagent.agent.handover.door_tool`):
 # those of what the agent's own tools do (read, write, edit, list, glob and grep for the files, bash for a command,
-# webfetch and websearch for the web; item 284), and finish, since a run here ends with the agent's last answer once it
-# has nothing left to do (item 283). Every other tool of Dot's is the agent's, as a run on Claude Code has it
-# (item 1720): Dot's look, a video, a draft, a wait, a skill saved, the team, the mail and calendars, the office and
-# the rest.
+# webfetch and websearch for the web; item 284). Every other tool of Dot's is the agent's, as a run on Claude Code has
+# it (item 1720): Dot's look, a video, a draft, a wait, a skill saved, the team, the mail and calendars, the office and
+# the rest, and since item 1695 finish and the plan's, which Dot's prompt tells it to use.
 OPENCODE_OWN: frozenset[str] = frozenset(
     {
         "read_file",
@@ -169,9 +184,35 @@ OPENCODE_OWN: frozenset[str] = frozenset(
         "shell",
         "web_fetch",
         "web_search",
-        FINISH_TOOL,
     }
 )
+# What the agent is told after Dot's own system prompt (item 1695): which of OpenCode's tools stand for Dot's that the
+# prompt names, where Dot's other tools are, and that its finish ends the run.
+_HARNESS: str = (
+    "# This run's harness\n"
+    "This run works as OpenCode's agent on one of Zen's free models. OpenCode's own tools do what the instructions "
+    "above name Dot's shell, file and web tools for: bash for shell, read, edit and write for read_file, edit_file and "
+    "write_file, glob, grep and list for finding and searching files, webfetch and websearch for web_fetch and "
+    "web_search. Dot's other tools are those of the MCP server {door} ({door}_<tool>): {tools}. Each call goes through "
+    "Dot's rules and, where they say so, the owner's approval; a refused call says why, and you go on another way. "
+    "Subagents are not available. {ending} Write every message in the language the owner writes in. Files you make go "
+    "in Dot's workspace, {workspace}, unless the owner names another place."
+)
+_ENDS_WITH_FINISH: str = (
+    "When the work is done, or cannot be done, call finish with your final answer, success true only if the goal was "
+    "achieved and verified, and needs_from_user for what only the owner can give or decide."
+)
+_ENDS_WITH_REPLY: str = "When the work is done, write your answer as your last reply: it is what the owner reads."
+
+
+def harness_prompt(dot_prompt: str, door: str, tools: Sequence[str], workspace: Path) -> str:
+    """What OpenCode's agent is told after OpenCode's own prompt (item 1695): ``dot_prompt``, the system prompt Dot's
+    own loop builds for the run with the door's ``tools``, then :data:`_HARNESS`."""
+    ending: str = _ENDS_WITH_FINISH if FINISH_TOOL in tools else _ENDS_WITH_REPLY
+    harness: str = _HARNESS.format(door=door, tools=", ".join(tools), workspace=workspace, ending=ending)
+    return f"{dot_prompt}\n\n{harness}"
+
+
 # What a run says when Zen's free tier turns a request down. Its own words say that the free tier serves OpenCode alone,
 # but it says them to OpenCode's own command line as well, for a few minutes after many requests in a short time
 # (measured 2026-10-15: refused from 17:48 to about 17:56, answered at 17:57, the same program and setup throughout).
@@ -472,6 +513,10 @@ class _Follow:
     told: LimitReached | None = None
     since_told: int = 0
     over: LimitReached | None = None
+    # Dot's system prompt for the run (item 1695), sent with every prompt: OpenCode keeps a prompt's system to its turn.
+    system: str = ""
+    # What the agent's finish said (item 1695), ``None`` until it calls it, and again after a later call of Dot's tools.
+    finished: FinishArgs | None = None
     # How the newest step ended, in OpenCode's words.
     finish: str = ""
     steps: int = 0
@@ -498,7 +543,7 @@ class _Follow:
 
     async def prompt(self, text: str, files: tuple[PromptFile, ...]) -> None:
         self.prompts += 1
-        await self.server.prompt(self.session_id, self.directory, self.model, self.variant, text, files)
+        await self.server.prompt(self.session_id, self.directory, self.model, self.variant, text, files, self.system)
 
     async def emit(self, kind: str, data: JsonObject, persisted: bool) -> None:
         await self.runtime.bus.emit(self.agent.run.id, kind, data, persisted)
@@ -867,6 +912,13 @@ def _outcome(follow: _Follow, answer: str, goal: str) -> RunOutcome:
     if follow.finish in _CUT_SHORT:
         cut: str = f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{follow.finish}')."
         return RunOutcome(status="failed", result=cut, needs="")
+    if follow.finished is not None:
+        # As the agent's finish says (item 1695): done only when it succeeded, with what it needs from the owner.
+        return RunOutcome(
+            status="done" if follow.finished.success else "failed",
+            result=follow.finished.answer,
+            needs=follow.finished.needs_from_user or "",
+        )
     return RunOutcome(status="done", result=answer or "OpenCode's agent finished without a closing message.", needs="")
 
 
@@ -897,12 +949,19 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
         tools = ToolRegistry(
             tools={name: tool for name, tool in tools.tools.items() if group_of(name) != BROWSER_GROUP}
         )
+    finished: list[FinishArgs] = []
     door: Door = new_door(
         door_name(run.thread_id),
         tuple(tool.spec for tool in tools.tools.values()),
         # OpenCode puts every tool of a server in its prompt: none is looked up.
         frozenset(),
-        partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools), None), agent.gate),
+        partial(
+            _noting_finish,
+            finished,
+            partial(
+                bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools), None), agent.gate
+            ),
+        ),
     )
     async with server.hold():
         chat: ChatSession = await _session(
@@ -913,7 +972,19 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
         goal: Message = await message_with_attachments(
             runtime, run.thread_id, run.id, agent.opening.text, agent.opening.files, info.vision
         )
-        await runtime.store.append_messages(run.thread_id, [goal])
+        # Dot's own system prompt and the notes under the message (item 1695), as a run on the plan has them.
+        facts: PromptFacts = await prompt_facts(agent, ref, frozenset(tools.tools))
+        inputs: PromptInputs = await run_prompt_inputs(agent, facts, door.specs)
+        heard: list[Message] = earlier[: chat.seen]
+        carried: str = "\n".join(message.content for message in heard if message.role == "user")
+        noted: Message = user_message(await handed_notes(agent, info, carried, inputs, turn_skills(facts)), ())
+        await runtime.store.append_messages(run.thread_id, [goal, noted])
+        system: str = harness_prompt(
+            build_system_prompt(inputs) + free_mode_line(runtime),
+            door.name,
+            [spec.name for spec in door.specs],
+            directory,
+        )
         queue: asyncio.Queue[_Item] = asyncio.Queue()
         follow: _Follow = _Follow(
             agent=agent,
@@ -927,6 +998,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             door=f"{door.name}_",
             started=started,
             limits=limits_of(runtime.config.agent, run.mode),
+            system=system,
         )
         async with _dot_tools(provider.bridge, server, directory, door), server.events(directory) as stream:
             pumps: tuple[asyncio.Task[None], ...] = (
@@ -937,7 +1009,8 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             ended: bool = False
             try:
                 await follow.prompt(
-                    meanwhile(goal.content, earlier[chat.seen :]), _prompt_files(agent.opening.files, info.vision)
+                    meanwhile(f"{goal.content}\n\n{noted.content}", earlier[chat.seen :]),
+                    _prompt_files(agent.opening.files, info.vision),
                 )
                 answer: str = await follow.follow()
                 # An agent that went on past the run's limit is stopped; the run's own ending is the failure.
@@ -953,7 +1026,19 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
         await asyncio.to_thread(
             write_chat,
             _chat_path(run.thread_id),
-            ChatSession(session_id=chat.session_id, seen=len(earlier) + 2 + follow.added),
+            ChatSession(session_id=chat.session_id, seen=len(earlier) + 3 + follow.added),
         )
     log.info("opencode_run_ended", run_id=run.id, session=chat.session_id, steps=follow.steps)
+    follow.finished = finished[-1] if finished else None
     return RunEnd(outcome=_outcome(follow, answer, run.goal), lessons=None)
+
+
+async def _noting_finish(finished: list[FinishArgs], run: CallRunner, call: ToolCall) -> ToolResult:
+    """A call of Dot's tool for the agent, its finish noted in ``finished`` (item 1695): the run ends as the agent's
+    last finish says, unless it called another of Dot's tools after it, which drops it."""
+    result: ToolResult = await run(call)
+    if call.name == FINISH_TOOL and not result.is_error:
+        finished.append(FinishArgs.model_validate(call.arguments))
+    elif call.name != FINISH_TOOL:
+        finished.clear()
+    return result
