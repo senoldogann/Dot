@@ -518,6 +518,8 @@ class _Follow:
     # and whether the agent has Dot's finish (a mode that ends with one).
     system: str = ""
     finishes: bool = False
+    # The agent's finishes since its last other call (item 1695): the run ends as the newest says.
+    finished_calls: list[FinishArgs] = field(default_factory=list)
     # What the agent's finish said (item 1695), ``None`` until it calls it, and again after a later call of Dot's tools.
     finished: FinishArgs | None = None
     # How the newest step ended, in OpenCode's words.
@@ -649,6 +651,9 @@ class _Follow:
         # The secrets Dot holds are masked word for word, as the executor masks those of its own calls (item 525).
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         if not call.announced:
+            # A call of OpenCode's own tool after a finish is work, which drops what the finish said, as any call does
+            # on the Claude plan (item 1695's pre-push review).
+            self.finished_calls.clear()
             call.announced = True
             step.tools.append(name)
             await self.emit(
@@ -1004,6 +1009,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             limits=limits_of(runtime.config.agent, run.mode),
             system=system,
             finishes=FINISH_TOOL in tools.tools,
+            finished_calls=finished,
         )
         async with _dot_tools(provider.bridge, server, directory, door), server.events(directory) as stream:
             pumps: tuple[asyncio.Task[None], ...] = (

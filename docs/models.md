@@ -375,12 +375,14 @@ answer keeps its words, Ollama's too.
   on OpenCode 1.19.5; before, the agent heard nothing of Dot's but your words); under your message come how the run
   was started, the notes of Dot's memory recalled for it and the skills that fit its goal; and it has Dot's `finish`,
   `update_plan` and `mark_plan_step`, so it keeps Dot's plan and the run ends as its `finish` says (done only when it
-  succeeded, with what it needs from you; a later call of Dot's tools drops it). A run here that ended is asked for its
-  lessons as Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own runs bring
-  besides (the goal check of a finish and playbooks) a run here does not have,
+  succeeded, with what it needs from you; a later call of a tool, Dot's or OpenCode's, drops it). A run here that ended
+  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own
+  runs bring besides (the goal check of a finish and playbooks) a run here does not have,
   and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
   apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models
-  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models. The free tier is Zen's to give: it
+  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models: since item 1695 every run here
+  sends them Dot's prompt with what Dot knows of you (your names, the accounts you signed in, what the nightly
+  reflection keeps of you; the secrets Dot holds stay masked) and the notes recalled for your message. The free tier is Zen's to give: it
   turned requests down for a few minutes after many in a short time, OpenCode's own command line's too (measured
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
@@ -412,7 +414,10 @@ answer keeps its words, Ollama's too.
   safety, the character, what the adopted harness learned, the skills listed for the chat, the team, the environment
   and what Dot knows of you; before it, a run on the plan was told 3.9 KB of its own, now about 32 KB), then what this
   harness changes of it (the door, the tools' names, Claude Code's own tools off), passed with
-  `--append-system-prompt` at every start, a `--resume` too, so Claude Code's compaction keeps it; under your message
+  `--append-system-prompt-file` at every start, a `--resume` too, so Claude Code's compaction keeps it: a file only you
+  can read in the run's private folder, removed as the run ends, since the prompt holds what Dot knows of you and the
+  program's arguments are shown by `ps` to every process; Claude Code records it with the session, and a resume sends
+  it as recorded until a compaction renders it again; under your message
   come how the run was started, the notes of Dot's memory recalled for it, as Dot's own loop hands them (item 1055:
   before it, a run on the plan said it did not know what the memory held), and the skills that fit its goal that the
   prompt does not list; and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
