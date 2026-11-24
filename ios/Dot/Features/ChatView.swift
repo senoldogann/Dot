@@ -395,14 +395,15 @@ struct Composer: View {
 
     private var showsStop: Bool { model.isWorking && !model.canSend }
 
-    /// The run waits on the owner: the card above asks, and the one thing the box can do meanwhile is queue a note.
+    /// A question waits on the owner: the card above asks, and the box can meanwhile queue a note behind the run that works, or, with
+    /// the run over (a helper it left at work asks), send a message.
     private var waitingOnYou: Bool {
         if case .waitingOnYou = model.state.line { return true }
         return false
     }
 
     private var placeholder: String {
-        waitingOnYou ? "Answer above, or queue a note" : (model.isWorking ? "Queue a message" : "Message Dot")
+        ComposerWords.placeholder(waitingOnYou: waitingOnYou, working: model.isWorking)
     }
 
     /// One round button for all three: the arrow, the queue mark, the stop square. Its mark is replaced in place.
