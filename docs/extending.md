@@ -625,7 +625,13 @@ does not know ping is there), so that the calls that come go to a new session ra
 server's words: "Session not found", "Session has been terminated") is a connection that broke, and the next call
 connects again. A call
 whose connection broke is not repeated, as the tool may have done part of its work, unless the server declares the
-tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log.
+Every Dot process that opens its own runtime (the daemon, a `dotx` command that is not handed to it) starts each enabled
+server as it starts, never lazily on a tool's first call: a run's tools, the gate's reading of each one (its
+annotations) and the server's line in the instructions come from the server's own listing (item 1724). A server you
+never use costs its start (1.4 to 2.8 s for Playwright's, in parallel with the others, about 140 MB of processes as it
+starts) in each such process; switch it off on Settings › Connectors if Dot's own browser tools do the work. A server
+that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a
 name) is left out, and Dot starts without its tools: Settings › System, under **Details**,
 names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin when they start their own
