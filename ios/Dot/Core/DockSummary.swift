@@ -24,6 +24,9 @@ struct DockSummary: Equatable, Sendable {
         var since: Double?
         /// What follows in a quieter shade: what the first helper does, "Reconnecting…".
         var detail: String?
+        /// What it says is only the last thing read, for the phone has no link or Dot cannot be reached: it is drawn dimmed
+        /// (the helpers' count, item 1466) and VoiceOver says "last known".
+        var dimmed: Bool = false
 
         var id: Kind { kind }
     }
@@ -37,8 +40,11 @@ struct DockSummary: Equatable, Sendable {
 
     func segment(_ kind: Kind) -> Segment? { segments.first { $0.kind == kind } }
 
-    /// The capsule for a chat: its run's line, the state of its stream, its queue and its schedules.
-    static func make(line: RunLine, connection: FeedState, queue: QueueView, automations: [ThreadAutomation]) -> DockSummary {
+    /// The capsule for a chat: its run's line, the state of its stream, its queue and its schedules. `offline` is the phone's
+    /// link being down: the helpers' count, which only a read of the daemon changes (item 1466), stays as last read and dims.
+    static func make(
+        line: RunLine, connection: FeedState, queue: QueueView, automations: [ThreadAutomation], offline: Bool = false
+    ) -> DockSummary {
         var segments: [Segment] = []
         var reconnecting: Segment?
         if case .reconnecting(_, let unauthorized) = connection {
@@ -68,8 +74,12 @@ struct DockSummary: Equatable, Sendable {
                     short: "\(count) \(helperWord(count))", tone: .accent, detail: now))
         case .helpersInBackground(let count):
             if let reconnecting { segments.append(reconnecting) }
+            // Helpers at work are the accent; a count that was only the last one read is the quiet shade, dimmed.
+            let lastKnown: Bool = HelperWatch.isLastKnown(online: !offline, reconnecting: reconnecting != nil)
             segments.append(
-                Segment(kind: .helpers, icon: .users, words: "\(count) \(helperWord(count))", short: "\(count)", tone: .plain))
+                Segment(
+                    kind: .helpers, icon: .users, words: "\(count) \(helperWord(count))", short: "\(count)",
+                    tone: lastKnown ? .plain : .accent, dimmed: lastKnown))
         }
         let loops: [ThreadAutomation] = automations.filter { $0.loop && $0.schedule.record.enabled }
         if !loops.isEmpty {

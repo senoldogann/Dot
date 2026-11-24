@@ -51,7 +51,10 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 Native: pairing with the code of Settings › Phone, the chat list (working, waiting on you, unread; pull to refresh; drawn
 from disk at launch), a chat (messages that stream in, a tool step as one line, approval and question cards with Allow
 and Deny, and over the composer ONE capsule of glass (item 1390) whose segments are the
-run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background,
+run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background
+(also once the chat's own run has ended: a run that ends done leaves its helpers at work, and then the capsule says "5 helpers",
+the line under the chat's title "5 helpers working" instead of "Done · 1 min ago" and the chat's row in the list says so too,
+item 1466),
 the chat's loops ("every 10 min") and the queue ("3 queued"), divided by hairlines, each opening its own sheet and none
 stacked; a segment exists only while it has something to say, so a chat at rest has no capsule; the queue's sheet gives
 each message an up and a down arrow, Send now (to the run at work) and Remove, and Resume when a stop held the queue;
@@ -190,6 +193,16 @@ shares the Mac's CPU and disk, so only the shape carries to a phone, and no real
   loses none. Past 500 events of a run, the newest 400 are read instead (`?tail=`) and a line says that steps are not
   shown. A read that failed says "reconnecting", keeps the rows and tries again by itself (0.5 s doubling to 15 s, with
   jitter), or waits for the link when there is none. A state the screen already has is not handed over again.
+- **Helpers that go on after their run ended** (item 1466): the daemon lets the helpers a run that ended done started work on
+  (item 1351) and the run's stream ends with it, so nothing tells the phone that one of them ended. `ChatState.line` is
+  `.helpersInBackground(count:)` for a chat whose run is over while a helper is live. While the chat is open and one is live,
+  `ChatSession` asks for the list of helpers (`GET /api/threads/{id}/helpers`, one small request, nothing else) every 8 seconds
+  (`HelperWatch.seconds`), reads the chat whole when one that was live has ended (its report may have started a run, which the
+  chat then follows) and stops when none is live; with no link it asks nothing and the capsule keeps the last count, dimmed. The
+  app coming to the front and a message of the lifecycle stream read the chat at once, as before. The daemon's list of chats
+  (`GET /api/threads`) has no field for helpers (its `latest_status` is the newest run's), so a chat's row in the list says
+  what the phone itself last read of the chat's helpers, in this run of the app and only while it was read at the chat's newest
+  run (`ListHelpers`): "5 helpers working", the ring turning, the chat among the working ones.
 - **Requests** (`APIClient`): reads time out after 10 s, writes after 30 s, a session waits for connectivity up to 45 s
   (photos 10 minutes), reads are tried three times, a refresh of the list is one request however often it is asked, and
   leaving a chat cancels its reads. Both the lifecycle stream and a run's stream wait for the link instead of trying.

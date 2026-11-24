@@ -146,14 +146,19 @@ struct ChatListView: View {
     }
 
     private var waiting: [ThreadSummary] { store.threads.filter(\.isWaitingOnYou) }
-    private var working: [ThreadSummary] { store.threads.filter { $0.isWorking && !$0.isWaitingOnYou } }
-    private var others: [ThreadSummary] { store.threads.filter { !$0.isWorking && !$0.isWaitingOnYou } }
+    /// A chat whose own run is over but whose helpers still work is at work too (item 1466): it stands with the working ones.
+    private var working: [ThreadSummary] {
+        store.threads.filter { !$0.isWaitingOnYou && ($0.isWorking || store.helpersLive(in: $0) > 0) }
+    }
+    private var others: [ThreadSummary] {
+        store.threads.filter { !$0.isWorking && !$0.isWaitingOnYou && store.helpersLive(in: $0) == 0 }
+    }
 
     /// One group of chats: a small header with its count, then the rows, each with the mark-as-read swipe.
     @ViewBuilder private func section(_ title: String?, tone: Color, threads: [ThreadSummary]) -> some View {
         Section {
             ForEach(threads) { thread in
-                Button { path.append(thread) } label: { ThreadRow(thread: thread) }
+                Button { path.append(thread) } label: { ThreadRow(thread: thread, helpers: store.helpersLive(in: thread)) }
                     .buttonStyle(RowPressStyle())
                     .listRowBackground(thread.isWaitingOnYou ? Theme.warn.opacity(0.08) : Color.clear)
                     .listRowSeparatorTint(Theme.hairline)
@@ -201,19 +206,33 @@ enum NewChatTarget: Identifiable {
 /// asks), working (a ring that turns and a moving mark), unread (a dot).
 struct ThreadRow: View {
     let thread: ThreadSummary
+    /// How many of the chat's helpers are live as the phone last read (`ListHelpers`, item 1466): the daemon's list of chats says
+    /// only how the newest run stands, so a chat whose run ended while its helpers work would read as at rest.
+    var helpers: Int = 0
     @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
+
+    private var state: ThreadState { thread.state(helpersLive: helpers) }
 
     var body: some View {
         Group { if typeSize.isAccessibilitySize { stacked } else { regular } }
             .accessibilityElement(children: .combine)
-            .accessibilityValue(thread.isWaitingOnYou ? "Needs you" : (thread.isWorking ? "Working" : ""))
+            .accessibilityValue(state == .waiting ? "Needs you" : (state == .working ? "Working" : ""))
+    }
+
+    /// "5 helpers working" under the words of a chat whose helpers are at work.
+    @ViewBuilder private var helpersLine: some View {
+        if helpers > 0 {
+            Label(HelperWords.header(count: helpers, runWorking: thread.isWorking), icon: .users, size: 13)
+                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.accent).lineLimit(1)
+                .accessibilityIdentifier("row-helpers")
+        }
     }
 
     /// At the accessibility sizes a row has no room for two columns: the mark and the age go over the words.
     private var stacked: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.m) {
-                AgentAvatar(id: thread.actorId, size: 36, state: thread.state)
+                AgentAvatar(id: thread.actorId, size: 36, state: state)
                 Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 Spacer(minLength: 0)
                 if thread.unread { Circle().fill(Theme.accent).frame(width: 10, height: 10).accessibilityLabel("Unread") }
@@ -221,6 +240,7 @@ struct ThreadRow: View {
             Text(thread.title.isEmpty ? "New chat" : thread.title)
                 .font(.body.weight(thread.unread ? .semibold : .regular)).foregroundStyle(Theme.text).lineLimit(3)
             Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(3)
+            helpersLine
         }
         .padding(.vertical, Space.m)
         .contentShape(Rectangle())
@@ -228,7 +248,7 @@ struct ThreadRow: View {
 
     private var regular: some View {
         HStack(alignment: .top, spacing: Space.m + 2) {
-            AgentAvatar(id: thread.actorId, size: 40, state: thread.state)
+            AgentAvatar(id: thread.actorId, size: 40, state: state)
                 .padding(.top, Space.xs)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: Space.s) {
@@ -239,13 +259,14 @@ struct ThreadRow: View {
                     Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 }
                 HStack(spacing: Space.s) {
-                    Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(thread.state == .idle ? 2 : 1)
+                    Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(state == .idle ? 2 : 1)
                     Spacer(minLength: Space.xs)
                     if thread.loopCron != nil {
                         DotIcon(.loop, size: 13, label: "Repeats", relativeTo: .caption).foregroundStyle(Theme.faint)
                     }
                     if thread.unread { Circle().fill(Theme.accent).frame(width: 8, height: 8).accessibilityLabel("Unread") }
                 }
+                helpersLine
             }
         }
         .padding(.vertical, Space.m)

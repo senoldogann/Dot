@@ -107,6 +107,8 @@ final class ChatModel {
     var handoff: HandoffCard? { HandoffCard.card(forChat: threadId, in: store.awareness.needsYou) }
 
     var isWorking: Bool { state.isWorking }
+    /// The phone has no link: what the capsule says of the helpers is the count last read, and is drawn dimmed (item 1466).
+    var offline: Bool { !store.linkState.online }
     var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty }
 
     // MARK: Life
