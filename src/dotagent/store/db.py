@@ -1918,21 +1918,22 @@ class Store:
         return 0 if row is None else int(row["value"])
 
     async def thread_revisions_after(self, after: int) -> list[ThreadRevision]:
-        """The chats whose revision is past ``after``, and the chats deleted since, in the order of their revisions."""
-        changed: list[aiosqlite.Row] = await self._all(
-            "SELECT id, revision FROM threads WHERE revision > ? ORDER BY revision", (after,)
+        """The chats whose revision is past ``after``, and the chats deleted since, in the order of their revisions.
+        One statement reads both, so that a write of another process between two reads cannot skip a chat."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT id AS name, revision AS revision, 0 AS deleted FROM threads WHERE revision > ? "
+            "UNION ALL SELECT key AS name, CAST(value AS INTEGER) AS revision, 1 AS deleted FROM kv "
+            "WHERE key >= ? AND key < ? AND CAST(value AS INTEGER) > ? ORDER BY revision",
+            (after, DELETED_PREFIX, DELETED_END, after),
         )
-        deleted: list[aiosqlite.Row] = await self._all(
-            "SELECT key, value FROM kv WHERE key >= ? AND key < ? AND CAST(value AS INTEGER) > ?",
-            (DELETED_PREFIX, DELETED_END, after),
-        )
-        found: list[ThreadRevision] = [
-            ThreadRevision(thread_id=str(row["id"]), revision=int(row["revision"]), deleted=False) for row in changed
-        ] + [
-            ThreadRevision(thread_id=str(row["key"])[len(DELETED_PREFIX) :], revision=int(row["value"]), deleted=True)
-            for row in deleted
+        return [
+            ThreadRevision(
+                thread_id=str(row["name"])[len(DELETED_PREFIX) :] if row["deleted"] else str(row["name"]),
+                revision=int(row["revision"]),
+                deleted=bool(row["deleted"]),
+            )
+            for row in rows
         ]
-        return sorted(found, key=lambda one: one.revision)
 
     async def thread_revisions(self, thread_ids: Sequence[str]) -> dict[str, int]:
         """The revisions of the chats ``thread_ids`` that exist, by id."""

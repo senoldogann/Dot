@@ -431,6 +431,51 @@ async def test_a_drop_does_not_read_again_the_whole_history_of_an_old_runs_finis
         await manager.shutdown()
 
 
+async def test_a_helper_that_starts_and_ends_during_a_drop_still_comes(
+    served: Served, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fourth pre-push review of item 1686: a helper of a run the stream follows through a cursor, made, stored and
+    finished while the bus dropped events, must still come."""
+    store: Store = served.runtime.store
+    bus = served.runtime.bus
+    chat: ThreadRecord = await store.create_thread("Chat", "ui")
+    elsewhere: ThreadRecord = await store.create_thread("Helper's chat", "delegate")
+    other: ThreadRecord = await store.create_thread("Busy elsewhere", "ui")
+    busy: RunRecord = await _run(store, other.id, None)
+    root: RunRecord = await _run(store, chat.id, None)
+    said: EventRecord = await bus.emit(root.id, "assistant", {"step": 1, "text": "working"}, True)
+    monkeypatch.setattr(events_module, "_QUEUE_SIZE", 4)
+    manager: RunManager = RunManager(served.runtime)
+    monkeypatch.setattr(manager, "active_run_ids", set)
+    context: ServerContext = ServerContext(
+        runtime=served.runtime,
+        manager=manager,
+        scheduler=None,
+        token=TOKEN,
+        host="127.0.0.1",
+        port=1,
+        started_at=time.time(),
+        stopping=asyncio.Event(),
+    )
+    try:
+        async with aclosing(follow_thread(context, chat.id, {root.id: said.id})) as stream:
+            async with asyncio.timeout(_WAIT_S):
+                assert b"event: synchronized" in await anext(stream)
+            helper: RunRecord = await _run(store, elsewhere.id, root.id)
+            wanted: set[int] = {(await bus.emit(helper.id, "assistant", {"step": n}, True)).id for n in range(2)}
+            await store.finish_run(helper.id, "done", "ok")
+            for number in range(10):
+                await bus.emit(busy.id, "assistant", {"step": number}, True)
+            await bus.emit(root.id, "assistant", {"step": 2}, True)
+            got: set[int] = set()
+            async with asyncio.timeout(_WAIT_S):
+                while not wanted <= got:
+                    for found in re.findall(rb"^id: (\d+)$", await anext(stream), re.MULTILINE):
+                        got.add(int(found))
+    finally:
+        await manager.shutdown()
+
+
 async def test_a_page_of_older_runs_holds_a_run_made_at_the_same_instant_as_the_one_it_starts_before(
     served: Served,
 ) -> None:

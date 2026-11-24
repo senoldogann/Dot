@@ -496,22 +496,24 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
                 # Deleted with its chat since it was announced: no run of this chat.
                 return False
 
-        async def changed_now() -> bytes:
-            """The chat's revision as it stands, told as a change, after events were lost; a deleted chat is told so."""
+        async def changed_now() -> tuple[bytes, bool]:
+            """The chat's revision as it stands, told as a change, after events were lost, and whether the chat was
+            deleted (a deleted chat is told so, and its stream then ends)."""
             try:
                 told: ThreadChanged = ThreadChanged(
                     thread_id=thread_id, revision=await store.thread_revision(thread_id), deleted=False
                 )
             except NotFoundError:
                 told = ThreadChanged(thread_id=thread_id, revision=await store.newest_thread_revision(), deleted=True)
-            return _marker(THREAD_CHANGED_EVENT, told.model_dump())
+            return _marker(THREAD_CHANGED_EVENT, told.model_dump()), told.deleted
 
         frames: bytes = await stored()
         try:
             revision: int = await store.thread_revision(thread_id)
         except NotFoundError:
             # Deleted in the moment since the route's check: told as the drop path tells it, and the stream ends.
-            yield frames + await changed_now()
+            gone, _ = await changed_now()
+            yield frames + gone
             return
         synced: Synchronized = Synchronized(revision=revision, runs=dict(sent.newest))
         yield frames + _marker(SYNCHRONIZED_EVENT, synced.model_dump())
@@ -530,19 +532,23 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
             if feed.dropped != dropped:
                 dropped = feed.dropped
                 # The start of a run of the chat, or of a helper, may be among what was lost: the members are found
-                # again, as at the start, and the helpers of every run followed (as ``follow_run`` widens its family).
+                # again, as at the start.
                 family.update(await _members(ctx, thread_id, {}))
                 # And a run of the chat that started and ended while the events were lost.
                 recent, _ = await store.thread_runs_window(thread_id, MOST_RUNS, None)
-                started: set[str] = {run.id for run in recent if run.created_at >= opened}
-                family.update(started)
-                # Only the helpers of those runs: a helper of a run followed before is a member already while it works
-                # (``_members``), and the helpers of an old run must not be read again from their first event.
-                for member in started:
-                    family.update(child.id for child in await store.list_child_runs(member))
-                caught: bytes = await stored() + await changed_now()
+                family.update(run.id for run in recent if run.created_at >= opened)
+                # And the helpers every run followed started since the stream opened, those that ended unread too; a
+                # helper made before is not read again from its first event (it is a member while it works).
+                for member in tuple(family):
+                    family.update(
+                        child.id for child in await store.list_child_runs(member) if child.created_at >= opened
+                    )
+                told, deleted = await changed_now()
+                caught: bytes = await stored() + told
                 owed, written = True, time.monotonic()
                 yield caught
+                if deleted:
+                    return
             if incoming.kind == THREAD_CHANGED_EVENT:
                 change: ThreadChanged = ThreadChanged.model_validate(incoming.data)
                 if change.thread_id != thread_id:
