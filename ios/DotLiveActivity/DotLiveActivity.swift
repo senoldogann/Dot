@@ -9,6 +9,16 @@ struct DotLiveActivityBundle: WidgetBundle {
     }
 }
 
+/// The app's colour tokens (`Shared/DotPalette.swift`), in the dark look the lock screen's glass sits on.
+private extension Color {
+    init(_ rgb: DotRGB) { self.init(red: rgb.red, green: rgb.green, blue: rgb.blue) }
+
+    static let dotAccent: Color = Color(DotPalette.dark.accent)
+    static let dotWarn: Color = Color(DotPalette.dark.warn)
+    static let dotBad: Color = Color(DotPalette.dark.bad)
+    static let dotGood: Color = Color(DotPalette.dark.good)
+}
+
 /// A run's status as the daemon names it; `nil` for a name this build does not know, shown as its raw text.
 enum RunStatus: String {
     case working
@@ -66,7 +76,7 @@ struct DotFleetLiveActivity: Widget {
                 DoingMark(state: context.state)
                     .padding(2)
             }
-            .keylineTint(.yellow)
+            .keylineTint(Color.dotAccent)
             .widgetURL(context.state.tapURL)
         }
     }
@@ -167,13 +177,13 @@ private struct StatusWord: View {
     var body: some View {
         switch RunStatus(rawValue: row.status) {
         case .working:
-            Text("Working").foregroundStyle(Color(red: 0.55, green: 0.78, blue: 1.0))
+            Text("Working").foregroundStyle(Color.dotAccent)
         case .waiting:
-            Text("Waiting").foregroundStyle(.orange)
+            Text("Waiting").foregroundStyle(Color.dotWarn)
         case .done:
-            Text("Done").foregroundStyle(.green)
+            Text("Done").foregroundStyle(Color.dotGood)
         case .failed:
-            Text(row.line == "Stopped" ? "Stopped" : "Failed").foregroundStyle(.red)
+            Text(row.line == "Stopped" ? "Stopped" : "Failed").foregroundStyle(Color.dotBad)
         case nil:
             Text(row.status).foregroundStyle(.secondary)
         }
@@ -193,14 +203,14 @@ private struct DoingMark: View {
             let waiting: Bool = row.status == RunStatus.waiting.rawValue
             Image(systemName: waiting ? "hand.raised.fill" : doingSymbol(row.kind))
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(waiting ? Color.orange : Color(red: 1.0, green: 0.78, blue: 0.22))
+                .foregroundStyle(waiting ? Color.dotWarn : Color.dotAccent)
                 .symbolEffect(.pulse, options: .repeating, isActive: !waiting)
                 .contentTransition(.symbolEffect(.replace))
                 .accessibilityLabel(row.line)
         } else {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.dotGood)
         }
     }
 }
@@ -226,18 +236,21 @@ private func doingSymbol(_ kind: String) -> String {
     }
 }
 
-/// Dot's mark, drawn small: a yellow dot with two eyes.
+/// Dot's mark, drawn small: the app icon's blue dot with two eyes.
 private struct LiveDotGlyph: View {
     let size: CGFloat
 
     var body: some View {
         ZStack {
-            Circle().fill(Color(red: 1.0, green: 0.78, blue: 0.22))
-            HStack(spacing: size * 0.14) {
-                Capsule().fill(Color(white: 0.12)).frame(width: size * 0.12, height: size * 0.22)
-                Capsule().fill(Color(white: 0.12)).frame(width: size * 0.12, height: size * 0.22)
+            Circle().fill(
+                RadialGradient(
+                    colors: [Color(red: 0.62, green: 0.80, blue: 1.0), Color(red: 0.24, green: 0.45, blue: 0.93), Color(red: 0.10, green: 0.22, blue: 0.62)],
+                    center: UnitPoint(x: 0.35, y: 0.28), startRadius: 0, endRadius: size * 0.85))
+            HStack(spacing: size * 0.15) {
+                Capsule().fill(Color(red: 0.04, green: 0.07, blue: 0.2)).frame(width: size * 0.11, height: size * 0.21)
+                Capsule().fill(Color(red: 0.04, green: 0.07, blue: 0.2)).frame(width: size * 0.11, height: size * 0.21)
             }
-            .offset(y: -size * 0.06)
+            .offset(y: -size * 0.02)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)

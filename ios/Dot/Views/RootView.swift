@@ -5,9 +5,23 @@ import SwiftUI
 struct RootView: View {
     @Bindable var model: AppModel
 
+    /// Debug builds: `-DotGallery 1|2|3` shows the design gallery instead of the app.
+    private static var galleryPage: Int? {
+        #if DEBUG
+        let page: Int = UserDefaults.standard.integer(forKey: "DotGallery")
+        return page > 0 ? page : nil
+        #else
+        return nil
+        #endif
+    }
+
     var body: some View {
         Group {
-            if let host: DaemonHost = model.host {
+            if let gallery: Int = Self.galleryPage {
+                #if DEBUG
+                DesignGallery(page: gallery)
+                #endif
+            } else if let host: DaemonHost = model.host {
                 if let store: NativeStore = model.native {
                     // The line that says the phone is offline stands over the screens, under the status bar, and has no height
                     // while there is nothing to say.
@@ -23,7 +37,6 @@ struct RootView: View {
                 AddressView(model: model, onSaved: nil)
             }
         }
-        .preferredColorScheme(.dark)
         .tint(Theme.accent)
         .background(Theme.background)
         .onOpenURL { model.open(url: $0) }
@@ -37,7 +50,7 @@ struct RootView: View {
         }
         .sheet(isPresented: $model.showsSettings) {
             if let store: NativeStore = model.native {
-                NativeSettingsView(model: model, store: store).tint(Theme.accent).preferredColorScheme(.dark).presentationBackground(Theme.background)
+                NativeSettingsView(model: model, store: store).dotSheet()
             } else {
                 SettingsView(model: model)
             }
@@ -47,7 +60,7 @@ struct RootView: View {
                 ZStack(alignment: .topTrailing) {
                     WebScreen(model: model, host: host)
                     Button("Done") { model.showsWeb = false }
-                        .buttonStyle(QuietButtonStyle())
+                        .dotButton(.glass)
                         .padding(.top, 54).padding(.trailing, 12)
                 }
             }
@@ -92,43 +105,35 @@ private struct LoadErrorView: View {
     let onSettings: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            DotGlyph(size: 40)
-            Text("Dot can't reach your Mac")
-                .font(.title3.weight(.semibold))
-            Text("\(host.name)\n\(message)")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Text("Is the Mac awake, Dot running and Tailscale on here?")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 12) {
-                Button("Try again", action: onRetry)
-                    .buttonStyle(.borderedProminent)
-                Button("Change address", action: onSettings)
-                    .buttonStyle(.bordered)
-            }
+        VStack(spacing: Space.l) {
+            DotEmptyState(
+                symbol: "macbook.slash", title: "Dot can't reach your Mac",
+                message: "\(host.name)\n\(message)\n\nIs the Mac awake, Dot running and Tailscale on here?", tone: Theme.warn,
+                actionTitle: "Try again", action: onRetry)
+            Button("Change address", action: onSettings).dotButton(.glass)
         }
-        .padding(24)
+        .padding(Space.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemBackground))
+        .background { DotBackground(glow: 0.6) }
     }
 }
 
-/// Dot's mark: a yellow dot with two eyes.
+/// Dot's mark: a luminous blue dot with two eyes, the app icon's sphere drawn small.
 struct DotGlyph: View {
     let size: CGFloat
 
     var body: some View {
         ZStack {
-            Circle().fill(Color(red: 1.0, green: 0.78, blue: 0.22))
-            HStack(spacing: size * 0.14) {
-                Capsule().fill(Color(white: 0.12)).frame(width: size * 0.11, height: size * 0.2)
-                Capsule().fill(Color(white: 0.12)).frame(width: size * 0.11, height: size * 0.2)
+            Circle().fill(
+                RadialGradient(
+                    colors: [Color(red: 0.62, green: 0.80, blue: 1.0), Color(red: 0.24, green: 0.45, blue: 0.93), Color(red: 0.10, green: 0.22, blue: 0.62)],
+                    center: UnitPoint(x: 0.35, y: 0.28), startRadius: 0, endRadius: size * 0.85))
+            Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: max(0.5, size * 0.015))
+            HStack(spacing: size * 0.15) {
+                Capsule().fill(Color(red: 0.04, green: 0.07, blue: 0.2)).frame(width: size * 0.11, height: size * 0.21)
+                Capsule().fill(Color(red: 0.04, green: 0.07, blue: 0.2)).frame(width: size * 0.11, height: size * 0.21)
             }
-            .offset(y: -size * 0.06)
+            .offset(y: -size * 0.02)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)

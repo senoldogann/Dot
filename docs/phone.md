@@ -133,7 +133,13 @@ code** takes its place. The same by hand:
    running; back in front, they open at once from the last event they read, and the list is read again. The system may
    also give it a moment to refresh while it is out of sight (a background refresh, a push that says there is something
    new; iOS decides, and it may never). After the list is read, the chats that moved on are read ahead, six at most,
-   three on a cellular link or a hotspot, and none with Low Data Mode on. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   three on a cellular link or a hotspot, and none with Low Data Mode on. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382, `ios/README.md`
+   › The design) is iOS-native: near-black surfaces in the dark and a cool white in the light, following the system, one
+   calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
+   chrome only: the composer bar, the status and queue panels, the agents' chips (a ring on each that turns while the
+   agent works and is amber while it waits for you), the new-chat button and the Allow and Deny of an approval, which is
+   the loudest card in a chat; message text and lists are never glass. What it still leaves to the web UI is in
+   `roadmap/1353.md`. The
    app's notifications are its own, through APNs: Settings in the app opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in the app). The
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with

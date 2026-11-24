@@ -1,6 +1,8 @@
 import SwiftUI
+import UIKit
 
-/// One row of the conversation.
+/// One row of the conversation. Dot's words are plain text on the ground (no bubble); the owner's words are a raised
+/// rounded box; a tool step is a quiet line; a step that needs the owner is a card that asks.
 struct ChatRow: View {
     let item: ChatItem
     let onDecide: (ApprovalCard, Bool, String) -> Void
@@ -10,23 +12,23 @@ struct ChatRow: View {
         switch item.kind {
         case .user(let text):
             HStack(spacing: 0) {
-                Spacer(minLength: 56)
+                Spacer(minLength: 48)
                 Text(LinkStyle.styled(text))
                     .font(Theme.body)
                     .foregroundStyle(Theme.text)
                     .tint(Theme.link)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
+                    .padding(.horizontal, Space.l)
+                    .padding(.vertical, Space.m - 1)
+                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.l + 2))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.l + 2).strokeBorder(Theme.hairline, lineWidth: 1))
             }
         case .assistant(let text, _):
             MessageText(text: text)
         case .answer(let text, let status):
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Space.s) {
                 MessageText(text: text)
                 if status == "failed" || status == "cancelled" {
-                    Text(status == "failed" ? "The run failed" : "Stopped")
+                    Label(status == "failed" ? "The run failed" : "Stopped", systemImage: status == "failed" ? "exclamationmark.circle" : "stop.circle")
                         .font(Theme.meta)
                         .foregroundStyle(status == "failed" ? Theme.bad : Theme.faint)
                 }
@@ -42,16 +44,18 @@ struct ChatRow: View {
             Text(text)
                 .font(Theme.meta)
                 .foregroundStyle(tone == .warn ? Theme.warn : tone == .bad ? Theme.bad : Theme.faint)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .multilineTextAlignment(.center)
         }
     }
 }
 
-/// Dot's words: prose with inline markdown and plain bright links, fenced code in a hairline block.
+/// Dot's words: prose with inline markdown and plain bright links, fenced code in a block of its own.
 struct MessageText: View {
     let text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Space.m) {
             ForEach(Array(MessageBlocks.parse(text).enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .prose(let prose):
@@ -59,102 +63,235 @@ struct MessageText: View {
                         .font(Theme.body)
                         .foregroundStyle(Theme.text)
                         .tint(Theme.link)
-                        .lineSpacing(3)
+                        .lineSpacing(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 case .code(let code):
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        Text(code)
-                            .font(Theme.mono)
-                            .foregroundStyle(Theme.text)
-                            .padding(10)
-                    }
-                    .card(fill: Theme.surface)
+                    CodeBlock(code: code)
                 }
             }
         }
     }
 }
 
-/// A tool step as one line: what it did, and whether it is still going.
+/// A fenced block: SF Mono on its own ground, scrolling sideways, with a copy button.
+struct CodeBlock: View {
+    let code: String
+    @State private var copied: Bool = false
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            Text(code)
+                .font(Theme.mono)
+                .foregroundStyle(Theme.text)
+                .padding(.leading, Space.m)
+                .padding(.trailing, 44)
+                .padding(.vertical, Space.m)
+                .textSelection(.enabled)
+        }
+        .background(Theme.codeFill, in: RoundedRectangle(cornerRadius: Radius.m))
+        .overlay(RoundedRectangle(cornerRadius: Radius.m).strokeBorder(Theme.hairline, lineWidth: 1))
+        .overlay(alignment: .topTrailing) {
+            Button {
+                UIPasteboard.general.string = code
+                copied = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.5))
+                    copied = false
+                }
+            } label: {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(copied ? Theme.good : Theme.muted)
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .sensoryFeedback(.success, trigger: copied) { _, new in new }
+            .accessibilityLabel(copied ? "Copied" : "Copy the code")
+        }
+    }
+}
+
+/// A tool step as one quiet line: the tool's symbol, what it did, and whether it is still going. The symbol pulses while
+/// the step runs and gives way to a check when it is done.
 struct ToolLine: View {
     let row: ToolRow
 
     var body: some View {
-        HStack(spacing: 8) {
-            switch row.state {
-            case .running:
-                ProgressView().controlSize(.mini).tint(Theme.muted).frame(width: 12, height: 12)
-            case .ok:
-                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.faint).frame(width: 12)
-            case .failed:
-                Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.bad).frame(width: 12)
-            }
-            Text(row.line)
-                .font(.system(size: 12))
-                .foregroundStyle(row.state == .failed ? Theme.bad : Theme.muted)
+        let words: (verb: String, rest: String) = ToolGlyph.split(row.line)
+        HStack(spacing: Space.s) {
+            Image(systemName: ToolGlyph.symbol(for: row.tool))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(row.state == .running ? Theme.accent : Theme.faint)
+                .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
+                .frame(width: 18)
+            line(words)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            Spacer(minLength: Space.xs)
+            Group {
+                switch row.state {
+                case .running:
+                    ProgressView().controlSize(.mini).tint(Theme.muted)
+                case .ok:
+                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.faint)
+                case .failed:
+                    Image(systemName: "exclamationmark.circle.fill").font(.system(size: 12)).foregroundStyle(Theme.bad)
+                }
+            }
+            .frame(width: 14)
+            .contentTransition(.symbolEffect(.replace))
         }
+        .frame(minHeight: 28)
+        .contentShape(Rectangle())
+        .dotAnimation(Motion.snappy, value: row.state)
         .accessibilityElement(children: .combine)
+        .accessibilityValue(row.state == .running ? "running" : row.state == .failed ? "failed" : "done")
+    }
+
+    private func line(_ words: (verb: String, rest: String)) -> Text {
+        if words.verb.isEmpty { return Text(words.rest).font(Theme.small).foregroundStyle(Theme.muted) }
+        return Text(words.verb).font(Theme.small.weight(.medium)).foregroundStyle(Theme.muted)
+            + Text("  ") + Text(words.rest).font(Theme.mono).foregroundStyle(row.state == .failed ? Theme.muted : Theme.faint)
     }
 }
 
-/// A step the run asks the owner about, or a question: Allow and Deny call the daemon.
+/// A step the run asks the owner about, or a question: Allow and Deny call the daemon. While it waits it is the loudest
+/// thing in the chat (the run is stopped on it); once answered it folds into a quiet line.
 struct ApprovalCardView: View {
     let card: ApprovalCard
     let onDecide: (ApprovalCard, Bool, String) -> Void
     @State private var answer: String = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: card.question != nil ? "questionmark.bubble" : "hand.raised")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(card.isPending ? Theme.warn : Theme.faint)
-                Text(card.question != nil ? "Dot asks" : "Dot asks to " + stepName)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(card.isPending ? Theme.warn : Theme.faint)
-                Spacer()
-                if !card.isPending {
-                    Text(resolution).font(Theme.meta).foregroundStyle(Theme.faint)
-                }
-            }
-            Text(card.question ?? card.summary)
-                .font(Theme.small)
-                .foregroundStyle(Theme.text)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if card.isPending {
-                if card.severity == "secret" {
-                    // A secret is given on the Mac or in the web UI, never typed into a phone's chat (the daemon's
-                    // decision route refuses a yes to it); the phone may skip it.
-                    Text("This asks for a secret. Give it on your Mac or in the web UI.").font(Theme.meta).foregroundStyle(Theme.muted)
-                    Button("Skip") { onDecide(card, false, "") }.buttonStyle(QuietButtonStyle(tint: Theme.muted))
-                } else if card.question != nil {
-                    TextField("Your answer", text: $answer, axis: .vertical)
-                        .font(Theme.small)
-                        .padding(8)
-                        .background(Theme.background, in: RoundedRectangle(cornerRadius: Theme.radius))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
-                    HStack(spacing: 8) {
-                        Button("Answer") { onDecide(card, true, answer) }
-                            .buttonStyle(QuietButtonStyle(tint: Theme.accent, filled: true))
-                            .disabled(answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        Button("Skip") { onDecide(card, false, "") }.buttonStyle(QuietButtonStyle(tint: Theme.muted))
-                    }
-                } else {
-                    HStack(spacing: 8) {
-                        Button("Allow") { onDecide(card, true, "") }.buttonStyle(QuietButtonStyle(tint: Theme.accent, filled: true))
-                        Button("Deny") { onDecide(card, false, "") }.buttonStyle(QuietButtonStyle(tint: Theme.muted))
-                    }
-                }
-            }
+        Group {
+            if card.isPending { pending } else { settled }
         }
-        .padding(12)
-        .card(fill: Theme.surface)
-        .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(card.isPending ? Theme.warn.opacity(0.35) : .clear, lineWidth: 1))
+        .sensoryFeedback(.success, trigger: card.status) { old, new in old == "pending" && new == "approved" }
+        .sensoryFeedback(.warning, trigger: card.status) { old, new in old == "pending" && new != "approved" }
+        .dotAnimation(Motion.smooth, value: card.status)
     }
 
-    private var stepName: String { card.tool.replacingOccurrences(of: "_", with: " ") }
+    // MARK: Waiting
+
+    private var pending: some View {
+        VStack(alignment: .leading, spacing: Space.m) {
+            HStack(spacing: Space.m) {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.warn)
+                    .symbolEffect(.bounce, options: .repeat(2), value: card.approvalId)
+                    .frame(width: 36, height: 36)
+                    .background(Theme.warn.opacity(0.16), in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(card.question != nil ? "Dot has a question" : "Waiting for your OK")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.warn)
+                    Text(card.question != nil ? "Your answer" : stepName)
+                        .font(.headline).foregroundStyle(Theme.text).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            if card.question != nil {
+                Text(card.question ?? "").font(Theme.body).foregroundStyle(Theme.text).frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(card.summary)
+                    .font(Theme.mono)
+                    .foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Space.m - 2)
+                    .background(Theme.codeFill, in: RoundedRectangle(cornerRadius: Radius.s))
+            }
+            actions
+        }
+        .padding(Space.l)
+        .background {
+            RoundedRectangle(cornerRadius: Radius.l)
+                .fill(LinearGradient(colors: [Theme.warn.opacity(0.12), Theme.warn.opacity(0.03)], startPoint: .top, endPoint: .bottom))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
+        }
+        .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.45), lineWidth: 1))
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var actions: some View {
+        if card.severity == "secret" {
+            // A secret is given on the Mac or in the web UI, never typed into a phone's chat (the daemon's decision
+            // route refuses a yes to it); the phone may skip it.
+            Label("This asks for a secret. Give it on your Mac or in the web UI.", systemImage: "lock.shield")
+                .font(Theme.small).foregroundStyle(Theme.muted)
+            Button { onDecide(card, false, "") } label: { Text("Skip").frame(maxWidth: .infinity) }
+                .dotButton(.glass).controlSize(.large)
+        } else if card.question != nil {
+            TextField("Your answer", text: $answer, axis: .vertical)
+                .font(Theme.body)
+                .padding(Space.m)
+                .background(Theme.background, in: RoundedRectangle(cornerRadius: Radius.m))
+                .overlay(RoundedRectangle(cornerRadius: Radius.m).strokeBorder(Theme.hairline, lineWidth: 1))
+            DotGlassGroup(spacing: Space.s) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.s) { skip; answerButton }
+                    VStack(spacing: Space.s) { answerButton; skip }
+                }
+                .controlSize(.large)
+            }
+        } else {
+            DotGlassGroup(spacing: Space.s) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.s) { deny; allow }
+                    VStack(spacing: Space.s) { allow; deny }
+                }
+                .controlSize(.large)
+            }
+        }
+    }
+
+    private var skip: some View {
+        Button { onDecide(card, false, "") } label: { Text("Skip").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.glass)
+    }
+
+    private var answerButton: some View {
+        Button { onDecide(card, true, answer) } label: { Text("Answer").lineLimit(1).frame(maxWidth: .infinity) }
+            .dotButton(.prominent)
+            .disabled(answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    private var deny: some View {
+        Button { onDecide(card, false, "") } label: { Text("Deny").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.glass)
+    }
+
+    private var allow: some View {
+        Button { onDecide(card, true, "") } label: { Text("Allow").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.prominent)
+    }
+
+    // MARK: Answered
+
+    private var settled: some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            Image(systemName: resolutionSymbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(resolutionTone)
+                .frame(width: 18, height: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(resolution + (card.question != nil ? "" : " · " + stepName))
+                    .font(Theme.small.weight(.medium)).foregroundStyle(Theme.muted)
+                Text(card.question ?? card.summary)
+                    .font(card.question != nil ? Theme.small : Theme.mono)
+                    .foregroundStyle(Theme.faint)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, Space.xs)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var symbol: String {
+        if card.severity == "secret" { return "lock.shield.fill" }
+        return card.question != nil ? "questionmark.bubble.fill" : "hand.raised.fill"
+    }
+
+    private var stepName: String { card.tool.replacingOccurrences(of: "_", with: " ").capitalizedFirst }
 
     private var resolution: String {
         switch card.status {
@@ -162,6 +299,22 @@ struct ApprovalCardView: View {
         case "denied": "Denied"
         case "left": "Left for later"
         default: "No longer asked"
+        }
+    }
+
+    private var resolutionSymbol: String {
+        switch card.status {
+        case "approved": "checkmark.circle.fill"
+        case "denied": "xmark.circle.fill"
+        default: "minus.circle"
+        }
+    }
+
+    private var resolutionTone: Color {
+        switch card.status {
+        case "approved": Theme.good
+        case "denied": Theme.bad
+        default: Theme.faint
         }
     }
 }

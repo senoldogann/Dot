@@ -151,126 +151,143 @@ struct NewChatView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                VStack(spacing: 8) {
-                    if let agent {
-                        Avatar(id: agent.id, name: agent.record.name, size: 52)
-                        Text(agent.record.name).font(.system(size: 17, weight: .semibold)).foregroundStyle(Theme.text)
-                        if !agent.record.role.isEmpty {
-                            Text(agent.record.role).font(Theme.small).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+            hero
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    VStack(spacing: Space.s) {
+                        if let refusal: ModelRefusal = model.refusal {
+                            VStack(alignment: .leading, spacing: Space.s) {
+                                Label(refusal.message, systemImage: "exclamationmark.triangle.fill")
+                                    .font(Theme.small).foregroundStyle(Theme.text)
+                                if refusal.fallback != nil {
+                                    Button("Send it on the default model") { Task { await start(onDefault: true) } }
+                                        .dotButton(.prominent)
+                                }
+                            }
+                            .padding(Space.m)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.warn.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.l))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.4), lineWidth: 1))
                         }
-                        Text("No chat yet. Your first message starts it.").font(Theme.meta).foregroundStyle(Theme.faint).padding(.top, 4)
-                    } else {
-                        Text("A message starts a chat of its own.").font(Theme.small).foregroundStyle(Theme.faint)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                if let refusal: ModelRefusal = model.refusal {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(refusal.message).font(Theme.small).foregroundStyle(Theme.warn)
-                        if refusal.fallback != nil {
-                            Button("Send it on the default model") { Task { await start(onDefault: true) } }
-                                .buttonStyle(QuietButtonStyle(tint: Theme.accent))
+                        if let failure: String = model.failure {
+                            Label(failure, systemImage: "exclamationmark.circle.fill").font(Theme.meta).foregroundStyle(Theme.bad)
                         }
+                        composer
                     }
-                    .padding(.horizontal, 16).padding(.bottom, 8).frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, Space.s + 2)
+                    .padding(.bottom, Space.xs)
                 }
-                if let failure: String = model.failure {
-                    Text(failure).font(Theme.meta).foregroundStyle(Theme.bad).padding(.bottom, 6)
+                .dotScreenBackground(inSheet: true)
+                .navigationTitle(agent.map { "Chat with \($0.record.name)" } ?? "New chat")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+                .sheet(isPresented: $showsPicker) {
+                    NavigationStack {
+                        ModelPickerView(
+                            store: store, model: model.model, effort: model.effort,
+                            onModel: { model.choose(model: $0) }, onEffort: { model.choose(effort: $0) }
+                        )
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsPicker = false } } }
+                    }
+                    .dotSheet()
+                    .presentationDetents([.medium, .large])
                 }
-                composer
-                    .background(Theme.background)
-                    .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
-            }
-            .background(Theme.background)
-            .navigationTitle(agent.map { "Chat with \($0.record.name)" } ?? "New chat")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .sheet(isPresented: $showsPicker) {
-                NavigationStack {
-                    ModelPickerView(
-                        store: store, model: model.model, effort: model.effort,
-                        onModel: { model.choose(model: $0) }, onEffort: { model.choose(effort: $0) }
-                    )
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsPicker = false } } }
+                .onChange(of: model.draft) { model.draftChanged() }
+                .onChange(of: picks) {
+                    let chosen: [PhotosPickerItem] = picks
+                    picks = []
+                    Task { await model.pick(chosen) }
                 }
-                .tint(Theme.accent)
-                .preferredColorScheme(.dark)
-                .presentationDetents([.medium, .large])
-                .presentationBackground(Theme.background)
-            }
-            .onChange(of: model.draft) { model.draftChanged() }
-            .onChange(of: picks) {
-                let chosen: [PhotosPickerItem] = picks
-                picks = []
-                Task { await model.pick(chosen) }
-            }
-            .task {
-                await store.loadProviders()
-                focused = true
-            }
-            .onDisappear { model.dictation.stop(); store.drafts.flush() }
+                .task {
+                    await store.loadProviders()
+                    focused = true
+                }
+                .onDisappear { model.dictation.stop(); store.drafts.flush() }
         }
     }
 
-    private var composer: some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 8) {
-                Button { showsPicker = true } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "cpu").font(.system(size: 10))
-                        Text(pillWords).font(Theme.meta).lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 8))
-                    }
-                    .foregroundStyle(Theme.muted)
-                    .padding(.horizontal, 10).frame(height: 26)
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
+    /// What the sheet says above the box: who the chat is with, or what a new chat is.
+    private var hero: some View {
+        VStack(spacing: Space.s) {
+            if let agent {
+                Avatar(id: agent.id, name: agent.record.name, size: 64)
+                    .padding(.bottom, Space.s)
+                Text(agent.record.name).font(.title2.weight(.semibold)).foregroundStyle(Theme.text)
+                if !agent.record.role.isEmpty {
+                    Text(agent.record.role).font(.subheadline).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
                 }
+                Text("No chat yet. Your first message starts it.").font(Theme.meta).foregroundStyle(Theme.faint).padding(.top, Space.xs)
+            } else {
+                DotEmptyState(
+                    symbol: "sparkles", title: "A new chat",
+                    message: "A message starts a chat of its own. Dot works on it and asks you only when it must.")
+            }
+        }
+        .padding(.horizontal, Space.xl)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var composer: some View {
+        VStack(spacing: Space.s) {
+            HStack(spacing: Space.s) {
+                Button { showsPicker = true } label: {
+                    HStack(spacing: Space.xs + 1) {
+                        Image(systemName: "cpu").font(.system(size: 11, weight: .medium))
+                        Text(pillWords).font(Theme.meta.weight(.medium)).lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .semibold))
+                    }
+                    .foregroundStyle(Theme.text)
+                    .padding(.horizontal, Space.m).frame(minHeight: 36)
+                    .dotGlass(in: Capsule(), interactive: true)
+                }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("model-pill")
                 .accessibilityLabel("Model: \(pillWords)")
                 Spacer()
             }
-            .padding(.horizontal, 12).padding(.top, 8)
-            if !model.images.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(model.images) { image in
-                            Image(uiImage: image.preview).resizable().scaledToFill().frame(width: 52, height: 52)
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
-                        }
-                    }.padding(.horizontal, 16)
+            VStack(spacing: Space.s) {
+                if !model.images.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Space.s) {
+                            ForEach(model.images) { image in
+                                Image(uiImage: image.preview).resizable().scaledToFill().frame(width: 52, height: 52)
+                                    .clipShape(RoundedRectangle(cornerRadius: Radius.m - 2))
+                            }
+                        }.padding(.horizontal, Space.m)
+                    }
                 }
+                DictationLine(dictation: model.dictation)
+                HStack(alignment: .bottom, spacing: 2) {
+                    PhotosPicker(selection: $picks, maxSelectionCount: 4, matching: .images) {
+                        Image(systemName: "plus").font(.system(size: 17, weight: .medium)).foregroundStyle(Theme.muted)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Attach a photo")
+                    TextField(agent.map { "Message \($0.record.name)" } ?? "Message Dot", text: $model.draft, axis: .vertical)
+                        .font(Theme.body)
+                        .lineLimit(1...6)
+                        .focused($focused)
+                        .padding(.vertical, Space.m - 1)
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("composer-field")
+                    MicButton(dictation: model.dictation) { model.toggleDictation() }
+                    Button { Task { await start(onDefault: false) } } label: {
+                        Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(model.canSend ? Theme.onAccent : Theme.faint)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!model.canSend)
+                    .accessibilityIdentifier("send")
+                    .accessibilityLabel("Start the chat")
+                    .sensoryFeedback(.impact(weight: .light), trigger: model.starting) { _, new in new }
+                }
+                .padding(.horizontal, Space.xs)
             }
-            DictationLine(dictation: model.dictation)
-            HStack(alignment: .bottom, spacing: 8) {
-                PhotosPicker(selection: $picks, maxSelectionCount: 4, matching: .images) {
-                    Image(systemName: "plus").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.muted).frame(width: 36, height: 36)
-                }
-                .accessibilityLabel("Attach a photo")
-                TextField(agent.map { "Message \($0.record.name)" } ?? "Message Dot", text: $model.draft, axis: .vertical)
-                    .font(Theme.body)
-                    .lineLimit(1...6)
-                    .focused($focused)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
-                    .accessibilityIdentifier("composer-field")
-                MicButton(dictation: model.dictation) { model.toggleDictation() }
-                Button { Task { await start(onDefault: false) } } label: {
-                    Image(systemName: "arrow.up").font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(model.canSend ? Color.black.opacity(0.9) : Theme.faint)
-                        .frame(width: 36, height: 36)
-                        .background(model.canSend ? Theme.accent : Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
-                }
-                .disabled(!model.canSend)
-                .accessibilityIdentifier("send")
-                .accessibilityLabel("Start the chat")
-            }
-            .padding(.horizontal, 10)
+            .dotGlass(in: RoundedRectangle(cornerRadius: Radius.xl + 2))
         }
-        .padding(.bottom, 8)
     }
 
     private var pillWords: String {

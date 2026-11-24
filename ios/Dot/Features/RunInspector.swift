@@ -11,83 +11,144 @@ struct RunInspector: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Run") {
-                    Group {
-                        row("Status", statusWords)
-                        if let run: RunRecord = model.run {
-                            row("Steps", String(run.steps))
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.xl) {
+                    statusCard
+                    CardGroup(title: "Run") {
                         NavigationLink {
                             ChatModelPicker(model: model).onAppear { onExpand() }
                         } label: {
-                            LabeledContent {
-                                Text(modelLine).font(Theme.small).foregroundStyle(Theme.muted)
-                            } label: {
-                                Text("Model for this chat").font(Theme.small).foregroundStyle(Theme.text)
+                            CardRow(symbol: "cpu", title: "Model for this chat", showsChevron: true) {
+                                Text(modelLine).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(1)
                             }
                         }
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("chat-model")
-                        Button("Default models…", action: onModels).font(Theme.small)
-                    }
-                    .listRowBackground(Theme.surface)
-                }
-                if !model.state.plan.isEmpty {
-                    Section("Plan") {
-                        Group {
-                            ForEach(Array(model.state.plan.enumerated()), id: \.offset) { _, step in
-                                HStack(alignment: .top, spacing: 8) {
-                                    Image(systemName: icon(for: step.status)).font(.system(size: 11))
-                                        .foregroundStyle(color(for: step.status)).frame(width: 14).padding(.top, 3)
-                                    Text(step.text).font(Theme.small).foregroundStyle(step.status == "done" ? Theme.muted : Theme.text)
-                                }
-                            }
+                        CardDivider()
+                        Button(action: onModels) {
+                            CardRow(symbol: "slider.horizontal.3", tint: Theme.muted, title: "Default models…", showsChevron: true)
                         }
-                        .listRowBackground(Theme.surface)
+                        .buttonStyle(.plain)
                     }
-                }
-                Section("Helpers") {
-                    Group {
+                    if !model.state.plan.isEmpty { planCard }
+                    CardGroup(title: "Helpers", footer: model.state.helpers.isEmpty ? nil : "Subagents Dot started for this chat.") {
                         if model.state.helpers.isEmpty {
-                            Text("No helpers in this chat.").font(Theme.small).foregroundStyle(Theme.faint)
+                            EmptyRow(symbol: "person.2", words: "No helpers in this chat.")
                         }
-                        ForEach(model.state.helpers) { helper in
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(shortened(helper.goal, 80)).font(Theme.small).foregroundStyle(Theme.text).lineLimit(2)
-                                    Spacer()
-                                    Text(helper.status).font(Theme.meta).foregroundStyle(helper.isLive ? Theme.accent : Theme.faint)
-                                }
-                                if helper.isLive, let words: String = helper.words {
-                                    Text(words).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(1)
-                                }
-                            }
+                        ForEach(Array(model.state.helpers.enumerated()), id: \.element.id) { index, helper in
+                            if index > 0 { CardDivider(inset: 48) }
+                            HelperRow(helper: helper)
                         }
                     }
-                    .listRowBackground(Theme.surface)
-                }
-                Section("Schedules and loops") {
-                    Group {
+                    CardGroup(title: "Schedules and loops") {
                         if model.automations.isEmpty {
-                            Text("None bound to this chat.").font(Theme.small).foregroundStyle(Theme.faint)
+                            EmptyRow(symbol: "clock.arrow.circlepath", words: "None bound to this chat.")
                         }
-                        ForEach(model.automations) { automation in
+                        ForEach(Array(model.automations.enumerated()), id: \.element.id) { index, automation in
+                            if index > 0 { CardDivider() }
                             ScheduleRow(
                                 schedule: automation.schedule, isLoop: automation.loop,
                                 onChange: { model.setAutomation(automation.id, on: $0) })
                         }
                     }
-                    .listRowBackground(Theme.surface)
                 }
+                .padding(Space.l)
             }
-            .scrollContentBackground(.hidden)
-            .listRowBackground(Theme.surface)
+            .dotScreenBackground(inSheet: true)
             .navigationTitle("Run")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task {
                 await model.refreshAutomations()
                 await model.store.loadProviders()
+            }
+        }
+    }
+
+    /// The run's standing, large: what it does, how many steps it has taken.
+    private var statusCard: some View {
+        HStack(spacing: Space.m) {
+            Image(systemName: statusSymbol)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(statusTone)
+                .symbolEffect(.pulse, options: .repeating, isActive: model.state.isWorking)
+                .frame(width: 48, height: 48)
+                .background(statusTone.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.m))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Status").font(Theme.meta).foregroundStyle(Theme.faint)
+                Text(statusWords).font(.title3.weight(.semibold)).foregroundStyle(Theme.text)
+            }
+            Spacer()
+            if let run: RunRecord = model.run {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("Steps").font(Theme.meta).foregroundStyle(Theme.faint)
+                    Text(String(run.steps)).font(.title3.weight(.semibold).monospacedDigit()).foregroundStyle(Theme.text)
+                }
+            }
+        }
+        .padding(Space.l)
+        .background {
+            RoundedRectangle(cornerRadius: Radius.l)
+                .fill(LinearGradient(colors: [statusTone.opacity(0.14), statusTone.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
+        }
+        .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.hairline, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var planCard: some View {
+        let steps: [PlanStep] = model.state.plan
+        let done: Int = steps.filter { $0.status == "done" }.count
+        return CardGroup(title: "Plan") {
+            VStack(alignment: .leading, spacing: Space.s) {
+                HStack {
+                    Text("\(done) of \(steps.count) done").font(Theme.meta.weight(.medium).monospacedDigit()).foregroundStyle(Theme.muted)
+                    Spacer()
+                }
+                ProgressView(value: Double(done), total: Double(max(steps.count, 1))).tint(Theme.accent)
+            }
+            .padding(.horizontal, Space.l).padding(.top, Space.m).padding(.bottom, Space.s)
+            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .top, spacing: Space.m) {
+                    Image(systemName: icon(for: step.status))
+                        .font(.system(size: 14))
+                        .foregroundStyle(color(for: step.status))
+                        .symbolEffect(.pulse, options: .repeating, isActive: step.status == "in_progress")
+                        .frame(width: 20).padding(.top, 1)
+                    Text(step.text).font(Theme.small)
+                        .foregroundStyle(step.status == "done" ? Theme.muted : Theme.text)
+                        .strikethrough(step.status == "skipped")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, Space.l).padding(.vertical, Space.s)
+                .padding(.bottom, index == steps.count - 1 ? Space.xs : 0)
+            }
+        }
+    }
+
+    private var statusSymbol: String {
+        switch model.state.line {
+        case .working: "waveform"
+        case .waitingOnYou: "hand.raised.fill"
+        case .waitingOnSubagents, .helpersInBackground: "person.2.fill"
+        case .idle:
+            switch model.state.runStatus {
+            case "failed": "exclamationmark.circle.fill"
+            case "cancelled": "stop.circle.fill"
+            default: "checkmark.circle.fill"
+            }
+        }
+    }
+
+    private var statusTone: Color {
+        switch model.state.line {
+        case .working, .waitingOnSubagents, .helpersInBackground: Theme.accent
+        case .waitingOnYou: Theme.warn
+        case .idle:
+            switch model.state.runStatus {
+            case "failed": Theme.bad
+            case "cancelled": Theme.faint
+            default: Theme.good
             }
         }
     }
@@ -101,19 +162,11 @@ struct RunInspector: View {
 
     private var statusWords: String {
         switch model.state.line {
-        case .idle: model.state.runStatus ?? "Idle"
+        case .idle: (model.state.runStatus ?? "Idle").capitalizedFirst
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
         case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
         case .helpersInBackground(let count): "\(count) subagent\(count == 1 ? "" : "s") in the background"
-        }
-    }
-
-    private func row(_ name: String, _ value: String) -> some View {
-        LabeledContent {
-            Text(value).font(Theme.small).foregroundStyle(Theme.muted)
-        } label: {
-            Text(name).font(Theme.small).foregroundStyle(Theme.text)
         }
     }
 
@@ -137,6 +190,44 @@ struct RunInspector: View {
     }
 }
 
+/// A helper in the inspector: a branch mark under the run, its goal, and how it stands; a live one says what it does.
+private struct HelperRow: View {
+    let helper: Helper
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            Image(systemName: "arrow.turn.down.right")
+                .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.faint)
+                .frame(width: 20).padding(.top, 3)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(shortened(helper.goal, 80)).font(Theme.small).foregroundStyle(Theme.text).lineLimit(2)
+                if helper.isLive, let words: String = helper.words {
+                    Text(words).font(Theme.meta).foregroundStyle(Theme.muted).lineLimit(1)
+                }
+            }
+            Spacer(minLength: Space.s)
+            StatusPill(text: helper.status.capitalizedFirst, symbol: helper.isLive ? "waveform" : nil, tone: helper.isLive ? Theme.accent : Theme.faint, pulse: helper.isLive)
+        }
+        .padding(.horizontal, Space.l).padding(.vertical, Space.m - 2)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// An empty line of a card, said quietly with its symbol.
+struct EmptyRow: View {
+    let symbol: String
+    let words: String
+
+    var body: some View {
+        HStack(spacing: Space.m) {
+            Image(systemName: symbol).font(.system(size: 14)).foregroundStyle(Theme.faint).frame(width: 20)
+            Text(words).font(Theme.small).foregroundStyle(Theme.muted)
+            Spacer()
+        }
+        .padding(.horizontal, Space.l).frame(minHeight: 52)
+    }
+}
+
 /// A schedule or loop with its on/off switch.
 struct ScheduleRow: View {
     let schedule: ScheduleView
@@ -145,13 +236,24 @@ struct ScheduleRow: View {
 
     var body: some View {
         Toggle(isOn: Binding(get: { schedule.record.enabled }, set: { onChange($0) })) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(schedule.record.name.isEmpty ? shortened(schedule.record.goal, 60) : schedule.record.name)
-                    .font(Theme.small).foregroundStyle(Theme.text).lineLimit(1)
-                Text(detail).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(1)
+            HStack(spacing: Space.m) {
+                Image(systemName: isLoop ? "repeat" : "clock")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(schedule.record.enabled ? Theme.accent : Theme.faint)
+                    .frame(width: 30, height: 30)
+                    .background((schedule.record.enabled ? Theme.accent : Theme.faint).opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.s))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(schedule.record.name.isEmpty ? shortened(schedule.record.goal, 60) : schedule.record.name)
+                        .font(.subheadline).foregroundStyle(Theme.text).lineLimit(1)
+                    Text(detail).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(2)
+                }
             }
         }
-        .tint(Theme.accent)
+        .tint(Theme.accentFill)
+        .padding(.horizontal, Space.l).padding(.vertical, Space.s)
+        .frame(minHeight: 56)
+        .sensoryFeedback(.selection, trigger: schedule.record.enabled)
     }
 
     private var detail: String {

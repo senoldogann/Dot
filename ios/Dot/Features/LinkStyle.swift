@@ -22,7 +22,7 @@ enum LinkStyle {
         }
         for run in result.runs where run.inlinePresentationIntent?.contains(.code) == true {
             result[run.range].font = Theme.mono
-            result[run.range].backgroundColor = Color.white.opacity(0.07)
+            result[run.range].backgroundColor = Theme.codeFill
         }
         return result
     }

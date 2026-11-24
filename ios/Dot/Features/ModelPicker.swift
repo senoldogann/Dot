@@ -11,68 +11,81 @@ struct ModelPickerView: View {
     let onEffort: (String?) -> Void
 
     var body: some View {
-        List {
-            let providers: [ProviderModels] = store.providers
-            let main: String? = store.models?.main
-            if let chosen: ModelOption = providers.option(model ?? main), !chosen.pickableEfforts.isEmpty {
-                Section("Reasoning") {
-                    Group {
+        let providers: [ProviderModels] = store.providers
+        let main: String? = store.models?.main
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.xl) {
+                if let chosen: ModelOption = providers.option(model ?? main), !chosen.pickableEfforts.isEmpty {
+                    CardGroup(title: "Reasoning", footer: "How long the model thinks before it answers.") {
                         effortRow(title: "Default", detail: chosen.defaultEffort.map(effortWords), level: nil)
                         ForEach(chosen.pickableEfforts, id: \.self) { level in
+                            CardDivider(inset: Space.l)
                             effortRow(title: effortWords(level), detail: nil, level: level)
                         }
                     }
-                    .listRowBackground(Theme.surface)
                 }
-            }
-            Section("Model") {
-                Group {
+                CardGroup(title: "Model") {
                     modelRow(title: "Default", detail: label(of: main, in: providers), ref: nil)
-                    ForEach(providers.pickable) { provider in
-                        // Each provider's name once, then its models.
-                        Text(provider.provider).font(Theme.meta).foregroundStyle(Theme.faint)
-                        ForEach(provider.models) { option in
+                    if providers.isEmpty {
+                        CardDivider(inset: Space.l)
+                        HStack(spacing: Space.s) {
+                            ProgressView().controlSize(.small)
+                            Text("Reading the models…").font(Theme.small).foregroundStyle(Theme.muted)
+                        }
+                        .padding(Space.l)
+                    }
+                }
+                ForEach(providers.pickable) { provider in
+                    // Each provider's name once, then its models.
+                    CardGroup(title: provider.provider) {
+                        ForEach(Array(provider.models.enumerated()), id: \.element.id) { index, option in
+                            if index > 0 { CardDivider(inset: Space.l) }
                             modelRow(title: option.label, detail: option.free ? "free" : nil, ref: option.ref)
                         }
                     }
-                    if providers.isEmpty {
-                        Text("Reading the models…").font(Theme.small).foregroundStyle(Theme.faint)
-                    }
                 }
-                .listRowBackground(Theme.surface)
             }
+            .padding(Space.l)
         }
-        .scrollContentBackground(.hidden)
-        .background(Theme.background)
+        .dotScreenBackground(inSheet: true)
         .navigationTitle("Model")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadProviders() }
+        .sensoryFeedback(.selection, trigger: model)
+        .sensoryFeedback(.selection, trigger: effort)
     }
 
     private func modelRow(title: String, detail: String?, ref: String?) -> some View {
         Button { onModel(ref) } label: {
-            HStack {
-                Text(title).font(Theme.small).foregroundStyle(Theme.text)
-                if let detail { Text(detail).font(Theme.meta).foregroundStyle(Theme.faint) }
-                Spacer()
-                if model == ref { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-            }
-            .contentShape(Rectangle())
+            choiceRow(title: title, detail: detail, selected: model == ref)
         }
+        .buttonStyle(.plain)
         .accessibilityIdentifier("model-\(ref ?? "default")")
     }
 
     private func effortRow(title: String, detail: String?, level: String?) -> some View {
         Button { onEffort(level) } label: {
-            HStack {
-                Text(title).font(Theme.small).foregroundStyle(Theme.text)
-                if let detail { Text(detail).font(Theme.meta).foregroundStyle(Theme.faint) }
-                Spacer()
-                if effort == level { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-            }
-            .contentShape(Rectangle())
+            choiceRow(title: title, detail: detail, selected: effort == level)
         }
+        .buttonStyle(.plain)
         .accessibilityIdentifier("effort-\(level ?? "default")")
+    }
+
+    private func choiceRow(title: String, detail: String?, selected: Bool) -> some View {
+        HStack(spacing: Space.s) {
+            Text(title).font(.subheadline).foregroundStyle(Theme.text)
+            if let detail { Text(detail).font(Theme.meta).foregroundStyle(Theme.faint) }
+            Spacer()
+            if selected {
+                Image(systemName: "checkmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, Space.l)
+        .frame(minHeight: 48)
+        .contentShape(Rectangle())
+        .dotAnimation(Motion.snappy, value: selected)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func label(of ref: String?, in providers: [ProviderModels]) -> String? {

@@ -20,7 +20,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `Outbox` and `OutboxModel` (what the owner did with no link, kept on disk and sent once in order), `Retrier` and
     `Coalescer`, `BackgroundGrace`.
   - `Features/`: the screens: `ChatListView`, `ChatView` with `Composer`, `QueuePanel` and the status line,
-    `RunInspector`, `SettingsViews` (models, schedules), `PairView`, `Theme`.
+    `RunInspector`, `SettingsViews` (models, schedules), `PairView`, `NewChatView`, `ModelPicker`, and the design system
+    (`Theme`, `Chrome`, `ToolGlyph`, `DesignGallery` in debug builds); `Shared/DotPalette.swift` is its colour tokens.
   - `Adapters/` the Keychain, UserDefaults and the push/share HTTP client; `Push/` the token registration;
     `Views/` the address screen and the web UI fallback (`DotWebView`).
 - `DotTests/`: the unit tests (XCTest) of the reducer, the SSE parser and feed, the cache, the queue order, the link
@@ -33,6 +34,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
   the rows being the Mac's, in the scenarios of the table below).
 - `DotUITests/`: the same screens driven by taps in the simulator (XCUITest, scheme `DotUI`) against a scratch daemon
   with a scripted model; they skip when `/tmp/dot-ui-daemon.json` is missing and write screenshots to `/tmp/dot-ui-shots/`.
+  `GlassShotsTests` (item 1380) takes the design's screenshots of the screens that need a tap, from
+  `/tmp/dot-glass-daemon.json`, to `/tmp/dot-ui-shots/glass/`.
 - `DotLiveActivity/`: the widget extension (`dev.dotagent.phone.live`) that draws the Live Activity.
 - `DotShare/`: the share extension (`dev.dotagent.phone.share`, item 1009): what another app shares goes to Dot as a
   new chat. It reads the host from the app group's defaults and the key from the shared Keychain access group.
@@ -156,6 +159,43 @@ the message waits and the later ones behind it.
   `xcodebuild test -scheme DotUI -only-testing:DotUITests/DotUIResilienceTests`. The debug build reads the phone's link from
   `-DotLinkFile <file>` (`up` or `down`), as the simulator cannot be taken off the Mac's network.
 
+## The design (items 1380 to 1382)
+
+The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `Shared/DotPalette.swift`:
+
+- **Colour** comes from `DotPalette` in two looks that follow the system's appearance: dark (near-black `#0A0A0B`,
+  surfaces `#121214` and `#1B1B1F`, hairlines at 9 % white) and light (a cool white), one calm blue (ink `#6AA4FF` in the
+  dark, `#2559C9` in the light; a fill with a very slight top-to-bottom gradient that white text sits on), and warn, bad
+  and good. The palette is plain numbers, so `DotPaletteTests` asserts that every text token holds 4.5:1 on every ground
+  in both looks, and the Live Activity draws with the same values.
+- **Type** is SF through the system's text styles (`Theme.body` is `.callout`, `small` `.footnote`, `meta` `.caption`) so
+  everything follows Dynamic Type; code is SF Mono. Rows and cards re-lay out at the accessibility sizes, and floating
+  chrome (the composer, the queue, the chips, the new-chat button) is capped at a size where it still fits.
+- **Space and radius** are two scales (`Space` 2 to 32; `Radius` 4, 8, 12, 16, 24): controls 8, cards 12, the owner's
+  message and the approval card 16, the floating bar 26.
+- **Glass is for floating chrome only**: the composer bar, the status and queue panels, the agents' chips, the
+  new-chat button, the jump-to-newest button, the approval card's Allow and Deny, the pairing field. `dotGlass(in:)`
+  is Liquid Glass (`glassEffect`) on iOS 26 and a thin material with a hairline before it; `dotButton(.glass|.prominent)`
+  are `.glass` and `.glassProminent` on iOS 26 and capsule buttons before it; `DotGlassGroup` is a
+  `GlassEffectContainer`. Message text, tool lines and long lists are never glass. With Reduce Transparency it is a solid
+  raised surface, with Increase Contrast the hairline is stronger, and `dotAnimation` stays still under Reduce Motion.
+  Sheets keep the system's own glass on iOS 26 (`dotSheet()`), and a title's subtitle and the soft scroll edges are
+  iOS 26's own.
+- **Behaviour of the look**: a working chat's avatar has a ring that turns, a waiting one an amber ring; a tool step has
+  its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
+  approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
+  folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).
+- **Debug-only aids**: `-DotGallery 1|2|3` shows the pieces on one screen with made-up data (a step that asks, a
+  secret, a failed step, the buttons, the empty states), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
+  look an iOS 18 phone gets, on an iOS 26 simulator.
+
+Screenshots of the design pass, with the audit that led to it, are in `roadmap/1380.md`; the simulator shots were made
+against a scratch daemon with a scripted model (the daemon of the screenshot section above) with
+`xcrun simctl ui <device> appearance dark|light`, `content_size accessibility-extra-extra-extra-large`, and
+`DotUITests/GlassShotsTests` for the screens that need a tap. No iOS 18 simulator runtime is installed on the Mac
+that built this, so the fallback look was seen only through `-DotMaterialLook`, which shares the app's own code paths but
+not the system's (a pre-iOS 26 navigation bar and sheet are the system's to draw).
+
 ## Build and install on the iPhone
 
 1. `brew install xcodegen` once, then in this folder: `xcodegen generate`.
@@ -193,7 +233,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1` and `-DotShowSchedules 1` open a screen at launch, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1` and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the
@@ -245,5 +285,9 @@ enforce it: `scripts/app_bound_domains.sh` writes the host as the only `WKAppBou
 
 ## The app icon
 
-`scripts/make_icon.swift` draws the placeholder icon (a yellow circle with two eyes):
-`swift scripts/make_icon.swift Dot/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.
+`scripts/make_icon.swift` draws the icon (item 1382): a luminous blue dot with two dark eyes, lit from the top left, on a
+near-black navy ground with a glow of the accent, in the three looks iOS 18 asks for (`icon-1024.png`,
+`icon-1024-dark.png`, `icon-1024-tinted.png`), and the launch screen's mark (`LaunchMark.imageset`, the same dot on
+transparency, shrunk with `sips -z 360 360`; the launch screen is that mark on `LaunchBackground`, the app's ground in
+both looks): `swift scripts/make_icon.swift Dot/Assets.xcassets/AppIcon.appiconset`. The global accent colour
+(`AccentColor`) is the app's blue, and the Live Activity draws with `DotPalette` and the same mark.
