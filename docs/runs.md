@@ -981,7 +981,10 @@ report is not lost. When it ends, its chat is told as a command in the backgroun
 work in the chat reads the report at its next step, in a note of Dot's, and a chat with no run at work gets a run
 started to read it (its source is `helper_report`, with the chat's choices and agent), unless the chat's queue holds or
 waits, its newest run did not end done or the emergency stop is on: the next run of the chat then reads it at its first
-step, so the queue and its order stay as they were. The report is fenced as third-party content when the helper read
+step, so the queue and its order stay as they were. A newest run that nothing of yours ended does not hold the report
+back (item 1669): one a stop, restart or crash of Dot cut off, and one your Claude plan's usage limit ended once the
+plan's window has reset (with a reset still ahead, Dot wakes the chat 30 s after it). Your Stop and a run that failed of
+its own still leave the report to your next message. The report is fenced as third-party content when the helper read
 some, marks the run that reads it as that content does, and carries the Verification note. It closes no plan step:
 the note says the step it was started for stays as it is, and the run checks the report and marks it itself. `wait`
 false starts the helper and returns at once, for a run that has other work or nothing left but to say what it waits

@@ -49,6 +49,7 @@ from dotagent.agent.helper_reports import (
     keep_detached,
     kept_detached,
     late_report_note,
+    plan_limit_of,
 )
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.learning_health import (
@@ -256,6 +257,8 @@ _EMERGENCY_MARK_S: float = 86_400.0
 _RELAY_PAGE: int = 500
 # Why a pending approval expired: its run was closed when the daemon started, or when its dotx command was found dead.
 _EXPIRED_ON_START: str = "daemon restarted"
+# How long after the Claude plan's window resets a chat waiting on it is woken for its helpers' reports (item 1669).
+_AFTER_RESET_S: float = 30.0
 _EXPIRED_COMMAND_DIED: str = "its dotx command died"
 _TITLE_CHARS: int = 60
 _RESULT_CHARS: int = 20_000
@@ -578,6 +581,8 @@ class RunManager:
         # those that ended whose report no run has read yet, by chat (:meth:`_tell_helper_reports`).
         self._detached: dict[str, DetachedHelper] = {}
         self._untold: dict[str, list[DetachedHelper]] = {}
+        # The wakes of chats whose helpers' reports wait for the Claude plan's window to reset (item 1669), by chat.
+        self._timed_wakes: dict[str, asyncio.Task[None]] = {}
         # Why each helper the daemon's own end cut off was not resumed at this start (item 1668), until its report is
         # told, by helper run id.
         self._not_resumed: dict[str, str] = {}
@@ -1953,7 +1958,10 @@ class RunManager:
         there (item 1351). It starts as the chat's next message would, with its choices and agent, under the guards
         of a command that ended in the background (:meth:`_tell_ended_commands`): not while a run works on the chat or
         ends there, or its queue holds or waits, or after the chat's newest run did not end done (the owner's next
-        run reads the reports instead, at its first step), or under the emergency stop; ``None`` then. The reports
+        run reads the reports instead, at its first step), or under the emergency stop; ``None`` then. A newest run
+        that nothing of the owner's ended is no reason to wait for them (item 1669): one the daemon's end cut off, and
+        one the Claude plan's usage limit ended, once the plan's window has reset (:meth:`_wake_at` wakes the chat
+        then). The owner's Stop and every other end still leave the reports to the owner's next run. The reports
         are Dot's note (:data:`HELPER_SOURCE`, none of the owner's words), which the run reads first; it starts
         untrusted when a helper read content third parties can author, or the chat's newest run ended so."""
         if self._stopping or self._leaves_queues or not self._untold.get(thread_id):
@@ -1968,7 +1976,9 @@ class RunManager:
             if not runs:
                 return None
             newest: RunRecord = runs[0]
-            if newest.status != "done" or newest.parent_run_id is not None or newest.campaign_id is not None:
+            if newest.parent_run_id is not None or newest.campaign_id is not None:
+                return None
+            if newest.status != "done" and not await self._wakes_after(newest):
                 return None
             if await store.queue_held(thread_id) or await store.list_queued(thread_id):
                 return None
@@ -2043,6 +2053,40 @@ class RunManager:
         await self._queue_changed(thread_id, run.id, newest.id, None)
         log.info("helper_report_run_started", thread_id=thread_id, run_id=run.id)
         return run
+
+    async def _wakes_after(self, newest: RunRecord) -> bool:
+        """Whether helpers' reports wake a chat whose newest run ``newest`` did not end done (item 1669): the daemon's
+        own end cut it off (:func:`~dotagent.agent.resume.cut_by_restart`), or the Claude plan's usage limit ended it
+        (its ``run_finished`` error is of the kind ``plan_limit``) and the plan's window has reset. A window that resets
+        later wakes the chat at that time (:meth:`_wake_at`); a reset the plan did not name is taken as passed."""
+        if cut_by_restart(newest):
+            return True
+        resets_at: float | None
+        limited, resets_at = plan_limit_of(await self._runtime.store.last_event(newest.id, "run_finished"))
+        if not limited:
+            return False
+        if resets_at is not None and resets_at > time.time():
+            self._wake_at(newest.thread_id, resets_at)
+            return False
+        return True
+
+    def _wake_at(self, thread_id: str, when: float) -> None:
+        """Tell the chat ``thread_id`` its helpers' reports at ``when`` (epoch seconds), once, unless the daemon ends
+        first (its end cancels the wait): a chat whose run the plan's usage limit ended is woken when the plan's window
+        resets (item 1669). A wake already set for the chat stands."""
+        if thread_id in self._timed_wakes:
+            return
+
+        async def wake() -> None:
+            try:
+                await asyncio.sleep(max(0.0, when - time.time()) + _AFTER_RESET_S)
+                del self._timed_wakes[thread_id]
+                await self._tell_helper_reports(thread_id)
+            except DotError as exc:
+                log.warning("helper_reports_not_told_after_reset", thread_id=thread_id, error=exc.message)
+
+        self._timed_wakes[thread_id] = asyncio.create_task(wake(), name=f"wake-{thread_id}")
+        log.info("helper_reports_wait_for_reset", thread_id=thread_id, resets_at=when)
 
     async def tell_helper_reports(self) -> int:
         """For the daemon, when it starts (item 1351): tell the chats the reports of the helpers that worked on without
@@ -2978,6 +3022,8 @@ class RunManager:
         chat: the daemon's stop ends it too."""
         self._stopping = True
         self._runtime.terminals.unwatch(self)
+        for waking in self._timed_wakes.values():
+            waking.cancel()
         handles: list[RunHandle] = list(self._handles.values())
         for handle in handles:
             self.cancel(handle.run_id)

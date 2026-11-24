@@ -16,11 +16,12 @@ helper's end and its telling loses nothing.
 import secrets
 from collections.abc import Collection
 
-from pydantic import TypeAdapter, ValidationError
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.store.db import Store
+from dotagent.store.models import EventRecord
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import render_outcome
 
@@ -134,3 +135,19 @@ def cut_report_note(outcome: DelegateOutcome, entry: DetachedHelper, why_not: st
         f"it ended, and it was not resumed ({why_not}). Its work stopped half way: delegate it again if it is still "
         f"needed; what it did so far is in its record below.\n{report}{step}"
     )
+
+
+def plan_limit_of(finished: EventRecord | None) -> tuple[bool, float | None]:
+    """Whether the run whose ``run_finished`` event is ``finished`` was ended by the Claude plan's usage limit (its
+    error is of the kind ``plan_limit``, item 1206), and when the plan said its window resets (epoch seconds, ``None``
+    when it did not say)."""
+    if finished is None:
+        return False, None
+    error: JsonValue = finished.data.get("error")
+    if not isinstance(error, dict) or error.get("kind") != "plan_limit":
+        return False, None
+    context: JsonValue = error.get("context")
+    resets_at: JsonValue = context.get("resets_at") if isinstance(context, dict) else None
+    if isinstance(resets_at, bool) or not isinstance(resets_at, int | float):
+        return True, None
+    return True, float(resets_at)

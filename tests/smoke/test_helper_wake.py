@@ -45,7 +45,8 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import WORKING_STATUSES, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.endings import RESULT_RESTARTED, RESULT_SHUTDOWN, RESULT_STOPPED
+from dotagent.store.models import WORKING_STATUSES, EventRecord, RunRecord, RunStatus, ThreadRecord
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -703,3 +704,75 @@ async def test_a_helper_whose_end_the_store_has_not_taken_is_kept_by_the_run_at_
         assert "Report of stored: all good." in await _thread_text(runtime, parent.thread_id)
         assert await kept_detached(runtime.store) == [] and not manager._untold.get(parent.thread_id)
         assert [run.id for run in await _runs_of_chat(runtime, parent.thread_id)] == [parent.id]
+
+
+_PLAN_LIMIT: str = "Your Claude plan's limit is reached."
+
+
+@pytest.mark.parametrize(
+    ("status", "result", "error", "wakes"),
+    [
+        ("cancelled", RESULT_SHUTDOWN, None, True),
+        ("failed", RESULT_RESTARTED, None, True),
+        ("failed", _PLAN_LIMIT, {"kind": "plan_limit", "context": {"resets_at": 1.0}}, True),
+        ("failed", _PLAN_LIMIT, {"kind": "plan_limit", "context": {"resets_at": None}}, True),
+        ("failed", _PLAN_LIMIT, {"kind": "plan_limit", "context": {"resets_at": 4_000_000_000.0}}, False),
+        ("cancelled", RESULT_STOPPED, None, False),
+        ("failed", "The model said no.", {"kind": "lasting", "context": {}}, False),
+    ],
+    ids=["shutdown", "crash", "plan_limit_reset", "plan_limit_unnamed", "plan_limit_later", "owners_stop", "failed"],
+)
+async def test_a_helpers_report_wakes_a_chat_whose_newest_run_a_restart_or_the_plans_limit_ended(
+    login_env: dict[str, str], status: RunStatus, result: str, error: JsonObject | None, wakes: bool
+) -> None:
+    """Item 1669: the chat's newest run did not end done, yet nothing of the owner's ended it: the daemon's end cut it
+    off, or the Claude plan's limit ended it and the plan's window has reset (or the plan named no time). A helper's
+    report then wakes the chat. A window that resets later sets a wake for that time; the owner's Stop and a failure of
+    the run's own still leave the report to the owner's next run."""
+    roles: _Roles = _Roles(
+        main=[ScriptedTurn(text="", calls=(_delegate("late", wait=False),)), _finish("Went on."), _finish("Read it.")],
+        helpers=[_turn("shell", {"command": "sleep 2"}), _finish(_report("late"))],
+    )
+    async with _session(login_env, roles) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+        assert (await _ended(manager, parent.id)).status == "done"
+        # A newer run of the chat, ended as the case says before the helper ends (as a restart or the plan's limit
+        # would have ended it).
+        newer: RunRecord = await runtime.store.create_run(
+            parent.thread_id,
+            "Go on.",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            UI_SOURCE,
+            "medium",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            None,
+        )
+        data: JsonObject = {"status": status, "result": result, "needs": ""}
+        if error is not None:
+            data["error"] = error
+        assert await runtime.store.end_run(newer.id, status, result, data) is not None
+
+        async def told_or_waiting() -> bool:
+            return len(await _runs_of_chat(runtime, parent.thread_id)) == 3 or bool(
+                manager._untold.get(parent.thread_id)
+            )
+
+        await _until(told_or_waiting, "the helper's report was told or left waiting")
+        runs: list[RunRecord] = await _runs_of_chat(runtime, parent.thread_id)
+        if wakes:
+            assert runs[2].source == HELPER_SOURCE
+            assert (await _ended(manager, runs[2].id)).status == "done"
+            assert "Report of late: all good." in await _thread_text(runtime, parent.thread_id)
+        else:
+            assert [run.id for run in runs] == [parent.id, newer.id]
+            assert len(manager._untold[parent.thread_id]) == 1
+        assert (parent.thread_id in manager._timed_wakes) == (
+            error is not None and error["kind"] == "plan_limit" and not wakes
+        )
