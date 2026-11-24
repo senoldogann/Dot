@@ -20,7 +20,11 @@ from test_themes import _base, _painted, _short
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.paths import themes_dir
+from dotagent.core.types import JsonValue
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -304,3 +308,123 @@ async def test_a_theme_of_ones_own_is_made_kept_picked_exported_copied_and_delet
     await expect(cards).to_have_count(_BUILT_IN + 4)
     assert errors == [], errors
     await page.close()
+
+
+async def test_a_chat_changes_two_open_clients_and_restores_their_device_themes(
+    browser: Browser, client: httpx.AsyncClient, runtime: Runtime
+) -> None:
+    provider: str = parse_model_ref(SCRIPTED_MODEL).provider
+    artwork: Path = runtime.workspace / "study.jpg"
+    source: Path = Path(__file__).parents[2] / "src/dotagent/server/static/images/quiet-forest.jpg"
+    image: bytes = await asyncio.to_thread(source.read_bytes)
+    await asyncio.to_thread(artwork.write_bytes, image)
+    theme: dict[str, JsonValue] = {
+        "name": "Cloud Study",
+        "light": {
+            "canvas": "#e5edf5",
+            "surface": "#f1f6fa",
+            "raised": "#dbe8f4",
+            "text": "#13283f",
+            "muted": "#3b4d64",
+            "accent": "#25486f",
+        },
+        "dark": {
+            "canvas": "#111e30",
+            "surface": "#182a40",
+            "raised": "#203654",
+            "text": "#e7f0fb",
+            "muted": "#b7c7db",
+            "accent": "#b2d9fa",
+        },
+        "artwork": "custom",
+    }
+    turns: list[ScriptedTurn] = [
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="use_tools", arguments={"group": "appearance"}),)),
+        ScriptedTurn(text="", calls=(ScriptedCall(tool="theme_read", arguments={}),)),
+        ScriptedTurn(
+            text="",
+            calls=(
+                ScriptedCall(tool="theme_apply", arguments={"revision": 0, "theme": theme, "image_path": artwork.name}),
+            ),
+        ),
+        ScriptedTurn(
+            text="", calls=(ScriptedCall(tool="finish", arguments={"answer": "Theme applied.", "success": True}),)
+        ),
+    ]
+    theme_darker: dict[str, JsonValue] = {
+        **theme,
+        "light": {
+            "canvas": "#dce4ec",
+            "surface": "#e8edf1",
+            "raised": "#d2dfeb",
+            "text": "#13283f",
+            "muted": "#3b4d64",
+            "accent": "#25486f",
+        },
+    }
+    turns.extend(
+        [
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="use_tools", arguments={"group": "appearance"}),)),
+            ScriptedTurn(text="", calls=(ScriptedCall(tool="theme_read", arguments={}),)),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="theme_apply", arguments={"revision": 1, "theme": theme_darker}),)
+            ),
+            ScriptedTurn(
+                text="", calls=(ScriptedCall(tool="finish", arguments={"answer": "Theme darkened.", "success": True}),)
+            ),
+        ]
+    )
+    await runtime.router.register(provider, ScriptedProvider(provider, turns))
+    host, port = _base(client)
+    light: Page = await browser.new_page(color_scheme="light")
+    dark: Page = await browser.new_page(color_scheme="dark")
+    try:
+        for page in (light, dark):
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"http://{host}:{port}/#/settings/appearance")
+            await expect(page.get_by_role("button", name="Use Quiet Forest")).to_be_visible()
+        start = await client.post(
+            "/api/runs",
+            json={
+                "goal": "Make a misty blue study theme with the study image",
+                "mode": "task",
+                "model": SCRIPTED_MODEL,
+                "source": "ui",
+            },
+        )
+        assert start.status_code == 201, start.text
+        await expect(light.locator("html")).to_have_attribute("data-shared-appearance", "")
+        await expect(dark.locator("html")).to_have_attribute("data-shared-appearance", "")
+        await expect(light.locator("body")).to_have_css("color", "rgb(19, 40, 63)")
+        await expect(dark.locator("body")).to_have_css("color", "rgb(231, 240, 251)")
+        current = await client.get("/api/active-theme")
+        assert current.json()["active"] == theme
+        assert (await client.get("/api/active-theme/artwork?revision=1")).json()["jpeg"]
+        assert await light.evaluate(
+            "document.documentElement.style.getPropertyValue('--shared-artwork').startsWith('url(\"data:image/jpeg;base64,')"
+        )
+        conflict = await client.put("/api/active-theme", json={"revision": 0, "choice": "local"})
+        assert conflict.status_code == 409
+        await dark.reload()
+        await expect(dark.locator("html")).to_have_attribute("data-shared-appearance", "")
+        refine = await client.post(
+            "/api/runs",
+            json={
+                "goal": "Make the light version slightly darker and keep the image",
+                "mode": "task",
+                "model": SCRIPTED_MODEL,
+                "source": "ui",
+            },
+        )
+        assert refine.status_code == 201, refine.text
+        await expect(light.locator("body")).to_have_css("background-color", "rgb(220, 228, 236)")
+        assert (await client.get("/api/active-theme?revision=2")).json()["active"] == theme_darker
+        assert (await client.get("/api/active-theme/artwork?revision=2")).json()["jpeg"]
+        await light.get_by_role("button", name="Undo appearance change").click()
+        await expect(light.locator("body")).to_have_css("background-color", "rgb(229, 237, 245)")
+        await light.get_by_role("button", name="Use device theme").click()
+        await expect(light.locator("html")).not_to_have_attribute("data-shared-appearance", "")
+        await expect(dark.locator("html")).not_to_have_attribute("data-shared-appearance", "")
+    finally:
+        await light.close()
+        await dark.close()

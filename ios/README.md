@@ -429,3 +429,7 @@ both looks): `swift scripts/make_icon.swift Dot/Assets.xcassets/AppIcon.appicons
 `DotPalette` and a flat copy of the in-app mark. The home-screen icon itself is still the blue dot above (the owner's to redraw:
 `scripts/make_icon.swift`); the launch screen's mark is the in-app one, a flat graphite disc with two eyes, in two looks
 (`launch-mark.png`, `launch-mark-dark.png`) on `LaunchBackground`.
+
+The native conversation follows the daemon's shared appearance using the phone's own light or dark mode. The app
+remembers the last palette and artwork per daemon and checks for changes in the foreground. Describe a new look or
+ask Dot to adjust the current one in chat.

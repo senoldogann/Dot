@@ -20,6 +20,7 @@ struct ChatView: View {
     @State private var selecting: String?
     @State private var editing: ChatItem?
     @Environment(\.dismiss) private var dismiss: DismissAction
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Debug builds' launch arguments that open a sheet of the chat (the look's screenshots); all false in a normal launch.
     private let debug: DebugOpen
@@ -59,7 +60,8 @@ struct ChatView: View {
             .frame(maxWidth: Theme.readingWidth)
             .frame(maxWidth: .infinity)
         }
-        .dotScreenBackground()
+        .environment(\.sharedAppearancePalette, store.sharedAppearance?.selection.palette(in: colorScheme))
+        .background { SharedAppearanceBackground(appearance: store.sharedAppearance) }
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
         .dotSubtitle(subtitle, tone: subtitleTone)
