@@ -450,6 +450,32 @@ async def test_a_picked_skill_reaches_claude_code_in_the_first_message(room: Roo
     assert [event.data["skills"] for event in chips] == [[_SKILL]]
 
 
+async def test_a_run_on_the_plan_is_told_dots_own_system_prompt_and_the_skills_of_its_goal(room: Room) -> None:
+    """Item 1691, the audit of 2026-11-24: a run on the plan was told 3.9 KB of its own, without how to work, the plan,
+    trust and safety, the skills or what Dot learned, and no skill was ever used in 124 runs. It is now told the
+    prompt Dot's own loop builds, whole, with the skills listed, then what the harness changes; under its message how
+    it was started, as Dot's own loop hands it."""
+    await asyncio.to_thread(_write_skill, Path(os.environ["DOT_HOME"]))
+    ended: RunRecord = await _run(room, "Write a note in the workspace.")
+    assert ended.status == "done", ended.result
+    started: dict[str, object] = await asyncio.to_thread(_json, room.record / "started.json")
+    args: list[str] = started["args"]  # type: ignore[assignment]  # what the stand-in wrote
+    prompt: str = args[args.index("--append-system-prompt") + 1]
+    for said in (
+        "# How to work",
+        "keep a short plan with update_plan",
+        "# Trust and safety",
+        "Bold in method, conservative in consequence.",
+        f"- {_SKILL}: Write the weekly report as the owner likes it.",
+        "# This run's harness",
+        "mcp__dot__<tool>",
+    ):
+        assert said in prompt, said
+    assert "use_tools" not in prompt
+    first: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert "How this run was started" in first
+
+
 async def test_plan_first_on_claude_code_is_refused_before_the_run(room: Room) -> None:
     """Plan first is Dot's own loop's plan and ask, which Claude Code does not run: refused, with what to do instead."""
     with pytest.raises(InvalidValueError, match="but not Plan first"):

@@ -225,6 +225,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import agent_folder
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.harness.components import GivenText
 from dotagent.harness.seat import TRIAL_EVENT, text_for_run
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.help.meaning import HelpVectorsCold
@@ -1573,6 +1574,177 @@ async def _session_number(agent: AgentRun, campaign_id: str) -> int:
     return session_number(await agent.runtime.store.campaign_sessions(campaign_id), agent.run.id)
 
 
+def free_mode_line(runtime: Runtime) -> str:
+    """What a run's prompt ends with while the owner's free mode is on as it starts (item 922), else nothing."""
+    return _FREE_MODE_LINE if runtime.approvals.free else ""
+
+
+async def run_harness_text(runtime: Runtime, run: RunRecord, held: tuple[str, ...]) -> GivenText:
+    """The texts of the adopted version of the harness the run's prompt takes (item 389), with the secrets ``held``
+    masked; the run records which version it took. While a version is tried on real runs (item 988), half the runs
+    take it, by their id, and record their half."""
+    text, version, seat = await text_for_run(runtime.store, run.id, held, time.time())
+    if version is not None:
+        await runtime.store.set_run_harness(run.id, version)
+    if seat is not None:
+        await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
+    return text
+
+
+@dataclass(frozen=True)
+class PromptFacts:
+    """What a run's system prompt is built from besides its tools, gathered once as the run starts, by Dot's own loop
+    and by a run on the owner's Claude plan alike (item 1691): how its questions go, its chat and the team it leads,
+    the skills listed by the chat's title (``listing``) and those that fit its goal (``fitting``), its browser, what the
+    MCP servers' groups are for, its agent and the team, the accounts signed in, its helpers, the harness's texts and
+    the secrets Dot held as it started."""
+
+    can_ask: bool
+    questions: AskMode
+    thread: ThreadRecord
+    lead: TeamBrief | None
+    listing: SkillListing
+    fitting: SkillListing
+    browser: BrowserSession
+    purposes: dict[str, McpPurpose]
+    agent_record: AgentRecord | None
+    team: tuple[AgentRecord, ...]
+    signed_in: tuple[Account, ...]
+    helpers: tuple[str, ...]
+    harness: GivenText
+    held: tuple[str, ...]
+
+
+async def gather_prompt_facts(
+    agent: AgentRun,
+    query: str,
+    skills: SkillCatalog,
+    agent_record: AgentRecord | None,
+    team: Sequence[AgentRecord],
+    signed_in: Sequence[Account],
+    helpers: tuple[str, ...],
+    harness: GivenText,
+    held: tuple[str, ...],
+) -> PromptFacts:
+    """The :class:`PromptFacts` of ``agent``'s run, whose goal reads as ``query`` and which is offered ``skills``."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    config: AgentConfig = runtime.config.agent
+    plan_first: bool = agent.opening.picks.plan_first
+    # Free mode (item 922) asks no run's owner anything; a Plan first, the owner's own word for this message, stands
+    # (item 1563).
+    can_ask: bool = can_ask_user(
+        run.source, run.parent_run_id, run.approvals, runtime.approvals.free and not plan_first
+    )
+    asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
+    # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
+    # wait for the answer whatever it says (item 508).
+    questions: AskMode = "wait" if asks == "choose" and plan_first else asks
+    # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
+    # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
+    # the provider's cache of the instructions and the history holds from message to message (item 404). More skills
+    # than the instructions list are picked by meaning too (item 169), or by their words when the embeddings fail
+    # (item 256).
+    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
+    close_to_title, close = (
+        await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
+        if len(skills.skills) > runtime.config.skills.listed
+        else ([], [])
+    )
+    return PromptFacts(
+        can_ask=can_ask,
+        questions=questions,
+        thread=thread,
+        # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
+        lead=team_brief(await runtime.store.find_team(thread.team_id), tuple(team), run),
+        listing=listed_skills(skills.skills, thread.title, close_to_title, runtime.config.skills.listed),
+        fitting=listed_skills(skills.skills, query, close, runtime.config.skills.listed),
+        browser=await browser_of(runtime, run),
+        # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked
+        # of a server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
+        purposes=runtime.mcp.purposes(held) if config.mcp_purposes else {},
+        agent_record=agent_record,
+        team=tuple(team),
+        signed_in=tuple(signed_in),
+        helpers=helpers,
+        harness=harness,
+        held=held,
+    )
+
+
+def turn_skills(facts: PromptFacts) -> list[Skill]:
+    """The skills that fit the run's goal and that its instructions do not list, handed under its message (item 404),
+    at most :data:`_TURN_SKILLS_MOST`."""
+    listed: set[str] = {skill.name for skill in facts.listing.skills}
+    return [skill for skill in facts.fitting.skills if skill.name not in listed][:_TURN_SKILLS_MOST]
+
+
+async def run_prompt_inputs(agent: AgentRun, facts: PromptFacts, tools: Sequence[ToolSpec]) -> PromptInputs:
+    """What the system prompt of ``agent``'s run is built from, for ``tools``: asked again when a small window left
+    tools out, so that the prompt names only the tools the run has (item 1211)."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    record: AgentRecord | None = facts.agent_record
+    names: AssistantView = runtime.assistant.view()
+    tool_names: list[str] = [spec.name for spec in tools]
+    return _with_phone_state(
+        runtime,
+        tool_names,
+        collect_prompt_inputs(
+            run.mode,
+            run.source,
+            runtime.config.policy.preset,
+            run.approvals,
+            facts.questions,
+            run.goal_mode,
+            splits_work(run.once),
+            runtime.workspace,
+            (),
+            0,
+            tools_in_order(tools, facts.thread.title),
+            facts.listing.skills,
+            facts.listing.left,
+            None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
+            facts.helpers,
+            None
+            if record is None
+            else AgentBrief(
+                name=record.name,
+                role=record.role,
+                instructions=record.instructions,
+                made_by_dot=record.made_by is not None,
+                team=team_name(record.name),
+                refuses=record.refuses,
+                folder=str(await _agent_folder(runtime.workspace, record.id)),
+            ),
+            [
+                AgentBrief(
+                    name=member.name,
+                    role=member.role,
+                    instructions="",
+                    made_by_dot=member.made_by is not None,
+                    team=team_name(member.name),
+                )
+                for member in facts.team
+            ],
+            (
+                *owner_name_lines(names.owner, names.mac_name),
+                *(called_lines(names.name) if record is None else ()),
+                # The accounts are named only to a run that has one of the tools that take them (an agent's may have
+                # none, or only some).
+                *(account_lines(list(facts.signed_in)) if tools_in(tool_names, ACCOUNTS_GROUP) else ()),
+                *owner_prompt_lines(await owner_section(runtime.store), facts.held),
+            ),
+            devtools_address(facts.browser.config),
+            runtime.config.agent.prompt,
+            facts.harness,
+            facts.lead,
+            skills_left_names=facts.listing.left_names,
+            group_purposes=facts.purposes,
+        ),
+    )
+
+
 async def _missing_in_answer(agent: AgentRun, answer: str, facts: RunFacts) -> tuple[str, ...]:
     """The paths ``answer`` names that do not exist and that no successful call of the run named."""
     return await asyncio.to_thread(missing_paths, answer_paths(answer), facts.named, agent.runtime.workspace)
@@ -2574,109 +2746,26 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # were written (item 587). A gate refuses by a value, so the values filled into a page are not among them (item
     # 621); a text that holds one reaches the prompt with it masked (``given_text``, ``owner_prompt_lines``).
     held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
-    # While a version is tried on real runs (item 988), half the runs take it, by their id, and record their half.
-    harness_text, harness_version, seat = await text_for_run(runtime.store, run.id, held_at_start, time.time())
-    if harness_version is not None:
-        await runtime.store.set_run_harness(run.id, harness_version)
-    if seat is not None:
-        await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
+    harness_text: GivenText = await run_harness_text(runtime, run, held_at_start)
     remembered: tuple[MemoryRecord, ...] = recalled.records
     await count_start_notes(runtime, run, recalled, memory_seen_at)
-    # Free mode (item 922) asks no run's owner anything; a Plan first, the owner's own word for this message, stands
-    # (item 1563).
-    can_ask: bool = can_ask_user(
-        run.source, run.parent_run_id, run.approvals, runtime.approvals.free and not opening.picks.plan_first
+    prompt_facts: PromptFacts = await gather_prompt_facts(
+        agent, query, skills, agent_record, team, signed_in, helpers, harness_text, held_at_start
     )
-    asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
-    # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
-    # wait for the answer whatever it says (item 508).
-    questions: AskMode = "wait" if asks == "choose" and agent.opening.picks.plan_first else asks
-    # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
-    # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
-    # the provider's cache of the instructions and the history holds from message to message (item 404). More skills
-    # than the instructions list are picked by meaning too (item 169), or by their words when the embeddings fail
-    # (item 256).
-    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
-    # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
-    lead: TeamBrief | None = team_brief(await runtime.store.find_team(thread.team_id), team, run)
+    can_ask: bool = prompt_facts.can_ask
+    questions: AskMode = prompt_facts.questions
+    lead: TeamBrief | None = prompt_facts.lead
     # A run that leads a group chat sends every agent its part in one reply, and they work at once (item 831).
     group_parallelism: int = parallel_calls(config.parallel_tools, lead)
-    close_to_title, close = (
-        await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
-        if len(skills.skills) > runtime.config.skills.listed
-        else ([], [])
-    )
-    listing: SkillListing = listed_skills(skills.skills, thread.title, close_to_title, runtime.config.skills.listed)
-    fitting: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
-    browser: BrowserSession = await browser_of(runtime, run)
-    names: AssistantView = runtime.assistant.view()
-    # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked of a
-    # server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
-    purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
+    browser: BrowserSession = prompt_facts.browser
 
     async def _inputs_for(tools: tuple[ToolSpec, ...]) -> PromptInputs:
         """What the prompt is built from, for ``tools``: it is asked again when a small window left tools out, so
         that the prompt names only the tools the run has (item 1211)."""
-        return _with_phone_state(
-            runtime,
-            [spec.name for spec in tools],
-            collect_prompt_inputs(
-                run.mode,
-                run.source,
-                runtime.config.policy.preset,
-                run.approvals,
-                questions,
-                run.goal_mode,
-                splits_work(run.once),
-                runtime.workspace,
-                (),
-                0,
-                tools_in_order(tools, thread.title),
-                listing.skills,
-                listing.left,
-                None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
-                helpers,
-                None
-                if agent_record is None
-                else AgentBrief(
-                    name=agent_record.name,
-                    role=agent_record.role,
-                    instructions=agent_record.instructions,
-                    made_by_dot=agent_record.made_by is not None,
-                    team=team_name(agent_record.name),
-                    refuses=agent_record.refuses,
-                    folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
-                ),
-                [
-                    AgentBrief(
-                        name=member.name,
-                        role=member.role,
-                        instructions="",
-                        made_by_dot=member.made_by is not None,
-                        team=team_name(member.name),
-                    )
-                    for member in team
-                ],
-                (
-                    *owner_name_lines(names.owner, names.mac_name),
-                    *(called_lines(names.name) if agent_record is None else ()),
-                    # The accounts are named only to a run that has one of the tools that take them (an agent's may
-                    # have none, or only some).
-                    *(account_lines(signed_in) if tools_in([spec.name for spec in tools], ACCOUNTS_GROUP) else ()),
-                    *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
-                ),
-                devtools_address(browser.config),
-                config.prompt,
-                harness_text,
-                lead,
-                skills_left_names=listing.left_names,
-                group_purposes=purposes,
-            ),
-        )
+        return await run_prompt_inputs(agent, prompt_facts, tools)
 
     # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
-    free_line: str = _FREE_MODE_LINE if runtime.approvals.free else ""
+    free_line: str = free_mode_line(runtime)
     prompt_inputs: PromptInputs = await _inputs_for(specs)
     system: Message = system_message(build_system_prompt(prompt_inputs) + free_line)
 
@@ -2767,10 +2856,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     fresh_notes: list[str] = list(handed_notes.fresh)
     forgotten: list[str] = list(handed_notes.forgotten)
     stood_in: list[MemoryRecord] = list(handed_notes.stood_in)
-    listed_names: set[str] = {skill.name for skill in listing.skills}
-    extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
-        :_TURN_SKILLS_MOST
-    ]
+    extra_skills: list[Skill] = turn_skills(prompt_facts)
     recalled_ids: list[str] = [record.id for record in (*remembered, *stood_in)]
 
     async def recalled_now(present: str) -> str:
@@ -3369,7 +3455,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             sites_seen.update(site_tag(site) for site in arrived)
             if arrived and finished is None:
                 arrival: str | None = await _arrival_note(
-                    agent, arrived, skills.skills, frozenset(skill.name for skill in listing.skills)
+                    agent, arrived, skills.skills, frozenset(skill.name for skill in prompt_facts.listing.skills)
                 )
                 if arrival is not None:
                     history.append(await _stored_note(agent, arrival))
