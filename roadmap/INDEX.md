@@ -13,6 +13,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1752](1752.md) | done | 2026-11-25 | On a phone a note's tags stand at the height of the badge beside them again |
 | [1751](1751.md) | done | 2026-11-25 | An offline test does not read the owner's Antigravity login |
 | [1750](1750.md) | done | 2026-11-25 | The code review's model is named "Code review model", apart from the review model of the roles |
+| [1740](1740.md) | done | 2026-11-24 | `search_chats`: a run finds what was said in any chat, by its words |
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
 | [1726](1726.md) | done | 2026-11-24 | DotNext's chat, whole: the work log, the ask dock in the composer's place, the composer, the queue and its edit, the inspector |
 | [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |

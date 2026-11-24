@@ -338,6 +338,7 @@ from dotagent.tools.office import (
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.recall import RECALL_TOOL
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
+from dotagent.tools.search_chats import SEARCH_CHATS_TOOL
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
 from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, WORK_ORDER_TOOLS
@@ -368,6 +369,8 @@ AGENT_CORE_TOOLS: tuple[str, ...] = (
     # The chats of this Mac, found and read (item 953), so that an agent knows where a thing was talked about.
     CHATS_TOOL,
     READ_CHAT_TOOL,
+    # What was said in any chat, found by its words (item 1740).
+    SEARCH_CHATS_TOOL,
     # A note to the run at work in another chat (item 957), so that the agents talk across their chats.
     SEND_TO_CHAT_TOOL,
     # The ids a compaction note names are read back with it (item 924), whatever tools the agent's role names.

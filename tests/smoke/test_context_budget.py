@@ -121,7 +121,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # it prints.
 # The appearance tools carry two validated palettes in the full tool surface.
 # Raised by 250 for the worktree capture tool (item 1658), with 32,048 measured.
-BUDGET_TOKENS: int = 32_150
+# Raised by 200 for `search_chats` (item 1740): one tool of a line and five short fields, which finds what was said in
+# any chat and reads one run, in the office group; 32,279 measured here.
+BUDGET_TOKENS: int = 32_350
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -157,7 +159,8 @@ SYSTEM_BUDGET_TOKENS: int = 9_050
 # Raised by 550 with `code_run` of item 1501 above (21,882 measured).
 # The appearance tools add a single portable theme schema and two revision-only calls.
 # Raised by 250 for the worktree, base commit and pull request arguments (item 1658), with 22,960 measured.
-TOOLS_BUDGET_TOKENS: int = 23_050
+# Raised by 200 for `search_chats` of item 1740 above (23,208 measured, with the growth of main it was made on).
+TOOLS_BUDGET_TOKENS: int = 23_250
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

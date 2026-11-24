@@ -113,6 +113,10 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "tools/office.py:_chats_tool.run": (True,),
     # A note to the run at work in another chat (item 957): what it says and the chat's page draws is masked.
     "tools/office.py:_send_to_chat_tool.run": (True,),
+    # What a search of the chats quotes (item 1740) is masked as a chat read is.
+    "tools/search_chats.py:_find": (True,),
+    "tools/search_chats.py:_around": (True,),
+    "tools/search_chats.py:_read": (True,),
     # A record read back by its id (item 924) is masked as a chat read is.
     "tools/recall.py:_recall_tool.run": (True,),
     "agent/reactions.py:_holds_a_secret": (False,),

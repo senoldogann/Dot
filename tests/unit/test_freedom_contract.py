@@ -544,6 +544,7 @@ ROWS: tuple[Row, ...] = (
     _row("office: read an agent's chat", "read_agent_chat", {"agent": "Scout"}),
     _row("office: chats", "chats", {}),
     _row("office: read a chat", "read_chat", {"chat": "thr_other"}),
+    _row("office: search the chats", "search_chats", {"mode": "find", "query": "launch"}),
     _row("consult: a helper model", "consult", {"question": "Which is better?"}),
     # --- campaigns
     _row("campaign: targets", "campaign_targets", {"targets": "ten replies", "verification": "count the replies"}),
