@@ -523,7 +523,8 @@ export async function request(method, path, body, signal) {
     }
   }
   // Before the daemon has answered it, a phone's page asks once and gives up after the time a read has, so that a link that
-  // died while Dot opened leaves the page with its copies instead of waiting for it (item 1521).
+  // carries nothing as Dot opens ends in the screen of a Dot out of reach instead of waiting for the browser's own timeout
+  // (item 1521).
   const read = () => (resilient() ? sharedRead(path, signal) : phoneScreen() ? tryRead(path, signal) : ask(method, path, body, signal));
   if (listKey(path) === null) {
     return read();

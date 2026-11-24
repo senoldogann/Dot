@@ -519,8 +519,9 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   header `X-Dot-Events-Tail`, item 1370; a daemon without it is ignored and the stream replays what was missed), says
   *Some steps are not shown*, and its stream goes on after the last event it read. Before Dot has answered the page once,
   a phone's reads, and the proof Dot gives before the first of them, are tried once and give up after the same 10 seconds,
-  so that a link that dies while Dot opens leaves the page with its copies instead of waiting for the browser's own
-  timeout.
+  so that a link that carries nothing as Dot opens ends in the screen of a Dot out of reach, which tries again by itself,
+  instead of waiting for the browser's own timeout (a list the phone holds a copy of is drawn from it after three seconds,
+  as above).
 - **A stream that is never silent without being noticed (item 1522).** The page reads its streams with `fetch` and a
   stream reader, not with `EventSource`, which cannot see the comment lines that are Dot's `: open` and its `: keepalive`
   every 15 seconds, and so could tell a quiet stream from a dead socket by nothing. A small parser (`js/sseframes.js`)
