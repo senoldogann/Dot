@@ -139,8 +139,8 @@ code** takes its place. The same by hand:
    three on a cellular link or a hotspot, and none with Low Data Mode on. A socket that died without a word (a path that died while the phone slept, a Wi-Fi that gave way to the cellular link) is not waited for: a connection that has answered nothing in 8 seconds, and an open stream that has said nothing for 35 seconds (Dot writes a keepalive every 15 seconds), are dropped and the stream goes on, from the last event read, on a new connection. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382, `ios/README.md`
    › The design) is iOS-native: near-black surfaces in the dark and a cool white in the light, following the system, one
    calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
-   chrome only: the composer bar, the capsule over it, the agents' chips (a ring on each that turns while the
-   agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
+   chrome only: the composer bar, the capsule over it, the agents' chips (a ring on each that turns, once in four
+   seconds, while the agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
    the loudest card in a chat; message text and lists are never glass. What it still leaves to the web UI is in
    `roadmap/1353.md`. The
    app's notifications are its own, through APNs: Settings in the app opens the
