@@ -1943,7 +1943,7 @@ class RunManager:
                     continue
                 if isinstance(found, _HelperNote):
                     try:
-                        self.note(run_id, found.text, found.tainted)
+                        self.note(run_id, found.text, found.tainted, entry.helper_run_id)
                     except RunConflict:
                         self._put_back_untold(thread_id, [*waiting, *entries[index:]])
                         return False
@@ -2327,12 +2327,13 @@ class RunManager:
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
 
-    def note(self, run_id: str, text: str, taints: bool) -> None:
+    def note(self, run_id: str, text: str, taints: bool, helper_run_id: str | None) -> None:
         """Hand the running agent a note of Dot's from another run (a chat's note, a work order, a helper's answer),
         which it reads before its next step as it reads a steer: Dot's words, which clear no mark and say nothing to
         the reviewer, as :meth:`tell`'s do, and which are no sign that the owner is there (item 974). ``taints`` marks
-        the reading run when the note carries words of content third parties can author. Refused like a steer to a run
-        that has ended."""
+        the reading run when the note carries words of content third parties can author. ``helper_run_id`` names the
+        helper whose report the note is (item 1686: its ``steer`` event says so), ``None`` for any other note.
+        Refused like a steer to a run that has ended."""
         handle: RunHandle = self._handle(run_id)
         try:
             handle.inbox.put_nowait(
@@ -2345,6 +2346,7 @@ class RunManager:
                     reaction="note",
                     taints=taints,
                     of_dot=True,
+                    helper_run_id=helper_run_id,
                 )
             )
         except asyncio.QueueShutDown as exc:
@@ -2405,7 +2407,7 @@ class RunManager:
             )
         tainted: bool = True
         try:
-            self.note(target.run_id, note.text, tainted)
+            self.note(target.run_id, note.text, tainted, None)
         except RunConflict:
             return None
         await self._runtime.bus.emit(
@@ -4703,7 +4705,9 @@ class RunManager:
 
     async def sessions_changed(self, thread_id: str) -> None:
         """Tell the pages that a chat's terminal sessions changed (item 229), as a live event of its newest run; a chat
-        that a rewind emptied has no page to tell."""
+        that a rewind emptied has no page to tell. The sessions live in this process: the chat's revision is moved here
+        (item 1686), as the store's triggers move it for what it keeps."""
+        await self._runtime.store.bump_thread_revision(thread_id)
         newest_run_id: str | None = await self._newest_run_id(thread_id)
         if newest_run_id is not None:
             await self._runtime.bus.emit(newest_run_id, TERMINALS_CHANGED_EVENT, {"thread_id": thread_id}, False)

@@ -1014,7 +1014,9 @@ queued message sent on, the answer to a question, a note of Dot's) ends the wait
 at once, as a model call gives way to one (item 509): the call returns with the helper's run id and that it keeps
 working in the background, the helper is not stopped, and the run reads the message and goes on. The helper's
 report is not lost. When it ends, its chat is told as a command in the background that ended is (item 229): the run at
-work in the chat reads the report at its next step, in a note of Dot's, and a chat with no run at work gets a run
+work in the chat reads the report at its next step, in a note of Dot's (its `steer` event says `of_dot: true`, `source:
+"helper_report"` and the helper's `helper_run_id`, item 1686, so a client draws it as Dot's row, not the owner's
+message; every other note of Dot's from another run says `of_dot: true`), and a chat with no run at work gets a run
 started to read it (its source is `helper_report`, with the chat's choices and agent), unless the chat's queue holds or
 waits, its newest run did not end done or the emergency stop is on: the next run of the chat then reads it at its first
 step, so the queue and its order stay as they were. A newest run that nothing of yours ended does not hold the report

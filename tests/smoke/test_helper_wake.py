@@ -291,6 +291,14 @@ async def test_a_helper_started_without_a_wait_reports_to_the_run_that_goes_on_w
         assert (await runtime.store.events_of_kind(parent.id, HELPER_RELEASED_EVENT, 5))[0].data["asked"] is True
         assert "Report of quick: all good." in await _thread_text(runtime, parent.thread_id)
         assert [run.id for run in await _runs_of_chat(runtime, parent.thread_id)] == [parent.id]
+        # The note is typed (item 1686): a client draws it as Dot's row and knows whose report it is.
+        (helper,) = await runtime.store.list_child_runs(parent.id)
+        (noted,) = await runtime.store.events_of_kind(parent.id, "steer", 5)
+        assert (noted.data["of_dot"], noted.data["source"], noted.data["helper_run_id"]) == (
+            True,
+            "helper_report",
+            helper.id,
+        )
         await _settled(runtime, manager, parent.thread_id)
 
 

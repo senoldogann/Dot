@@ -11,6 +11,7 @@ import base64
 import contextlib
 import errno
 import hashlib
+import math
 import os
 import re
 import secrets
@@ -115,6 +116,7 @@ from dotagent.store.models import (
     StepRow,
     TeamRecord,
     ThreadRecord,
+    ThreadRevision,
     ThreadSummary,
     TodoRecord,
     TodoStatus,
@@ -130,6 +132,8 @@ from dotagent.store.models import (
     WorkOrderRecord,
     WorkOrderStatus,
 )
+from dotagent.store.revisions import COUNTER_KEY as REVISION_COUNTER_KEY
+from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_sql, revision_statements
 from dotagent.store.stats import (
     RETRIED_CHATS,
     RETRIED_FAILURES,
@@ -1439,6 +1443,8 @@ _ADDED_THREAD_COLUMNS: tuple[tuple[str, str], ...] = (
     ("team_id", "TEXT"),
     # The agent a chat is with: NULL for a chat that is nobody's or Dot's, and for every chat from before it existed.
     ("agent_id", "TEXT"),
+    # The chat's revision (item 1686, :mod:`dotagent.store.revisions`): 0 until something of its state changes.
+    ("revision", "INTEGER NOT NULL DEFAULT 0"),
 )
 # Columns of ``agents`` added later: NULL means the owner made the agent (item 99).
 _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -1531,6 +1537,10 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
     # The steps kept for the owner: the same one once in a chat, and the ones whose time is over (item 482).
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_kept ON approvals(digest, status)")
+    # The chats' revisions (item 1686): the counter, its index and the triggers that move it with every write of a
+    # chat's state, whichever process writes; after the columns they name.
+    for statement in revision_statements():
+        await connection.execute(statement)
 
 
 # The schema's version (item 1268), kept in the database's header (``PRAGMA user_version``). Every open makes the tables
@@ -1892,6 +1902,143 @@ class Store:
     async def _all(self, sql: str, params: Sequence[object]) -> list[aiosqlite.Row]:
         async with self._db.execute(sql, params) as cursor:
             return list(await cursor.fetchall())
+
+    # ----- the chats' revisions (item 1686) -------------------------------------------------
+
+    async def thread_revision(self, thread_id: str) -> int:
+        """The chat's revision (:mod:`dotagent.store.revisions`); ``NotFoundError`` for no chat."""
+        row: aiosqlite.Row | None = await self._one("SELECT revision FROM threads WHERE id = ?", (thread_id,))
+        if row is None:
+            raise NotFoundError("thread not found", {"thread_id": thread_id})
+        return int(row["revision"])
+
+    async def newest_thread_revision(self) -> int:
+        """The revision the last change of any chat took, 0 before any."""
+        row: aiosqlite.Row | None = await self._one("SELECT value FROM kv WHERE key = ?", (REVISION_COUNTER_KEY,))
+        return 0 if row is None else int(row["value"])
+
+    async def thread_revisions_after(self, after: int) -> list[ThreadRevision]:
+        """The chats whose revision is past ``after``, and the chats deleted since, in the order of their revisions."""
+        changed: list[aiosqlite.Row] = await self._all(
+            "SELECT id, revision FROM threads WHERE revision > ? ORDER BY revision", (after,)
+        )
+        deleted: list[aiosqlite.Row] = await self._all(
+            "SELECT key, value FROM kv WHERE key >= ? AND key < ? AND CAST(value AS INTEGER) > ?",
+            (DELETED_PREFIX, DELETED_END, after),
+        )
+        found: list[ThreadRevision] = [
+            ThreadRevision(thread_id=str(row["id"]), revision=int(row["revision"]), deleted=False) for row in changed
+        ] + [
+            ThreadRevision(thread_id=str(row["key"])[len(DELETED_PREFIX) :], revision=int(row["value"]), deleted=True)
+            for row in deleted
+        ]
+        return sorted(found, key=lambda one: one.revision)
+
+    async def thread_revisions(self, thread_ids: Sequence[str]) -> dict[str, int]:
+        """The revisions of the chats ``thread_ids`` that exist, by id."""
+        named: tuple[str, ...] = tuple(thread_ids)
+        if not named:
+            return {}
+        rows: list[aiosqlite.Row] = await self._all(
+            f"SELECT id, revision FROM threads WHERE id IN ({', '.join('?' for _ in named)})", named
+        )
+        return {str(row["id"]): int(row["revision"]) for row in rows}
+
+    async def thread_summary(self, thread_id: str, same_chat: bool) -> ThreadSummary | None:
+        """The chat as :meth:`list_thread_summaries` lists it, ``None`` for a thread that is no chat (one that holds a
+        helper's runs only)."""
+        row: aiosqlite.Row | None = await self._one(
+            _thread_summaries_sql(" WHERE t.id = ?", "updated_at DESC LIMIT 1"),
+            (
+                None,
+                None,
+                _LAST_MESSAGE_READ_CHARS,
+                _LAST_MESSAGE_READ_CHARS,
+                int(same_chat),
+                int(same_chat),
+                thread_id,
+            ),
+        )
+        return None if row is None else _summary(row)
+
+    async def thread_runs_window(self, thread_id: str, tail: int, before: str | None) -> tuple[list[RunRecord], bool]:
+        """The chat's newest ``tail`` runs, before the run ``before`` when one is named, oldest first, the runs a rewind
+        took out left out; and whether older ones are left. ``NotFoundError`` for a ``before`` that is no run of the
+        chat."""
+        # The page ends before the run ``before`` in the order the page is in (its time, then its row), so a run made
+        # at the same instant falls on one page or the other, never on neither.
+        bound: tuple[float, int] = (math.inf, 0)
+        if before is not None:
+            found: aiosqlite.Row | None = await self._one(
+                "SELECT created_at, rowid FROM runs WHERE id = ? AND thread_id = ?", (before, thread_id)
+            )
+            if found is None:
+                raise NotFoundError("the chat has no such run", {"thread_id": thread_id, "run_id": before})
+            bound = (float(found["created_at"]), int(found["rowid"]))
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT * FROM runs WHERE thread_id = ? AND rewound_at IS NULL"
+            " AND (created_at < ? OR (created_at = ? AND rowid < ?)) ORDER BY created_at DESC, rowid DESC LIMIT ?",
+            (thread_id, bound[0], bound[0], bound[1], tail + 1),
+        )
+        return [_run(row) for row in reversed(rows[:tail])], len(rows) > tail
+
+    async def thread_asks(self, thread_id: str) -> list[ApprovalRecord]:
+        """The asks waiting for the owner of the chat's runs and of the helpers they started, oldest first."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT approvals.* FROM approvals JOIN runs AS ran ON ran.id = approvals.run_id"
+            " LEFT JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE approvals.status = 'pending'"
+            " AND (ran.thread_id = ? OR parent.thread_id = ?) ORDER BY approvals.created_at",
+            (thread_id, thread_id),
+        )
+        return [_approval(row) for row in rows]
+
+    async def ask_counts(self) -> dict[str, int]:
+        """How many asks wait for the owner in each chat, a helper's counted in its parent's chat too."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT chat, COUNT(DISTINCT id) AS asks FROM (SELECT approvals.id AS id, ran.thread_id AS chat"
+            " FROM approvals JOIN runs AS ran ON ran.id = approvals.run_id WHERE approvals.status = 'pending'"
+            " UNION ALL SELECT approvals.id, parent.thread_id FROM approvals JOIN runs AS ran ON ran.id ="
+            " approvals.run_id JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE approvals.status = 'pending')"
+            " GROUP BY chat",
+            (),
+        )
+        return {str(row["chat"]): int(row["asks"]) for row in rows}
+
+    async def thread_drafts(self, thread_id: str) -> list[DraftRecord]:
+        """The drafts waiting for the owner that the chat's runs and their helpers wrote, oldest first."""
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT drafts.* FROM drafts JOIN runs AS ran ON ran.id = drafts.run_id"
+            " LEFT JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE drafts.status = 'pending'"
+            " AND (ran.thread_id = ? OR parent.thread_id = ?) ORDER BY drafts.created_at",
+            (thread_id, thread_id),
+        )
+        return [_draft(row) for row in rows]
+
+    async def newest_step(self, run_id: str) -> EventRecord | None:
+        """The run's newest stored call of a tool or reply of its model: what it does now."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT * FROM events WHERE run_id = ? AND kind IN ('tool_call', 'assistant') ORDER BY id DESC LIMIT 1",
+            (run_id,),
+        )
+        return None if row is None else _event(row)
+
+    @_writing
+    async def forget_deleted_threads(self, upto: int) -> None:
+        """Remove the marks of the chats deleted at revision ``upto`` or before, once the daemon told them."""
+        await self._db.execute(
+            "DELETE FROM kv WHERE key >= ? AND key < ? AND CAST(value AS INTEGER) <= ?",
+            (DELETED_PREFIX, DELETED_END, upto),
+        )
+        await self._db.commit()
+
+    @_writing
+    async def bump_thread_revision(self, thread_id: str) -> None:
+        """Move the chat's revision for state this process keeps in memory (a chat's terminal sessions), with the
+        statement the triggers run (:func:`dotagent.store.revisions.bump_sql`)."""
+        statements: list[str] = [part.strip() for part in bump_sql("SELECT ?").split(";") if part.strip()]
+        await self._db.execute(statements[0])
+        await self._db.execute(statements[1], (thread_id,))
+        await self._db.commit()
 
     # ----- key/value -----------------------------------------------------------------------
 

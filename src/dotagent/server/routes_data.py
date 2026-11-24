@@ -437,6 +437,24 @@ def memories_router(ctx: ServerContext) -> APIRouter:
     return router
 
 
+async def thread_automations(ctx: ServerContext, thread_id: str) -> list[ThreadAutomation]:
+    """The schedules of the chat (item 1333), switched-on ones first and soonest first, each with whether it is the
+    chat's loop: the side panel's Automations, and a chat's view (item 1686)."""
+    store: Store = ctx.runtime.store
+    agents: dict[str, AgentRecord] = {agent.id: agent for agent in await store.list_agents()}
+    brief_id: str | None = (await read_state(store)).schedule_id
+    records: list[ScheduleRecord] = [record for record in await store.list_schedules() if record.thread_id == thread_id]
+    return [
+        ThreadAutomation(
+            schedule=_schedule_view(
+                record, await schedule_zone(record.options, ctx.runtime.schedule_zone), agents, brief_id
+            ),
+            loop=is_loop(record),
+        )
+        for record in sorted(records, key=schedule_order)
+    ]
+
+
 def schedules_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
@@ -469,18 +487,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
         among them (``loop``), switched-on ones first and soonest first; 404 for no chat. Switching one on or off and
         running it now are the schedule's own routes below, and what they change is read at the next firing."""
         await store.get_thread(thread_id)
-        agents: dict[str, AgentRecord] = await agents_by_id()
-        brief_id: str | None = (await read_state(store)).schedule_id
-        records: list[ScheduleRecord] = [
-            record for record in await store.list_schedules() if record.thread_id == thread_id
-        ]
-        return [
-            ThreadAutomation(
-                schedule=_schedule_view(record, await schedule_zone(record.options, zone), agents, brief_id),
-                loop=is_loop(record),
-            )
-            for record in sorted(records, key=schedule_order)
-        ]
+        return await thread_automations(ctx, thread_id)
 
     @router.get("/schedules/{schedule_id}")
     async def get_schedule(schedule_id: str) -> ScheduleView:

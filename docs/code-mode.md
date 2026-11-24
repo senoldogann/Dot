@@ -35,9 +35,10 @@ On its first `code_run` a run gets its tools written as files in `tools/dot_tool
 any library:
 
 ```python
-from dot_tools.servers.dot import read_file, search_files     # Dot's own tools
-from dot_tools.servers.github import list_issues              # an MCP server's tools, by the server's name
-rows = read_file(path="notes.txt")                            # parameters as keywords
+from dot_tools.servers.dot import read_file, search_files  # Dot's own tools
+from dot_tools.servers.github import list_issues  # an MCP server's tools, by the server's name
+
+rows = read_file(path="notes.txt")  # parameters as keywords
 ```
 
 `servers/<server>/<tool>.py` holds one function for each tool the run may call from code: a signature of keyword-only

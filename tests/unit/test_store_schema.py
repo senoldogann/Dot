@@ -16,13 +16,14 @@ from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.store import db
 from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 
-# The tables, columns and indexes of the version, as `_tables_digest` reads them. A new column or index (added at every
-# open by `db._add_missing_columns`) changes it under the same version: pin the new digest. Any other change of the
-# tables needs a step in `db._MIGRATIONS` under the next version, `SCHEMA_VERSION` raised, and its digest pinned there.
+# The tables, columns, indexes and triggers of the version, as `_tables_digest` reads them. A new column, index or
+# trigger (added at every open by `db._add_missing_columns`) changes it under the same version: pin the new digest. Any
+# other change of the tables needs a step in `db._MIGRATIONS` under the next version, `SCHEMA_VERSION` raised, and its
+# digest pinned there.
 _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
     2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
-    3: "66e0a24f4bf54c5af28d7d08793626ee4d31517d7e71130250aa203aef817356",
+    3: "34e5b2b5ed4e94713a3be3b69d0474f77f1ff58d129517dbf5ab20f0adf8865d",
 }
 
 

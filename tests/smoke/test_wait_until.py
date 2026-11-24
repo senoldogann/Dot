@@ -279,7 +279,7 @@ async def test_the_owners_own_message_ends_a_wait_once_and_dots_notes_do_not(
                     while (await heard.queue.get()).kind != "tool_call":
                         pass
                 manager.tell(run.id, "The owner reacted 👍.", "quiet")
-                manager.note(run.id, "A helper reported: the tests pass.", False)
+                manager.note(run.id, "A helper reported: the tests pass.", False, None)
                 await asyncio.sleep(4.5)
                 assert not await runtime.store.events_of_kind(run.id, "tool_result", 5)
                 steered: float = time.monotonic()

@@ -36,32 +36,37 @@ def _picked(request: QueueMessageRequest) -> bool:
     return bool(request.plugins or request.skills or request.accounts or request.plan_first)
 
 
+async def _named_files(ctx: ServerContext, message: QueuedMessage) -> list[QueuedFile]:
+    """The files of a queued message, named for the box that edits it (item 376). A file gone from the workspace
+    is logged and left out, so one lost file does not take the whole queue from the page; the message that names
+    it fails on it when it starts, with its id."""
+    files: list[QueuedFile] = []
+    for attachment_id in message.attachments:
+        try:
+            stored: StoredAttachment = await asyncio.to_thread(load_attachment, ctx.runtime.workspace, attachment_id)
+        except NotFoundError:
+            log.warning("queued_attachment_gone", message_id=message.id, attachment_id=attachment_id)
+            continue
+        files.append(QueuedFile(id=stored.id, name=stored.name, size=stored.size, kind=stored.kind))
+    return files
+
+
+async def queue_view(ctx: ServerContext, thread_id: str) -> QueueView:
+    """A chat's queue as its page shows it (and a chat's view, item 1686)."""
+    store: Store = ctx.runtime.store
+    messages: list[QueuedMessageView] = [
+        QueuedMessageView(**message.model_dump(), files=await _named_files(ctx, message))
+        for message in await store.list_queued(thread_id)
+    ]
+    return QueueView(held=await store.queue_held(thread_id), messages=messages)
+
+
 def queue_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
 
-    async def named_files(message: QueuedMessage) -> list[QueuedFile]:
-        """The files of a queued message, named for the box that edits it (item 376). A file gone from the workspace
-        is logged and left out, so one lost file does not take the whole queue from the page; the message that names
-        it fails on it when it starts, with its id."""
-        files: list[QueuedFile] = []
-        for attachment_id in message.attachments:
-            try:
-                stored: StoredAttachment = await asyncio.to_thread(
-                    load_attachment, ctx.runtime.workspace, attachment_id
-                )
-            except NotFoundError:
-                log.warning("queued_attachment_gone", message_id=message.id, attachment_id=attachment_id)
-                continue
-            files.append(QueuedFile(id=stored.id, name=stored.name, size=stored.size, kind=stored.kind))
-        return files
-
     async def view(thread_id: str) -> QueueView:
-        messages: list[QueuedMessageView] = [
-            QueuedMessageView(**message.model_dump(), files=await named_files(message))
-            for message in await store.list_queued(thread_id)
-        ]
-        return QueueView(held=await store.queue_held(thread_id), messages=messages)
+        return await queue_view(ctx, thread_id)
 
     @router.get("/threads/{thread_id}/queue")
     async def get_queue(thread_id: str) -> QueueView:

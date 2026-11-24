@@ -153,46 +153,53 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
     )
 
 
+async def _campaign_of(store: Store, run: RunRecord) -> CampaignChip | None:
+    if run.campaign_id is None:
+        return None
+    campaign: CampaignRecord = await store.get_campaign(run.campaign_id)
+    return CampaignChip(
+        id=campaign.id,
+        title=campaign.title,
+        session=session_number(await store.campaign_sessions(campaign.id), run.id),
+    )
+
+
+async def run_detail(ctx: ServerContext, run_id: str) -> RunDetail:
+    """A run as its page shows it (``GET /runs/{id}``, and the newest run of a chat's view, item 1686)."""
+    store: Store = ctx.runtime.store
+    # A run's end is stored before it stops being active, so a run read after it was seen not to be active is read
+    # with its end; read the other way round, a run that ends in between would show as neither active nor ended.
+    active: bool = run_id in ctx.manager.active_run_ids()
+    elsewhere: bool = run_id in ctx.manager.elsewhere_run_ids()
+    run: RunRecord = ctx.manager.as_shown(await store.get_run(run_id))
+    thread: ThreadRecord = await store.get_thread(run.thread_id)
+    return RunDetail(
+        run=run,
+        title=thread.title,
+        children=[ctx.manager.as_shown(child) for child in await store.list_child_runs(run_id)],
+        active=active,
+        elsewhere=elsewhere,
+        resumable=await ctx.manager.resumable(run),
+        cut_off=cut_off_by(run),
+        lessons=await run_lessons(store, run_id),
+        disliked=await disliked_of(store, run_id),
+        questions=await store.list_left_questions(run_id),
+        campaign=await _campaign_of(store, run),
+        held=ctx.manager.held(run_id),
+        holding=ctx.manager.holding(run_id),
+        agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
+        keep_going=run.goal_mode and keep_going_ask(run.goal) is not None,
+        choices=await store.chat_choices(run.thread_id),
+        team=chat_team(await store.find_team(thread.team_id)),
+    )
+
+
 def runs_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     store: Store = ctx.runtime.store
 
-    async def campaign_of(run: RunRecord) -> CampaignChip | None:
-        if run.campaign_id is None:
-            return None
-        campaign: CampaignRecord = await store.get_campaign(run.campaign_id)
-        return CampaignChip(
-            id=campaign.id,
-            title=campaign.title,
-            session=session_number(await store.campaign_sessions(campaign.id), run.id),
-        )
-
     async def detail(run_id: str) -> RunDetail:
-        # A run's end is stored before it stops being active, so a run read after it was seen not to be active is read
-        # with its end; read the other way round, a run that ends in between would show as neither active nor ended.
-        active: bool = run_id in ctx.manager.active_run_ids()
-        elsewhere: bool = run_id in ctx.manager.elsewhere_run_ids()
-        run: RunRecord = ctx.manager.as_shown(await store.get_run(run_id))
-        thread: ThreadRecord = await store.get_thread(run.thread_id)
-        return RunDetail(
-            run=run,
-            title=thread.title,
-            children=[ctx.manager.as_shown(child) for child in await store.list_child_runs(run_id)],
-            active=active,
-            elsewhere=elsewhere,
-            resumable=await ctx.manager.resumable(run),
-            cut_off=cut_off_by(run),
-            lessons=await run_lessons(store, run_id),
-            disliked=await disliked_of(store, run_id),
-            questions=await store.list_left_questions(run_id),
-            campaign=await campaign_of(run),
-            held=ctx.manager.held(run_id),
-            holding=ctx.manager.holding(run_id),
-            agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
-            keep_going=run.goal_mode and keep_going_ask(run.goal) is not None,
-            choices=await store.chat_choices(run.thread_id),
-            team=chat_team(await store.find_team(thread.team_id)),
-        )
+        return await run_detail(ctx, run_id)
 
     @router.get("/runs")
     async def list_runs(query: Annotated[RunsQuery, Query()]) -> list[RunRecord]:

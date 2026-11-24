@@ -107,7 +107,7 @@ class _Runs:
             if not end.done():
                 await self.finish(run_id, "cancelled", "Stopped.")
 
-    def note(self, run_id: str, text: str, taints: bool) -> None:
+    def note(self, run_id: str, text: str, taints: bool, helper_run_id: str | None) -> None:
         self.told.append((run_id, text, taints))
 
     async def wake_lead(
