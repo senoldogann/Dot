@@ -30,6 +30,8 @@ first message on its input, and answers as the message says:
 - ``die while sending``: a step that calls ``shell`` through the door, and a SIGKILL half a second into the call, which
   the test makes slow and an action the policy keeps for the owner (item 1581: a call of that kind in flight is not
   continued);
+- ``die in a step``: a step of the model that has said half a sentence, then a SIGKILL, so that the step is never closed
+  (item 1581: the page drops the half sentence);
 - ``die after finishing``: a call of ``finish`` that succeeded, then a SIGKILL before the program says anything more
   (item 1581: the run ends as the finish said, it is not a cut to go on from);
 - ``die after sending``: the same call, which returns, then a step that says it went, then a SIGKILL: the model had
@@ -189,6 +191,19 @@ async def _work(
         if plan is not None and plan["after_cut"]:
             _go_on(plan, said, resumed is not None)
             return
+        if "die in a step" in said:
+            _event(
+                {"type": "message_start", "message": {"usage": {"input_tokens": 100, "cache_read_input_tokens": 20}}}
+            )
+            _event({"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}})
+            _event(
+                {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "text_delta", "text": "Half a sentence of"},
+                }
+            )
+            os.kill(os.getpid(), signal.SIGKILL)
         if "die after finishing" in said:
             _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
             await client.call_tool("finish", {"answer": "Everything is checked.", "success": True})
@@ -314,7 +329,7 @@ def _plan_of(record: Path, said: str, resumed: str | None) -> dict[str, object] 
     if "could not be taken up again" in said:
         SESSION = f"ses-cut-{secrets.token_hex(4)}"
         return {"always": False, "refuse": False, "how": "sigkill", "after_cut": True}
-    if "die by" not in said and "die with" not in said and "die after" not in said:
+    if "die by" not in said and "die with" not in said and "die after" not in said and "die in a step" not in said:
         return None
     SESSION = f"ses-cut-{secrets.token_hex(4)}"
     plan: dict[str, object] = {
