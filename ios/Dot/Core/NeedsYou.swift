@@ -76,7 +76,9 @@ struct NeedsYouRow: Equatable, Sendable, Identifiable {
     struct Choice: Equatable, Sendable, Identifiable {
         let label: String
         let recommended: Bool
-        var id: String { label }
+        /// The place in the list: the run chooses the words, and two options may say the same, so each is its own button.
+        let position: Int
+        var id: Int { position }
     }
 
     enum Ask: Equatable, Sendable {
@@ -121,7 +123,8 @@ struct NeedsYouRow: Equatable, Sendable, Identifiable {
 
 enum NeedsYouRules {
     /// How long the daemon cuts a title (`TITLE_CHARS` in `notify/needs_you.py`), without a mark: a title that long may be the
-    /// start of a longer line, and a line that may be cut is not allowed from a list.
+    /// start of a longer line, and a line that may be cut is not allowed from a list. The daemon counts code points, so this
+    /// does: a line with combining marks or an emoji sequence is shorter in characters than it was cut at.
     static let titleLimit: Int = 120
 
     /// The rows of a list, newest first (the daemon sorts them, and a list read from disk or merged keeps no order that this
@@ -141,11 +144,12 @@ enum NeedsYouRules {
             let presentation: ApprovalPresentation = ApprovalPresentation.make(tool: tool, summary: item.title)
             return .approval(
                 title: tool.isEmpty ? "Dot wants to do this" : presentation.title, command: presentation.command, why: presentation.why,
-                mayAllow: !item.title.isEmpty && item.title.count < titleLimit)
+                mayAllow: !item.title.isEmpty && item.title.unicodeScalars.count < titleLimit)
         case .question:
             let labels: [String] = (item.choices ?? []).filter { !$0.isEmpty }
             return .question(
-                text: item.title, choices: labels.map { NeedsYouRow.Choice(label: $0, recommended: $0 == item.recommended) })
+                text: item.title,
+                choices: labels.enumerated().map { NeedsYouRow.Choice(label: $1, recommended: $1 == item.recommended, position: $0) })
         case .secret:
             return .secret
         case .handoff:

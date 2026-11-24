@@ -112,6 +112,19 @@ final class NeedsYouTests: XCTestCase {
         XCTAssertNotNil(whole.decision(approve: true), "one character short of the cut was shown whole")
     }
 
+    /// The daemon cuts at 120 code points, not characters (the pre-push review of this item): a line of combining marks reaches the
+    /// phone as fewer characters than it was cut at, and must not pass for a whole one.
+    func testALineCutByCodePointsIsNotTakenForWholeWhenItsCharactersAreFewer() {
+        let line: String = "Run: " + String(repeating: "e\u{0301}", count: 57) + "x"
+        XCTAssertEqual(line.unicodeScalars.count, NeedsYouRules.titleLimit)
+        XCTAssertLessThan(line.count, NeedsYouRules.titleLimit, "fewer characters than code points")
+        XCTAssertNil(row(.approval, title: line).decision(approve: true), "it was cut: Allow once is not offered")
+        XCTAssertNotNil(row(.approval, title: line).decision(approve: false))
+        let whole: String = "Run: " + String(repeating: "e\u{0301}", count: 57)
+        XCTAssertEqual(whole.unicodeScalars.count, NeedsYouRules.titleLimit - 1)
+        XCTAssertNotNil(row(.approval, title: whole).decision(approve: true), "one code point short of the cut was shown whole")
+    }
+
     func testAnEmptyLineIsNotAllowed() {
         XCTAssertNil(row(.approval, title: "").decision(approve: true))
     }
@@ -124,7 +137,20 @@ final class NeedsYouTests: XCTestCase {
             ask,
             .question(
                 text: "Which day should it ship?",
-                choices: [NeedsYouRow.Choice(label: "Friday", recommended: true), NeedsYouRow.Choice(label: "Monday", recommended: false)]))
+                choices: [
+                    NeedsYouRow.Choice(label: "Friday", recommended: true, position: 0),
+                    NeedsYouRow.Choice(label: "Monday", recommended: false, position: 1),
+                ]))
+    }
+
+    /// The run chooses the words of its options and nothing makes them differ: two that say the same are still two buttons.
+    func testTwoOptionsThatSayTheSameAreTwoButtons() {
+        guard case .question(_, let choices) = row(.question, title: "Which?", choices: ["Yes", "Yes", "No"], recommended: "No").ask else {
+            return XCTFail("a question")
+        }
+        XCTAssertEqual(choices.map(\.id), [0, 1, 2], "one identity each")
+        XCTAssertEqual(Set(choices.map(\.id)).count, 3)
+        XCTAssertEqual(choices.map(\.recommended), [false, false, true])
     }
 
     func testAChoiceIsTheAnswerAsItsLabelAndSkipIsADenial() {
