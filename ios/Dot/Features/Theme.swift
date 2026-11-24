@@ -442,43 +442,7 @@ struct SectionLabel: View {
     }
 }
 
-// MARK: - Avatar
-
-/// An agent's avatar: a circle with a gradient in a hue taken from its id, its initial, and a ring that says how it
-/// stands: a sweep that turns while it works, a steady amber one while it waits for the owner.
-struct Avatar: View {
-    let id: String
-    let name: String
-    var size: CGFloat = 40
-    var state: ThreadState = .idle
-
-    var body: some View {
-        Group {
-            if id == "dot" {
-                // Dot itself wears the app's own mark; the agents wear their initial in a hue of their own.
-                DotGlyph(size: size)
-            } else {
-                let base: Double = hue(of: id)
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hue: base, saturation: 0.50, brightness: 0.78), Color(hue: base, saturation: 0.62, brightness: 0.50)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.75))
-                    .overlay(
-                        Text(name.prefix(1).uppercased())
-                            .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
-                    )
-            }
-        }
-        .frame(width: size, height: size)
-        .overlay { StateRing(state: state).padding(-size * 0.11) }
-        .accessibilityHidden(true)
-    }
-}
+// MARK: - The ring of an avatar
 
 /// The ring round an avatar. It turns only while the run works (once in `RingMotion.secondsPerTurn`), and stands still
 /// under Reduce Motion.
@@ -510,10 +474,6 @@ struct StateRing: View {
                 .shadow(color: Theme.warn.opacity(0.45), radius: 3)
         }
     }
-}
-
-func hue(of id: String) -> Double {
-    Double(id.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 360 }) / 360
 }
 
 extension ThreadState {

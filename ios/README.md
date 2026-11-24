@@ -252,7 +252,14 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   iOS 26's own.
 - **Behaviour of the look**: a working chat's avatar has a ring that turns, once in four seconds and evenly (item 1460:
   `RingMotion.secondsPerTurn`, the one line to change; it was 1.4 s, "far too fast", and it stands still under Reduce
-  Motion), a waiting one an amber ring; a tool step has
+  Motion), a waiting one an amber ring. **Agents are bots, not letters** (item 1462): one `AgentAvatar` draws every agent,
+  Dot with its own face and every other agent with Lucide's `bot` on one neutral disc (the theme's raised ground and a
+  hairline), whatever its id: no hue taken from the id, no initial (`AgentLook.face(ofAgent:)` is the rule, tested). It stands
+  in the agents strip, the chat list's rows, the inbox's rows, the new-chat hero, the inspector's helpers (the bot, ringed
+  while the helper works) and, at the leading edge of the first line of an agent's since someone else spoke, in the chat itself
+  (`AgentLane`; the lines that follow line up with its words; at the accessibility sizes the face stands over the line,
+  as there is no room for a lane, and `SpeakerRule.wearsFace` says which line). VoiceOver says "Research, working" or "Research,
+  waits for you" (`AgentLook.words`). The Live Activity draws no avatar. A tool step has
   its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
   approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
   folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).

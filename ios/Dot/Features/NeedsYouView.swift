@@ -146,7 +146,7 @@ struct NeedsYouRowView: View {
 
     private var header: some View {
         HStack(spacing: Space.m) {
-            Avatar(id: row.who == "Dot" ? "dot" : row.who, name: row.who, size: 32, state: .waiting)
+            AgentAvatar(id: row.who == "Dot" ? AgentLook.dotId : row.who, size: 32, state: .waiting)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.who).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text).lineLimit(1)
                 if let chat: String = row.chat, !chat.isEmpty, chat != row.who {

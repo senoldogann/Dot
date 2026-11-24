@@ -201,7 +201,8 @@ private struct Transcript: View {
                     }
                     ForEach(Array(model.state.items.enumerated()), id: \.element.id) { index, item in
                         MessageRow(
-                            model: model, item: item, onTool: onTool, onSelect: onSelect, onEdit: onEdit,
+                            model: model, item: item, wearsFace: SpeakerRule.wearsFace(at: index, in: model.state.items),
+                            onTool: onTool, onSelect: onSelect, onEdit: onEdit,
                             onDecide: { card, approve, note in model.decide(card, approve: approve, note: note) }
                         )
                         .padding(.top, index == 0 ? 0 : Self.gap(after: model.state.items[index - 1], before: item))
@@ -483,6 +484,8 @@ private struct OlderRow: View {
 private struct MessageRow: View {
     let model: ChatModel
     let item: ChatItem
+    /// The agent's face stands at the leading edge of this line (the first since someone else spoke).
+    let wearsFace: Bool
     let onTool: (ToolRow) -> Void
     let onSelect: (String) -> Void
     let onEdit: (ChatItem) -> Void
@@ -490,6 +493,18 @@ private struct MessageRow: View {
 
     var body: some View {
         let standing: [String] = MessageActions.standing(on: item, among: model.reactions)
+        Group {
+            if item.kind.isAgentLine {
+                AgentLane(agentId: model.agentId, wearsFace: wearsFace) { line(standing) }
+            } else {
+                line(standing)
+            }
+        }
+        .modifier(MessageMenu(model: model, item: item, standing: standing, onSelect: onSelect, onEdit: onEdit))
+    }
+
+    /// The row itself with the reactions that stand on it, small signs under it.
+    private func line(_ standing: [String]) -> some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             ChatRow(item: item, onDecide: onDecide, onTool: onTool)
             if !standing.isEmpty {
@@ -504,7 +519,6 @@ private struct MessageRow: View {
                 .accessibilityIdentifier("reactions")
             }
         }
-        .modifier(MessageMenu(model: model, item: item, standing: standing, onSelect: onSelect, onEdit: onEdit))
     }
 }
 

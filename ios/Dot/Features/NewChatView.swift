@@ -209,7 +209,7 @@ struct NewChatView: View {
     private var hero: some View {
         VStack(spacing: Space.s) {
             if let agent {
-                Avatar(id: agent.id, name: agent.record.name, size: 64)
+                AgentAvatar(id: agent.id, size: 64)
                     .padding(.bottom, Space.s)
                 Text(agent.record.name).font(.title2.weight(.semibold)).foregroundStyle(Theme.text)
                 if !agent.record.role.isEmpty {

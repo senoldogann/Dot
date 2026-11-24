@@ -7,12 +7,20 @@ struct DotIcon: View {
     let name: IconName
     var label: String?
     var pulse: Bool
+    private let size: CGFloat
+    private let scales: Bool
     @ScaledMetric private var side: CGFloat
 
-    init(_ name: IconName, size: CGFloat = 16, pulse: Bool = false, label: String? = nil, relativeTo style: Font.TextStyle = .body) {
+    /// `scales: false` keeps the icon at `size` whatever the text size (a mark inside a disc that is itself a fixed size).
+    init(
+        _ name: IconName, size: CGFloat = 16, pulse: Bool = false, label: String? = nil, relativeTo style: Font.TextStyle = .body,
+        scales: Bool = true
+    ) {
         self.name = name
         self.label = label
         self.pulse = pulse
+        self.size = size
+        self.scales = scales
         _side = ScaledMetric(wrappedValue: size, relativeTo: style)
     }
 
@@ -21,7 +29,7 @@ struct DotIcon: View {
             .renderingMode(.template)
             .resizable()
             .scaledToFit()
-            .frame(width: side, height: side)
+            .frame(width: scales ? side : size, height: scales ? side : size)
             .modifier(IconPulse(active: pulse))
             .accessibilityHidden(label == nil)
             .accessibilityLabel(label ?? "")

@@ -33,7 +33,6 @@ enum IconName: String, CaseIterable, Sendable {
     case circleX
     case clock
     case copy
-    case cornerDownRight
     case cornerUpRight
     case cpu
     case database
