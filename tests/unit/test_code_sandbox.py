@@ -3,6 +3,7 @@ installation it may read, the environment the code gets, the output window, and 
 run's folders, which a link must never lead elsewhere."""
 
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -269,3 +270,36 @@ def test_a_run_id_that_names_another_place_is_refused_not_joined(run_id: str, tm
     with pytest.raises(ValueError, match="is not the id of a run"):
         layout_for(tmp_path, run_id)
     assert layout_for(tmp_path, "run_mwue93jj_503849-2").run.name == "run_mwue93jj_503849-2"
+
+
+def test_a_framework_python_is_started_by_the_program_in_its_app_and_not_by_its_stub(tmp_path: Path) -> None:
+    """The gate's runner has python.org's framework Python, whose ``bin/python3.13`` is a stub that does a ``realpath``
+    of its own folder (refused in the sandbox: the folders above the installation are not readable) before it executes
+    the program in ``Resources/Python.app``: the sandbox failed to start it on the first run of the pull request."""
+    prefix: Path = Path(os.path.realpath(tmp_path)) / "Frameworks" / "Python.framework" / "Versions" / "3.13"
+    (prefix / "bin").mkdir(parents=True)
+    stub: Path = prefix / "bin" / "python3.13"
+    stub.write_text("stub", encoding="utf-8")
+    plain: Interpreter = sandbox.interpreter_at(stub, prefix)
+    assert plain.executable == stub and plain.prefix == prefix
+    app: Path = prefix / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
+    app.parent.mkdir(parents=True)
+    app.write_text("the program", encoding="utf-8")
+    framework: Interpreter = sandbox.interpreter_at(stub, prefix)
+    assert framework.executable == app and framework.prefix == prefix
+
+
+@pytest.mark.macos
+def test_homebrews_framework_python_starts_in_the_sandbox_when_this_mac_has_it() -> None:
+    brewed: Path = Path("/opt/homebrew/opt/python@3.13")
+    if not (brewed / "bin" / "python3.13").exists():
+        pytest.skip("this Mac has no Homebrew Python 3.13")
+    done = subprocess.run(
+        [str(brewed / "bin" / "python3.13"), "-c", "import os, sys; print(os.path.realpath(sys.base_prefix))"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    interpreter: Interpreter = sandbox.interpreter_at(brewed / "bin" / "python3.13", done.stdout.strip())
+    assert interpreter.executable.name == "Python"
+    assert sandbox.probe_blocking(interpreter).ok
