@@ -361,6 +361,13 @@ class EventsQuery(FrozenModel):
     tail: int | None = Field(default=None, ge=1, le=2000)
 
 
+class UsageQuery(FrozenModel):
+    """``GET /api/usage``: how many local days back the usage is summed, today among them (item 1403): a week unless
+    asked, at most a quarter."""
+
+    days: int = Field(default=7, ge=1, le=92)
+
+
 class RunsStreamQuery(FrozenModel):
     """The runs one stream follows, their ids joined by commas (item 889), and the event id it goes on after."""
 
@@ -1176,6 +1183,25 @@ class SkillProposalsView(FrozenModel):
     items: tuple[ProposalView, ...]
 
 
+class SkillLeftOutView(FrozenModel):
+    """A skill Dot could not offer to a run (item 1405): the file or folder (``path``), why (``reason``, the catalog's
+    own sentence), where Dot looked for it (``source``, as a palette skill's: ``home``, ``config``, ``plugin <name>``,
+    ``learned`` or ``built-in``; ``None`` under no folder Dot reads) and whether nothing is wrong with the file
+    (``shadowed``): another skill has its name, so it is only not offered."""
+
+    path: str
+    reason: str
+    source: str | None
+    shadowed: bool
+
+
+class SkillsLeftOutView(FrozenModel):
+    """The skills left out as the catalog reads them now, those whose file is wrong first (item 1405,
+    ``GET /api/skills/left-out``)."""
+
+    items: tuple[SkillLeftOutView, ...]
+
+
 class SkillShareRequest(FrozenModel):
     """Whether an agent's learned skill is offered to every run (item 94)."""
 
@@ -1386,15 +1412,30 @@ class FileEdit(FrozenModel):
     changes: int
 
 
+OutsideCategory = Literal["shell", "browser", "desktop", "message", "app"]
+
+
+class OutsideSteps(FrozenModel):
+    """How many steps of a run and of the runs it delegated acted through one kind of tool that no undo journal holds
+    (item 1404): ``shell`` (a command), ``browser`` (a click, typing), ``desktop`` (the screen, an application),
+    ``message`` (a step that sends a message or mail for the owner) and ``app`` (a connected app's tool that may change
+    things). A count of steps that ran, not of what they did: a command may only have read."""
+
+    category: OutsideCategory
+    steps: int
+
+
 class RunActions(FrozenModel):
     """What a run did and what can be undone: its acting steps, its approvals and questions with their decisions, and
     the files it (or a run it delegated to) changed. ``ended`` says whether the run and its delegated runs have all
-    ended, which the undo of a file needs."""
+    ended, which the undo of a file needs. ``outside`` counts the steps that ran with a tool the undo journal does not
+    hold (:class:`OutsideSteps`), only the kinds there are any of."""
 
     steps: list[ActionStep]
     approvals: list[ApprovalRecord]
     edits: list[FileEdit]
     ended: bool
+    outside: list[OutsideSteps]
 
 
 class UndoRequest(FrozenModel):

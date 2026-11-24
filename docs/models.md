@@ -32,7 +32,15 @@ models that call tools, or **Default model** for `[models] main`; it holds from 
 lists its models) puts the review model on `claude_code:opus` and the roles of the night's learning on it (item 1033).
 Under the roles, the page says how many schedules and agents run on each model, each chosen on its own page; and
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
-harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. Each role's box opens the composer's
+harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. **Usage**, before the list of every
+model, says what the tasks used in the last seven days (item 1403): the windows of your Claude plan the tasks last saw
+(its 5-hour and 7-day windows: how much is used, when it resets, how long ago a step saw it), the week in one line, and a
+row for each day, today first, with the tasks that began on it, the tokens in and out, their time (to their end, or to
+now for one at work) and a bar of its tokens against the busiest day. It is `GET /api/usage?days=7` (`days` from 1 to
+92): a day is a local day, a task counts on the day it began, a day with none is there with zeros, and `windows` holds
+the newest window of each kind that a step of the period recorded (`assistant.plan_window`, a Claude plan run's step; a
+task that did not run on the plan records none). Dot keeps no price for a model, so the page shows time and tokens and
+the plan's window, never money. Each role's box opens the composer's
 model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
 starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none

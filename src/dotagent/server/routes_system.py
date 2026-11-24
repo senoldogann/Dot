@@ -126,6 +126,7 @@ from dotagent.server.guard import PHONE_STATE, daemon_proof, refuse_from_a_phone
 from dotagent.server.palette import palette_view
 from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_mcp import service_of
+from dotagent.server.skills_left_out import left_out_view
 from dotagent.server.views import (
     ContextChoice,
     ContextEvidenceQuery,
@@ -168,11 +169,12 @@ from dotagent.server.views import (
     SkillProposalsView,
     SkillRestoreRequest,
     SkillShareRequest,
+    SkillsLeftOutView,
     SkillVersionsView,
     StandbyModelsRequest,
     StatusView,
 )
-from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.catalog import SkillRoot, load_catalog, load_skills, playbook_root, skill_roots
 from dotagent.skills.types import SkillCatalog
 from dotagent.store.models import ApprovalRecord, PushSubscription
 from dotagent.store.stats import ContextEvidence
@@ -708,6 +710,18 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
         them changes; the proposals after it (item 585)."""
         await asyncio.to_thread(dismiss_proposal, playbooks_dir(), proposal_id)
         return SkillProposalsView(items=await asyncio.to_thread(waiting_proposals, playbooks_dir()))
+
+    @router.get("/skills/left-out")
+    async def skills_left_out() -> SkillsLeftOutView:
+        """The skills Dot could not offer to a run, read from the folders as a run reads them (item 1405): each file or
+        folder with the catalog's reason and where Dot looked for it, those whose file is wrong first and then those
+        only not offered because another skill has the name. The same list ``dotx skills list`` and Doctor's skills
+        row say; the learned skills and the others are on the routes above."""
+        roots: tuple[SkillRoot, ...] = await asyncio.to_thread(
+            skill_roots, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
+        )
+        catalog: SkillCatalog = await asyncio.to_thread(load_catalog, roots)
+        return left_out_view(catalog.problems, roots)
 
     async def found_now() -> FoundElsewhere:
         catalog: SkillCatalog = await asyncio.to_thread(

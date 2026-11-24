@@ -4,10 +4,12 @@
 // the file beside the conversation, and Undo, which takes the changes back after a question; Review, which opened the
 // Changes tab, is left out where the line stands in it. Not an editor's list: one line of what Dot did and the way
 // back, and nothing for a run that changed no file. A command's own writes are in no journal and so not here
-// (docs/autonomy.md); the run's own notes are left out.
+// (docs/autonomy.md); the run's own notes are left out. A run that also acted with a tool the journal does not hold (a
+// command, the browser, the screen, a message) says how many such steps it ran and that Undo cannot take them back, with
+// no claim of what they did (item 1404); that line stands alone for a run that changed no file.
 
 import { api } from "./api.js";
-import { el, requestFile } from "./dom.js";
+import { el, plural, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { attempt, confirmDialog, toast } from "./ui.js";
 
@@ -38,6 +40,31 @@ export function changedWords(edits) {
     return `Created ${files(created)}`;
   }
   return `Created ${files(created)} and changed ${changed}`;
+}
+
+// What a step outside the undo journal is called, by its category (`outside` of `GET /runs/{id}/actions`).
+const OUTSIDE_NOUNS = {
+  shell: ["command", "commands"],
+  browser: ["browser action", "browser actions"],
+  desktop: ["desktop action", "desktop actions"],
+  message: ["message step", "message steps"],
+  app: ["connected app action", "connected app actions"],
+};
+
+/**
+ * What the run did that no undo can take back, in a sentence ("Dot also ran 3 commands and 2 browser actions. Undo
+ * takes back files only, so it cannot take these back."), from `outside` (the categories of `GET /runs/{id}/actions`
+ * that have steps); "" when there are none. It counts steps that ran and says nothing of what they did.
+ */
+export function outsideWords(outside) {
+  const counted = outside.filter((item) => item.steps > 0 && item.category in OUTSIDE_NOUNS);
+  if (counted.length === 0) {
+    return "";
+  }
+  const parts = counted.map((item) => plural(item.steps, ...OUTSIDE_NOUNS[item.category]));
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  const total = counted.reduce((sum, item) => sum + item.steps, 0);
+  return `Dot also ran ${list}. Undo takes back files only, so it cannot take ${total === 1 ? "this" : "these"} back.`;
 }
 
 /** What Undo asks before it takes `ready` back, of `shown`: what goes back, what is deleted, what stays. */
@@ -82,9 +109,13 @@ export function runChangesCard({ runId, onReview, onUndone }) {
 
   function draw(actions) {
     const shown = shownEdits(actions.edits);
+    // A daemon older than item 1404 sends no `outside`: no such line then.
+    const outside = outsideWords(actions.outside ?? []);
+    const outsideLine = outside === "" ? null : el("div", { class: "run-changes-outside", dataset: { outside: "" } }, outside);
     if (shown.length === 0) {
-      element.replaceChildren(...(undone ? [icon("undo"), el("span", { class: "run-changes-words" }, "Its file changes were taken back.")] : []));
-      element.hidden = !undone;
+      const taken = undone ? [icon("undo"), el("span", { class: "run-changes-words" }, "Its file changes were taken back.")] : [];
+      element.replaceChildren(...taken, ...(outsideLine === null ? [] : [outsideLine]));
+      element.hidden = !undone && outsideLine === null;
       return;
     }
     const named = shown.slice(0, NAMED).map((edit) =>
@@ -107,15 +138,19 @@ export function runChangesCard({ runId, onReview, onUndone }) {
     if (ready.length === 0) {
       undo.title = "No file can go back as the task left it";
     }
+    // The native replaceChildren writes a null as the word: a line that is not there is left out first.
     element.replaceChildren(
-      icon("fileDiff"),
-      el("div", { class: "run-changes-body" }, el("span", { class: "run-changes-words" }, changedWords(shown)), el("span", { class: "run-changes-files" }, ...named, more)),
-      el(
-        "div",
-        { class: "run-changes-actions" },
-        onReview === null ? null : el("button", { class: "btn ghost sm", type: "button", onclick: onReview }, "Review"),
-        undo,
-      ),
+      ...[
+        icon("fileDiff"),
+        el("div", { class: "run-changes-body" }, el("span", { class: "run-changes-words" }, changedWords(shown)), el("span", { class: "run-changes-files" }, ...named, more)),
+        el(
+          "div",
+          { class: "run-changes-actions" },
+          onReview === null ? null : el("button", { class: "btn ghost sm", type: "button", onclick: onReview }, "Review"),
+          undo,
+        ),
+        outsideLine,
+      ].filter((part) => part !== null),
     );
     element.hidden = false;
   }

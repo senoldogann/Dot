@@ -7,7 +7,7 @@ import statistics
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -430,10 +430,25 @@ class ModelStats(FrozenModel):
     bands: tuple[StepBand, ...]
 
 
+class PlanWindowSeen(FrozenModel):
+    """A window of the owner's Claude plan as a step of a run last recorded it (``assistant.plan_window``, item 1403):
+    its ``kind`` (``five_hour``, ``seven_day``), whether a call is allowed (``status``), how much of it is used (0 to 1,
+    ``None`` when the plan did not say), when it resets (epoch seconds, ``None`` when not said) and when the step was
+    taken. What the plan says of its price: it has none per call, a window that fills."""
+
+    kind: str
+    status: str
+    utilization: float | None
+    resets_at: float | None
+    seen_at: float
+
+
 class RunCosts(FrozenModel):
     """What one run cost and where it went: its minutes of wall time (to its end, or to now while it works), the numbers
     of its model (as :class:`ModelStats` counts them for one run), its tool calls' seconds and the part spent at the
-    gate, and its tools, the slowest first; and the version of the harness it took (``None``: Dot's own text alone)."""
+    gate, and its tools, the slowest first; and the version of the harness it took (``None``: Dot's own text alone).
+    ``plan_window`` is the window of the Claude plan its newest step recorded (item 1403), ``None`` for a run that did
+    not run on the plan."""
 
     run_id: str
     status: RunStatus
@@ -443,6 +458,29 @@ class RunCosts(FrozenModel):
     waited_s: float
     tools: tuple[ToolStats, ...]
     harness_version: str | None = None
+    plan_window: PlanWindowSeen | None = None
+
+
+class UsageDay(FrozenModel):
+    """What the runs created on one local day used (item 1403): how many, their steps, the tokens sent to and written
+    by their models, and their minutes of wall time (to their end, or to now for one at work). ``day`` is
+    ``YYYY-MM-DD``."""
+
+    day: str
+    runs: int
+    steps: int
+    input_tokens: int
+    output_tokens: int
+    minutes: float
+
+
+class Usage(FrozenModel):
+    """What the owner's runs used over the last days (item 1403, ``GET /api/usage``): one :class:`UsageDay` for each day
+    from the oldest to today, a day with no run among them with zeros, and the last window of the Claude plan each kind
+    of window was seen in (the newest step that recorded one in the period), the newest first."""
+
+    days: tuple[UsageDay, ...]
+    windows: tuple[PlanWindowSeen, ...]
 
 
 class HarnessUse(FrozenModel):
@@ -1386,6 +1424,7 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
     finished_at: float = now if run[8] is None else _number(run[8], "finished_at")
     statistics_of_run: RunStatistics = _statistics(rows)
     tools: list[ToolSample] = _tool_samples(rows.tools)
+    seen: list[PlanWindowSeen] = _read_windows(database, _RUN_WINDOW_SQL, (run_id,))
     return RunCosts(
         run_id=str(run[6]),
         status=_STATUS.validate_python(run[1]),
@@ -1395,4 +1434,102 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
         waited_s=sum(sample.waited_s for sample in tools),
         tools=statistics_of_run.tools,
         harness_version=None if run[9] is None else str(run[9]),
+        plan_window=seen[0] if seen else None,
     )
+
+
+# The window of the Claude plan the newest step of one run recorded (item 1403): its kind, status, share used and reset,
+# and when the step was taken. A step of a run that did not run on the plan records none.
+_RUN_WINDOW_SQL: str = (
+    "SELECT json_extract(data, '$.plan_window.kind'), json_extract(data, '$.plan_window.status'),"
+    " json_extract(data, '$.plan_window.utilization'), json_extract(data, '$.plan_window.resets_at'), ts FROM events"
+    " WHERE kind = 'assistant' AND run_id = ? AND json_extract(data, '$.plan_window.kind') IS NOT NULL"
+    " ORDER BY ts DESC, id DESC LIMIT 1"
+)
+# The newest window of each kind that any step since a time recorded, the newest first: the step of the latest moment
+# of each kind, however many steps came between (a kind that only older steps saw is still there).
+_NEWEST_WINDOWS_SQL: str = (
+    "SELECT json_extract(e.data, '$.plan_window.kind'), json_extract(e.data, '$.plan_window.status'),"
+    " json_extract(e.data, '$.plan_window.utilization'), json_extract(e.data, '$.plan_window.resets_at'), e.ts"
+    " FROM events AS e JOIN (SELECT json_extract(data, '$.plan_window.kind') AS kind, MAX(ts) AS ts FROM events"
+    " WHERE kind = 'assistant' AND json_extract(data, '$.plan_window.kind') IS NOT NULL AND ts >= ?"
+    " GROUP BY 1) AS newest"
+    " ON e.kind = 'assistant' AND e.ts = newest.ts AND json_extract(e.data, '$.plan_window.kind') = newest.kind"
+    " ORDER BY e.ts DESC, e.id DESC"
+)
+
+
+def _optional_number(value: object) -> float | None:
+    return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
+
+
+def _read_windows(database: Path, sql: str, values: tuple[object, ...]) -> list[PlanWindowSeen]:
+    """The windows ``sql`` (:data:`_RUN_WINDOW_SQL` or :data:`_NEWEST_WINDOWS_SQL`) selects with ``values``, in the
+    order it gives them. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            rows = connection.execute(sql, values).fetchall()
+    except sqlite3.Error as error:
+        raise StoreError(
+            "the plan's windows could not be read", {"database": str(database), "error": str(error)}
+        ) from error
+    return [
+        PlanWindowSeen(
+            kind=str(row[0]),
+            status=str(row[1] or ""),
+            utilization=_optional_number(row[2]),
+            resets_at=_optional_number(row[3]),
+            seen_at=float(row[4]),
+        )
+        for row in rows
+    ]
+
+
+# One row per local day of the runs created since a time: how many, their steps, tokens and wall time (to now for a run
+# at work). The day is the run's start in the local time zone of the process, as the day of the owner's clock.
+_USAGE_SQL: str = (
+    "SELECT date(created_at, 'unixepoch', 'localtime') AS day, COUNT(*), COALESCE(SUM(steps), 0),"
+    " COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0),"
+    f" COALESCE(SUM(COALESCE(finished_at, ?) - created_at), 0) FROM {_ALL_RUNS} WHERE created_at >= ? GROUP BY day"
+)
+
+
+def local_day_start(now: float, days_back: int) -> float:
+    """The start of the local day ``days_back`` days before the day of ``now``, in epoch seconds."""
+    today = datetime.fromtimestamp(now).date()
+    return datetime.combine(today - timedelta(days=days_back), time.min).timestamp()
+
+
+def collect_usage(database: Path, days: int, now: float) -> Usage:
+    """What the runs created in the last ``days`` local days (today and the ``days - 1`` before it) used, one
+    :class:`UsageDay` for each, and the plan's windows the steps of the period recorded, read on a read-only connection.
+    A run counts on the day it was created. Blocking."""
+    since: float = local_day_start(now, days - 1)
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            rows = connection.execute(_USAGE_SQL, (now, since)).fetchall()
+    except sqlite3.Error as error:
+        raise StoreError("the usage could not be read", {"database": str(database), "error": str(error)}) from error
+    used: dict[str, tuple[object, ...]] = {str(row[0]): row for row in rows}
+    today = datetime.fromtimestamp(now).date()
+    listed: list[UsageDay] = []
+    for back in range(days - 1, -1, -1):
+        day: str = (today - timedelta(days=back)).isoformat()
+        row: tuple[object, ...] | None = used.get(day)
+        listed.append(
+            UsageDay(day=day, runs=0, steps=0, input_tokens=0, output_tokens=0, minutes=0.0)
+            if row is None
+            else UsageDay(
+                day=day,
+                runs=int(str(row[1])),
+                steps=int(str(row[2])),
+                input_tokens=int(str(row[3])),
+                output_tokens=int(str(row[4])),
+                minutes=max(0.0, float(str(row[5]))) / 60,
+            )
+        )
+    newest: dict[str, PlanWindowSeen] = {}
+    # Two steps of one kind at the same moment are both selected: the first, the later step, stands.
+    for window in _read_windows(database, _NEWEST_WINDOWS_SQL, (since,)):
+        newest.setdefault(window.kind, window)
+    return Usage(days=tuple(listed), windows=tuple(sorted(newest.values(), key=lambda window: -window.seen_at)))

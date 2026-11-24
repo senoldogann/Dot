@@ -56,7 +56,11 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   so what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode,
   the concurrency limits (`max_concurrent_runs`; 0, the default, sets no limit) and the default ceilings of 120 minutes
   and 10,000,000 tokens (set `run_max_minutes` or `run_max_tokens` to 0 for no bound; a lower limit to spend less). A
-  run that varies its steps without getting anywhere still ends at a ceiling unless you turn both off.
+  run that varies its steps without getting anywhere still ends at a ceiling unless you turn both off. With no bound
+  there is no "left", so Dot shows what is spent: a run at work says what it has used so far on its Cost card, and
+  Settings › Models › Usage sums the last days (`GET /api/usage`, item 1403). Dot records time, tokens and the windows of
+  your Claude plan, and keeps no price for a model, so none of this shows money; the plan's window is what a Claude plan
+  has instead of a price, and the usage says only what the steps recorded of it.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
   What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
   item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and
@@ -70,7 +74,11 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   the approvals it waits on, to that process, and marks it as cut off only once the process has ended (the daemon never
   resumes such a run on its own).
 - Undo: only `write_file`, `edit_file` and `write_notes` are in the journal, not shell commands, the browser or the
-  desktop. A run keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and
+  desktop. A run's line of what it changed, at the head of the Changes tab, says how many of its steps (and its helpers')
+  ran with a command, the browser, the screen, a message or a connected app, and that Undo cannot take them back
+  (`outside` of `GET /api/runs/{id}/actions`, item 1404): the steps that ran, never what they did (a command may only
+  have read), and not the pages it opened, which read. A run that changed no file shows the sentence alone. A run keeps
+  a copy of a file at its first change to it only, within `undo_max_file_bytes` and
   `undo_max_run_bytes`. Runs that change the same file are taken back in the order their changes were noted. `dotx undo`
   and `POST /api/runs/{id}/undo` need the run in the database (the journals of a deleted
   chat stay until `dotx prune --apply`).

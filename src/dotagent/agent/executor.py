@@ -2,7 +2,8 @@
 
 import asyncio
 import time
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -45,6 +46,9 @@ log = get_logger(__name__)
 
 _EVENT_TEXT_CHARS: int = 4000
 _BROKEN_ARGUMENTS_CHARS: int = 600
+# How far past its own limit a tool may run before the call says so in the log (item 1406): a page that closes or a
+# process that is killed as the call is cut takes a few seconds, and more means the tool held the cut call.
+_OVERRUN_GRACE_S: float = 5.0
 # Read-only tools: a failed one may be tried once more, as a second call changes nothing. A tool that acts on a page or
 # a window is never in this set: a second call could repeat the action.
 _READ_ONLY_TOOLS: frozenset[str] = frozenset(
@@ -176,6 +180,34 @@ class _GateTime:
         self.seconds: float = 0.0
 
 
+class _ToolTime:
+    """The seconds one call spends in its tool, which the tool's own limit is meant to hold (item 1406): each attempt's
+    run and what the tool does while it is cut, less the time its running tool waited at the gate. A call's seconds
+    hold more (the gate before it, a hold of the run, the lessons after it), so they say nothing of an overrun."""
+
+    def __init__(self, run_id: str, tool: str, limit_s: float) -> None:
+        self.seconds: float = 0.0
+        self._run_id: str = run_id
+        self._tool: str = tool
+        self._limit_s: float = limit_s
+
+    @contextmanager
+    def attempt(self, at_gate: _GateTime) -> Iterator[None]:
+        """One attempt of the tool, around its ``asyncio.timeout``: an attempt that took more than the limit and
+        :data:`_OVERRUN_GRACE_S` is logged, whether it ended or was cut."""
+        started: float = time.monotonic()
+        gate_before: float = at_gate.seconds
+        try:
+            yield
+        finally:
+            took: float = max(time.monotonic() - started - (at_gate.seconds - gate_before), 0.0)
+            self.seconds += took
+            if took > self._limit_s + _OVERRUN_GRACE_S:
+                log.warning(
+                    "tool_overran", run_id=self._run_id, tool=self._tool, limit_s=self._limit_s, took_s=round(took, 2)
+                )
+
+
 class _PausedClock:
     """The gate a running tool asks again for a step it did not know about up front. The tool's own timeout stands
     still while the user decides: waiting for an answer is not time the tool spent working. The time these questions
@@ -226,11 +258,15 @@ class _Checked:
     action: ActionInfo | None
     waited_s: float
     decision: StepDecision | None
+    # The seconds the call spent in its tool, under the tool's own limit (:class:`_ToolTime`); 0 for a call that never
+    # ran.
+    ran_s: float = 0.0
 
 
 async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
     action: ActionInfo | None = None
     at_gate: _GateTime = _GateTime()
+    in_tool: _ToolTime = _ToolTime(ctx.run_id, tool.spec.name, tool.timeout_s)
     note: str = ""
     decision: StepDecision | None = None
     held_s: float = 0.0
@@ -273,8 +309,11 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         fallback: str = ""
         for attempt in range(1, max_attempts + 1):
             try:
-                async with asyncio.timeout(tool.timeout_s) as scope:
-                    result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
+                with in_tool.attempt(at_gate):
+                    async with asyncio.timeout(tool.timeout_s) as scope:
+                        result: ToolResult = await prepared.run(
+                            replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate))
+                        )
             except (RunCancelled, FailSafeTriggered):
                 raise
             except (TimeoutError, DotError) as exc:
@@ -332,7 +371,9 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
         failed = await _record_yolo(ctx, tool.spec.name, action, failed)
-        return _Checked(result=failed, action=action, waited_s=at_gate.seconds, decision=decision)
+        return _Checked(
+            result=failed, action=action, waited_s=at_gate.seconds, decision=decision, ran_s=in_tool.seconds
+        )
     if action is not None and not result.is_error:
         gate.observe(action)
         ctx.runtime.peers.saw(ctx.run_id, call.name, action)
@@ -344,7 +385,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     if held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})
     noted = await _record_yolo(ctx, tool.spec.name, action, noted)
-    return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision)
+    return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision, ran_s=in_tool.seconds)
 
 
 async def _record_yolo(ctx: ToolContext, tool_name: str, action: ActionInfo | None, result: ToolResult) -> ToolResult:
@@ -402,6 +443,7 @@ async def _execute_one(
     )
     action: ActionInfo | None = None
     waited_s: float = 0.0
+    ran_s: float = 0.0
     decision: StepDecision | None = None
     group: str | None = hidden.get(call.name)
     learned: LessonsNote | None = None
@@ -422,6 +464,7 @@ async def _execute_one(
     else:
         checked: _Checked = await _run_checked(call, tool, ctx, gate)
         result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
+        ran_s = checked.ran_s
         lessons_on: bool = ctx.runtime.config.agent.lessons != "off"
         # A run that is tainted now, in a context that shows them, is handed the lessons saved while reading outside
         # content too (item 1192): fenced, next to the result in its own requests, stored nowhere.
@@ -478,6 +521,9 @@ async def _execute_one(
             "images": list(files),
             "seconds": round(seconds, 2),
             "waited_s": round(waited_s, 2),
+            # The part of the seconds the call spent in its tool, which its limit holds (item 1406); the rest is the
+            # gate, a hold of the run and what Dot does around the call.
+            "ran_s": round(ran_s, 2),
             "summary": shown.summary if shown is not None else "",
             "kind": action.kind if action is not None else "",
             "risk": action.risk if action is not None else "",

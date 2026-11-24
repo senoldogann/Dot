@@ -93,6 +93,7 @@ from dotagent.store.models import (
     ObjectiveWorkflow,
     PushSubscription,
     QueuedMessage,
+    RanStep,
     ReactionName,
     ReactionRecord,
     ResultStep,
@@ -135,8 +136,10 @@ from dotagent.store.stats import (
     ContextEvidence,
     ModelProfile,
     RunCosts,
+    Usage,
     chat_spend,
     collect_run_costs,
+    collect_usage,
     read_context_evidence,
     read_model_profile,
 )
@@ -4187,6 +4190,27 @@ class Store:
             for row in rows
         ]
 
+    async def ran_steps(self, run_id: str) -> list[RanStep]:
+        """The steps of a run and of the runs it delegated (its family, as :meth:`result_steps` reads it) that the gate
+        let run, oldest first: a ``tool_result`` event that records the decision of the gate, which one of a call that
+        was refused or that never reached its tool does not (item 1404: what the line of steps outside the undo journal
+        counts)."""
+        rows = await self._all(
+            _family_of("SELECT ?") + " SELECT json_extract(e.data, '$.kind') AS kind,"
+            " json_extract(e.data, '$.flags') AS flags, json_extract(e.data, '$.steps') AS steps"
+            " FROM events AS e WHERE e.run_id IN (SELECT id FROM family) AND e.kind = 'tool_result'"
+            " AND json_extract(e.data, '$.decision') IS NOT NULL ORDER BY e.id",
+            (run_id,),
+        )
+        return [
+            RanStep(
+                kind=str(row["kind"] or ""),
+                flags=_step_flags(parse_json_value(row["flags"], "step flags")) if row["flags"] else (),
+                steps=max(int(row["steps"] or 0), 1),
+            )
+            for row in rows
+        ]
+
     async def helper_calls_without_result(self, run_id: str) -> int:
         """How many calls of the runs ``run_id`` delegated (its family but itself) started and have no result: a
         ``tool_call`` event each, without the ``tool_result`` every call that ends gets (item 1206: a call a stop or a
@@ -4266,6 +4290,11 @@ class Store:
         """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a
         read-only connection."""
         return await asyncio.to_thread(read_context_evidence, self._database, model, days, time.time())
+
+    async def usage(self, days: int) -> Usage:
+        """What the runs of the last ``days`` local days used, a row for each day, and the Claude plan's windows their
+        steps recorded (item 1403), read on a read-only connection."""
+        return await asyncio.to_thread(collect_usage, self._database, days, time.time())
 
     async def run_costs(self, run_id: str) -> RunCosts:
         """What the run cost and where it went, read on a read-only connection; its minutes run to now while it

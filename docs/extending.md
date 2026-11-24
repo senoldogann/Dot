@@ -667,8 +667,10 @@ the head of Skills with Personal and System, **Save from a chat** and **Import f
 past a section's first six cards, See N more. **Personal** holds yours (Dot's skills folder and the `[skills] dirs`
 folders), those imported from the Mac's other agents (with Remove) and the learned ones (below, with Share and Drop);
 **System** holds those that come with Dot and those of its plugins. **Save from a chat** writes the skill of a chat that
-ended done (`POST /api/runs/{id}/skill`). Under Personal, Found on this Mac and Import from other apps (below). The old
-address `#/settings/skills` leads here.
+ended done (`POST /api/runs/{id}/skill`). Under Personal, Found on this Mac and Import from other apps (below). A skill
+Dot could not offer to a task (a `SKILL.md` that does not parse, a name another skill has) is listed under **Left out**
+at the foot of the tab it belongs on (Personal for your folders, System for a plugin's), a closed fold with the skill's
+file and the reason (`GET /api/skills/left-out`, item 1405). The old address `#/settings/skills` leads here.
 
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
 frontmatter (`name`, `description`, and Dot's own `icon`, the name of one of the interface's icons, item 408: a skill
@@ -697,7 +699,8 @@ its folder's (a plugin's `canva-brand-check` in `brand-check`: the skill goes by
 takes it) nor a description past the specification's 1,024 characters (cut there with an ellipsis; item 948). Dot's
 own learned and taught skills still carry their folders' names, by which they are kept. A `SKILL.md` may begin with blank lines before its opening `---` line; anything else there leaves the skill out.
 A skill left out is logged once while its file stays as it is (`skill_skipped`, item 1305), not at every run; Doctor's
-`skills` row and `dotx skills list` keep saying so. To use your own, put `dirs =
+`skills` row, `dotx skills list` and Settings › Skills (Left out, item 1405) keep saying so, each with the file and the
+reason. To use your own, put `dirs =
 ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be
 one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills written for
 Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for

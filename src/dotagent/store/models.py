@@ -738,6 +738,15 @@ class ResultStep(FrozenModel):
     helper: bool = False
 
 
+class RanStep(FrozenModel):
+    """A step the gate let run, as its ``tool_result`` event says it (item 1404): the kind of its action, the flags the
+    action raised and how many steps a batched call (``browser_act``, ``desktop_act``) carried, 1 for any other."""
+
+    kind: str
+    flags: tuple[str, ...]
+    steps: int
+
+
 class TrashedMemory(FrozenModel):
     """A note the owner forgot, kept whole for a while so that it can come back (item 584): the note as it was and
     when it went to the trash."""

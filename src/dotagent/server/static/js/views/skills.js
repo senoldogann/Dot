@@ -14,7 +14,9 @@
 // [agent] skill_rest_days rests (item 585): it is shown as resting, last in its section, and is not offered to runs
 // until Wake; Pin keeps one from resting; Versions lists the ones a rewrite, a merge or a restore kept, with the steps
 // each changed, and Restore puts one back. What the nightly reflection proposes (a merge of two skills that say the
-// same) waits above them as cards, with the steps it would write, for the owner's yes or no.
+// same) waits above them as cards, with the steps it would write, for the owner's yes or no. A skill Dot could not offer
+// to a task (a SKILL.md that does not parse, a name another skill has) is listed under "Left out" at the foot of the tab
+// it belongs on, a closed fold with the file and the reason (`GET /api/skills/left-out`, item 1405).
 
 import { api, query } from "../api.js";
 import { customizeHead } from "../customizehead.js";
@@ -22,6 +24,7 @@ import { ago, clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
+import { leftOutChip, leftOutIsSystem, leftOutName, leftOutSummary } from "../skillleftout.js";
 import { proposalCard } from "../skillproposals.js";
 import { WHOLE_RUN, providerOf } from "../providers.js";
 import { showVersions } from "../skillversions.js";
@@ -451,6 +454,36 @@ function foundSection(found, onFound) {
   return [head, hint, el("div", { class: "card list-box" }, groups)];
 }
 
+/** A skill Dot could not offer, as a row (item 1405): its name, why, and the file it is in. */
+function leftOutRow(entry) {
+  return el(
+    "div",
+    { class: "list-row", dataset: { leftOut: leftOutName(entry.path) } },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, leftOutName(entry.path)),
+      el("div", { class: "row-text" }, entry.reason),
+      el("div", { class: "row-meta" }, el("span", { class: "chip" }, leftOutChip(entry)), el("span", null, entry.path)),
+    ),
+  );
+}
+
+/**
+ * The skills Dot could not offer to a task, as a part of the page (item 1405): a head, one plain sentence of what is
+ * wrong and a closed fold with a row each, the file and the catalog's reason in it; nothing when `entries` is empty. Each
+ * tab's fold is its own (`tab`, "personal" or "system"): opening one does not open the other.
+ */
+function leftOutSection(entries, tab) {
+  if (entries.length === 0) {
+    return [];
+  }
+  const head = el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, "Left out"));
+  const hint = el("div", { class: "hint", dataset: { leftOutHint: "" } }, leftOutSummary(entries));
+  const group = foundGroup(`left-out-${tab}`, "Skills Dot could not use", plural(entries.length, "skill", "skills"), null, entries.map(leftOutRow));
+  return [head, hint, el("div", { class: "card list-box" }, group)];
+}
+
 // A section shows this many cards, and the rest after See more.
 const SHOWN_CARDS = 6;
 // A skill's source as the catalogue names it (skills/catalog.py), and what its card says of it.
@@ -664,6 +697,8 @@ export function mount(root) {
   let restDays = 60;
   // The changes to learned skills that wait for a yes, read apart from the skills so that a failure leaves them on the page.
   let proposals = [];
+  // The skills Dot could not offer to a task (item 1405), read apart too: a failure leaves the skills as they were.
+  let leftOut = [];
   let agents = [];
   let found = null;
   let foundError = null;
@@ -832,7 +867,14 @@ export function mount(root) {
           : emptyPanel("search", "No skill matches the search", ""),
       );
     }
-    return [...parts, ...foundPart()];
+    return [...parts, ...leftOutPart("personal"), ...foundPart()];
+  }
+
+  /** The skills Dot could not offer that belong on this tab (item 1405), the search applied: a plugin's and Dot's own on
+   * System, the others on Personal. */
+  function leftOutPart(tab) {
+    const here = leftOut.filter((entry) => leftOutIsSystem(entry.source) === (tab === "system") && matches(leftOutName(entry.path), `${entry.reason} ${entry.path}`));
+    return leftOutSection(here, tab);
   }
 
   function system() {
@@ -859,7 +901,7 @@ export function mount(root) {
           : emptyPanel("search", "No skill matches the search", ""),
       );
     }
-    return parts;
+    return [...parts, ...leftOutPart("system")];
   }
 
   function paint() {
@@ -958,6 +1000,18 @@ export function mount(root) {
   }
 
   // Read apart from the skills, so that a failure here leaves them on the page.
+  async function loadLeftOut() {
+    try {
+      leftOut = (await api.get("/skills/left-out")).items;
+    } catch (error) {
+      console.error("the skills Dot left out could not be read", error);
+    }
+    if (!disposed) {
+      paint();
+    }
+  }
+
+  // Read apart from the skills, so that a failure here leaves them on the page.
   async function loadFound() {
     try {
       found = await api.get("/skills/elsewhere");
@@ -972,6 +1026,7 @@ export function mount(root) {
   root.append(head.element, holder);
   load();
   loadProposals();
+  loadLeftOut();
   loadFound();
   return () => {
     disposed = true;

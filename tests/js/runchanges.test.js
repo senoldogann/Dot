@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { changedWords, shownEdits, undoQuestion } from "../../src/dotagent/server/static/js/runchanges.js";
+import { changedWords, outsideWords, shownEdits, undoQuestion } from "../../src/dotagent/server/static/js/runchanges.js";
 
 /** A file of the run's undo plan (`GET /runs/{id}/actions`): what taking it back does, and whether it can. */
 function edit(path, action, state = "ready", tool = action === "delete" ? "write_file" : "edit_file") {
@@ -43,4 +43,29 @@ test("Undo asks what goes back, what is deleted and what stays as it is", () => 
     undoQuestion([created], [created, edit("big.bin", "restore", "cannot")]),
     "The file it created is deleted. A file that cannot go back stays as it is.",
   );
+});
+
+test("the steps no undo can take back are counted by what ran, in one sentence that claims nothing of what they did (item 1404)", () => {
+  assert.equal(outsideWords([]), "");
+  assert.equal(outsideWords([{ category: "shell", steps: 0 }]), "");
+  assert.equal(outsideWords([{ category: "shell", steps: 1 }]), "Dot also ran 1 command. Undo takes back files only, so it cannot take this back.");
+  assert.equal(
+    outsideWords([
+      { category: "shell", steps: 3 },
+      { category: "browser", steps: 2 },
+    ]),
+    "Dot also ran 3 commands and 2 browser actions. Undo takes back files only, so it cannot take these back.",
+  );
+  assert.equal(
+    outsideWords([
+      { category: "shell", steps: 1 },
+      { category: "browser", steps: 1 },
+      { category: "desktop", steps: 1 },
+      { category: "message", steps: 2 },
+      { category: "app", steps: 1 },
+    ]),
+    "Dot also ran 1 command, 1 browser action, 1 desktop action, 2 message steps and 1 connected app action. Undo takes back files only, so it cannot take these back.",
+  );
+  // A category this page does not know is left out, never drawn as a word of its own.
+  assert.equal(outsideWords([{ category: "teleport", steps: 4 }]), "");
 });
