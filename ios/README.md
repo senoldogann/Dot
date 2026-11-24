@@ -250,7 +250,9 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   raised surface, with Increase Contrast the hairline is stronger, and `dotAnimation` stays still under Reduce Motion.
   Sheets keep the system's own glass on iOS 26 (`dotSheet()`), and a title's subtitle and the soft scroll edges are
   iOS 26's own.
-- **Behaviour of the look**: a working chat's avatar has a ring that turns, a waiting one an amber ring; a tool step has
+- **Behaviour of the look**: a working chat's avatar has a ring that turns, once in four seconds and evenly (item 1460:
+  `RingMotion.secondsPerTurn`, the one line to change; it was 1.4 s, "far too fast", and it stands still under Reduce
+  Motion), a waiting one an amber ring; a tool step has
   its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
   approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
   folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).

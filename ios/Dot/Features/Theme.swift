@@ -487,7 +487,8 @@ struct Avatar: View {
     }
 }
 
-/// The ring round an avatar. It turns only while the run works, and stands still under Reduce Motion.
+/// The ring round an avatar. It turns only while the run works (once in `RingMotion.secondsPerTurn`), and stands still
+/// under Reduce Motion.
 struct StateRing: View {
     let state: ThreadState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
@@ -504,12 +505,13 @@ struct StateRing: View {
                     lineWidth: 2.5
                 )
                 .rotationEffect(.degrees(turning ? 360 : 0))
-                .animation(turning ? .linear(duration: 1.4).repeatForever(autoreverses: false) : nil, value: turning)
+                .animation(
+                    turning ? .linear(duration: RingMotion.secondsPerTurn).repeatForever(autoreverses: false) : nil, value: turning)
                 // It turns every time the chat comes back to work (a ring that left with the state starts again) and it
                 // follows Reduce Motion while it turns.
-                .onAppear { turning = !reduceMotion }
+                .onAppear { turning = RingMotion.turns(state: state, reduceMotion: reduceMotion) }
                 .onDisappear { turning = false }
-                .onChange(of: reduceMotion) { _, still in turning = !still }
+                .onChange(of: reduceMotion) { turning = RingMotion.turns(state: state, reduceMotion: reduceMotion) }
         case .waiting:
             Circle().strokeBorder(Theme.warn, lineWidth: 2.5)
                 .shadow(color: Theme.warn.opacity(0.45), radius: 3)
@@ -521,15 +523,8 @@ func hue(of id: String) -> Double {
     Double(id.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 360 }) / 360
 }
 
-/// How a chat or an agent stands.
-enum ThreadState: Sendable {
-    case idle, working, waiting
-
+extension ThreadState {
     var color: Color { self == .waiting ? Theme.warn : Theme.accent }
-}
-
-extension ThreadSummary {
-    var state: ThreadState { isWaitingOnYou ? .waiting : isWorking ? .working : .idle }
 }
 
 /// "2 min", "3 h", "Mon", "12 Oct": the age of a moment in the fewest characters.
