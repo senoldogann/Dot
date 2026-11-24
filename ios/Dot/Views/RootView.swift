@@ -9,8 +9,13 @@ struct RootView: View {
         Group {
             if let host: DaemonHost = model.host {
                 if let store: NativeStore = model.native {
-                    ChatListView(model: model, store: store)
-                        .id(host.name)
+                    // The line that says the phone is offline stands over the screens, under the status bar, and has no height
+                    // while there is nothing to say.
+                    VStack(spacing: 0) {
+                        ConnectionBannerView(store: store)
+                        ChatListView(model: model, store: store)
+                            .id(host.name)
+                    }
                 } else {
                     PairView(model: model, host: host)
                 }

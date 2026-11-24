@@ -198,11 +198,13 @@ struct SchedulesView: View {
     }
 
     private func load() async {
+        // What the disk held is on the screen already; a read that fails leaves it, with its line.
+        if schedules.isEmpty { schedules = store.schedules }
         do {
             schedules = try await store.api.schedules()
             failure = nil
         } catch {
-            failure = "Could not read the schedules."
+            failure = schedules.isEmpty ? "Could not read the schedules." : "Showing the schedules saved on this phone."
         }
         loading = false
     }

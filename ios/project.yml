@@ -59,6 +59,9 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         UIBackgroundModes:
           - remote-notification
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - dev.dotagent.phone.refresh
         DotApsEnvironment: $(APS_ENVIRONMENT)
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true

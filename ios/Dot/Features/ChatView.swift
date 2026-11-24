@@ -246,13 +246,7 @@ private struct PendingRow: View {
                     .padding(.horizontal, 12).padding(.vertical, 9)
                     .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
             }
-            if send.failed {
-                HStack(spacing: 12) {
-                    Text("Not sent").font(Theme.meta).foregroundStyle(Theme.bad)
-                    Button("Retry", action: onRetry).font(Theme.meta)
-                    Button("Edit", action: onDiscard).font(Theme.meta)
-                }
-            }
+            PendingStatusLine(send: send, onRetry: onRetry, onDiscard: onDiscard)
         }
     }
 }

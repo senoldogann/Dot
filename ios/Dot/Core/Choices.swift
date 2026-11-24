@@ -78,7 +78,7 @@ extension ChatChoices {
 /// What a message carries of the chat's choices, written as the web's composer writes them: the mode, model, level, speed,
 /// approvals and goal mode of the chat, the agent whose chat it is. A message of a chat whose choices are not known goes
 /// as before (the daemon's own).
-struct MessageChoices: Equatable, Sendable {
+struct MessageChoices: Equatable, Sendable, Codable {
     var mode: String?
     var model: String?
     var effort: String?

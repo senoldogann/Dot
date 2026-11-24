@@ -110,6 +110,8 @@ func apnsEnvironment() -> String {
 struct DaemonClient: Sendable {
     let session: URLSession
     let maxAttempts: Int
+    /// Seconds a request may stay silent: the share sheet's and the lock screen's are short, a photo on a poor link is not.
+    var timeout: TimeInterval = 20
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "daemon")
 
     func registerAPNs(_ registration: APNsRegistration, host: DaemonHost, key: String) async throws {
@@ -166,7 +168,7 @@ struct DaemonClient: Sendable {
         }
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.httpBody = body
-        request.timeoutInterval = 20
+        request.timeoutInterval = timeout
 
         var attempt: Int = 1
         while true {

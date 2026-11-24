@@ -107,7 +107,33 @@ code** takes its place. The same by hand:
    permissions when first pressed, and ends in a line, with a way to the app's page in Settings when a permission is
    off, whenever it cannot start); and the Live Activity, its rows and a notification's Open action open the chat of
    their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>` route). What it still leaves to the web UI is in
-   `roadmap/1353.md`. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
+   `roadmap/1353.md`.
+
+   **On a bad link (items 1370 and 1371)** the app draws what it holds first and never makes the owner wait for the
+   network. The list, the agents, each chat (its newest runs and their last 400 events, its queue, schedules and
+   reactions), the models and the schedules are kept on the phone, one file each, written whole or not at all, in a
+   layout with a version, within 24 MB (the chats read longest ago go first); a file that does not read is dropped and
+   read from Dot again. A chat that was open before opens in its first frame. What it asks Dot is asked together and
+   tried again: a read gives up after 10 seconds, is tried three times with a growing wait and a little chance in it,
+   and while the phone has no link at all it waits for the link rather than spending its tries; a second ask for what is
+   already being read waits for that one, and leaving a chat cancels what it was reading. A chat that was away through
+   a long run does not read the whole run: at 500 events or more it asks for the newest 400
+   (`GET /api/runs/{id}/events?tail=400`; an older Dot answers with the run's first events and no
+   `X-Dot-Events-Tail` header, and the app then reads the pages as before) and says that some steps are not shown. One
+   thin line under the status bar says when the phone has no link (*Offline — showing saved chats · last updated 3 min
+   ago*, or *Offline — 2 waiting to send*), when Dot cannot be reached for more than a moment (*Reconnecting…*) and when
+   the phone's key was refused; it never covers what is read. **What is done with no link is kept and sent when it
+   returns, once and in order**: a message shows at once under the chat as *Waiting to send* (with *Retry now* and
+   *Edit*) and goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue` sent again after an answer
+   that was lost is the same message; a message that waited more than a day is left to the owner to send again, as
+   Dot keeps a key for a day); an answer to an approval or a question goes when the link is back, and says so when the
+   question had expired meanwhile or was answered on the Mac; a stop, a removal from the queue and a new order of it go
+   the same way. A photo of a message is kept beside it until it is sent. After the app leaves the screen it keeps its
+   streams for 20 seconds (a call that ends, a quick look at another app) and then closes them, with no timer left
+   running; back in front, they open at once from the last event they read, and the list is read again. The system may
+   also give it a moment to refresh while it is out of sight (a background refresh, a push that says there is something
+   new; iOS decides, and it may never). After the list is read, the chats that moved on are read ahead, six at most,
+   three on a cellular link or a hotspot, and none with Low Data Mode on. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). The
    app's notifications are its own, through APNs: Settings in the app opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in the app). The
    app asks once for the tailnet address (`https://<mac>.<tailnet>.ts.net`; it loads nothing else) and is signed in with

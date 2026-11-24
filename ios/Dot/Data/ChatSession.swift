@@ -14,6 +14,9 @@ enum ChatOutput: Sendable {
     /// A moment of the daemon's lifecycle stream (`queue_changed`, `run_finished`, ...), for what the screen keeps
     /// beside the transcript (the queue).
     case lifecycle(String)
+    /// What the disk held beside the transcript (the queue, the chat's schedules and reactions), so that a chat opened
+    /// with no link shows them as they were.
+    case aside(queue: QueueView?, automations: [ThreadAutomation]?, reactions: [ReactionRecord]?)
 }
 
 /// What reading a page of older runs did.
@@ -43,6 +46,20 @@ actor ChatSession {
     private var publishTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var startTask: Task<Void, Never>?
+    private var retryTask: Task<Void, Never>?
+    /// Bumped whenever a read succeeds or the chat is kicked: a retry that was waiting for its turn finds it changed and
+    /// gives way.
+    private var retryGeneration: Int = 0
+    private var readFailures: Int = 0
+    private var lastPublished: ChatState?
+    private var asideQueue: QueueView?
+    private var asideAutomations: [ThreadAutomation]?
+    private var asideReactions: [ReactionRecord]?
+    private var listUpdatedAt: Double?
+    private let link: LinkMonitor?
+    /// The session of the run's stream: made like the requests' (no timeout on the whole, 45 s on silence).
+    private let streamSession: URLSession
     private var catching: Bool = false
     private var again: Bool = false
     private var stopped: Bool = false
@@ -68,10 +85,18 @@ actor ChatSession {
     /// How soon after the last change the screen is handed the state again while words stream.
     static let publishEvery: Duration = .milliseconds(40)
 
-    init(threadId: String, api: APIClient, cache: ChatCache) {
+    /// More events than this after the last one held make the gap too large to replay: the newest `tailSize` are read
+    /// instead (items 1370 and 1371).
+    static let gapPage: Int = 500
+    static let tailSize: Int = 400
+
+    init(threadId: String, api: APIClient, cache: ChatCache, link: LinkMonitor? = nil, listUpdatedAt: Double? = nil) {
         self.threadId = threadId
         self.api = api
         self.cache = cache
+        self.link = link
+        self.streamSession = APIClient.makeStreamSession(like: api.session)
+        self.listUpdatedAt = listUpdatedAt
     }
 
     /// Starts the session; the stream ends when it is stopped.
@@ -80,7 +105,7 @@ actor ChatSession {
             of: ChatOutput.self, bufferingPolicy: .unbounded)
         output = continuation
         continuation.onTermination = { [weak self] _ in Task { await self?.stop() } }
-        Task { [weak self] in
+        startTask = Task { [weak self] in
             await self?.loadDisk()
             await self?.catchUp()
         }
@@ -92,6 +117,8 @@ actor ChatSession {
         feedTask?.cancel()
         publishTask?.cancel()
         refreshTask?.cancel()
+        retryTask?.cancel()
+        startTask?.cancel()
         Task { [feed] in await feed?.stop() }
         feed = nil
         output?.finish()
@@ -114,6 +141,7 @@ actor ChatSession {
         olderCursor = nil
         olderExhausted = nil
         state = ChatState()
+        lastPublished = nil
         await cache.removeChat(threadId)
         publishNow()
         await catchUp()
@@ -122,8 +150,42 @@ actor ChatSession {
     /// The app is in front again or the network changed: reconnect at once, and read what came after meanwhile.
     func kick() {
         keyRefused = false
+        retryGeneration += 1
         Task { [feed] in await feed?.kick() }
         scheduleRefresh(after: .zero)
+    }
+
+    /// The app went to the background for good: the stream is closed (a socket held open on a phone that sleeps is a
+    /// drain), what is held is written at once, and nothing is asked until `kick`. The session stays, so that the screen
+    /// the owner left open comes back with its rows.
+    func suspend() {
+        retryGeneration += 1
+        refreshTask?.cancel()
+        retryTask?.cancel()
+        feedTask?.cancel()
+        if let feed { Task { await feed.stop() } }
+        feed = nil
+        feedRun = nil
+        persistNow()
+    }
+
+    /// Keeps what the screen holds beside the transcript with the chat, to draw again with no link.
+    func keep(queue: QueueView?, automations: [ThreadAutomation]?, reactions: [ReactionRecord]?) {
+        if let queue { asideQueue = queue }
+        if let automations { asideAutomations = automations }
+        if let reactions { asideReactions = reactions }
+        scheduleSave()
+    }
+
+    /// Reads the chat once and keeps it, with no screen and no stream: what a prefetch and a background refresh do. The
+    /// chat's state when the daemon was reached, else `nil`.
+    func warm(listUpdatedAt updated: Double?) async -> ChatState? {
+        await loadDisk()
+        let reached: Bool = await readDelta()
+        guard reached else { return nil }
+        if let updated { listUpdatedAt = updated }
+        await persist()
+        return state
     }
 
     /// A moment of the daemon's lifecycle stream that may concern this chat (a run queued or ended, a question asked
@@ -166,8 +228,13 @@ actor ChatSession {
         state = stored.state()
         unreadable = stored.unreadable ?? UnreadableEvents()
         for (run, ids) in unreadable.byRun { state.setUnreadable(ids.count, ofRun: run) }
+        asideQueue = stored.queue
+        asideAutomations = stored.automations
+        asideReactions = stored.reactions
+        listUpdatedAt = listUpdatedAt ?? stored.listUpdatedAt
         publishNow()
         output?.yield(.older(hasMore: hasOlderHint))
+        output?.yield(.aside(queue: stored.queue, automations: stored.automations, reactions: stored.reactions))
     }
 
     private var hasOlderHint: Bool { olderExhausted.map { !$0 } ?? (runs.count >= Self.firstPage) }
@@ -230,36 +297,63 @@ actor ChatSession {
         for waiter in ending { waiter.resume() }
     }
 
-    private func readDelta() async {
+    /// One read of what the daemon has after what is held. True when it got through. Everything that can be asked at once is
+    /// asked at once: the chat's list of runs, its helpers, the questions that wait, its newest run's page, and the events
+    /// after the cursors of the runs already held (those need no list to be asked), so that a bad link costs one round trip
+    /// and not four in a row; the events draw as they arrive. A failure that may pass (the link, the daemon busy) is told
+    /// as "reconnecting" and tried again by itself with a growing wait, and any other is the screen's to say.
+    @discardableResult
+    private func readDelta() async -> Bool {
         do {
-            let listed: [RunRecord] = try await api.runs(thread: threadId, limit: Self.firstPage)
+            if let link, !link.state.online {
+                throw DaemonRequestError.transport(path: "", underlying: URLError(.notConnectedToInternet))
+            }
+            let held: [String] = Array(state.rootRunIds.suffix(ChatState.followedRuns))
+            let starts: [String: Int] = Dictionary(uniqueKeysWithValues: held.map { ($0, cursors[$0] ?? 0) })
+            async let listing: [RunRecord] = api.runs(thread: threadId, limit: Self.firstPage)
+            async let helpers: [RunRecord] = api.helpers(thread: threadId)
+            async let waiting: [ApprovalRecord] = api.pendingApprovals()
+            async let heldPage: RunDetail? = detail(of: held.last)
+            // What is held is read on from its cursor while the list is on its way; each run's events are put on the
+            // screen as they come, and the cursor moves only when they are in the state (a read that fails moves nothing).
+            try await withThrowingTaskGroup(of: (String, EventRead).self) { group in
+                for run in held {
+                    let start: Int = starts[run] ?? 0
+                    group.addTask { [self] in (run, try await readEvents(of: run, after: start)) }
+                }
+                for try await (run, read) in group {
+                    commit(read, run: run)
+                    publishSoon()
+                }
+            }
+            let listed: [RunRecord] = try await listing
             // The first page says whether there is more behind it; once older pages were read, they say it.
             if olderExhausted == nil, listed.count < Self.firstPage { olderExhausted = true }
             for run in listed {
                 if let at: Int = runs.firstIndex(where: { $0.id == run.id }) { runs[at] = run } else { runs.append(run) }
             }
             let roots: [RunRecord] = listed.filter { $0.parentRunId == nil }
-            guard let newest: RunRecord = roots.first else { return }
-            async let detail: RunDetail = api.detail(run: newest.id)
-            async let helpers: [RunRecord] = api.helpers(thread: threadId)
-            async let waiting: [ApprovalRecord] = api.pendingApprovals()
+            guard let newest: RunRecord = roots.first else {
+                readSucceeded()
+                return true
+            }
             // Oldest first, each run with its own events before the next run's message: the rows come in the order
             // things happened.
             let followed: Set<String> = Set(roots.prefix(ChatState.followedRuns).map(\.id))
             for run in roots.reversed() {
                 if followed.contains(run.id) {
                     if state.rootRunIds.contains(run.id) { state.setStatus(run.status, ofRun: run.id) } else { state.addRun(run) }
-                    let fresh: [EventRecord] = try await readEvents(of: run.id)
-                    state.apply(fresh)
-                    state.setUnreadable(unreadable.count(run: run.id), ofRun: run.id)
-                    events.append(contentsOf: fresh.filter { $0.id > 0 })
+                    if !held.contains(run.id) {
+                        commit(try await readEvents(of: run.id, after: cursors[run.id] ?? 0), run: run.id)
+                    }
                 } else if state.rootRunIds.contains(run.id) {
                     state.setStatus(run.status, ofRun: run.id)
                 } else {
                     state.addSummary(run)
                 }
             }
-            let shown: RunDetail = try await detail
+            let page: RunDetail? = try await heldPage
+            let shown: RunDetail = try await page?.run.id == newest.id ? page! : api.detail(run: newest.id)
             helperRuns = try await helpers
             state.setHelpers(helperRuns)
             let mine: Set<String> = Set(state.rootRunIds + helperRuns.map(\.id))
@@ -268,36 +362,129 @@ actor ChatSession {
             state.setStatus(shown.run.status, ofRun: shown.run.id)
             output?.yield(.run(shown.run, title: shown.title, choices: shown.choices))
             output?.yield(.older(hasMore: hasOlderHint))
+            readSucceeded()
             publishNow()
             scheduleSave()
+            return true
         } catch {
+            if stopped || Task.isCancelled || (error as? DaemonRequestError).map({ RetryPolicy.isCancellation($0) }) == true { return false }
             logger.info("catch-up failed: \(String(describing: error), privacy: .public)")
             if case DaemonRequestError.status(_, let code, _) = error, code == 401 || code == 403 {
                 refuse()
+            } else if RetryPolicy.isWorthRepeating(error) {
+                // What the phone holds stays on the screen; the line says it is trying, and it tries again by itself.
+                readFailures += 1
+                output?.yield(.connection(.reconnecting(attempt: readFailures, unauthorized: false)))
+                scheduleRetry()
             } else {
                 output?.yield(.failed(String(describing: error)))
             }
+            // What came before the failure is on the screen and kept.
+            publishNow()
+            scheduleSave()
+            return false
         }
     }
 
-    private func readEvents(of runId: String) async throws -> [EventRecord] {
-        var all: [EventRecord] = []
-        var after: Int = cursors[runId] ?? 0
-        while true {
-            let page: EventsPage = try await api.events(run: runId, after: after)
-            all.append(contentsOf: page.events)
-            // The ids that did not read are kept as a set (met again, they are not counted again), and the cursor goes past the
-            // whole page, the unread elements included, so that they are not asked for again.
-            if unreadable.add(page.droppedIds, run: runId) > 0 {
-                output?.yield(.failed(Self.unreadableWords))
+    private func detail(of run: String?) async throws -> RunDetail? {
+        guard let run else { return nil }
+        return try await api.detail(run: run)
+    }
+
+    private func readSucceeded() {
+        readFailures = 0
+        retryGeneration += 1
+        retryTask?.cancel()
+        retryTask = nil
+        if feed == nil { output?.yield(.connection(.live)) }
+    }
+
+    /// Reads again after a failure: with the wait that grows (and with the link, when it is down, which comes first), for as
+    /// long as the chat is open and the key is not refused.
+    private func scheduleRetry() {
+        guard !stopped, !keyRefused else { return }
+        retryGeneration += 1
+        let generation: Int = retryGeneration
+        let wait: Duration = backoffDelay(attempt: readFailures)
+        retryTask = Task { [weak self, link] in
+            if let link, !link.state.online {
+                _ = await link.waitForOnline(timeout: .seconds(30))
+            } else {
+                try? await Task.sleep(for: wait)
             }
+            if Task.isCancelled { return }
+            await self?.retry(generation: generation)
+        }
+    }
+
+    private func retry(generation: Int) async {
+        guard generation == retryGeneration, !stopped, !keyRefused else { return }
+        await catchUp()
+    }
+
+    /// What a read of a run's events brought: its events, the ids that did not read, the highest id of the pages whether
+    /// they read or not, and whether the gap was too long to replay (these are the newest events, not the ones after the
+    /// cursor).
+    struct EventRead: Sendable {
+        var events: [EventRecord] = []
+        var droppedIds: [Int] = []
+        var top: Int?
+        var wasTail: Bool = false
+    }
+
+    /// Reads a run's events after `start`, and changes nothing here: the caller puts them in the state with `commit`, so
+    /// that a read cut short moves no cursor past events that were not drawn. A gap of more than a page (the phone slept
+    /// through a long run) is not replayed: the daemon's newest `tailSize` stand in for it.
+    private func readEvents(of runId: String, after start: Int) async throws -> EventRead {
+        var read: EventRead = EventRead()
+        var after: Int = start
+        var first: Bool = true
+        while true {
+            // The first page asks for a gap's worth, the rest a full page: a page is the last when it comes short of what
+            // it asked for.
+            let asked: Int = first ? Self.gapPage : 2000
+            let page: EventsPage = try await api.events(run: runId, after: after, limit: asked)
+            if first, page.size >= Self.gapPage, let tail: EventsPage = try await api.eventsTail(run: runId, count: Self.tailSize) {
+                logger.info("a gap of \(page.size)+ events of \(runId, privacy: .public) was read as its newest \(tail.events.count)")
+                return EventRead(events: tail.events, droppedIds: tail.droppedIds, top: tail.topId, wasTail: true)
+            }
+            first = false
+            read.events.append(contentsOf: page.events)
+            read.droppedIds.append(contentsOf: page.droppedIds)
             if let top: Int = page.topId {
                 after = top
-                cursors[runId] = max(cursors[runId] ?? 0, top)
+                read.top = max(read.top ?? 0, top)
             }
             // A page that said no id at all cannot be walked past: it ends the read rather than ask for it again.
-            if page.size < 2000 || page.topId == nil { return all }
+            if page.size < asked || page.topId == nil { return read }
         }
+    }
+
+    /// Puts what was read into the state: the ids that did not read are kept as a set (met again, they are not counted
+    /// again), the cursor goes past the whole page (the unread elements included, so that they are not asked for again),
+    /// and the rows are drawn. The tail of a long gap replaces what was held of the run, and a line says the steps before
+    /// it are not shown here.
+    private func commit(_ read: EventRead, run runId: String) {
+        if read.wasTail {
+            let wanted: Set<Int> = Set(read.events.map(\.id))
+            events.removeAll { $0.runId == runId && !wanted.contains($0.id) }
+            dropped(runId: runId)
+        }
+        if unreadable.add(read.droppedIds, run: runId) > 0 { output?.yield(.failed(Self.unreadableWords)) }
+        if let top: Int = read.top { cursors[runId] = max(cursors[runId] ?? 0, top) }
+        state.apply(read.events)
+        state.setUnreadable(unreadable.count(run: runId), ofRun: runId)
+        events.append(contentsOf: read.events.filter { $0.id > 0 })
+    }
+
+    /// The rows of a run whose middle was not read: rebuilt from the records and the events held, with a line that says
+    /// so.
+    private func dropped(runId: String) {
+        olderCursor = nil
+        olderExhausted = nil
+        var built: ChatState = ChatState.build(runs: runs, helpers: helperRuns, events: events.filter { $0.runId != runId })
+        built.upsertNote(id: "n:gap:\(runId)", words: "Some steps of this run are not shown here. The web UI has them all.", ts: Date().timeIntervalSince1970)
+        state = built
     }
 
     // MARK: Following
@@ -316,7 +503,8 @@ actor ChatSession {
         guard !keyRefused else { return }
         guard !stopped, let newest: String = state.newestRunId, state.isWorking else {
             if let feed { Task { await feed.stop() }; self.feed = nil; feedRun = nil }
-            output?.yield(.connection(.ended))
+            // A read that failed said "reconnecting" and tries again: that line is not replaced by "ended".
+            if readFailures == 0 { output?.yield(.connection(.ended)) }
             return
         }
         if feedRun == newest, feed != nil { return }
@@ -325,7 +513,7 @@ actor ChatSession {
         let api: APIClient = api
         let after: Int = max(state.lastEventId, cursors[newest] ?? 0)
         let feed: EventFeed = EventFeed(
-            session: Self.streamSession, after: after, isFinal: { $0.kind == "run_finished" && $0.runId == newest },
+            session: streamSession, after: after, link: link, isFinal: { $0.kind == "run_finished" && $0.runId == newest },
             open: { after in runStreamRequest(api: api, runId: newest, after: after) })
         self.feed = feed
         feedRun = newest
@@ -373,20 +561,14 @@ actor ChatSession {
         if !stopped, !keyRefused { await catchUp() }
     }
 
-    /// A session for streams: no timeout on the whole, 45 s on silence (the daemon writes a keepalive every 15 s).
-    private static let streamSession: URLSession = {
-        let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 45
-        configuration.timeoutIntervalForResource = 24 * 3600
-        configuration.waitsForConnectivity = false
-        return URLSession(configuration: configuration)
-    }()
-
     // MARK: Telling and keeping
 
     private func publishNow() {
         publishTask?.cancel()
         publishTask = nil
+        // A state the screen already has is not handed over again: nothing is re-drawn for a read that found nothing new.
+        if lastPublished == state { return }
+        lastPublished = state
         output?.yield(.state(state))
     }
 
@@ -411,11 +593,28 @@ actor ChatSession {
     private func persistNow() {
         saveTask?.cancel()
         saveTask = nil
-        guard !runs.isEmpty else { return }
-        let chat: StoredChat = StoredChat(
-            threadId: threadId, runs: Array(runs.sorted { $0.createdAt > $1.createdAt }.prefix(12)), helpers: Array(helperRuns.prefix(30)), events: events,
-            savedAt: Date().timeIntervalSince1970, unreadable: unreadable.isEmpty ? nil : unreadable)
+        guard let chat: StoredChat = snapshot() else { return }
         let cache: ChatCache = cache
         Task.detached { await cache.saveChat(chat) }
+    }
+
+    /// Writes the chat and returns when it is on disk (a background refresh is let to end only after).
+    private func persist() async {
+        saveTask?.cancel()
+        saveTask = nil
+        guard let chat: StoredChat = snapshot() else { return }
+        await cache.saveChat(chat)
+    }
+
+    private func snapshot() -> StoredChat? {
+        guard !runs.isEmpty else { return nil }
+        var chat: StoredChat = StoredChat(
+            threadId: threadId, runs: Array(runs.sorted { $0.createdAt > $1.createdAt }.prefix(12)), helpers: Array(helperRuns.prefix(30)), events: events,
+            savedAt: Date().timeIntervalSince1970, unreadable: unreadable.isEmpty ? nil : unreadable)
+        chat.queue = asideQueue
+        chat.automations = asideAutomations
+        chat.reactions = asideReactions
+        chat.listUpdatedAt = listUpdatedAt
+        return chat
     }
 }

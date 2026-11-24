@@ -322,8 +322,13 @@ class TerminalView(FrozenModel):
 
 
 class EventsQuery(FrozenModel):
+    """``tail`` reads the newest that many events instead of the ones after ``after`` (item 1370): a client that was
+    away through a long run reads the end of it, and the answer says it knew ``tail`` in the ``X-Dot-Events-Tail``
+    header."""
+
     after: int = Field(default=0, ge=0)
     limit: int = Field(default=500, ge=1, le=2000)
+    tail: int | None = Field(default=None, ge=1, le=2000)
 
 
 class RunsStreamQuery(FrozenModel):

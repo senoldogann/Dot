@@ -23,10 +23,6 @@ struct ChatListView: View {
                     Button { openFailed = nil } label: { Text(words).font(Theme.meta).foregroundStyle(Theme.warn) }
                         .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
-                if let line: String = connectionLine {
-                    Text(line).font(Theme.meta).foregroundStyle(Theme.warn)
-                        .listRowBackground(Color.clear).listRowSeparator(.hidden)
-                }
                 ForEach(store.threads) { thread in
                     Button { path.append(thread) } label: { ThreadRow(thread: thread) }
                         .buttonStyle(.plain)
@@ -115,13 +111,6 @@ struct ChatListView: View {
         }
     }
 
-    private var connectionLine: String? {
-        switch store.connection {
-        case .reconnecting: "Reconnecting to your Mac…"
-        case .unauthorized: "This phone's key was refused. Pair again in Settings."
-        default: nil
-        }
-    }
 }
 
 /// What the new-chat sheet is for: a chat of its own from the home, or an agent's first message.
