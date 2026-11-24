@@ -643,3 +643,9 @@ async def test_a_picture_the_code_made_impossible_to_save_is_an_error_to_the_cal
     assert not outcome.result.is_error, outcome.result.text
     assert outcome.result.text.startswith("told: the picture could not be saved in the scratch folder")
     assert await asyncio.to_thread(os.listdir, victim) == []
+
+
+def test_the_description_does_not_name_a_python_the_daemon_may_not_run() -> None:
+    """The review of item 1501: the code runs on the daemon's own interpreter (3.13 or later), so the model is told
+    Python 3, not a minor version."""
+    assert "Python 3 " in DESCRIPTION and "3.13" not in DESCRIPTION
