@@ -25,6 +25,9 @@ const LISTS = [
   { key: "approvals", pattern: /^\/approvals\?status=pending&limit=100$/ },
   { key: "assistant", pattern: /^\/assistant$/ },
   { key: "themes", pattern: /^\/themes$/ },
+  // The models each provider offers: a message is made with the level of one of them, so the composer waits for the list
+  // before it sends, which a phone with no link must not wait on (item 1523).
+  { key: "models", pattern: /^\/models$/ },
 ];
 
 /**

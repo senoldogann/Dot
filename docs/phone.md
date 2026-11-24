@@ -523,6 +523,25 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   history is read again; it is made again at once when the page comes back into view and when the phone is back on the
   network, and otherwise after 0.5, 1, 2, 4, 8 and then every 15 seconds. A chat's stored steps, read once when it
   opens, keep the 45 seconds they had.
+- **What is done with no link is kept and sent once (item 1523).** A message, an answer to an approval or a question, a
+  Stop and a change of a chat's queue (a message edited, taken out, moved, the queue resumed) made while the phone has no
+  link, or Dot cannot be reached, go into the outbox, in IndexedDB (the store `outbox` of `dot-cache`), with their key and
+  their place in the order, before anything is asked of the network; they survive the page being killed, and the cache
+  being dropped with a key that is forgotten does not take them. A message shows at once under the chat as *Waiting to
+  send* with **Retry now** and **Edit** (Edit takes it back into the composer); an answer, a Stop and a change of the queue
+  are a line that says they wait. They are sent when the phone is online and the page in view (`online`, the page coming
+  back, the stream coming back, and a wait that grows from 0.5 to 15 seconds while Dot cannot be reached), one chat's
+  things in the order they were made, the one that waits holding the ones behind it; a write gives up after 30 seconds.
+  A message goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue`, `POST /api/runs/{id}/steer`
+  and `POST /api/runs`, item 189: the daemon keeps a key for a day, answers a repeat with what the first made, and refuses
+  a second send with 409 while the first is under way, which is waited out), so an answer that was lost after Dot took the
+  message, a page killed while it sent and a link that came back twice send it once; the daemon is not changed. A message
+  that waited more than a day is *Not sent*: Dot has forgotten its key, so it is the owner's to **Send again** (under a
+  new key), **Edit** or **Discard**; a message Dot refuses stays with Dot's words and does not hold the next. An answer
+  to a question that had expired when it arrived says so (*That question had expired when your answer reached Dot, so it
+  was not used.*), and so does one answered on the Mac meanwhile; a Stop or a queue change that finds nothing to do is
+  done. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
+  could not reach Dot and the words stay in the box.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 

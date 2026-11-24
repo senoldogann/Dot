@@ -7,6 +7,8 @@ import { codeBlock } from "./codeblock.js";
 import { clip, dateTime, el } from "./dom.js";
 import { capital, flagWords, kindWords } from "./flagwords.js";
 import { icon } from "./icons.js";
+import { t } from "./i18n.js";
+import { viaOutbox } from "./outbox.js";
 import { toastError } from "./ui.js";
 
 const STATUS_BADGE = { approved: "b-ok", denied: "b-bad", expired: "b-muted" };
@@ -311,7 +313,16 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     });
     let decided;
     try {
-      decided = await api.post(`/approvals/${approval.id}/decision`, remember ? { approve, note, remember } : { approve, note });
+      // With no link the answer is kept and sent once the link is back, in order with what else was done in the chat
+      // (item 1523); a card that was closed meanwhile is told then.
+      const answer = remember ? { approve, note, remember } : { approve, note };
+      decided = await viaOutbox({ kind: "answer", chat: approval.runId, method: "POST", path: `/approvals/${approval.id}/decision`, body: answer }, () =>
+        api.post(`/approvals/${approval.id}/decision`, answer),
+      );
+      if (decided !== null && typeof decided === "object" && "kept" in decided) {
+        node.append(el("div", { class: "note outbox-note", role: "status" }, icon("clock"), el("span", null, t("outbox.answerWaiting"))));
+        return;
+      }
     } catch (error) {
       busy = false;
       node.querySelectorAll("button, input").forEach((control) => {

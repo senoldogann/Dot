@@ -6,6 +6,8 @@
 
 /** How long one try of a read waits for the answer to begin and end. */
 export const READ_TIMEOUT_MS = 10_000;
+/** How long a write waits: what was done is kept and sent again with its key (the iPhone app gives a write 30 s). */
+export const WRITE_TIMEOUT_MS = 30_000;
 /** How many times a read is tried. */
 export const TRIES = 3;
 /** The wait before the second try; each wait after it is twice the one before, up to `MAX_WAIT_MS`. */
