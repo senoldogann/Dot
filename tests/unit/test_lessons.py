@@ -27,7 +27,7 @@ from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
 from dotagent.core.types import JsonObject
 from dotagent.memory.service import MemoryHit
-from dotagent.store.models import EventRecord, MemoryRecord, RunMode, RunStatus
+from dotagent.store.models import EventRecord, LessonSave, MemoryRecord, RunMode, RunStatus
 
 MAX_CHARS: int = 300
 GOAL: str = "Summarise the quarterly report in report.pdf"
@@ -235,9 +235,37 @@ def test_a_lesson_never_repeats_the_one_that_says_the_opposite() -> None:
 
 def test_a_day_keeps_at_most_its_cap_of_lessons() -> None:
     # Item 1247: past [agent] lessons_per_day in 24 hours, auto leaves a lesson out and says why.
-    assert day_full(39, 40) is None
-    assert day_full(40, 40) == "40 lessons were saved in the last 24 hours, the most a day keeps is 40"
-    assert day_full(1, 1) == "1 lesson was saved in the last 24 hours, the most a day keeps is 1"
+    mixed: list[LessonSave] = [_save("ui" if number % 2 else "schedule", False) for number in range(39)]
+    assert day_full(mixed, "cli", False, 40) is None
+    assert day_full([*mixed, _save("ui", False)], "cli", False, 40) == (
+        "40 lessons were saved in the last 24 hours, the most a day keeps is 40"
+    )
+    assert day_full([_save("ui", False)], "ui", False, 1) == (
+        "1 lesson was saved in the last 24 hours, the most a day keeps is 1"
+    )
+
+
+def _save(source: str, tainted: bool) -> LessonSave:
+    return LessonSave(at=1.0, source=source, tainted=tainted)
+
+
+def test_one_kind_of_task_takes_at_most_half_of_the_days_lessons() -> None:
+    """Item 1713: the room was first come, first served; a schedule that loops took it from every other task."""
+    schedules: list[LessonSave] = [_save("schedule", False) for _ in range(20)]
+    assert day_full(schedules, "schedule", False, 40) == (
+        "20 lessons of schedule tasks were saved in the last 24 hours, the most one kind of task takes is 20 of the "
+        "day's 40"
+    )
+    assert day_full(schedules, "ui", False, 40) is None
+
+
+def test_the_last_quarter_of_the_day_is_kept_for_clean_lessons() -> None:
+    saved: list[LessonSave] = [_save("ui" if number % 3 else "schedule", True) for number in range(30)]
+    assert day_full(saved, "cli", True, 40) == (
+        "30 of the day's 40 lessons were saved; the rest is kept for lessons of tasks that read no outside content"
+    )
+    assert day_full(saved, "cli", False, 40) is None
+    assert day_full(saved[:29], "cli", True, 40) is None
 
 
 def test_kept_lessons_drop_what_is_not_a_lesson_and_every_repeat() -> None:

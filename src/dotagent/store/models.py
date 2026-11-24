@@ -795,6 +795,15 @@ class AwakeNotes(FrozenModel):
     agent_id: str | None
 
 
+class LessonSave(FrozenModel):
+    """A lesson ``auto`` saved as a new note (item 1713): when, the source of the run it came from (``ui``,
+    ``schedule``, ``review``...) and whether that run had read content third parties can author."""
+
+    at: float
+    source: str
+    tainted: bool
+
+
 class MemoryScore(FrozenModel):
     """How the runs a note was handed to ended: ``handed`` runs in all, of which ``done`` ended done and ``failed``
     failed (the rest were cancelled, or still work)."""

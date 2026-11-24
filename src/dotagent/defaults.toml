@@ -457,6 +457,8 @@ lesson_rest_days = 60
 # lessons of 2026-10-28 to 11-19, every one a later run was handed, 346, was handed first within 20 days, 90% within
 # 14). lessons_per_day is the most lessons "auto" saves in 24 hours; past it a lesson is left out with that reason and
 # its run's page still offers Save anyway (the same days made 3 to 97 a day, 38 on average; 7 of 23 days passed 40).
+# One kind of task (its source: ui, schedule, review...) takes at most half of it, and the last quarter is kept for
+# lessons of runs that read no outside content (item 1713).
 lesson_unused_rest_days = 21
 lessons_per_day = 40
 # After a task run of its own that ended done (its answer checked, or its goal found achieved) with at least

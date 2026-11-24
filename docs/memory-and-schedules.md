@@ -116,7 +116,13 @@ dotx memory reindex      # embed every note again, for example after changing [m
   a run on the Claude plan or OpenCode (whose program keeps a call's result in a session a later run resumes) are
   handed none of them; `memory_search` still finds them all.
 - Lessons are kept from piling up (item 1247). A run's lessons are not saved when a note already says them or the
-  harness's habits do; `auto` saves at most `[agent] lessons_per_day` (40) in 24 hours, and the night rests a lesson
+  harness's habits do; `auto` saves at most `[agent] lessons_per_day` (40) in 24 hours, counted from a record of
+  its saves that stays when a chat is deleted (item 1713: the count read the runs' events, which go with their chat, so
+  deleting chats gave the day its room back). The room is shared: one kind of task (the run's source, such as `ui`,
+  `schedule` or `review`) takes at most half of it, so that a schedule that loops or a night's reflection over many
+  runs of one kind leaves room for the others, and its last quarter is kept for lessons of runs that read no outside
+  content, the ones a run can start with (on the owner's Mac 72% of those were handed to a later run, 31% of the
+  others); a lesson left out says which limit it met, and its run's page offers Save anyway. The night rests a lesson
   that no run was ever handed after `[agent] lesson_unused_rest_days` (21), sooner than one that helped
   (`lesson_rest_days`, 60). Resting is not forgetting: a resting lesson is listed, can be woken, and is only ever
   proposed to be forgotten. Measured on the owner's 834 lessons of 2026-10-28 to 11-19: 346 were handed to a later
