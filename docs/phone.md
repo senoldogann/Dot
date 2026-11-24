@@ -499,7 +499,9 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   a phone with no link opens on its chats instead of on "Dot cannot be reached"; a refusal of the daemon's (a key it
   does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from the
   cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
-  looks fresher than it is.
+  looks fresher than it is. What the page needs to open is Dot's status; the agents' looks, the owner's themes and Dot's
+  name are read beside it, and one of them that cannot be read leaves the page with its defaults, not without its chats
+  (a key that is refused among them is refused all the same).
 - **Reads that try again (item 1521).** On a phone's touch screen, once Dot has answered the page, one wrapper makes the
   reads (`js/api.js`, the rules in `js/retryrules.js`): a try gives up after 10 seconds, a read is tried three times
   with a wait that grows from 0.4 s to 3 s and has chance in it (half fixed, half random), within 20 seconds in all; a

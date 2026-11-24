@@ -788,7 +788,21 @@ async function connect() {
   // answer, and nothing of the page's start needs it. A composer made before it listens the browser's way.
   loadMacVoice();
   try {
-    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
+    // What the page needs to open is the daemon's status; the agents' looks, the owner's themes and Dot's name are read
+    // beside it, and one that cannot be read leaves the page with its defaults rather than without its chats (a phone on a
+    // bad link opens on the copies it holds, item 1520). A refused key among them is refused all the same.
+    const [status, ...others] = await Promise.allSettled([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
+    if (status.status === "rejected") {
+      throw status.reason;
+    }
+    for (const other of others) {
+      if (other.status === "rejected") {
+        if (other.reason instanceof ApiError && other.reason.status === 401) {
+          throw other.reason;
+        }
+        console.warn("something the page opens with could not be read; it goes on with its defaults", other.reason);
+      }
+    }
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       const before = untried === null ? null : keptBefore;
