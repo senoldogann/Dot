@@ -11,6 +11,8 @@ struct ChatListView: View {
     @State private var composing: NewChatTarget?
     /// The inbox of what waits on the owner (item 1442).
     @State private var showsInbox: Bool = false
+    /// Whether the Code reviews section is open (item 1664): folded until the owner opens it, then kept as left.
+    @AppStorage("chatList.reviewsOpen") private var reviewsOpen: Bool = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -42,6 +44,7 @@ struct ChatListView: View {
                 if !waiting.isEmpty { section("Needs you", tone: Theme.warn, threads: waiting) }
                 if !working.isEmpty { section("Working", tone: Theme.muted, threads: working) }
                 if !others.isEmpty { section(waiting.isEmpty && working.isEmpty ? nil : "Chats", tone: Theme.muted, threads: others) }
+                if !reviews.isEmpty { reviewsSection }
                 if store.threads.isEmpty && !store.refreshing {
                     DotEmptyState(
                         icon: .message, title: "No chats yet",
@@ -163,13 +166,44 @@ struct ChatListView: View {
         NeedsYouRules.rows(from: store.awareness.needsYou).first.map(NeedsYouRules.preview(of:))
     }
 
-    private var waiting: [ThreadSummary] { store.threads.filter(\.isWaitingOnYou) }
+    /// The owner's chats: the code reviews stand apart, at the foot (item 1664).
+    private var owners: [ThreadSummary] { ChatSections.owners(store.threads) }
+    private var reviews: [ThreadSummary] { ChatSections.reviews(store.threads) }
+    private var waiting: [ThreadSummary] { owners.filter(\.isWaitingOnYou) }
     /// A chat whose own run is over but whose helpers still work is at work too (item 1466): it stands with the working ones.
     private var working: [ThreadSummary] {
-        store.threads.filter { !$0.isWaitingOnYou && ($0.isWorking || store.helpersLive(in: $0) > 0) }
+        owners.filter { !$0.isWaitingOnYou && ($0.isWorking || store.helpersLive(in: $0) > 0) }
     }
     private var others: [ThreadSummary] {
-        store.threads.filter { !$0.isWorking && !$0.isWaitingOnYou && store.helpersLive(in: $0) == 0 }
+        owners.filter { !$0.isWorking && !$0.isWaitingOnYou && store.helpersLive(in: $0) == 0 }
+    }
+
+    /// The code reviews of the pre-push hook: a header that folds them, their rows while it is open.
+    @ViewBuilder private var reviewsSection: some View {
+        Section {
+            if reviewsOpen {
+                ForEach(reviews) { thread in
+                    Button { path.append(thread) } label: { ThreadRow(thread: thread, helpers: store.helpersLive(in: thread)) }
+                        .buttonStyle(RowPressStyle())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparatorTint(Theme.hairline)
+                        .alignmentGuide(.listRowSeparatorLeading) { _ in 70 }
+                        .listRowInsets(EdgeInsets(top: 0, leading: Space.l, bottom: 0, trailing: Space.l))
+                }
+            }
+        } header: {
+            Button { reviewsOpen.toggle() } label: {
+                HStack(spacing: Space.xs) {
+                    SectionLabel(title: "Code reviews", count: reviews.count, tone: Theme.muted)
+                    DotIcon(reviewsOpen ? .chevronDown : .chevron, size: 12, relativeTo: .caption).foregroundStyle(Theme.faint)
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, Space.xs)
+            .accessibilityLabel("Code reviews, \(reviews.count)")
+            .accessibilityValue(reviewsOpen ? "Open" : "Folded")
+            .accessibilityIdentifier("code-reviews-header")
+        }
     }
 
     /// One group of chats: a small header with its count, then the rows, each with the mark-as-read swipe.
