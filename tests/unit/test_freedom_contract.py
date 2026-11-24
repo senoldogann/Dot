@@ -1009,7 +1009,8 @@ def _asking_sites() -> dict[tuple[str, str], int]:
 
 
 def _broker_importers() -> set[str]:
-    """The files of the source that import the approval broker's class, whatever name they give it."""
+    """The files of the source that import the approval broker's class by its name, under whatever name they give it
+    (one that reaches it through its module is for the review to find)."""
     source: Path = ROOT / "src" / "dotagent"
     found: set[str] = set()
     for path in sorted(source.rglob("*.py")):
