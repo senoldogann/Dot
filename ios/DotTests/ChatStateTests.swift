@@ -35,6 +35,17 @@ final class ChatStateTests: XCTestCase {
         XCTAssertEqual(state.items.map(\.id), ["u:run_1"])
     }
 
+    func testAnInteractivePageBecomesOneRowAndCannotSupplyItsOwnURL() {
+        var state: ChatState = started()
+        let id: String = "page_abcdefghijklmnopqrstuvwx"
+        let shown: EventRecord = event(1, "run_1", "page_shown", ["page_id": .string(id), "title": .string("Sales")])
+        state.apply(shown)
+        state.apply(shown)
+        state.apply(event(2, "run_1", "page_shown", ["page_id": .string("../api/status"), "title": .string("Invalid")]))
+        XCTAssertEqual(state.items.count, 2)
+        XCTAssertEqual(state.items.last?.kind, .shownPage(id: id, title: "Sales"))
+    }
+
     func testAToolStepIsOneLineThatCompletes() {
         var state: ChatState = started()
         state.apply(event(2, "run_1", "tool_call", ["call_id": .string("c1"), "tool": .string("shell"), "args": .object(["command": .string("swift test")])]))

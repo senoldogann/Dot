@@ -23,5 +23,6 @@ func text(of item: ChatItem) -> String? {
     case .note(let text, _): text
     case .tool(let row): row.line
     case .approval(let card): card.question ?? card.summary
+    case .shownPage(_, let title): title
     }
 }

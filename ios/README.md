@@ -432,4 +432,5 @@ both looks): `swift scripts/make_icon.swift Dot/Assets.xcassets/AppIcon.appicons
 
 The native conversation follows the daemon's shared appearance using the phone's own light or dark mode. The app
 remembers the last palette and artwork per daemon and checks for changes in the foreground. Describe a new look or
-ask Dot to adjust the current one in chat.
+ask Dot to adjust the current one in chat. Interactive pages shown by replies open from a native row in a Safari
+preview sheet. Dot's native API key is never added to the page's address.
