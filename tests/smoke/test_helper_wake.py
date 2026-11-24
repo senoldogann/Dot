@@ -23,6 +23,7 @@ from playwright.async_api import Browser, Page, async_playwright, expect
 
 from dotagent.agent.helper_reports import (
     HELPER_RELEASED_EVENT,
+    HELPER_RESUMED_EVENT,
     HELPER_SOURCE,
     DetachedHelper,
     keep_detached,
@@ -56,6 +57,7 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 # What the goal of every helper starts with: the model told apart by it plays the helper.
 _HELPER_GOAL: str = "HELPER-JOB"
 _NOTE_OPENING: str = "[system note] A helper that kept working in the background ended."
+_CUT_NOTE_OPENING: str = "[system note] A helper that kept working in the background did not fail: a restart of Dot cut"
 
 
 def _turn(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
@@ -170,6 +172,10 @@ async def _thread_text(runtime: Runtime, thread_id: str) -> str:
 async def _delegate_results(runtime: Runtime, run_id: str) -> list[str]:
     events: list[EventRecord] = await runtime.store.list_events(run_id, 0, 500)
     return [str(e.data["text"]) for e in events if e.kind == "tool_result" and e.data["tool"] == "delegate"]
+
+
+async def _has_runs(runtime: Runtime, thread_id: str, count: int) -> bool:
+    return len(await _runs_of_chat(runtime, thread_id)) >= count
 
 
 async def _settled(runtime: Runtime, manager: RunManager, thread_id: str) -> None:
@@ -379,7 +385,8 @@ async def test_a_report_not_told_when_the_daemon_stopped_is_told_when_it_starts_
     login_env: dict[str, str],
 ) -> None:
     """The run ended while its helper worked on; the daemon stopped (which ends the helper too) before the helper's end
-    was told. The report is kept, and the next start tells the chat, from the helper's record."""
+    was told. The report is kept, and the next start tells the chat, from the helper's record. With resuming off the
+    helper is not resumed (item 1668): the note says the restart cut it off, not that it failed, and why."""
     roles: _Roles = _Roles(
         main=[
             ScriptedTurn(text="", calls=(_delegate("long"),)),
@@ -398,14 +405,98 @@ async def test_a_report_not_told_when_the_daemon_stopped_is_told_when_it_starts_
         assert [one.helper_run_id for one in await kept_detached(runtime.store)] == [helper.id]
         assert len(await _runs_of_chat(runtime, parent.thread_id)) == 1
         again: RunManager = RunManager(runtime)
+        again.set_resume_mode("off")
         try:
             assert await again.tell_helper_reports() == 0
             runs: list[RunRecord] = await _runs_of_chat(runtime, parent.thread_id)
             assert [run.source for run in runs][1:] == [HELPER_SOURCE]
             assert (await _ended(again, runs[1].id)).status == "done"
             text: str = await _thread_text(runtime, parent.thread_id)
-            assert _NOTE_OPENING in text and f"Delegated run {helper.id}" in text and "ended as cancelled" in text
+            assert _CUT_NOTE_OPENING in text and f"Delegated run {helper.id}" in text and "ended as cancelled" in text
+            assert "resuming cut-off runs is off" in text
             assert await kept_detached(runtime.store) == []
+        finally:
+            await again.shutdown()
+
+
+async def test_a_helper_the_daemons_stop_cut_is_resumed_at_the_next_start_and_reports_when_it_really_ends(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1668: the daemon's stop cuts a helper that works in the background for a chat whose run ended done. The
+    next start resumes it as a helper of the same run, in its own chat, from the note of the cut; the parent's page
+    hears it goes on; the chat is told the resumed helper's report, which says a restart cut it and Dot resumed it."""
+    roles: _Roles = _Roles(
+        main=[
+            ScriptedTurn(text="", calls=(_delegate("long"),)),
+            _finish("Went on."),
+            _finish("Read the resumed report."),
+        ],
+        helpers=[_turn("shell", {"command": "sleep 60"}), _finish(_report("long"))],
+    )
+    async with _session(login_env, roles) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+        (helper,) = await _helpers_of(runtime, parent)
+        manager.steer(parent.id, "Stop waiting.", ())
+        assert (await _ended(manager, parent.id)).status == "done"
+        await manager.shutdown()
+        assert (await runtime.store.get_run(helper.id)).status == "cancelled"
+        again: RunManager = RunManager(runtime)
+        try:
+            assert await again.tell_helper_reports() == 0
+            [resumed] = [run for run in await _runs_of_chat(runtime, helper.thread_id) if run.id != helper.id]
+            assert (resumed.parent_run_id, resumed.source) == (parent.id, helper.source)
+            [moved] = await runtime.store.events_of_kind(parent.id, HELPER_RESUMED_EVENT, 5)
+            assert moved.data == {"run_id": resumed.id, "from_run_id": helper.id, "step": None}
+            assert [one.helper_run_id for one in await kept_detached(runtime.store)] == [resumed.id]
+            assert (await _ended(again, resumed.id)).status == "done"
+            assert (await runtime.store.events_of_kind(resumed.id, "resumed", 5))[0].data["cut_off"] == (
+                "daemon_shutdown"
+            )
+            await _until(
+                lambda: _has_runs(runtime, parent.thread_id, 2), "the chat was woken for the resumed helper's report"
+            )
+            runs: list[RunRecord] = await _runs_of_chat(runtime, parent.thread_id)
+            assert runs[1].source == HELPER_SOURCE
+            assert (await _ended(again, runs[1].id)).status == "done"
+            text: str = await _thread_text(runtime, parent.thread_id)
+            assert _NOTE_OPENING in text
+            assert f"A restart of Dot cut this helper off while it worked (run {helper.id})" in text
+            assert "Report of long: all good." in text and _CUT_NOTE_OPENING not in text
+            await _settled(runtime, again, parent.thread_id)
+        finally:
+            await again.shutdown()
+
+
+async def test_the_daemons_stop_keeps_the_helpers_of_a_run_it_cuts_and_the_next_start_resumes_them(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1668: the daemon's stop cuts a run that let a helper go on and is still at work. Its helper is not forgotten
+    as a stop of the owner's would (that run did not fail): the next start resumes it."""
+    roles: _Roles = _Roles(
+        main=[ScriptedTurn(text="", calls=(_delegate("long"),)), _turn("shell", {"command": "sleep 60"})],
+        helpers=[_turn("shell", {"command": "sleep 60"}), _finish(_report("long"))],
+    )
+    async with _session(login_env, roles) as (runtime, manager):
+        parent: RunRecord = await _start(manager)
+        (helper,) = await _helpers_of(runtime, parent)
+        manager.steer(parent.id, "Stop waiting.", ())
+
+        async def going_on() -> bool:
+            return (await runtime.store.get_run(parent.id)).steps >= 2
+
+        await _until(going_on, "the run went on")
+        await manager.shutdown()
+        ended: RunRecord = await runtime.store.get_run(parent.id)
+        cut: RunRecord = await runtime.store.get_run(helper.id)
+        assert (ended.status, cut.status) == ("cancelled", "cancelled")
+        assert cut.finished_at is not None and ended.finished_at is not None and cut.finished_at <= ended.finished_at
+        assert [one.helper_run_id for one in await kept_detached(runtime.store)] == [helper.id]
+        again: RunManager = RunManager(runtime)
+        try:
+            await again.tell_helper_reports()
+            [resumed] = [run for run in await _runs_of_chat(runtime, helper.thread_id) if run.id != helper.id]
+            assert resumed.parent_run_id == parent.id
+            assert (await _ended(again, resumed.id)).status == "done"
         finally:
             await again.shutdown()
 
@@ -426,6 +517,7 @@ async def test_a_chat_that_cannot_be_told_at_start_keeps_its_report_and_the_star
         assert (await _ended(manager, parent.id)).status == "done"
         await manager.shutdown()
         again: RunManager = RunManager(runtime)
+        again.set_resume_mode("off")
 
         async def refused(thread_id: str) -> None:
             raise ModelUnavailableError("the chat's model has no key", {"thread_id": thread_id})

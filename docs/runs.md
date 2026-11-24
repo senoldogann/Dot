@@ -989,8 +989,18 @@ for: it ends its turn, and the chat is woken when the helper ends, with no model
 meanwhile. A chat lets at most eight helpers work in the background. Stop is not changed: a Stop of the run stops
 its helpers too, those it still waited for and those it stopped waiting for, and their ends are stored before its own;
 what a stop ended is told to nobody. A run that ends done leaves its helpers at work; one that fails or is stopped stops them. The
-reports not yet told are kept in the store (the key `detached_helpers`): when the daemon stops, a helper ends with it
-as every run does, and the next start tells its chat what it reported, or that the stop cut it off. The line over the
+reports not yet told are kept in the store (the key `detached_helpers`): when the daemon stops or crashes, a helper
+ends with it as every run does (a run the daemon's stop cuts keeps the helpers it let go on, as it did not fail), and the
+next start resumes it (item 1668): a new helper run of the same parent in the helper's chat, with its goal and choices,
+whose first message is the resume note (how it was cut, the calls of its step and how each ended, its plan), and which
+is kept in the old one's place, so that the chat is told its report when it really ends. The parent's page gets a
+`helper_resumed` event (`run_id`, `from_run_id`, `step`), and the report the chat reads says a restart cut the helper off
+and Dot resumed it. A helper is not resumed when `[agent] resume` is `off`, when it was cut longer ago than
+`resume_within_s`, when another run went on in its chat, when it was itself resumed after a restart (no loop of
+restarts), or when a call that pays, sends or posts for you was cut while it ran (a second try could send twice): its
+chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the
+work again rather than taking it as a failed part. A helper the run still waited for when the daemon stopped ends with
+that run, whose own resume note names the cut `delegate` call. The line over the
 composer says "Waiting on N subagents" only while the run is blocked on them, "N subagents keep working in the
 background" once it was released, and nothing when none work; on a phone (item 1383) the same words are the first line
 of the sheet that the capsule's **N helpers** segment opens, which also names what each helper does now and has

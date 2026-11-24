@@ -40,9 +40,11 @@ from dotagent.agent.campaign import (
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.helper_reports import (
     HELPER_RELEASED_EVENT,
+    HELPER_RESUMED_EVENT,
     HELPER_SOURCE,
     MOST_DETACHED_PER_CHAT,
     DetachedHelper,
+    cut_report_note,
     forget_detached,
     keep_detached,
     kept_detached,
@@ -99,12 +101,15 @@ from dotagent.agent.reflection import reflect
 from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
     RESUME_SOURCE,
+    RESUMED_EVENT,
     HandOff,
     InterruptedCall,
     Resumption,
     can_resume,
+    cut_by_restart,
     cut_off_by,
     handoff_of,
+    helper_not_resumed,
     identities_of,
     interrupted_calls,
     resume_note,
@@ -573,6 +578,9 @@ class RunManager:
         # those that ended whose report no run has read yet, by chat (:meth:`_tell_helper_reports`).
         self._detached: dict[str, DetachedHelper] = {}
         self._untold: dict[str, list[DetachedHelper]] = {}
+        # Why each helper the daemon's own end cut off was not resumed at this start (item 1668), until its report is
+        # told, by helper run id.
+        self._not_resumed: dict[str, str] = {}
         self._followers: set[asyncio.Task[None]] = set()
         # The claims on queued messages the store refused to end (:meth:`_end_claim`), by chat, with the store's way to
         # end each: its message started (``Store.drop_claimed``) or could not (``Store.hold_claimed``).
@@ -1837,6 +1845,18 @@ class RunManager:
             *(handle.finished.wait() for one in stopped if (handle := self._handles.get(one.helper_run_id)) is not None)
         )
 
+    async def _wait_detached_of(self, parent_run_id: str) -> None:
+        """Wait until the helpers that ``parent_run_id`` let go on have ended, as the daemon's stop ends them
+        (:meth:`shutdown`), so that the end of the run is stored after theirs (item 197). They stay kept, in memory
+        and in the store: the daemon's next start resumes them, or tells why it did not (item 1668)."""
+        await asyncio.gather(
+            *(
+                handle.finished.wait()
+                for one in self._detached.values()
+                if one.parent_run_id == parent_run_id and (handle := self._handles.get(one.helper_run_id)) is not None
+            )
+        )
+
     def _top_run_on(self, thread_id: str) -> RunHandle | None:
         """The run at work in this process in the chat ``thread_id`` that the owner's chat is, not a helper's: the run
         a note for the chat goes to."""
@@ -1864,6 +1884,10 @@ class RunManager:
             return "working"
         tainted: bool = await self._ended_tainted(run.id)
         outcome: DelegateOutcome = DelegateOutcome(run=run, tainted=tainted)
+        if cut_by_restart(run):
+            # Cut by the daemon's own end and not resumed (item 1668): no failure of the helper's, and said so.
+            why_not: str = self._not_resumed.pop(run.id, "the daemon stopped before it could be")
+            return _HelperNote(cut_report_note(outcome, entry, why_not), tainted)
         return _HelperNote(late_report_note(outcome, entry), tainted)
 
     async def _hand_reports_to_new_run(self, thread_id: str, run_id: str) -> None:
@@ -2022,9 +2046,10 @@ class RunManager:
 
     async def tell_helper_reports(self) -> int:
         """For the daemon, when it starts (item 1351): tell the chats the reports of the helpers that worked on without
-        their run when the daemon last stopped. A helper still at work in a process that lives is left; one that ended
-        (the daemon's stop ended it as it ended its parent) is told from its record. Returns how many reports were
-        left to tell."""
+        their run when the daemon last stopped. A helper still at work in a process that lives is left. One that the
+        daemon's own end cut off (a crash, a stop or a restart) is resumed (item 1668, :meth:`_resume_helper`), and its
+        chat is told when the resumed helper ends; one that cannot be is told as cut off by the restart, with why, not
+        as a failure. Any other that ended is told from its record. Returns how many reports were left to tell."""
         store: Store = self._runtime.store
         kept: list[DetachedHelper] = await kept_detached(store)
         gone: list[str] = []
@@ -2039,6 +2064,11 @@ class RunManager:
                 continue
             if run.status in WORKING_STATUSES:
                 continue
+            if cut_by_restart(run):
+                why_not: str | None = await self._resume_helper(entry, run)
+                if why_not is None:
+                    continue
+                self._not_resumed[run.id] = why_not
             if all(one.helper_run_id != entry.helper_run_id for one in self._untold.get(entry.thread_id, [])):
                 self._untold.setdefault(entry.thread_id, []).append(entry)
             threads.add(entry.thread_id)
@@ -2052,6 +2082,76 @@ class RunManager:
             except DotError as exc:
                 log.warning("helper_reports_not_told_at_start", thread_id=thread_id, error=exc.message)
         return sum(len(entries) for entries in self._untold.values())
+
+    async def _resume_helper(self, entry: DetachedHelper, old: RunRecord) -> str | None:
+        """Resume the helper ``old``, which the daemon's own end cut off while it worked in the background for its chat
+        (item 1668), as a root run the end cut off is resumed (:meth:`_resume`): a new helper run in its chat, with its
+        goal, mode, model and choices, under the same parent, whose first message is the note that says how it was cut
+        and what its step's calls did. It is kept and followed in ``entry``'s place, so that its chat is told its
+        report when it ends, and the parent's page hears that it goes on (:data:`HELPER_RESUMED_EVENT`). Returns why it
+        was not resumed (:func:`~dotagent.agent.resume.helper_not_resumed`, or the error that refused it), ``None``
+        when it was."""
+        store: Store = self._runtime.store
+        cut: HandOff | None = cut_off_by(old)
+        if cut is None:
+            raise RunConflict("only a helper the daemon's end cut off is resumed", {"run_id": old.id})
+        try:
+            calls: tuple[InterruptedCall, ...] = await interrupted_calls(self._runtime, old)
+            why_not: str | None = helper_not_resumed(
+                old,
+                await self._newest_run_id(old.thread_id),
+                calls,
+                await store.last_event(old.id, RESUMED_EVENT) is not None,
+                self._resume_mode,
+                time.time(),
+                self._runtime.config.agent.resume_within_s,
+            )
+            if why_not is not None:
+                log.info("helper_not_resumed", run_id=old.id, thread_id=entry.thread_id, why=why_not)
+                return why_not
+            resumption: Resumption = await self._resumption(old, cut, calls, True)
+            run, handle = await self._launch(
+                old.goal,
+                old.mode,
+                old.model,
+                old.thread_id,
+                old.source,
+                entry.parent_run_id,
+                old.effort,
+                old.speed,
+                old.approvals,
+                old.goal_mode,
+                RunOpening(
+                    text=resume_note(old.goal, resumption),
+                    files=(),
+                    resumed=resumption,
+                    once=old.once,
+                    carried=(),
+                    picks=NO_PICKS,
+                ),
+                None,
+                old.agent_id,
+            )
+        except DotError as exc:
+            log.warning("helper_resume_failed", run_id=old.id, error=exc.message, context=exc.context)
+            return f"resuming it failed: {exc.message}"
+        resumed: DetachedHelper = entry.model_copy(update={"helper_run_id": run.id, "resumed_from": old.id})
+        self._detached[run.id] = resumed
+        await keep_detached(store, resumed)
+        await forget_detached(store, [old.id])
+        follower: asyncio.Task[None] = asyncio.create_task(
+            self._follow_helper(handle, resumed), name=f"follow-{run.id}"
+        )
+        self._followers.add(follower)
+        follower.add_done_callback(self._followers.discard)
+        await self._runtime.bus.emit(
+            entry.parent_run_id,
+            HELPER_RESUMED_EVENT,
+            {"run_id": run.id, "from_run_id": old.id, "step": entry.step},
+            True,
+        )
+        log.info("helper_resumed", run_id=run.id, from_run_id=old.id, parent_run_id=entry.parent_run_id, cut_off=cut)
+        return None
 
     def at_work_in(self, thread_id: str) -> bool:
         """Whether a run of this process is claimed for, or works in, the chat ``thread_id`` now, before its record
@@ -3624,20 +3724,27 @@ class RunManager:
         runtime: Runtime = self._runtime
         asked_level: Effort = level if opening.once is None else ONE_MESSAGE_LEVELS[opening.once]
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
+        # The run that delegated a helper a restart cut off, which the next start resumes after that run ended (item
+        # 1658, :meth:`_resume_helper`): the helper's gate takes what that run's had, read again from its record.
+        ended_parent: RunRecord | None = None
         if parent_run_id is not None and parent is None:
             # A helper takes its parent's taint, guards and where it keeps its steps from the parent's gate: one whose
             # parent has ended meanwhile would start with none of them (item 941), so it does not start.
             parent_record: RunRecord = await runtime.store.get_run(parent_run_id)
             # One whose end the store refused is ended too, though stored as at work (``_left_ends``, the review).
             if parent_record.status not in WORKING_STATUSES or parent_run_id in self._left_ends:
-                raise RunConflict(
-                    "the run that delegated it has ended",
-                    {"parent_run_id": parent_run_id, "status": parent_record.status},
-                )
+                if opening.resumed is None:
+                    raise RunConflict(
+                        "the run that delegated it has ended",
+                        {"parent_run_id": parent_run_id, "status": parent_record.status},
+                    )
+                ended_parent = parent_record
         # A goal that is not the owner's words is no instruction (:data:`_NOT_THE_OWNERS_WORDS`).
         own: tuple[str, ...] = () if source in _NOT_THE_OWNERS_WORDS else (goal,)
         instructions: tuple[str, ...] = (
-            await self._instructions_for(own, thread_id, parent_run_id, parent)
+            await self._instructions_before(ended_parent)
+            if ended_parent is not None
+            else await self._instructions_for(own, thread_id, parent_run_id, parent)
             if campaign_id is None
             else await self._session_instructions(goal, campaign_id)
         )
@@ -3712,20 +3819,30 @@ class RunManager:
                 },
                 True,
             )
+            # The chat and the source the marks below are read from: the run's own, or, for a resumed helper whose
+            # parent ended (item 1668), that parent's, as its gate read them when it started. A delegated run takes
+            # its parent's from the parent's gate.
+            marked_by: tuple[str, str] | None = (
+                (thread_id, source)
+                if parent_run_id is None
+                else None
+                if ended_parent is None
+                else (ended_parent.thread_id, ended_parent.source)
+            )
             # A chat Dot opened on its own initiative (item 850): its runs, the ones the owner's answers start there
             # among them, and their helpers ask the owner before a message, a post or a release, in every mode.
-            opener: str | None = None if parent_run_id is not None else await runtime.store.opened_by(thread_id)
+            opener: str | None = None if marked_by is None else await runtime.store.opened_by(marked_by[0])
             owners_word: bool = (
                 (parent is not None and parent.gate.owners_word)
-                if parent_run_id is not None
-                else source == INITIATIVE_SOURCE or opener == INITIATIVE_SOURCE
+                if marked_by is None
+                else marked_by[1] == INITIATIVE_SOURCE or opener == INITIATIVE_SOURCE
             )
             # A chat the owner opened (item 860): in yolo its payments, messages and posts are theirs, whatever started
             # the run there (a schedule a run of the chat made goes on in it: the third pre-push review of item 860). A
             # chat of a schedule, a watcher or Dot's own is not. A delegated run takes its parent's.
             owners_chat: bool = (
                 (parent is not None and parent.gate.owners_chat)
-                if parent_run_id is not None
+                if marked_by is None
                 else not owners_word and opener not in _NOBODY_WATCHES
             )
             # Whether the owner is there to answer (item 860): a run of theirs is; one a schedule, a watcher or a notice
@@ -3733,8 +3850,8 @@ class RunManager:
             # "e-posta … legal ise, tehlike arz etmiyorsa ve bir amaç içinse yollasın; ajanın niyeti önemli").
             owner_there: bool = (
                 (parent is not None and parent.gate.owner_there)
-                if parent_run_id is not None
-                else source not in _NOBODY_WATCHES
+                if marked_by is None
+                else marked_by[1] not in _NOBODY_WATCHES
             )
             gate: RunGate = RunGate(
                 runtime.store,
@@ -3760,9 +3877,7 @@ class RunManager:
                 owners_chat=owners_chat,
                 owner_there=owner_there,
                 # The chat whose "don't ask again" answers its questions (item 866): a delegated run's parent's.
-                chat_id=(parent.gate.chat_id if parent is not None else None)
-                if parent_run_id is not None
-                else thread_id,
+                chat_id=(parent.gate.chat_id if parent is not None else None) if marked_by is None else marked_by[0],
             )
             if starts_tainted:
                 gate.taint()
@@ -3862,6 +3977,19 @@ class RunManager:
             if record.parent_run_id is None and record.source not in _NOT_THE_OWNERS_WORDS
         ]
         return (*earlier, *own)
+
+    async def _instructions_before(self, parent: RunRecord) -> tuple[str, ...]:
+        """What the owner had told the run ``parent`` when it started, read again from its chat
+        (:meth:`_instructions_for` as it was then): the goals of the chat's runs up to it that are the owner's words.
+        For a helper resumed after that run ended (item 1668), which takes them as its parent's gate held them."""
+        recent: list[RunRecord] = await self._runtime.store.list_runs(_THREAD_INSTRUCTION_RUNS, parent.thread_id)
+        return tuple(
+            record.goal
+            for record in reversed(recent)
+            if record.parent_run_id is None
+            and record.source not in _NOT_THE_OWNERS_WORDS
+            and record.created_at <= parent.created_at
+        )
 
     async def _session_instructions(self, goal: str, campaign_id: str) -> tuple[str, ...]:
         """What the owner has told a session of a campaign that is about to start: the goals of the runs in the
@@ -4025,8 +4153,9 @@ class RunManager:
             inbox.shutdown()
             if status != "done" and any(one.parent_run_id == run.id for one in self._detached.values()):
                 # Before its own end is stored (item 197): the helpers it stopped waiting for end first. A stop that
-                # comes meanwhile is dropped (:func:`_to_its_end`): the end below must still be recorded.
-                await _to_its_end(self._stop_detached_of(run.id))
+                # comes meanwhile is dropped (:func:`_to_its_end`): the end below must still be recorded. The daemon's
+                # own stop cuts them too, but keeps them: the next start resumes them (item 1668).
+                await _to_its_end(self._wait_detached_of(run.id) if self._stopping else self._stop_detached_of(run.id))
             recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         learns: bool = recorded and not self._stopping and not self._learning_dropped

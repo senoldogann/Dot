@@ -25,6 +25,7 @@ from dotagent.agent.continuity import named_ids
 from dotagent.agent.plan import PlanPayload, plan_lines
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.verify import new_facts
+from dotagent.config import ResumeMode
 from dotagent.core.errors import DotError, PolicyDenied, StoreError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
@@ -166,6 +167,53 @@ def handoff_of(run: RunRecord) -> HandOff | None:
         return "blocked"
     if run.status == "failed":
         return "failed"
+    return None
+
+
+# The cuts of a run that the daemon's own end made: a crash, or a stop or restart of the daemon. A helper cut so is
+# resumed when the daemon starts again (:func:`helper_not_resumed`).
+RESTART_CUTS: frozenset[CutOff] = frozenset({"daemon_restarted", "daemon_shutdown"})
+# The flags of an action that pays, sends a message or mail for the owner or posts in their name: the policy's class of
+# what even yolo keeps for the owner (``dotagent.policy.engine.owners_guard``; a test holds the two equal). A call of
+# one that was cut while it ran may have been done, and a resumed run could do it a second time.
+OUTWARD_FLAGS: frozenset[Flag] = frozenset({"financial", "message_send", "public_post"})
+
+
+def cut_by_restart(run: RunRecord) -> bool:
+    """Whether ``run`` ended because the daemon itself ended: it crashed, or it was stopped or restarted."""
+    cut: CutOff | None = cut_off_by(run)
+    return cut is not None and cut in RESTART_CUTS
+
+
+def helper_not_resumed(
+    run: RunRecord,
+    newest_run_id: str | None,
+    calls: Sequence[InterruptedCall],
+    resumed_before: bool,
+    mode: ResumeMode,
+    now: float,
+    within_s: float,
+) -> str | None:
+    """Why the helper ``run``, which the daemon's own end cut off (:func:`cut_by_restart`) while it worked in the
+    background for its chat, is not resumed when the daemon starts again; ``None`` when it is. It is not when resuming
+    is off (``[agent] resume``), when it ended longer ago than ``[agent] resume_within_s`` (``within_s``), when another
+    run went on in its chat since, when it was itself a resumption (a helper that brings Dot down is not resumed again
+    and again, as a root run is not, :func:`resumes_on_start`), or when a call of an outward action (it pays, sends or
+    posts for the owner) was cut while it ran: done or not, a second try could send twice. A call of any other kind that
+    was cut is told in the note, which says to check what it may have changed."""
+    if mode == "off":
+        return "resuming cut-off runs is off ([agent] resume)"
+    if run.finished_at is None or now - run.finished_at > within_s:
+        return "it was cut off longer ago than [agent] resume_within_s"
+    if run.id != newest_run_id:
+        return "another run went on in its chat"
+    if resumed_before:
+        return "it was itself resumed after a restart, and is not resumed twice"
+    sent: list[str] = [call.tool for call in calls if call.end == "cut_off" and OUTWARD_FLAGS & set(call.flags)]
+    if sent:
+        return (
+            f"a call that pays, sends or posts was cut while it ran ({', '.join(sent)}): a second try could send twice"
+        )
     return None
 
 
