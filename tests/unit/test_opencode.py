@@ -52,6 +52,7 @@ from dotagent.opencode.server import (
 )
 from dotagent.policy.sandbox import confined_server
 from dotagent.policy.types import ActionInfo
+from dotagent.store.models import RunRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.delegate import build_delegate_tools
@@ -303,19 +304,51 @@ def _registry() -> ToolRegistry:
     )
 
 
+_TASK_RUN: RunRecord = RunRecord(
+    id="run_zen",
+    thread_id="thread_zen",
+    goal="Look into it",
+    mode="task",
+    model="opencode:big-pickle",
+    status="running",
+    created_at=1.0,
+    finished_at=None,
+    result="",
+    steps=0,
+    input_tokens=0,
+    output_tokens=0,
+    parent_run_id=None,
+    source="ui",
+    effort=None,
+    speed="standard",
+    once=None,
+    approvals="yolo",
+    goal_mode=False,
+    campaign_id=None,
+    agent_id=None,
+    rewindable=True,
+)
+
+
 def test_the_agent_gets_dots_tools_for_what_opencode_has_none_of() -> None:
-    names: set[str] = set(bridged_tools(_registry(), "task", None).tools)
+    names: set[str] = set(bridged_tools(_registry(), _TASK_RUN, None).tools)
     assert {"browser_open", "browser_act", "memory_save", "memory_search", "memory_forget", "schedule_create"} <= names
-    assert {"ask_user", "notify"} <= names
-    # OpenCode's agent has its own for files, commands and the web; the plan, finish, tool groups and helpers are Dot's
-    # loop's.
-    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search", "terminal_send", "finish"}
-    assert not names & (left_out | {"update_plan", "use_tools", "delegate"})
+    assert {"ask_user", "notify", "delegate", "terminal_send"} <= names
+    # OpenCode's agent has its own for files, commands and the web; the run ends with its last answer, not finish; the
+    # plan and the tool groups are Dot's loop's.
+    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search", "finish"}
+    assert not names & (left_out | {"update_plan", "use_tools"})
+
+
+def test_a_delegated_run_gets_none_of_what_a_delegated_run_may_not_use() -> None:
+    delegated: RunRecord = _TASK_RUN.model_copy(update={"parent_run_id": "run_parent"})
+    names: set[str] = set(bridged_tools(_registry(), delegated, None).tools)
+    assert "browser_open" in names and not names & {"ask_user", "delegate"}
 
 
 def test_an_agent_bounded_to_some_tools_gives_only_those() -> None:
     bounded: frozenset[str] = frozenset({"browser_open", "finish", "ask_user", "read_file"})
-    assert set(bridged_tools(_registry(), "task", bounded).tools) == {"browser_open", "ask_user"}
+    assert set(bridged_tools(_registry(), _TASK_RUN, bounded).tools) == {"browser_open", "ask_user"}
 
 
 def _decided(tool: str, rules: list[JsonValue]) -> str:
