@@ -25,7 +25,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `Coalescer`, `BackgroundGrace`.
   - `Features/`: the screens: `ChatListView`, `ChatView` with `Composer`, `Dock` (the capsule over the composer and the queue's sheet; `Core/DockSummary` says what it holds),
     `RunInspector`, `SettingsViews` (models, schedules), `PairView`, `NewChatView`, `ModelPicker`, and the design system
-    (`Theme`, `Chrome`, `ToolGlyph`, `DesignGallery` in debug builds); `Shared/DotPalette.swift` is its colour tokens.
+    (`Theme`, `Chrome`, `DotIcon`, `ToolGlyph`, `DesignGallery` in debug builds); `Shared/DotPalette.swift` is its colour tokens.
   - `Adapters/` the Keychain, UserDefaults and the push/share HTTP client; `Push/` the token registration;
     `Views/` the address screen and the web UI fallback (`DotWebView`).
 - `DotTests/`: the unit tests (XCTest) of the reducer, the SSE parser and feed, the cache, the queue order, the link
@@ -256,6 +256,17 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
   approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
   folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).
+- **Icons** (item 1461): the web app's own set, Lucide, drawn as templates (`DotIcon(.bot, size: 16)`, which takes the colour
+  of the text round it and grows with Dynamic Type, and `Label(_:icon:)`/`Label(_:menuIcon:)`). `Core/IconName.swift` is the
+  list, one case a line: a screen can only draw a case, so a name the catalog lacks does not compile. The images are
+  `Dot/Resources/Icons.xcassets/<name>.imageset/<name>.svg` (single scale, vectors kept, template rendering), written by
+  `uv run python scripts/export_ios_icons.py` from `src/dotagent/server/static/js/icons.js` with the frame and stroke the web
+  page draws them with (item 849), and from the few Lucide shapes the script keeps for what the web app does not draw yet (the
+  bot, the chip, the wifi that is off: `EXTRA`, which the test empties of any icon the web app gains). The web app's icons
+  change and the phone's set must follow: `tests/unit/test_ios_icons.py` fails until the script was run, and `IconTests`
+  draws every icon through the system's renderer and checks it takes the colour it is given. The Lucide licence ships in the
+  app (`Resources/Licences/LICENSE-Lucide.txt`, a copy of the web app's file the script keeps current) and reads in Settings ›
+  About › Licences. SF Symbols stay only where the system's own meaning matters: the actions of a notification.
 - **Debug-only aids**: `-DotGallery 1|2|3|4` shows the pieces on one screen with made-up data (a step that asks, a
   secret, a failed step, the buttons, the empty states), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
   look an iOS 18 phone gets, on an iOS 26 simulator.
@@ -304,7 +315,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) and `-DotSettingsPage <models|schedules|licences|appearance>` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the

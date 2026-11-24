@@ -77,7 +77,7 @@ struct ModelPickerView: View {
             if let detail { Text(detail).font(Theme.meta).foregroundStyle(Theme.faint) }
             Spacer()
             if selected {
-                Image(systemName: "checkmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent)
+                DotIcon(.check, size: 16, relativeTo: .footnote).foregroundStyle(Theme.accent)
                     .transition(.scale.combined(with: .opacity))
             }
         }

@@ -39,7 +39,7 @@ struct ChatView: View {
             VStack(spacing: Space.s) {
                 if let notice: String = model.notice {
                     Button { model.clearNotice() } label: {
-                        Label(notice, systemImage: "info.circle")
+                        Label(notice, icon: .info)
                             .font(Theme.meta).foregroundStyle(Theme.warn)
                             .padding(.horizontal, Space.m).frame(minHeight: 32)
                     }
@@ -59,7 +59,7 @@ struct ChatView: View {
         .dotSubtitle(subtitle, tone: subtitleTone)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showsInspector = true } label: { Image(systemName: "info.circle") }
+                Button { showsInspector = true } label: { DotIcon(.info, size: 20) }
                     .accessibilityLabel("Run details")
             }
         }
@@ -117,7 +117,7 @@ struct ChatView: View {
             HStack(spacing: Space.s) {
                 DockCapsule(summary: summary, onOpen: openDock)
                 if !atBottom {
-                    GlassCircleButton(symbol: "arrow.down", label: "Jump to the newest message") {
+                    GlassCircleButton(icon: .arrowDown, label: "Jump to the newest message") {
                         atBottom = true
                         jump += 1
                     }
@@ -192,7 +192,7 @@ private struct Transcript: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if model.state.items.isEmpty && model.pending.isEmpty && model.loaded {
                         DotEmptyState(
-                            symbol: "text.bubble", title: "No messages yet",
+                            icon: .message, title: "No messages yet",
                             message: "Say what you want done. Dot works on it and asks you only when it must.")
                             .padding(.top, Space.xxl)
                     }
@@ -338,7 +338,7 @@ private struct PendingRow: View {
 }
 
 /// The composer, one floating bar of glass: + (a photo), the text, the microphone (dictation on the phone), and a
-/// button that is Send, or Queue while a run works, or Stop with an empty box. The button changes by morphing its symbol.
+/// button that is Send, or Queue while a run works, or Stop with an empty box. The button changes by swapping its mark.
 struct Composer: View {
     @Bindable var model: ChatModel
     @State private var picks: [PhotosPickerItem] = []
@@ -362,7 +362,7 @@ struct Composer: View {
             }
             HStack(alignment: .bottom, spacing: 2) {
                 PhotosPicker(selection: $picks, maxSelectionCount: 4, matching: .images) {
-                    Image(systemName: "plus").font(.system(size: 17, weight: .medium)).foregroundStyle(Theme.muted)
+                    DotIcon(.plus, size: 20).foregroundStyle(Theme.muted)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -403,7 +403,7 @@ struct Composer: View {
         waitingOnYou ? "Answer above, or queue a note" : (model.isWorking ? "Queue a message" : "Message Dot")
     }
 
-    /// One round button for all three: the arrow, the queue mark, the stop square. Its symbol is replaced in place.
+    /// One round button for all three: the arrow, the queue mark, the stop square. Its mark is replaced in place.
     private var actionButton: some View {
         Button {
             if showsStop {
@@ -414,11 +414,19 @@ struct Composer: View {
                 model.send()
             }
         } label: {
-            Image(systemName: showsStop ? "stop.fill" : (model.isWorking ? "text.append" : "arrow.up"))
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(showsStop ? (waitingOnYou ? Theme.text : Theme.background) : (model.canSend ? Theme.onAccent : Theme.muted))
-                .contentTransition(.symbolEffect(.replace))
-                .frame(width: 36, height: 36)
+            ZStack {
+                if showsStop {
+                    // The stop mark is a plain square: an outline would not read as Stop on the round button.
+                    RoundedRectangle(cornerRadius: 3).frame(width: 13, height: 13)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                } else {
+                    DotIcon(model.isWorking ? .listPlus : .arrowUp, size: 19)
+                        .id(model.isWorking)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                }
+            }
+            .foregroundStyle(showsStop ? (waitingOnYou ? Theme.text : Theme.background) : (model.canSend ? Theme.onAccent : Theme.muted))
+            .frame(width: 36, height: 36)
                 .background {
                     // The white disc of Stop is the loudest thing on the screen: while the run waits on a decision it is a
                     // quiet tonal one, so that the card is.
@@ -436,6 +444,7 @@ struct Composer: View {
         .accessibilityIdentifier(showsStop ? "stop" : "send")
         .accessibilityLabel(showsStop ? "Stop" : (model.isWorking ? "Queue" : "Send"))
         .dotAnimation(Motion.snappy, value: showsStop)
+        .dotAnimation(Motion.snappy, value: model.isWorking)
         .dotAnimation(Motion.snappy, value: model.canSend)
     }
 }
@@ -454,7 +463,7 @@ private struct OlderRow: View {
                 Button { model.loadOlder() } label: {
                     Label(
                         model.olderFailed ? "Could not read older messages. Tap to try again." : "Load older messages",
-                        systemImage: model.olderFailed ? "exclamationmark.circle" : "arrow.up.to.line")
+                        icon: model.olderFailed ? .circleAlert : .arrowUpToLine)
                         .font(Theme.meta).foregroundStyle(model.olderFailed ? Theme.warn : Theme.muted)
                         .padding(.horizontal, Space.m).frame(minHeight: 32)
                         .background(Theme.surface, in: Capsule())
@@ -509,23 +518,23 @@ private struct MessageMenu: ViewModifier {
     func body(content: Content) -> some View {
         if let words: String = MessageActions.copyText(of: item) {
             content.contextMenu {
-                Button { UIPasteboard.general.string = words } label: { Label("Copy", systemImage: "doc.on.doc") }
-                Button { onSelect(words) } label: { Label("Select text", systemImage: "text.cursor") }
+                Button { UIPasteboard.general.string = words } label: { Label("Copy", menuIcon: .copy) }
+                Button { onSelect(words) } label: { Label("Select text", menuIcon: .textCursor) }
                 if MessageActions.reactionTarget(of: item) != nil {
                     Menu {
                         ForEach(Reaction.all) { reaction in
                             Button { model.toggleReaction(reaction.id, on: item) } label: {
                                 if standing.contains(reaction.id) {
-                                    Label("\(reaction.symbol) \(reaction.label)", systemImage: "checkmark")
+                                    Label("\(reaction.symbol) \(reaction.label)", menuIcon: .check)
                                 } else {
                                     Text("\(reaction.symbol) \(reaction.label)")
                                 }
                             }
                         }
-                    } label: { Label("React", systemImage: "face.smiling") }
+                    } label: { Label("React", menuIcon: .smilePlus) }
                 }
                 if MessageActions.rewindTarget(of: item, chatIsWorking: model.isWorking) != nil {
-                    Button { onEdit(item) } label: { Label("Edit from here", systemImage: "pencil") }
+                    Button { onEdit(item) } label: { Label("Edit from here", menuIcon: .pencil) }
                 }
             }
         } else {
@@ -566,8 +575,7 @@ private struct ToolDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.l) {
                     HStack(spacing: Space.m) {
-                        Image(systemName: ToolGlyph.symbol(for: row.tool))
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(tone)
+                        DotIcon(ToolGlyph.icon(for: row.tool), size: 17).foregroundStyle(tone)
                             .frame(width: 36, height: 36)
                             .background(tone.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 1) {
@@ -594,7 +602,7 @@ private struct ToolDetailSheet: View {
                         }
                     } else if failed {
                         DotEmptyState(
-                            symbol: "wifi.exclamationmark", title: "Dot could not be reached",
+                            icon: .wifiOff, title: "Dot could not be reached",
                             message: "The step's detail is read from your Mac.", tone: Theme.warn, actionTitle: "Try again",
                             action: { Task { await load() } })
                     } else {

@@ -29,8 +29,7 @@ struct ConnectionBannerView: View {
     private func bar(_ banner: ConnectionBanner) -> some View {
         let refused: Bool = banner.kind == .unauthorized
         return HStack(spacing: Space.s) {
-            Image(systemName: icon(banner.kind)).font(.system(size: 12, weight: .semibold))
-                .symbolEffect(.pulse, options: .repeating, isActive: banner.kind == .reconnecting)
+            DotIcon(icon(banner.kind), size: 14, pulse: banner.kind == .reconnecting, relativeTo: .caption)
             Text(banner.text).font(Theme.meta.weight(.medium)).lineLimit(1).minimumScaleFactor(0.85)
         }
         .foregroundStyle(refused ? Theme.warn : Theme.text)
@@ -42,11 +41,11 @@ struct ConnectionBannerView: View {
         .accessibilityIdentifier("connection-banner")
     }
 
-    private func icon(_ kind: ConnectionBanner.Kind) -> String {
+    private func icon(_ kind: ConnectionBanner.Kind) -> IconName {
         switch kind {
-        case .offline: "wifi.slash"
-        case .reconnecting: "arrow.triangle.2.circlepath"
-        case .unauthorized: "key"
+        case .offline: .wifiOff
+        case .reconnecting: .refresh
+        case .unauthorized: .key
         }
     }
 }

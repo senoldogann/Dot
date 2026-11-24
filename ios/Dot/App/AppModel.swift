@@ -28,6 +28,8 @@ final class AppModel {
     var debugOpenChat: String?
     var debugInspector: Bool = false
     var debugSchedules: Bool = false
+    /// A page of Settings to open at launch (`models`, `schedules`, `licences`, `appearance`): debug builds only.
+    var debugSettingsPage: String?
     /// Debug builds only: `-DotShowInbox 1` opens the inbox of what waits on the owner at launch (item 1442).
     var debugInbox: Bool = false
     /// Debug builds only: `-DotOpenURL dotagent://run/<id>` opens a link at launch, as a Live Activity's tap does.
@@ -55,6 +57,7 @@ final class AppModel {
             self.devKey = args.string(forKey: "DotDevKey").flatMap { $0.isEmpty ? nil : $0 }
         }
         self.debugSchedules = args.bool(forKey: "DotShowSchedules")
+        self.debugSettingsPage = args.string(forKey: "DotSettingsPage")
         self.debugInbox = args.bool(forKey: "DotShowInbox")
         self.debugOpenChat = args.string(forKey: "DotOpenChat")
         self.debugInspector = args.bool(forKey: "DotShowInspector")

@@ -4,11 +4,11 @@ import SwiftUI
 struct NoticeCard: View {
     let words: String
     var tone: Color = Theme.bad
-    var symbol: String = "exclamationmark.triangle.fill"
+    var icon: IconName = .alert
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s) {
-            Image(systemName: symbol).font(.system(size: 13, weight: .semibold)).foregroundStyle(tone).padding(.top, 2)
+            DotIcon(icon, size: 15, relativeTo: .footnote).foregroundStyle(tone).padding(.top, 2)
             Text(words).font(Theme.small).foregroundStyle(Theme.text)
             Spacer(minLength: 0)
         }
@@ -36,12 +36,12 @@ struct NativeSettingsView: View {
                     macCard
                     CardGroup(title: "Dot") {
                         NavigationLink(value: "models") {
-                            CardRow(symbol: "cpu", title: "Models", detail: "The main and the review model", showsChevron: true)
+                            CardRow(icon: .cpu, title: "Models", detail: "The main and the review model", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         CardDivider()
                         NavigationLink(value: "schedules") {
-                            CardRow(symbol: "clock.arrow.circlepath", tint: Theme.accentFill, title: "Schedules", detail: "What Dot does on its own, and when", showsChevron: true)
+                            CardRow(icon: .history, tint: Theme.accentFill, title: "Schedules", detail: "What Dot does on its own, and when", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -52,13 +52,13 @@ struct NativeSettingsView: View {
                             if let url: URL = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                         } label: {
                             CardRow(
-                                symbol: "bell.badge.fill", tint: Color(red: 0.9, green: 0.32, blue: 0.3), title: "iPhone notification settings",
+                                icon: .bell, tint: Color(red: 0.9, green: 0.32, blue: 0.3), title: "iPhone notification settings",
                                 detail: "Banners, sounds and the badge", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         CardDivider()
                         Button { changingAddress = true } label: {
-                            CardRow(symbol: "network", tint: Color(red: 0.2, green: 0.6, blue: 0.62), title: "Change address", showsChevron: true)
+                            CardRow(icon: .network, tint: Color(red: 0.2, green: 0.6, blue: 0.62), title: "Change address", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         CardDivider()
@@ -66,7 +66,7 @@ struct NativeSettingsView: View {
                             model.forgetKey()
                             dismiss()
                         } label: {
-                            CardRow(symbol: "key.slash.fill", tint: Theme.bad, title: "Forget this phone's key")
+                            CardRow(icon: .key, tint: Theme.bad, title: "Forget this phone's key")
                         }
                         .buttonStyle(.plain)
                     }
@@ -77,9 +77,16 @@ struct NativeSettingsView: View {
                             dismiss()
                             model.showsWeb = true
                         } label: {
-                            CardRow(symbol: "safari.fill", tint: Color(red: 0.35, green: 0.4, blue: 0.9), title: "Open web UI", showsChevron: true)
+                            CardRow(icon: .globe, tint: Color(red: 0.35, green: 0.4, blue: 0.9), title: "Open web UI", showsChevron: true)
                         }
                         .buttonStyle(.plain)
+                    }
+                    CardGroup(title: "About") {
+                        NavigationLink(value: "licences") {
+                            CardRow(icon: .shieldCheck, tint: Theme.muted, title: "Licences", detail: "What the app's icons are drawn from", showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("licences")
                     }
                 }
                 .padding(Space.l)
@@ -88,9 +95,15 @@ struct NativeSettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { page in
-                if page == "models" { ModelsView(store: store) } else { SchedulesView(store: store) }
+                switch page {
+                case "models": ModelsView(store: store)
+                case "licences": LicencesView()
+                default: SchedulesView(store: store)
+                }
             }
-            .onAppear { if model.debugSchedules { path = ["schedules"] } }
+            .onAppear {
+                if model.debugSchedules { path = ["schedules"] } else if let page: String = model.debugSettingsPage { path = [page] }
+            }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $changingAddress) {
                 AddressView(model: model, onSaved: { changingAddress = false; dismiss() }).dotSheet()
@@ -102,14 +115,13 @@ struct NativeSettingsView: View {
     private var macCard: some View {
         let layout: AnyLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.m)) : AnyLayout(HStackLayout(spacing: Space.m))
         return layout {
-            Image(systemName: "macbook.gen2")
-                .font(.system(size: 22, weight: .regular))
+            DotIcon(.laptop, size: 24, relativeTo: .title3)
                 .foregroundStyle(connectionTone)
                 .frame(width: 52, height: 52)
                 .background(connectionTone.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.m))
             VStack(alignment: .leading, spacing: 3) {
                 Text(store.host.name).font(.headline).foregroundStyle(Theme.text).lineLimit(1).truncationMode(.middle)
-                StatusPill(text: connectionWords, symbol: connectionSymbol, tone: connectionTone, pulse: store.connection == .connecting || store.connection == .reconnecting)
+                StatusPill(text: connectionWords, icon: connectionIcon, tone: connectionTone, pulse: store.connection == .connecting || store.connection == .reconnecting)
             }
             if !typeSize.isAccessibilitySize { Spacer() }
         }
@@ -127,11 +139,11 @@ struct NativeSettingsView: View {
         }
     }
 
-    private var connectionSymbol: String {
+    private var connectionIcon: IconName {
         switch store.connection {
-        case .live: "checkmark.circle.fill"
-        case .connecting, .reconnecting: "arrow.triangle.2.circlepath"
-        case .unauthorized: "key.fill"
+        case .live: .circleCheck
+        case .connecting, .reconnecting: .refresh
+        case .unauthorized: .key
         }
     }
 
@@ -157,11 +169,11 @@ struct ModelsView: View {
             VStack(alignment: .leading, spacing: Space.xl) {
                 if let failure { NoticeCard(words: failure) }
                 CardGroup(footer: "The main model answers new messages. The review model checks runs and draws lessons.") {
-                    picker("Main model", symbol: "sparkles", current: store.models?.main) { ref in
+                    picker("Main model", icon: .sparkles, current: store.models?.main) { ref in
                         try await store.api.chooseMain(model: ref)
                     }
                     CardDivider()
-                    picker("Review model", symbol: "checkmark.seal", current: store.models?.review) { ref in
+                    picker("Review model", icon: .badgeCheck, current: store.models?.review) { ref in
                         try await store.api.chooseRole("review", model: ref)
                     }
                 }
@@ -179,11 +191,11 @@ struct ModelsView: View {
         }
     }
 
-    private func picker(_ title: String, symbol: String, current: String?, choose: @escaping (String) async throws -> Void) -> some View {
+    private func picker(_ title: String, icon: IconName, current: String?, choose: @escaping (String) async throws -> Void) -> some View {
         NavigationLink {
             ModelChoiceList(title: title, providers: providers, current: current, choose: choose, reload: { await store.loadModels() })
         } label: {
-            CardRow(symbol: symbol, title: title, showsChevron: true) {
+            CardRow(icon: icon, title: title, showsChevron: true) {
                 Text(label(of: current)).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(1)
             }
         }
@@ -227,9 +239,9 @@ struct ModelChoiceList: View {
                                     }
                                 }
                             } label: {
-                                CardRow(symbol: nil, title: option.label) {
+                                CardRow(icon: nil, title: option.label) {
                                     if option.ref == (chosen ?? current) {
-                                        Image(systemName: "checkmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.accent)
+                                        DotIcon(.check, size: 16, relativeTo: .footnote).foregroundStyle(Theme.accent)
                                     }
                                 }
                             }
@@ -260,7 +272,7 @@ struct SchedulesView: View {
                 if let failure { NoticeCard(words: failure) }
                 if schedules.isEmpty && !loading {
                     DotEmptyState(
-                        symbol: "calendar.badge.clock", title: "No schedules",
+                        icon: .calendarClock, title: "No schedules",
                         message: "What Dot does on its own, at a time or on a loop, shows here with a switch each.")
                         .padding(.top, Space.xxl)
                 } else {
@@ -301,5 +313,55 @@ struct SchedulesView: View {
             do { _ = try await store.api.setSchedule(id, on: on) } catch { failure = "Could not switch the schedule." }
             await load()
         }
+    }
+}
+
+/// The licences of what the app is made from (Settings › About › Licences): the icons are Lucide's, the shapes the web app draws,
+/// under the ISC licence, and those Lucide took from Feather under Feather's MIT licence. The text is the web app's own file
+/// (`static/js/LICENSE-Lucide.txt`), copied into the app by `scripts/export_ios_icons.py`.
+struct LicencesView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.xl) {
+                CardGroup(footer: "Dot's icons are drawn from Lucide, as the web app's are.") {
+                    NavigationLink {
+                        LicenceTextView(title: "Lucide", resource: "LICENSE-Lucide")
+                    } label: {
+                        CardRow(icon: .shieldCheck, tint: Theme.muted, title: "Lucide", detail: "Icons · ISC licence", showsChevron: true)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("licence-lucide")
+                }
+            }
+            .padding(Space.l)
+        }
+        .dotScreenBackground(inSheet: true)
+        .navigationTitle("Licences")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// A licence's text, as the file carries it, to read and to select.
+struct LicenceTextView: View {
+    let title: String
+    let resource: String
+
+    var body: some View {
+        ScrollView {
+            Text(text)
+                .font(Theme.mono).foregroundStyle(Theme.text).textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Space.l)
+        }
+        .dotScreenBackground(inSheet: true)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var text: String {
+        guard let url: URL = Bundle.main.url(forResource: resource, withExtension: "txt"),
+            let words: String = try? String(contentsOf: url, encoding: .utf8)
+        else { return "The licence text is missing from this build." }
+        return words
     }
 }
