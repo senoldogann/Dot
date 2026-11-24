@@ -1,12 +1,15 @@
 """A model box of Settings › Models (item 1044): it opens the composer's model menu, the favourites and the providers on
 a rail, the models of the provider pressed. The browser tests read and choose through it, as a reader does."""
 
+import re
+
 from playwright.async_api import Locator, Page, expect
 
 
 def model_box(page: Page, label: str) -> Locator:
-    """The box of the role `label` ("Fast model"), whose name says the model chosen after the role's."""
-    return page.get_by_role("button", name=f"{label}:")
+    """The box of the role `label` ("Fast model"), whose name says the model chosen after the role's. The name starts
+    with the label, so that "Review model" is not also "Code review model"."""
+    return page.get_by_role("button", name=re.compile(rf"^{re.escape(label)}: "))
 
 
 def open_menu(page: Page) -> Locator:
