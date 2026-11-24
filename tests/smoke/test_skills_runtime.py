@@ -94,7 +94,7 @@ def _build_home(root: Path) -> Path:
     _write(root / "config.toml", f'[models]\nmain = "ollama:{MODEL}"\n')
     _write(root / "skills" / "release-notes" / "SKILL.md", RELEASE_NOTES)
     _write(root / "skills" / "release-notes" / "scripts" / "collect.sh", "#!/bin/sh\necho collected\n")
-    _write(root / "skills" / "broken" / "SKILL.md", "# No frontmatter here\n")
+    _write(root / "skills" / "broken" / "SKILL.md", "---\nname: broken\nThe frontmatter is not closed.\n")
     plugin: Path = root / "plugins" / "acme-tools"
     _write(
         plugin / ".claude-plugin" / "plugin.json",
@@ -215,7 +215,7 @@ async def test_skills_are_found_in_the_home_and_in_the_plugins(runtime: Runtime,
     ]
     (problem,) = catalog.problems
     assert problem.path == home / "skills" / "broken" / "SKILL.md"
-    assert "does not start with the --- line" in problem.reason
+    assert "not closed by a --- line" in problem.reason
 
 
 async def test_the_prompt_lists_the_skills_and_tells_the_model_to_read_one_first(runtime: Runtime) -> None:

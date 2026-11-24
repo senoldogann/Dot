@@ -2417,6 +2417,13 @@ async def _route_step(
     return chosen
 
 
+# What a skill left out of the runs needs, said with it in the log (item 1723).
+SKIPPED_SKILL_FIX: str = (
+    "correct its SKILL.md as the reason says, or remove its folder (a plugin's: update or remove the plugin); "
+    "`dotx skills list` and Doctor list it"
+)
+
+
 async def run_skills(runtime: Runtime, run: RunRecord) -> SkillCatalog:
     """The skills ``run`` is offered (its agent's, item 1022), the same for a run of Dot's own loop and one on the
     owner's Claude plan (item 1068); a skill that could not be read is left out and logged once per process while its
@@ -2425,7 +2432,14 @@ async def run_skills(runtime: Runtime, run: RunRecord) -> SkillCatalog:
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
     for problem in unreported(skills.problems):
-        log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
+        log.warning(
+            "skill_skipped",
+            run_id=run.id,
+            path=str(problem.path),
+            reason=problem.reason,
+            # What the owner can do (item 1723): the log line is read alone, without Doctor's.
+            fix=SKIPPED_SKILL_FIX,
+        )
     return skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.agent_id)})
 
 
