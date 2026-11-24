@@ -84,6 +84,7 @@ from dotagent.tools.shell import build_shell_tool
 
 DOOR: str = "dot_1a2b3c4d"
 CONFIG: Path = Path("/private/dot/claude_code/runs/run-x/mcp.json")
+PROMPT_FILE: Path = Path("/private/dot/claude_code/runs/run-x/prompt.md")
 
 
 async def _run(call: object) -> ToolResult:
@@ -103,13 +104,15 @@ def _value(argv: tuple[str, ...], flag: str) -> str:
 def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() -> None:
     door: Door = _door()
     argv: tuple[str, ...] = claude_argv(
-        "/usr/local/bin/claude", "opus", "medium", "standard", "You are Dot.", CONFIG, door.name, None
+        "/usr/local/bin/claude", "opus", "medium", "standard", PROMPT_FILE, CONFIG, door.name, None
     )
     assert argv[:2] == ("/usr/local/bin/claude", "-p")
     assert _value(argv, "--input-format") == "stream-json"
     assert _value(argv, "--output-format") == "stream-json"
     assert _value(argv, "--model") == "opus"
-    assert _value(argv, "--append-system-prompt") == "You are Dot."
+    # The prompt is in a 0600 file, never in the arguments, which ps shows (item 1691's pre-push review).
+    assert _value(argv, "--append-system-prompt-file") == str(PROMPT_FILE)
+    assert "--append-system-prompt" not in argv
     # No built-in tool at all, no settings file read, the door as the only MCP server and the only allowed tools.
     # Claude Code's search of the door's tools is its one tool of its own (item 1053).
     assert _value(argv, "--tools") == "ToolSearch"
@@ -132,7 +135,7 @@ def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() ->
 
 
 def test_a_chat_with_a_session_resumes_it() -> None:
-    argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", "p", CONFIG, DOOR, "ses-1")
+    argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", PROMPT_FILE, CONFIG, DOOR, "ses-1")
     assert _value(argv, "--resume") == "ses-1"
     # The allowed tools stay the last words, so that nothing after them is read as one.
     assert argv[-2:] == ("--allowedTools", f"mcp__{DOOR},ToolSearch")
@@ -418,10 +421,10 @@ def test_only_the_measured_built_in_plugins_pass() -> None:
 def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     """Item 1014: the run's reasoning level goes as --effort when it is one of Claude Code's, and fast mode as the
     --settings the run reads; neither goes when the run has none."""
-    argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", "p", CONFIG, DOOR, None)
+    argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", PROMPT_FILE, CONFIG, DOOR, None)
     assert argv[argv.index("--effort") + 1] == "xhigh"
     assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
-    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", "p", CONFIG, DOOR, None)
+    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", PROMPT_FILE, CONFIG, DOOR, None)
     assert "--settings" not in plain
     # The configured default goes when the run chose none, rounded to the levels Claude Code lists for the model, as
     # the composer shows it (item 1367): Opus 4.6 has no xhigh, Haiku 4.5 no level, and then no --effort goes.
@@ -434,7 +437,7 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     assert opus_4_6 is not None and haiku_4_5 is not None
     assert run_effort(opus_4_6.efforts, None, "xhigh") in ("high", "max")
     assert run_effort(haiku_4_5.efforts, None, "xhigh") is None
-    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", "p", CONFIG, DOOR, None)
+    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", PROMPT_FILE, CONFIG, DOOR, None)
     # Fast mode goes to a model that has it alone, as Claude Code last listed them (item 1367).
     keep_models(PlanModels(fetched_at=0.0, models=_listed()))
     assert run_speed(ModelRef(provider="claude_code", model="sonnet"), "fast") == "standard"

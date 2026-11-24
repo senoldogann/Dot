@@ -471,6 +471,8 @@ def main() -> None:
                 },
                 "cwd": os.getcwd(),
                 "config_file": str(config_file),
+                "prompt": Path(_flag(args, "--append-system-prompt-file")).read_text(encoding="utf-8"),
+                "prompt_mode": stat.S_IMODE(Path(_flag(args, "--append-system-prompt-file")).stat().st_mode),
                 "config_mode": stat.S_IMODE(config_file.stat().st_mode),
                 "folder_mode": stat.S_IMODE(config_file.parent.stat().st_mode),
             }
