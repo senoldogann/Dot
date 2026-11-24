@@ -141,7 +141,9 @@ code** takes its place. The same by hand:
    calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
    chrome only: the composer bar, the capsule over it, the agents' chips (a ring on each that turns, once in four
    seconds, while the agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
-   the loudest card in a chat; message text and lists are never glass. What it still leaves to the web UI is in
+   the loudest card in a chat; message text and lists are never glass. Its icons are the web app's own, Lucide's
+   (item 1461: `scripts/export_ios_icons.py` writes them from the web app's `icons.js`, so an icon the web app changes
+   reaches the phone; the licence reads in Settings › About › Licences). What it still leaves to the web UI is in
    `roadmap/1353.md`. The
    app's notifications are its own, through APNs: Settings in the app opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in the app). The

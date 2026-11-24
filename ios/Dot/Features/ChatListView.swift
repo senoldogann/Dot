@@ -35,7 +35,7 @@ struct ChatListView: View {
                 }
                 if let words: String = openFailed {
                     Button { openFailed = nil } label: {
-                        Label(words, systemImage: "exclamationmark.circle").font(Theme.small).foregroundStyle(Theme.warn)
+                        Label(words, icon: .circleAlert).font(Theme.small).foregroundStyle(Theme.warn)
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
@@ -44,7 +44,7 @@ struct ChatListView: View {
                 if !others.isEmpty { section(waiting.isEmpty && working.isEmpty ? nil : "Chats", tone: Theme.faint, threads: others) }
                 if store.threads.isEmpty && !store.refreshing {
                     DotEmptyState(
-                        symbol: "bubble.left.and.text.bubble.right", title: "No chats yet",
+                        icon: .message, title: "No chats yet",
                         message: "Message Dot from the Mac, or start a chat here.", actionTitle: "New chat",
                         action: { composing = .home }
                     )
@@ -62,13 +62,13 @@ struct ChatListView: View {
             .dotAnimation(Motion.smooth, value: store.threads.map { "\($0.id)\($0.state)" })
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { composing = .home } label: { Image(systemName: "square.and.pencil") }
+                    Button { composing = .home } label: { DotIcon(.squarePen, size: 20) }
                         .accessibilityLabel("New chat")
                         .accessibilityIdentifier("new-chat")
                         .sensoryFeedback(.impact(weight: .light), trigger: composing != nil)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { model.showsSettings = true } label: { Image(systemName: "gearshape") }
+                    Button { model.showsSettings = true } label: { DotIcon(.settings, size: 20) }
                         .accessibilityLabel("Settings")
                 }
             }
@@ -161,7 +161,7 @@ struct ChatListView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: Space.l, bottom: 0, trailing: Space.l))
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         if thread.unread {
-                            Button { store.markSeen(thread.id) } label: { Label("Read", systemImage: "envelope.open") }
+                            Button { store.markSeen(thread.id) } label: { Label("Read", menuIcon: .mailOpen) }
                                 .tint(Theme.accentFill)
                         }
                     }
@@ -242,8 +242,7 @@ struct ThreadRow: View {
                     Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(thread.state == .idle ? 2 : 1)
                     Spacer(minLength: Space.xs)
                     if thread.loopCron != nil {
-                        Image(systemName: "repeat").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.faint)
-                            .accessibilityLabel("Repeats")
+                        DotIcon(.loop, size: 13, label: "Repeats", relativeTo: .caption).foregroundStyle(Theme.faint)
                     }
                     if thread.unread { Circle().fill(Theme.accent).frame(width: 8, height: 8).accessibilityLabel("Unread") }
                 }

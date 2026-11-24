@@ -13,7 +13,7 @@ struct PendingStatusLine: View {
                 ProgressView().controlSize(.mini)
                 Text("Sending…").font(Theme.meta).foregroundStyle(Theme.faint)
             } else if send.waiting {
-                Image(systemName: "clock").font(Theme.meta).foregroundStyle(Theme.faint)
+                DotIcon(.clock, size: 13, relativeTo: .caption).foregroundStyle(Theme.faint)
                 Text("Waiting to send").font(Theme.meta).foregroundStyle(Theme.faint)
                 Button("Retry now", action: onRetry).font(Theme.meta.weight(.semibold))
                 Button("Edit", action: onDiscard).font(Theme.meta.weight(.semibold))

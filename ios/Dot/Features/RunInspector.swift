@@ -23,7 +23,7 @@ struct RunInspector: View {
                         NavigationLink {
                             ChatModelPicker(model: model).onAppear { onExpand() }
                         } label: {
-                            CardRow(symbol: "cpu", title: "Model for this chat", showsChevron: true) {
+                            CardRow(icon: .cpu, title: "Model for this chat", showsChevron: true) {
                                 Text(modelLine).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(1)
                             }
                         }
@@ -31,14 +31,14 @@ struct RunInspector: View {
                         .accessibilityIdentifier("chat-model")
                         CardDivider()
                         Button(action: onModels) {
-                            CardRow(symbol: "slider.horizontal.3", tint: Theme.muted, title: "Default models…", showsChevron: true)
+                            CardRow(icon: .sliders, tint: Theme.muted, title: "Default models…", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
                     if !model.state.plan.isEmpty { planCard }
                     CardGroup(title: "Helpers", footer: model.state.helpers.isEmpty ? nil : "Subagents Dot started for this chat.") {
                         if model.state.helpers.isEmpty {
-                            EmptyRow(symbol: "person.2", words: "No helpers in this chat.")
+                            EmptyRow(icon: .users, words: "No helpers in this chat.")
                         }
                         ForEach(Array(model.state.helpers.enumerated()), id: \.element.id) { index, helper in
                             if index > 0 { CardDivider(inset: 48) }
@@ -48,7 +48,7 @@ struct RunInspector: View {
                     .id(Focus.helpers)
                     CardGroup(title: "Schedules and loops") {
                         if model.automations.isEmpty {
-                            EmptyRow(symbol: "clock.arrow.circlepath", words: "None bound to this chat.")
+                            EmptyRow(icon: .history, words: "None bound to this chat.")
                         }
                         ForEach(Array(model.automations.enumerated()), id: \.element.id) { index, automation in
                             if index > 0 { CardDivider() }
@@ -83,10 +83,8 @@ struct RunInspector: View {
     /// The run's standing, large: what it does, how many steps it has taken.
     private var statusCard: some View {
         HStack(spacing: Space.m) {
-            Image(systemName: statusSymbol)
-                .font(.system(size: 20, weight: .semibold))
+            DotIcon(statusIcon, size: 22, pulse: model.state.isWorking, relativeTo: .title3)
                 .foregroundStyle(statusTone)
-                .symbolEffect(.pulse, options: .repeating, isActive: model.state.isWorking)
                 .frame(width: 48, height: 48)
                 .background(statusTone.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.m))
             VStack(alignment: .leading, spacing: 2) {
@@ -125,10 +123,8 @@ struct RunInspector: View {
             .padding(.horizontal, Space.l).padding(.top, Space.m).padding(.bottom, Space.s)
             ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                 HStack(alignment: .top, spacing: Space.m) {
-                    Image(systemName: icon(for: step.status))
-                        .font(.system(size: 14))
+                    planMark(step.status)
                         .foregroundStyle(color(for: step.status))
-                        .symbolEffect(.pulse, options: .repeating, isActive: step.status == "in_progress")
                         .frame(width: 20).padding(.top, 1)
                     Text(step.text).font(Theme.small)
                         .foregroundStyle(step.status == "done" ? Theme.muted : Theme.text)
@@ -141,16 +137,16 @@ struct RunInspector: View {
         }
     }
 
-    private var statusSymbol: String {
+    private var statusIcon: IconName {
         switch model.state.line {
-        case .working: "waveform"
-        case .waitingOnYou: "hand.raised.fill"
-        case .waitingOnSubagents, .helpersInBackground: "person.2.fill"
+        case .working: .audioWaveform
+        case .waitingOnYou: .hand
+        case .waitingOnSubagents, .helpersInBackground: .users
         case .idle:
             switch model.state.runStatus {
-            case "failed": "exclamationmark.circle.fill"
-            case "cancelled": "stop.circle.fill"
-            default: "checkmark.circle.fill"
+            case "failed": .circleAlert
+            case "cancelled": .stop
+            default: .circleCheck
             }
         }
     }
@@ -185,13 +181,14 @@ struct RunInspector: View {
         }
     }
 
-    private func icon(for status: String) -> String {
+    /// The mark of a plan step: done, at work (dashed, breathing), failed, skipped, or a plain ring for one not begun.
+    @ViewBuilder private func planMark(_ status: String) -> some View {
         switch status {
-        case "done": "checkmark.circle.fill"
-        case "in_progress": "circle.dotted"
-        case "failed": "xmark.circle"
-        case "skipped": "minus.circle"
-        default: "circle"
+        case "done": DotIcon(.circleCheck, size: 16, relativeTo: .footnote)
+        case "in_progress": DotIcon(.circleDashed, size: 16, pulse: true, relativeTo: .footnote)
+        case "failed": DotIcon(.circleX, size: 16, relativeTo: .footnote)
+        case "skipped": DotIcon(.circleMinus, size: 16, relativeTo: .footnote)
+        default: Circle().strokeBorder(lineWidth: 1.5).frame(width: 13, height: 13)
         }
     }
 
@@ -211,8 +208,7 @@ private struct HelperRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s) {
-            Image(systemName: "arrow.turn.down.right")
-                .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.faint)
+            DotIcon(.cornerDownRight, size: 14, relativeTo: .caption).foregroundStyle(Theme.faint)
                 .frame(width: 20).padding(.top, 3)
             VStack(alignment: .leading, spacing: 3) {
                 Text(shortened(helper.goal, 80)).font(Theme.small).foregroundStyle(Theme.text).lineLimit(2)
@@ -221,7 +217,7 @@ private struct HelperRow: View {
                 }
             }
             Spacer(minLength: Space.s)
-            StatusPill(text: helper.status.capitalizedFirst, symbol: helper.isLive ? "waveform" : nil, tone: helper.isLive ? Theme.accent : Theme.faint, pulse: helper.isLive)
+            StatusPill(text: helper.status.capitalizedFirst, icon: helper.isLive ? .audioWaveform : nil, tone: helper.isLive ? Theme.accent : Theme.faint, pulse: helper.isLive)
         }
         .padding(.horizontal, Space.l).padding(.vertical, Space.m - 2)
         .accessibilityElement(children: .combine)
@@ -230,12 +226,12 @@ private struct HelperRow: View {
 
 /// An empty line of a card, said quietly with its symbol.
 struct EmptyRow: View {
-    let symbol: String
+    let icon: IconName
     let words: String
 
     var body: some View {
         HStack(spacing: Space.m) {
-            Image(systemName: symbol).font(.system(size: 14)).foregroundStyle(Theme.faint).frame(width: 20)
+            DotIcon(icon, size: 16, relativeTo: .footnote).foregroundStyle(Theme.faint).frame(width: 20)
             Text(words).font(Theme.small).foregroundStyle(Theme.muted)
             Spacer()
         }
@@ -252,8 +248,7 @@ struct ScheduleRow: View {
     var body: some View {
         Toggle(isOn: Binding(get: { schedule.record.enabled }, set: { onChange($0) })) {
             HStack(spacing: Space.m) {
-                Image(systemName: isLoop ? "repeat" : "clock")
-                    .font(.system(size: 14, weight: .semibold))
+                DotIcon(isLoop ? .loop : .clock, size: 16, relativeTo: .footnote)
                     .foregroundStyle(schedule.record.enabled ? Theme.accent : Theme.faint)
                     .frame(width: 30, height: 30)
                     .background((schedule.record.enabled ? Theme.accent : Theme.faint).opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.s))

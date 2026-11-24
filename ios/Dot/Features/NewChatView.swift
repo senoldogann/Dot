@@ -156,7 +156,7 @@ struct NewChatView: View {
                     VStack(spacing: Space.s) {
                         if let refusal: ModelRefusal = model.refusal {
                             VStack(alignment: .leading, spacing: Space.s) {
-                                Label(refusal.message, systemImage: "exclamationmark.triangle.fill")
+                                Label(refusal.message, icon: .alert)
                                     .font(Theme.small).foregroundStyle(Theme.text)
                                 if refusal.fallback != nil {
                                     Button("Send it on the default model") { Task { await start(onDefault: true) } }
@@ -169,7 +169,7 @@ struct NewChatView: View {
                             .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.4), lineWidth: 1))
                         }
                         if let failure: String = model.failure {
-                            Label(failure, systemImage: "exclamationmark.circle.fill").font(Theme.meta).foregroundStyle(Theme.bad)
+                            Label(failure, icon: .circleAlert).font(Theme.meta).foregroundStyle(Theme.bad)
                         }
                         composer
                     }
@@ -218,7 +218,7 @@ struct NewChatView: View {
                 Text("No chat yet. Your first message starts it.").font(Theme.meta).foregroundStyle(Theme.faint).padding(.top, Space.xs)
             } else {
                 DotEmptyState(
-                    symbol: "sparkles", title: "A new chat",
+                    icon: .sparkles, title: "A new chat",
                     message: "A message starts a chat of its own. Dot works on it and asks you only when it must.")
             }
         }
@@ -231,9 +231,9 @@ struct NewChatView: View {
             HStack(spacing: Space.s) {
                 Button { showsPicker = true } label: {
                     HStack(spacing: Space.xs + 1) {
-                        Image(systemName: "cpu").font(.system(size: 11, weight: .medium))
+                        DotIcon(.cpu, size: 13, relativeTo: .caption)
                         Text(pillWords).font(Theme.meta.weight(.medium)).lineLimit(1)
-                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .semibold))
+                        DotIcon(.chevronsUpDown, size: 11, relativeTo: .caption2)
                     }
                     .foregroundStyle(Theme.text)
                     .padding(.horizontal, Space.m).frame(minHeight: 36)
@@ -258,7 +258,7 @@ struct NewChatView: View {
                 DictationLine(dictation: model.dictation)
                 HStack(alignment: .bottom, spacing: 2) {
                     PhotosPicker(selection: $picks, maxSelectionCount: 4, matching: .images) {
-                        Image(systemName: "plus").font(.system(size: 17, weight: .medium)).foregroundStyle(Theme.muted)
+                        DotIcon(.plus, size: 20).foregroundStyle(Theme.muted)
                             .frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .accessibilityLabel("Attach a photo")
@@ -271,7 +271,7 @@ struct NewChatView: View {
                         .accessibilityIdentifier("composer-field")
                     MicButton(dictation: model.dictation) { model.toggleDictation() }
                     Button { Task { await start(onDefault: false) } } label: {
-                        Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold))
+                        DotIcon(.arrowUp, size: 19)
                             .foregroundStyle(model.canSend ? Theme.onAccent : Theme.faint)
                             .frame(width: 36, height: 36)
                             .background(Circle().fill(model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))

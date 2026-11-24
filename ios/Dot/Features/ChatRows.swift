@@ -28,7 +28,7 @@ struct ChatRow: View {
             VStack(alignment: .leading, spacing: Space.s) {
                 MessageText(text: text)
                 if status == "failed" || status == "cancelled" {
-                    Label(status == "failed" ? "The run failed" : "Stopped", systemImage: status == "failed" ? "exclamationmark.circle" : "stop.circle")
+                    Label(status == "failed" ? "The run failed" : "Stopped", icon: status == "failed" ? .circleAlert : .stop)
                         .font(Theme.meta)
                         .foregroundStyle(status == "failed" ? Theme.bad : Theme.faint)
                 }
@@ -99,10 +99,8 @@ struct CodeBlock: View {
                     copied = false
                 }
             } label: {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .font(.system(size: 13, weight: .medium))
+                DotIcon(copied ? .check : .copy, size: 16, relativeTo: .footnote)
                     .foregroundStyle(copied ? Theme.good : Theme.muted)
-                    .contentTransition(.symbolEffect(.replace))
                     .frame(width: 40, height: 40)
                     .contentShape(Rectangle())
             }
@@ -121,10 +119,8 @@ struct ToolLine: View {
     var body: some View {
         let words: (verb: String, rest: String) = ToolGlyph.split(row.line)
         HStack(alignment: .firstTextBaseline, spacing: Space.s) {
-            Image(systemName: ToolGlyph.symbol(for: row.tool))
-                .font(.footnote.weight(.medium))
+            DotIcon(ToolGlyph.icon(for: row.tool), size: 15, pulse: row.state == .running, relativeTo: .footnote)
                 .foregroundStyle(row.state == .running ? Theme.accent : Theme.faint)
-                .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 line(words)
@@ -140,13 +136,12 @@ struct ToolLine: View {
                 case .running:
                     ProgressView().controlSize(.mini).tint(Theme.muted)
                 case .ok:
-                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.faint)
+                    DotIcon(.check, size: 11, relativeTo: .caption2).foregroundStyle(Theme.faint)
                 case .failed:
-                    Image(systemName: "exclamationmark.circle.fill").font(.system(size: 12)).foregroundStyle(Theme.bad)
+                    DotIcon(.circleAlert, size: 14, relativeTo: .caption).foregroundStyle(Theme.bad)
                 }
             }
             .frame(width: 14)
-            .contentTransition(.symbolEffect(.replace))
         }
         .frame(minHeight: 28)
         // The line is 28 points tall and quiet; a finger gets 44 (it reaches over the gap above and below).
@@ -187,10 +182,8 @@ struct ApprovalCardView: View {
     private var pending: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             HStack(spacing: Space.m) {
-                Image(systemName: symbol)
-                    .font(.title3.weight(.semibold))
+                DotIcon(icon, size: 20, relativeTo: .title3)
                     .foregroundStyle(Theme.warn)
-                    .symbolEffect(.bounce, options: .repeat(2), value: card.approvalId)
                     .frame(width: 36, height: 36)
                     .background(Theme.warn.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 1) {
@@ -239,7 +232,7 @@ struct ApprovalCardView: View {
         if card.severity == "secret" {
             // A secret is given on the Mac or in the web UI, never typed into a phone's chat (the daemon's decision
             // route refuses a yes to it); the phone may skip it.
-            Label("This asks for a secret. Give it on your Mac or in the web UI.", systemImage: "lock.shield")
+            Label("This asks for a secret. Give it on your Mac or in the web UI.", icon: .lock)
                 .font(Theme.small).foregroundStyle(Theme.muted)
             Button { onDecide(card, false, "") } label: { Text("Skip").frame(maxWidth: .infinity) }
                 .dotButton(.glass).controlSize(.large)
@@ -289,8 +282,7 @@ struct ApprovalCardView: View {
 
     private var settled: some View {
         HStack(alignment: .top, spacing: Space.s) {
-            Image(systemName: resolutionSymbol)
-                .font(.system(size: 13, weight: .semibold))
+            DotIcon(resolutionIcon, size: 15, relativeTo: .footnote)
                 .foregroundStyle(resolutionTone)
                 .frame(width: 18, height: 20)
             VStack(alignment: .leading, spacing: 2) {
@@ -307,9 +299,9 @@ struct ApprovalCardView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var symbol: String {
-        if card.severity == "secret" { return "lock.shield.fill" }
-        return card.question != nil ? "questionmark.bubble.fill" : "hand.raised.fill"
+    private var icon: IconName {
+        if card.severity == "secret" { return .lock }
+        return card.question != nil ? .help : .hand
     }
 
     private var resolution: String {
@@ -321,11 +313,11 @@ struct ApprovalCardView: View {
         }
     }
 
-    private var resolutionSymbol: String {
+    private var resolutionIcon: IconName {
         switch card.status {
-        case "approved": "checkmark.circle.fill"
-        case "denied": "xmark.circle.fill"
-        default: "minus.circle"
+        case "approved": .circleCheck
+        case "denied": .circleX
+        default: .circleMinus
         }
     }
 

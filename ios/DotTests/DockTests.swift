@@ -107,11 +107,11 @@ final class DockTests: XCTestCase {
         let down: DockSummary = make(.idle, connection: .reconnecting(attempt: 2, unauthorized: false))
         XCTAssertEqual(down.segments.map(\.words), ["Reconnecting…"])
         let refused: DockSummary = make(.idle, connection: .reconnecting(attempt: 1, unauthorized: true))
-        XCTAssertEqual(refused.segments[0].symbol, "key")
+        XCTAssertEqual(refused.segments[0].icon, .key)
         XCTAssertEqual(refused.segments[0].tone, .warn)
         let working: DockSummary = make(.working(since: nil), connection: .reconnecting(attempt: 1, unauthorized: false))
         XCTAssertEqual(working.segments.count, 1, "a working run that is reconnecting is one segment, not two")
         XCTAssertEqual(working.segments[0].detail, "Reconnecting…")
-        XCTAssertEqual(working.segments[0].symbol, "wifi.exclamationmark", "the compact form still says the stream is down")
+        XCTAssertEqual(working.segments[0].icon, .wifiOff, "the compact form still says the stream is down")
     }
 }

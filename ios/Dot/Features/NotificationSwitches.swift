@@ -18,7 +18,7 @@ struct NotificationSwitches: View {
             ) {
                 ForEach(Array(PushKind.allCases.enumerated()), id: \.element) { index, kind in
                     if index > 0 { CardDivider() }
-                    CardRow(symbol: kind.symbol, title: kind.title, detail: kind.words) {
+                    CardRow(icon: kind.icon, title: kind.title, detail: kind.words) {
                         Toggle(
                             kind.title,
                             isOn: Binding(get: { awareness.push.shown[kind] }, set: { awareness.flip(kind, to: $0) })
@@ -32,7 +32,7 @@ struct NotificationSwitches: View {
                 .opacity(push.isLive ? 1 : 0.5)
             }
             if let line: String = push.offlineLine {
-                Label(line, systemImage: "wifi.slash").font(Theme.meta).foregroundStyle(Theme.faint).padding(.horizontal, Space.l)
+                Label(line, icon: .wifiOff).font(Theme.meta).foregroundStyle(Theme.faint).padding(.horizontal, Space.l)
             }
         }
         .task(id: online) { await awareness.loadPush() }

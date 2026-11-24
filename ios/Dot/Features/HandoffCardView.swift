@@ -12,8 +12,7 @@ struct HandoffCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             HStack(alignment: .top, spacing: Space.m) {
-                Image(systemName: "safari")
-                    .font(.title3.weight(.semibold))
+                DotIcon(.globe, size: 20, relativeTo: .title3)
                     .foregroundStyle(Theme.accent)
                     .frame(width: 36, height: 36)
                     .background(Theme.accent.opacity(0.14), in: Circle())
@@ -22,7 +21,7 @@ struct HandoffCardView: View {
             }
             Text(HandoffCard.explanation).font(Theme.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             Button(action: onOpenWeb) {
-                Label(HandoffCard.buttonTitle, systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity)
+                Label(HandoffCard.buttonTitle, icon: .external, size: 16).frame(maxWidth: .infinity)
             }
             .dotButton(.glass)
             .controlSize(.large)

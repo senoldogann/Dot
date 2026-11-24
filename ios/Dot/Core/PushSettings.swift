@@ -56,11 +56,11 @@ enum PushKind: CaseIterable, Sendable, Identifiable {
         }
     }
 
-    var symbol: String {
+    var icon: IconName {
         switch self {
-        case .needsYou: "hand.raised.fill"
-        case .ready: "tray.and.arrow.down.fill"
-        case .done: "checkmark.circle.fill"
+        case .needsYou: .hand
+        case .ready: .inbox
+        case .done: .circleCheck
         }
     }
 }

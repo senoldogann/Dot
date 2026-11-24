@@ -19,8 +19,7 @@ struct AwayCardView: View {
                 }
                 Spacer(minLength: Space.s)
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                    DotIcon(.x, size: 14, relativeTo: .caption)
                         .foregroundStyle(Theme.muted)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -46,7 +45,7 @@ struct AwayCardView: View {
                 }
             }
             if let decisions: String = card.decisions {
-                Label(decisions, systemImage: "checkmark.shield").font(Theme.meta).foregroundStyle(Theme.muted)
+                Label(decisions, icon: .shieldCheck).font(Theme.meta).foregroundStyle(Theme.muted)
             }
         }
         .padding(.horizontal, Space.l)
@@ -64,8 +63,7 @@ private struct AwayRowView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
+            DotIcon(icon, size: 16, relativeTo: .footnote)
                 .foregroundStyle(tone)
                 .frame(width: 20, height: 22)
                 .accessibilityHidden(true)
@@ -83,13 +81,13 @@ private struct AwayRowView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var symbol: String {
+    private var icon: IconName {
         switch row.run.status {
-        case "done": "checkmark.circle.fill"
-        case "failed": "exclamationmark.circle.fill"
-        case "cancelled": "stop.circle"
-        case "blocked": "hand.raised.fill"
-        default: "waveform"
+        case "done": .circleCheck
+        case "failed": .circleAlert
+        case "cancelled": .stop
+        case "blocked": .hand
+        default: .audioWaveform
         }
     }
 

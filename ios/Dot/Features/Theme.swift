@@ -286,15 +286,14 @@ struct QuietButtonStyle: ButtonStyle {
 
 /// A round glass button for the floating chrome (jump to the newest, a toolbar-like action): 44 points.
 struct GlassCircleButton: View {
-    let symbol: String
+    let icon: IconName
     let label: String
     var tint: Color?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+            DotIcon(icon, size: 18)
                 .foregroundStyle(tint ?? Theme.text)
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
@@ -369,16 +368,14 @@ struct DotMesh: View {
 /// A small status word in a tinted capsule: "Needs you", "Working", "Paused".
 struct StatusPill: View {
     let text: String
-    var symbol: String?
+    var icon: IconName?
     var tone: Color = Theme.accent
     var pulse: Bool = false
 
     var body: some View {
         HStack(spacing: Space.xs) {
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .symbolEffect(.pulse, options: .repeating, isActive: pulse)
+            if let icon {
+                DotIcon(icon, size: 12, pulse: pulse, relativeTo: .caption)
             }
             Text(text).font(.caption.weight(.semibold))
         }
@@ -393,13 +390,12 @@ struct StatusPill: View {
 /// An empty, error or offline state: a layered symbol over a soft mesh, a title, a line, and one button when there is a
 /// way out.
 struct DotEmptyState: View {
-    let symbol: String
+    let icon: IconName
     let title: String
     let message: String
     var tone: Color = Theme.accent
     var actionTitle: String?
     var action: (() -> Void)?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
     var body: some View {
         VStack(spacing: Space.m) {
@@ -410,11 +406,8 @@ struct DotEmptyState: View {
                 Circle()
                     .strokeBorder(LinearGradient(colors: [tone.opacity(0.5), tone.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
                     .frame(width: 104, height: 104)
-                Image(systemName: symbol)
-                    .font(.system(size: 40, weight: .light))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(tone, tone.opacity(0.45))
-                    .symbolEffect(.pulse, options: .repeating.speed(0.4), isActive: !reduceMotion)
+                DotIcon(icon, size: 36, pulse: true, relativeTo: .largeTitle)
+                    .foregroundStyle(tone)
                     .frame(width: 88, height: 88)
                     .dotGlass(in: Circle(), tint: tone.opacity(0.10))
             }
