@@ -276,7 +276,7 @@ from dotagent.scheduler.timing import format_local
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root, unreported
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
-from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
+from dotagent.store.endings import GOAL_CHECK_MARK, GOAL_CHECK_UNAVAILABLE, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
 from dotagent.store.models import (
     NO_PICKS,
     AgentRecord,
@@ -1639,7 +1639,7 @@ async def _ask_checker(
         return RunOutcome(
             status="failed",
             result=_with_check_note(
-                ended.result, f"the check could not run ({error.message}); this answer is not verified."
+                ended.result, f"{GOAL_CHECK_UNAVAILABLE} ({error.message}); this answer is not verified."
             ),
             needs=ended.needs,
         )

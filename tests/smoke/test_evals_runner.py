@@ -18,6 +18,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, replay_reference
 from dotagent.evals.scoring import Scorecard, score_report
 from dotagent.evals.types import EvalTask, ScriptedCall, ScriptedTurn
 from dotagent.policy.types import QuestionMode
+from dotagent.store.endings import classify_ending
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -146,6 +147,8 @@ async def test_a_goal_check_that_cannot_run_fails_the_attempt_which_is_judged_an
     outcome: TaskOutcome = await replay_reference(select_tasks(["write-todo-note"])[0], keyless, login_env)
     assert outcome.status == "failed", outcome
     assert "the check could not run (missing API key)" in outcome.answer
+    # And its ending says no model judged it: not that the check refused it (item 1402).
+    assert classify_ending("failed", outcome.answer) == "goal_check_unavailable"
     assert all(check.passed for check in outcome.checks) and not outcome.passed
     assert outcome.metrics.unproven_steps == 0
 
