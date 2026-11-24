@@ -212,7 +212,8 @@ async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversatio
                     await expect(page.get_by_text("Shelf 1 next.")).to_be_in_viewport()
                     assert await _in_window(pill), "scrolled to the top, the pill is out of the window"
                     # The arrow down stands just above the pill, not over it, nor away under the bar (item 352).
-                    arrow: Locator = page.locator(".jump")
+                    # A phone's is the round control beside the capsule (item 1383), a computer's the arrow in the bar.
+                    arrow: Locator = page.locator(".dock-end" if width <= 720 else ".jump")
                     await expect(arrow).to_be_visible()
                     gap: float = await _top(pill) - await _bottom(arrow)
                     assert 0 <= gap <= _ARROW_GAP_PX, gap

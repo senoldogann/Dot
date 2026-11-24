@@ -81,6 +81,13 @@ export function loopRhythm(cron) {
   return times === null || days === null ? null : t("rhythm.daysAt", { days, times });
 }
 
+/** The rhythm `cron` in the fewest words, for the phone's capsule over the composer (item 1383): "every 10 min" where
+ * `loopRhythm` says "every 10 minutes", the others as it says them; null for a form that has no words. */
+export function shortRhythm(cron) {
+  const minutes = /^\*\/(\d+) \* \* \* \*$/.exec(cron);
+  return minutes === null ? loopRhythm(cron) : t("rhythm.minutesShort", { count: minutes[1] });
+}
+
 /** When a schedule fires next (`at`, seconds), as the sidebar says it: the time alone later today ("15:30"), the day's
  * name and the time within the coming week ("Fri 18:30"), else the date and the time ("1 Nov 09:00"), so that a firing
  * weeks away, or one missed while the daemon was off, does not read as the coming one; one a few minutes past its time

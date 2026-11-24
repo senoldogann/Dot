@@ -728,11 +728,6 @@
     z-index: 21;
   }
 
-  /* The bar's parts are a phone's width together (item 401): the three counters and the way down fit one row. */
-  .status-bar .capsule-part {
-    padding-inline: var(--space-1);
-  }
-
   /* The dock keeps a position of its own: the bar over the composer stands in it, not over the conversation. */
   html.chat-shell .dock {
     position: relative;
@@ -783,21 +778,6 @@
   .waiting .dock {
     padding-top: 0;
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
-  }
-
-  /* The bar over the composer is a phone's line (item 401): one pane across the dock, as wide as its parts and the way
-     down beside them and no wider, in the middle (item 427; it was the dock's whole width, its few words at the left
-     and the way down far from them), never a circle of its own over the conversation. It gives way, and never goes
-     past the dock, on the narrowest phone. */
-  .status-bar {
-    width: fit-content;
-    max-width: 100%;
-    min-height: 40px;
-  }
-
-  .status-bar > .jump {
-    width: 32px;
-    height: 32px;
   }
 
   /* The conversation's rows sit a breath apart on a phone (item 401): the message, what Dot did and its answer read as
@@ -922,6 +902,553 @@
   html.chat-shell .run-thread > .steps + .steps {
     margin-top: var(--space-1);
   }
+}
+
+/* ---------- the one capsule over a phone's composer (item 1383) ---------- */
+
+/* On a phone nothing is stacked over the composer. The line that waits for the subagents, the bar, the queue, the loops
+   and the commands at work were five panes one upon the other, drawn at different widths, and they are one row now: a
+   capsule of glass whose segments are divided by hairlines, with the way down as a round button beside it (dockbar.js).
+   A tap on a segment opens what its pane showed in a sheet (docksheet.js), and what Dot asks stays its own card over the
+   row. A window wider than a phone's keeps the panes, and the row is not drawn there. */
+.dockbar {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .dock > :is(.wait-line, .status-bar, .queue, .chat-loops, .background-work) {
+    display: none;
+  }
+
+  /* The loss of the stream is said in the capsule here ("Reconnecting…"), not in a note under the top bar. */
+  .connection-slot {
+    display: none;
+  }
+
+  .dockbar:not([hidden]) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  /* The row lets a touch through where nothing of it is drawn, as the rest of the dock does (item 1349). */
+  html.chat-shell .dock > .dockbar {
+    pointer-events: none;
+  }
+
+  .dockbar > * {
+    pointer-events: auto;
+  }
+
+  /* One glass surface: the capsule keeps a solid ground where the browser draws no blur. */
+  .dockbar-capsule {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: stretch;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    box-shadow: var(--shadow-float);
+    animation: capsule-in var(--motion-base) var(--ease) both;
+  }
+
+  .dock-end {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--shadow-float);
+    color: var(--text-2);
+    cursor: pointer;
+  }
+
+  @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .dockbar-capsule,
+    .dock-end {
+      background: var(--glass-surface);
+      -webkit-backdrop-filter: var(--glass-blur);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
+  /* A segment is a finger's height and no less; the hairline stands at the left of each one after the first. */
+  .dock-seg {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .dockbar-chips {
+    display: contents;
+  }
+
+  .dock-seg:not([hidden]) ~ .dock-seg:not([hidden])::before,
+  .dockbar-capsule:not([data-fit="wrapped"]) > :is(.dock-status, .dock-stop):not([hidden]) ~ .dockbar-chips > .dock-seg:not([hidden])::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    height: 20px;
+    border-left: 1px solid var(--border-strong);
+    translate: 0 -50%;
+  }
+
+  .dock-seg:active,
+  .dock-end:active {
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+  }
+
+  .dock-seg:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  .dock-end:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  .dock-mark {
+    display: inline-grid;
+  }
+
+  .dock-seg .icon,
+  .dock-end .icon {
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+  }
+
+  .dock-end .icon {
+    width: 18px;
+    height: 18px;
+    color: var(--text-2);
+  }
+
+  .dock-seg[data-tone="work"] .dock-mark .icon {
+    animation: spin var(--motion-spin) linear infinite;
+    animation-play-state: var(--endless);
+  }
+
+  .dock-seg[data-tone="waiting"],
+  .dock-seg[data-tone="waiting"] .icon,
+  .dock-seg[data-tone="warn"],
+  .dock-seg[data-tone="warn"] .icon {
+    color: var(--warn);
+  }
+
+  .dock-stop {
+    color: var(--text);
+    font-weight: var(--weight-label);
+  }
+
+  .dock-stop .icon {
+    color: var(--bad);
+  }
+
+  .dock-short {
+    display: none;
+  }
+
+  /* The row says less before it scrolls or cuts (dockbar.js `fit`): first the counts of the secondary segments alone, then
+     the Stop without its word, then the status's time without its word, and last a second line. */
+  .dockbar-capsule:is([data-fit="counts"], [data-fit="compact"], [data-fit="tight"], [data-fit="wrapped"]) .dock-seg:not(.dock-status, .dock-stop) .dock-long {
+    display: none;
+  }
+
+  .dockbar-capsule:is([data-fit="counts"], [data-fit="compact"], [data-fit="tight"], [data-fit="wrapped"]) .dock-seg:not(.dock-status, .dock-stop) .dock-short {
+    display: inline;
+  }
+
+  .dockbar-capsule:is([data-fit="compact"], [data-fit="tight"]) .dock-stop .dock-long,
+  .dockbar-capsule[data-fit="tight"] .dock-status .dock-long {
+    display: none;
+  }
+
+  .dockbar-capsule[data-fit="tight"] .dock-status .dock-short {
+    display: inline;
+  }
+
+  .dockbar-capsule:is([data-fit="compact"], [data-fit="tight"]) .dock-seg {
+    padding-inline: var(--space-2);
+  }
+
+  /* Where even that does not fit (a narrow phone, many segments, and the way down beside them) the status and its Stop
+     keep a line, in words, and the others share a second, equal and divided, rather than a cut or a scroll. */
+  .dockbar-capsule[data-fit="wrapped"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    border-radius: var(--radius-lg);
+  }
+
+  .dockbar-capsule[data-fit="wrapped"] > .dock-status {
+    justify-content: flex-start;
+  }
+
+  .dockbar-capsule[data-fit="wrapped"] > .dockbar-chips {
+    display: flex;
+    grid-column: 1 / -1;
+  }
+
+  .dockbar-capsule[data-fit="wrapped"] > .dock-status:not([hidden]) ~ .dockbar-chips,
+  .dockbar-capsule[data-fit="wrapped"] > .dock-stop:not([hidden]) ~ .dockbar-chips {
+    border-top: 1px solid var(--border-strong);
+  }
+
+  .dockbar-capsule[data-fit="wrapped"] > .dockbar-chips > .dock-seg {
+    flex: 1 1 0;
+  }
+
+  /* Reduced motion: the capsule does not rise into place and the dashed circle of a run at work stands still. */
+  @media (prefers-reduced-motion: reduce) {
+    .dockbar-capsule,
+    .dock-seg[data-tone="work"] .dock-mark .icon {
+      animation: none;
+    }
+  }
+
+  /* The narrowest phones: the secondary segments keep a finger's width less their padding. */
+  @media (max-width: 360px) {
+    .dockbar-capsule[data-fit="tight"] .dock-seg:not(.dock-status) {
+      min-width: 40px;
+      padding-inline: var(--space-1);
+    }
+  }
+}
+
+/* The sheet of a phone's capsule (docksheet.js): the sheet of the chat's settings above, as tall as what it holds up to
+   three quarters of the window, with a handle that closes it. What a pane showed stands in it as it was drawn over the
+   composer, in rows a finger can hit. */
+.dock-sheet > .dock-sheet-panel {
+  height: auto;
+  max-height: min(78dvh, calc(100dvh - var(--safe-top) - var(--space-6)));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.dock-sheet-head {
+  flex: none;
+  touch-action: none;
+}
+
+.dock-sheet-handle {
+  display: grid;
+  width: 100%;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-sheet > .dock-sheet-panel {
+    transition: none;
+  }
+}
+
+.dock-sheet-handle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.dock-sheet-handle > .sheet-grip {
+  margin: 0;
+}
+
+.dock-sheet-title {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  text-align: center;
+}
+
+.dock-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-4) calc(var(--space-4) + var(--safe-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* A pane of the dock in its sheet is a plain section: no tuck under the composer, no frame, no head (the sheet has the
+   title), and its list shows whole, the sheet being what scrolls. */
+.dock-sheet-body > :is(.queue, .chat-loops, .background-work) {
+  position: static;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.dock-sheet-body > .queue > .queue-head,
+.dock-sheet-body > .chat-loops > .chat-loops-toggle {
+  display: none;
+}
+
+.dock-sheet-body .queue-list {
+  max-height: none;
+}
+
+.dock-sheet-body .queue-paused,
+.dock-sheet-body .queue-unread,
+.dock-sheet-body .background-unread {
+  padding: var(--space-2) 0;
+}
+
+.dock-sheet-body .queue-paused .btn,
+.dock-sheet-body .queue-unread .btn,
+.dock-sheet-body .background-unread .btn {
+  min-height: 44px;
+}
+
+/* A queued message: its words over its controls, wrapped to three lines where the row held one; its arrows, which move
+   it a place (never a drag), at the left and what it can do at the right. */
+.dock-sheet-body .queue-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "text text text"
+    "move files actions";
+  align-items: center;
+  gap: 0 var(--space-2);
+  min-height: 0;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.dock-sheet-body .queue-row:last-child {
+  border-bottom: 0;
+}
+
+.dock-sheet-body .queue-text {
+  display: -webkit-box;
+  grid-area: text;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  padding-block: var(--space-1);
+  color: var(--text);
+  font-size: var(--text-ui);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dock-sheet-body .queue-move {
+  grid-area: move;
+}
+
+.dock-sheet-body .queue-files {
+  grid-area: files;
+  justify-self: start;
+}
+
+.dock-sheet-body .queue-actions {
+  grid-area: actions;
+  justify-self: end;
+}
+
+.dock-sheet-body .queue-icon,
+.dock-sheet-body .queue-steer,
+.dock-sheet-body .queue-cancel {
+  height: 44px;
+}
+
+.dock-sheet-body .queue-icon {
+  width: 44px;
+}
+
+/* Steer keeps its word where the sheet has the room for it, and its arrow alone where it has not. */
+.dock-sheet-body .queue-steer {
+  width: auto;
+  padding: 0 var(--space-3);
+}
+
+.dock-sheet-body .queue-steer .label {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+}
+
+@media (max-width: 359px) {
+  .dock-sheet-body .queue-steer {
+    width: 44px;
+    padding: 0;
+  }
+
+  .dock-sheet-body .queue-steer .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* A loop: its message and how often it asks again and when next, wrapped, with its Stop repeating under them. */
+.dock-sheet-body .loop-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "dot text"
+    ". stop";
+  align-items: start;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dock-sheet-body .loop-row:last-child {
+  border-bottom: 0;
+}
+
+.dock-sheet-body .loop-row > .status-dot {
+  grid-area: dot;
+  margin-top: var(--space-2);
+}
+
+.dock-sheet-body .loop-row > .loop-text {
+  grid-area: text;
+}
+
+.dock-sheet-body .loop-row > .btn {
+  grid-area: stop;
+  justify-self: start;
+}
+
+/* A command at work: its words wrapped whole, then how long it has run and its Stop on a line of their own. */
+.dock-sheet-body .background-work .background-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "dot label label"
+    ". time stop";
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-height: 0;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dock-sheet-body .background-work .background-row:last-child {
+  border-bottom: 0;
+}
+
+.dock-sheet-body .background-work .status-dot {
+  grid-area: dot;
+  align-self: start;
+  margin-top: var(--space-2);
+}
+
+.dock-sheet-body .background-work .background-label {
+  grid-area: label;
+}
+
+.dock-sheet-body .background-work .background-time {
+  grid-area: time;
+}
+
+.dock-sheet-body .background-work .btn {
+  grid-area: stop;
+}
+
+/* Their Stops keep a frame in the sheet, a finger's height, where the line over the composer drew them as bare words. */
+.dock-sheet-body :is(.loop-row, .background-work .background-row) > .btn {
+  min-height: 44px;
+  border: 1px solid var(--button-border);
+  background: var(--button-fill);
+  color: var(--text);
+}
+
+.dock-sheet-body .background-label {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.dock-sheet-body .chat-loops .background-time {
+  white-space: normal;
+}
+
+/* The helpers: that the task waits on them, what each does now, and the way to the Agents tab and the Stop. */
+.dock-helpers-lead {
+  margin: 0 0 var(--space-2);
+  color: var(--text-2);
+  font-size: var(--text-ui);
+}
+
+.dock-helpers {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dock-helper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dock-helper-title {
+  color: var(--text);
+  font-weight: var(--weight-label);
+  overflow-wrap: anywhere;
+}
+
+.dock-helper-now {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.dock-helpers-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.dock-helpers-actions .btn {
+  flex: 1;
+  min-height: 44px;
+}
+
+/* The plan: its steps as the Plan tab draws them, and the way to that tab a finger's height. */
+.dock-sheet-body .plan-popover-open {
+  min-height: 44px;
+  margin-left: auto;
+  font-size: var(--text-sm);
 }
 
 /* ---------- the marks of the conversation's messages (item 201) ---------- */

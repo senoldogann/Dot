@@ -17,6 +17,8 @@ import { createComputer } from "../computer.js";
 import { createMacScreen } from "../macscreen.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
+import { createDockBar } from "../dockbar.js";
+import { createDockSheets } from "../docksheet.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { createContextPanel } from "../contextpanelview.js";
@@ -44,7 +46,7 @@ import { messageOutline } from "../outline.js";
 import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
 import { LAST_CHAT_KEY, openingOf, readPref, removePref } from "../prefs.js";
 import { PAGE_ANSWER_EVENT } from "../pageframe.js";
-import { planBubble, planStep, planTargets } from "../planbubble.js";
+import { planBubble, planContent, planStep, planTargets } from "../planbubble.js";
 import { createReactions, REACTION_EVENTS } from "../reactions.js";
 import { approvalLabel, heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
@@ -56,6 +58,7 @@ import { createStageSize } from "../stagesize.js";
 import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, breakToldAt, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
+import { waitCounts } from "../waitcounts.js";
 import { createWorkStatus } from "../workstatus.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { attemptWithFallback } from "../modelrefused.js";
@@ -240,6 +243,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // on a keyboard's device: on a touch screen a focus would bring the keyboard up over the conversation.
       workStatus.stopping();
       capsule.stopping();
+      halting = true;
+      paintDock();
       if (!touchFirst()) {
         input.focus();
       }
@@ -334,6 +339,21 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // A break that mends at once, as when the page comes back into view, says nothing (items 286 and 328); one that lasts
   // is told over the conversation, never in its way: what is read does not move (item 328).
   const showConnectionNote = showFrom(connectionNote, breakToldAt);
+  // A phone's capsule says it too, at the same moment, and the note under the top bar is not drawn there (item 1383):
+  // `showFrom` only sets and reads `hidden`, which here is whether the stream is told to be lost.
+  let reconnecting = false;
+  const showReconnecting = showFrom(
+    {
+      get hidden() {
+        return !reconnecting;
+      },
+      set hidden(value) {
+        reconnecting = !value;
+        paintCapsule();
+      },
+    },
+    breakToldAt,
+  );
   const connectionSlot = el("div", { class: "connection-slot" }, connectionNote);
 
   // ------------------------------------------------------------------------------------ details and plan
@@ -735,6 +755,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // message steer the run at work (item 230). A campaign's chat takes no queue: a message steers its session, as
   // before.
   const queueing = run.campaign_id === null;
+  // What the queue, the loops and the commands at work say to a phone's capsule (item 1383), which draws them in place of
+  // the panes over the composer.
+  let queueNow = { count: 0, held: false, problem: false, sending: false };
+  let loopsNow = { count: 0, rhythm: null, problem: false };
+  let runningNow = { count: 0, problem: false };
   const queue = createQueue({
     threadId: run.thread_id,
     frame,
@@ -744,8 +769,17 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         goOn(`/runs/${startedRunId}`);
       }
     },
-    onEdit: () => syncControls(),
-    onCount: () => paintCapsule(),
+    onEdit: () => {
+      // The edit is made in the composer, which the queue's sheet covers on a phone.
+      if (queue.editing() !== null) {
+        sheets.close("queue", false);
+      }
+      syncControls();
+    },
+    onChange: (summary) => {
+      queueNow = summary;
+      paintCapsule();
+    },
   });
   // ⌘⇧Enter sends what the box holds the other way than the send does (`steers`): to the run now, past the queue, or
   // into the queue where a message steers; with the box empty, it sends the queue's next message to the run. Escape
@@ -880,9 +914,21 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const stopIntentWatch = frame.watchText(() => paintIntent());
   const stopStatus = onChange(choices.sync);
   // The chat's commands at work (item 229), between the queue and the composer.
-  const background = backgroundWork({ threadId: run.thread_id });
+  const background = backgroundWork({
+    threadId: run.thread_id,
+    onChange: (summary) => {
+      runningNow = summary;
+      paintCapsule();
+    },
+  });
   // The chat's loops (item 281), beside its commands at work.
-  const loops = chatLoops({ threadId: run.thread_id });
+  const loops = chatLoops({
+    threadId: run.thread_id,
+    onChange: (summary) => {
+      loopsNow = summary;
+      paintCapsule();
+    },
+  });
   // The bar over the composer (items 297, 352, 360 and 401): the run's time, its helpers and the messages queued at its
   // left, and the way down at its right end, all in one pane of glass.
   const capsule = createCapsule({
@@ -895,7 +941,36 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     onStop: () => stopRun(),
   });
   const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
-  const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, frame.element, foot);
+  // On a phone the line, the bar, the queue, the loops and the commands at work are not stacked over the composer (item
+  // 1383): they are one capsule, `dockBar`, whose segments open the detail each pane showed in a sheet, one at a time. What
+  // Dot asks stays its own card over the capsule. A computer's window keeps the panes.
+  const sheets = createDockSheets();
+  const dockBar = createDockBar({ onWork: () => inspector.openTab("run"), onStop: () => stopRun(), onEnd: () => goDown(), sheets });
+  const dock = el("div", { class: "dock" }, capsule.wait, statusBar, resumeLine, queue.element, loops.element, background.element, asks.element, dockBar.element, frame.element, foot);
+  sheets.add("queue", { anchor: dockBar.segment("queue"), title: () => t("dock.queueTitle"), adopt: queue.element, onOpen: () => queue.expand() });
+  sheets.add("loops", {
+    anchor: dockBar.segment("loops"),
+    title: () => t("loops.region"),
+    adopt: loops.element,
+    onOpen: () => loops.present(true),
+    onClose: () => loops.present(false),
+  });
+  sheets.add("running", { anchor: dockBar.segment("running"), title: () => t("dock.runningTitle"), adopt: background.element });
+  sheets.add("helpers", { anchor: dockBar.segment("helpers"), title: () => t("run.helpers"), build: helpersSheet });
+  sheets.add("plan", {
+    anchor: dockBar.segment("plan"),
+    title: () => t("capsule.plan", { done: planNow.done, total: planNow.steps.length }),
+    build: () =>
+      planContent({
+        steps: planNow.steps,
+        targets: planNow.targets,
+        head: false,
+        openTab: () => {
+          sheets.close("plan");
+          inspector.openTab("plan");
+        },
+      }),
+  });
   // The plan over the composer (item 644): its part in the capsule opens it as a bubble above the dock.
   bubble = planBubble({ anchor: capsule.plan, frame: dock, onOpenTab: () => inspector.openTab("plan") });
   bubble.paint(planNow.steps, planNow.targets);
@@ -1294,7 +1369,73 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     if (capsule.plan.hidden) {
       bubble?.close();
     }
+    paintDock();
     paintBar();
+  }
+
+  // Stop was pressed and the run has not ended yet: the phone's capsule says it stops until it has.
+  let halting = false;
+
+  /** The phone's capsule over the composer (item 1383): the run's status, its helpers, and what the queue, the loops and the
+   * commands at work told of themselves. */
+  function paintDock() {
+    if (!active) {
+      halting = false;
+    }
+    const { steps, done } = planNow;
+    dockBar.paint({
+      status: active ? status : null,
+      took: Date.now() / 1000 - run.created_at,
+      stopping: halting,
+      reconnecting,
+      plan: steps.length === 0 ? null : { done, total: steps.length },
+      helpers: waitCounts(timeline.helperStatuses(), timeline.helperReleased()),
+      loops: loopsNow,
+      queue: queueNow,
+      running: runningNow,
+    });
+    sheets.repaint("helpers");
+    sheets.repaint("plan");
+  }
+
+  /** What the helpers' sheet holds: that the run waits on its subagents (or that they work on in the background), what
+   * each does now, and the way to the Agents tab and the Stop that the line over the composer had. */
+  function helpersSheet() {
+    const { waitedFor, letGo } = waitCounts(timeline.helperStatuses(), timeline.helperReleased());
+    const lead = waitedFor > 0 ? tCount(waitedFor, "capsule.waitOne", "capsule.waitMany") : tCount(letGo, "capsule.backgroundOne", "capsule.backgroundMany");
+    const rows = timeline.helperNow().map((helper) => el("li", { class: "dock-helper" }, el("span", { class: "dock-helper-title" }, helper.title), el("span", { class: "dock-helper-now" }, helper.words)));
+    return [
+      el("p", { class: "dock-helpers-lead" }, lead),
+      el("ul", { class: "dock-helpers" }, ...rows),
+      el(
+        "div",
+        { class: "dock-helpers-actions" },
+        el(
+          "button",
+          {
+            class: "btn",
+            type: "button",
+            onclick: () => {
+              sheets.close("helpers");
+              inspector.openTab("agents");
+            },
+          },
+          t("capsule.details"),
+        ),
+        el(
+          "button",
+          {
+            class: "btn danger",
+            type: "button",
+            onclick: () => {
+              sheets.close("helpers");
+              stopRun();
+            },
+          },
+          t("capsule.stop"),
+        ),
+      ),
+    ];
   }
 
   // The bar stands while one of its parts has something to say or the way down is offered in it (item 401).
@@ -1315,21 +1456,26 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       hidden: true,
       title: t("run.jump"),
       "aria-label": t("run.jump"),
-      onclick: () => {
-        jumpVisible = false;
-        jump.hidden = true;
-        paintBar();
-        if (answerNode !== null) {
-          answerNode.scrollIntoView({ block: "start", behavior: "smooth" });
-          return;
-        }
-        following = true;
-        toEnd("smooth");
-      },
+      onclick: () => goDown(),
     },
     icon("arrowDown"),
   );
   statusBar.append(jump);
+
+  /** The way down: to the answer once there is one, else to the end of the conversation. A computer's arrow in the bar and
+   * a phone's round one beside the capsule do the same. */
+  function goDown() {
+    jumpVisible = false;
+    jump.hidden = true;
+    dockBar.setEnd(false, jump.title);
+    paintBar();
+    if (answerNode !== null) {
+      answerNode.scrollIntoView({ block: "start", behavior: "smooth" });
+      return;
+    }
+    following = true;
+    toEnd("smooth");
+  }
 
   // What scrolls the conversation (item 352): on a phone the conversation itself, between the top bar and the composer,
   // which stay put (`html.chat-shell`, run.css); on a wider window the window, as before. The conversation's box is
@@ -1367,6 +1513,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     const words = answerNode !== null ? t("run.jumpAnswer") : t("run.jumpLatest");
     jump.title = words;
     jump.setAttribute("aria-label", words);
+    dockBar.setEnd(show, words);
     paintBar();
   }
 
@@ -1712,6 +1859,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     },
   });
   showChanges = () => inspector.openTab("changes");
+  // The status of a phone's capsule opens the panel: it says whether it is open.
+  const panelWatch = new MutationObserver(() => dockBar.setWorkOpen(inspector.element.dataset.open === "true"));
+  panelWatch.observe(inspector.element, { attributes: true, attributeFilter: ["data-open"] });
   paintScreen();
 
   /** Read the chat's agents again; their tab counts them, and so does a phone's bar. */
@@ -2068,6 +2218,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     isFinished: finished,
     onState: (state) => {
       showConnectionNote(state === "reconnecting");
+      showReconnecting(state === "reconnecting");
     },
     onMessage: (message) => {
       kept.messages.push(message);
@@ -2121,6 +2272,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     queue.dispose();
     background.dispose();
     loops.dispose();
+    panelWatch.disconnect();
+    dockBar.dispose();
+    sheets.dispose();
     automations.dispose();
     meter.dispose();
     bubble.dispose();

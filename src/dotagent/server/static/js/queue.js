@@ -28,16 +28,19 @@ function oneLine(text) {
  * Returns `{ element, add(body), steerFirst(), setActive(on), editing(), saveEdit(text), cancelEdit(), count(),
  * expand(), dispose() }`: `add` queues a message (the body of `POST /threads/{id}/queue`), `editing()` is the id of the
  * message the composer edits or null, `saveEdit` keeps the composer's text as that message's, `count()` is how many
- * messages wait and `expand()` opens their list. `onCount(count)` is called on every change of the queue (item 352: the
- * line over the composer counts them).
+ * messages wait and `expand()` opens their list. `onChange({ count, held, problem, sending })` is called on every change
+ * of the queue (item 352: the line over the composer counts them; item 1383: on a phone it says whether the queue is
+ * held, could not be read, or has a message on its way, which the queue's own banner is not drawn there to say).
  */
-export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onCount }) {
+export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onChange }) {
   const listId = `queue-${threadId}`;
   let messages = [];
   let held = false;
   let active = false;
   let expanded = true;
   let busy = false;
+  // A message is on its way into the queue (`add`).
+  let sendingNow = false;
   // Why the queue could not be read the last time, or null once it was.
   let problem = null;
   // The message the composer edits, and the draft it held before.
@@ -296,7 +299,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     paused.hidden = !held;
     resume.disabled = busy;
     // The rows are drawn anew, on every change of the queue from any page: the control that has the focus hands it to
-    // its like in the new rows (the arrow pressed moved with its message), or to the box once that is gone.
+    // its like in the new rows (the arrow pressed moved with its message), or to the box once that is gone; in a phone's
+    // sheet (item 1383), which covers the box, to the sheet, so that no keyboard rises behind it.
     const active = document.activeElement;
     const focused = active instanceof HTMLElement && list.contains(active) ? active : null;
     list.replaceChildren(...messages.map(row));
@@ -307,9 +311,19 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       const next = parts
         .map((part) => /** @type {HTMLButtonElement | null} */ (list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${part}"]`)))
         .find((button) => button !== null && !button.disabled);
-      (next ?? frame.textarea).focus();
+      const sheet = element.closest(".dock-sheet-panel");
+      if (next === undefined && sheet instanceof HTMLElement) {
+        sheet.focus({ preventScroll: true });
+      } else {
+        (next ?? frame.textarea).focus();
+      }
     }
-    onCount(messages.length);
+    tell();
+  }
+
+  /** Say what the queue holds to whoever draws it beside the composer (`onChange`). */
+  function tell() {
+    onChange({ count: messages.length, held, problem: problem !== null, sending: sendingNow });
   }
 
   const stopLifecycle = onLifecycle((event) => {
@@ -339,12 +353,16 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       const hidden = element.hidden;
       element.hidden = false;
       element.append(sending);
+      sendingNow = true;
+      tell();
       let view;
       try {
         view = await api.post(`/threads/${threadId}/queue`, body);
       } finally {
         sending.remove();
         element.hidden = hidden;
+        sendingNow = false;
+        tell();
       }
       showNewest(mine, view);
       // A request of its own started at once in a chat of its own (item 915): said, with the way to it.

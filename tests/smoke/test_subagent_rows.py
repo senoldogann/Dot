@@ -184,6 +184,13 @@ async def test_the_subagents_are_one_card_with_a_row_each_and_the_task_says_it_w
                     wait: Locator = page.locator(".wait-line")
                     await expect(wait.locator(".wait-line-text")).to_have_text("Waiting on 2 subagents")
                     await expect(wait.locator(".wait-line-now")).to_contain_text("Running sleep 300")
+                    if width <= 720:
+                        # A phone does not stack the line over its composer (item 1383): the capsule has a segment
+                        # for the helpers, whose sheet says the same and has the same buttons.
+                        await expect(wait).to_be_hidden()
+                        await expect(page.locator('[data-segment="helpers"]')).to_have_attribute(
+                            "aria-label", "2 helpers. Waiting on 2 subagents"
+                        )
                     # The line is a pane on a ground of its own, in the dock and not in the conversation (item 1347):
                     # the history goes by under it and shows nothing through it.
                     pane: dict[str, object] = await wait.evaluate(

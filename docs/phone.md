@@ -300,15 +300,23 @@ Details); at its right the panel's switch, Dot's computer once the run has had a
 conversation begins under the bar, which no longer floats over it as three panes of glass (item 1119). A new chat and an
 agent's page wear the same bar (item 1123). An agent's page
 is its conversation (item 1272): it loads as a chat does, Dot's three dots in the middle, its face, name and box stand
-in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from. The line over the
-composer is one bar (item 401): how long the run has worked (or that it waits for you), how its subagents stand
-and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
-end, in the same bar; it is a row of 40 px, a plain surface on a hairline and the card's corner, with no glass, no shadow
-and no pill (items 352 and 360, drawn so since item 1335; a wider window has the same bar), as wide as its parts and the
-way down and no wider, in the middle of the dock, not across all of it (item 427). While the task waits for its
-subagents a line over it says **Waiting on 2 subagents**, with Details and Stop (item 1331): a pane on the bar's own
-ground and hairline, in the dock under the conversation and never in it, so it stays where it is however far the chat is
-scrolled up and no message shows through it (item 1347).
+in the middle of the room under the bar, and its way back is the list of chats, or the agents' page it was opened from.
+Over the composer there is one row and nothing stacked (item 1383, which ended the bar of item 401, the line that waited
+on the subagents, the queue, the loops and the commands at work, five panes one upon the other at different widths): a
+capsule of glass (a blurred translucent surface with a solid one where the browser draws no blur), its segments divided
+by hairlines and each at least 44 px tall, in the middle of the dock, with the way down a round button beside it and
+never a layer over it. Its segments are the run's status with its Stop (**Working · 36 s**, **Waiting for you**,
+**Reconnecting…**), its plan, **2 helpers**, the loops (**every 10 min**, **2 loops**), **1 queued** and **1 running**,
+each there only while it has something to say, and with none the capsule is not drawn at all. A row too narrow says
+fewer words (the counts alone for the secondary segments, then the Stop without its word, then the time without
+"Working") and at 320 px, with everything to say, takes a second line that keeps the status and the Stop in words, never
+a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
+at a time, which closes by a tap outside, by Escape, by its handle or by a swipe down: the queue's rows with their
+arrows, the loops with when next and **Stop repeating**, the commands with their words wrapped and **Stop**, the helpers
+with **Details** and **Stop**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their
+own directly over the capsule, never folded into it.
+It respects reduced motion and its segments have focus rings, names and `aria-expanded`. A window wider than 720 px
+keeps the bar of item 401 and the panes over the composer.
 A list row (Campaigns, Scheduled tasks, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
@@ -320,8 +328,8 @@ and the composer stay where they are and only the conversation scrolls, so a scr
 keyboard move nothing else. The conversation is that one scroller and it is as wide as the screen (item 1349): the page's
 12 px at its sides and its 16 px under the bar, which scroll nothing, are the conversation's own padding now, so the
 system's scroll bar stands at the screen's edge and a swipe that begins at the edge scrolls; the dock lets a touch through
-where nothing of it is drawn, so the gaps beside the bar and the queue scroll the conversation too, and the way down's
-invisible 4 px ring no longer covers the dock while it shows. The window never scrolls and does not stretch past its ends;
+where nothing of it is drawn, so the gaps beside the capsule scroll the conversation too (item 1383), and the way down,
+a round button beside the capsule, covers nothing of the dock while it shows. The window never scrolls and does not stretch past its ends;
 on the pages that scroll (the chats, Settings, Models, Memory) the window alone scrolls, with no box of the page beside it
 (`tests/smoke/test_chat_one_scroller.py`). The composer stands at the conversation's foot on the page's own surface, a rounded box with a hairline edge (item 1330: the
 pane of glass of items 374 and 401 and the quiet resting box of item 1120 are gone), with no band of the page's colour

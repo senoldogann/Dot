@@ -2,17 +2,17 @@
 1349). WebKit with an iPhone's touch, at 390 by 844 and 430 by 932, over a served daemon whose task has handed two
 jobs to two subagents and has three messages waiting in its queue.
 
-* The line "Waiting on 2 subagents" is in the dock, on a ground of its own that no message shows through, and it
-  stands where it stood however far the conversation is scrolled and while the conversation grows.
-* A queued message is moved by an up and a down arrow of 44 px, disabled at the ends of the queue; no row can be
-  dragged.
+* The capsule over the composer (item 1383), which says the task waits on 2 helpers and has 3 messages queued, is in
+  the dock, never in the conversation, and it stands where it stood however far the conversation is scrolled and while
+  the conversation grows, with nothing over it.
+* A queued message is moved, in the sheet the capsule's queue segment opens, by an up and a down arrow of 44 px,
+  disabled at the ends of the queue; no row can be dragged.
 * The conversation is as wide as the screen, so its scroll bar is at the screen's edge and a swipe that begins in the
   page's old 12 px gutters or in the dock's gaps scrolls it; nothing else of the chat scrolls, and the window not at
   all.
 * The pages of the app that scroll (the chats, Settings, Models, Memory) scroll in the window alone.
 No network and no model service is used: the scripted model plays the run and its subagents."""
 
-import re
 from pathlib import Path
 from typing import Any
 
@@ -45,19 +45,18 @@ _FACTS: str = """() => {
     return [Math.round(b.left), Math.round(b.top), Math.round(b.right), Math.round(b.bottom)];
   };
   const thread = document.querySelector('.run-thread');
-  const wait = document.querySelector('.wait-line');
+  const bar = document.querySelector('.dockbar-capsule');
   const scrollers = [...document.querySelectorAll('body *')]
     .filter((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1)
     .map((e) => e.tagName.toLowerCase() + '.' + [...e.classList].join(' '));
   return {
     thread: rect(thread),
     dock: rect(document.querySelector('.dock')),
-    wait: rect(wait),
-    bar: rect(document.querySelector('.status-bar')),
+    bar: rect(bar),
+    row: rect(document.querySelector('.dockbar')),
     composer: rect(document.querySelector('.dock .composer')),
-    waitInThread: wait ? thread.contains(wait) : null,
-    waitInDock: wait ? !!wait.closest('.dock') : null,
-    waitGround: wait ? getComputedStyle(wait).backgroundColor : null,
+    barInThread: bar ? thread.contains(bar) : null,
+    barInDock: bar ? !!bar.closest('.dock') : null,
     scrollTop: thread.scrollTop,
     scrollMax: thread.scrollHeight - thread.clientHeight,
     scrollers,
@@ -82,19 +81,19 @@ async def _phone(playwright: Playwright, browser: Browser, width: int, height: i
     return await browser.new_context(**device, reduced_motion="reduce")
 
 
-def _opaque(ground: str) -> bool:
-    """Whether a computed colour lets nothing through: rgb(...) or an alpha of 1."""
-    parts: list[str] = re.findall(r"[\d.]+", ground)
-    return ground.startswith("rgb") and (len(parts) == 3 or float(parts[3]) == 1.0)
+def _stands_as(now: dict[str, Any], before: dict[str, Any]) -> bool:
+    """Whether the capsule stands where it stood: at the same height. Its width follows its words, the run's time among
+    them, and the way down beside it moves it half a button aside, so neither is compared."""
+    return (now["bar"][1], now["bar"][3]) == (before["bar"][1], before["bar"][3])
 
 
 async def _hit(page: Page, x: float, y: float) -> str:
-    """What is at a point of the screen: the line, the conversation, the dock or one of its parts, or something else."""
+    """What is at a point of the screen: the capsule, the conversation, the dock or a part of it, or something else."""
     return await page.evaluate(
         """([x, y]) => {
           const e = document.elementFromPoint(x, y);
           if (!e) return 'none';
-          if (e.closest('.wait-line')) return 'wait-line';
+          if (e.closest('.dockbar-capsule')) return 'capsule';
           if (e.closest('.run-thread')) return 'thread';
           if (e.closest('.dock')) return e.classList.contains('dock') ? 'dock' : 'dock-child:' + e.className;
           return 'other:' + e.tagName.toLowerCase() + '.' + [...e.classList].join('.');
@@ -103,7 +102,7 @@ async def _hit(page: Page, x: float, y: float) -> str:
     )
 
 
-async def test_the_wait_line_stays_pinned_the_queue_has_arrows_and_the_conversation_is_the_one_scroller(
+async def test_the_capsule_stays_pinned_the_queue_has_arrows_and_the_conversation_is_the_one_scroller(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     with scratch_home() as home, eval_environment(home, {}):
@@ -126,9 +125,10 @@ async def test_the_wait_line_stays_pinned_the_queue_has_arrows_and_the_conversat
                     port: int = int(address.rpartition(":")[2])
                     await page.goto(ui_url("127.0.0.1", port, TOKEN))
                     await page.goto(f"{address}/#/runs/{parent.id}")
-                    wait: Locator = page.locator(".wait-line")
-                    await expect(wait.locator(".wait-line-text")).to_have_text("Waiting on 2 subagents")
-                    await expect(page.locator(".queue .queue-row")).to_have_count(len(_QUEUED))
+                    await expect(page.locator('[data-segment="helpers"]')).to_have_attribute(
+                        "aria-label", "2 helpers. Waiting on 2 subagents"
+                    )
+                    await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "3 queued")
                     where: str = f"at {width}x{height}"
 
                     # A long conversation: the history that scrolls under the dock.
@@ -147,21 +147,20 @@ async def test_the_wait_line_stays_pinned_the_queue_has_arrows_and_the_conversat
                     await page.wait_for_timeout(300)
                     foot: dict[str, Any] = await page.evaluate(_FACTS)
 
-                    # A: the line is in the dock, never in the conversation, on a ground nothing shows through, above
-                    # the bar and the composer; it is where it was at the end, in the middle and at the top of the
-                    # conversation, and while the conversation grows under it.
-                    assert foot["waitInDock"] is True and foot["waitInThread"] is False, (where, foot)
-                    assert _opaque(foot["waitGround"]), (where, foot["waitGround"])
-                    assert foot["wait"][3] <= foot["bar"][1] <= foot["composer"][1], (where, foot)
-                    assert foot["thread"][3] > foot["wait"][3], "the conversation runs under the line"
-                    centre: float = (foot["wait"][0] + foot["wait"][2]) / 2
-                    middle: float = (foot["wait"][1] + foot["wait"][3]) / 2
+                    # A: the capsule is in the dock, never in the conversation, over the composer; it is where it was at
+                    # the end, in the middle and at the top of the conversation, and while the conversation grows
+                    # under it, and nothing covers it.
+                    assert foot["barInDock"] is True and foot["barInThread"] is False, (where, foot)
+                    assert foot["bar"][3] <= foot["composer"][1], (where, foot)
+                    assert foot["thread"][3] > foot["bar"][3], "the conversation runs under the capsule"
+                    centre: float = (foot["bar"][0] + foot["bar"][2]) / 2
+                    middle: float = (foot["bar"][1] + foot["bar"][3]) / 2
                     for to in (foot["scrollMax"], foot["scrollMax"] / 2, 0):
                         await page.evaluate("(to) => { document.querySelector('.run-thread').scrollTop = to; }", to)
                         await page.wait_for_timeout(150)
                         moved: dict[str, Any] = await page.evaluate(_FACTS)
-                        assert moved["wait"] == foot["wait"], (where, "the line moved with the scroll", moved, foot)
-                        assert await _hit(page, centre, middle) == "wait-line", (where, "something covers the line")
+                        assert _stands_as(moved, foot), (where, "the capsule moved with the scroll", moved, foot)
+                        assert await _hit(page, centre, middle) == "capsule", (where, "something covers the capsule")
                     await page.evaluate(
                         """() => {
                           const thread = document.querySelector('.run-thread');
@@ -174,7 +173,7 @@ async def test_the_wait_line_stays_pinned_the_queue_has_arrows_and_the_conversat
                         }"""
                     )
                     await page.wait_for_timeout(150)
-                    assert (await page.evaluate(_FACTS))["wait"] == foot["wait"], (where, "the line moved as it grew")
+                    assert _stands_as(await page.evaluate(_FACTS), foot), (where, "the capsule moved as it grew")
                     await page.screenshot(path=str(tmp_path / f"pinned-{width}.png"))
 
                     # C: one scroller, as wide as the screen, with its bar at the screen's edge.
@@ -186,16 +185,24 @@ async def test_the_wait_line_stays_pinned_the_queue_has_arrows_and_the_conversat
                     )
                     assert foot["windowScroll"][1] <= foot["windowScroll"][2], (where, "the window scrolls")
                     assert foot["htmlOverflow"] == "hidden" and foot["overscroll"] == "none", (where, foot)
-                    seen: float = (foot["thread"][1] + foot["wait"][1]) / 2
+                    seen: float = (foot["thread"][1] + foot["bar"][1]) / 2
                     for x in (1, vw - 2):
                         assert await _hit(page, x, seen) == "thread", (where, f"a swipe at x={x} reaches no scroller")
-                    # The dock's gaps, beside the line, the bar and the queue, let a swipe through to the conversation.
+                    # The dock's gaps, beside the capsule and between it and the composer, let a swipe through to the
+                    # conversation.
                     dock: list[int] = foot["dock"]
-                    for y in (dock[1] + 2, (foot["wait"][3] + foot["bar"][1]) / 2, dock[3] - 2):
+                    for y in (
+                        dock[1] + 2,
+                        (foot["bar"][1] + foot["bar"][3]) / 2,
+                        (foot["bar"][3] + foot["composer"][1]) / 2,
+                    ):
                         for x in (2, vw - 3):
                             assert await _hit(page, x, y) == "thread", (where, f"the dock stops a swipe at ({x}, {y})")
 
-                    # B: an up and a down arrow of 44 px for each queued message, disabled at the ends, no drag.
+                    # B: an up and a down arrow of 44 px for each queued message, in the queue's sheet, disabled at the
+                    # ends, no drag.
+                    await page.locator('[data-segment="queue"]').tap()
+                    await expect(page.locator(".dock-sheet:not([hidden])")).to_have_count(1)
                     rows: Locator = page.locator(".queue .queue-row")
                     ups: Locator = page.locator(".queue .queue-up")
                     downs: Locator = page.locator(".queue .queue-down")

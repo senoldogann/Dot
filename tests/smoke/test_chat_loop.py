@@ -15,6 +15,7 @@ from typing import Literal
 
 import httpx
 import pytest
+from dock_scenario import is_phone, open_sheet
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -225,6 +226,17 @@ async def test_slash_loop_shows_the_loop_over_the_composer_and_its_stop_ends_it(
                 await box.fill("/loop 30m check the build")
                 await box.press("Enter")
                 loops: Locator = page.get_by_role("region", name="Loops of this chat")
+                phone: bool = is_phone(page)
+                if phone:
+                    # The loop's message goes at once as the chat's next run and the page goes on to it: a new page,
+                    # which says the loop in the capsule ("every 30 min") and shows it in the sheet its segment opens
+                    # (item 1383), whose rows are open whatever the fold of the line over the composer was. The sheet
+                    # is opened once the page has gone on, since a page that goes on takes its sheet away.
+                    await expect(page.get_by_role("heading", name="check the build", level=1)).to_have_count(1)
+                    await expect(page.locator('[data-segment="loops"]')).to_have_attribute(
+                        "aria-label", "Loop, every 30 min"
+                    )
+                    await open_sheet(page, "loops")
                 await expect(loops).to_be_visible()
                 await expect(loops).to_contain_text("check the build")
                 await expect(loops).to_contain_text("every 30 minutes")
@@ -233,10 +245,11 @@ async def test_slash_loop_shows_the_loop_over_the_composer_and_its_stop_ends_it(
                 # The page of that run shows the chat's loop too.
                 await expect(loops).to_contain_text("every 30 minutes")
                 await page.screenshot(path=tmp_path / f"loop-{width}-{scheme}.png")
-                # A loop at rest is one folded line: its Stop is a press on the line away.
-                await page.locator(".chat-loops-toggle").click()
+                # A loop at rest is one folded line: its Stop is a press on the line away (a phone's sheet has no line).
+                if not phone:
+                    await page.locator(".chat-loops-toggle").click()
                 await page.get_by_role("button", name="Stop repeating: check the build").click()
-                await page.get_by_role("dialog").get_by_role("button", name="Stop repeating").click()
+                await page.locator("dialog.modal").get_by_role("button", name="Stop repeating").click()
                 await expect(loops).to_be_hidden()
                 # A loop with no rhythm is said how to write it, and nothing is sent.
                 await box.fill("/loop check the build")
@@ -275,14 +288,18 @@ async def test_slash_loop_in_a_new_chat_starts_it_with_its_loop(tmp_path: Path) 
                 await expect(page).to_have_url(re.compile(r"#/runs/run_"))
                 await expect(page.locator(".run-thread")).to_contain_text("check the build")
                 loops: Locator = page.get_by_role("region", name="Loops of this chat")
+                phone = is_phone(page)
+                if phone:
+                    await open_sheet(page, "loops")
                 await expect(loops).to_contain_text("check the build")
                 await expect(loops).to_contain_text("every 30 minutes")
                 await page.screenshot(path=tmp_path / f"new-chat-loop-{width}-{scheme}.png")
                 # Stopped, the loop leaves room for the next width's.
-                # A loop at rest is one folded line: its Stop is a press on the line away.
-                await page.locator(".chat-loops-toggle").click()
+                # A loop at rest is one folded line: its Stop is a press on the line away (a phone's sheet has no line).
+                if not phone:
+                    await page.locator(".chat-loops-toggle").click()
                 await page.get_by_role("button", name="Stop repeating: check the build").click()
-                await page.get_by_role("dialog").get_by_role("button", name="Stop repeating").click()
+                await page.locator("dialog.modal").get_by_role("button", name="Stop repeating").click()
                 await expect(loops).to_be_hidden()
                 await page.close()
         finally:
@@ -373,7 +390,7 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 # A loop at rest is one folded line: its Stop is a press on the line away.
                 await page.locator(".chat-loops-toggle").click()
                 await page.get_by_role("button", name="Stop repeating: check the build").click()
-                await page.get_by_role("dialog").get_by_role("button", name="Stop repeating").click()
+                await page.locator("dialog.modal").get_by_role("button", name="Stop repeating").click()
                 await expect(sidebar.locator(".side-loop")).to_have_count(0)
                 await page.close()
         finally:
@@ -406,8 +423,28 @@ async def test_the_loops_of_a_chat_fold_under_their_head_and_keep_their_stops_in
                         await box.press("Enter")
                         await expect(loops).to_contain_text(line.split(" ", 2)[2][:12])
                         await expect(page.locator(".run-thread")).to_contain_text(f"Answer {answer}.")
+                phone: bool = is_phone(page)
+                if phone:
+                    # A phone has no head to fold the rows under: its capsule says "2 loops", and the segment opens the
+                    # rows whole in a sheet, their Stops in one column and a finger tall (item 1383).
+                    await expect(page.locator('[data-segment="loops"]')).to_have_attribute("aria-label", "2 loops")
+                    await open_sheet(page, "loops")
                 rows: Locator = loops.locator(".loop-row")
                 await expect(rows).to_have_count(2)
+                if phone:
+                    await expect(loops.locator(".chat-loops-toggle")).to_be_hidden()
+                    await expect(rows.first).to_be_visible()
+                    lefts: list[float] = []
+                    for at in range(2):
+                        stop = (
+                            await rows.nth(at).get_by_role("button", name=re.compile(r"^Stop repeating")).bounding_box()
+                        )
+                        assert stop is not None and stop["height"] >= 43.99, stop
+                        lefts.append(stop["x"])
+                    assert abs(lefts[0] - lefts[1]) <= 1, lefts
+                    await page.screenshot(path=tmp_path / f"loops-open-{width}-{scheme}.png")
+                    await page.close()
+                    continue
                 # At rest (each page a browser of its own, which kept no fold) the loops are one line, which says how
                 # many there are and when the next one asks; a press opens their rows.
                 head: Locator = loops.locator(".chat-loops-toggle")
