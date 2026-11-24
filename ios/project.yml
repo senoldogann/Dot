@@ -194,6 +194,84 @@ targets:
         com.apple.security.application-groups:
           - group.dev.dotagent.phone
 
+  # The rewrite (plan 2026-11-24, ios/Next/README.md): its own bundle id, app group, Keychain group and URL scheme so
+  # it installs beside the old app; iOS 26, iPhone and iPad; no push or Live Activity until the swap (owner's call).
+  DotNext:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Next
+        excludes:
+          - "Tests/**"
+          - "scripts/**"
+          - "README.md"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.next
+        PRODUCT_NAME: DotNext
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # Every user-visible string is in Next/Resources/Localizable.xcstrings with a required Turkish translation;
+        # the compiler writes the keys it finds (.stringsdata) for scripts/check_strings.sh.
+        SWIFT_EMIT_LOC_STRINGS: YES
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: Next/Info.plist
+      properties:
+        CFBundleDisplayName: Dot Next
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations:
+          - en
+          - tr
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.dotagent.phone.next
+            CFBundleURLSchemes:
+              - dotnext
+    entitlements:
+      path: Next/DotNext.entitlements
+      properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.dotagent.phone.next
+        com.apple.security.application-groups:
+          - group.dev.dotagent.phone.next
+    scheme:
+      testTargets:
+        - DotNextTests
+
+  # Unit tests of DotNext's pure parts: the palette's contrast, the type rhythm, the reading column, component rules.
+  DotNextTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Next/Tests
+    dependencies:
+      - target: DotNext
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.next.tests
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+
 schemes:
   DotUI:
     build:
