@@ -149,7 +149,7 @@ enum NeedsYouRules {
         case .secret:
             return .secret
         case .handoff:
-            return .handoff(line: item.title)
+            return .handoff(line: HandoffCard.make(from: item)?.headline ?? item.title)
         case .other:
             return .other(line: item.title)
         }

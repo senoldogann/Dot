@@ -689,6 +689,17 @@ all of it in the chat (Deny stays). **A secret is never answered on the phone**:
 on your Mac" and has no field or button that takes a value. A hand-off and a kind the app does not know are answered in
 the chat, which each row opens (`dotagent://run/<run id>`).
 
+**The hand-off card** (item 1444). A chat whose run waits for a step only the owner can do in the browser (a `handoff` row of
+this list) shows one calm card in its transcript: "Dot is waiting for you in the browser on `<host>`", a line that Dot
+cannot go on until the step is done, and a button, **Open in Safari**, that opens the run's page of the web UI on the
+address the app already holds (`https://<mac>/#/runs/<run id>`) in the system's browser, where **Take over** lets the
+owner do the step from the phone ([Daemon](daemon.md)); the chat stays one tap away by the deep link
+(`dotagent://run/<run id>`), and the inbox's row says the same words with the same button. The card says what the daemon's
+fixed line says and nothing else: the host is shown only when it is plainly a host (letters, digits, `-`, `.`, `_`, `:`; no
+space, path, `@` or query), so no credential, address part, page text or typed word can come to it through the line, and
+without a host it says only that Dot is waiting. The step is not answered with a tap on the phone: the run goes on when
+the owner hands the browser back or answers in the web UI.
+
 ### POST /api/phone/live-start-token and DELETE /api/phone/live-start-token
 
 The token that starts the phone's Live Activity by push (item 1425; `Activity<DotFleetAttributes>.pushToStartTokenUpdates`,

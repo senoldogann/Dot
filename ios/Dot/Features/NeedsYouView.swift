@@ -78,6 +78,11 @@ struct NeedsYouView: View {
                             onOpenChat: {
                                 dismiss()
                                 onOpen(row.item.runId)
+                            },
+                            onOpenWeb: {
+                                if let card: HandoffCard = HandoffCard.make(from: row.item) {
+                                    HandoffCardView.openInSafari(card, on: store.host)
+                                }
                             })
                     }
                 }
@@ -99,6 +104,8 @@ struct NeedsYouRowView: View {
     let row: NeedsYouRow
     let onAnswer: (OutboxItem.Action) -> Void
     let onOpenChat: () -> Void
+    /// Opens the run's page of the web UI in Safari (a hand-off's button).
+    var onOpenWeb: () -> Void = {}
     @State private var typed: String = ""
     @State private var expanded: Bool = false
 
@@ -182,7 +189,10 @@ struct NeedsYouRowView: View {
         case .secret:
             Label("Dot needs a secret: enter it on your Mac", systemImage: "lock.shield.fill")
                 .font(.subheadline).foregroundStyle(Theme.text)
-        case .handoff(let line), .other(let line):
+        case .handoff(let line):
+            Text(line).font(.headline).foregroundStyle(Theme.text)
+            Text(HandoffCard.explanation).font(Theme.small).foregroundStyle(Theme.muted)
+        case .other(let line):
             Text(line).font(.headline).foregroundStyle(Theme.text)
         }
     }
@@ -237,7 +247,14 @@ struct NeedsYouRowView: View {
                     .controlSize(.large)
                 }
             }
-        case .secret, .handoff, .other:
+        case .handoff:
+            Button(action: onOpenWeb) {
+                Label(HandoffCard.buttonTitle, systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity)
+            }
+            .dotButton(.glass)
+            .controlSize(.large)
+            .accessibilityIdentifier("needs-you-open-web")
+        case .secret, .other:
             EmptyView()
         }
     }

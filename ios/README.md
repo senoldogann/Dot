@@ -14,7 +14,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
     `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
     `PushSettings` (item 1441) the three push switches and what a flip does; `NeedsYou` (item 1442) the inbox's list, its rows
-    and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it.
+    and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it; `Handoff` (item 1444) the card of a step only the owner can do.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -126,6 +126,12 @@ did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app'
   and how many approvals Dot answered for the owner. It is read against the mark Dot keeps for every device
   (`GET /api/away/read`; the first visit marks the moment and shows nothing) and put away with `POST /api/away/read` (the
   card goes at once; a mark that does not get through is kept in `awareness.json` and sent first by the next read).
+- **Hand-off card** (item 1444): a chat whose run waits for a step only the owner can do in the browser (a `handoff` row of
+  the needs-you list) shows one calm card (`HandoffCardView`, the rules in `Core/Handoff`): "Dot is waiting for you in the
+  browser on <host>" and **Open in Safari**, which opens the run's page of the web UI on the address the app holds
+  (`https://<mac>/#/runs/<id>`) in the system's browser; the chat is still `dotagent://run/<id>`. The card carries only the host
+  the daemon's fixed line names (and only when it is plainly a host), never a credential or page text; the inbox's row has
+  the same words and button.
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 

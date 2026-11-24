@@ -161,7 +161,7 @@ final class NeedsYouTests: XCTestCase {
 
     func testAHandOffAndAKindThisBuildDoesNotKnowAreAnsweredInTheChat() {
         let handoff: NeedsYouRow = row(.handoff, title: "Dot needs you on bank.example")
-        XCTAssertEqual(handoff.ask, .handoff(line: "Dot needs you on bank.example"))
+        XCTAssertEqual(handoff.ask, .handoff(line: "Dot is waiting for you in the browser on bank.example"))
         XCTAssertNil(handoff.decision(approve: true))
         XCTAssertNil(handoff.decision(approve: false))
         let other: NeedsYouRow = row(.other, title: "Look at this")
@@ -203,7 +203,8 @@ final class NeedsYouTests: XCTestCase {
     func testThePreviewIsWhatTheNewestAsks() throws {
         let rows: [NeedsYouRow] = NeedsYouRules.rows(from: try list())
         XCTAssertEqual(rows.map(NeedsYouRules.preview(of:)), [
-            "Dot needs a secret: enter it on your Mac", "Dot needs you on bank.example", "Which day should it ship?", "Run a command: make deploy",
+            "Dot needs a secret: enter it on your Mac", "Dot is waiting for you in the browser on bank.example", "Which day should it ship?",
+            "Run a command: make deploy",
         ])
     }
 
