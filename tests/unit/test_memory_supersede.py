@@ -102,6 +102,11 @@ def test_the_same_sentence_with_a_value_swapped_or_a_word_of_change_says_the_fac
         ("PR 12 is merged.", "PR 13 is merged."),
         ("The user's invoice 1042 is paid.", "The user's invoice 1043 is paid."),
         ("Ticket 12 is assigned to Maria.", "Ticket 13 is assigned to Maria."),
+        # A number after a preposition may name a thing as well as be a value.
+        ("The fix for 1077 is merged.", "The fix for 1080 is merged."),
+        ("The draft is in 1729.md.", "The draft is in 1730.md."),
+        # A time within the same hour: the hour is shared, so the cut lies after a number, and nothing is guessed.
+        ("The standup is at 10:00.", "The standup is at 10:30."),
         # A version after a word that names a thing is left to a subject or the night, not guessed.
         ("The invoice template is invoice-v1.docx.", "The invoice template is invoice-v2.docx."),
         # Both can be true: a name is no number, and no word says it changed.
