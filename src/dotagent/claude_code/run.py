@@ -1547,20 +1547,34 @@ class _Cuts:
         await _pause(agent.cancel, waited, agent.run.id)
         self.continued += 1
         started: _Program = await self.launch.start(None if fresh else follow.session_id, continuing=True, fresh=fresh)
-        lost: list[tuple[str, tuple[ImageData, ...]]] = await follow.restart(started.stdin)
+        try:
+            return started, await self._first_messages(program, started, fresh, waited)
+        except BaseException:
+            # A stop that comes before the run holds the new program (it is handed over when this returns): nobody else
+            # would end it.
+            await asyncio.shield(_retire(started))
+            raise
+
+    async def _first_messages(
+        self, program: ProgramExit, started: _Program, fresh: bool, waited: float
+    ) -> list[_Outgoing]:
+        """The run takes the new program up (what it had of the cut one's is gone, the page is told) and what is sent
+        it first: what the owner sent that the cut program never took in, as sent, then the note about the cut; or, for
+        a new session, the run's brief."""
+        agent: AgentRun = self.agent
+        lost: list[tuple[str, tuple[ImageData, ...]]] = await self.follow.restart(started.stdin)
         data: JsonObject = continued_event_data(program, self.continued, self.allowed, fresh, waited)
         log.warning("claude_code_run_continued", run_id=agent.run.id, **data)
-        await follow.emit(CONTINUED_EVENT, data, True)
+        await self.follow.emit(CONTINUED_EVENT, data, True)
         note: str = continuation_note(program, fresh)
         if not fresh:
-            # What the owner sent that the cut program never took in goes to the new one first, as sent.
-            return started, [*((text, shown, True) for text, shown in lost), (note, (), False)]
+            return [*((text, shown, True) for text, shown in lost), (note, (), False)]
         runtime: Runtime = agent.runtime
         sent: list[Message] = await runtime.store.load_messages(agent.run.thread_id, 0)
         steers: list[str] = [message.content for message in sent[len(self.earlier) + 2 :] if message.role == "user"]
         briefing: str = await _what_was_done(runtime, agent.run.id, steers)
         text: str = f"{meanwhile(self.opening, self.earlier)}\n\n{briefing}\n\n{note}"
-        return started, [(text, self.pictures, False)]
+        return [(text, self.pictures, False)]
 
 
 async def run_in_claude_code(agent: AgentRun) -> RunEnd:

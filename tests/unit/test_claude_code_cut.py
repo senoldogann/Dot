@@ -30,11 +30,14 @@ from dotagent.claude_code.cut import (
     why_not_continued,
 )
 from dotagent.claude_code.run import (
+    _Cuts,
     _drop_stale,
     _end_program,
     _Ended,
     _noting_outward,
+    _Program,
     _Quiet,
+    _read_tail,
     _Silent,
     _what_was_done,
 )
@@ -481,3 +484,62 @@ async def test_the_first_words_in_the_brief_of_a_new_session_are_the_runs_first_
     assert 'Its first words: "words of step 1"' in brief
     assert f'Its last words: "words of step {steps}"' in brief
     assert "What the owner wrote while it worked:\n- Also the second folder." in brief
+
+
+async def _program(*, sleeps: int = 30) -> _Program:
+    """A program of a run as the runner holds it: a process of a group of its own, its input, the end of its error
+    stream and a pump."""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-c",
+        f"import time; time.sleep({sleeps})",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        start_new_session=True,
+    )
+    assert process.stdin is not None and process.stderr is not None
+    return _Program(
+        process=process,
+        stdin=process.stdin,
+        tail=asyncio.create_task(_read_tail(process.stderr)),
+        pumps=(asyncio.create_task(asyncio.sleep(30)),),
+        continuing=True,
+    )
+
+
+async def test_a_program_started_to_go_on_is_ended_when_the_run_is_stopped_before_it_is_taken_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Item 1581: the new program is handed to the run only when ``_go_on`` returns, so a stop that comes between its
+    start and that, with nobody else holding it, must end it here, not leave a ``claude`` at work on the plan."""
+    monkeypatch.setattr(cut_module, "CONTINUE_AFTER_S", (0.01, 0.01))
+    cut: _Program = await _program(sleeps=0)
+    await cut.process.wait()
+    started: _Program = await _program()
+
+    class _Launch:
+        queue: asyncio.Queue[object] = asyncio.Queue()
+
+        async def start(self, resume: str | None, continuing: bool, fresh: bool = False) -> _Program:
+            return started
+
+    class _Follow:
+        session_id: str = "ses-1"
+
+        async def restart(self, stdin: object) -> list[object]:
+            raise asyncio.CancelledError
+
+    agent = SimpleNamespace(cancel=asyncio.Event(), run=SimpleNamespace(id="run_a"), runtime=None)
+    cuts = _Cuts(
+        agent=agent,  # type: ignore[arg-type]  # the parts of a run that ``_go_on`` reads
+        follow=_Follow(),  # type: ignore[arg-type]
+        launch=_Launch(),  # type: ignore[arg-type]
+        allowed=2,
+        earlier=[],
+        opening="",
+        pictures=(),
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await cuts._go_on(_exit(-9), cut, False)
+    assert started.process.returncode is not None, "the program that was started to go on is still at work"
