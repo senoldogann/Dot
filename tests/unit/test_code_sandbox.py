@@ -9,7 +9,7 @@ import pytest
 
 from dotagent.codemode import install, sandbox
 from dotagent.codemode.runner import OutputWindow, child_environment
-from dotagent.codemode.sandbox import Interpreter, Layout
+from dotagent.codemode.sandbox import Interpreter, Layout, layout_for
 from dotagent.codemode.tree import Tree
 
 
@@ -262,3 +262,10 @@ def test_a_limit_the_system_will_not_take_ends_the_launcher_before_the_code_runs
     assert status == 72
     seen = capsys.readouterr()
     assert "could not be set" in seen.err and "the code ran" not in seen.out
+
+
+@pytest.mark.parametrize("run_id", ["", "..", "../x", "a/b", ".hidden", "a b", "run\x00x", "x" * 81, "run.id"])
+def test_a_run_id_that_names_another_place_is_refused_not_joined(run_id: str, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="is not the id of a run"):
+        layout_for(tmp_path, run_id)
+    assert layout_for(tmp_path, "run_mwue93jj_503849-2").run.name == "run_mwue93jj_503849-2"

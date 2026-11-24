@@ -25,6 +25,7 @@ A Mac where the probe cannot start Python in it runs nothing (:func:`code_mode_r
 import asyncio
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -44,6 +45,7 @@ from dotagent.policy.sandbox import SANDBOX_EXEC
 _MIN_PREFIX_PARTS: int = 5
 # How long a probe that failed stands before it is made again: a Mac that could not start it a minute ago may now.
 _FAILED_STANDS_S: float = 300.0
+_RUN_ID: re.Pattern[str] = re.compile(r"[A-Za-z0-9_-]{1,80}")
 _PROBE_TIMEOUT_S: float = 20.0
 # The system's own folders Python's loader reads, and the libraries it maps, whatever the interpreter.
 _SYSTEM_READS: tuple[str, ...] = ("/usr/lib", "/System/Library", "/usr/share/locale")
@@ -110,7 +112,10 @@ def current_interpreter() -> Interpreter:
 
 
 def layout_for(workspace: Path, run_id: str) -> Layout:
-    """Where the code of the run ``run_id`` has its folders: ``<workspace>/code/<run id>``."""
+    """Where the code of the run ``run_id`` has its folders: ``<workspace>/code/<run id>``. A run's id is made by Dot
+    (letters, digits, ``_`` and ``-``); one that names another place is refused, not joined."""
+    if _RUN_ID.fullmatch(run_id) is None:
+        raise ValueError(f"{run_id!r} is not the id of a run")
     root: Path = Path(os.path.realpath(workspace))
     run: Path = root / "code" / run_id
     return Layout(root=root, run=run, tools=run / "tools", scratch=run / "scratch")
