@@ -246,6 +246,7 @@ class ContinuedPayload(Payload):
     fresh_session: bool
     signal: str | None = None
     returncode: int | None = None
+    said: str = ""
 
 
 class ResumedPayload(Payload):
@@ -523,7 +524,11 @@ class TerminalUi:
                 self._on_resumed(ResumedPayload.model_validate(data))
             case "claude_code_continued":
                 continued = ContinuedPayload.model_validate(data)
-                how: str = continued.signal or f"exit code {continued.returncode}"
+                how: str = continued.signal or (
+                    f"exit code {continued.returncode}"
+                    if continued.returncode is not None
+                    else continued.said or "ended by Dot"
+                )
                 session: str = "in a new session" if continued.fresh_session else "in its session"
                 self._line(
                     self._paint(

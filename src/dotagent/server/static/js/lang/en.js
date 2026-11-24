@@ -557,6 +557,7 @@ export const EN = {
   "timeline.programContinued": "The program was cut off at {at}; Dot continued the run",
   "timeline.programContinuedFresh": "The program was cut off at {at} and its session could not be resumed; Dot went on in a new one",
   "timeline.programCut": "Ended with {how}; {steps} steps taken; {silent} s since its last line",
+  "timeline.programEndedByDot": "Dot ended it",
   "timeline.compactedSized": "Older part of the chat summed up: {before} → {after}",
   "timeline.compacted": "Older part of the chat summed up",
   "timeline.condensed": "Earlier messages were condensed",

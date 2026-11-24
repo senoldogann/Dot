@@ -548,6 +548,7 @@ export const TR = {
   "timeline.programContinued": "Program {at} saatinde kesildi; Dot görevi kaldığı yerden sürdürdü",
   "timeline.programContinuedFresh": "Program {at} saatinde kesildi ve oturumu sürdürülemedi; Dot yeni bir oturumda devam etti",
   "timeline.programCut": "Şununla bitti: {how}; {steps} adım atıldı; son satırından bu yana {silent} sn",
+  "timeline.programEndedByDot": "Dot sonlandırdı",
   "timeline.compactedSized": "Sohbetin eski kısmı özetlendi: {before} → {after}",
   "timeline.compacted": "Sohbetin eski kısmı özetlendi",
   "timeline.condensed": "Önceki mesajlar kısaltıldı",

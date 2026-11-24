@@ -330,10 +330,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `claude_code_programs_ended_together` when several programs are cut in one second) and, unless the cause is Dot's own
   (your Stop, the emergency stop, the daemon's stop, the plan's limit, the run's limits, the silence watch) or a call that
   may have sent a message or mail, a payment or a post for you was in flight, starts the program again in the same
-  session and the same run, after 2 s and after 10 s, at most `[providers.claude_code] continue_cut` (2) times. It is
+  session and the same run (a new session when the resume is refused), after 2 s and after 10 s, at most
+  `[providers.claude_code] continue_cut` (2) times. It is
   one run all through: its id, its events and its steps go on, the run that delegated it keeps waiting for it, and a
   helper that works in the background stays one; the page says "The program was cut off at 10:44:04; Dot continued the
-  run" each time. A second program that is cut too is continued again until the count is used up; then the run fails
+  run" each time (or, in a new session, "... and its session could not be resumed; Dot went on in a new one"). A second program that is cut too is continued again until the count is used up; then the run fails
   with the exits of all the cuts in its context. The chat's session is kept only when the run ends clean (see
   [Models](models.md)).
 - A message sent to a running run (steering) reaches the model at once: a step whose model is still answering is cut

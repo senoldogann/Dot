@@ -5,6 +5,7 @@ a moment to have. The runner's own use of them is in ``tests/smoke/test_claude_c
 import asyncio
 import re
 import sys
+from types import SimpleNamespace
 
 import pytest
 from structlog.testing import capture_logs
@@ -28,7 +29,15 @@ from dotagent.claude_code.cut import (
     signal_name,
     why_not_continued,
 )
-from dotagent.claude_code.run import _drop_stale, _end_program, _Ended, _noting_outward, _Quiet, _Silent
+from dotagent.claude_code.run import (
+    _drop_stale,
+    _end_program,
+    _Ended,
+    _noting_outward,
+    _Quiet,
+    _Silent,
+    _what_was_done,
+)
 from dotagent.cli_ui import TerminalUi, UiOptions
 from dotagent.config import load_default_config
 from dotagent.llm.types import ToolSpec
@@ -413,3 +422,62 @@ async def test_the_terminal_says_the_run_was_continued_and_how_the_program_ended
     shown: str = capsys.readouterr().err
     assert "the program was cut off at" in shown and "(SIGKILL)" in shown and says in shown
     assert shown.count("\n") == 1
+
+
+def test_a_program_that_failed_and_that_dot_ended_says_what_it_said_instead_of_an_exit() -> None:
+    """Item 1581 (the pre-push review): the program a refused resume leaves is ended by Dot, so it has no exit of its
+    own; its context says what it said (the start of it), and one that was cut says none."""
+    context = _exit(None, said="API Error: 400 " + "x" * 600).context()
+    assert context["returncode"] is None and context["exited"] is False and context["signal"] is None
+    assert str(context["said"]).startswith("API Error: 400") and len(str(context["said"])) == 300
+    assert "said" not in _exit(-9).context()
+
+
+async def test_the_terminal_says_what_a_refused_program_said_and_never_an_exit_code_of_none(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    ui: TerminalUi = TerminalUi(
+        None,  # type: ignore[arg-type]  # no decision is asked here
+        load_default_config().server,
+        UiOptions(interactive=False, stream_text=False, show_thinking=False, verbose=False),
+    )
+    refused = _exit(None, said="Claude Code's session failed: API Error: 400 invalid_request_error")
+    data = continued_event_data(refused, attempt=1, allowed=2, fresh=True, waited_s=2.0)
+    await ui.handle(EventRecord(id=1, run_id="run_a", ts=1.0, kind="claude_code_continued", data=data))
+    shown: str = capsys.readouterr().err
+    assert "API Error: 400" in shown and "None" not in shown and "in a new session" in shown
+
+
+class _Record:
+    """The events of a run as the store gives them: the newest ``limit`` of a kind, oldest first, or all after an id."""
+
+    def __init__(self, steps: int) -> None:
+        self.events: list[EventRecord] = [
+            EventRecord(
+                id=number,
+                run_id="run_a",
+                ts=float(number),
+                kind="assistant",
+                data={"step": number, "text": f"words of step {number}", "tool_calls": []},
+            )
+            for number in range(1, steps + 1)
+        ]
+
+    async def events_of_kind(self, run_id: str, kind: str, limit: int) -> list[EventRecord]:
+        return self.events[-limit:] if kind == "assistant" else []
+
+    async def events_of_kind_after(self, run_id: str, kind: str, after: int) -> list[EventRecord]:
+        return [event for event in self.events if event.id > after]
+
+
+@pytest.mark.parametrize("steps", [3, 400, 450])
+async def test_the_first_words_in_the_brief_of_a_new_session_are_the_runs_first_however_long_it_ran(
+    steps: int,
+) -> None:
+    """Item 1581 (the pre-push review): the record is read as the newest 400 steps, so past 400 the oldest of them is
+    not the run's first; the brief reads them all then."""
+    runtime = SimpleNamespace(store=_Record(steps))
+    brief: str = await _what_was_done(runtime, "run_a", ("Also the second folder.",))  # type: ignore[arg-type]  # the part the brief reads
+    assert 'Its first words: "words of step 1"' in brief
+    assert f'Its last words: "words of step {steps}"' in brief
+    assert "What the owner wrote while it worked:\n- Also the second folder." in brief
