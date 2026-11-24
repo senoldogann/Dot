@@ -1171,6 +1171,20 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   Dot's commands in a safe box", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
   file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
   start is refused, and nothing changes.
+- **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)): the code of a `code_run` is text a model wrote, which a page
+  may have shaped, so it does not run in the sandbox above, which allows everything but Dot's files. It runs under
+  `sandbox-exec` with `(deny default)`: it reads its interpreter's installation and its `tools` folder, reads and writes its
+  `scratch` folder, and nothing else: no network (a connect, a bind and a send are refused), no program (`fork`, `exec`,
+  `posix_spawn`), none of your files, nothing of Dot's home, `~/Library` or the keychain, no service of the system, with a
+  clean environment (no token, key, cookie or address with a password) and limits on its CPU, its file size, its open files
+  and its processes; the daemon watches its time, its memory (macOS has no kernel limit for it, so this is a watch that can be
+  overrun by one large allocation), its output and its scratch folder, and kills its whole process group. It is an action
+  like a shell line to every approval mode and to your rules, and each tool call it makes goes through the run's own gate, one
+  by one, as a call of the model's does. **It fails closed:** where the sandbox cannot start Python, or a probe that checks
+  that the code can use its two folders and that a file outside, a write outside, the network and a fork are refused finds it
+  does not hold, `code_run` runs nothing and says why (`dotx doctor` shows it). The profile was measured on macOS 26.6.2 only.
+  The one thing the code does reach is what it prints, which the model reads, and what the tools it may call answer: a code
+  cannot do more than the run's own tools can, and it cannot call the tools that end the run, ask you, or start other runs.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`

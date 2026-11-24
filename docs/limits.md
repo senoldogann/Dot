@@ -82,3 +82,9 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   `undo_max_run_bytes`. Runs that change the same file are taken back in the order their changes were noted. `dotx undo`
   and `POST /api/runs/{id}/undo` need the run in the database (the journals of a deleted
   chat stay until `dotx prune --apply`).
+- Code mode (items 1500 to 1507): its sandbox was measured on macOS 26.6.2 (arm64, Python 3.13.16 from uv) only; another
+  release may need other lines in the profile, which the probe (`dotx doctor`) says by refusing to run code on a Mac where
+  Python does not start in it or the sandbox does not hold. Memory is watched from outside, not limited by the kernel (macOS
+  refuses `RLIMIT_AS`): a single allocation larger than what is read between two looks (25 ms) goes over before it is seen
+  (measured: 463 MB held against a limit of 300 MB, for an allocation of 3 GB). `import ctypes` and `import platform` fail in
+  the sandbox, which refuses the name of the Mac. Whether a hole exists in `sandbox-exec` itself is not shown.

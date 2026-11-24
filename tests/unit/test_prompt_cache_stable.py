@@ -66,3 +66,29 @@ def test_only_a_message_of_the_users_is_said_to_have_started_the_run() -> None:
         assert f"started by Dot ({source})" in note
     for source in (UI_SOURCE, CLI_SOURCE, EVAL_SOURCE):
         assert "the user's own message" in started_note(_from(source, "wait"))
+
+
+def _with_tools(*names: str) -> PromptInputs:
+    return collect_prompt_inputs(
+        "task", "ui", "aggressive", "ask", "wait", False, False, Path("/tmp/work"), [], 0,
+        list(names), [], 0, None, [], None, (), (), None, "full", NO_HARNESS,
+    )  # fmt: skip
+
+
+def test_the_prompt_teaches_code_mode_in_the_same_few_lines_whenever_the_run_has_code_run() -> None:
+    """Item 1501: when to write code and when to call a tool, in lines that hold no state of the run, so that the
+    provider's cache of the instructions holds; a run without the tool is told nothing of it."""
+    with_code: str = build_system_prompt(_with_tools("shell", "code_run"))
+    without: str = build_system_prompt(_with_tools("shell"))
+    assert "# Code\ncode_run runs Python in a sandbox" in with_code and "# Code" not in without
+    for words in ("many calls, a lot of data, a loop or a poll", "at most 5 rows", "For one call"):
+        assert words in with_code
+    assert "the same approvals as one of yours" in with_code
+    assert build_system_prompt(_with_tools("shell", "code_run")) == with_code
+    # Nothing of the run's own state is in them: the same words whoever started the run and however it asks.
+    other_inputs: PromptInputs = collect_prompt_inputs(
+        "task", "team", "cautious", "yolo", "leave", True, True, Path("/elsewhere"), [], 0,
+        ["code_run", "shell"], [], 0, None, [], None, (), (), None, "full", NO_HARNESS,
+    )  # fmt: skip
+    section: str = with_code[with_code.index("# Code") :].split("\n\n")[0]
+    assert section in build_system_prompt(other_inputs)

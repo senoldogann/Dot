@@ -1311,3 +1311,24 @@ runner_bundle = "dev.dotagent.wda.xctrunner"
 check_every_s = 30.0
 notify_after_s = 300.0
 request_timeout_s = 20.0
+
+[code]
+# Code mode (items 1500 to 1507, docs/code-mode.md): the tool code_run, where the model writes Python that calls its
+# tools as functions, filters and loops over what they answer, and prints only what it needs. The code runs in a macOS
+# sandbox of its own (no network, no programs, no file but its scratch folder) and every tool call it makes goes through
+# the same approvals as a call of the model's; where the sandbox cannot start Python, nothing runs. false offers no
+# code_run (a change takes effect when the daemon starts).
+enabled = true
+# How many seconds the code itself may run, a time.sleep included; the time a tool call takes, and the time you take to
+# answer a question, are not counted (each has a limit of its own). A code_run asks for less with timeout_s, never more.
+max_seconds = 120
+# The most resident memory the code may hold, in megabytes. macOS has no kernel limit for it: the daemon looks many times a
+# second and kills the code over this, so a single large allocation can go over before it is seen.
+max_mb = 512
+# How many characters of what the code prints reach the model: the head and the tail, with a note between them.
+output_chars = 8000
+# How many tool calls one code_run may make; the next one ends the code.
+max_calls = 200
+# The longest a tool's result may be when it is handed to the code. The model's own results are cut to [agent]
+# tool_output_chars; a code reads what it filters, and only what it prints reaches the model.
+result_chars = 5000000

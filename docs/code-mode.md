@@ -5,10 +5,88 @@ its context. The model writes a program, the program calls tools as functions, f
 and only what it prints goes back to the model. A job of many calls or a lot of data costs a short program and a short
 answer, not every result in the conversation.
 
-This page describes what exists. It grows with the items: the sandbox and the bridge (item 1500, below) come first, then
-the tool `code_run` (item 1501), the tools as files (item 1502), the settings and the checks (item 1503), and in a second
-pull request the swap of emails and phone numbers for tokens (item 1504), skills as code (item 1505) and the measurements
-(item 1506).
+This page describes what exists. It grows with the items: the tool `code_run` (item 1501) and the sandbox and the bridge
+it runs on (item 1500) are below; the tools as files and the deny list's tests follow (item 1502), the settings, the
+checks and the threat model (item 1503), and in a second pull request the swap of emails and phone numbers for tokens
+(item 1504), skills as code (item 1505) and the measurements (item 1506).
+
+## The tool `code_run` (item 1501)
+
+`code_run` takes the Python 3.13 `code`, a one-line `title` (the row of the step) and `timeout_s`. The model reads only
+what the code prints, stdout and stderr in the order they were written, as a head and a tail when it is long, and a
+footer with the number of tool calls and the seconds: `[3 tool calls, 1.2 s]`. A code that ends by itself with nothing
+printed is told so. A code that fails is an error result with the end of its traceback, in which Dot's own paths are said
+short (`<tools>`, `<scratch>`, `<python>`, `<dot home>`, `~`) and the lines of the code are shown; one that is stopped
+(its own time, its memory, its calls, its output, its scratch folder, the run's Stop) is an error that says which and what
+to do about it, with what it printed before.
+
+The code calls tools through `dot_tools`: `dot_tools.call("read_file", path="a.txt")`, parameters as keywords. A result is
+the JSON the tool said, as Python objects, when it said JSON, else its text, and a picture is saved in the scratch folder
+(`images/`) and replaced in the text by its path. Results are not cut to what a model reads (`[agent] tool_output_chars`,
+item 494: a code reads what it filters); a result is cut at `[code] result_chars` (5,000,000 characters) so that one tool
+cannot flood the code's memory. `dot_tools.search_tools("words", detail="name"|"description"|"schema")` finds tools without
+listing them all, and `dot_tools.list_servers()` says which servers the run's tools are of: Dot's own (`dot`) and each MCP
+server. A code polls, retries and branches in Python: `time.sleep` is fine, and what counts against `[code] max_seconds` is
+the code's own time, not the time a tool call takes or the time you take to answer a question.
+
+### What it is to the policy
+
+`code_run` is an action like a shell line: kind `shell`, risk `medium` (what the shell guard makes of `python3 -c`), the
+summary `Run code: <first line> (N lines)`, the target the scratch folder, and the whole code as the body, which your rules
+(their expressions are matched against the summary, the target and the body) and the review model read. Every approval mode
+treats it as it treats a command: `supervised` and `cautious` ask, `ask`, `auto` and `yolo` as they do for `python3 -c`.
+It is offered to the runs that act (`task` and `chat`), not to a research run, which may not run commands.
+
+It adds nothing a command does not have, because the code itself can do next to nothing (the sandbox above) and everything
+it asks of Dot is a call of the run's own: each tool call the code makes is validated, classified, checked against the
+other runs, judged by the run's own gate (the secret a tainted run would send out, the mode, your rules, the preset, the
+taint, the question to you or the review model), run under the tool's own time limit, masked of every secret Dot holds,
+recorded in the undo journal where the tool writes files, and shown on the timeline, by the same path a call of the model's
+takes (`agent/executor.py`: there is no second one). What differs is only what is on the timeline: the `tool_call` and
+`tool_result` events of such a call carry `"via": "code"` and the id of the `code_run` call as `"parent_call_id"`, and its
+id is that call's with a dot and its number (`call_7.3`). A question is the owner's as any other: it waits for you, and the
+code waits (the wait is not its time). A refusal, by the policy, your rules, you or the review model, raises
+`dot_tools.ToolRefused` in the code with the gate's words, and so does a step you did yourself; a call that fails raises
+`dot_tools.ToolError`. A result that third parties can author (a page, a mail) taints the run at once, as for the model,
+and marks the result of the `code_run`.
+
+What a code cannot call: `code_run` (no code starts code, and a call made from code is handed no way to make calls either),
+`finish`, `ask_user`, `ask_secret`, `browser_captcha`, `use_tools`, the plan and the reaction (`update_plan`,
+`mark_plan_step`, `react`), the tools that start or steer another run, agent or chat (`delegate`, `consult`,
+`message_agent`, `assign_work`, `work_orders`, `review_work`, `create_agent`, `create_team`, `send_to_chat`,
+`pass_reply`), a campaign's own (`campaign_*`), `wait_until` (poll with `time.sleep`), and the families `terminal_*`,
+`meeting_*` and `phone_*`. The code is told which, and why, and the gate is not asked. Everything else the run's mode and
+its tool list allow is callable.
+
+### Where it is offered
+
+In Dot's own loop `code_run` is in the core group, so a run that has it has what it needs; the system prompt teaches it in a
+few lines that hold no state of the run (when to write code: many calls, a lot of data, a loop or a poll; when to call the
+tool: one call, or a result to read whole). On the owner's Claude plan it is a door tool like the others, found with
+`ToolSearch`, and its lines are in the door's prompt. Its own definition is under 1,200 characters; no definition of a tool
+the code can call goes into any prompt.
+
+### Settings
+
+`[code]` in `config.toml` (the defaults are in `defaults.toml`):
+
+| Key            | Default     | What it is |
+| -------------- | ----------- | ---------- |
+| `enabled`      | `true`      | whether `code_run` is offered at all (read when the daemon starts) |
+| `max_seconds`  | `120`       | the most the code's own time may be, 1 to 900; `timeout_s` asks for less |
+| `max_mb`       | `512`       | the most resident memory the code may hold, 64 to 8192 |
+| `output_chars` | `8000`      | the characters of what it prints that reach the model, the head and the tail |
+| `max_calls`    | `200`       | the tool calls one `code_run` may make; the next one ends the code |
+| `result_chars` | `5000000`   | the longest a tool's result may be when it is handed to the code |
+
+The step's own limit is an hour: the code's time is `max_seconds`, and what a tool call takes and the time you take to answer
+have limits of their own.
+
+### Its folders
+
+The folders of a run's code are `<workspace>/code/<run id>/tools` and `.../scratch`. The scratch folder is kept between the
+`code_run`s of a run (a file one writes is there for the next), and a folder nothing has written to for three days is removed
+the first time the daemon runs code after it starts. The code of each `code_run` is kept as `tools/snippets/<n>.py`.
 
 ## The sandbox (item 1500)
 

@@ -51,7 +51,7 @@ from dotagent.agent.continuity import (
     with_empty_sections,
     with_instruction,
 )
-from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls, reached_sites
+from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls, reached_sites, with_nested
 from dotagent.agent.gate import RunGate
 from dotagent.agent.goal_chain import goal_checker_with_standby
 from dotagent.agent.goal_read import read_written
@@ -3281,7 +3281,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 ledger, [(outcome.call, not outcome.result.is_error, outcome.result.text) for outcome in outcomes]
             )
             await _keep_loop()
-            facts = with_outcomes(facts, outcomes)
+            # The calls a code_run made in the step are calls of the run's own, and the facts read them too (item 1501).
+            facts = with_outcomes(facts, with_nested(outcomes))
             failed_now: int = sum(1 for outcome in outcomes if outcome.result.is_error)
             failures += failed_now
             failures_in_a_row = failures_in_a_row + 1 if failed_now else 0

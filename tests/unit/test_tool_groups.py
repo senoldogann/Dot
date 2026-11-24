@@ -135,6 +135,9 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "search_files",
         "find_files",
         "shell",
+        # Python the model writes, which calls its tools in a sandbox (item 1501): in the core, so that a run that has
+        # it has what it needs; its one definition is short, and no definition of the tools it calls goes in the prompt.
+        "code_run",
         "web_search",
         "web_fetch",
         "web_crawl",

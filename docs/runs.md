@@ -599,6 +599,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Area            | Tools                                                                                                              |
 | --------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`, `write_notes`           |
+| Code            | `code_run` (item 1501): Python the model writes, which calls its tools as functions in a sandbox and prints what it needs ([Code mode](code-mode.md)); a shell line to the policy |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
 | Waits           | `wait_until` (item 887, tool group `waits`): a wait in code for a check, an address or a file                       |
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`, `judge_items`                                               |
@@ -659,7 +660,7 @@ application or works on a large document (at most 110 s, item 1180); the applica
 which the timeout says. A tool's own limit (the `timeout_s` its `tool_call` event carries) holds the time the tool
 spends, not the time its call spends at the gate or in a hold of the run: a `tool_result` carries `seconds` (the whole
 call), `waited_s` (at the gate, and in a hold) and `ran_s` (in the tool, item 1406), and a tool that is still running
-more than five seconds past its limit, cut or not, is logged as `tool_overran`. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
+more than five seconds past its limit, cut or not, is logged as `tool_overran`. The calls a `code_run`'s code makes are calls of the run's own with the same two events, which carry `"via": "code"` and `"parent_call_id"`, the id of the `code_run` call (item 1501; [Code mode](code-mode.md)). `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
 to be, the browser rung only with Dot's own browser and the web-research rung only while that server runs; its Try asks
 one engine one search. The search APIs that take a key of their own are Brave's Search API (`BRAVE_SEARCH_API_KEY`),

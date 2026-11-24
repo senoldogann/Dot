@@ -412,6 +412,13 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
     write_transport.set_write_buffer_limits(high=1, low=0)
     state: _State = _State(process, OutputWindow(plan.limits.window_bytes, plan.limits.window_bytes))
     tasks: tuple[asyncio.Task[None], ...] = ()
+
+    def failed(task: asyncio.Task[None]) -> None:
+        """A task that ends in an error (a call the handler could not make, a stop of the run raised through it) leaves
+        a code that waits for an answer that will not come: the group is killed at once, and the error is raised."""
+        if not task.cancelled() and task.exception() is not None:
+            kill_group(process.pid)
+
     try:
         if stream is not None:
             tasks = (
@@ -419,10 +426,17 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
                 asyncio.create_task(_serve(reader, write_transport, replies, handler, plan.limits, state)),
                 asyncio.create_task(_watch(plan, state, cancel)),
             )
+            for task in tasks:
+                task.add_done_callback(failed)
         await process.wait()
         if tasks:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(asyncio.shield(tasks[0]), timeout=_DRAIN_GRACE_S)
+        for task in tasks:
+            if task.done() and not task.cancelled():
+                raised: BaseException | None = task.exception()
+                if raised is not None:
+                    raise raised
         return _ended(state, state.clock.wall())
     finally:
         if process.returncode is None:

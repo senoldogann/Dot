@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from dotagent.agent.orders import WorkDesk
     from dotagent.agent.verify import RunFacts
     from dotagent.browser.session import BrowserSession
+    from dotagent.codemode.inner import NestedCalls
     from dotagent.runtime import Runtime
 
 
@@ -168,6 +169,10 @@ class ToolContext:
     # own loop shows them next to a call's result in its own requests and stores them nowhere. A run on the Claude plan
     # or OpenCode is handed none, as the result goes to a session of its program that a later run resumes.
     shows_outside_lessons: bool = False
+    # How a tool that makes further calls makes them (``code_run``, item 1501): handed to that tool by the executor for
+    # the call, with the run's own registry and gate behind it; ``None`` for every other tool, and inside the calls it
+    # makes.
+    nested: "NestedCalls | None" = None
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:

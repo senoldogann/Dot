@@ -114,7 +114,12 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 150 for the hand-over line of the Delegation section and `delegate`'s description (item 1362: a delegated
 # run starts with the plan, the files, the checks and the failures its parent already measured, so it does not read the
 # same files again): 30,305 measured on the gate's runner, system 8,758, tools 21,377.
-BUDGET_TOKENS: int = 30_400
+# Raised by 700 for `code_run` and the section of the prompt that teaches it (item 1501, the owner's decision of
+# 2026-11-24: the model writes code that calls its tools): one tool of 1,064 characters of description and three fields,
+# and four lines that hold no state of the run. 30,971 measured here, system 8,919, tools 21,882. What it spares is the
+# other side of the account: a run that calls many tools, or reads a lot of data, writes a short program and reads what
+# it prints.
+BUDGET_TOKENS: int = 31_100
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -126,7 +131,8 @@ BUDGET_TOKENS: int = 30_400
 # Raised by 600 for the owner's `CHARACTER` block of items 1210 and 1211 (system 8,405 measured here).
 # Raised by 300 with the block of item 1211 above: the gate's runner measures longer paths than this Mac, whose system
 # reads 8,465 now.
-SYSTEM_BUDGET_TOKENS: int = 8_900
+# Raised by 150 for the Code section of item 1501 above (system 8,919 measured here).
+SYSTEM_BUDGET_TOKENS: int = 9_050
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
@@ -146,7 +152,8 @@ SYSTEM_BUDGET_TOKENS: int = 8_900
 # Raised by 1,350 for the pipeline tools and the parts of an objective's work of item 1227 above (20,808 measured).
 # Raised by 400 with `browser_captcha` of item 1288 above (21,118 measured).
 # Raised by 200 with the `wait` field of `delegate` of item 1351 above (21,302 measured).
-TOOLS_BUDGET_TOKENS: int = 21_450
+# Raised by 550 with `code_run` of item 1501 above (21,882 measured).
+TOOLS_BUDGET_TOKENS: int = 22_000
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

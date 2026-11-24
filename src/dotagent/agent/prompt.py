@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 from dotagent.channels.types import TITLES
+from dotagent.codemode.inner import CODE_RUN_TOOL
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
@@ -728,6 +729,13 @@ installed here, the tools of the MCP servers and the applications that AppleScri
 what fits. Call it again when a way has failed twice. What it finds that another agent of this Mac set up is used \
 only once the owner adds it: when one would spare you a hard way, ask the owner to add it."""
 
+_CODE_SECTION: str = """# Code
+code_run runs Python in a sandbox, and the code calls your tools as functions (dot_tools). Use it when the work is \
+many calls, a lot of data, a loop or a poll: filter, count and loop in the code and print a short summary (a count \
+and at most 5 rows), so that the data never enters this conversation. For one call, or a result you must read \
+whole, call the tool yourself. Every call the code makes goes through the same approvals as one of yours: a refused \
+call is refused, and no code finds a way round it."""
+
 _DELEGATE_SECTION: str = """# Delegation
 - delegate runs one self-contained part of the work in a separate agent with a clean context and returns its final \
 report. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research \
@@ -928,6 +936,12 @@ def _help_section(tool_names: Sequence[str]) -> str:
     return _HELP_SECTION if FIND_HELP_TOOL in tool_names else ""
 
 
+def code_section(tool_names: Sequence[str]) -> str:
+    """Only when code_run is offered (item 1501): when to write code and when to call the tool, in lines that are the
+    same for every run, so that the provider's cache of the instructions holds."""
+    return _CODE_SECTION if CODE_RUN_TOOL in tool_names else ""
+
+
 def _delegate_section(tool_names: Sequence[str], team: Sequence[AgentBrief]) -> str:
     """Only when delegate is offered; with a team to message, a part an agent's role fits is that agent's (item 512)."""
     if DELEGATE_TOOL not in tool_names:
@@ -1088,6 +1102,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _skills_section(inputs.skills, inputs.skills_left, inputs.tool_names, inputs.skills_left_names),
         _pages_section(inputs.tool_names),
         _help_section(inputs.tool_names),
+        code_section(inputs.tool_names),
         _delegate_section(inputs.tool_names, inputs.team),
         _helpers_section(inputs.helpers, inputs.tool_names),
         _team_section(inputs.agent, inputs.team, inputs.tool_names),
@@ -1102,9 +1117,10 @@ def team_sections(
 ) -> str:
     """What Dot's own prompt says of the team for a run with ``tool_names``: the team the run leads, delegating, and the
     agents it may message or give work orders, for a run whose prompt is not Dot's own (one on the owner's Claude plan,
-    item 1063). Empty for a run with none of those tools and no team to lead."""
+    item 1063), and when to write code (item 1501). Empty for a run with none of those tools and no team to lead."""
     sections: list[str] = [
         _lead_section(lead, tool_names),
+        code_section(tool_names),
         _delegate_section(tool_names, team),
         _team_section(agent, team, tool_names),
     ]

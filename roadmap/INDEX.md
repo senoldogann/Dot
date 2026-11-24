@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1501](1501.md) | done | 2026-11-24 | `code_run`: Python the model writes calls its tools through the run's own gate, as a shell line to the policy |
 | [1500](1500.md) | done | 2026-11-24 | Code mode's sandbox: the code of a `code_run` runs in a deny-default macOS profile, behind a bridge of two pipes, and fails closed |
 | [1446](1446.md) | done | 2026-11-24 | Foreground quiet: the app draws no banner for the chat the owner is reading |
 | [1445](1445.md) | done | 2026-11-24 | The Live Activity starts by push: the app gives Dot its push-to-start token |
