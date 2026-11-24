@@ -557,10 +557,27 @@ check; blocked: HTTP 401 or 403; in transit; other); the calls of any tool **ref
 the run waited for them; and the step line adds the median input tokens a step sent per band, the growth of the
 context. **`dotx stats --run ID`** prints the same for one run: its minutes of wall time (to now while it works), its
 tool calls' seconds and the part spent at the gate, the version of [the harness](harness.md) it took (or Dot's own
-text), then the lines above and its tools. The daemon serves the same as `GET /api/runs/{id}/stats`. A **Harness**
+text), then the lines above, **the prompt cache** (item 1742, below) and its tools. The daemon serves the same as
+`GET /api/runs/{id}/stats`. A **Harness**
 table follows the learning lines (item 588): the finished runs of the window by the version of the harness they took,
 the busiest first, with the share that ended done and the runs on Dot's own text beside them, which is how a
 version's effect on its runs is read.
+
+**The prompt cache of a run** (item 1742): `dotx stats --run ID` and the run's Cost card (**Cache misses**, `cache` in
+`GET /api/runs/{id}/stats`) say how much of the run's input the provider read from its cache and what it wrote to it
+(`cache_write_tokens`, which Anthropic reports and bills above the price of input), and why a step was cold. The first
+step is *warm*, or cold because the chat had no earlier call (*new chat*), because the instructions or the tools differ
+from the chat's previous run (*prefix changed*, with the sections, `system:<heading>`, and groups, `tools:<group>`, that
+differ, told by the fingerprints `context_parts` carries since item 1742, by their sizes for a run recorded before),
+because the chat was last called longer ago than five minutes with the same prompt (*after a pause*), or for no cause
+the run recorded (*unexplained*). A later step that sent more than 20,000 tokens at full price is told with what
+happened just before it: a tool group turned on (the tools stand before the conversation, so the step reads nothing),
+a compaction, or no mark. Measured on the owner's 10,236 answered calls of 2026-11-10 to 11-24 (14 days): 94.3 % of
+the 1.04 billion step input tokens were read from the cache (OpenCode Go's DeepSeek 94.3 %, Anthropic 86.9 %,
+Antigravity 89.8 %); of the 59.2 million that were not, 21 % were first steps (69 of 72 first steps after a pause of an
+hour or more were cold, 3 of 17 within five minutes), 7 % were steps after a tool group turned on, and the rest steps
+that grew by a large tool result or met no mark. The side calls (a progress check, a goal check, lessons, a recap, a
+compaction) are asked once and read 0 to 12 % from the cache by design.
 
 **What a run's first step carries** (item 735): the first step of every run records, as a `context_parts` event, what
 its request holds in characters, the system prompt by the heading of each section, the tools' schemas by group (`core`,

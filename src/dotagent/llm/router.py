@@ -152,6 +152,7 @@ def _answered(
         input_tokens=reply.usage.input_tokens,
         output_tokens=reply.usage.output_tokens,
         cached_tokens=reply.usage.cached_tokens,
+        cache_write_tokens=reply.usage.cache_write_tokens,
         error=None,
     )
 

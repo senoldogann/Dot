@@ -8,7 +8,7 @@
 
 import { compact, duration, el } from "./dom.js";
 import { panelSection } from "./panels.js";
-import { budgetLine, usedSoFar } from "./usagewords.js";
+import { budgetLine, cacheWords, usedSoFar } from "./usagewords.js";
 
 const HINTS = {
   sofar: "What this task has used since it began: its time, what was sent to the model and what it wrote, and its steps",
@@ -20,6 +20,7 @@ const HINTS = {
   gate: "The part of that time spent waiting for your approval or your answer",
   steps: "How many times Dot went back to the model",
   input: "What was sent to the model in all its calls, and the share its service had ready from before",
+  cache: "Why the service did not have the task's prompt ready from before, where it did not: a new chat, a change in the instructions, a pause, a tool group turned on",
   output: "What the model wrote",
   compactions: "How often the older part of the chat was summed up to make room",
   searches: "The web searches that came back, by the search service that answered (the Anthropic one costs one cent a search)",
@@ -66,6 +67,7 @@ export function createCostCard() {
       ["Waiting for you", spent(costs.waited_s, total), HINTS.gate],
       ["Steps", String(stats.steps), HINTS.steps],
       ["Usage in", `${compact(stats.input_tokens)}${cached}`, HINTS.input],
+      ["Cache misses", cacheWords(costs.cache), HINTS.cache],
       ["Usage out", compact(stats.output_tokens), HINTS.output],
       ["Chat summaries", compactions, HINTS.compactions],
       ["Tasks given to helpers", delegated, HINTS.delegated],
