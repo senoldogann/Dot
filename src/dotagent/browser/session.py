@@ -4034,7 +4034,7 @@ class BrowserSession:
 
         What changed is also the step's check (item 1744), from the same looks and no wait of its own: the page
         reacted (verified, with what changed) or did not (uncertain); on a page that changed by itself since Dot last
-        looked (``busy``), a change of its content or a request is no check. The end of the watch is Dot's last look."""
+        looked (``busy``), a change of its content or a request is no check."""
         after: Pulse = pulse
         moved: str | None = None
         waited: float = 0.0
