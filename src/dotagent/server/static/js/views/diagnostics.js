@@ -1,7 +1,8 @@
 // Settings › System › Diagnostics (item 370): the daemon's process and those it started, with what each takes of the
-// CPU and of memory, read again every few seconds while the page is seen; the room the files Dot keeps take on disk; and
-// the logs, the last lines of one, with a filter. A process is named by its executable alone, and a log's lines come
-// with their secrets masked (dotagent/server/diagnostics.py).
+// CPU and of memory, read again every few seconds while the page is seen; the room the files Dot keeps take on disk; the
+// logs, the last lines of one, with a filter; and the pauses, the times Dot stopped answering for a moment (item 1672).
+// A process is named by its executable alone, and a log's lines come with their secrets masked
+// (dotagent/server/diagnostics.py).
 
 import { api } from "../api.js";
 import { sizeLabel } from "../attachments.js";
@@ -57,6 +58,21 @@ function folderRow(folder) {
   );
 }
 
+/** A time Dot stopped answering (item 1672): when, for how long, and, under Details, where its work was then. */
+function stallRow(stall) {
+  const length = stall.ongoing ? `${stall.seconds.toFixed(1)} s so far` : `${stall.seconds.toFixed(1)} s`;
+  return el(
+    "div",
+    { class: "list-row stall-row" },
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, `${ago(stall.began_at)} · ${length}`),
+      el("details", null, el("summary", { class: "small muted" }, "Details"), el("pre", { class: "log-lines" }, stall.stack)),
+    ),
+  );
+}
+
 export function mount(root) {
   let disposed = false;
   let timer = 0;
@@ -64,6 +80,7 @@ export function mount(root) {
   const processesBody = el("div", null, inlineLoading());
   const diskBody = el("div", null, inlineLoading());
   const logsBody = el("div", null, inlineLoading());
+  const stallsBody = el("div", null, inlineLoading());
 
   // The cue on the table now shown; the table is drawn again at every reading.
   let stopCue = () => {};
@@ -110,6 +127,24 @@ export function mount(root) {
     } catch (error) {
       if (!disposed) {
         diskBody.replaceChildren(inlineError(error, () => attempt(loadDisk)));
+      }
+    }
+  }
+
+  async function loadStalls() {
+    try {
+      const view = await api.get("/diagnostics/stalls");
+      if (disposed) {
+        return;
+      }
+      stallsBody.replaceChildren(
+        view.stalls.length === 0
+          ? el("div", { class: "card-pad hint" }, `Dot has not stopped answering for more than ${view.stall_s} seconds since it started.`)
+          : el("div", { class: "list" }, view.stalls.map(stallRow)),
+      );
+    } catch (error) {
+      if (!disposed) {
+        stallsBody.replaceChildren(inlineError(error, () => attempt(loadStalls)));
       }
     }
   }
@@ -162,6 +197,7 @@ export function mount(root) {
     pageHead("Diagnostics", "For finding out what went wrong: the programs Dot runs and how much of the Mac they use, the room its files take, and its logs, read on this Mac.", null),
     card("Processes", totals, processesBody),
     card("Disk", refreshButton("Measure the folders again", () => attempt(loadDisk)), diskBody),
+    card("Pauses", refreshButton("Read the pauses again", () => attempt(loadStalls)), stallsBody),
     card("Logs", refreshButton("Read the log again", () => attempt(loadLogs)), logsBody),
   );
   attempt(async () => {
@@ -172,6 +208,7 @@ export function mount(root) {
   });
   attempt(loadDisk);
   attempt(loadLogs);
+  attempt(loadStalls);
   return () => {
     disposed = true;
     clearTimeout(timer);

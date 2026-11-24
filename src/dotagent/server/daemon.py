@@ -30,6 +30,7 @@ from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, runnin
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, EventBus, Subscription
+from dotagent.loop_watch import LoopWatch
 from dotagent.meetings.desk import MeetingDesk
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
@@ -467,6 +468,10 @@ async def run_daemon(config: AppConfig) -> int:
             # the daemon.
             reactions: Reactions = Reactions(runtime, manager)
             cleanup.push_async_callback(reactions.close)
+            # A loop that stops answering is said in the log with where it is, and listed in Diagnostics (item 1672).
+            loop_watch: LoopWatch = LoopWatch()
+            loop_watch.start()
+            cleanup.callback(loop_watch.stop)
             context: ServerContext = ServerContext(
                 runtime=runtime,
                 manager=manager,
@@ -482,6 +487,7 @@ async def run_daemon(config: AppConfig) -> int:
                 phones=phones,
                 notifications=phone,
                 leases=leases,
+                loop_watch=loop_watch,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))
