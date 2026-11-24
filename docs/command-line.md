@@ -88,3 +88,22 @@ set once under the adopted version; `--scripted` plays the references through th
 answer from a script, a check of the loop at no model's cost. `graph [--steps N]` draws the provenance (the newest N
 steps, 50 by default, and four experiences a step) as a Mermaid flowchart, `steps` and `experiences` list the newest of
 each, and `show ID` ends with the version's lineage.
+
+## Code review before a push
+
+`.claude/hooks/pre-push-review.sh`, the pre-push hook of Dot's own repository, has Dot review each push following
+REVIEW.md, in research mode (it reads the code and cannot change it), with `dotx run --review`. `dotx review plan
+--lines N --changed FILE --guide REVIEW.md` tells it what to run on (item 1663): `[code_review]` of `config.toml`,
+which Settings › Models › Code review chooses ([Models](models.md)), for a change of N changed lines (added and removed)
+whose paths `FILE` lists one per line. It prints `size small` or `size full`, `limit <seconds>`, then one
+`try <model> <effort>` line per model in the order they are tried: the small change model first for a change of at most
+`small_max_lines` lines that touches no path REVIEW.md lists under "Always needs a human", when one is chosen, else the
+review model; then the fallbacks, each once.
+
+The hook tries them in that order under **Code reviews** (the first in the branch's review chat, each next one in a
+chat of its own), as long as one gives no verdict (a
+`VERDICT: PASS` or `VERDICT: BLOCK` line: Claude refusing the diff, a plan that is spent and a failed run give none). A
+`BLOCK` stops the push. The push stops too, with "could not be reviewed" and why, when no model gave a verdict, when the
+review ran past `max_minutes` in all (the run is then stopped: `dotx run` asks Dot to stop it on SIGTERM), and when the
+plan cannot be read; it never passes unreviewed. `git push --no-verify` skips it. A commit that passed is not reviewed
+again, nor a push that only brings main in.

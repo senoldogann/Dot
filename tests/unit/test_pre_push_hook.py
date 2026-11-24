@@ -1,15 +1,19 @@
 """The pre-push review hook (item 540): a push that only brings main in is not reviewed again, a push that changes the
-branch's own change is, and the hook says so after three earlier reviews of the branch that BLOCKed. A stand-in for the
-`dotx` command answers PASS and records that it was asked: no model is called."""
+branch's own change is, and the hook says so after three earlier reviews of the branch that BLOCKed. The models it tries
+are `dotx review plan`'s (item 1663): a model that gives no verdict hands the change to the next, and a review that
+none gives a verdict, or that runs past its time, stops the push. A stand-in for the `dotx` command answers the plan and
+the review and records the model it was asked on: no model is called."""
 
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
 
 _HOOK: Path = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "pre-push-review.sh"
 _ZERO: str = "0" * 40
+_PLAN: str = "size full\nlimit 900\ntry first:model medium\ntry second:model high\n"
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -53,23 +57,43 @@ def _run_hook(
 
 
 def _run_hook_on(
-    repo: Path, tmp_path: Path, refs: str, answer: str = "No issues found.\nVERDICT: PASS"
+    repo: Path,
+    tmp_path: Path,
+    refs: str,
+    answer: str = "No issues found.\nVERDICT: PASS",
+    plan: str = _PLAN,
+    answers: dict[str, str] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], int]:
-    """The hook as git runs it with ``refs`` on its stdin; the stand-in records that it was asked."""
+    """The hook as git runs it with ``refs`` on its stdin, and how many times the stand-in was asked to review. The
+    stand-in prints ``plan`` for `dotx review plan`; asked to review on a model, it prints that model's entry of
+    ``answers`` (``SLEEP`` sleeps until it is stopped), else ``answer``, and records the model."""
     bin_dir: Path = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
     asked: Path = tmp_path / "asked"
     stand_in: Path = bin_dir / "dotx"
-    answer_file: Path = tmp_path / "answer"
-    answer_file.write_text(answer + "\n", encoding="utf-8")
+    answers_dir: Path = tmp_path / "answers"
+    answers_dir.mkdir(exist_ok=True)
+    (answers_dir / "default").write_text(answer + "\n", encoding="utf-8")
+    for model, words in (answers or {}).items():
+        (answers_dir / model).write_text(words + "\n", encoding="utf-8")
+    (tmp_path / "plan").write_text(plan, encoding="utf-8")
     stand_in.write_text(
-        f'#!/bin/sh\ncat > /dev/null\necho asked >> "{asked}"\ncat "{answer_file}"\n'
+        "#!/bin/sh\n"
+        f'if [ "$1" = review ]; then cat "{tmp_path / "plan"}"; exit 0; fi\n'
+        'model=""; previous=""\n'
+        'for arg in "$@"; do [ "$previous" = --model ] && model=$arg; previous=$arg; done\n'
+        "cat > /dev/null\n"
+        f'echo "$model" >> "{asked}"\n'
+        f'answer="{answers_dir}/$model"; [ -f "$answer" ] || answer="{answers_dir}/default"\n'
+        'if [ "$(cat "$answer")" = SLEEP ]; then exec sleep 60; fi\n'
+        'cat "$answer"\n'
         'echo "run run_test, thread thr_test"\n',
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
     env = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env.pop("DOTX", None)
     done = subprocess.run(
         ["bash", str(_HOOK)],
         cwd=repo,
@@ -78,8 +102,13 @@ def _run_hook_on(
         text=True,
         env=env,
         check=False,
+        timeout=60,
     )
     return done, len(asked.read_text().splitlines()) if asked.exists() else 0
+
+
+def _asked_models(tmp_path: Path) -> list[str]:
+    return (tmp_path / "asked").read_text().splitlines()
 
 
 def test_a_first_push_is_reviewed(repo: Path, tmp_path: Path) -> None:
@@ -232,3 +261,50 @@ def test_a_block_stops_the_push(repo: Path, tmp_path: Path) -> None:
     )
     assert (done.returncode, asked) == (1, 1), done.stdout + done.stderr
     assert "push stopped" in done.stderr
+
+
+def test_a_model_that_gives_no_verdict_hands_the_change_to_the_next(repo: Path, tmp_path: Path) -> None:
+    """Item 1211's refusal ("the safeguards flagged this message"): the next model of the plan reviews the change."""
+    refs: str = f"refs/heads/feature {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature {_ZERO}\n"
+    done, asked = _run_hook_on(
+        repo, tmp_path, refs, answers={"first:model": "API Error: the safeguards flagged this message"}
+    )
+    assert (done.returncode, asked) == (0, 2), done.stdout + done.stderr
+    assert _asked_models(tmp_path) == ["first:model", "second:model"]
+    assert "first:model gave no verdict" in done.stderr
+
+
+def test_a_change_no_model_gives_a_verdict_on_stops_the_push_and_says_why(repo: Path, tmp_path: Path) -> None:
+    refs: str = f"refs/heads/feature {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature {_ZERO}\n"
+    done, asked = _run_hook_on(repo, tmp_path, refs, answer="API Error: refused")
+    assert (done.returncode, asked) == (1, 2), done.stdout + done.stderr
+    assert "could not be reviewed: no model gave a verdict (first:model, second:model)" in done.stderr
+    assert "--no-verify" in done.stderr
+
+
+def test_a_review_past_its_time_is_stopped_and_stops_the_push(repo: Path, tmp_path: Path) -> None:
+    """The time is the whole review's: the model that ran it out is stopped, and no other is tried."""
+    refs: str = f"refs/heads/feature {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature {_ZERO}\n"
+    started: float = time.monotonic()
+    done, asked = _run_hook_on(
+        repo, tmp_path, refs, plan=_PLAN.replace("limit 900", "limit 2"), answers={"first:model": "SLEEP"}
+    )
+    assert time.monotonic() - started < 30
+    assert (done.returncode, asked) == (1, 1), done.stdout + done.stderr
+    assert "could not be reviewed: the review ran past" in done.stderr and "--no-verify" in done.stderr
+
+
+def test_a_plan_that_cannot_be_read_stops_the_push(repo: Path, tmp_path: Path) -> None:
+    refs: str = f"refs/heads/feature {_git(repo, 'rev-parse', 'HEAD')} refs/heads/feature {_ZERO}\n"
+    bin_dir: Path = tmp_path / "bin"
+    bin_dir.mkdir()
+    stand_in: Path = bin_dir / "dotx"
+    stand_in.write_text("#!/bin/sh\necho 'error: [code_review] max_minutes must be at least 1' >&2\nexit 2\n")
+    stand_in.chmod(0o755)
+    env = {key: value for key, value in os.environ.items() if key != "DOTX"}
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    done = subprocess.run(
+        ["bash", str(_HOOK)], cwd=repo, input=refs, capture_output=True, text=True, env=env, check=False, timeout=60
+    )
+    assert done.returncode == 1
+    assert "could not be reviewed" in done.stderr and "max_minutes must be at least 1" in done.stderr

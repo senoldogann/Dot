@@ -43,6 +43,7 @@ type ConfigTable = Literal[
     "browser",
     "builtin_mcp",
     "channels",
+    "code_review",
     "harness",
     "initiative",
     "judge",
@@ -58,6 +59,7 @@ type ConfigTable = Literal[
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
 type ChannelsSetting = Literal["imessage", "progress"]
+type CodeReviewSetting = Literal["model", "fallback", "small_model", "small_max_lines", "max_minutes"]
 type BrowserSetting = Literal[
     "mode",
     "raise_window",
@@ -89,6 +91,7 @@ type SettingKey = (
     | BrowserSetting
     | BuiltinMcpSetting
     | ChannelsSetting
+    | CodeReviewSetting
     | HarnessSetting
     | InitiativeSetting
     | JudgeSetting
@@ -437,6 +440,23 @@ def set_browser_settings(path: Path, settings: tuple[tuple[BrowserSetting, Setti
         lambda text: _with_all(text, settings),
         "set " + ", ".join(f"{key} = {_literal(value)}" for key, value in settings) + " under [browser]",
     )
+
+
+def set_code_review(path: Path, settings: tuple[tuple[CodeReviewSetting, SettingValue], ...]) -> None:
+    """Write each ``[code_review] key = value`` of ``settings`` (item 1663, the models of the pre-push review) into
+    the config file at ``path`` in one edit: all of them are written, or, when one cannot be, none."""
+    _edit_all(
+        path,
+        tuple((("code_review", key), value) for key, value in settings),
+        lambda text: _with_code_review(text, settings),
+        "set " + ", ".join(f"{key} = {_literal(value)}" for key, value in settings) + " under [code_review]",
+    )
+
+
+def _with_code_review(text: str, settings: tuple[tuple[CodeReviewSetting, SettingValue], ...]) -> str:
+    for key, value in settings:
+        text = with_setting(text, "code_review", key, value)
+    return text
 
 
 def _with_all(text: str, settings: tuple[tuple[BrowserSetting, SettingValue], ...]) -> str:

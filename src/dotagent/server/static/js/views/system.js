@@ -1426,17 +1426,19 @@ const STANDBY_HINT =
  * in their order, when its own model cannot answer, each a numbered row with its arrows and its ×, over a row that adds
  * one of the models that call tools. `choose(refs)` sends the whole list, which the daemon keeps as `[models] standby`,
  * and gives back the models it answered with. `paint(providers, chosen)` draws it again; `hide()` hides it while the
- * models are read.
+ * models are read. The code review's fallbacks (item 1663) are the same list with words of their own: `title`,
+ * `lead`, `noneText`, `addLabel` (its add box's name), `className`, `takes(provider)` (the providers whose models it
+ * offers) and `listOf(answer)` (the list the daemon's answer holds).
  */
-function standbySetting({ choose }) {
+function standbySetting({ choose, title, lead, noneText, addLabel, className, takes, listOf }) {
   let shown = [];
   // The select lies over the row's words, clear, so that a press anywhere on the row opens its menu.
-  const add = el("select", { class: "standby-add-select", "aria-label": "Add a fallback model" });
-  const list = el("ol", { class: "standby-list", "aria-label": "Fallback models, in their order" });
-  const none = el("div", { class: "set-row standby-none" }, "None: a task whose model cannot answer ends with the error.");
+  const add = el("select", { class: "standby-add-select", "aria-label": addLabel });
+  const list = el("ol", { class: "standby-list", "aria-label": `${title}, in their order` });
+  const none = el("div", { class: "set-row standby-none" }, noneText);
   const adder = el("div", { class: "set-row standby-add" }, el("span", { class: "standby-add-label" }, icon("plus"), "Add a fallback model"), add);
-  const element = setSection({ title: "Fallbacks", lead: STANDBY_HINT, body: setCard(list, none, adder) });
-  element.classList.add("models-standby");
+  const element = setSection({ title, lead, body: setCard(list, none, adder) });
+  element.classList.add(className);
   element.hidden = true;
   // Each change is sent once the one before it was answered, and made to the list that answer holds, so changes made
   // in a row all hold; the list is drawn again from the status after each.
@@ -1445,7 +1447,7 @@ function standbySetting({ choose }) {
     making = making.then(() =>
       attempt(async () => {
         const answered = await choose(change(shown));
-        shown = [...answered.standby];
+        shown = [...listOf(answered)];
         await refresh();
       }),
     );
@@ -1508,7 +1510,7 @@ function standbySetting({ choose }) {
     shown = [...chosen];
     const groups = providers
       // A model that answers only as an agent program of its own (WHOLE_RUN) cannot be a standby model.
-      .filter((provider) => !WHOLE_RUN.has(provider.provider))
+      .filter((provider) => takes(provider.provider))
       .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools && !shown.includes(model.ref)) }))
       .filter((group) => group.models.length > 0);
     add.replaceChildren(
@@ -1651,12 +1653,100 @@ function buildModels(isDisposed, asked, head) {
   // every model of Dot's is.
   const usage = el("div", { class: "set-row hint models-usage", hidden: true });
   const standby = standbySetting({
+    title: "Fallbacks",
+    lead: STANDBY_HINT,
+    noneText: "None: a task whose model cannot answer ends with the error.",
+    addLabel: "Add a fallback model",
+    className: "models-standby",
+    takes: (provider) => !WHOLE_RUN.has(provider),
+    listOf: (answered) => answered.standby,
     choose: async (refs) => {
       const answered = await api.put("/models/standby", { models: refs });
       toast("ok", refs.length === 0 ? "A task whose model cannot answer ends with the error now." : `A task whose model cannot answer moves to ${refs.map(modelName).join(", then ")}.`);
       return answered;
     },
   });
+  // The pre-push review of Dot's own repository (item 1663, `[code_review]`): read on its own, as the look is; null
+  // hides its rows until it is read. Every change sends the whole table, which the daemon writes all or not at all.
+  let review = null;
+  const reviewFailed = el("div", { class: "set-row models-look-failed", hidden: true });
+  async function saveReview(change) {
+    const answered = await api.put("/code-review", {
+      model: review.model,
+      fallback: review.fallback,
+      small_model: review.small_model,
+      small_max_lines: review.small_max_lines,
+      max_minutes: review.max_minutes,
+      ...change,
+    });
+    paintReview(answered);
+    return answered;
+  }
+  const REVIEW_REFUSED = "A review is a run of Dot's own tools, which these models do not take.";
+  const reviewModel = modelSetting({
+    label: "Review model",
+    hint: "Reviews each change of Dot's own code before it is pushed, following REVIEW.md, and cannot change it. Its chats are kept under Code reviews.",
+    className: "models-review",
+    can: (model) => model.tools,
+    takes: (provider) => runsDotsTools(provider),
+    refused: REVIEW_REFUSED,
+    none: null,
+    choose: async (ref) => {
+      await saveReview({ model: ref, fallback: review.fallback.filter((one) => one !== ref) });
+      toast("ok", `The next code review runs on ${modelName(ref)}.`);
+    },
+  });
+  const smallModel = modelSetting({
+    label: "Small change model",
+    hint: "Reviews a small change first: one under the line limit below that touches no file REVIEW.md says always needs a human.",
+    className: "models-review",
+    can: (model) => model.tools,
+    takes: (provider) => runsDotsTools(provider),
+    refused: REVIEW_REFUSED,
+    none: "Review model",
+    choose: async (ref) => {
+      await saveReview({ small_model: ref });
+      toast("ok", ref === "" ? "Small changes are reviewed on the review model." : `Small changes are reviewed on ${modelName(ref)} first.`);
+    },
+  });
+  const smallLines = el("input", { class: "input", type: "number", min: "0", max: "100000", step: "1", inputmode: "numeric", "aria-label": "Lines a small change has at most" });
+  const maxMinutes = el("input", { class: "input", type: "number", min: "1", max: "240", step: "1", inputmode: "numeric", "aria-label": "Minutes a review may take" });
+  const linesRow = setRow({ title: "Small change", lead: "Changed lines, added and removed, a change has at most to go to the small change model.", control: smallLines });
+  const minutesRow = setRow({ title: "Time limit", lead: "Minutes a push's review may take in all. Past them it is stopped, and so is the push.", control: maxMinutes });
+  for (const [input, key] of [
+    [smallLines, "small_max_lines"],
+    [maxMinutes, "max_minutes"],
+  ]) {
+    input.addEventListener("change", () =>
+      attempt(async () => {
+        const value = Number(input.value);
+        try {
+          await saveReview({ [key]: value });
+          toast("ok", key === "max_minutes" ? `A code review stops after ${value} minutes.` : `A change of at most ${value} lines is a small one.`);
+        } finally {
+          input.value = String(review[key]);
+        }
+      }),
+    );
+  }
+  const reviewFallbacks = standbySetting({
+    title: "Code review fallbacks",
+    lead: "When the review model gives no verdict (it refused the change, its plan is spent, it failed), these review it in their order, each once. When none gives one, the push stops.",
+    noneText: "None: a change the review model gives no verdict on stops the push.",
+    addLabel: "Add a code review fallback",
+    className: "models-review-fallbacks",
+    takes: (provider) => runsDotsTools(provider),
+    listOf: (answered) => answered.fallback,
+    choose: async (refs) => {
+      const answered = await saveReview({ fallback: refs });
+      toast("ok", refs.length === 0 ? "A code review has no fallback now." : `A code review falls back to ${refs.map(modelName).join(", then ")}.`);
+      return answered;
+    },
+  });
+  const reviewRows = [linesRow, minutesRow];
+  for (const row of reviewRows) {
+    row.hidden = true;
+  }
   // Every model by provider: a search over the folds of the providers, which keep the tables of their models.
   const search = el("input", { class: "input", type: "search", placeholder: "Search models", "aria-label": "Search models", autocomplete: "off", spellcheck: "false" });
   const noMatch = el("div", { class: "set-row hint", hidden: true }, "No model has that in its name.");
@@ -1666,6 +1756,8 @@ function buildModels(isDisposed, asked, head) {
     setSection({ title: "Roles", body: setCard(planRow, main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, usage) }),
     setSection({ title: "Night's learning and self-repair", body: setCard(...learning.map(({ control }) => control.element), learningFailed, repairRow) }),
     standby.element,
+    setSection({ title: "Code review", body: setCard(reviewModel.element, smallModel.element, ...reviewRows, reviewFailed) }),
+    reviewFallbacks.element,
     setSection({ title: "Every model, by service", body: setCard(el("div", { class: "set-row models-search" }, el("span", { class: "models-search-box" }, icon("search"), search)), list, noMatch) }),
   );
   let providers = null;
@@ -1714,6 +1806,7 @@ function buildModels(isDisposed, asked, head) {
     paintLearningRows();
     planRow.hidden = !providers.some((provider) => provider.models.some((model) => model.ref === PLAN_REVIEW));
     standby.paint(providers, standbyModels);
+    paintReviewRows();
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
     cueTables();
     showAsked();
@@ -1776,6 +1869,43 @@ function buildModels(isDisposed, asked, head) {
     providers = providers.map((provider) => ({ ...provider, models: provider.models.map((model) => (model.ref === updated.ref ? updated : model)) }));
     if (painted !== null) {
       painted = { ...painted, providers };
+    }
+  }
+
+  /** Keep the code review's table as the daemon answered, and draw it once the list is here. */
+  function paintReview(view) {
+    review = view;
+    paintReviewRows();
+  }
+
+  function paintReviewRows() {
+    if (providers === null || review === null) {
+      return;
+    }
+    reviewModel.paint(providers, review.model, null);
+    smallModel.paint(providers, review.small_model, review.model);
+    reviewFallbacks.paint(providers, review.fallback);
+    smallLines.value = String(review.small_max_lines);
+    maxMinutes.value = String(review.max_minutes);
+    for (const row of reviewRows) {
+      row.hidden = false;
+    }
+  }
+
+  /** The code review's table, read on its own: a failure stands in its place with a way to read it again. */
+  async function loadReview() {
+    reviewFailed.hidden = true;
+    try {
+      const view = await api.get("/code-review");
+      if (!isDisposed()) {
+        paintReview(view);
+      }
+    } catch (error) {
+      if (!isDisposed()) {
+        console.error("the models of the code review could not be read", error);
+        reviewFailed.replaceChildren(inlineError(error, () => attempt(loadReview)));
+        reviewFailed.hidden = false;
+      }
     }
   }
 
@@ -1899,8 +2029,10 @@ function buildModels(isDisposed, asked, head) {
     providers = null;
     lookModel = null;
     learningChosen = null;
+    review = null;
     attempt(loadLook);
     attempt(loadLearning);
+    attempt(loadReview);
     attempt(loadRepair);
     attempt(loadUsage);
     forgetModels();
@@ -1914,6 +2046,12 @@ function buildModels(isDisposed, asked, head) {
       control.hide();
     }
     standby.hide();
+    reviewModel.hide();
+    smallModel.hide();
+    reviewFallbacks.hide();
+    for (const row of reviewRows) {
+      row.hidden = true;
+    }
     list.replaceChildren(inlineLoading());
     head.setMeta();
     try {
@@ -1949,7 +2087,7 @@ function buildModels(isDisposed, asked, head) {
   // Leaving the page closes a model menu left open, and with it what it listens to on the document.
   function dispose() {
     stopCues();
-    for (const setting of [main, look, ...roles.map(({ control }) => control), ...learning.map(({ control }) => control)]) {
+    for (const setting of [main, look, reviewModel, smallModel, ...roles.map(({ control }) => control), ...learning.map(({ control }) => control)]) {
       setting.dispose();
     }
   }
