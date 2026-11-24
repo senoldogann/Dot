@@ -44,11 +44,11 @@ struct ChatView: View {
                 if let notice: String = model.notice {
                     Button { model.clearNotice() } label: {
                         Label(notice, icon: .info)
-                            .font(Theme.meta).foregroundStyle(Theme.warn)
-                            .padding(.horizontal, Space.m).frame(minHeight: 32)
+                            .font(Theme.meta).foregroundStyle(Theme.text)
+                            .padding(.horizontal, Space.m).frame(minHeight: 36)
                     }
                     .buttonStyle(.plain)
-                    .dotGlass(in: Capsule(), tint: Theme.warn.opacity(0.2))
+                    .dotGlass(in: Capsule())
                 }
                 dock
                 Composer(model: model).dynamicTypeSize(...DynamicTypeSize.accessibility2)
@@ -146,9 +146,9 @@ struct ChatView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .dotAnimation(Motion.snappy, value: summary)
-        .dotAnimation(Motion.bouncy, value: atBottom)
+        .dotAnimation(Motion.snappy, value: atBottom)
     }
 
     /// The subtitle's colour: the warm one while the run waits on the owner, as the capsule's.
@@ -454,15 +454,15 @@ struct Composer: View {
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                 }
             }
-            .foregroundStyle(showsStop ? (waitingOnYou ? Theme.text : Theme.background) : (model.canSend ? Theme.onAccent : Theme.muted))
+            .foregroundStyle(showsStop ? (waitingOnYou ? Theme.text : Theme.onAction) : (model.canSend ? Theme.onAction : Theme.faint))
             .frame(width: 36, height: 36)
                 .background {
                     // The white disc of Stop is the loudest thing on the screen: while the run waits on a decision it is a
                     // quiet tonal one, so that the card is.
                     Circle().fill(
                         showsStop
-                            ? (waitingOnYou ? AnyShapeStyle(Theme.raised) : AnyShapeStyle(Theme.text))
-                            : (model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
+                            ? (waitingOnYou ? Theme.raised : Theme.action)
+                            : (model.canSend ? Theme.action : Theme.raised))
                 }
                 .overlay { if showsStop && waitingOnYou { Circle().strokeBorder(Theme.hairline, lineWidth: 1) } }
                 .frame(width: 44, height: 44)
@@ -493,7 +493,7 @@ private struct OlderRow: View {
                     Label(
                         model.olderFailed ? "Could not read older messages. Tap to try again." : "Load older messages",
                         icon: model.olderFailed ? .circleAlert : .arrowUpToLine)
-                        .font(Theme.meta).foregroundStyle(model.olderFailed ? Theme.warn : Theme.muted)
+                        .font(Theme.meta).foregroundStyle(model.olderFailed ? Theme.bad : Theme.muted)
                         .padding(.horizontal, Space.m).frame(minHeight: 32)
                         .background(Theme.surface, in: Capsule())
                         .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
@@ -599,7 +599,7 @@ private struct SelectTextSheet: View {
             .dotScreenBackground(inSheet: true)
             .navigationTitle("Select text")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { DoneButton { dismiss() } }
         }
     }
 }
@@ -617,9 +617,8 @@ private struct ToolDetailSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.l) {
                     HStack(spacing: Space.m) {
-                        DotIcon(ToolGlyph.icon(for: row.tool), size: 17).foregroundStyle(tone)
-                            .frame(width: 36, height: 36)
-                            .background(tone.opacity(0.14), in: Circle())
+                        DotIcon(ToolGlyph.icon(for: row.tool), size: 22, relativeTo: .title3).foregroundStyle(tone)
+                            .frame(width: 28)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(row.tool.replacingOccurrences(of: "_", with: " ").capitalizedFirst)
                                 .font(.headline).foregroundStyle(Theme.text)
@@ -657,7 +656,7 @@ private struct ToolDetailSheet: View {
             .dotScreenBackground(inSheet: true)
             .navigationTitle("Step")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { DoneButton { dismiss() } }
             .task { await load() }
         }
     }
@@ -695,5 +694,5 @@ private struct ToolDetailSheet: View {
         }
     }
 
-    private var tone: Color { row.state == .failed ? Theme.bad : (row.state == .running ? Theme.accent : Theme.muted) }
+    private var tone: Color { row.state == .failed ? Theme.bad : (row.state == .running ? Theme.text : Theme.muted) }
 }

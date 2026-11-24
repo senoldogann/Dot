@@ -36,6 +36,13 @@ enum HelperOrder {
         }
     }
 
-    /// The badge on a helper's row: how it stands in the daemon's own word, "Running", "Done", "Failed", "Cancelled".
-    static func badge(for helper: Helper) -> String { helper.status.capitalizedFirst }
+    /// The words on a helper's row: how it stands in the daemon's own word, "Running", "Done", "Failed", "Cancelled"; one that
+    /// waits on the owner says "Waiting on you" (the daemon's word for it is "blocked"), one that is ending "Stopping".
+    static func badge(for helper: Helper) -> String {
+        switch helper.status {
+        case "blocked": "Waiting on you"
+        case "ending": "Stopping"
+        default: helper.status.capitalizedFirst
+        }
+    }
 }

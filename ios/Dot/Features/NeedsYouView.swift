@@ -27,12 +27,7 @@ struct NeedsYouEntry: View {
             }
             .padding(Space.l)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: Radius.l)
-                    .fill(Theme.warn.opacity(0.08))
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
-            }
-            .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.4), lineWidth: 1))
+            .card(border: Theme.warn.opacity(0.45))
             .contentShape(RoundedRectangle(cornerRadius: Radius.l))
         }
         .buttonStyle(.plain)
@@ -68,7 +63,7 @@ struct NeedsYouView: View {
                     if rows.isEmpty {
                         DotEmptyState(
                             icon: .circleCheck, title: "Nothing waits on you",
-                            message: "When Dot needs an answer, it shows here and on your lock screen.", tone: Theme.good
+                            message: "When Dot needs an answer, it shows here and on your lock screen."
                         )
                         .padding(.top, Space.xl)
                     }
@@ -92,7 +87,7 @@ struct NeedsYouView: View {
             .dotScreenBackground(inSheet: true)
             .navigationTitle("Needs you")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { DoneButton { dismiss() } }
             .task { await awareness.refreshNeedsYou() }
         }
     }
@@ -124,7 +119,7 @@ struct NeedsYouRowView: View {
                     DotIcon(.chevron, size: 13, relativeTo: .caption)
                 }
                 .font(Theme.small.weight(.medium))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.text)
                 .frame(minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
@@ -132,12 +127,7 @@ struct NeedsYouRowView: View {
             .accessibilityIdentifier("needs-you-open-chat")
         }
         .padding(Space.l)
-        .background {
-            RoundedRectangle(cornerRadius: Radius.l)
-                .fill(Theme.warn.opacity(0.07))
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
-        }
-        .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.4), lineWidth: 1))
+        .card(border: Theme.warn.opacity(0.45))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("needs-you-row-\(row.id)")
     }
@@ -202,56 +192,50 @@ struct NeedsYouRowView: View {
     @ViewBuilder private var answers: some View {
         switch row.ask {
         case .approval(_, _, _, let mayAllow):
-            DotGlassGroup(spacing: Space.s) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Space.s) { deny; if mayAllow { allow } else { readAll } }
-                    VStack(spacing: Space.s) { if mayAllow { allow } else { readAll }; deny }
-                }
-                .controlSize(.large)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s) { deny; if mayAllow { allow } else { readAll } }
+                VStack(spacing: Space.s) { if mayAllow { allow } else { readAll }; deny }
             }
+            .controlSize(.large)
         case .question(_, let choices):
             if choices.isEmpty {
                 TextField("", text: $typed, prompt: Text("Type your answer").foregroundStyle(Theme.muted), axis: .vertical)
                     .font(Theme.body)
                     .padding(Space.m)
-                    .background(Theme.background, in: RoundedRectangle(cornerRadius: Radius.m))
+                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.m))
                     .overlay(RoundedRectangle(cornerRadius: Radius.m).strokeBorder(Theme.hairline, lineWidth: 1))
-                DotGlassGroup(spacing: Space.s) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: Space.s) { skip; send }
-                        VStack(spacing: Space.s) { send; skip }
-                    }
-                    .controlSize(.large)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.s) { skip; send }
+                    VStack(spacing: Space.s) { send; skip }
                 }
+                .controlSize(.large)
             } else {
-                DotGlassGroup(spacing: Space.s) {
-                    VStack(spacing: Space.s) {
-                        ForEach(choices) { choice in
-                            Button {
-                                perform(row.decision(approve: true, note: choice.label))
-                            } label: {
-                                HStack(spacing: Space.s) {
-                                    Text(choice.label).lineLimit(2).multilineTextAlignment(.leading)
-                                    Spacer(minLength: Space.xs)
-                                    if choice.recommended {
-                                        Text("Recommended").font(Theme.tiny.weight(.semibold)).textCase(.uppercase)
-                                    }
+                VStack(spacing: Space.s) {
+                    ForEach(choices) { choice in
+                        Button {
+                            perform(row.decision(approve: true, note: choice.label))
+                        } label: {
+                            HStack(spacing: Space.s) {
+                                Text(choice.label).lineLimit(2).multilineTextAlignment(.leading)
+                                Spacer(minLength: Space.xs)
+                                if choice.recommended {
+                                    Text("Recommended").font(Theme.meta.weight(.medium))
                                 }
-                                .frame(maxWidth: .infinity)
                             }
-                            .dotButton(choice.recommended ? .prominent : .glass)
-                            .accessibilityHint(choice.recommended ? "The answer Dot recommends" : "")
+                            .frame(maxWidth: .infinity)
                         }
-                        skip
+                        .dotButton(choice.recommended ? .primary : .secondary)
+                        .accessibilityHint(choice.recommended ? "The answer Dot recommends" : "")
                     }
-                    .controlSize(.large)
+                    skip
                 }
+                .controlSize(.large)
             }
         case .handoff:
             Button(action: onOpenWeb) {
                 Label(HandoffCard.buttonTitle, icon: .external, size: 16).frame(maxWidth: .infinity)
             }
-            .dotButton(.glass)
+            .dotButton(.secondary)
             .controlSize(.large)
             .accessibilityIdentifier("needs-you-open-web")
         case .secret, .other:
@@ -261,27 +245,27 @@ struct NeedsYouRowView: View {
 
     private var deny: some View {
         Button { perform(row.decision(approve: false)) } label: { Text("Deny").lineLimit(1).frame(maxWidth: .infinity) }
-            .dotButton(.glass).accessibilityIdentifier("needs-you-deny")
+            .dotButton(.secondary).accessibilityIdentifier("needs-you-deny")
     }
 
     private var allow: some View {
         Button { perform(row.decision(approve: true)) } label: { Text("Allow once").lineLimit(1).frame(maxWidth: .infinity) }
-            .dotButton(.prominent).accessibilityIdentifier("needs-you-allow")
+            .dotButton(.primary).accessibilityIdentifier("needs-you-allow")
     }
 
     private var readAll: some View {
         Button(action: onOpenChat) { Text("Read it all").lineLimit(1).frame(maxWidth: .infinity) }
-            .dotButton(.prominent).accessibilityIdentifier("needs-you-read-all")
+            .dotButton(.primary).accessibilityIdentifier("needs-you-read-all")
     }
 
     private var skip: some View {
         Button { perform(row.decision(approve: false)) } label: { Text("Skip").lineLimit(1).frame(maxWidth: .infinity) }
-            .dotButton(.glass).accessibilityIdentifier("needs-you-skip")
+            .dotButton(.secondary).accessibilityIdentifier("needs-you-skip")
     }
 
     private var send: some View {
         Button { perform(row.decision(approve: true, note: typed)) } label: { Text("Send answer").lineLimit(1).frame(maxWidth: .infinity) }
-            .dotButton(.prominent)
+            .dotButton(.primary)
             .disabled(typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .accessibilityIdentifier("needs-you-send")
     }

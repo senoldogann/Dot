@@ -65,6 +65,12 @@ final class HelperOrderTests: XCTestCase {
         XCTAssertEqual(HelperOrder.badge(for: helper("a", "running")), "Running")
     }
 
+    /// The daemon's word for a helper that asks the owner something is "blocked"; the row says what it means.
+    func testAHelperThatWaitsOnTheOwnerSaysSoAndOneThatIsEndingSaysStopping() {
+        XCTAssertEqual(HelperOrder.badge(for: helper("a", "blocked")), "Waiting on you")
+        XCTAssertEqual(HelperOrder.badge(for: helper("a", "ending")), "Stopping")
+    }
+
     /// The state keeps the time the daemon queued each helper: from its list, and from the event that queued it.
     func testTheStateKeepsWhenEachHelperWasQueuedFromTheListAndFromTheEvents() {
         var state: ChatState = ChatState()

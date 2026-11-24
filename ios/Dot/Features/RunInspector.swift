@@ -32,31 +32,35 @@ struct RunInspector: View {
                         .accessibilityIdentifier("chat-model")
                         CardDivider()
                         Button(action: onModels) {
-                            CardRow(icon: .sliders, tint: Theme.muted, title: "Default models…", showsChevron: true)
+                            CardRow(icon: .sliders, title: "Default models…", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
                     if !model.state.plan.isEmpty { planCard }
                     helpersSection
-                    CardGroup(title: "Schedules and loops") {
-                        if model.automations.isEmpty {
-                            EmptyRow(icon: .history, words: "None bound to this chat.")
+                    if !model.automations.isEmpty {
+                        CardGroup(title: "Schedules and loops") {
+                            ForEach(Array(model.automations.enumerated()), id: \.element.id) { index, automation in
+                                if index > 0 { CardDivider(inset: 56) }
+                                ScheduleRow(
+                                    schedule: automation.schedule, isLoop: automation.loop,
+                                    onChange: { model.setAutomation(automation.id, on: $0) })
+                            }
                         }
-                        ForEach(Array(model.automations.enumerated()), id: \.element.id) { index, automation in
-                            if index > 0 { CardDivider() }
-                            ScheduleRow(
-                                schedule: automation.schedule, isLoop: automation.loop,
-                                onChange: { model.setAutomation(automation.id, on: $0) })
-                        }
+                        .id(Focus.loops)
                     }
-                    .id(Focus.loops)
+                    if model.state.helpers.isEmpty && model.automations.isEmpty {
+                        // Two empty cards said the same thing twice; one quiet line says it once.
+                        Text("No helpers and no schedules in this chat.")
+                            .font(Theme.small).foregroundStyle(Theme.faint).padding(.horizontal, Space.l)
+                    }
                 }
                 .padding(Space.l)
             }
             .dotScreenBackground(inSheet: true)
             .navigationTitle("Run")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { DoneButton { dismiss() } }
             .task {
                 await model.refreshAutomations()
                 await model.store.loadProviders()
@@ -77,12 +81,6 @@ struct RunInspector: View {
     /// helpers segment scrolls here (`Focus.helpers`), to the first group.
     @ViewBuilder private var helpersSection: some View {
         let groups: HelperOrder.Groups = HelperOrder.groups(model.state.helpers)
-        if groups.isEmpty {
-            CardGroup(title: "Helpers") {
-                EmptyRow(icon: .users, words: "No helpers in this chat.")
-            }
-            .id(Focus.helpers)
-        }
         if !groups.working.isEmpty {
             helperGroup(.working, groups.working, footer: nil).id(Focus.helpers)
         }
@@ -98,24 +96,24 @@ struct RunInspector: View {
     private func helperGroup(_ group: HelperOrder.Group, _ helpers: [Helper], footer: String?) -> some View {
         CardGroup(title: HelperOrder.title(group, count: helpers.count), footer: footer) {
             ForEach(Array(helpers.enumerated()), id: \.element.id) { index, helper in
-                if index > 0 { CardDivider(inset: 48) }
+                if index > 0 { CardDivider(inset: 54) }
                 HelperRow(helper: helper)
             }
         }
         .accessibilityIdentifier(group == .working ? "helpers-working" : "helpers-finished")
     }
 
-    /// The run's standing, large: what it does, how many steps it has taken.
+    /// The run's standing, large: what it does, how many steps it has taken. A card like every other (the surface, a hairline): no
+    /// tint over it and no tile under its glyph; the glyph and the words say how it stands.
     private var statusCard: some View {
         // At the accessibility sizes the three parts stand over each other: side by side the words ("5 helpers working") broke
         // in the middle of a word.
         let stacked: Bool = typeSize.isAccessibilitySize
         let layout: AnyLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.m)) : AnyLayout(HStackLayout(spacing: Space.m))
         return layout {
-            DotIcon(statusIcon, size: 22, pulse: model.state.isWorking, relativeTo: .title3)
+            DotIcon(statusIcon, size: 24, pulse: model.state.isWorking, relativeTo: .title3)
                 .foregroundStyle(statusTone)
-                .frame(width: 48, height: 48)
-                .background(statusTone.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.m))
+                .frame(width: 28)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Status").font(Theme.meta).foregroundStyle(Theme.faint)
                 Text(statusWords).font(.title3.weight(.semibold)).foregroundStyle(Theme.text)
@@ -130,12 +128,7 @@ struct RunInspector: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Space.l)
-        .background {
-            RoundedRectangle(cornerRadius: Radius.l)
-                .fill(statusTone.opacity(0.08))
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
-        }
-        .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.hairline, lineWidth: 1))
+        .card()
         .accessibilityElement(children: .combine)
     }
 
@@ -148,7 +141,7 @@ struct RunInspector: View {
                     Text("\(done) of \(steps.count) done").font(Theme.meta.weight(.medium).monospacedDigit()).foregroundStyle(Theme.muted)
                     Spacer()
                 }
-                ProgressView(value: Double(done), total: Double(max(steps.count, 1))).tint(Theme.accent)
+                ProgressView(value: Double(done), total: Double(max(steps.count, 1))).tint(Theme.text)
             }
             .padding(.horizontal, Space.l).padding(.top, Space.m).padding(.bottom, Space.s)
             ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
@@ -183,13 +176,12 @@ struct RunInspector: View {
 
     private var statusTone: Color {
         switch model.state.line {
-        case .working, .waitingOnSubagents, .helpersInBackground: Theme.accent
+        case .working, .waitingOnSubagents, .helpersInBackground: Theme.text
         case .waitingOnYou: Theme.warn
         case .idle:
             switch model.state.runStatus {
             case "failed": Theme.bad
-            case "cancelled": Theme.faint
-            default: Theme.good
+            default: Theme.muted
             }
         }
     }
@@ -224,8 +216,8 @@ struct RunInspector: View {
 
     private func color(for status: String) -> Color {
         switch status {
-        case "done": Theme.good
-        case "in_progress": Theme.accent
+        case "done": Theme.muted
+        case "in_progress": Theme.text
         case "failed": Theme.bad
         default: Theme.faint
         }
@@ -248,25 +240,10 @@ private struct HelperRow: View {
                 }
             }
             Spacer(minLength: Space.s)
-            StatusPill(text: HelperOrder.badge(for: helper), icon: helper.isLive ? .audioWaveform : nil, tone: helper.isLive ? Theme.accent : Theme.faint, pulse: helper.isLive)
+            StateMark(words: HelperOrder.badge(for: helper), kind: StateMark.Kind(helperStatus: helper.status))
         }
         .padding(.horizontal, Space.l).padding(.vertical, Space.m - 2)
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// An empty line of a card, said quietly with its symbol.
-struct EmptyRow: View {
-    let icon: IconName
-    let words: String
-
-    var body: some View {
-        HStack(spacing: Space.m) {
-            DotIcon(icon, size: 16, relativeTo: .footnote).foregroundStyle(Theme.faint).frame(width: 20)
-            Text(words).font(Theme.small).foregroundStyle(Theme.muted)
-            Spacer()
-        }
-        .padding(.horizontal, Space.l).frame(minHeight: 52)
     }
 }
 
@@ -279,19 +256,18 @@ struct ScheduleRow: View {
     var body: some View {
         Toggle(isOn: Binding(get: { schedule.record.enabled }, set: { onChange($0) })) {
             HStack(spacing: Space.m) {
-                DotIcon(isLoop ? .loop : .clock, size: 16, relativeTo: .footnote)
-                    .foregroundStyle(schedule.record.enabled ? Theme.accent : Theme.faint)
-                    .frame(width: 30, height: 30)
-                    .background((schedule.record.enabled ? Theme.accent : Theme.faint).opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.s))
+                DotIcon(isLoop ? .loop : .clock, size: 22, relativeTo: .title3)
+                    .foregroundStyle(schedule.record.enabled ? Theme.muted : Theme.faint)
+                    .frame(width: 28)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(schedule.record.name.isEmpty ? shortened(schedule.record.goal, 60) : schedule.record.name)
-                        .font(.subheadline).foregroundStyle(Theme.text).lineLimit(1)
+                        .font(.body).foregroundStyle(Theme.text).lineLimit(1)
                     Text(detail).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(2)
                 }
             }
         }
-        .tint(Theme.accentFill)
+        .tint(Theme.toggleOn)
         .padding(.horizontal, Space.l).padding(.vertical, Space.s)
         .frame(minHeight: 56)
         .sensoryFeedback(.selection, trigger: schedule.record.enabled)
@@ -316,5 +292,19 @@ struct ChatModelPicker: View {
         ModelPickerView(
             store: model.store, model: model.choices?.model, effort: model.choices?.effort,
             onModel: { model.choose(model: $0, among: model.store.providers) }, onEffort: { model.choose(effort: $0) })
+    }
+}
+
+extension StateMark.Kind {
+    /// How a helper's run status reads as a mark: at work (neutral, moving), waiting on the owner (amber), failed (muted red),
+    /// done (muted), anything else (words only).
+    init(helperStatus status: String) {
+        switch status {
+        case "running", "queued", "ending": self = .working
+        case "blocked": self = .waiting
+        case "failed": self = .failed
+        case "done": self = .done
+        default: self = .quiet
+        }
     }
 }

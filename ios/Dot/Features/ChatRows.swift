@@ -16,7 +16,7 @@ struct ChatRow: View {
                 Text(LinkStyle.styled(text))
                     .font(Theme.body)
                     .foregroundStyle(Theme.text)
-                    .tint(Theme.link)
+                    .tint(Theme.text)
                     .padding(.horizontal, Space.l)
                     .padding(.vertical, Space.m - 1)
                     .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.l + 2))
@@ -62,7 +62,7 @@ struct MessageText: View {
                     Text(LinkStyle.styled(prose))
                         .font(Theme.body)
                         .foregroundStyle(Theme.text)
-                        .tint(Theme.link)
+                        .tint(Theme.text)
                         .lineSpacing(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 case .code(let code):
@@ -100,7 +100,7 @@ struct CodeBlock: View {
                 }
             } label: {
                 DotIcon(copied ? .check : .copy, size: 16, relativeTo: .footnote)
-                    .foregroundStyle(copied ? Theme.good : Theme.muted)
+                    .foregroundStyle(copied ? Theme.text : Theme.muted)
                     .frame(width: 40, height: 40)
                     .contentShape(Rectangle())
             }
@@ -120,7 +120,7 @@ struct ToolLine: View {
         let words: (verb: String, rest: String) = ToolGlyph.split(row.line)
         HStack(alignment: .firstTextBaseline, spacing: Space.s) {
             DotIcon(ToolGlyph.icon(for: row.tool), size: 15, pulse: row.state == .running, relativeTo: .footnote)
-                .foregroundStyle(row.state == .running ? Theme.accent : Theme.faint)
+                .foregroundStyle(row.state == .running ? Theme.text : Theme.faint)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 line(words)
@@ -182,10 +182,9 @@ struct ApprovalCardView: View {
     private var pending: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             HStack(spacing: Space.m) {
-                DotIcon(icon, size: 20, relativeTo: .title3)
+                DotIcon(icon, size: 22, relativeTo: .title3)
                     .foregroundStyle(Theme.warn)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.warn.opacity(0.16), in: Circle())
+                    .frame(width: 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.question != nil ? "Dot has a question" : "Waiting for your OK")
                         .font(.caption.weight(.semibold)).foregroundStyle(Theme.warn)
@@ -219,12 +218,7 @@ struct ApprovalCardView: View {
             actions
         }
         .padding(Space.l)
-        .background {
-            RoundedRectangle(cornerRadius: Radius.l)
-                .fill(Theme.warn.opacity(0.09))
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
-        }
-        .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.45), lineWidth: 1))
+        .card(border: Theme.warn.opacity(0.45))
         .accessibilityElement(children: .contain)
     }
 
@@ -235,47 +229,43 @@ struct ApprovalCardView: View {
             Label("This asks for a secret. Give it on your Mac or in the web UI.", icon: .lock)
                 .font(Theme.small).foregroundStyle(Theme.muted)
             Button { onDecide(card, false, "") } label: { Text("Skip").frame(maxWidth: .infinity) }
-                .dotButton(.glass).controlSize(.large)
+                .dotButton(.secondary).controlSize(.large)
         } else if card.question != nil {
             TextField("", text: $answer, prompt: Text("Type your answer").foregroundStyle(Theme.muted), axis: .vertical)
                 .font(Theme.body)
                 .padding(Space.m)
-                .background(Theme.background, in: RoundedRectangle(cornerRadius: Radius.m))
+                .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.m))
                 .overlay(RoundedRectangle(cornerRadius: Radius.m).strokeBorder(Theme.hairline, lineWidth: 1))
-            DotGlassGroup(spacing: Space.s) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Space.s) { skip; answerButton }
-                    VStack(spacing: Space.s) { answerButton; skip }
-                }
-                .controlSize(.large)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s) { skip; answerButton }
+                VStack(spacing: Space.s) { answerButton; skip }
             }
+            .controlSize(.large)
         } else {
-            DotGlassGroup(spacing: Space.s) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Space.s) { deny; allow }
-                    VStack(spacing: Space.s) { allow; deny }
-                }
-                .controlSize(.large)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s) { deny; allow }
+                VStack(spacing: Space.s) { allow; deny }
             }
+            .controlSize(.large)
         }
     }
 
     private var skip: some View {
-        Button { onDecide(card, false, "") } label: { Text("Skip").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.glass)
+        Button { onDecide(card, false, "") } label: { Text("Skip").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.secondary)
     }
 
     private var answerButton: some View {
         Button { onDecide(card, true, answer) } label: { Text("Send answer").lineLimit(1).frame(maxWidth: .infinity) }
-            .dotButton(.prominent)
+            .dotButton(.primary)
             .disabled(answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     private var deny: some View {
-        Button { onDecide(card, false, "") } label: { Text("Deny").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.glass)
+        Button { onDecide(card, false, "") } label: { Text("Deny").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.secondary)
     }
 
     private var allow: some View {
-        Button { onDecide(card, true, "") } label: { Text("Allow once").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.prominent)
+        Button { onDecide(card, true, "") } label: { Text("Allow once").lineLimit(1).frame(maxWidth: .infinity) }.dotButton(.primary)
     }
 
     // MARK: Answered
@@ -323,8 +313,7 @@ struct ApprovalCardView: View {
 
     private var resolutionTone: Color {
         switch card.status {
-        case "approved": Theme.good
-        case "denied": Theme.bad
+        case "approved", "denied": Theme.muted
         default: Theme.faint
         }
     }

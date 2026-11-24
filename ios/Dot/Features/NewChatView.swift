@@ -163,13 +163,12 @@ struct NewChatView: View {
                                     .font(Theme.small).foregroundStyle(Theme.text)
                                 if refusal.fallback != nil {
                                     Button("Send it on the default model") { Task { await start(onDefault: true) } }
-                                        .dotButton(.prominent)
+                                        .dotButton(.primary)
                                 }
                             }
                             .padding(Space.m)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.warn.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.l))
-                            .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.warn.opacity(0.4), lineWidth: 1))
+                            .card(border: Theme.warn.opacity(0.45))
                         }
                         if let failure: String = model.failure {
                             Label(failure, icon: .circleAlert).font(Theme.meta).foregroundStyle(Theme.bad)
@@ -189,7 +188,7 @@ struct NewChatView: View {
                             store: store, model: model.model, effort: model.effort,
                             onModel: { model.choose(model: $0) }, onEffort: { model.choose(effort: $0) }
                         )
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsPicker = false } } }
+                        .toolbar { DoneButton { showsPicker = false } }
                     }
                     .dotSheet()
                     .presentationDetents([.medium, .large])
@@ -238,19 +237,9 @@ struct NewChatView: View {
     private var composer: some View {
         VStack(spacing: Space.s) {
             HStack(spacing: Space.s) {
-                Button { showsPicker = true } label: {
-                    HStack(spacing: Space.xs + 1) {
-                        DotIcon(.cpu, size: 13, relativeTo: .caption)
-                        Text(pillWords).font(Theme.meta.weight(.medium)).lineLimit(1)
-                        DotIcon(.chevronsUpDown, size: 11, relativeTo: .caption2)
-                    }
-                    .foregroundStyle(Theme.text)
-                    .padding(.horizontal, Space.m).frame(minHeight: 36)
-                    .dotGlass(in: Capsule(), interactive: true)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("model-pill")
-                .accessibilityLabel("Model: \(pillWords)")
+                DotChip(icon: .cpu, words: pillWords) { showsPicker = true }
+                    .accessibilityIdentifier("model-pill")
+                    .accessibilityLabel("Model: \(pillWords)")
                 Spacer()
             }
             VStack(spacing: Space.s) {
@@ -281,9 +270,9 @@ struct NewChatView: View {
                     MicButton(dictation: model.dictation) { model.toggleDictation() }
                     Button { Task { await start(onDefault: false) } } label: {
                         DotIcon(.arrowUp, size: 19)
-                            .foregroundStyle(model.canSend ? Theme.onAccent : Theme.faint)
+                            .foregroundStyle(model.canSend ? Theme.onAction : Theme.faint)
                             .frame(width: 36, height: 36)
-                            .background(Circle().fill(model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
+                            .background(Circle().fill(model.canSend ? Theme.action : Theme.raised))
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                     }

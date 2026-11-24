@@ -3,31 +3,46 @@ import UIKit
 
 // MARK: - Tokens
 
-/// The app's look (item 1380): near-black ground with raised surfaces and hairlines in the dark, a cool white in the
-/// light, one calm blue with a very slight gradient, an 8-point radius scale, SF for words and SF Mono for code.
-/// Colours come from `DotPalette` (also read by the Live Activity and measured by `DotPaletteTests`); they follow the
-/// system's appearance. Glass is for floating chrome only: see `dotGlass(in:)`.
+/// The app's look (items 1380 to 1382; made professional by items 1640 to 1647): ONE neutral graphite family from the web app's
+/// Graphite theme, flat surfaces with hairlines, no accent hue, no gradient, no shadow, no coloured tile. Colour is for two
+/// states only: amber for what waits on the owner, a muted red for what failed. The primary action is the ink itself.
+/// Colours come from `DotPalette` (also read by the Live Activity and measured by `DotPaletteTests`); they follow the system's
+/// appearance. Glass is for floating chrome only: see `dotGlass(in:)`.
 enum Theme {
+    /// The ground of every screen and of every sheet.
     static let background: Color = dynamic(\.background)
+    /// A card: one step above the ground, never darker than it.
     static let surface: Color = dynamic(\.surface)
+    /// A fill a step off the surface: the owner's message, an avatar's disc, a field.
     static let raised: Color = dynamic(\.raised)
     static let text: Color = dynamic(\.text)
     static let muted: Color = dynamic(\.muted)
+    /// The quiet tier: a footer, a time, a placeholder.
     static let faint: Color = dynamic(\.faint)
-    static let accent: Color = dynamic(\.accent)
-    /// A fill white text sits on (a prominent button, the send button).
-    static let accentFill: Color = dynamic(\.accentFill)
-    static let onAccent: Color = dynamic(\.onAccent)
+    /// The primary action is the text colour on the ground: this is its fill, and `onAction` the label on it.
+    static let action: Color = dynamic(\.action)
+    static let onAction: Color = dynamic(\.onAction)
+    /// The track of a switch that is on: a mid grey of the quiet tier, so that the white knob reads on it (the system's own tint is
+    /// the app's ink, which would hide the knob).
+    static let toggleOn: Color = dynamic(\.faint)
+    /// Waiting on the owner: an amber ink, and the one amber fill.
     static let warn: Color = dynamic(\.warn)
+    static let warnSurface: Color = dynamic(\.warnSurface)
+    /// A failure: a muted red ink for a glyph and its words.
     static let bad: Color = dynamic(\.bad)
-    static let good: Color = dynamic(\.good)
-    /// A link: plain words in the accent's lightest shade, no chip (brighter than the text round it in the dark).
-    static let link: Color = dynamic(\.link)
 
-    /// A hairline: 9 % of the ink over the ground.
+    /// The fills of a row's swipe actions. The system draws their label in white in both looks, so the fills are mid-dark ones
+    /// in both: a graphite for an action and a deep muted red for the one that removes. (`DotPaletteTests` holds white on them
+    /// to 4.5:1.)
+    static let swipeNeutral: Color = Color(swipeNeutralRGB)
+    static let swipeDestructive: Color = Color(swipeDestructiveRGB)
+    static let swipeNeutralRGB: DotRGB = DotRGB(hex: 0x58585C)
+    static let swipeDestructiveRGB: DotRGB = DotRGB(hex: 0xB3261E)
+
+    /// A hairline: 10 % of the ink over the ground.
     static let hairline: Color = Color(
         uiColor: UIColor { trait in
-            trait.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.09) : UIColor(white: 0, alpha: 0.10)
+            trait.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.10) : UIColor(white: 0, alpha: 0.10)
         })
     /// The hairline when the reader asked for more contrast.
     static let hairlineStrong: Color = Color(
@@ -39,13 +54,6 @@ enum Theme {
         uiColor: UIColor { trait in
             trait.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.07) : UIColor(white: 0, alpha: 0.06)
         })
-
-    /// The accent as a fill: a very slight top-to-bottom gradient.
-    static let accentGradient: LinearGradient = LinearGradient(
-        colors: [dynamic(\.accentFillTop), dynamic(\.accentFill)], startPoint: .top, endPoint: .bottom)
-
-    /// The text's brightest channel in the dark (a link has to be above it).
-    static let textLevel: Double = 0.88
 
     /// The corner radius of controls; `Radius` has the rest of the scale.
     static let radius: CGFloat = Radius.s
@@ -73,8 +81,11 @@ extension UIColor {
     convenience init(_ rgb: DotRGB) { self.init(red: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1) }
 }
 
-/// The radius scale: 4 for a chip's inner mark, 8 for a control, 12 for a card, 16 for a sheet's block, 24 for the
-/// floating bar.
+extension Color {
+    init(_ rgb: DotRGB) { self.init(red: rgb.red, green: rgb.green, blue: rgb.blue) }
+}
+
+/// The radius scale: 4 for a chip's inner mark, 8 for a control, 12 for a field, 16 for a card, 24 for the floating bar.
 enum Radius {
     static let xs: CGFloat = 4
     static let s: CGFloat = 8
@@ -96,11 +107,11 @@ enum Space {
 
 // MARK: - Motion
 
-/// Spring presets. A reader who turned Reduce Motion on gets no movement from `.dotAnimation`.
+/// Spring presets: few and slow, nothing bounces for fun. A reader who turned Reduce Motion on gets no movement from
+/// `.dotAnimation`.
 enum Motion {
     static let snappy: Animation = .snappy(duration: 0.28)
     static let smooth: Animation = .smooth(duration: 0.35)
-    static let bouncy: Animation = .bouncy(duration: 0.42, extraBounce: 0.12)
 }
 
 private struct DotAnimation<V: Equatable>: ViewModifier {
@@ -146,7 +157,7 @@ private struct DotGlass<S: Shape>: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if reduceTransparency {
             content
-                .background(Theme.raised, in: shape)
+                .background(tint == nil ? Theme.raised : Theme.warnSurface, in: shape)
                 .overlay(shape.stroke(stroke, lineWidth: 1))
         } else if #available(iOS 26, *), DotDesign.liquidGlass {
             content.glassEffect(glass, in: shape)
@@ -169,27 +180,9 @@ private struct DotGlass<S: Shape>: ViewModifier {
     }
 }
 
-/// The accent as glass: tinted Liquid Glass on iOS 26, the accent's gradient fill before it (and under Reduce Transparency).
-private struct DotProminentGlass<S: Shape>: ViewModifier {
-    let shape: S
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency: Bool
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 26, *), DotDesign.liquidGlass, !reduceTransparency {
-            content.glassEffect(.regular.tint(Theme.accentFill).interactive(), in: shape)
-        } else {
-            content.background(Theme.accentGradient, in: shape)
-        }
-    }
-}
-
 extension View {
-    /// A call to action floating over content: the accent as glass (no screen uses it now; the compose button is a plain
-    /// glass button of the title bar).
-    func dotProminentGlass<S: Shape>(in shape: S) -> some View { modifier(DotProminentGlass(shape: shape)) }
-
-    /// Floating chrome (the composer, the capsule over it, a round button, a chip): glass on iOS 26, a material before.
-    /// Never on message text or on a long list.
+    /// Floating chrome only (the composer, the capsule over it, a round button, a chip): glass on iOS 26, a material before.
+    /// Never on message text, on a card or on a long list. `tint` is for the one amber fill, "Waiting on you".
     func dotGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(DotGlass(shape: shape, tint: tint, interactive: interactive))
     }
@@ -214,73 +207,75 @@ struct DotGlassGroup<Content: View>: View {
     }
 }
 
-/// Glass buttons on iOS 26, filled and hairline buttons of the same shape before it.
-enum DotButtonKind { case prominent, glass, quiet }
+// MARK: - Buttons
+
+/// The app's four buttons, flat in both looks (no glass, no gradient): ONE primary (the ink as a fill, the ground as its label),
+/// ONE secondary (a raised fill with a hairline), ONE destructive (the secondary, its words in the failure's ink) and a quiet one
+/// (words in a hairline outline).
+enum DotButtonKind { case primary, secondary, destructive, quiet }
 
 private struct DotButtonModifier: ViewModifier {
     let kind: DotButtonKind
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency: Bool
 
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 26, *), DotDesign.liquidGlass, !reduceTransparency, kind != .quiet {
-            if kind == .prominent {
-                content.buttonStyle(.glassProminent).tint(Theme.accentFill)
-            } else {
-                content.buttonStyle(.glass)
-            }
-        } else {
-            content.buttonStyle(DotFallbackButtonStyle(kind: kind))
-        }
-    }
+    func body(content: Content) -> some View { content.buttonStyle(DotButtonStyle(kind: kind)) }
 }
 
 extension View {
-    func dotButton(_ kind: DotButtonKind = .glass) -> some View { modifier(DotButtonModifier(kind: kind)) }
+    /// `Button { } label: { Text("Allow once").frame(maxWidth: .infinity) }.dotButton(.primary)`; `.controlSize(.large)` makes it
+    /// 50 points tall, `.small` 36, else it is 44.
+    func dotButton(_ kind: DotButtonKind = .secondary) -> some View { modifier(DotButtonModifier(kind: kind)) }
 }
 
-/// The button of the material look (and of Reduce Transparency): a capsule, 44 points tall.
-struct DotFallbackButtonStyle: ButtonStyle {
+/// The button of every screen: a capsule, 44 points tall (50 large, 36 small).
+struct DotButtonStyle: ButtonStyle {
     let kind: DotButtonKind
     @Environment(\.isEnabled) private var isEnabled: Bool
+    @Environment(\.controlSize) private var controlSize: ControlSize
     @Environment(\.colorSchemeContrast) private var contrast: ColorSchemeContrast
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.subheadline.weight(.semibold))
-            .foregroundStyle(kind == .prominent ? Theme.onAccent : Theme.text)
+            .foregroundStyle(label)
             .padding(.horizontal, Space.l)
-            .frame(minHeight: 44)
-            .background {
-                if kind == .prominent {
-                    Capsule().fill(Theme.accentGradient)
-                } else {
-                    Capsule().fill(kind == .glass ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.clear))
-                }
-            }
-            .overlay(Capsule().strokeBorder(kind == .prominent ? Color.clear : (contrast == .increased ? Theme.hairlineStrong : Theme.hairline), lineWidth: 1))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.snappy(duration: 0.18), value: configuration.isPressed)
+            .frame(minHeight: height)
+            .background(fill, in: Capsule())
+            .overlay(Capsule().strokeBorder(border, lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.78 : 1)
+            .contentShape(Capsule())
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
-}
 
-/// A small text button of the app (kept for the compact places: a row's "Retry", a sheet's "Try again").
-struct QuietButtonStyle: ButtonStyle {
-    var tint: Color = Theme.text
-    var filled: Bool = false
-    @Environment(\.isEnabled) private var isEnabled: Bool
+    private var height: CGFloat {
+        switch controlSize {
+        case .large, .extraLarge: 50
+        case .small, .mini: 36
+        default: 44
+        }
+    }
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(filled ? Theme.onAccent : tint)
-            .padding(.horizontal, Space.m)
-            .frame(minHeight: 36)
-            .background {
-                if filled { RoundedRectangle(cornerRadius: Radius.s).fill(Theme.accentGradient) }
-            }
-            .overlay(RoundedRectangle(cornerRadius: Radius.s).strokeBorder(filled ? Color.clear : Theme.hairline, lineWidth: 1))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.45)
+    private var fill: Color {
+        switch kind {
+        case .primary: isEnabled ? Theme.action : Theme.raised
+        case .secondary, .destructive: Theme.raised
+        case .quiet: .clear
+        }
+    }
+
+    private var label: Color {
+        guard isEnabled else { return Theme.faint }
+        switch kind {
+        case .primary: return Theme.onAction
+        case .secondary, .quiet: return Theme.text
+        case .destructive: return Theme.bad
+        }
+    }
+
+    private var border: Color {
+        switch kind {
+        case .primary: .clear
+        default: contrast == .increased ? Theme.hairlineStrong : Theme.hairline
+        }
     }
 }
 
@@ -304,119 +299,145 @@ struct GlassCircleButton: View {
     }
 }
 
+/// THE chip: a small capsule of glass with a glyph and words (floating chrome: the model chip over a composer). 36 points to the
+/// eye, 44 to the finger.
+struct DotChip: View {
+    let icon: IconName
+    let words: String
+    var showsChevrons: Bool = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.xs + 1) {
+                DotIcon(icon, size: 13, relativeTo: .caption)
+                Text(words).font(Theme.meta.weight(.medium)).lineLimit(1)
+                if showsChevrons { DotIcon(.chevronsUpDown, size: 11, relativeTo: .caption2) }
+            }
+            .foregroundStyle(Theme.text)
+            .padding(.horizontal, Space.m).frame(minHeight: 36)
+            .dotGlass(in: Capsule(), interactive: true)
+            .padding(.vertical, Space.xs)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Surfaces
 
-/// A surface with a hairline border and the 12-point radius, flat in both looks (no shadow, no gradient: one card recipe).
+/// THE card: a surface one step above the ground, a 1-point hairline, a 16-point radius, flat in both looks (no shadow, no
+/// gradient, no tint). Used for every group of rows, every approval, every status.
 struct Card: ViewModifier {
     var fill: Color = Theme.surface
-    var radius: CGFloat = Radius.m
+    var radius: CGFloat = Radius.l
+    var border: Color?
     @Environment(\.colorSchemeContrast) private var contrast: ColorSchemeContrast
 
     func body(content: Content) -> some View {
         content
             .background(fill, in: RoundedRectangle(cornerRadius: radius))
-            .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(contrast == .increased ? Theme.hairlineStrong : Theme.hairline, lineWidth: 1))
+            .overlay(
+                RoundedRectangle(cornerRadius: radius)
+                    .strokeBorder(border ?? (contrast == .increased ? Theme.hairlineStrong : Theme.hairline), lineWidth: 1))
     }
 }
 
 extension View {
-    func card(fill: Color = Theme.surface, radius: CGFloat = Radius.m) -> some View { modifier(Card(fill: fill, radius: radius)) }
+    /// `border` is for the one card that asks the owner: an amber hairline (`Theme.warn`) instead of the grey one.
+    func card(fill: Color = Theme.surface, radius: CGFloat = Radius.l, border: Color? = nil) -> some View {
+        modifier(Card(fill: fill, radius: radius, border: border))
+    }
 }
 
-/// The ground of a screen: the base colour, and under the top a glow of the accent that fades out, so that a large
-/// title and the first rows stand on something other than flat black.
+/// The ground of a screen: flat. (It had a glow of the accent under the top until item 1640.)
 struct DotBackground: View {
-    var glow: Double = 1
-    @Environment(\.colorScheme) private var scheme: ColorScheme
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Theme.background
-            EllipticalGradient(
-                colors: [Theme.accent.opacity((scheme == .dark ? 0.20 : 0.13) * glow), Theme.accent.opacity(0)],
-                center: .top, startRadiusFraction: 0, endRadiusFraction: 0.9
-            )
-            .frame(height: 420)
-            .frame(maxWidth: .infinity)
-        }
-        .ignoresSafeArea()
-    }
-}
-
-/// A soft mesh of blues behind a hero (the pairing screen, an empty state): static, never loud.
-struct DotMesh: View {
-    var body: some View {
-        MeshGradient(
-            width: 3, height: 3,
-            points: [
-                [0, 0], [0.5, 0], [1, 0],
-                [0, 0.5], [0.55, 0.45], [1, 0.5],
-                [0, 1], [0.5, 1], [1, 1],
-            ],
-            colors: [
-                Theme.accent.opacity(0.30), Theme.accent.opacity(0.10), Color.indigo.opacity(0.20),
-                Color.indigo.opacity(0.12), Theme.accent.opacity(0.24), Color.cyan.opacity(0.10),
-                Color.clear, Theme.accent.opacity(0.08), Color.clear,
-            ]
-        )
-        .accessibilityHidden(true)
-    }
+    var body: some View { Theme.background.ignoresSafeArea() }
 }
 
 // MARK: - Pieces
 
-/// A small status word in a tinted capsule: "Needs you", "Working", "Paused".
-struct StatusPill: View {
-    let text: String
-    var icon: IconName?
-    var tone: Color = Theme.accent
-    var pulse: Bool = false
+/// A state, small and honest (rule 3 of the look): a mark and words, no capsule and no fill. Working is neutral words with a
+/// small moving indicator; waiting on the owner is amber (a dot and amber words); failed is a muted red glyph and words; done
+/// is muted. The one amber fill, "Waiting on you", is the capsule over the composer's.
+struct StateMark: View {
+    enum Kind { case working, waiting, failed, done, quiet }
+
+    let words: String
+    var kind: Kind
 
     var body: some View {
-        HStack(spacing: Space.xs) {
-            if let icon {
-                DotIcon(icon, size: 12, pulse: pulse, relativeTo: .caption)
-            }
-            Text(text).font(.caption.weight(.semibold))
+        HStack(spacing: Space.xs + 2) {
+            mark
+            Text(words).font(.caption.weight(.medium)).foregroundStyle(ink).lineLimit(1)
         }
-        .foregroundStyle(tone)
-        .padding(.horizontal, Space.s)
-        .padding(.vertical, 3)
-        .background(tone.opacity(0.14), in: Capsule())
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var mark: some View {
+        switch kind {
+        case .working: WorkingIndicator(size: 10)
+        case .waiting: Circle().fill(Theme.warn).frame(width: 7, height: 7)
+        case .failed: DotIcon(.circleAlert, size: 12, relativeTo: .caption).foregroundStyle(Theme.bad)
+        case .done: DotIcon(.check, size: 11, relativeTo: .caption).foregroundStyle(Theme.faint)
+        case .quiet: EmptyView()
+        }
+    }
+
+    private var ink: Color {
+        switch kind {
+        case .working: Theme.muted
+        case .waiting: Theme.warn
+        case .failed: Theme.bad
+        case .done, .quiet: Theme.faint
+        }
     }
 }
 
-/// An empty, error or offline state: a layered symbol over a soft mesh, a title, a line, and one button when there is a
-/// way out.
+/// The small moving indicator of work: an arc that turns once in `RingMotion.secondsPerTurn`; it stands still, as an arc, under
+/// Reduce Motion.
+struct WorkingIndicator: View {
+    var size: CGFloat = 10
+    var ink: Color = Theme.text
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @State private var turning: Bool = false
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.72)
+            .stroke(ink, style: StrokeStyle(lineWidth: max(1.5, size * 0.16), lineCap: .round))
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(turning ? 360 : 0))
+            .animation(
+                turning ? .linear(duration: RingMotion.secondsPerTurn).repeatForever(autoreverses: false) : nil, value: turning
+            )
+            .onAppear { turning = !reduceMotion }
+            .onDisappear { turning = false }
+            .onChange(of: reduceMotion) { turning = !reduceMotion }
+            .accessibilityHidden(true)
+    }
+}
+
+/// An empty, error or offline state: a quiet symbol, a title, a line, and one button when there is a way out. Plain and adult:
+/// no illustration, no colour.
 struct DotEmptyState: View {
     let icon: IconName
     let title: String
     let message: String
-    var tone: Color = Theme.accent
+    var tone: Color = Theme.faint
     var actionTitle: String?
     var action: (() -> Void)?
 
     var body: some View {
         VStack(spacing: Space.m) {
-            ZStack {
-                DotMesh()
-                    .frame(width: 220, height: 220)
-                    .mask(RadialGradient(colors: [.black, .clear], center: .center, startRadius: 20, endRadius: 110))
-                Circle()
-                    .strokeBorder(LinearGradient(colors: [tone.opacity(0.5), tone.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-                    .frame(width: 104, height: 104)
-                DotIcon(icon, size: 36, pulse: true, relativeTo: .largeTitle)
-                    .foregroundStyle(tone)
-                    .frame(width: 88, height: 88)
-                    .dotGlass(in: Circle(), tint: tone.opacity(0.10))
-            }
-            .frame(height: 150)
-            Text(title).font(.title3.weight(.semibold)).foregroundStyle(Theme.text).multilineTextAlignment(.center)
+            DotIcon(icon, size: 28, relativeTo: .title)
+                .foregroundStyle(tone)
+                .padding(.bottom, Space.xs)
+            Text(title).font(.headline).foregroundStyle(Theme.text).multilineTextAlignment(.center)
             Text(message).font(.subheadline).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
-                Button(actionTitle, action: action).dotButton(.prominent).padding(.top, Space.xs)
+                Button(actionTitle, action: action).dotButton(.primary).padding(.top, Space.xs)
             }
         }
         .padding(.horizontal, Space.xl)
@@ -425,17 +446,18 @@ struct DotEmptyState: View {
     }
 }
 
-/// A section's title: small, muted, with a count when it has one.
+/// A section's title: small, in the secondary colour, sentence case, with a count when it has one.
 struct SectionLabel: View {
     let title: String
     var count: Int?
-    var tone: Color = Theme.faint
+    /// Only the inbox's and the list's "Needs you" header is amber.
+    var tone: Color = Theme.muted
 
     var body: some View {
         HStack(spacing: Space.xs) {
-            Text(title).textCase(nil).font(.footnote.weight(.semibold)).foregroundStyle(tone)
+            Text(title).textCase(nil).font(.footnote.weight(.medium)).foregroundStyle(tone)
             if let count {
-                Text("\(count)").font(.footnote.weight(.semibold).monospacedDigit()).foregroundStyle(tone.opacity(0.8))
+                Text("\(count)").font(.footnote.monospacedDigit()).foregroundStyle(tone == Theme.muted ? Theme.faint : tone)
             }
         }
         .accessibilityAddTraits(.isHeader)
@@ -444,8 +466,8 @@ struct SectionLabel: View {
 
 // MARK: - The ring of an avatar
 
-/// The ring round an avatar. It turns only while the run works (once in `RingMotion.secondsPerTurn`), and stands still
-/// under Reduce Motion.
+/// The ring round an avatar. While the run works a short arc turns once in `RingMotion.secondsPerTurn` (it stands still under
+/// Reduce Motion); while it waits for the owner the ring is amber and whole. No gradient, no glow.
 struct StateRing: View {
     let state: ThreadState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
@@ -457,10 +479,8 @@ struct StateRing: View {
             EmptyView()
         case .working:
             Circle()
-                .strokeBorder(
-                    AngularGradient(colors: [Theme.accent.opacity(0), Theme.accent.opacity(0.1), Theme.accent], center: .center),
-                    lineWidth: 2.5
-                )
+                .trim(from: 0, to: 0.3)
+                .stroke(Theme.text.opacity(0.85), style: StrokeStyle(lineWidth: 2, lineCap: .round))
                 .rotationEffect(.degrees(turning ? 360 : 0))
                 .animation(
                     turning ? .linear(duration: RingMotion.secondsPerTurn).repeatForever(autoreverses: false) : nil, value: turning)
@@ -470,14 +490,9 @@ struct StateRing: View {
                 .onDisappear { turning = false }
                 .onChange(of: reduceMotion) { turning = RingMotion.turns(state: state, reduceMotion: reduceMotion) }
         case .waiting:
-            Circle().strokeBorder(Theme.warn, lineWidth: 2.5)
-                .shadow(color: Theme.warn.opacity(0.45), radius: 3)
+            Circle().strokeBorder(Theme.warn, lineWidth: 2)
         }
     }
-}
-
-extension ThreadState {
-    var color: Color { self == .waiting ? Theme.warn : Theme.accent }
 }
 
 /// "2 min", "3 h", "Mon", "12 Oct": the age of a moment in the fewest characters.

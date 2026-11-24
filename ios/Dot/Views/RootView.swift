@@ -37,7 +37,7 @@ struct RootView: View {
                 AddressView(model: model, onSaved: nil)
             }
         }
-        .tint(Theme.accent)
+        .tint(Theme.text)
         .background(Theme.background)
         .onOpenURL { model.open(url: $0) }
         .task {
@@ -60,7 +60,7 @@ struct RootView: View {
                 ZStack(alignment: .topTrailing) {
                     WebScreen(model: model, host: host)
                     Button("Done") { model.showsWeb = false }
-                        .dotButton(.glass)
+                        .dotButton(.secondary)
                         .padding(.top, 54).padding(.trailing, 12)
                 }
             }
@@ -110,28 +110,27 @@ private struct LoadErrorView: View {
                 icon: .monitorOff, title: "Dot can't reach your Mac",
                 message: "\(host.name)\n\(message)\n\nIs the Mac awake, Dot running and Tailscale on here?", tone: Theme.warn,
                 actionTitle: "Try again", action: onRetry)
-            Button("Change address", action: onSettings).dotButton(.glass)
+            Button("Change address", action: onSettings).dotButton(.secondary)
         }
         .padding(Space.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background { DotBackground(glow: 0.6) }
+        .background { DotBackground() }
     }
 }
 
-/// Dot's mark: a luminous blue dot with two eyes, the app icon's sphere drawn small.
+/// Dot's mark: a flat graphite disc with two eyes in the ink (the same neutral disc the other agents' bots stand on, and the
+/// same two eyes the app icon has). No gradient, no hue.
 struct DotGlyph: View {
     let size: CGFloat
+    @Environment(\.colorSchemeContrast) private var contrast: ColorSchemeContrast
 
     var body: some View {
         ZStack {
-            Circle().fill(
-                RadialGradient(
-                    colors: [Color(red: 0.62, green: 0.80, blue: 1.0), Color(red: 0.24, green: 0.45, blue: 0.93), Color(red: 0.10, green: 0.22, blue: 0.62)],
-                    center: UnitPoint(x: 0.35, y: 0.28), startRadius: 0, endRadius: size * 0.85))
-            Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: max(0.5, size * 0.015))
+            Circle().fill(Theme.raised)
+            Circle().strokeBorder(contrast == .increased ? Theme.hairlineStrong : Theme.hairline, lineWidth: max(0.5, size * 0.02))
             HStack(spacing: size * 0.15) {
-                Capsule().fill(Color(red: 0.04, green: 0.07, blue: 0.2)).frame(width: size * 0.11, height: size * 0.21)
-                Capsule().fill(Color(red: 0.04, green: 0.07, blue: 0.2)).frame(width: size * 0.11, height: size * 0.21)
+                Capsule().fill(Theme.text).frame(width: size * 0.11, height: size * 0.21)
+                Capsule().fill(Theme.text).frame(width: size * 0.11, height: size * 0.21)
             }
             .offset(y: -size * 0.02)
         }

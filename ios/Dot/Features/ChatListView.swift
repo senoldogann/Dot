@@ -35,13 +35,13 @@ struct ChatListView: View {
                 }
                 if let words: String = openFailed {
                     Button { openFailed = nil } label: {
-                        Label(words, icon: .circleAlert).font(Theme.small).foregroundStyle(Theme.warn)
+                        Label(words, icon: .circleAlert).font(Theme.small).foregroundStyle(Theme.bad)
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
                 if !waiting.isEmpty { section("Needs you", tone: Theme.warn, threads: waiting) }
-                if !working.isEmpty { section("Working", tone: Theme.accent, threads: working) }
-                if !others.isEmpty { section(waiting.isEmpty && working.isEmpty ? nil : "Chats", tone: Theme.faint, threads: others) }
+                if !working.isEmpty { section("Working", tone: Theme.muted, threads: working) }
+                if !others.isEmpty { section(waiting.isEmpty && working.isEmpty ? nil : "Chats", tone: Theme.muted, threads: others) }
                 if store.threads.isEmpty && !store.refreshing {
                     DotEmptyState(
                         icon: .message, title: "No chats yet",
@@ -166,14 +166,14 @@ struct ChatListView: View {
             ForEach(threads) { thread in
                 Button { path.append(thread) } label: { ThreadRow(thread: thread, helpers: store.helpersLive(in: thread)) }
                     .buttonStyle(RowPressStyle())
-                    .listRowBackground(thread.isWaitingOnYou ? Theme.warn.opacity(0.08) : Color.clear)
+                    .listRowBackground(Color.clear)
                     .listRowSeparatorTint(Theme.hairline)
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 70 }
                     .listRowInsets(EdgeInsets(top: 0, leading: Space.l, bottom: 0, trailing: Space.l))
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         if thread.unread {
                             Button { store.markSeen(thread.id) } label: { Label("Read", menuIcon: .mailOpen) }
-                                .tint(Theme.accentFill)
+                                .tint(Theme.swipeNeutral)
                         }
                     }
             }
@@ -229,7 +229,7 @@ struct ThreadRow: View {
     @ViewBuilder private var helpersLine: some View {
         if helpers > 0 {
             Label(HelperWords.header(count: helpers, runWorking: thread.isWorking), icon: .users, size: 13)
-                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.accent).lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.muted).lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 .accessibilityIdentifier("row-helpers")
         }
     }
@@ -241,7 +241,7 @@ struct ThreadRow: View {
                 AgentAvatar(id: thread.actorId, size: 36, state: state)
                 Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 Spacer(minLength: 0)
-                if thread.unread { Circle().fill(Theme.accent).frame(width: 10, height: 10).accessibilityLabel("Unread") }
+                if thread.unread { Circle().fill(Theme.text).frame(width: 10, height: 10).accessibilityLabel("Unread") }
             }
             Text(thread.title.isEmpty ? "New chat" : thread.title)
                 .font(.body.weight(thread.unread ? .semibold : .regular)).foregroundStyle(Theme.text).lineLimit(3)
@@ -270,7 +270,7 @@ struct ThreadRow: View {
                     if thread.loopCron != nil {
                         DotIcon(.loop, size: 13, label: "Repeats", relativeTo: .caption).foregroundStyle(Theme.faint)
                     }
-                    if thread.unread { Circle().fill(Theme.accent).frame(width: 8, height: 8).accessibilityLabel("Unread") }
+                    if thread.unread { Circle().fill(Theme.text).frame(width: 8, height: 8).accessibilityLabel("Unread") }
                 }
                 helpersLine
             }
@@ -302,7 +302,7 @@ struct AgentStrip: View {
                                     if current != .idle || agent.isPaused {
                                         Text(current == .waiting ? "Needs you" : current == .working ? "Working" : "Paused")
                                             .font(Theme.tiny.weight(.semibold))
-                                            .foregroundStyle(current == .waiting ? Theme.warn : current == .working ? Theme.accent : Theme.faint)
+                                            .foregroundStyle(current == .waiting ? Theme.warn : current == .working ? Theme.muted : Theme.faint)
                                     }
                                 }
                             }

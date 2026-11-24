@@ -56,8 +56,11 @@ run's status (working with its clock, waiting on you, waiting on N helpers), the
 the line under the chat's title "5 helpers working" instead of "Done · 1 min ago" and the chat's row in the list says so too,
 item 1466),
 the chat's loops ("every 10 min") and the queue ("3 queued"), divided by hairlines, each opening its own sheet and none
-stacked; a segment exists only while it has something to say, so a chat at rest has no capsule; the queue's sheet gives
-each message an up and a down arrow, Send now (to the run at work) and Remove, and Resume when a stop held the queue;
+stacked (at the accessibility text sizes the segments stand over each other with their whole words, item 1643); a segment
+exists only while it has something to say, so a chat at rest has no capsule; the queue's sheet (item 1643) is a card for each
+message on the sheet's ground: swipe left to remove it (a line says "Removed from the queue" with an Undo for five seconds
+before the Mac is told), swipe right (or press and hold) for Send now to the run at work, press and hold for Move up and Move
+down, Reorder for the handles to drag the order, and Resume when a stop held the queue;
 the round button to the newest message stands beside the capsule; Send queues while a run works, and Stop with an empty
 box; a photo to attach), the
 run inspector (the run, its plan, its helpers in two groups, **Working** first and **Finished** after, each newest first and
@@ -243,41 +246,68 @@ the message waits and the later ones behind it.
   `xcodebuild test -scheme DotUI -only-testing:DotUITests/DotUIResilienceTests`. The debug build reads the phone's link from
   `-DotLinkFile <file>` (`up` or `down`), as the simulator cannot be taken off the Mac's network.
 
-## The design (items 1380 to 1382)
+## The design (items 1380 to 1382, made professional by items 1640 to 1644)
 
-The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `Shared/DotPalette.swift`:
+The owner's order of 2026-11-24 ("the design on the phone must not be childish; watch these blues, these silly designs
+everywhere ... the Done button is purple") is the standard every screen is held to. The look is one system, in
+`Features/Theme.swift`, `Features/Chrome.swift` and `Shared/DotPalette.swift`; `DesignGallery` (`-DotGallery 2`, and `5` with the
+sheet over it) shows all of it on one screen:
 
-- **Colour** comes from `DotPalette` in two looks that follow the system's appearance: dark (near-black `#0A0A0B`,
-  surfaces `#121214` and `#1B1B1F`, hairlines at 9 % white) and light (a cool white), one calm blue (ink `#6AA4FF` in the
-  dark, `#2559C9` in the light; a fill with a very slight top-to-bottom gradient that white text sits on), and warn, bad
-  and good. The palette is plain numbers, so `DotPaletteTests` asserts that every text token holds 4.5:1 on every ground
-  in both looks, and the Live Activity draws with the same values.
+- **One neutral family, no accent hue.** `DotPalette` has twelve roles in two looks, the greys of the web app's Graphite theme
+  (`static/js/appearance/palettes-more.js`: the phone and the web are one product). Dark: the ground `#121212`, a surface one step
+  above it `#1F1F1F`, a raised step `#2C2C2E`, the ink `#F5F5F5` in three tiers (`text`, `muted` `#B0B0B0`, `faint` `#949494`).
+  Light: a light grey ground `#F2F2F2` with white cards above it `#FFFFFF`, raised `#E9E9EB`, the ink `#0D0D0D`, `#4A4A4A`,
+  `#666666`. A card is never darker than the ground it lies on (the Queued sheet's black card was the bug). The primary action is
+  the ink itself: a light pill with a dark label on the dark ground, a dark pill with a light label on the light one (`action`,
+  `onAction`). There is no blue anywhere: the `AccentColor` asset (the system tint of any control that sets none), every `.tint(`
+  and the link in a message are the ink, and a link is told by its underline. Colour means two things only: amber for what waits on
+  the owner (`warn`, one amber fill `warnSurface`: the capsule's "Waiting on you") and a muted red for what failed (`bad`, a glyph
+  and its words, never a fill). Running is neutral words with a small moving indicator, done is muted. The roles are plain numbers,
+  so `DotPaletteTests` measures them: every ink 4.5:1 for words and 3:1 for glyphs on the ground, the surface and the raised step in
+  both looks, the action's label on its fill, the amber ink on the amber fill, the family neutral (channels within 3/255) with
+  only the amber and the red warm, a card never darker than its ground, and the `AccentColor` asset equal to the ink.
 - **Type** is SF through the system's text styles (`Theme.body` is `.callout`, `small` `.footnote`, `meta` `.caption`) so
-  everything follows Dynamic Type; code is SF Mono. Rows and cards re-lay out at the accessibility sizes, and floating
-  chrome (the composer, the capsule, the chips) is capped at a size where it still fits.
-- **Space and radius** are two scales (`Space` 2 to 32; `Radius` 4, 8, 12, 16, 24): controls 8, cards 12, the owner's
-  message and the approval card 16, the floating bar 26.
-- **Glass is for floating chrome only**: the composer bar, the capsule over it, the agents' chips, the
-  the compose and settings buttons of the title bar (iOS 26 draws them as glass), the jump-to-newest button, the approval card's Allow once and Deny, the pairing field. `dotGlass(in:)`
-  is Liquid Glass (`glassEffect`) on iOS 26 and a thin material with a hairline before it; `dotButton(.glass|.prominent)`
-  are `.glass` and `.glassProminent` on iOS 26 and capsule buttons before it; `DotGlassGroup` is a
-  `GlassEffectContainer`. Message text, tool lines and long lists are never glass. With Reduce Transparency it is a solid
-  raised surface, with Increase Contrast the hairline is stronger, and `dotAnimation` stays still under Reduce Motion.
-  Sheets keep the system's own glass on iOS 26 (`dotSheet()`), and a title's subtitle and the soft scroll edges are
-  iOS 26's own.
-- **Behaviour of the look**: a working chat's avatar has a ring that turns, once in four seconds and evenly (item 1460:
-  `RingMotion.secondsPerTurn`, the one line to change; it was 1.4 s, "far too fast", and it stands still under Reduce
-  Motion), a waiting one an amber ring. **Agents are bots, not letters** (item 1462): one `AgentAvatar` draws every agent,
-  Dot with its own face and every other agent with Lucide's `bot` on one neutral disc (the theme's raised ground and a
-  hairline), whatever its id: no hue taken from the id, no initial (`AgentLook.face(ofAgent:)` is the rule, tested). It stands
-  in the agents strip, the chat list's rows, the inbox's rows, the new-chat hero, the inspector's helpers (the bot, ringed
-  while the helper works) and, at the leading edge of the first line of an agent's since someone else spoke, in the chat itself
-  (`AgentLane`; the lines that follow line up with its words; at the accessibility sizes the face stands over the line,
-  as there is no room for a lane, and `SpeakerRule.wearsFace` says which line). VoiceOver says "Research, working" or "Research,
-  waits for you" (`AgentLook.words`). The Live Activity draws no avatar. A tool step has
-  its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
-  approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
-  folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).
+  everything follows Dynamic Type; code is SF Mono; sentence case, no capitals, one level of weight for one level of hierarchy.
+  Rows and cards re-lay out at the accessibility sizes, and floating chrome (the composer, the capsule, the chips) is capped at a
+  size where it still fits.
+- **Space and radius** are two scales (`Space` 2 to 32; `Radius` 4, 8, 12, 16, 24): controls 8, fields 12, cards 16, the floating
+  bar 26. Margins are 16, hit areas 44.
+- **The recipes**, each one piece of code:
+  - **Card** (`.card()`): the surface, a 1-point hairline, radius 16, flat. A card that asks the owner has an amber hairline
+    (`.card(border: Theme.warn...)`); no card has a shadow, a gradient or a tint over its fill.
+  - **Row** (`CardRow` in a `CardGroup`): a monochrome 22-point Lucide glyph in the secondary colour (no tile), the title, a detail
+    in the quiet tier, a chevron when it opens something; the one row that ends something (`destructive`) has its words, and only
+    its words, in the muted red.
+  - **Section** (`SectionLabel`, `CardGroup`): the header in the secondary colour, sentence case, with a count; the footer in
+    the quiet tier.
+  - **Sheet** (`dotSheet()`, `DoneButton`): the app's ground as the background, the neutral tint, the drag indicator, a title, ONE
+    trailing "Done" in the system's confirmation style (a filled glass capsule: the ink with the ground's label), the same in the
+    medium and the large detent in every sheet (Queued, Run, Step, Needs you, Settings, New chat, Models, Schedules, Pair,
+    Address, Select text); content in cards; a list of actions uses swipe actions and a context menu, not three icon buttons a row.
+  - **Buttons** (`dotButton(.primary|.secondary|.destructive|.quiet)`): flat capsules, 44 points (50 with
+    `.controlSize(.large)`): Allow once is the primary, Deny the secondary, a disabled primary a raised fill with the quiet tier's
+    words.
+  - **State mark** (`StateMark`): a dot, a glyph or the moving indicator and words, no capsule (see the colours above).
+  - **Chip** (`DotChip`): a small glass capsule with a glyph and words (the model chip).
+- **Glass is for floating chrome only**: the composer bar, the capsule over it, the agents' chips, the model chip, the compose and
+  settings buttons of the title bar (iOS 26 draws them as glass), the jump-to-newest button, a sheet's top buttons and the line that
+  takes a removal back. Never a card, a row, message text or a long list. `dotGlass(in:)` is Liquid Glass (`glassEffect`) on iOS 26
+  and a thin material with a hairline before it; `DotGlassGroup` is a `GlassEffectContainer`. With Reduce Transparency it is a
+  solid raised surface, with Increase Contrast the hairline is stronger, and `dotAnimation` stays still under Reduce Motion.
+  Sheets are the app's ground on every iOS (a glass sheet made the card on it unreadable against its own sheet).
+- **Behaviour of the look**: a working chat's avatar has a short arc that turns once in four seconds and evenly (item 1460:
+  `RingMotion.secondsPerTurn`, the one line to change), a waiting one an amber ring; both stand still under Reduce Motion.
+  **Agents are bots, not letters** (item 1462): one `AgentAvatar` draws every agent, Dot with its own face (a flat graphite disc
+  with two eyes in the ink, `DotGlyph`) and every other agent with Lucide's `bot` on one neutral disc (the theme's raised ground
+  and a hairline), whatever its id: no hue taken from the id, no initial (`AgentLook.face(ofAgent:)` is the rule, tested). It
+  stands in the agents strip, the chat list's rows, the inbox's rows, the new-chat hero, the inspector's helpers and, at the leading
+  edge of the first line of an agent's since someone else spoke, in the chat itself (`AgentLane`; at the accessibility sizes the face
+  stands over the line, as there is no room for a lane, and `SpeakerRule.wearsFace` says which line). VoiceOver says "Research,
+  working" or "Research, waits for you" (`AgentLook.words`). A tool step has its tool's symbol that pulses while it runs; the send
+  button is one symbol that changes (arrow, queue, stop); an approval is the loudest thing in a chat (a card with an amber hairline,
+  Allow once and Deny), and once answered folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a
+  switch, a selection). The Live Activity and the share extension read the same palette (`Shared/DotPalette.swift`); they stay static
+  by choice, but they are the ink, amber and the muted red, not blue.
 - **Icons** (item 1461): the web app's own set, Lucide, drawn as templates (`DotIcon(.bot, size: 16)`, which takes the colour
   of the text round it and grows with Dynamic Type, and `Label(_:icon:)`/`Label(_:menuIcon:)`). `Core/IconName.swift` is the
   list, one case a line: a screen can only draw a case, so a name the catalog lacks does not compile. The images are
@@ -290,16 +320,16 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   app (`Resources/Licences/LICENSE-Lucide.txt`, a copy of the web app's file the script keeps current) and reads in Settings ›
   About › Licences. SF Symbols stay only where the system's own meaning matters (the actions of a notification) and in the Live
   Activity and the share extension, two other targets that do not read the catalog.
-- **Debug-only aids**: `-DotGallery 1|2|3|4` shows the pieces on one screen with made-up data (a step that asks, a
-  secret, a failed step, the buttons, the empty states), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
+- **Debug-only aids**: `-DotGallery 1|2|3|4|5` shows the pieces on one screen with made-up data (a step that asks, a secret, a
+  failed step, the recipes, the empty states, the capsule, the sheet), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
   look an iOS 18 phone gets, on an iOS 26 simulator.
 
-Screenshots of the design pass, with the audit that led to it, are in `roadmap/1380.md`; the simulator shots were made
-against a scratch daemon with a scripted model (the daemon of the screenshot section above) with
-`xcrun simctl ui <device> appearance dark|light`, `content_size accessibility-extra-extra-extra-large`, and
-`DotUITests/GlassShotsTests` for the screens that need a tap. No iOS 18 simulator runtime is installed on the Mac
-that built this, so the fallback look was seen only through `-DotMaterialLook`, which shares the app's own code paths but
-not the system's (a pre-iOS 26 navigation bar and sheet are the system's to draw).
+Screenshots of the design pass, with the audit that led to it, are in `roadmap/1380.md`; the shots of the owner's order of
+2026-11-24 are before and after in the workspace's `ios-pro-shots/` (`roadmap/1640.md`, `roadmap/1644.md`); they were made against
+a canned daemon (`tools/ios_pro_daemon.py`) with `xcrun simctl ui <device> appearance dark|light`, `content_size
+accessibility-extra-extra-extra-large`, and the launch arguments below (no taps). No iOS 18 simulator runtime is installed on the Mac
+that built this, so the fallback look was seen only through `-DotMaterialLook`, which shares the app's own code paths but not the
+system's (a pre-iOS 26 navigation bar and sheet are the system's to draw).
 
 ## Build and install on the iPhone
 
@@ -338,7 +368,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) and `-DotSettingsPage <models|schedules|licences>` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) and `-DotSettingsPage <models|schedules|licences>` (with the settings) open a screen at launch, `-DotShowQueue 1` (with `-DotOpenChat`) the queue's sheet, `-DotShowStep 1` (with `-DotOpenChat`) the first step's sheet, `-DotShowInspector 1|2` the run's sheet at its large or its medium height, `-DotShowNewChat 1|2` the new-chat sheet (2: with the model picker over it), `-DotGallery 1|2|3|4|5` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the
@@ -395,4 +425,7 @@ near-black navy ground with a glow of the accent, in the three looks iOS 18 asks
 `icon-1024-dark.png`, `icon-1024-tinted.png`), and the launch screen's mark (`LaunchMark.imageset`, the same dot on
 transparency, shrunk with `sips -z 360 360`; the launch screen is that mark on `LaunchBackground`, the app's ground in
 both looks): `swift scripts/make_icon.swift Dot/Assets.xcassets/AppIcon.appiconset`. The global accent colour
-(`AccentColor`) is the app's blue, and the Live Activity draws with `DotPalette` and the same mark.
+(`AccentColor`) is the ink (item 1641: `#0D0D0D` in the light, `#F5F5F5` in the dark), and the Live Activity draws with
+`DotPalette` and a flat copy of the in-app mark. The home-screen icon itself is still the blue dot above (the owner's to redraw:
+`scripts/make_icon.swift`); the launch screen's mark is the in-app one, a flat graphite disc with two eyes, in two looks
+(`launch-mark.png`, `launch-mark-dark.png`) on `LaunchBackground`.

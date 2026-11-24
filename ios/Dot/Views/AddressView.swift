@@ -12,7 +12,7 @@ struct AddressView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.l) {
                 VStack(spacing: Space.m) {
-                    DotGlyph(size: 72).shadow(color: Theme.accent.opacity(0.45), radius: 24, y: 6)
+                    DotGlyph(size: 72)
                     Text("Your Mac's address").font(.title.weight(.semibold)).foregroundStyle(Theme.text)
                     Text("The tailnet address of the Mac Dot runs on, as Tailscale shows it, for example mac.your-tailnet.ts.net.")
                         .font(.subheadline).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
@@ -29,24 +29,20 @@ struct AddressView: View {
                     .font(.body)
                     .padding(Space.l)
                     .frame(minHeight: 56)
-                    .dotGlass(in: RoundedRectangle(cornerRadius: Radius.l))
+                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.l))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.hairline, lineWidth: 1))
                 if let error { NoticeCard(words: error) }
                 Button(action: save) {
                     Text("Open Dot").frame(maxWidth: .infinity)
                 }
-                .dotButton(.prominent)
+                .dotButton(.primary)
                 .controlSize(.large)
                 .disabled(input.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(.horizontal, Space.xl)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background {
-            ZStack(alignment: .top) {
-                DotBackground(glow: 0.6)
-                DotMesh().frame(height: 460).mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)).ignoresSafeArea()
-            }
-        }
+        .background { DotBackground() }
         .onAppear {
             input = model.host?.name ?? model.buildHost ?? ""
         }
@@ -89,9 +85,7 @@ struct SettingsView: View {
             .navigationTitle("Dot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
+                DoneButton { dismiss() }
             }
         }
     }
