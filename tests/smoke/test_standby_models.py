@@ -256,7 +256,7 @@ async def test_settings_choose_the_models_of_the_code_review(runtime: Runtime, s
                 await page.goto(f"{served}/#/settings/models")
                 fallbacks: Locator = page.locator(".models-review-fallbacks")
                 minutes: Locator = page.get_by_role("spinbutton", name="Minutes a review may take")
-                review: Locator = page.get_by_role("button", name="Review model: opus (not listed now)")
+                review: Locator = page.get_by_role("button", name="Code review model: opus (not listed now)")
                 await expect(review).to_be_visible()
                 if index == 0:
                     await expect(minutes).to_have_value("15")
