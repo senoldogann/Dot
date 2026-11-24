@@ -1436,7 +1436,7 @@ function standbySetting({ choose, title, lead, noneText, addLabel, className, ta
   const add = el("select", { class: "standby-add-select", "aria-label": addLabel });
   const list = el("ol", { class: "standby-list", "aria-label": `${title}, in their order` });
   const none = el("div", { class: "set-row standby-none" }, noneText);
-  const adder = el("div", { class: "set-row standby-add" }, el("span", { class: "standby-add-label" }, icon("plus"), "Add a fallback model"), add);
+  const adder = el("div", { class: "set-row standby-add" }, el("span", { class: "standby-add-label" }, icon("plus"), addLabel), add);
   const element = setSection({ title, lead, body: setCard(list, none, adder) });
   element.classList.add(className);
   element.hidden = true;
