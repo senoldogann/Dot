@@ -386,8 +386,17 @@ answer keeps its words, Ollama's too.
   them (`ToolSearch`) is ended failed at once, but the four plugins the
   program comes with (`cc-plugin-sec-default`, `-agents-md`, `-privacy`, `-plugin-authoring`, by name: measured on
   2.1.318 with the flags above, they gave the model no tool, command or skill, and no `CLAUDE.md` or `AGENTS.md` reached
-  it; a built-in a later version brings ends the run until it is measured). The door's secret is in a
-  file only you can read in a folder of the run's own, removed as the run ends, never in the program's arguments. The
+  it; a built-in a later version brings ends the run until it is measured). That line must also list the tools the run
+  cannot do its job without (item 1400): `finish`, where the run's mode has it, and `notify`, when the run is a
+  schedule's firing, which nobody reads as it ends, and its goal asks for a notification ("notify me", "send me a
+  notification", "show a notification", Turkish "bildirim gönder", Finnish "lähetä ilmoitus"; a goal that only mentions
+  one, or says not to send one, asks for none). A run short of one ends failed at once, before its model says a word,
+  and its result says which tool and why: an agent whose own list of tools leaves `notify` out is named before the
+  program starts (add the tool to the agent; no try again follows, and the chat keeps its session), and a bridge's list
+  that came up short is a passing failure, which a schedule tries once more. That is all the check is: a run that
+  calls no tool is not a failed run, and a schedule's row says `failed`, not `done`, for one that ended so.
+  The door's secret is in a file only you can read in a folder of the run's own, removed as the run ends, never in the
+  program's arguments. The
   timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
   window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
   composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first
