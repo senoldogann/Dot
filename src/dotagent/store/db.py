@@ -704,6 +704,7 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         harness_version=row["harness_version"],
         follows_reaction=row["follows_reaction"],
         end_reason=None if row["end_reason"] is None else str(row["end_reason"]),
+        hops=int(row["hops"]),
     )
 
 
@@ -1345,6 +1346,9 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("follows_reaction", "TEXT"),
     # Why the run ended, beside the result text. NULL until it ends, and for every run stored before.
     ("end_reason", "TEXT"),
+    # How many hand-offs from agent to agent the run is away from the last message of a person, schedule or watcher that
+    # began the chain (item 1741); 0 for every run that began one and for every run stored before.
+    ("hops", "INTEGER NOT NULL DEFAULT 0"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -3582,9 +3586,11 @@ class Store:
         agent_id: str | None,
         owner: str | None,
         follows_reaction: ReactionName | None = None,
+        hops: int = 0,
     ) -> RunRecord:
-        """A new queued run; ``owner`` is the process that drives it (:mod:`dotagent.agent.owners`), and
-        ``follows_reaction`` the reaction it follows up (item 844)."""
+        """A new queued run; ``owner`` is the process that drives it (:mod:`dotagent.agent.owners`),
+        ``follows_reaction`` the reaction it follows up (item 844) and ``hops`` how many hand-offs between agents it is
+        from the message of a person that began the chain (item 1741), which only the manager that launches it sets."""
         record: RunRecord = RunRecord(
             id=new_id("run"),
             thread_id=thread_id,
@@ -3609,6 +3615,7 @@ class Store:
             agent_id=agent_id,
             rewindable=parent_run_id is None,
             follows_reaction=follows_reaction,
+            hops=hops,
         )
         # ``ending`` occupies the chat too: a run whose end is not stored yet is not a free chat.
         working: tuple[RunStatus, ...] = tuple(sorted(OCCUPIED_STATUSES))
@@ -3641,8 +3648,8 @@ class Store:
         async with self._db.execute(
             "INSERT INTO runs(id, thread_id, goal, mode, model, status, created_at, finished_at, result, steps,"
             " input_tokens, output_tokens, parent_run_id, source, effort, speed, once, approvals, goal_mode,"
-            " campaign_id, agent_id, owner, follows_reaction, history_version, history_seq) SELECT ?, ?, ?, ?, ?, ?,"
-            f" ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {place}{refusal} RETURNING id",
+            " campaign_id, agent_id, owner, follows_reaction, hops, history_version, history_seq) SELECT ?, ?, ?, ?, ?,"
+            f" ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {place}{refusal} RETURNING id",
             (
                 record.id,
                 record.thread_id,
@@ -3667,6 +3674,7 @@ class Store:
                 record.agent_id,
                 owner,
                 record.follows_reaction,
+                record.hops,
                 *(() if parent_run_id is not None else (thread_id, thread_id)),
                 *(
                     (thread_id, *working, owner)
@@ -3713,6 +3721,13 @@ class Store:
         )
         await self._db.commit()
         return cursor.rowcount > 0
+
+    @_writing
+    async def set_run_hops(self, run_id: str, hops: int) -> None:
+        """Set how many hand-offs between agents the run is from the start of its chain (item 1741). Only the owner's
+        answer to the card of the hop limit lowers it (:meth:`RunManager._carry_on`); no tool reaches this."""
+        await self._db.execute("UPDATE runs SET hops = ? WHERE id = ?", (hops, run_id))
+        await self._db.commit()
 
     @_writing
     async def set_run_status(self, run_id: str, status: WorkingStatus) -> bool:

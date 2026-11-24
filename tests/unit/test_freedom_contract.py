@@ -124,12 +124,15 @@ _FLAG_OF: dict[str, str] = {
 # The places of the source that put a question to the owner themselves, past the gate, and so ask in yolo and free mode
 # too whatever the gate decides: each by file and function, with what it asks and when. A new one is a new ask. The
 # gate's own three (``_ask_user``, ``_keep`` and ``_keep_send_card``) are reached only for a step its mode does not
-# waive; they are the gate, not a way around it.
+# waive; they are the gate, not a way around it. So is the hop limit's card (``RunManager._leave_hop_card``, item 1741):
+# a yolo run and every run while free mode is on never reach it (``_tell_of_the_hop_limit`` tells the owner and
+# refuses nothing; tests/smoke/test_hop_limit.py holds that).
 GATE_SITES: frozenset[tuple[str, str]] = frozenset(
     {
         ("agent/gate.py", "_ask_user"),
         ("agent/gate.py", "_keep"),
         ("agent/gate.py", "_keep_send_card"),
+        ("agent/manager.py", "_leave_hop_card"),
     }
 )
 KNOWN_ASKS: dict[tuple[str, str], str] = {

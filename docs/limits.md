@@ -61,6 +61,14 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   Settings › Models › Usage sums the last days (`GET /api/usage`, item 1403). Dot records time, tokens and the windows of
   your Claude plan, and keeps no price for a model, so none of this shows money; the plan's window is what a Claude plan
   has instead of a price, and the usage says only what the steps recorded of it.
+- Agents that hand work to each other are watched for a loop (item 1741): every hand-off from one agent to another (a run
+  another run delegated or messaged, a work order's attempt, the lead's run woken by its agent's answer, a thing on Dot's
+  list a run put there) is one hop further than the run it came from, which a run cannot lower; a message of yours, a
+  schedule's firing or a watcher's alert starts a chain at 0. Past `[agent] max_hops` (8; `0` for no limit): in yolo and
+  free mode ([Freedom](freedom.md)) nothing is refused, the hand-off is made and you are told once, with a link to the run;
+  in the other modes the next hand-off is not made, the run it came from is told and goes on, and you get one card,
+  **Allow once** (the run's count goes back to 0) or **Stop**, and a thing on Dot's list that the limit stops is let go
+  and you are told. Real chains here went one deep.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
   What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
   item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and

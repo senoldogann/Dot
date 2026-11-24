@@ -536,7 +536,10 @@ class RunOpening(FrozenModel):
     skills, stays in the chat's history, and with grouped tools ``use_tools`` turns a picked server's group on.
     ``tainted`` starts the run untrusted whatever it goes on from: the run a watcher starts (item 571) is set off by
     what a third party wrote. ``follows`` is the reaction of the owner's the run follows up (item 844), which the run
-    keeps (``RunRecord.follows_reaction``)."""
+    keeps (``RunRecord.follows_reaction``). ``hops`` is how many hand-offs between agents the run is from the message of
+    a person, a schedule or a watcher that began its chain of work (item 1741), which the run keeps (``RunRecord.hops``)
+    and the manager checks against ``[agent] max_hops`` as it launches the run; ``from_run_id`` is the run the hand-off
+    came from, which the card to the owner is left on when the limit stops it."""
 
     text: str
     files: tuple[StoredAttachment, ...]
@@ -546,6 +549,8 @@ class RunOpening(FrozenModel):
     picks: RunPicks
     tainted: bool = False
     follows: ReactionName | None = None
+    hops: int = 0
+    from_run_id: str | None = None
 
 
 @dataclass(frozen=True)
