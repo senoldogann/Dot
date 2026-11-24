@@ -238,9 +238,10 @@ def _show_page_tool() -> RegisteredTool:
         remote: tuple[str, ...] = remote_media(html)
         if remote:
             raise ToolInputError(
-                "The page was not shown: a shown page loads pictures, sound and video only written into it, so these "
-                f"would stand empty: {', '.join(remote)}. Save each in the workspace and name it by its relative path "
-                "(it is written in), write it in as a data: address, or leave it out; then show the page again.",
+                "The page was not shown: a shown page loads pictures, sound and video only written into it, and style "
+                f"sheets and fonts only from {', '.join(LIBRARY_HOSTS)}, so these would not load: {', '.join(remote)}. "
+                "Save each in the workspace and name it by its relative path (it is written in), write it in (a data: "
+                "address, a style block), take it from one of those hosts, or leave it out; then show the page again.",
                 {"remote": list(remote)},
             )
         page: ShownPage = await ctx.runtime.store.add_shown_page(ctx.run_id, args.title, html)

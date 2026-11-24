@@ -46,6 +46,7 @@ from dotagent.notify.tells import (
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
+from dotagent.store.failed import failed_result_sql
 from dotagent.store.models import (
     NO_PICKS,
     OBJECTIVE_MOVES,
@@ -2993,7 +2994,7 @@ class Store:
             " r.harness_version,"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_call'),"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_result'"
-            "  AND json_extract(e.data, '$.ok') = 0),"
+            f"  AND {failed_result_sql('e.data')}),"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_call'"
             "  AND instr(e.data, ?) > 0),"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'stall'),"
@@ -4231,7 +4232,7 @@ class Store:
             return {}
         rows = await self._all(
             "SELECT run_id, COUNT(*) AS errors FROM events WHERE kind = 'tool_result'"
-            f" AND run_id IN ({','.join('?' * len(run_ids))}) AND json_extract(data, '$.ok') = 0 GROUP BY run_id",
+            f" AND run_id IN ({','.join('?' * len(run_ids))}) AND {failed_result_sql('data')} GROUP BY run_id",
             tuple(run_ids),
         )
         return {row["run_id"]: row["errors"] for row in rows}
@@ -7242,8 +7243,9 @@ class Store:
         marks: str = ", ".join("?" for _ in sources_out)
         rows = await self._all(
             "SELECT e.run_id, r.thread_id, COALESCE(r.source, '') AS source, e.ts,"
-            " COALESCE(json_extract(e.data, '$.tool'), '') AS tool, COALESCE(json_extract(e.data, '$.ok'), 0) AS ok,"
-            " CASE WHEN COALESCE(json_extract(e.data, '$.ok'), 0) = 0"
+            " COALESCE(json_extract(e.data, '$.tool'), '') AS tool,"
+            f" NOT COALESCE({failed_result_sql('e.data')}, 1) AS ok,"
+            f" CASE WHEN COALESCE({failed_result_sql('e.data')}, 1)"
             " THEN substr(COALESCE(json_extract(e.data, '$.text'), ''), 1, ?) ELSE '' END AS error,"
             " COALESCE(json_extract(e.data, '$.site'), '') AS site,"
             " COALESCE(json_type(e.data, '$.tainted') = 'true', 0) AS tainted"

@@ -648,6 +648,7 @@ def test_the_web_addresses_of_a_pages_media_are_found_and_the_rest_are_not() -> 
         '<link rel="icon" href="https://a.example/favicon.ico"><div style="background:url(https://c.example/bg.png)">'
         "</div><style>@import url(https://cdn.jsdelivr.net/npm/x@1/x.css); .f{src:url(https://unpkg.com/f.woff2)}"
         " .g{background:url('https://d.example/g.png')}</style><img src=\"https://a.example/1.png\">"
+        '<link rel="stylesheet" href="https://e.example/s.css"><link rel="stylesheet" href="https://unpkg.com/k.css">'
     )
     assert page_files.remote_media(html) == (
         "https://a.example/1.png",
@@ -656,6 +657,7 @@ def test_the_web_addresses_of_a_pages_media_are_found_and_the_rest_are_not() -> 
         "http://127.0.0.1:9/v.mp4",
         "https://a.example/favicon.ico",
         "https://c.example/bg.png",
+        "https://e.example/s.css",
         "https://d.example/g.png",
     )
     assert page_files.remote_media("<p>No media</p>") == ()

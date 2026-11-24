@@ -15,6 +15,9 @@ _DELIMITER: str = "---"
 
 
 _HEADING: re.Pattern[str] = re.compile(r"^#{1,6}\s+")
+_FENCES: tuple[str, ...] = ("```", "~~~")
+# The starts of a line that is a table row, a list item, a quote or a rule, not a sentence that says what a skill is.
+_NOT_WORDS: tuple[str, ...] = ("|", "- ", "* ", "+ ", ">", "<", "---", "***")
 
 
 def _opens_frontmatter(text: str) -> bool:
@@ -93,10 +96,17 @@ def parse_skill(path: Path, text: str, source: str) -> Skill:
 
 
 def _first_words(body: str) -> str:
-    """The line of ``body`` that says what the skill is: its first line of words that is no heading, else its first
-    heading's words."""
+    """The line of ``body`` that says what the skill is: its first line of words outside a fenced block that is no
+    heading, table row, list item or quote, else its first heading's words."""
     lines: list[str] = [line.strip() for line in body.splitlines() if line.strip() != ""]
-    return next((line for line in lines if _HEADING.match(line) is None), _HEADING.sub("", lines[0]))
+    fenced: bool = False
+    for line in lines:
+        if line.startswith(_FENCES):
+            fenced = not fenced
+            continue
+        if not fenced and _HEADING.match(line) is None and not line.startswith(_NOT_WORDS):
+            return line
+    return _HEADING.sub("", lines[0])
 
 
 def parse_others_skill(path: Path, text: str, source: str) -> Skill:

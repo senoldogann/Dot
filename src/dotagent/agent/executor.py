@@ -614,10 +614,9 @@ async def _execute_one(
         {
             "call_id": call.id,
             "tool": call.name,
-            # A call Dot's rule turned another way is not a failure (item 1722): ``ok`` and ``steered``, so that what
-            # counts failed calls by ``ok`` (the tools' health, the run ledger, the self-improvement loop) counts
-            # failures alone; the model read it as an error all the same.
-            "ok": not failed_call(clipped),
+            # Whether the call did its job; ``steered`` marks one Dot's rule turned another way (item 1722), which
+            # did not, and which the counts of failed calls leave out (``store/failed.py``).
+            "ok": not clipped.is_error,
             "steered": clipped.steered,
             "text": truncate_middle(redact_known(clipped.text, known), _EVENT_TEXT_CHARS),
             "images": list(files),
