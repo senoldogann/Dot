@@ -4,6 +4,7 @@ import { listKey } from "./cacherules.js";
 import { claim, forget, keepList, keptList } from "./datacache.js";
 import { UNREACHABLE } from "./errors.js";
 import { noteCopy, noteReached, noteUnreachable } from "./linkfacts.js";
+import { nextStep, READ_TIMEOUT_MS } from "./retryrules.js";
 import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
@@ -239,12 +240,17 @@ async function proveDaemon() {
   }
   const nonce = hexOf(crypto.getRandomValues(new Uint8Array(NONCE_BYTES)));
   let response;
+  // A daemon that does not answer the proof makes every read wait for it: on a phone it is given the time a read has.
+  const limit = new AbortController();
+  const timer = resilient() ? setTimeout(() => limit.abort(), READ_TIMEOUT_MS) : null;
   try {
     const phone = phoneIdOf(token);
-    response = await fetch(`/api/proof?nonce=${nonce}${phone === null ? "" : `&phone=${phone}`}`, { cache: "no-store" });
+    response = await fetch(`/api/proof?nonce=${nonce}${phone === null ? "" : `&phone=${phone}`}`, { cache: "no-store", signal: limit.signal });
   } catch (cause) {
     noteUnreachable();
     throw new ApiError(0, UNREACHABLE, { path: "/proof", cause: String(cause) });
+  } finally {
+    clearTimeout(timer);
   }
   const text = await response.text();
   const data = response.ok ? parseJson(text) : null;
@@ -302,26 +308,225 @@ const AGENT_CHANGE = /^\/(agents(\/|$|\?)|agent-templates\/[^/]+\/use$|agent-tea
  * 1096); one that started none after all opens a card the daemon ends a minute later. */
 const RUN_START = /^\/(runs|runs\/[^/]+\/(resume|loop)|threads\/[^/]+\/queue(\/resume)?)$/;
 
+// How long a read of a list waits for the daemon when the phone holds a copy of it: past this the copy answers and the
+// daemon's own answer, when it comes, replaces it (`FRESH_EVENT`), so that a slow link never keeps the first frame waiting.
+const COPY_PATIENCE_MS = 3000;
+/** The event the page sends when the daemon answered a read late, after the copy kept on the phone had answered it
+ * (item 1521): `detail.path` is what was read. A page that drew the copy reads again. */
+export const FRESH_EVENT = "dot:fresh";
+// Whether the daemon has answered this page once: before it has, a read is tried once, so that a Mac that is out of reach
+// shows its screen (main.js) instead of a page that waits for a link that is there.
+let reachedOnce = false;
+// The reads on their way, by path (item 1521): the same read asked again while it is under way waits for that one.
+const flights = new Map();
+
+/** Whether this page reads as a phone's does on a bad link (item 1521): a touch screen with no pointer that hovers, and
+ * after the daemon has answered it once. A computer's page keeps its single try and its own timeouts. */
+function resilient() {
+  return reachedOnce && typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
+/** The error a cancelled read ends with, the page's own (a chat left): nothing is told of it. */
+function cancelled(signal) {
+  return signal?.reason instanceof Error ? signal.reason : new DOMException("The read was cancelled.", "AbortError");
+}
+
+/** Settles after `ms`; at once, rejected, when `signal` aborts. */
+function pause(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(done, ms);
+    function done() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", stop);
+      resolve(undefined);
+    }
+    function stop() {
+      clearTimeout(timer);
+      reject(cancelled(signal));
+    }
+    signal?.addEventListener("abort", stop, { once: true });
+    if (signal?.aborted) {
+      stop();
+    }
+  });
+}
+
+/** Settles once the phone has a link and the page is in view: no try is spent while there is none (item 1521). Rejected
+ * when `signal` aborts. */
+function untilLinkUp(signal) {
+  const ready = () => navigator.onLine && document.visibilityState === "visible";
+  return new Promise((resolve, reject) => {
+    if (ready()) {
+      resolve(undefined);
+      return;
+    }
+    function check() {
+      if (ready()) {
+        cleanup();
+        resolve(undefined);
+      }
+    }
+    function stop() {
+      cleanup();
+      reject(cancelled(signal));
+    }
+    function cleanup() {
+      window.removeEventListener("online", check);
+      document.removeEventListener("visibilitychange", check);
+      signal?.removeEventListener("abort", stop);
+    }
+    window.addEventListener("online", check);
+    document.addEventListener("visibilitychange", check);
+    signal?.addEventListener("abort", stop, { once: true });
+    if (signal?.aborted) {
+      stop();
+    }
+  });
+}
+
+/** One try of a read: `ask` with the time a read has. A try that outruns it ends as a request with no answer does. */
+async function tryRead(path, signal, outcome) {
+  const limit = new AbortController();
+  const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: "no answer in time" })), READ_TIMEOUT_MS);
+  const cancel = () => limit.abort(cancelled(signal));
+  signal?.addEventListener("abort", cancel, { once: true });
+  if (signal?.aborted) {
+    cancel();
+  }
+  try {
+    return await ask("GET", path, null, limit.signal, outcome);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
 /**
- * A request to the daemon. A read of one of the lists the shell draws (cacherules.js `listKey`) is kept on the phone as it
- * is answered (item 1520), and while Dot cannot be reached it is answered from that copy instead, so that the page opens
- * with its chats drawn on a link that is bad or gone; `linkfacts.js` says the page shows a copy, and since when. A refusal
- * of the daemon's, a rejected key among them, is never answered from a copy.
+ * A read as a phone makes it on a bad link (item 1521, retryrules.js): each try gives up after 10 s, it is tried three
+ * times with a wait that grows and has chance in it, and while the phone has no link at all, or the page is out of view,
+ * it waits for the link and the view instead of spending its tries. What will not change (a refusal) is never asked again.
  */
-export async function request(method, path, body) {
-  if (method !== "GET" || listKey(path) === null) {
+async function readWithTries(path, signal, outcome) {
+  const began = Date.now();
+  let failed = 0;
+  for (;;) {
+    await untilLinkUp(signal);
+    try {
+      return await tryRead(path, signal, outcome);
+    } catch (error) {
+      if (signal?.aborted) {
+        throw error;
+      }
+      const step = nextStep({
+        failed: failed + 1,
+        elapsed: Date.now() - began,
+        chance: Math.random(),
+        linkUp: navigator.onLine,
+        failure: { status: error instanceof ApiError ? error.status : 0 },
+      });
+      if ("giveUp" in step) {
+        throw error;
+      }
+      if ("wait" in step) {
+        failed += 1;
+        await pause(step.wait, signal);
+      }
+    }
+  }
+}
+
+/**
+ * The newest `count` events of the run `runId`, oldest first, and whether the daemon knows `tail` (item 1370: it says so in
+ * the header `X-Dot-Events-Tail`; an older one answers the first events of the run, which are no end of it). Made as a
+ * phone's reads are (item 1521); `signal` cancels it.
+ * @returns {Promise<{ events: { id: number, run_id: string, kind: string, data: any }[], tailed: boolean }>}
+ */
+export async function readEventsTail(runId, count, signal) {
+  const path = `/runs/${runId}/events${query({ tail: count })}`;
+  const outcome = {};
+  const events = resilient() ? await readWithTries(path, signal, outcome) : await ask("GET", path, null, signal, outcome);
+  return { events, tailed: outcome.headers?.has("X-Dot-Events-Tail") === true };
+}
+
+/** The read of `path` that is on its way, or a new one; each caller has its own copy of the answer, and leaves it alone
+ * when its `signal` aborts (the read is cancelled once every caller has left). */
+function sharedRead(path, signal) {
+  let flight = flights.get(path);
+  if (flight === undefined) {
+    const controller = new AbortController();
+    const made = { promise: readWithTries(path, controller.signal), controller, callers: 0 };
+    flight = made;
+    flights.set(path, made);
+    const over = () => {
+      if (flights.get(path) === made) {
+        flights.delete(path);
+      }
+    };
+    made.promise.then(over, over);
+  }
+  const mine = flight;
+  mine.callers += 1;
+  return new Promise((resolve, reject) => {
+    const leave = () => {
+      mine.callers -= 1;
+      if (mine.callers === 0) {
+        mine.controller.abort(cancelled(signal));
+      }
+      reject(cancelled(signal));
+    };
+    if (signal?.aborted) {
+      leave();
+      return;
+    }
+    signal?.addEventListener("abort", leave, { once: true });
+    mine.promise.then(
+      (value) => {
+        signal?.removeEventListener("abort", leave);
+        resolve(mine.callers > 1 ? structuredClone(value) : value);
+      },
+      (error) => {
+        signal?.removeEventListener("abort", leave);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * A request to the daemon. On a phone a read is made as `readWithTries` makes it and shared with the same read on its way
+ * (item 1521); `signal` cancels it. A read of one of the lists the shell draws (cacherules.js `listKey`) is kept on the
+ * phone as it is answered (item 1520), and while Dot cannot be reached, or does not answer within a few seconds, it is
+ * answered from that copy instead, so that the page opens with its chats drawn on a link that is bad or gone;
+ * `linkfacts.js` says the page shows a copy, and since when. A refusal of the daemon's, a rejected key among them, is
+ * never answered from a copy.
+ */
+export async function request(method, path, body, signal) {
+  if (method !== "GET") {
     return ask(method, path, body);
   }
+  const read = () => (resilient() ? sharedRead(path, signal) : ask(method, path, body, signal));
+  if (listKey(path) === null) {
+    return read();
+  }
+  const copy = cacheOn() ? await keptList(path) : null;
+  if (copy !== null && !navigator.onLine) {
+    noteCopy(copy.savedAt);
+    return copy.value;
+  }
+  const asked = read();
   let value;
   try {
-    value = await ask(method, path, body);
+    value = copy === null ? await asked : await answeredInTime(asked, copy, path);
   } catch (error) {
-    const kept = unreachable(error) && cacheOn() ? await keptList(path) : null;
-    if (kept === null) {
+    if (copy === null || !unreachable(error)) {
       throw error;
     }
-    noteCopy(kept.savedAt);
-    return kept.value;
+    noteCopy(copy.savedAt);
+    return copy.value;
+  }
+  if (value === LATE) {
+    noteCopy(copy.savedAt);
+    return copy.value;
   }
   if (cacheOn()) {
     keepList(path, value);
@@ -329,7 +534,35 @@ export async function request(method, path, body) {
   return value;
 }
 
-async function ask(method, path, body) {
+const LATE = Symbol("late");
+
+/** The daemon's answer, or `LATE` once `COPY_PATIENCE_MS` has passed with the copy in hand: the answer that comes after is
+ * kept and told to the page (`FRESH_EVENT`), which reads again what it drew from the copy. */
+async function answeredInTime(asked, copy, path) {
+  let patient = null;
+  const slow = new Promise((resolve) => {
+    patient = setTimeout(() => resolve(LATE), COPY_PATIENCE_MS);
+  });
+  try {
+    const first = await Promise.race([asked, slow]);
+    if (first === LATE) {
+      asked.then(
+        (value) => {
+          if (cacheOn()) {
+            keepList(path, value);
+          }
+          window.dispatchEvent(new CustomEvent(FRESH_EVENT, { detail: { path } }));
+        },
+        () => undefined,
+      );
+    }
+    return first;
+  } finally {
+    clearTimeout(patient);
+  }
+}
+
+async function ask(method, path, body, signal, outcome) {
   await proven();
   const headers = authHeaders();
   let payload;
@@ -339,19 +572,28 @@ async function ask(method, path, body) {
   }
   let response;
   try {
-    response = await fetch(`/api${path}`, { method, headers, body: payload, cache: "no-store" });
+    response = await fetch(`/api${path}`, { method, headers, body: payload, cache: "no-store", signal });
   } catch (cause) {
+    // A read the page cancelled (a chat left) or that ran out of its time ends as the page decided, not as a lost link.
+    if (signal?.aborted) {
+      throw cancelled(signal);
+    }
     noteUnreachable();
     throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
   if (method !== "GET") {
     // A read on its way may return what was there before this change: the next one goes to the daemon (item 1169).
     sharedReads.clear();
+    flights.clear();
   }
   if (!response.ok) {
     throw await errorOf(response, path);
   }
+  if (outcome !== undefined) {
+    outcome.headers = response.headers;
+  }
   // Dot answered: what the page shows next is its word of now, not a copy kept on the phone (linkfacts.js).
+  reachedOnce = true;
   noteReached();
   if (method !== "GET" && SCHEDULE_CHANGE.test(path)) {
     window.dispatchEvent(new CustomEvent(SCHEDULES_CHANGED_EVENT));
@@ -428,7 +670,8 @@ export async function pairWithCode(code) {
 }
 
 export const api = {
-  get: (path) => request("GET", path, null),
+  /** A read; `options.signal` cancels it (a chat left, item 1521). */
+  get: (path, options) => request("GET", path, null, options?.signal),
   post: (path, body) => request("POST", path, body),
   patch: (path, body) => request("PATCH", path, body),
   put: (path, body) => request("PUT", path, body),
@@ -443,7 +686,12 @@ const sharedReads = new Map();
  * what another changes in it. Once a change (`request`) is answered, the next read goes to the daemon again; a read
  * asked while a change is on its way may share one from before it, and the page reads again on the change's own event
  * (`AGENTS_CHANGED_EVENT` and the others). */
-export function sharedGet(path) {
+export function sharedGet(path, signal) {
+  if (resilient()) {
+    // On a phone a read is shared with the same read on its way by `request` itself (item 1521), whose callers each leave
+    // it by their own `signal`.
+    return request("GET", path, null, signal);
+  }
   let pending = sharedReads.get(path);
   if (pending === undefined) {
     pending = request("GET", path, null);

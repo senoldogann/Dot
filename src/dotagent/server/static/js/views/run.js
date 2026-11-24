@@ -5,10 +5,11 @@ import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { agentPanel } from "../agentpanel.js";
 import { automationsPanel } from "../automations.js";
-import { api, eventNotShown, follow, query, sharedGet, sse } from "../api.js";
+import { api, eventNotShown, follow, query, readEventsTail, sharedGet, sse } from "../api.js";
 import { historyOf } from "../cacherules.js";
 import { dropChat, keepChat, keptChat } from "../datacache.js";
 import { noteCopy } from "../linkfacts.js";
+import { GAP_EVENTS, longGap, TAIL_EVENTS, tailToAdd } from "../retryrules.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAsksDock } from "../asksdock.js";
@@ -1616,7 +1617,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     refreshes += 1;
     const mine = refreshes;
     try {
-      const fresh = await api.get(`/runs/${runId}`);
+      const fresh = await api.get(`/runs/${runId}`, { signal });
       if (signal.aborted || mine !== refreshes) {
         return;
       }
@@ -1696,7 +1697,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     let runs;
     try {
-      runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`);
+      runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`, { signal });
     } catch (error) {
       if (!signal.aborted) {
         readFailed("readFailed.chat", error);
@@ -2243,13 +2244,61 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
   const finished = (message) => message.data.kind === "run_finished" && message.data.run_id === runId;
   const ended = kept.messages.some(finished);
+  /**
+   * The id the stream goes on after (item 1521). A chat drawn from a copy that was at work when it was kept may have been
+   * away through a long run: when the run stored `GAP_EVENTS` events or more since the last one the copy holds, the
+   * stream would replay all of them, one round trip after the other on a bad link, to draw steps nobody is waiting for. The
+   * newest `TAIL_EVENTS` are read instead (`GET /runs/{id}/events?tail=`, item 1370), the chat says that some steps are not
+   * shown, and the stream goes on after the last of them. An older daemon answers `tail` with the first events of the run,
+   * no end of it: it is ignored, and the stream replays what was missed as before. A read that fails leaves the stream to
+   * replay, as it did before.
+   */
+  async function afterTheGap(lastId) {
+    if (kept.copy !== true || lastId === 0 || !(kept.detail.active || kept.detail.elsewhere)) {
+      return lastId;
+    }
+    try {
+      const page = await api.get(`/runs/${runId}/events${query({ after: lastId, limit: GAP_EVENTS })}`, { signal });
+      if (!longGap(page.length)) {
+        return lastId;
+      }
+      const { events, tailed } = await readEventsTail(runId, TAIL_EVENTS, signal);
+      const added = tailToAdd(events, tailed, lastId);
+      if (added === null || added.length === 0) {
+        return lastId;
+      }
+      timeline.element.append(
+        el("div", { class: "note steps-not-shown", role: "note" }, icon("info"), el("span", null, t("run.stepsNotShown", { count: added.length }))),
+      );
+      replaying = true;
+      for (const event of added) {
+        const message = { id: event.id, event: event.kind, data: event };
+        kept.messages.push(message);
+        try {
+          take(message);
+        } catch (error) {
+          eventNotShown(`/runs/${runId}/events`, message, error);
+        }
+      }
+      replaying = false;
+      kept.verifiedAt = Date.now();
+      keepChatSoon();
+      return Math.max(lastId, added[added.length - 1].id);
+    } catch (error) {
+      replaying = false;
+      if (!signal.aborted) {
+        console.warn("the end of a long run could not be read; the stream replays what was missed", error);
+      }
+      return lastId;
+    }
+  }
   // The stream goes on after the last stored event read (item 568). A live piece, of a thought or of a message being
   // written, has no id (0): taken for the last event, it made the stream start again from the first, and a chat left
   // and come back to while its run worked drew every message again, once more at each return.
   const lastStored = kept.messages.reduce((highest, message) => Math.max(highest, message.id), 0);
-  (ended ? Promise.resolve() : follow({
+  (ended ? Promise.resolve() : afterTheGap(lastStored).then((after) => follow({
     path: `/runs/${runId}/stream`,
-    after: lastStored,
+    after,
     signal,
     isFinished: finished,
     onState: (state) => {
@@ -2267,7 +2316,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       take(message);
       keepChatSoon();
     },
-  })).catch((error) => {
+  }))).catch((error) => {
     if (signal.aborted) {
       return;
     }
@@ -2406,7 +2455,7 @@ export function mount(root, ctx) {
     let messages = [];
     try {
       // Shared with the side menu, which looks up the run's chat as it opens (item 1169).
-      detail = await sharedGet(`/runs/${runId}`);
+      detail = await sharedGet(`/runs/${runId}`, controller.signal);
       // Found: a later read that finds nothing (a Reload after it was deleted) says Task not found (item 810).
       opening.found();
       // A run is read whole before it is drawn (item 454), not filled in as its stream comes; one at work up to now
@@ -2480,6 +2529,7 @@ export function mount(root, ctx) {
       messages: saved.messages,
       queue: saved.queue,
       verifiedAt: saved.savedAt,
+      copy: true,
     };
     try {
       stopRun = showRun({

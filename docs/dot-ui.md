@@ -124,7 +124,11 @@ the store `js/datacache.js`), so that Dot opens with a chat drawn on a link that
 chat from its copy at once (`drawFromCopy`) and keeps it as it stands (a moment after its last event, when the page is
 put away and when the chat is left), `js/api.js` keeps the lists as they are read and answers a read of one of them from
 the copy while Dot cannot be reached, and `js/linkfacts.js` says that what is shown is a copy and since when. The service
-worker stays the shell's alone. See [On a bad link: the web app](phone.md).
+worker stays the shell's alone. Its reads are made as the iPhone app makes them (item 1521, `js/retryrules.js`: 10 s a
+try, three tries, a wait that grows with chance in it, none spent while there is no link; a read is shared with the same
+read on its way and ends when its page is left), and a chat that was away through 500 events or more of a run reads the
+newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`). See
+[On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 

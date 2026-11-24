@@ -500,6 +500,18 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from the
   cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
   looks fresher than it is.
+- **Reads that try again (item 1521).** On a phone's touch screen, once Dot has answered the page, one wrapper makes the
+  reads (`js/api.js`, the rules in `js/retryrules.js`): a try gives up after 10 seconds, a read is tried three times
+  with a wait that grows from 0.4 s to 3 s and has chance in it (half fixed, half random), within 20 seconds in all; a
+  refusal (a 4xx but 408 and 429), an answer that cannot be read and a read that was cancelled are never asked again;
+  while the phone has no link at all (`navigator.onLine`) or the page is out of view, a read waits for the link and the
+  view instead of spending its tries; the same read asked while it is on its way is one request, each caller having an
+  answer of its own to change; and a read ends when its page leaves (the chat's reads end when the chat is left). A
+  list the phone holds a copy of is answered from it at once when there is no link, and after three seconds when Dot is
+  slow to answer, Dot's own answer replacing it when it comes. A chat drawn from a copy that was at work when it was
+  kept, and that missed 500 events or more of its run, reads the newest 400 (`GET /api/runs/{id}/events?tail=400`,
+  header `X-Dot-Events-Tail`, item 1370; a daemon without it is ignored and the stream replays what was missed), says
+  *Some steps are not shown*, and its stream goes on after the last event it read.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
