@@ -1395,6 +1395,16 @@ async def test_firings_skipped_in_a_row_are_counted_and_the_first_that_starts_a_
         await asyncio.to_thread(stop.unlink)
     held: ScheduleRecord = await runtime.store.get_schedule(record.id)
     assert (held.skipped_in_row, held.last_status) == (4, "skipped: the emergency stop is engaged")
+    # A firing that fails to start is no skip: it breaks the row (a count beside "failed to start" would be a lie).
+    broken_models: ModelsConfig = runtime.config.models.model_copy(update={"main": "nonsense"})
+    broken: Runtime = dataclasses.replace(runtime, config=runtime.config.model_copy(update={"models": broken_models}))
+    await Scheduler(broken, RunManager(broken)).tick(_planned(held) + 1)
+    failed: ScheduleRecord = await runtime.store.get_schedule(record.id)
+    assert failed.last_status.startswith("failed to start: ") and failed.skipped_in_row == 0
+    await busy.tick(_planned(failed) + 1)
+    again: ScheduleRecord = await runtime.store.get_schedule(record.id)
+    assert (again.skipped_in_row, again.last_status.startswith("skipped: ")) == (1, True)
+    held = again
     # The chat is free: the firing starts its run, and the count is over whether or not the run has ended.
     runs: Scheduler = Scheduler(runtime, _Starts(runtime))
     try:
