@@ -2,9 +2,10 @@
 
 import { el } from "./dom.js";
 import { t } from "./i18n.js";
-import { explain } from "./errors.js";
+import { explain, UNREACHABLE } from "./errors.js";
 import { createFormFlow, firstFieldOf, stateOfControls } from "./formflow.js";
 import { icon } from "./icons.js";
+import { linkFacts } from "./linkfacts.js";
 import { openViewer } from "./viewer.js";
 
 const TOAST_MS = 3500;
@@ -91,13 +92,22 @@ export function toastError(error) {
   toast("error", text, null, details);
 }
 
+/** Whether `error` is a request that got no answer at all (api.js `unreachable`, which this module cannot import). */
+function isUnreachable(error) {
+  return error !== null && typeof error === "object" && "status" in error && error.status === 0 && "message" in error && error.message === UNREACHABLE;
+}
+
 /** Run `action`; when it fails, tell the user why instead of leaving the click without any effect. */
 export async function attempt(action) {
   try {
     await action();
   } catch (error) {
     console.error("action failed", error);
-    toastError(error);
+    // A request that got no answer while the line under the bar says so (offline, reconnecting) says nothing more: a toast
+    // over the chat would cover what the phone keeps for the owner to read (item 1524).
+    if (!(isUnreachable(error) && linkFacts().unreachable)) {
+      toastError(error);
+    }
   }
 }
 

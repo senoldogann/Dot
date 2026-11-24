@@ -25,7 +25,7 @@ export function createOutboxRows({ chat, onEdit }) {
 
   /** @param {string} part @param {string} label @param {() => void} run */
   function button(part, label, run) {
-    return el("button", { class: "btn sm ghost outbox-button", type: "button", "data-part": part, onclick: run }, label);
+    return el("button", { class: "btn sm outbox-button", type: "button", "data-part": part, onclick: run }, label);
   }
 
   /** @param {import("./outboxrules.js").Entry} entry */

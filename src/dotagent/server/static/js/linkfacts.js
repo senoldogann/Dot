@@ -7,14 +7,39 @@
  * @property {number | null} copyFrom when the copy the page shows was kept (ms), null while it shows what Dot just said
  * @property {boolean} unreachable the last read or stream could not reach Dot
  * @property {number} waiting how many things done with no link wait to be sent
+ * @property {boolean} refused Dot refused the phone's key
  */
 
 /** @type {LinkFacts} */
-const facts = { copyFrom: null, unreachable: false, waiting: 0 };
+const facts = { copyFrom: null, unreachable: false, waiting: 0, refused: false };
+
+const listeners = new Set();
+
+/** The facts as they stand: a copy, that must not be changed. */
+export function linkFacts() {
+  return { ...facts };
+}
+
+/** Run `listener` with the facts whenever one changes. Returns the function that stops it. */
+export function onLinkFacts(listener) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 /** @param {Partial<LinkFacts>} change */
 function set(change) {
-  Object.assign(facts, change);
+  let changed = false;
+  for (const [name, value] of Object.entries(change)) {
+    if (facts[name] !== value) {
+      facts[name] = value;
+      changed = true;
+    }
+  }
+  if (changed) {
+    for (const listener of listeners) {
+      listener(linkFacts());
+    }
+  }
 }
 
 /** The page draws a copy kept on the phone, which was Dot's word at `savedAt`: until Dot answers, what it shows is not Dot's
@@ -25,12 +50,17 @@ export function noteCopy(savedAt) {
 
 /** Dot answered a read: what is shown is its word of now, and it is reachable. */
 export function noteReached() {
-  set({ copyFrom: null, unreachable: false });
+  set({ copyFrom: null, unreachable: false, refused: false });
 }
 
 /** A read or a stream could not reach Dot. */
 export function noteUnreachable() {
   set({ unreachable: true });
+}
+
+/** Dot refused the phone's key (or, `false`, the key is not refused any more). */
+export function noteRefused(refused = true) {
+  set({ refused });
 }
 
 /** How many things done with no link wait to be sent (the outbox, item 1523). */

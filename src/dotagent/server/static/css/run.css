@@ -4272,7 +4272,7 @@ dialog.computer-full::backdrop {
   gap: var(--space-1);
 }
 
-.outbox-button {
+.outbox .outbox-button.btn.sm {
   min-height: 44px;
 }
 
