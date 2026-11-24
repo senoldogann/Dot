@@ -287,22 +287,42 @@ def door_tools(registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] |
 
 
 # What makes a goal a request for a notification to the owner (item 1400), in the owner's three languages: "notify
-# me", "send me a notification", "show a notification", "use notify"; Turkish "bildirim gönder/at/yap/ver"; Finnish
-# "lähetä ilmoitus". A goal that only mentions one ("review the notification settings", "lue tämä ilmoitus") is none,
-# and neither is one that refuses it ("do not send a notification"). "Remind me" is not here: a reminder may as well be
-# the run's own answer, which the schedule's notice carries.
+# me", "send me a notification", "show me a notification", "use notify"; Turkish "bildirim gönder/at/yap/ver", "bana
+# bildir"; Finnish "lähetä ilmoitus", "ilmoita minulle". A goal that only mentions one ("review the notification
+# settings", "lue tämä ilmoitus"), names another's ("a notification email to the leads", "a notification to the team")
+# or refuses one ("do not send a notification", "älä lähetä ilmoitusta"; a Turkish refusal is the verb with a suffix,
+# which the word's end leaves out) is none. "Remind me" is not here: a reminder may as well be the run's own answer,
+# which the schedule's notice carries.
 _NOT_REFUSED: str = r"(?<!not )(?<!n't )(?<!never )"
+_NOT_REFUSED_FI: str = r"(?<!älä )(?<!ei )"
+_OWNER: str = r"(?:me|us|the\s+(?:owner|user))"
+# What follows "a notification" when it is another thing or another's: a thing it names ("notification email"), or a
+# person other than the owner it goes to.
+_NOT_THE_OWNERS: str = (
+    r"(?!\s+(?:e-?mails?|badges?|settings?|screens?|banners?|cent(?:er|re)s?|templates?|texts?|preferences?"
+    r"|permissions?))(?!\s+(?:to|for)\s+(?!" + _OWNER + r"\b))"
+)
 _NOTIFICATION_REQUESTS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pattern, re.IGNORECASE)
     for pattern in (
-        _NOT_REFUSED + r"\bnotify\s+(?:me|us|the\s+(?:owner|user))\b",
+        _NOT_REFUSED + r"\bnotify\s+" + _OWNER + r"\b",
         _NOT_REFUSED + r"\b(?:use|call)\s+(?:the\s+)?notify\b",
         _NOT_REFUSED
-        + r"\b(?:send|give|push|show|display)\s+(?:(?:me|us|him|her|them|the\s+(?:owner|user))\s+)?an?\s+"
-        + r"(?:\w+\s+)?notifications?\b",
+        + r"\b(?:send|give|push)\s+(?:(?:me|us|him|her|them|the\s+(?:owner|user))\s+)?"
+        + r"(?:an?\s+(?:\w+\s+)?notifications?|notifications)\b"
+        + _NOT_THE_OWNERS,
+        _NOT_REFUSED
+        + r"\b(?:show|display)\s+(?:"
+        + _OWNER
+        + r"\s+an?\s+(?:\w+\s+)?notifications?\b"
+        + r"|an?\s+(?:\w+\s+)?notifications?\s+(?:to\s+"
+        + _OWNER
+        + r"\b|at\s+\d|with\s+(?:the\s+)?title\b))",
         r"\bbildirim\w*\s+(?:gönder(?:in|iniz|mek)?|at|atın|yap(?:ın|mak)?|ver(?:in|mek)?|göster(?:in|mek)?"
-        + r"|yolla(?:yın|mak)?)\b",
-        r"\b(?:lähetä|näytä|anna)\b(?:\s+\w+){0,2}?\s+ilmoitu\w*",
+        r"|yolla(?:yın|mak)?)\b",
+        r"\bbana\s+bildir(?:in|iniz)?\b",
+        _NOT_REFUSED_FI + r"\b(?:lähetä|näytä|anna)\b(?:\s+\w+){0,2}?\s+ilmoitu\w*",
+        _NOT_REFUSED_FI + r"\bilmoita\s+(?:minulle|meille)\b",
     )
 )
 

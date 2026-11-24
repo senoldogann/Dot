@@ -526,33 +526,46 @@ def test_a_goal_that_asks_for_a_notification_is_told_in_the_owners_three_languag
         "Send me a notification that the course starts at 16:00.",
         "Send a push notification at 15:30: the course starts at 16:00.",
         "Send the owner a notification when the build is done.",
+        "Send me notifications when the build is done.",
+        "Send a notification to me at 15:30.",
+        "Show me a notification when it is time.",
         "Show a macOS notification with the title Course.",
+        "Display a notification to the user at 15:30.",
         "Notify me when the build is done.",
         "Use notify to tell me the course starts.",
         "Gönder: kurs 16:00'da, bana bildirim gönder.",
         "Saat 15:30'da bildirim at.",
+        "Saat 15:30'da bana bildir.",
         "Lähetä ilmoitus puhelimeeni kello 15.30.",
         "Lähetä minulle ilmoitus kun kurssi alkaa.",
+        "Ilmoita minulle kello 15.30.",
     ):
         assert goal_asks_notification(goal), goal
 
 
 def test_a_goal_that_only_mentions_a_notification_or_refuses_one_asks_for_none() -> None:
-    """Item 1400's review: a goal that merely names a notification (a screen to review, a job ad, a sale listing), and
-    one that says not to send one, must not make a run fail for want of ``notify``."""
+    """Item 1400's review: a goal that merely names a notification (a screen to review, a job ad, a sale listing), names
+    another's (an email, a team), or says not to send one, must not make a run fail for want of ``notify``, in any of
+    the owner's three languages."""
     for goal in (
         "Review the push notification settings screen.",
         "Explain how notifications work on macOS.",
         "Write the notification text for the release.",
         "Show the notification settings to the team.",
+        "Display a notification badge on the app icon.",
+        "Send a notification email to the leads.",
+        "Send a notification to the team's Slack channel.",
         "I was notified twice already; do not notify again.",
         "Do not send a notification before 08:00.",
         "Don't send me a notification, just write the report.",
-        "Never show a notification for this task.",
+        "Never show me a notification for this task.",
         "Bildirim ekranını incele.",
         "Bildirim verilerini ve yapılandırmasını kontrol et.",
+        "Bildirim gönderme, sadece raporu yaz.",
+        "Bana bildirme, sadece raporu yaz.",
         "Lue tämä ilmoitus ja tee hakemus.",
         "Tarkista myynti-ilmoitus ja vastaa siihen.",
+        "Älä lähetä ilmoitusta, kirjoita vain raportti.",
         "Remind me about the course at 16:00.",
         "Register for the course (ilmoittautua).",
         "",
