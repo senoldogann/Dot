@@ -9,6 +9,8 @@ import { api, eventNotShown, follow, ONE_SHOT, query, readEventsTail, sharedGet,
 import { historyOf } from "../cacherules.js";
 import { dropChat, keepChat, keptChat } from "../datacache.js";
 import { noteCopy } from "../linkfacts.js";
+import { loadOutbox, viaOutbox } from "../outbox.js";
+import { createOutboxRows } from "../outboxrows.js";
 import { GAP_EVENTS, longGap, TAIL_EVENTS, tailToAdd } from "../retryrules.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
@@ -245,7 +247,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The run is stopped from the composer's send while the box is empty, or from a delegated run's pill (item 120).
   function stopRun() {
     attempt(async () => {
-      await api.post(`/runs/${runId}/cancel`, null);
+      // With no link the Stop is kept and sent when the link is back, in order with what else was done (item 1523).
+      const stopped = await viaOutbox({ kind: "stop", chat: run.thread_id, method: "POST", path: `/runs/${runId}/cancel`, body: null }, () =>
+        api.post(`/runs/${runId}/cancel`, null),
+      );
+      if (stopped !== null && typeof stopped === "object" && "kept" in stopped) {
+        return;
+      }
       // The line and the bar over the composer say it stops until it has; the box keeps the focus for what comes next,
       // on a keyboard's device: on a touch screen a focus would bring the keyboard up over the conversation.
       workStatus.stopping();
@@ -1187,7 +1195,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         attachments: files,
         ...frame.picks.body(),
       };
-      await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
+      // With no link the message is kept under its key and sent once when the link is back (item 1523).
+      const queued = { ...body, key: keys.of("queue", run.thread_id, body) };
+      await viaOutbox(
+        { id: queued.key, kind: "message", chat: run.thread_id, method: "POST", path: `/threads/${run.thread_id}/queue`, body: queued, text },
+        () => queue.add(queued),
+      );
       keys.sent();
       choices.sent();
       frame.picks.sent();
@@ -1207,8 +1220,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       }
       const entry = holdMessage(text);
       const body = { text, attachments: files };
+      const steered = { ...body, key: keys.of("steer", runId, body) };
       try {
-        await api.post(`/runs/${runId}/steer`, { ...body, key: keys.of("steer", runId, body) });
+        const sent = await viaOutbox(
+          { id: steered.key, kind: "message", chat: run.thread_id, method: "POST", path: `/runs/${runId}/steer`, body: steered, text },
+          () => api.post(`/runs/${runId}/steer`, steered),
+        );
+        // Kept for the link: the message is the outbox's row, not one sent to the run.
+        if (sent !== null && typeof sent === "object" && "kept" in sent) {
+          releaseMessage(entry);
+        }
       } catch (error) {
         releaseMessage(entry);
         throw error;
@@ -1233,11 +1254,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       attachments: files,
       ...frame.picks.body(),
     };
-    const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
+    const started = { ...body, key: keys.of("run", body) };
+    const next = await viaOutbox(
+      { id: started.key, kind: "message", chat: run.thread_id, method: "POST", path: "/runs", body: started, text },
+      () => api.post("/runs", started),
+    );
     keys.sent();
     choices.sent();
     frame.picks.sent();
-    return next.id;
+    // Kept for the link: the chat goes on at its next run once it is sent, whichever page learns of it first (`catchUp`).
+    return next !== null && typeof next === "object" && "kept" in next ? null : next.id;
   }
 
   // Edit from here (item 282): the chat goes back to before the message of the run `past`, and the message
@@ -2052,6 +2078,20 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
   // first message (item 129).
   const earlier = earlierTurns(history, (past) => (past.rewindable ? () => editFromHere(past) : null), signal, reactions);
+  // What was done in this chat with no link and has not gone yet shows under its conversation, with Retry now and Edit
+  // (item 1523); a message taken back to be edited goes to the box, ahead of what was typed there.
+  loadOutbox();
+  const outboxRows = createOutboxRows({
+    chat: run.thread_id,
+    onEdit: (words) => {
+      input.value = input.value.trim() === "" ? words : `${words}\n\n${input.value}`;
+      input.dispatchEvent(new Event("input"));
+      frame.autosize();
+      if (!touchFirst()) {
+        input.focus();
+      }
+    },
+  });
   const thread = el(
     "div",
     { class: "run-thread" },
@@ -2065,6 +2105,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     workStatus.announcer,
     waitingList,
     lessonsPlace,
+    outboxRows.element,
   );
   paintWorking();
   const main = el("div", { class: "run-main" }, thread, dock);
@@ -2339,6 +2380,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
 
   return () => {
     keepChatNow();
+    outboxRows.dispose();
     document.removeEventListener("visibilitychange", keepWhenAway);
     window.removeEventListener("pagehide", keepChatNow);
     if (sessionStorage.getItem(shownKey) === runId) {

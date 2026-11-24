@@ -66,7 +66,8 @@ test("a read of a list the shell draws is kept under one key, and any other read
   assert.equal(listKey("/approvals?status=pending&limit=100"), "approvals");
   assert.equal(listKey("/assistant"), "assistant");
   assert.equal(listKey("/themes"), "themes");
-  for (const path of ["/runs/run_1", "/approvals?status=decided", "/threads", "/agents/agent_1", "/models", "/status/x", "/vault"]) {
+  assert.equal(listKey("/models"), "models");
+  for (const path of ["/runs/run_1", "/approvals?status=decided", "/threads", "/agents/agent_1", "/models/x", "/status/x", "/vault"]) {
     assert.equal(listKey(path), null, path);
   }
 });

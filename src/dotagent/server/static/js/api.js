@@ -4,7 +4,7 @@ import { listKey } from "./cacherules.js";
 import { claim, forget, keepList, keptList } from "./datacache.js";
 import { UNREACHABLE } from "./errors.js";
 import { noteCopy, noteReached, noteUnreachable } from "./linkfacts.js";
-import { nextStep, READ_TIMEOUT_MS } from "./retryrules.js";
+import { nextStep, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from "./retryrules.js";
 import { CONNECT_TIMEOUT_MS, createParser, IDLE_TIMEOUT_MS, reconnectWait } from "./sseframes.js";
 import { toast } from "./ui.js";
 
@@ -503,7 +503,18 @@ function sharedRead(path, signal) {
  */
 export async function request(method, path, body, signal) {
   if (method !== "GET") {
-    return ask(method, path, body);
+    if (!resilient()) {
+      return ask(method, path, body);
+    }
+    // A write on a phone gives up after 30 s as a request with no answer does (item 1523): what was done is kept and sent
+    // again with its key, which the daemon answers with what the first made.
+    const limit = new AbortController();
+    const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: "no answer in time" })), WRITE_TIMEOUT_MS);
+    try {
+      return await ask(method, path, body, limit.signal);
+    } finally {
+      clearTimeout(timer);
+    }
   }
   const read = () => (resilient() ? sharedRead(path, signal) : ask(method, path, body, signal));
   if (listKey(path) === null) {
@@ -577,7 +588,11 @@ async function ask(method, path, body, signal, outcome) {
   } catch (cause) {
     // A read the page cancelled (a chat left) or that ran out of its time ends as the page decided, not as a lost link.
     if (signal?.aborted) {
-      throw cancelled(signal);
+      const why = cancelled(signal);
+      if (why instanceof ApiError) {
+        noteUnreachable();
+      }
+      throw why;
     }
     noteUnreachable();
     throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });

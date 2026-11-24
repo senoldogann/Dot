@@ -23,9 +23,11 @@ import {
   touch,
 } from "./cacherules.js";
 
-// The version of the database's layout of stores (not the records': LAYOUT is that). The outbox (item 1523) adds a store.
-const DB_VERSION = 1;
+// The version of the database's layout of stores (not the records': LAYOUT is that): 2 added the outbox (item 1523).
+const DB_VERSION = 2;
+// The stores of the cache, which a forgotten key empties; the outbox is the owner's own words and is not the cache's to drop.
 const STORES = ["meta", "lists", "chats"];
+const OUTBOX_STORE = "outbox";
 // A list read again and again (the sidebar's, with every event) is written at most this often.
 const LIST_WRITE_EVERY_MS = 2000;
 const FINGERPRINT_CHARS = 32;
@@ -76,7 +78,7 @@ function database() {
       const request = indexedDB.open(CACHE_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const made = request.result;
-        for (const name of STORES) {
+        for (const name of [...STORES, OUTBOX_STORE]) {
           if (!made.objectStoreNames.contains(name)) {
             made.createObjectStore(name, { keyPath: "id" });
           }
@@ -99,6 +101,19 @@ function database() {
     });
   }
   return opening;
+}
+
+/** Whether this browser can keep the page's data (IndexedDB and a place to make its fingerprints). */
+export function canKeep() {
+  return supported();
+}
+
+/**
+ * The database the cache and the outbox are kept in (item 1523: the outbox is the store `outbox`, its key the entry's id).
+ * @returns {Promise<IDBDatabase>}
+ */
+export function openDatabase() {
+  return database();
 }
 
 /** The first characters of the SHA-256 of `token`, in hex: whose cache this is, the key itself never kept. */

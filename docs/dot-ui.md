@@ -129,7 +129,9 @@ try, three tries, a wait that grows with chance in it, none spent while there is
 read on its way and ends when its page is left), and a chat that was away through 500 events or more of a run reads the
 newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`). Its streams are read by
 `js/sseframes.js` (item 1522: a connection that answers nothing in 8 s and a stream that says nothing in 35 s are dropped
-and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-Event-ID`). See
+and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-Event-ID`). What is done with no link is
+kept by `js/outbox.js` (the rules are `js/outboxrules.js`) and shown under the chat by `js/outboxrows.js`: a message as
+*Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). See
 [On a bad link: the web app](phone.md).
 
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)

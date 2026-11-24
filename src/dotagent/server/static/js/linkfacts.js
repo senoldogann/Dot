@@ -6,10 +6,11 @@
  * @typedef {object} LinkFacts
  * @property {number | null} copyFrom when the copy the page shows was kept (ms), null while it shows what Dot just said
  * @property {boolean} unreachable the last read or stream could not reach Dot
+ * @property {number} waiting how many things done with no link wait to be sent
  */
 
 /** @type {LinkFacts} */
-const facts = { copyFrom: null, unreachable: false };
+const facts = { copyFrom: null, unreachable: false, waiting: 0 };
 
 /** @param {Partial<LinkFacts>} change */
 function set(change) {
@@ -30,4 +31,9 @@ export function noteReached() {
 /** A read or a stream could not reach Dot. */
 export function noteUnreachable() {
   set({ unreachable: true });
+}
+
+/** How many things done with no link wait to be sent (the outbox, item 1523). */
+export function noteWaiting(count) {
+  set({ waiting: count });
 }
