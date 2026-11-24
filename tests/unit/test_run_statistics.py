@@ -12,6 +12,7 @@ import pytest_asyncio
 from dotagent.cli_stats import (
     render_harness,
     render_learning,
+    render_model,
     render_run_costs,
     render_stats,
     render_tool_health,
@@ -21,7 +22,7 @@ from dotagent.core.types import JsonObject
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.db import Store
-from dotagent.store.endings import RESULT_STALLED, RESULT_STOPPED
+from dotagent.store.endings import GOAL_CHECK_MARK, GOAL_CHECK_UNAVAILABLE, RESULT_STALLED, RESULT_STOPPED
 from dotagent.store.models import MemoryScore, RunRecord, RunStatus
 from dotagent.store.stats import (
     ActStats,
@@ -709,3 +710,34 @@ async def test_an_old_run_without_a_stored_end_reason_keeps_how_it_ended_after_i
         await store.close()
     stats: RunStatistics = collect_statistics(database, time.time() - DAY_S)
     assert [(count.ending, count.runs) for count in _by_model(stats)["ollama:a"].endings] == [("stalled", 1)]
+
+
+async def test_a_check_that_could_not_run_is_counted_apart_from_a_refusal_even_for_an_older_run(
+    tmp_path: Path,
+) -> None:
+    """Item 1402: `dotx stats` said "refused by the goal check" of runs no model had judged. Closed with the note of a
+    check that could not run, a run is counted as such; a run stored as a refusal before the difference is read again
+    from its note; a real refusal stays one."""
+    path: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(path, tmp_path / "screenshots")
+    thread = await store.create_thread("t", "test")
+    unavailable: str = f"the work{GOAL_CHECK_MARK}{GOAL_CHECK_UNAVAILABLE} (HTTP 429); this answer is not verified."
+    await _run(store, thread.id, "ollama:a", "failed", unavailable, 3, 3000)
+    await _run(store, thread.id, "ollama:a", "failed", f"the work{GOAL_CHECK_MARK}the goal is not reached.", 3, 3000)
+    old: RunRecord = await _run(store, thread.id, "ollama:a", "failed", unavailable, 3, 3000)
+    await store.close()
+    stored: sqlite3.Connection = sqlite3.connect(path)
+    try:
+        stored.execute("UPDATE runs SET end_reason = 'goal_check_refused' WHERE id = ?", (old.id,))
+        stored.commit()
+    finally:
+        stored.close()
+    stats: RunStatistics = collect_statistics(path, time.time() - DAY_S)
+    endings = _by_model(stats)["ollama:a"].endings
+    assert sorted((count.ending, count.runs) for count in endings) == [
+        ("goal_check_refused", 1),
+        ("goal_check_unavailable", 2),
+    ]
+    lines: list[str] = render_model(_by_model(stats)["ollama:a"])
+    assert "goal check could not run (answer not verified) 2" in lines[1]
+    assert "refused by the goal check 1" in lines[1]

@@ -36,12 +36,16 @@ RESULT_EMERGENCY_STOPPED: str = f"{PREFIX_EMERGENCY_STOP}every active run was st
 PREFIX_INTERNAL_ERROR: str = "Internal error: "
 # Between the answer of a run and what the goal check made of it, when the check does not accept the end.
 GOAL_CHECK_MARK: str = "\n\n---\nGoal check: "
+# What the goal check's note starts with when no model could answer it (item 1402): the run's work stands, not checked.
+# Any other note under the mark is the check's own word on the end.
+GOAL_CHECK_UNAVAILABLE: str = "the check could not run"
 
 type Ending = Literal[
     "active",
     "finished",
     "failed",
     "goal_check_refused",
+    "goal_check_unavailable",
     "stalled",
     "limit",
     "empty_replies",
@@ -61,6 +65,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "finished": "finished",
     "failed": "failed (the agent's own report, or an error of the model service)",
     "goal_check_refused": "refused by the goal check",
+    "goal_check_unavailable": "goal check could not run (answer not verified)",
     "stalled": "stopped by the progress watchdog",
     "limit": "stopped at its limit of minutes or tokens",
     "empty_replies": "empty replies from the model",
@@ -91,8 +96,15 @@ def _failed_ending(result: str) -> Ending:
     if result.startswith(PREFIX_INTERNAL_ERROR):
         return "internal_error"
     if GOAL_CHECK_MARK in result:
-        return "goal_check_refused"
+        return _goal_check_ending(result)
     return "failed"
+
+
+def _goal_check_ending(result: str) -> Ending:
+    """How a run the goal check ended ended, from the note after its last mark: the check could not run (no model could
+    answer it: the work is not judged), or it refused the end (its own word on it)."""
+    note: str = result.rpartition(GOAL_CHECK_MARK)[2]
+    return "goal_check_unavailable" if note.startswith(GOAL_CHECK_UNAVAILABLE) else "goal_check_refused"
 
 
 def _cancelled_ending(result: str) -> Ending:
@@ -120,6 +132,9 @@ def classify_ending(status: RunStatus, result: str, stored: str | None = None) -
     later edit of the words would otherwise reclassify. A run stored before the reason was kept, or one that has not
     ended, is still read from the text."""
     known: Ending | None = _stored_ending(stored)
+    if known == "goal_check_refused" and GOAL_CHECK_MARK in result:
+        # Before item 1402 a check that could not run was stored as a refusal too: the note under the mark says which.
+        return _goal_check_ending(result)
     if known is not None:
         return known
     match status:
