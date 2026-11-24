@@ -109,9 +109,22 @@ export function nextDue(entries, facts) {
   return first;
 }
 
+// What the daemon says (`server/sending.py`) while the first sending of a message is still under way: the one 409 of a message
+// that passes with time. Every other 409 of the routes a message goes by (a steer to a run that has ended, a next run in a
+// chat that has one at work) is Dot's refusal, and asking again for a day does not change it.
+export const SENDING_ALREADY = "the message is being sent already";
+
+/**
+ * Whether `message`, what a 409 said, is the daemon's word that the first sending of the message is still under way.
+ * @param {string | undefined} message
+ */
+export function sendingAlready(message) {
+  return typeof message === "string" && message.toLowerCase().includes(SENDING_ALREADY);
+}
+
 /**
  * What came of sending an entry, and what is done about it.
- * @typedef {{ done: true } | { done: true, told: "expired" | "answered" | "gone" } | { again: true } | { refused: true, why: string }} Verdict
+ * @typedef {{ done: true } | { done: true, told: "expired" | "answered" | "gone" } | { done: true, told: "refused", why: string } | { again: true } | { refused: true, why: string }} Verdict
  */
 
 /**
@@ -119,11 +132,13 @@ export function nextDue(entries, facts) {
  * ran out of time).
  * - It took it (`ok`): done.
  * - No answer, 408, 429, a 5xx: the link or the daemon is the trouble and may pass: the entry waits, and holds the ones behind it.
- * - 409 on a message: the daemon is still sending the first of it: it waits it out.
+ * - 409 on a message that says it is being sent already: the daemon is still sending the first of it: it waits it out.
+ *   Any other 409 on a message is Dot's refusal (a run that has ended, a chat with a run at work): the message stays, with
+ *   Dot's words, and does not hold the next.
  * - 409 or 404 on an answer: the card is closed already, expired or answered on the Mac: told, and done.
  * - 409 or 404 on a Stop or a change of the queue: there was nothing left to stop or change: done.
- * - Any other refusal of a message or of a change: the daemon will not take it, whatever is tried: it stays, with its words,
- *   and does not hold the next.
+ * - Any other refusal of a message: the daemon will not take it, whatever is tried: it stays, with its words, and does not
+ *   hold the next. Of an answer, a Stop or a change of the queue, which have no row to stay in: it is told, and let go.
  * @param {Entry} entry
  * @param {{ ok: true } | { ok?: false, status: number, message?: string }} outcome
  * @returns {Verdict}
@@ -137,7 +152,7 @@ export function verdictOf(entry, outcome) {
     return { again: true };
   }
   if (status === 409 && entry.kind === "message") {
-    return { again: true };
+    return sendingAlready(outcome.message) ? { again: true } : { refused: true, why: outcome.message ?? "" };
   }
   if (status === 409 || status === 404) {
     if (entry.kind === "answer") {
@@ -148,7 +163,7 @@ export function verdictOf(entry, outcome) {
     }
     return { done: true, told: "gone" };
   }
-  return { refused: true, why: outcome.message ?? "" };
+  return entry.kind === "message" ? { refused: true, why: outcome.message ?? "" } : { done: true, told: "refused", why: outcome.message ?? "" };
 }
 
 /**

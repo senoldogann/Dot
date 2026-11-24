@@ -257,7 +257,7 @@ export const TR = {
   "outbox.stopWaiting": "Durdur gönderilmeyi bekliyor",
   "outbox.queueWaiting": "Kuyruktaki bir değişiklik gönderilmeyi bekliyor",
   "outbox.expired": "Yanıtın Dot'a ulaştığında o sorunun süresi dolmuştu, bu yüzden kullanılmadı.",
-  "outbox.answered": "O soru zaten yanıtlanmıştı (Mac'te ya da başka bir ekranda), bu yüzden yanıtın kullanılmadı.",
+  "outbox.answered": "Yanıtın Dot'a ulaştığında o soru zaten yanıtlanmıştı (Mac'te, başka bir ekranda ya da yanıtın yanıtı kaybolan ilk gönderimiyle), bu yüzden yeniden gönderilmedi.",
   // Çubuğun altındaki bağlantının durumunu söyleyen ince satır (linewords.js, 1524).
   "line.refused": "Bu telefonun anahtarı reddedildi",
   "line.pairAgain": "Yeniden eşle",

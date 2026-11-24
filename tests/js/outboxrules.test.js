@@ -9,7 +9,9 @@ import {
   leaveOld,
   nextDue,
   ofChat,
+  SENDING_ALREADY,
   sendAgain,
+  sendingAlready,
   settled,
   tooOld,
   verdictOf,
@@ -107,8 +109,21 @@ test("no answer, a busy daemon and a message still being sent wait: the entry is
   for (const status of [0, 408, 429, 500, 502, 503, 504]) {
     assert.deepEqual(verdictOf(message, { status }), { again: true }, String(status));
   }
-  // 409 on a message is the first sending of it still under way: it is waited out, not refused.
-  assert.deepEqual(verdictOf(message, { status: 409 }), { again: true });
+  // 409 saying that the message is being sent already is the first sending of it still under way: it is waited out.
+  assert.deepEqual(verdictOf(message, { status: 409, message: SENDING_ALREADY }), { again: true });
+  assert.equal(sendingAlready("The message is being sent already."), true);
+});
+
+test("a 409 that is Dot's refusal is not waited out for a day: the message stays with Dot's words and holds nothing", () => {
+  const message = make("m", "a");
+  // A steer to a run that has ended, a next run in a chat that has one at work: nothing changes them with time.
+  for (const why of ["the run has ended", "this chat already has a run at work", ""]) {
+    assert.deepEqual(verdictOf(message, { status: 409, message: why }), { refused: true, why });
+  }
+  assert.equal(sendingAlready(undefined), false);
+  const after = settled([message], "m", verdictOf(message, { status: 409, message: "the run has ended" }));
+  assert.equal(after[0].state, "refused");
+  assert.equal(nextDue(after, UP), null, "a refused message holds no one");
 });
 
 test("an answer to a card that is closed is told: expired, or answered on the Mac", () => {
@@ -138,10 +153,18 @@ test("a message the daemon refuses stays, with its words, and is not tried again
   assert.equal(nextDue(settledOnes, UP), null);
 });
 
-test("a change the daemon refuses is refused, not waited for", () => {
-  const entry = make("q", "a", "queue");
-  assert.deepEqual(verdictOf(entry, { status: 422, message: "bad order" }), { refused: true, why: "bad order" });
-  assert.deepEqual(verdictOf(entry, { status: 401, message: "" }), { refused: true, why: "" });
+test("a message the daemon refuses stays with its words; a change with no row to stay in is told and let go", () => {
+  const message = make("m", "a");
+  assert.deepEqual(verdictOf(message, { status: 422, message: "bad order" }), { refused: true, why: "bad order" });
+  assert.deepEqual(verdictOf(message, { status: 401, message: "" }), { refused: true, why: "" });
+  // An answer, a Stop and a change of the queue have no row that holds them: kept as refused they would sit in the store
+  // for ever, unseen and with no Discard.
+  for (const kind of ["answer", "stop", "queue"]) {
+    const entry = make(kind, "a", kind);
+    assert.deepEqual(verdictOf(entry, { status: 422, message: "bad order" }), { done: true, told: "refused", why: "bad order" });
+    assert.deepEqual(verdictOf(entry, { status: 403, message: "" }), { done: true, told: "refused", why: "" });
+    assert.deepEqual(settled([entry], kind, verdictOf(entry, { status: 403, message: "" })), []);
+  }
 });
 
 test("a message sent again after it was left or refused has a new key, a new place in the order and a new day", () => {

@@ -261,7 +261,7 @@ export const EN = {
   "outbox.stopWaiting": "Stop is waiting to send",
   "outbox.queueWaiting": "A change to the queue is waiting to send",
   "outbox.expired": "That question had expired when your answer reached Dot, so it was not used.",
-  "outbox.answered": "That question was answered already, on the Mac or on another screen, so your answer was not used.",
+  "outbox.answered": "That question was already answered when your answer reached Dot (on the Mac, on another screen, or by this answer's first send, whose reply was lost), so it was not sent again.",
   // The thin line under the bar that says how the link stands (linewords.js, item 1524).
   "line.refused": "This phone's key was refused",
   "line.pairAgain": "Pair again",

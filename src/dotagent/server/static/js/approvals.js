@@ -285,11 +285,13 @@ function keptNote(handoff, keptUntil, inCampaign) {
 /**
  * A card for one approval. `onSettled(decided)` runs once the daemon answered a decision: `decided` is the decided
  * record when it took the decision, null when it refused it (made already, or not possible now). `leftNote` says what
- * becomes of the answer to a question the run left (LEFT_IN_RUN or LEFT_IN_CAMPAIGN). `onUseHere`, where the card
+ * becomes of the answer to a question the run left (LEFT_IN_RUN or LEFT_IN_CAMPAIGN). `chat` is the chat the card stands in
+ * (its thread), which an answer made with no link is kept under, in order with the rest of what was done in it (item 1523);
+ * a card with none keeps it under its run. `onUseHere`, where the card
  * stands beside the run's view, is offered on the hand-off of a browser step: use the page from this screen (item 475).
  * Returns the node and `settle(status, note)`, which turns the card into its decided form.
  */
-export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere }) {
+export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere, chat = null }) {
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
@@ -316,7 +318,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
       // With no link the answer is kept and sent once the link is back, in order with what else was done in the chat
       // (item 1523); a card that was closed meanwhile is told then.
       const answer = remember ? { approve, note, remember } : { approve, note };
-      decided = await viaOutbox({ kind: "answer", chat: approval.runId, method: "POST", path: `/approvals/${approval.id}/decision`, body: answer }, () =>
+      decided = await viaOutbox({ kind: "answer", chat: chat ?? approval.runId, method: "POST", path: `/approvals/${approval.id}/decision`, body: answer }, () =>
         api.post(`/approvals/${approval.id}/decision`, answer),
       );
       if (decided !== null && typeof decided === "object" && "kept" in decided) {

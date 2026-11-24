@@ -12,7 +12,7 @@
 import { request, unreachable } from "./api.js";
 import { canKeep, inTime, openDatabase } from "./datacache.js";
 import { t } from "./i18n.js";
-import { noteWaiting } from "./linkfacts.js";
+import { noteWaiting, phoneScreen } from "./linkfacts.js";
 import { added, afterKill, entryOf, leaveOld, nextDue, ofChat, sendAgain, settled, verdictOf, waitingCount } from "./outboxrules.js";
 import { reconnectWait } from "./sseframes.js";
 import { onStreamLive } from "./state.js";
@@ -98,6 +98,10 @@ async function read() {
 
 /** Load what is kept, once, and start answering the link's return. Settles when the entries are known. */
 export function loadOutbox() {
+  // The outbox is the phone's (item 1523): a page that is not a phone's touch screen sends at once, as it always did.
+  if (!phoneScreen()) {
+    return Promise.resolve();
+  }
   if (loading === null) {
     loading = (async () => {
       const kept = afterKill(await inTime(read(), []));
@@ -166,6 +170,9 @@ export async function keep(made) {
  * @returns {Promise<T | { kept: import("./outboxrules.js").Entry }>}
  */
 export async function viaOutbox(made, send) {
+  if (!phoneScreen()) {
+    return send();
+  }
   await loadOutbox();
   if (!navigator.onLine || holds(made.chat)) {
     return { kept: await keep(made) };
@@ -180,12 +187,15 @@ export async function viaOutbox(made, send) {
   }
 }
 
-/** Say what came of an entry that the daemon answered for in words the owner reads (an answer to a card that was closed). */
-function say(what) {
-  if (what === "expired") {
+/** Say what came of an entry that the daemon answered for in words the owner reads (an answer to a card that was closed, a
+ * change that Dot did not take). */
+function say(verdict) {
+  if (verdict.told === "expired") {
     toast("error", t("outbox.expired"));
-  } else if (what === "answered") {
+  } else if (verdict.told === "answered") {
     toast("ok", t("outbox.answered"));
+  } else if (verdict.told === "refused") {
+    toast("error", verdict.why === "" ? t("outbox.refusedNoWhy") : t("outbox.refused", { why: verdict.why }));
   }
 }
 
@@ -234,7 +244,7 @@ export async function flush() {
         }
         entries = settled(entries, next.id, verdict);
         if ("done" in verdict && "told" in verdict) {
-          say(verdict.told);
+          say(verdict);
         }
         paint();
         await write();
