@@ -360,7 +360,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   holds it when it starts after such an end. While a message's run is starting, editing it, taking it out or steering it
   is refused (409). A campaign's chat has no queue: a message there steers its session. In the page, a queued message
   moves a place up or down from its own two arrows, the end ones disabled, which call the same reorder as before
-  (`PUT /threads/{id}/queue`, item 1348); a row is not dragged.
+  (`PUT /threads/{id}/queue`, item 1348); a row is not dragged. On a phone the queue is not a pane over the composer
+  (item 1383): the capsule over the box says **3 queued** (**3 paused** while a stop holds it), and a tap on that
+  segment opens the same rows, arrows, edit, **Steer**, × and **Resume** in a sheet from the foot of the screen.
 - `/btw <question>` in the box of a run (the slash menu offers it) asks on the side: the run's model answers from what
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
@@ -371,15 +373,17 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the message that starts it), and a schedule of the chat (item 291) asks it again every 5, 10, 15, 20 or 30 minutes or
   every 1, 2, 3, 4, 6, 8 or 12 hours, in the chat, as its follow-ups start (its model, reasoning level, speed, approvals
   and goal mode, and as its agent in a chat with one of yours, item 463). Each run of it is told how the loop ends: it
-  deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer, in the bar that
-  also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
+  deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer a line shows
   each loop of the chat, how often it asks again ("every 30 minutes", and "every day at 10:00" for a schedule a run of
   it made, where it read `cron 0 10 * * *` before item 590), when next, and a **Stop repeating** that deletes it (the
-  task at work goes on; the composer's Stop stops that); the Stops stand in one column, on a phone the message
-  stands over how often it asks again, which wraps rather than end in dots (item 787), and the rows fold under a head
+  task at work goes on; the composer's Stop stops that); the Stops stand in one column, and the rows fold under a head
   that says, folded, how often the loop repeats ("Repeats every 30 minutes", or how many there are) and when the next one
   asks, the fold kept in the browser (item 591). Until the owner opens them the rows are folded, so that a loop at rest
-  is one line over the composer, not a card over a phone's reading room; a list that could not be read says why. A rhythm a cron
+  is one line over the composer; a list that could not be read says why. On a phone (item 1383) there is no such line,
+  and no fold: the capsule over the box has a segment for the loops, **every 10 min** for the one and **2 loops** for
+  several, and a tap on it opens a sheet from the foot of the screen with each loop's message over how often it asks
+  again and when next (wrapped, which ended in dots before item 787) and its **Stop repeating**, a finger tall (the fold
+  kept in the browser stays as it was and is not read there). A rhythm a cron
   expression cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.
@@ -970,7 +974,9 @@ what a stop ended is told to nobody. A run that ends done leaves its helpers at 
 reports not yet told are kept in the store (the key `detached_helpers`): when the daemon stops, a helper ends with it
 as every run does, and the next start tells its chat what it reported, or that the stop cut it off. The line over the
 composer says "Waiting on N subagents" only while the run is blocked on them, "N subagents keep working in the
-background" once it was released, and nothing when none work. Calls of `fan_out`, `message_agent` and the work orders
+background" once it was released, and nothing when none work; on a phone (item 1383) the same words are the first line
+of the sheet that the capsule's **N helpers** segment opens, which also names what each helper does now and has
+**Details** and **Stop**. Calls of `fan_out`, `message_agent` and the work orders
 keep waiting as before. The helper of a run of one of your agents carries the agent's id (item 553): its tools are those the
 agent is bound to, as its parent's are, and its prompt holds the agent's instructions. A step it hands to you, or a
 question for your yes, that nobody answers in time is kept where its parent keeps them, with `[policy] unanswered =
