@@ -212,12 +212,18 @@ attempt("users", lambda: os.listdir("/Users"))
 attempt("network", lambda: socket.create_connection(("127.0.0.1", 9), timeout=2))
 attempt("fork", forking)
 attempt("spawn", lambda: os.posix_spawn("/bin/echo", ["echo"], {}))
+print("probe " + " ".join(done), flush=True)
+# Last, and said on a line of its own: where an exec of another program is allowed, this process becomes that program
+# and the line is never written, which reads as the thing not refused.
+done.clear()
+attempt("exec", lambda: os.execv("/usr/bin/true", ["true"]))
 print("probe " + " ".join(done))
 """
 
 
 # What the probe must have seen of each thing: the code can use its two folders, and nothing else.
 _EXPECTED: dict[str, str] = {
+    "exec": "denied",
     "scratch-write": "worked",
     "tools-read": "worked",
     "tools-write": "denied",
@@ -232,8 +238,8 @@ _EXPECTED: dict[str, str] = {
 
 def _judge(output: str) -> str | None:
     """Why the output of the probe does not show a sandbox that holds, or ``None`` when it does."""
-    line: str = next((text for text in output.splitlines() if text.startswith("probe ")), "")
-    seen: dict[str, str] = dict(word.split("=", 1) for word in line.removeprefix("probe ").split() if "=" in word)
+    lines: list[str] = [text.removeprefix("probe ") for text in output.splitlines() if text.startswith("probe ")]
+    seen: dict[str, str] = dict(word.split("=", 1) for line in lines for word in line.split() if "=" in word)
     wrong: list[str] = [
         f"{name}: {seen.get(name, 'did not run')}" for name, wanted in _EXPECTED.items() if seen.get(name) != wanted
     ]

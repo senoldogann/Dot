@@ -399,3 +399,90 @@ def test_a_profile_the_kernel_refuses_or_one_that_does_not_hold_is_no_sandbox(
         assert "does not hold" in holds.why and "tools-write: worked" in holds.why and "network" in holds.why
     # The profile as it is, is the twin: it holds, and the probe says so.
     assert sandbox.probe_blocking(code_box.interpreter).ok
+
+
+def test_the_interpreter_may_exec_itself_and_the_new_one_is_in_the_same_sandbox(code_box: Box, tmp_path: Path) -> None:
+    """The profile allows ``exec`` of the interpreter's own path and of nothing else (the docs say so): a code that
+    execs it replaces itself with a fresh interpreter that is in the same sandbox, and reads no more than it did."""
+    owners: Path = tmp_path / "owners-file.txt"
+    owners.write_text(DECOY, encoding="utf-8")
+    again: str = (
+        "import os, sys\n"
+        f"os.execv(sys.executable, [sys.executable, '-I', '-S', '-c', {f'print(open({str(owners)!r}).read())'!r}])\n"
+    )
+    assert DECOY in code_box.unguarded(again)
+    ended: Ended = code_box.start(again)
+    assert ended.ending == "failed" and REFUSED in ended.output and DECOY not in ended.output
+    harmless: Ended = code_box.start(
+        "import os, sys\nos.execv(sys.executable, [sys.executable, '-I', '-S', '-c', 'print(40 + 2)'])\n"
+    )
+    assert (harmless.ending, harmless.output.strip()) == ("finished", "42")
+    other: Ended = code_box.start("import os\nos.execv('/usr/bin/true', ['true'])\nprint('never')")
+    assert other.ending == "failed" and REFUSED in other.output
+
+
+def test_a_link_left_where_the_daemon_writes_the_code_is_not_written_through(code_box: Box, tmp_path: Path) -> None:
+    """A command of the run may leave a link at ``tools/snippets`` or at the next code's file: the daemon writes the
+    code where the name is, never where the link leads (the review of item 1500 found the one write that followed)."""
+    victim: Path = tmp_path / "victim"
+    victim.mkdir()
+    (victim / "kept.txt").write_text("the owner's file", encoding="utf-8")
+    code_box.start("print('first')")
+    snippets: Path = code_box.layout.tools / "snippets"
+    # The next code's file is a link to a file of the owner's: the link is replaced, the owner's file is as it was.
+    (snippets / "2.py").symlink_to(victim / "kept.txt")
+    assert code_box.start("print('second')").output.strip() == "second"
+    assert (victim / "kept.txt").read_text(encoding="utf-8") == "the owner's file" and not (
+        snippets / "2.py"
+    ).is_symlink()
+    # The folder is a link to a folder of the owner's: nothing is written, and the code does not run.
+    for entry in list(snippets.iterdir()):
+        entry.unlink()
+    snippets.rmdir()
+    snippets.symlink_to(victim)
+    blocked: Ended = code_box.start(f"open({str(code_box.layout.scratch / 'ran')!r}, 'w').write('ran')")
+    assert blocked.ending == "unstartable" and "could not be written" in blocked.detail
+    assert sorted(path.name for path in victim.iterdir()) == ["kept.txt"]
+    assert not (code_box.layout.scratch / "ran").exists()
+    # A name that is a link to nothing is the same: an error that says so, not a crash.
+    snippets.unlink()
+    snippets.mkdir()
+    (snippets / "4.py").symlink_to(tmp_path / "nowhere" / "x.py")
+    assert code_box.start("print('after a link to nothing')").output.strip() == "after a link to nothing"
+    assert not (tmp_path / "nowhere").exists()
+
+
+def test_a_scratch_folder_that_is_a_link_is_never_emptied_through_it(
+    code_box: Box, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    victim: Path = tmp_path / "victim"
+    victim.mkdir()
+    for name in ("a.txt", "b.txt", "c.txt"):
+        (victim / name).write_text(DECOY, encoding="utf-8")
+    code_box.layout.run.mkdir(parents=True)
+    code_box.layout.scratch.symlink_to(victim)
+    monkeypatch.setattr(runner, "SCRATCH_MAX_ENTRIES", 1)
+    with pytest.raises(OSError):
+        runner.clear_scratch_if_full(code_box.layout)
+    assert sorted(path.name for path in victim.iterdir()) == ["a.txt", "b.txt", "c.txt"]
+    # A folder of the run's own, over its quota, is emptied, and a link in it goes without what it led to.
+    code_box.layout.scratch.unlink()
+    code_box.layout.scratch.mkdir()
+    for name in ("x.txt", "y.txt"):
+        (code_box.layout.scratch / name).write_text("x", encoding="utf-8")
+    (code_box.layout.scratch / "link").symlink_to(victim)
+    assert runner.clear_scratch_if_full(code_box.layout)
+    assert list(code_box.layout.scratch.iterdir()) == []
+    assert sorted(path.name for path in victim.iterdir()) == ["a.txt", "b.txt", "c.txt"]
+
+
+def test_a_process_whose_memory_cannot_be_read_is_stopped_not_let_be_as_if_it_held_nothing(
+    code_box: Box, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started: float = time.monotonic()
+    monkeypatch.setattr(runner, "resident_bytes", lambda pid: None)
+    ended: Ended = code_box.start("import time\ntime.sleep(30)", seconds=60.0)
+    assert (ended.ending, ended.signal) == ("memory", 9)
+    assert "cannot be read" in ended.detail and time.monotonic() - started < 10.0
+    monkeypatch.undo()
+    assert code_box.start("print('read again')").output.strip() == "read again"

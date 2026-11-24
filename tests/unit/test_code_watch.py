@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from dotagent.codemode import watch
 from dotagent.codemode.watch import memory_is_watchable, resident_bytes, scratch_usage
 
 
@@ -47,3 +48,20 @@ def test_the_scratch_folder_is_measured_by_what_its_files_take_and_a_link_is_not
     _, stopped = scratch_usage(scratch, 2)
     assert stopped == 3
     assert scratch_usage(tmp_path / "missing", 10) == (0, 0)
+
+
+@pytest.mark.macos
+def test_the_probe_asks_whether_another_process_can_be_read_not_the_daemon_itself(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A daemon may read itself where it may not read a process it started: the probe starts one and reads that."""
+    assert memory_is_watchable()
+    calls: list[int] = []
+
+    def refuses_others(pid: int) -> int | None:
+        calls.append(pid)
+        return None
+
+    monkeypatch.setattr(watch, "resident_bytes", refuses_others)
+    assert not memory_is_watchable()
+    assert calls and os.getpid() not in calls

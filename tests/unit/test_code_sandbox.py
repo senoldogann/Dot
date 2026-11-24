@@ -240,3 +240,25 @@ def test_the_tools_of_an_earlier_start_are_not_left_to_be_imported(tmp_path: Pat
     assert stale.is_file()
     install.install(layout, {("dot_tools", "servers", "github", "other.py"): b"x = 2\n"})
     assert not stale.exists() and (stale.parent / "other.py").is_file()
+
+
+def test_a_limit_the_system_will_not_take_ends_the_launcher_before_the_code_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The review of item 1500: the launcher let a limit it could not set go, so a code could have run with fewer guards
+    than it was promised. Now it says so and does not run the code."""
+    from dotagent.codemode import child_launcher
+
+    code: Path = tmp_path / "code.py"
+    code.write_text("print('the code ran')", encoding="utf-8")
+    limits: str = '{"cpu_s": 5, "fsize_bytes": 1000000, "nofile": 64}'
+
+    def refuses(*_arguments: object) -> None:
+        raise ValueError("current limit exceeds maximum limit")
+
+    monkeypatch.setattr(child_launcher.resource, "setrlimit", refuses)
+    monkeypatch.chdir(tmp_path)
+    status: int = child_launcher.main(["3", "4", str(tmp_path), str(tmp_path), str(code), limits])
+    assert status == 72
+    seen = capsys.readouterr()
+    assert "could not be set" in seen.err and "the code ran" not in seen.out

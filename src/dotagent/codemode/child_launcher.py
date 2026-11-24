@@ -28,19 +28,18 @@ _NAME: str = "<code>"
 _FAILED: int = 1
 _BROKEN_BRIDGE: int = 70
 _ORPHANED: int = 71
+_NO_LIMITS: int = 72
 
 
 def _lower(which: int, soft: int, hard: int | None = None) -> None:
-    """Lower a limit of the process, never raise one: a limit the system will not take is left as it is."""
+    """Lower a limit of the process, never raise one. A limit the system will not take is an error, not a limit left
+    off: the code is not run with fewer guards than it is promised."""
     _, current_hard = resource.getrlimit(which)
     wanted_hard: int = soft if hard is None else hard
     if current_hard != resource.RLIM_INFINITY:
         wanted_hard = min(wanted_hard, current_hard)
     wanted_soft: int = min(soft, wanted_hard)
-    try:
-        resource.setrlimit(which, (wanted_soft, wanted_hard))
-    except (ValueError, OSError):
-        return
+    resource.setrlimit(which, (wanted_soft, wanted_hard))
 
 
 def _set_limits(limits: dict[str, int]) -> None:
@@ -77,7 +76,11 @@ def main(arguments: list[str]) -> int:
     scratch, tools, code_file = arguments[2], arguments[3], arguments[4]
     limits: dict[str, int] = json.loads(arguments[5])
     os.chdir(scratch)
-    _set_limits(limits)
+    try:
+        _set_limits(limits)
+    except (ValueError, OSError) as error:
+        print(f"a limit of the process could not be set ({error}), so the code was not run", file=sys.stderr)
+        return _NO_LIMITS
     _leave_with_the_daemon()
     sys.path.append(tools)
     for stream in (sys.stdout, sys.stderr):

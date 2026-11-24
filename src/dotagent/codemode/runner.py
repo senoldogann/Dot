@@ -22,7 +22,6 @@ import contextlib
 import json
 import math
 import os
-import shutil
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -38,6 +37,7 @@ from dotagent.codemode.bridge import (
     reply_frame,
 )
 from dotagent.codemode.sandbox import Interpreter, Layout, launch_words
+from dotagent.codemode.tree import Tree
 from dotagent.codemode.watch import resident_bytes, scratch_usage
 from dotagent.core.types import JsonObject
 from dotagent.tools.env_filter import hides_secret
@@ -51,6 +51,8 @@ type Ending = Literal[
 
 # How often the watch looks, in seconds.
 POLL_S: float = 0.025
+# How many looks in a row (25 ms apart) may find the memory of a process still there unreadable before it is stopped.
+_UNREADABLE_LOOKS: int = 20
 # How long the output the process left in its pipe is read for after it ended.
 _DRAIN_GRACE_S: float = 1.0
 # The most a code may print before it is stopped: what it prints is read and dropped, but an endless print is a loop.
@@ -191,11 +193,13 @@ class _State:
         self.peak_bytes: int = 0
 
     def stop(self, verdict: Ending, detail: str = "") -> None:
-        """Kill the code's whole process group, for ``verdict``: the first verdict stands."""
+        """Kill the code's whole process group, for ``verdict``: the first verdict stands. Not once the process is gone:
+        its number may be another's by then."""
         if self.verdict is None:
             self.verdict = verdict
             self.detail = detail
-        kill_group(self.process.pid)
+        if self.process.returncode is None:
+            kill_group(self.process.pid)
 
 
 def child_environment(layout: Layout, parent: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -211,25 +215,25 @@ def child_environment(layout: Layout, parent: Mapping[str, str] | None = None) -
 
 def clear_scratch_if_full(layout: Layout) -> bool:
     """Empty the scratch folder when what an earlier start left in it is over its quota, so that the next code starts
-    with room; whether it did. Blocking."""
+    with room; whether it did. It is emptied through its descriptor, following no link: a link where the folder is, or
+    in it, is never entered. Blocking."""
     size, entries = scratch_usage(layout.scratch, SCRATCH_MAX_ENTRIES)
     if size <= SCRATCH_MAX_BYTES and entries <= SCRATCH_MAX_ENTRIES:
         return False
-    for entry in layout.scratch.iterdir():
-        if entry.is_dir() and not entry.is_symlink():
-            shutil.rmtree(entry, ignore_errors=True)
-        else:
-            entry.unlink(missing_ok=True)
+    with Tree(layout.root) as tree:
+        tree.clear(layout.scratch.relative_to(layout.root).parts)
     return True
 
 
 def _write_code(plan: RunPlan) -> Path:
-    """Keep the code in the tools folder, which the code itself can read and not change, and return its path."""
-    folder: Path = plan.layout.tools / _SNIPPETS
-    folder.mkdir(parents=True, exist_ok=True)
-    path: Path = folder / f"{plan.serial}.py"
-    path.write_text(plan.code, encoding="utf-8")
-    return path
+    """Keep the code in the tools folder, which the code itself can read and not change, and return its path. Written
+    as every file of the run's folders is, following no link (:class:`~dotagent.codemode.tree.Tree`): a command of the
+    run that left a link at ``snippets`` or at the file's name would else have the daemon write the code anywhere.
+    Blocking."""
+    parts: tuple[str, ...] = (*plan.layout.tools.relative_to(plan.layout.root).parts, _SNIPPETS, f"{plan.serial}.py")
+    with Tree(plan.layout.root) as tree:
+        tree.write(parts, plan.code.encode("utf-8"))
+    return plan.layout.root.joinpath(*parts)
 
 
 async def _pump(stream: asyncio.StreamReader, state: _State) -> None:
@@ -304,6 +308,7 @@ async def _watch(plan: RunPlan, state: _State, cancel: asyncio.Event) -> None:
     """Look at the process until it ends: the run's Stop, the code's own time, its memory, its scratch folder."""
     limit_bytes: int = plan.limits.memory_mb * 1024 * 1024
     scratch_looked: float = 0.0
+    unread: int = 0
     while state.process.returncode is None:
         await asyncio.sleep(POLL_S)
         if cancel.is_set():
@@ -313,7 +318,14 @@ async def _watch(plan: RunPlan, state: _State, cancel: asyncio.Event) -> None:
             state.stop("timeout", f"{plan.limits.seconds:g} s of its own time")
             return
         held: int | None = resident_bytes(state.process.pid)
-        if held is not None:
+        if held is None:
+            # A process the daemon cannot look at is a limit it cannot hold: stopped, not let be as if it held nothing.
+            unread += 1
+            if unread >= _UNREADABLE_LOOKS:
+                state.stop("memory", "its memory cannot be read, so it cannot be limited")
+                return
+        else:
+            unread = 0
             state.peak_bytes = max(state.peak_bytes, held)
             if held > limit_bytes:
                 state.stop("memory", f"{held // (1024 * 1024)} MB held, the limit is {plan.limits.memory_mb} MB")
@@ -360,7 +372,11 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
     """Start the code of ``plan`` in its sandbox and see it to its end. ``handler`` answers each call of the code;
     ``cancel`` is the run's Stop. Whatever ends this function, the code's process group does not outlive it."""
     layout: Layout = plan.layout
-    code_file: Path = _write_code(plan)
+    try:
+        code_file: Path = await asyncio.to_thread(_write_code, plan)
+    except OSError as error:
+        detail: str = f"the code could not be written into the run's folder ({type(error).__name__}: {error})"
+        return Ended("unstartable", "", 0, None, None, detail, 0, 0.0, 0.0, 0.0)
     requests_read, requests_write = os.pipe()
     replies_read, replies_write = os.pipe()
     limits_json: str = json.dumps(
@@ -416,7 +432,7 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
     def failed(task: asyncio.Task[None]) -> None:
         """A task that ends in an error (a call the handler could not make, a stop of the run raised through it) leaves
         a code that waits for an answer that will not come: the group is killed at once, and the error is raised."""
-        if not task.cancelled() and task.exception() is not None:
+        if not task.cancelled() and task.exception() is not None and process.returncode is None:
             kill_group(process.pid)
 
     try:
@@ -446,5 +462,3 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
         write_transport.close()
         with contextlib.suppress(ProcessLookupError):
             await process.wait()
-        # A group that outlived its leader (nothing can start one: a thread's work is not one) is gone with it.
-        kill_group(process.pid)
