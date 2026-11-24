@@ -289,18 +289,19 @@ def door_tools(registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] |
 # What makes a goal a request for a notification to the owner (item 1400), in the owner's three languages: "notify
 # me", "send me a notification", "show me a notification", "use notify"; Turkish "bildirim gönder/at/yap/ver", "bana
 # bildir"; Finnish "lähetä ilmoitus", "ilmoita minulle". A goal that only mentions one ("review the notification
-# settings", "lue tämä ilmoitus"), names another's ("a notification email to the leads", "a notification to the team")
-# or refuses one ("do not send a notification", "älä lähetä ilmoitusta"; a Turkish refusal is the verb with a suffix,
+# settings", "lue tämä ilmoitus"), names a thing that is none ("a notification email", "a notification badge") or
+# refuses one ("do not send a notification", "älä lähetä ilmoitusta"; a Turkish refusal is the verb with a suffix,
 # which the word's end leaves out) is none. "Remind me" is not here: a reminder may as well be the run's own answer,
-# which the schedule's notice carries.
+# which the schedule's notice carries. This is a list of phrases, not a reading of the goal: one it does not know asks
+# for nothing (the run is as it was), and one it reads wrongly (a notification sent to another) fails with a result that
+# names the tool and what to change.
 _NOT_REFUSED: str = r"(?<!not )(?<!n't )(?<!never )"
 _NOT_REFUSED_FI: str = r"(?<!älä )(?<!ei )"
 _OWNER: str = r"(?:me|us|the\s+(?:owner|user))"
-# What follows "a notification" when it is another thing or another's: a thing it names ("notification email"), or a
-# person other than the owner it goes to.
-_NOT_THE_OWNERS: str = (
+# What follows "a notification" when it names another thing ("notification email"), not the notification itself.
+_NOT_A_THING: str = (
     r"(?!\s+(?:e-?mails?|badges?|settings?|screens?|banners?|cent(?:er|re)s?|templates?|texts?|preferences?"
-    r"|permissions?))(?!\s+(?:to|for)\s+(?!" + _OWNER + r"\b))"
+    r"|permissions?)\b)"
 )
 _NOTIFICATION_REQUESTS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pattern, re.IGNORECASE)
@@ -310,7 +311,7 @@ _NOTIFICATION_REQUESTS: tuple[re.Pattern[str], ...] = tuple(
         _NOT_REFUSED
         + r"\b(?:send|give|push)\s+(?:(?:me|us|him|her|them|the\s+(?:owner|user))\s+)?"
         + r"(?:an?\s+(?:\w+\s+)?notifications?|notifications)\b"
-        + _NOT_THE_OWNERS,
+        + _NOT_A_THING,
         _NOT_REFUSED
         + r"\b(?:show|display)\s+(?:"
         + _OWNER
