@@ -34,6 +34,12 @@ struct ActivityRegistration: Encodable, Sendable, Equatable {
     }
 }
 
+/// The body of `POST /api/phone/live-start-token`: the token that starts the phone's Live Activity by push (item 1425), in
+/// lowercase hex as iOS gives it, 64 to 512 characters.
+struct LiveStartToken: Encodable, Sendable, Equatable {
+    let token: String
+}
+
 /// The body of `POST /api/approvals/{id}/decision` from the lock screen (item 1008): a yes or a no, no note, and no
 /// "don't ask again", which is the app's page's to give.
 struct ApprovalDecision: Encodable, Sendable, Equatable {
@@ -120,6 +126,19 @@ struct DaemonClient: Sendable {
 
     func registerActivity(_ registration: ActivityRegistration, host: DaemonHost, key: String) async throws {
         try await post(path: "/api/phone/apns/activity", body: registration, host: host, key: key)
+    }
+
+    /// Gives the daemon the token that lets it start the phone's Live Activity by push (`POST /api/phone/live-start-token`,
+    /// items 1425 and 1445), as iOS gives it, and again whenever it changes. It need not follow the device's registration.
+    func registerStartToken(_ registration: LiveStartToken, host: DaemonHost, key: String) async throws {
+        try await post(path: "/api/phone/live-start-token", body: registration, host: host, key: key)
+    }
+
+    /// Has the daemon forget the token that starts the phone's Live Activity (`DELETE /api/phone/live-start-token`): the phone's
+    /// key is forgotten, or Live Activities are switched off.
+    func forgetStartToken(host: DaemonHost, key: String) async throws {
+        let path: String = "/api/phone/live-start-token"
+        try await perform(method: "DELETE", url: host.url(path: path), path: path, body: nil, key: key)
     }
 
     /// Has the daemon forget the token of the phone's Live Activity (item 1093): `token`, the token of the activity the

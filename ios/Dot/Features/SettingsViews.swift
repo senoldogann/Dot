@@ -45,12 +45,15 @@ struct NativeSettingsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    NotificationSwitches(awareness: store.awareness, online: store.linkState.online)
                     CardGroup(title: "Phone") {
                         Button {
                             // The iPhone's own page of this app's settings, where its notifications are switched.
                             if let url: URL = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                         } label: {
-                            CardRow(symbol: "bell.badge.fill", tint: Color(red: 0.9, green: 0.32, blue: 0.3), title: "Notifications", showsChevron: true)
+                            CardRow(
+                                symbol: "bell.badge.fill", tint: Color(red: 0.9, green: 0.32, blue: 0.3), title: "iPhone notification settings",
+                                detail: "Banners, sounds and the badge", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         CardDivider()

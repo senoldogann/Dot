@@ -7,8 +7,9 @@ import os
 /// Registers with the daemon what Apple gives this phone: the device token and the Live Activity's update token, and
 /// opens the Live Activity when the owner starts a run here.
 ///
-/// It runs once the phone's key and the daemon's host are both known. The device token is kept in memory only. No
-/// push-to-start token is given: the daemon starts no activity, which would come with a notification (item 1096).
+/// It runs once the phone's key and the daemon's host are both known. The device token is kept in memory only. The token
+/// that lets the daemon start the Live Activity by push goes to its own route (`POST /api/phone/live-start-token`, item
+/// 1445), never with the device's registration, which keeps `start_token` null.
 @MainActor
 final class PushRegistrar {
     private let keyStore: PhoneKeyStore
@@ -21,6 +22,8 @@ final class PushRegistrar {
     private var opening: Bool = false
     private var observedActivities: Set<String> = []
     private var tasks: [Task<Void, Never>] = []
+    /// What the daemon holds of the token that starts the Live Activity (item 1445).
+    private var startGate: StartTokenGate = StartTokenGate()
 
     init(keyStore: PhoneKeyStore, client: DaemonClient) {
         self.keyStore = keyStore
@@ -38,6 +41,8 @@ final class PushRegistrar {
         started = true
         tasks.append(Task { [weak self] in await self?.requestPermissionAndRegister() })
         tasks.append(Task { [weak self] in await self?.observeActivities() })
+        tasks.append(Task { [weak self] in await self?.observePushToStart() })
+        tasks.append(Task { [weak self] in await self?.observeLiveActivitySwitch() })
     }
 
     /// Stops observing and forgets the tokens, as when the owner changes the daemon's address.
@@ -49,6 +54,7 @@ final class PushRegistrar {
         host = nil
         deviceToken = nil
         observedActivities = []
+        startGate.forget()
     }
 
     /// Called by the app delegate with the token APNs gave this device.
@@ -113,6 +119,69 @@ final class PushRegistrar {
                 }
                 self?.opening = false
             })
+    }
+
+    // MARK: Push to start (item 1445)
+
+    /// The token iOS gives for starting the phone's one Live Activity by push (`pushToStartTokenUpdates`, iOS 17.2 and later; the
+    /// app needs iOS 18): the one it holds and each change of it go to the daemon, once each. The token of the activity that is
+    /// started later goes the way it did (`POST /api/phone/apns/activity`).
+    private func observePushToStart() async {
+        if let current: Data = Activity<DotFleetAttributes>.pushToStartToken { offer(startToken: current) }
+        for await data: Data in Activity<DotFleetAttributes>.pushToStartTokenUpdates {
+            if Task.isCancelled { return }
+            offer(startToken: data)
+        }
+    }
+
+    /// Live Activities switched off for Dot in the iPhone's settings: the daemon is told it has no token to start one with (it
+    /// would start nothing, and a start's alert would only ring); switched on again, the token iOS holds goes again.
+    private func observeLiveActivitySwitch() async {
+        for await enabled: Bool in ActivityAuthorizationInfo().activityEnablementUpdates {
+            if Task.isCancelled { return }
+            if enabled {
+                if let current: Data = Activity<DotFleetAttributes>.pushToStartToken { offer(startToken: current) }
+            } else {
+                forgetStartToken()
+            }
+        }
+    }
+
+    private func offer(startToken data: Data) {
+        let token: String = hexString(data)
+        guard startGate.shouldSend(token) else { return }
+        logger.info("push-to-start token received: token=\(redactToken(token), privacy: .public)")
+        withCredentials(
+            { (client: DaemonClient, host: DaemonHost, key: String) in
+                try await client.registerStartToken(LiveStartToken(token: token), host: host, key: key)
+            },
+            onSuccess: { [weak self] in self?.startGate.didSend(token) })
+    }
+
+    /// Has the daemon forget the token that starts the Live Activity: the phone's key is about to be forgotten (this is called
+    /// before the key is deleted, and its request is made with the key read now), or Live Activities were switched off. It is
+    /// not one of `tasks`: stopping the registrar, which comes next, must not cancel it. A forget that does not get through
+    /// (no link) leaves the token with the daemon until the phone is removed there, which forgets it too.
+    func forgetStartToken() {
+        startGate.forget()
+        guard let host else { return }
+        let key: String
+        do {
+            guard let saved: String = try keyStore.read() else { return }
+            key = saved
+        } catch {
+            logger.error("phone key unreadable: error=\(error.description, privacy: .public)")
+            return
+        }
+        let client: DaemonClient = self.client
+        let logger: Logger = self.logger
+        Task.detached {
+            do {
+                try await client.forgetStartToken(host: host, key: key)
+            } catch {
+                logger.error("forgetting the push-to-start token failed: error=\(String(describing: error), privacy: .public)")
+            }
+        }
     }
 
     private func activityUp() -> Bool {
@@ -217,7 +286,8 @@ final class PushRegistrar {
 
     /// Runs `request` with the host and the key read from the Keychain, logging a failure after the client's retries.
     private func withCredentials(
-        _ request: @escaping @Sendable (DaemonClient, DaemonHost, String) async throws -> Void
+        _ request: @escaping @Sendable (DaemonClient, DaemonHost, String) async throws -> Void,
+        onSuccess: @escaping @MainActor () -> Void = {}
     ) {
         guard let host else {
             return
@@ -239,6 +309,7 @@ final class PushRegistrar {
             Task {
                 do {
                     try await request(client, host, key)
+                    onSuccess()
                 } catch {
                     logger.error("registration with the daemon failed: error=\(String(describing: error), privacy: .public)")
                 }

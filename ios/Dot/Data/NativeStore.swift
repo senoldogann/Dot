@@ -38,12 +38,21 @@ final class NativeStore {
     private(set) var lastUpdated: Date?
     /// What was typed and not sent, per chat, kept between launches.
     let drafts: DraftStore
+    /// What the phone knows of Dot's awareness of the owner: the push switches (item 1441), later what waits on them and what
+    /// Dot did while they were away.
+    let awareness: AwarenessModel
+    /// Tells the daemon whether the app is in front of the owner and which chat it shows (item 1440), so that its alerts
+    /// stay quiet while the owner looks and go the moment they do not.
+    @ObservationIgnored let lease: ActivityLease
 
     /// Chats read before, as their state: a chat that is here opens drawn, in its first frame.
     @ObservationIgnored private var warm: [String: ChatState] = [:]
     /// The sessions of the chats on the screen, by the token of the screen that made each: a chat opened twice in a row
     /// (a navigation that settles) must not stop the later one when the earlier goes.
     @ObservationIgnored private var open: [UUID: ChatSession] = [:]
+    /// The tokens of the same screens, oldest first: the chat on the screen is the newest that is still open (a navigation
+    /// that settles holds two for a moment).
+    @ObservationIgnored private var openOrder: [UUID] = []
     @ObservationIgnored private let startedAt: Date = Date()
     @ObservationIgnored private let folder: URL
     /// The session of the streams: the requests' own configuration (so that the same protocols and proxies apply) with no
@@ -53,6 +62,7 @@ final class NativeStore {
     @ObservationIgnored private var lifecycleTask: Task<Void, Never>?
     @ObservationIgnored private var listTask: Task<Void, Never>?
     @ObservationIgnored private var listRefresh: Task<Void, Never>?
+    @ObservationIgnored private var needsYouTask: Task<Void, Never>?
     @ObservationIgnored private var linkTask: Task<Void, Never>?
     @ObservationIgnored private var outcomeTask: Task<Void, Never>?
     @ObservationIgnored private var preloadTask: Task<Void, Never>?
@@ -79,10 +89,25 @@ final class NativeStore {
         self.linkState = link.state
         let client: APIClient = APIClient(host: host, key: key, session: session, link: link)
         self.api = client
+        // The lease's reports have a client of their own: one try, no waiting for a link (see `makeLeaseSession`).
+        let leaseClient: APIClient = APIClient(host: host, key: key, session: APIClient.makeLeaseSession(like: session))
+        let leaseLog: Logger = Logger(subsystem: "dev.dotagent.phone", category: "lease")
+        self.lease = ActivityLease(
+            paired: true,
+            send: { report in
+                do {
+                    try await leaseClient.report(activity: report)
+                } catch {
+                    // Never shown to the owner: a lease that is not said ends by itself, and the alerts go.
+                    leaseLog.info("the activity lease was not said: \(String(describing: error), privacy: .public)")
+                }
+            })
         let folder: URL = directory ?? ChatCache.directory(for: host)
         self.folder = folder
-        self.cache = ChatCache(directory: folder)
+        let chatCache: ChatCache = ChatCache(directory: folder)
+        self.cache = chatCache
         self.drafts = DraftStore(directory: folder)
+        self.awareness = AwarenessModel(api: client, cache: chatCache, directory: folder, link: link)
         let box: Outbox = Outbox(directory: folder, api: client, link: link, uploadSession: uploadSession)
         self.outbox = OutboxModel(box: box, initial: Outbox.read(folder.appending(path: "outbox.json")))
         #if DEBUG
@@ -122,9 +147,12 @@ final class NativeStore {
         outbox.start()
         Task { await refreshList() }
         Task { await loadModels() }
+        Task { await awareness.refreshNeedsYou() }
+        Task { await awareness.refreshAway() }
     }
 
     func stop() {
+        lease.stop()
         lifecycleTask?.cancel()
         lifecycleTask = nil
         linkTask?.cancel()
@@ -135,6 +163,7 @@ final class NativeStore {
         prefetchTask?.cancel()
         listTask?.cancel()
         listRefresh?.cancel()
+        needsYouTask?.cancel()
         preloadTask?.cancel()
         let feed: EventFeed? = lifecycleFeed
         Task { await feed?.stop() }
@@ -145,6 +174,7 @@ final class NativeStore {
         grace.end()
         for session in open.values { Task { await session.stop() } }
         open = [:]
+        openOrder = []
     }
 
     /// The chats the owner is most likely to open, decoded off the main actor, several at once, and kept as states.
@@ -180,6 +210,14 @@ final class NativeStore {
         listRefresh = task
         await task.value
         listRefresh = nil
+    }
+
+    /// A pull to refresh: the list and what waits on the owner are read together.
+    func refreshEverything() async {
+        async let listed: Void = refreshList()
+        async let waiting: Void = awareness.refreshNeedsYou()
+        async let away: Void = awareness.refreshAway()
+        _ = await (listed, waiting, away)
     }
 
     private func readList() async {
@@ -223,6 +261,16 @@ final class NativeStore {
             try? await Task.sleep(for: .milliseconds(300))
             if Task.isCancelled { return }
             await self?.refreshList()
+        }
+    }
+
+    /// What waits on the owner is read again soon (a moment of waiting joins the notices that come together).
+    private func refreshNeedsYouSoon() {
+        needsYouTask?.cancel()
+        needsYouTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
+            await self?.awareness.refreshNeedsYou()
         }
     }
 
@@ -289,12 +337,36 @@ final class NativeStore {
         let session: ChatSession = ChatSession(
             threadId: id, api: api, cache: cache, link: link, listUpdatedAt: threads.first(where: { $0.id == id })?.updatedAt)
         open[token] = session
+        openOrder.removeAll { $0 == token }
+        openOrder.append(token)
+        lease.showing(chat: chatOnScreen)
         return session
     }
 
     func release(token: UUID) {
         if let session: ChatSession = open.removeValue(forKey: token) { Task { await session.stop() } }
+        openOrder.removeAll { $0 == token }
+        lease.showing(chat: chatOnScreen)
     }
+
+    /// The chat on the screen (its thread id), `nil` when the list or Settings is.
+    var chatOnScreen: String? { openOrder.last.flatMap { open[$0]?.threadId } }
+
+    /// The runs of the chat on the screen, its own and its helpers' (and the newest one the list names): an alert about one of
+    /// them is about the chat the owner is reading (item 1446). `nil` when no chat is on the screen.
+    func runIdsOnScreen() -> Set<String>? {
+        guard let id: String = chatOnScreen else { return nil }
+        var ids: Set<String> = []
+        if let state: ChatState = warm[id] {
+            ids.formUnion(state.rootRunIds)
+            ids.formUnion(state.helpers.map(\.id))
+        }
+        if let latest: String = threads.first(where: { $0.id == id })?.latestRunId, !latest.isEmpty { ids.insert(latest) }
+        return ids
+    }
+
+    /// The scene's phase changed: the lease says so to the daemon at once (item 1440).
+    func sceneChanged(_ phase: LeaseScene) { lease.scene(phase) }
 
     // MARK: Reading ahead
 
@@ -372,6 +444,7 @@ final class NativeStore {
             }
         case .notice(let kind):
             refreshListSoon()
+            if NeedsYouRules.refreshes(onNotice: kind) { refreshNeedsYouSoon() }
             for session in open.values { Task { await session.lifecycle(kind) } }
         case .events, .unreadable:
             break
@@ -391,6 +464,9 @@ final class NativeStore {
         Task { await feed?.kick() }
         for session in open.values { Task { await session.kick() } }
         if Date().timeIntervalSince(lastListAt) > 5 { refreshListSoon() }
+        // What waits on the owner may have changed on the Mac while the phone was away, and Dot may have done things on its own.
+        Task { await awareness.refreshNeedsYou() }
+        Task { await awareness.refreshAway() }
         outbox.start()
     }
 
@@ -424,6 +500,8 @@ final class NativeStore {
             for await _ in await box.outcomes() {
                 guard let self else { return }
                 self.refreshListSoon()
+                // An answer given from the phone closes a card (or finds it closed): the inbox and the badge follow.
+                self.refreshNeedsYouSoon()
             }
         }
     }
@@ -474,6 +552,8 @@ final class NativeStore {
             wasDown = false
             startLifecycle()
             refreshListSoon()
+            Task { await awareness.refreshNeedsYou() }
+            Task { await awareness.refreshAway() }
             for session in open.values { Task { await session.kick() } }
             outbox.start()
         } else {
@@ -486,7 +566,10 @@ final class NativeStore {
     func refreshInBackground(seconds: Double = 20) async -> Bool {
         // Reached only when the list was read now: a refresh that asked nothing (no link) or failed says so to the system.
         let began: Date = Date()
+        // What waits on the owner is read beside the list: the badge is set from it while iOS gives the app its seconds.
+        async let waiting: Void = awareness.refreshNeedsYou()
         await refreshList()
+        await waiting
         guard link.state.online, lastListAt >= began else { return false }
         prefetch(budget: min(3, link.state.prefetchBudget), force: true)
         let task: Task<Void, Never>? = prefetchTask

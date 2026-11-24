@@ -180,7 +180,8 @@ code** takes its place. The same by hand:
    start a run in it (a message, a
    queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
    notification (item 1096). A run started on the Mac, or by a schedule, opens no activity, but for a phone that gave
-   its push-to-start token (item 1425, iOS 17.2 and later, `POST /api/phone/live-start-token`): the daemon starts the
+   its push-to-start token (items 1425 and 1445, iOS 17.2 and later, `POST /api/phone/live-start-token`, which the app sends as
+   soon as iOS hands it over): the daemon starts the
    activity there by push, with the notification Apple requires of a start (a fixed title and line), when the phone shows
    none and the app is not in the foreground, at once for a command that ended in the background and for any other row
    of the activity (a run of yours, or the run that goes on in your chat when an agent's order came back or a run was
@@ -191,8 +192,10 @@ code** takes its place. The same by hand:
    (in [the app's calls](#the-iphone-apps-calls) below), a lease that it renews every 25 seconds, and for as long as it
    holds the end of a run, of a schedule's run and of a campaign are not sent to that phone as alerts, while what asks
    something of you (an approval, a question, a secret, a hand-off), a draft, what Dot tells you and its own warnings
-   are sent whatever it says, and so is every Live Activity update. The app of this checkout does not send the lease
-   yet, so until it does every alert goes as before. The app's pushes come in three kinds that each phone switches for itself (item 1421,
+   are sent whatever it says, and so is every Live Activity update. The app sends the lease (item 1440), and agrees with it
+   (item 1446): while it is active and shows a chat, an alert about that chat (a run of it or of its helpers, by the run
+   its route names) is not drawn, whatever kind it is, since an approval or a question of that chat is its own card; an
+   alert about another chat is a banner with its sound, and so is every alert while the app is inactive or shows the list. The app's pushes come in three kinds that each phone switches for itself (item 1421,
    `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
    failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
    an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run, a
@@ -546,8 +549,23 @@ and of a campaign are not sent to that phone as alerts, for the chat on screen a
 itself. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
 hand-off, a draft written for you, what Dot tells you on its own and its own warnings (a schedule that did not run or was
 switched off, learning that stopped, a restart). The Live Activity is not touched by the lease, nor are the other phones,
-nor the web push of a browser. A phone that is removed loses its lease. The app of this checkout does not call this
-route yet (`ios/` was left as it was), so until it does the lease is never made and every alert goes.
+nor the web push of a browser. A phone that is removed loses its lease.
+
+The iPhone app makes the lease (item 1440): it says `foreground` as its scene becomes active and again every 25 seconds while
+the scene stays so, `foreground` with the new `chat` (the thread id) at once when the chat on its screen changes (`null`
+on the list and in Settings), and `background` at once when the scene goes inactive (a system sheet, the app switcher) or
+to the background, once. A report is one try with an 8-second wait and does not wait for a link, and one is on its way at
+a time with only the newest behind it, so a poor link never piles requests up and `background` is never overtaken by an
+older `foreground`. A report that does not get through is only logged, never shown: the lease ends by itself within 45
+seconds, which is the safe side (the alerts go). An app that is not paired says nothing.
+
+The same moment decides what the app draws (item 1446): while the app is active and shows a chat, an alert about that chat,
+the run its `route` names being one of that chat's runs or its helpers', is handed to iOS with no banner and no sound and
+is not added to the list of alerts (`willPresent` answers none); an alert about another chat is a banner with its sound
+and its place in the list as before, an alert that names no run (a campaign, a schedule, Dot's own message) is drawn too,
+and so is every alert while the app is inactive (a system sheet, the app switcher) or shows the list or Settings. What the
+daemon holds back (the `done` kind's three events) and what the app does not draw (an alert about the chat in front of
+the owner) are one quiet.
 
 Errors: 403 for the Mac's token; 422 for a `state` that is neither `foreground` nor `background`, a `chat` that is empty
 or over 64 characters, a `ttl_s` that is not a number above 0, or any other key (the lease is as it was); 404 for a phone
@@ -585,6 +603,15 @@ and answers 200 with what it kept:
 Errors: 403 for the Mac's token; 422 for a `PUT` that is not the three booleans (the switches are as they were); 404 for a
 phone removed while its `PUT` was on its way. Web push to a browser has its own switch (Settings › General ›
 Notifications) and is not changed by these.
+
+The iPhone app has these switches in Settings, under **Notifications** (item 1441), each with one line of what it means
+("Needs you": Dot waits on your answer, or something it does on its own needs a look; "Ready": a draft is ready to send, or
+Dot has news for you; "Done": a task, a schedule or a campaign has finished, or failed). It reads them with a `GET` when
+Settings opens and again when the phone's link comes back, and writes all three with a `PUT` when one is flipped: the
+switch moves at once, a second flip while a write is on its way waits and goes after it with the latest of all three, and
+a write the daemon does not keep (a refusal, or no answer) puts the switches back to what the daemon held and says so in a
+plain line. With no answer to the read the phone shows the switches as it last knew them (kept in `awareness.json` of the
+cache folder), dimmed, and they do not move: a switch that cannot be kept is no switch.
 
 ### GET /api/needs-you
 
@@ -625,7 +652,8 @@ Reply, 200:
   (`dotagent://run/<run id>`; an alert's own route is `#/runs/<run id>`, as before).
 - `kind`: `approval` (a step a run asks leave for), `question` (`ask_user`), `secret` (`ask_secret`) or `handoff` (a
   step only you can do, which the run waits for or kept for you: see Hand-offs below).
-- `title`: what is asked, on one line of at most 120 characters, with secrets masked; for a `secret` a fixed line, never
+- `title`: what is asked, on one line of at most 120 characters (code points: the cut is made on those, with no mark that it was
+  made), with secrets masked; for a `secret` a fixed line, never
   the card's words, and the list carries **no secret's value** (a request for one has none: it is told by its id and who
   asks); for a `handoff` a fixed line with the host of the page alone (below).
 - `choices` (a `question` that offers options only): the options' labels, in the order the run gave them. `recommended`:
@@ -659,6 +687,32 @@ Answer it as before with `POST /api/approvals/{id}/decision`. What is **not** a 
 that Dot meets without a step the policy hands over (it asks you with `ask_user`, a `question`, or with `ask_secret`, a
 `secret`): the browser tools give the daemon no sure sign that a page is one only you can pass, so none is recorded.
 
+**The iPhone app's inbox** (item 1442). The app reads this list when it starts, when it comes to the front or the link is
+back, when the chat list is pulled down, when an alert arrives or a push wakes it, and when a notice of its stream says a
+card was asked or answered, a question was left or a run ended; it draws the list from the last read at once (`awareness.json`
+in the cache folder) and puts `count` on the app's icon after every read (`UNUserNotificationCenter.setBadgeCount`). While
+anything waits, the chat list has one card at its top (the count on a badge, and what the newest asks) that opens the
+inbox, newest first. Each row says who asks and in which chat, and what: an approval says what Dot wants to do (the line
+taken apart as the chat's card takes it) with **Allow once** and **Deny**; a question shows its options as buttons, the
+recommended one marked, or a field for words when it offers none; both answer through the outbox and the decision route
+above, as the chat's card does. **Allow once is not offered for an approval whose line is 120 code points long**: the
+daemon cuts a title there (it counts code points, so a line of combining marks or an emoji sequence is cut at 120 of them
+and reads as fewer characters) and says nothing of it, so that line may be the start of a longer one, and the row says to
+read all of it in the chat (Deny stays). **A secret is never answered on the phone**: its row says "Dot needs a secret: enter it
+on your Mac" and has no field or button that takes a value. A hand-off and a kind the app does not know are answered in
+the chat, which each row opens (`dotagent://run/<run id>`).
+
+**The hand-off card** (item 1444). A chat whose run waits for a step only the owner can do in the browser (a `handoff` row of
+this list) shows one calm card in its transcript: "Dot is waiting for you in the browser on `<host>`", a line that Dot
+cannot go on until the step is done, and a button, **Open in Safari**, that opens the run's page of the web UI on the
+address the app already holds (`https://<mac>/#/runs/<run id>`) in the system's browser, where **Take over** lets the
+owner do the step from the phone ([Daemon](daemon.md)); the chat stays one tap away by the deep link
+(`dotagent://run/<run id>`), and the inbox's row says the same words with the same button. The card says what the daemon's
+fixed line says and nothing else: the host is shown only when it is plainly a host (letters, digits, `-`, `.`, `_`, `:`; no
+space, path, `@` or query), so no credential, address part, page text or typed word can come to it through the line, and
+without a host it says only that Dot is waiting. The step is not answered with a tap on the phone: the run goes on when
+the owner hands the browser back or answers in the web UI.
+
 ### POST /api/phone/live-start-token and DELETE /api/phone/live-start-token
 
 The token that starts the phone's Live Activity by push (item 1425; `Activity<DotFleetAttributes>.pushToStartTokenUpdates`,
@@ -676,6 +730,15 @@ Reply, 204, with no body. `DELETE` (204, no body) forgets the phone's token: the
 switched off). A token APNs calls gone, and a removed phone, are forgotten too. Errors: 403 for the Mac's token; 422 for
 a token that is not lowercase hex of 64 to 512 characters or a body with another key; 404 for a phone removed while the
 call was on its way (nothing is kept).
+
+The iPhone app sends the token (item 1445) as `Activity<DotFleetAttributes>.pushToStartTokenUpdates` gives it, the one it
+holds when it starts and each change after, once each (a token the daemon already has is not sent again, and one that is
+not 64 to 512 characters of lowercase hex is not sent at all); it needs iOS 18, which is above the 17.2 it asks. The
+device's registration still carries `start_token: null`. The app sends the `DELETE` when the phone's key is forgotten
+(Settings › Forget this phone's key, or a changed address), before the key goes, and when Live Activities are switched off
+for Dot in the iPhone's settings (switched on again, the token goes again); a `DELETE` that does not get through (no link)
+leaves the token with the daemon until the phone is removed there, which forgets it too. The activity's own token, which
+ActivityKit gives once the activity started, goes as it did (`POST /api/phone/apns/activity`).
 
 What the daemon does with it: when a row of the Live Activity is at work (a command that ended in the background at once,
 any other row after 30 seconds of work: a run of the owner's, or the run that goes on in their chat when an agent's order
@@ -755,6 +818,16 @@ is a 422); the daemon takes it within the last seven days and never after now. R
 /api/away/read` takes `{"until": 1764003600.0}` (the `until` of the card that was shown: a number of 0 or more, no other
 key, or a 422) and answers 200 with the same shape, where the mark stands now: it never moves back and never past now. The
 first visit from any device marks it and shows nothing, so the card never pours out history.
+
+**The iPhone app's card** (item 1443). The app reads the mark when it starts, comes to the front or the link is back, and
+when the chat list is pulled down. No device has set it yet: the app marks the moment (`POST` with the phone's now) and
+shows nothing, so the card never pours out history. Otherwise it reads `GET /api/away?since=` against the mark and, when
+Dot did anything in that time, shows one flat card at the top of the chat list: how many things Dot did on its own and how
+they ended, the three newest (each a row that opens its chat) and how many more there are, and, when it did, how many
+approvals Dot answered for you. Putting the card away marks the `until` of the card that was shown (`POST
+/api/away/read`), so that the Mac and every phone agree on what is news; the card goes at once, and a mark that does not
+get through (no link, no answer) is kept in `awareness.json` and sent first by the next read, so a card put away stays away.
+The card is drawn from the last read, kept in the same file, before the network answers.
 
 ### What the daemon pushes to the app
 

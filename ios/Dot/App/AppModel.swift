@@ -20,11 +20,16 @@ final class AppModel {
     private(set) var native: NativeStore?
     /// A run a notification asked to open: the native list opens its chat.
     var pendingRunId: String?
+    /// The scene's phase as the activity lease reads it (item 1440), kept so that a store made later (pairing done while the
+    /// app is in front) says it at once.
+    @ObservationIgnored private(set) var scene: LeaseScene = .background
     /// Debug builds only: `-DotOpenChat <title prefix>` opens that chat at launch, `-DotShowInspector 1` its inspector,
     /// `-DotShowSettings 1` the settings; for looking at a screen in the simulator, which has no way to tap from here.
     var debugOpenChat: String?
     var debugInspector: Bool = false
     var debugSchedules: Bool = false
+    /// Debug builds only: `-DotShowInbox 1` opens the inbox of what waits on the owner at launch (item 1442).
+    var debugInbox: Bool = false
     /// Debug builds only: `-DotOpenURL dotagent://run/<id>` opens a link at launch, as a Live Activity's tap does.
     var debugOpenURL: URL?
 
@@ -50,6 +55,7 @@ final class AppModel {
             self.devKey = args.string(forKey: "DotDevKey").flatMap { $0.isEmpty ? nil : $0 }
         }
         self.debugSchedules = args.bool(forKey: "DotShowSchedules")
+        self.debugInbox = args.bool(forKey: "DotShowInbox")
         self.debugOpenChat = args.string(forKey: "DotOpenChat")
         self.debugInspector = args.bool(forKey: "DotShowInspector")
         self.showsSettings = args.bool(forKey: "DotShowSettings")
@@ -70,6 +76,13 @@ final class AppModel {
         let store: NativeStore = NativeStore(host: host, key: key)
         native = store
         store.start()
+        store.sceneChanged(scene)
+    }
+
+    /// The scene became active, inactive or went to the background: the daemon is told at once whether the owner is looking.
+    func sceneChanged(_ phase: LeaseScene) {
+        scene = phase
+        native?.sceneChanged(phase)
     }
 
     private func currentKey() -> String? {
@@ -112,6 +125,8 @@ final class AppModel {
 
     /// Removes the phone's key from the Keychain and stops registering.
     func forgetKey() {
+        // The daemon is told first, with the key that is about to go: it forgets the token that starts this phone's Live Activity.
+        registrar.forgetStartToken()
         registrar.stop()
         let forgotten: NativeStore? = native
         Task { await forgotten?.clearCache() }
@@ -167,14 +182,4 @@ final class AppModel {
             return false
         }
     }
-}
-
-/// The run id of a route like `#/runs/run_abc` or `/runs/run_abc`, or `nil` for any other route.
-func runId(inRoute route: String) -> String? {
-    let trimmed: String = route.trimmingCharacters(in: CharacterSet(charactersIn: "#/"))
-    let parts: [Substring] = trimmed.split(separator: "/")
-    guard parts.count == 2, parts[0] == "runs", parts[1].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) else {
-        return nil
-    }
-    return String(parts[1])
 }

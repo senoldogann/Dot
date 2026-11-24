@@ -22,11 +22,15 @@ struct DotApp: App {
                     native.enterForeground()
                     native.reconnect()
                 }
+                // The daemon is told the owner is looking: its alerts of a task's end stay quiet while they do.
+                appDelegate.model.sceneChanged(.active)
             case .background:
+                appDelegate.model.sceneChanged(.background)
                 appDelegate.model.native?.enterBackground()
                 BackgroundRefresh.schedule()
             case .inactive:
-                break
+                // A system sheet or the app switcher is over the app: the owner may not be looking, so the lease ends.
+                appDelegate.model.sceneChanged(.inactive)
             @unknown default:
                 break
             }
@@ -86,16 +90,30 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         model.registrar.didFailToRegister(error: error)
     }
 
-    /// Shows the daemon's alerts while the app is open, too.
+    /// Shows the daemon's alerts while the app is open, too, but not the ones about the chat the owner is reading (item 1446):
+    /// the lease says the app is in front of them, and an approval or a question of that chat is its own card, so a banner
+    /// over it would say it twice. An alert about another chat is a banner, as is every alert while the app is not active.
     ///
     /// The forms with a completion handler (item 1114): the `async` form of these methods completed on a thread of
     /// Swift's own, and UIKit, which updates the app's snapshot as a tap's handling is done, stopped the app with an
-    /// assertion at every tap of a notification. iOS calls this one on the main thread.
+    /// assertion at every tap of a notification. The answer is given on the main actor, at once; what the alert may have
+    /// changed is read after it.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .list, .sound])
+        let route: String? = notification.request.content.userInfo["route"] as? String
+        Task { @MainActor in
+            switch ForegroundQuiet.presentation(
+                appIsActive: UIApplication.shared.applicationState == .active, runIdsOnScreen: self.model.native?.runIdsOnScreen(),
+                alertRunId: route.flatMap(runId(inRoute:)))
+            {
+            case .quiet: completionHandler([])
+            case .banner: completionHandler([.banner, .list, .sound])
+            }
+            // An alert arrived while the app is open: what waits on the owner may have changed (item 1442).
+            await self.model.native?.awareness.refreshNeedsYou()
+        }
     }
 
     /// Answers an approval from the lock screen (Approve, Deny), or opens the alert's `route` in the web view; tells

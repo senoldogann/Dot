@@ -99,6 +99,10 @@ final class ChatModel {
         self.draft = store.drafts.text(for: thread.id)
     }
 
+    /// The step only the owner can do that this chat waits for (item 1444), from what waits on the owner: a calm card, no credential
+    /// and no page text.
+    var handoff: HandoffCard? { HandoffCard.card(forChat: threadId, in: store.awareness.needsYou) }
+
     var isWorking: Bool { state.isWorking }
     var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty }
 

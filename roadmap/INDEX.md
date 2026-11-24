@@ -6,6 +6,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1446](1446.md) | done | 2026-11-24 | Foreground quiet: the app draws no banner for the chat the owner is reading |
+| [1445](1445.md) | done | 2026-11-24 | The Live Activity starts by push: the app gives Dot its push-to-start token |
+| [1444](1444.md) | done | 2026-11-24 | The hand-off card: "Dot is waiting for you in the browser on <host>" |
+| [1443](1443.md) | done | 2026-11-24 | "While you were away": what Dot did on its own, as a card at the top of the chat list |
+| [1442](1442.md) | done | 2026-11-24 | The iPhone app's inbox of what waits on the owner, with its badge |
+| [1441](1441.md) | done | 2026-11-24 | The iPhone app's Notifications switches: which pushes Dot tells this phone |
+| [1440](1440.md) | done | 2026-11-24 | The iPhone app says it is in front of the owner: the activity lease |
 | [1425](1425.md) | done as far as the rows allow | 2026-11-24 | The Live Activity starts by push on a phone that shows none (push-to-start, iOS 17.2 and later) |
 | [1424](1424.md) | done | 2026-11-24 | "While you were away" covers what Dot did on its own, not only what a schedule did |
 | [1423](1423.md) | done as far as the data allows | 2026-11-24 | The hand-off state: a step only the owner can do is told by its host and a fixed line, one for a chat |

@@ -212,6 +212,11 @@ private struct Transcript: View {
                             .padding(.top, 20)
                             .id(send.id)
                     }
+                    if let card: HandoffCard = model.handoff {
+                        HandoffCardView(card: card, onOpenWeb: { HandoffCardView.openInSafari(card, on: model.store.host) })
+                            .padding(.top, 20)
+                            .id("handoff")
+                    }
                     if let words: String = model.finishedWords {
                         Text(words).font(Theme.meta).foregroundStyle(Theme.faint)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(.top, Space.m)
@@ -299,6 +304,7 @@ private struct Transcript: View {
         var hasher: Hasher = Hasher()
         hasher.combine(model.state.items.count)
         hasher.combine(model.pending.count)
+        hasher.combine(model.handoff?.approvalId)
         if let last: ChatItem = model.state.items.last {
             switch last.kind {
             case .assistant(let text, _), .answer(let text, _): hasher.combine(text.utf8.count)

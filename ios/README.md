@@ -12,6 +12,10 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     rows; `QueueOrder`; `MessageBlocks`.
     Resilience rules live here too (item 1371): `RetryPolicy` (tries, waits, jitter, what is worth repeating),
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
+    `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
+    `PushSettings` (item 1441) the three push switches and what a flip does; `NeedsYou` (item 1442) the inbox's list, its rows
+    and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it; `Handoff` (item 1444) the card of a step only the owner can do; `LiveStartToken` (item 1445) when the token that starts the Live
+    Activity is sent; `ForegroundQuiet` (item 1446) which alerts are not drawn while the owner reads the chat they are about.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -87,6 +91,58 @@ the models (the default and the review model) in Settings, notifications and the
   `DotDeepLink`, a run id that is not plainly an id opens nothing); a notification's tap and its **Open** action (new next
   to Approve and Deny; it comes to the front) open the chat of the alert's run, reading the run's own page and drawing
   the chat from it when the list does not hold it yet (a cold launch from the tap).
+
+Awareness (items 1440 to 1446: the app knows when Dot needs the owner, stays quiet while they look at it, and says what Dot
+did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app's calls"):
+
+- **The activity lease** (item 1440): the app tells Dot it is in front of the owner (`POST /api/phone/activity`:
+  `foreground` and the chat on the screen) as its scene becomes active, every 25 s while it stays so and at once when the
+  chat on the screen changes, and `background` at once when the scene goes inactive or to the background, so that Dot's
+  alerts of a task's end stay quiet while the owner looks and go the moment they do not. The rules are `Core/ActivityLease`
+  (`ActivityLeaseRules`: no clock, no network; `ActivityLease`: the clock, the timer and the sender that a test replaces);
+  a report is one try that does not wait for a link, one on its way at a time with the newest behind it, and one that
+  does not get through is only logged (the lease ends by itself in 45 s: the safe side). `NativeStore` owns the lease (a
+  store exists for a paired phone only, so an unpaired app says nothing), knows the chat on the screen from the sessions
+  it holds (`chatOnScreen`) and is told the scene's phase by `AppModel.sceneChanged`.
+- **Push switches** (item 1441): Settings has a **Notifications** group of three switches (`Core/PushSettings`: Needs you,
+  Ready, Done, each with its one line), read with `GET /api/phone/push-settings` when Settings opens and when the link is
+  back, written as all three with `PUT` on a flip. `PushSwitches` is the rule: a flip shows at once, one write is on its
+  way at a time (a second flip goes after it with the latest of all three), a write that is not kept puts the switches
+  back to what the daemon held with a plain line (`words(forStatus:)`), and without the daemon's answer the last switches
+  the phone knew are shown dimmed and do not move. `AwarenessModel` (one per store) draws them from `awareness.json` in the
+  cache folder before the network answers. The old row that opens the iPhone's own page of this app's settings is now
+  "iPhone notification settings".
+- **Needs-you inbox** (item 1442): `GET /api/needs-you` is read on start, on foreground, on a pull to refresh, when an alert
+  arrives or a push wakes the app, and on the stream's notices that change it (`NeedsYouRules.refreshes`); the last read is
+  kept in `awareness.json` and drawn at once, and the app icon's number follows `count` after every read
+  (`AwarenessModel.systemBadge`). The chat list has one card at the top while anything waits (`NeedsYouEntry`) that opens
+  `NeedsYouView`: one row each (`Core/NeedsYou`), newest first, who asks and in which chat. An approval has Allow once and
+  Deny (the line taken apart by `ApprovalPresentation`; no Allow once when the line is as long as the daemon cuts a title,
+  which it does without a mark), a question its choices as buttons with the recommended one marked or a field for words,
+  both through the outbox like the chat's card; a secret has no way to answer (its row says "Dot needs a secret: enter it
+  on your Mac"); a hand-off is answered in the chat. A row opens its chat.
+- **"While you were away"** (item 1443): when Dot did something on its own since the owner last looked (what a schedule, an
+  agent's standing chat or a background run did), one flat card at the top of the chat list (`AwayCardView`, the pure rules
+  in `Core/Away`) says how many things and how they ended, lists the three newest (each opens its chat) and how many more,
+  and how many approvals Dot answered for the owner. It is read against the mark Dot keeps for every device
+  (`GET /api/away/read`; the first visit marks the moment and shows nothing) and put away with `POST /api/away/read` (the
+  card goes at once; a mark that does not get through is kept in `awareness.json` and sent first by the next read).
+- **Hand-off card** (item 1444): a chat whose run waits for a step only the owner can do in the browser (a `handoff` row of
+  the needs-you list) shows one calm card (`HandoffCardView`, the rules in `Core/Handoff`): "Dot is waiting for you in the
+  browser on <host>" and **Open in Safari**, which opens the run's page of the web UI on the address the app holds
+  (`https://<mac>/#/runs/<id>`) in the system's browser; the chat is still `dotagent://run/<id>`. The card carries only the host
+  the daemon's fixed line names (and only when it is plainly a host), never a credential or page text; the inbox's row has
+  the same words and button.
+- **Live Activity push-to-start** (item 1445): `PushRegistrar` sends the token `Activity<DotFleetAttributes>.pushToStartTokenUpdates`
+  gives (iOS 17.2 and later; the app needs 18) to `POST /api/phone/live-start-token` (`StartTokenGate`: once each, only lowercase
+  hex of 64 to 512 characters), so that Dot can start the phone's Live Activity by push when a run begins on the Mac or by a
+  schedule. `DELETE` goes when the phone's key is forgotten (`AppModel.forgetKey`, before the key is deleted) and when Live
+  Activities are switched off for Dot; the activity's own token goes as it did. `DotFleetAttributes` is unchanged.
+- **Foreground quiet** (item 1446): while the app is active and shows a chat, an alert about that chat is not drawn
+  (`willPresent` answers `[]`): `ForegroundQuiet` says so when the run the alert's route names is one of the runs of the chat on
+  the screen or its helpers' (`NativeStore.runIdsOnScreen`); an alert about another chat is a banner with its sound as
+  before, and so is every alert while the app is inactive, shows the list or Settings, or names no run. The same moment
+  is what the lease tells the daemon, so the two agree.
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 
@@ -246,7 +302,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1` and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the

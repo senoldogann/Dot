@@ -52,6 +52,12 @@ struct ApprovalPresentation: Equatable, Sendable {
             title: title(of: tool), command: command, why: reasons.isEmpty ? nil : reasons.joined(separator: "; "))
     }
 
+    /// The tool a summary line is of, when it says so itself: the inbox (`GET /api/needs-you`) knows an approval by its line
+    /// alone, and the line of a command starts with "Run: ". Empty when the line says nothing of its tool.
+    static func tool(inferredFrom summary: String) -> String {
+        summary.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("Run: ") ? "shell" : ""
+    }
+
     /// The tool as the step it asks for.
     static func title(of tool: String) -> String {
         switch tool {

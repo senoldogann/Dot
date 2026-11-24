@@ -9,6 +9,8 @@ struct ChatListView: View {
     /// Why a tapped notification opened nothing.
     @State private var openFailed: String?
     @State private var composing: NewChatTarget?
+    /// The inbox of what waits on the owner (item 1442).
+    @State private var showsInbox: Bool = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -16,6 +18,18 @@ struct ChatListView: View {
                 if !store.agents.isEmpty {
                     AgentStrip(store: store, onOpen: { open(agent: $0) })
                         .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+                if store.awareness.needsYou.count > 0 {
+                    NeedsYouEntry(count: store.awareness.needsYou.count, preview: inboxPreview, onOpen: { showsInbox = true })
+                        .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
+                if let card: AwayCard = awayCard {
+                    AwayCardView(card: card, onOpen: { model.pendingRunId = $0 }, onDismiss: { store.awareness.dismissAway() })
+                        .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
@@ -42,7 +56,7 @@ struct ChatListView: View {
             .scrollContentBackground(.hidden)
             .background { DotBackground() }
             .dotScrollEdges()
-            .refreshable { await store.refreshList() }
+            .refreshable { await store.refreshEverything() }
             .navigationTitle("Dot")
             .navigationBarTitleDisplayMode(.large)
             .dotAnimation(Motion.smooth, value: store.threads.map { "\($0.id)\($0.state)" })
@@ -62,6 +76,9 @@ struct ChatListView: View {
                 NewChatView(store: store, agent: target.agent, onStarted: { path = [$0] })
                     .dotSheet()
             }
+            .sheet(isPresented: $showsInbox) {
+                NeedsYouView(store: store, onOpen: { runId in model.pendingRunId = runId }).dotSheet()
+            }
             .navigationDestination(for: ThreadSummary.self) { thread in
                 ChatView(store: store, thread: thread, inspectorOpen: model.debugInspector)
             }
@@ -72,6 +89,13 @@ struct ChatListView: View {
                     path.first?.id != thread.id
                 {
                     path = [thread]
+                }
+            }
+            .task {
+                // Debug builds: `-DotShowInbox 1` opens the inbox once the list is on the screen.
+                if model.debugInbox {
+                    try? await Task.sleep(for: .milliseconds(900))
+                    showsInbox = true
                 }
             }
             .task(id: model.pendingRunId) {
@@ -111,6 +135,14 @@ struct ChatListView: View {
         } else {
             composing = .agent(agent)
         }
+    }
+
+    /// What Dot did on its own since the owner last looked, as the card says it (none: no card).
+    private var awayCard: AwayCard? { store.awareness.away.flatMap(AwayRules.card(from:)) }
+
+    /// What the newest thing that waits on the owner asks, for the entry's second line.
+    private var inboxPreview: String? {
+        NeedsYouRules.rows(from: store.awareness.needsYou).first.map(NeedsYouRules.preview(of:))
     }
 
     private var waiting: [ThreadSummary] { store.threads.filter(\.isWaitingOnYou) }
