@@ -58,13 +58,13 @@ async def test_a_search_with_bge_m3_over_the_benchmark_replaces_what_a_subject_o
 ) -> None:
     """Item 1729: with the real model the numbers are those of the scripted run: every case that gives a subject finds
     the newest fact first with no outdated note beside it, nothing that is still true is put aside, and no more than
-    the 9 cases a note worded apart or a name swapped leave open show an outdated note."""
+    the 10 cases a note worded apart or a name swapped leave open show an outdated note."""
     config: AppConfig = load_default_config()
     results: list[CaseResult] = await play_configured(config, tmp_path)
     groups: dict[str, Tally] = {group.name.strip(): group for group in tallies(results)}
     keyed: Tally = groups["saved with a subject"]
     assert (keyed.cases, keyed.first, keyed.stale) == (18, 18, 0)
     changed: Tally = groups["facts that changed"]
-    assert (changed.found, changed.stale) == (34, 9)
+    assert (changed.found, changed.stale) == (34, 10)
     kept: Tally = groups["facts that did not change"]
     assert (kept.cases, kept.first, kept.found) == (8, 8, 8)

@@ -42,7 +42,7 @@ from dotagent.store.models import OWNER_EDIT, MemoryRecord
 log = get_logger("dotagent.memory")
 
 _MOST_SUBJECT_CHARS: int = 48
-_SUBJECT_NOISE: re.Pattern[str] = re.compile(r"[^\w]+")
+_SUBJECT_NOISE: re.Pattern[str] = re.compile(r"[^\w]+|_")
 _WORD: re.Pattern[str] = re.compile(r"\w+")
 # A note shares at least this many words, at its start and its end, with the note it replaces.
 _LEAST_SHARED_WORDS: int = 3
@@ -50,6 +50,13 @@ _LEAST_SHARED_WORDS: int = 3
 _MOST_CHANGED_WORDS: int = 4
 # With a word of change the sentences must share this part of the shorter one.
 _LEAST_SHARED_PART: float = 0.6
+# The words a value follows in a sentence that states one (``is 20 minutes``, ``at 09:00``, ``on port 8765``, ``has 4
+# cores``): a number straight after another word (``invoice 1042``, ``server 1``, ``PR 12``) names a thing, and two
+# things of one kind are both true.
+_BEFORE_VALUE: frozenset[str] = frozenset(
+    {"is", "are", "was", "were", "at", "on", "in", "to", "by", "of", "for", "from", "until", "than", "within", "has"}
+    | {"have", "had", "port", "about", "around", "costs", "cost"}
+)
 # Words that say the fact changed: "the call is now on Wednesdays", "no longer drinks coffee".
 _CHANGE_WORDS: frozenset[str] = frozenset({"now", "longer", "anymore", "instead", "moved", "switched", "changed"})
 
@@ -88,11 +95,13 @@ def _numbers(words: list[str]) -> bool:
 def wording_replaces(older: str, newer: str) -> bool:
     """Whether ``newer`` says the fact of ``older`` changed and nothing else, by its words alone. Both are cut at the
     words they share at the start and at the end; what is left between is at most :data:`_MOST_CHANGED_WORDS` words on
-    each side, and either all of it is numbers on both sides (``at 09:00`` and ``at 10:30``, ``port 8765`` and ``port
-    9120``: a value swapped), or the new side holds a word of change (:data:`_CHANGE_WORDS`) the old note lacks and the
+    each side, and either all of it is numbers on both sides after a word a value follows (:data:`_BEFORE_VALUE`:
+    ``at 09:00`` and ``at 10:30``, ``port 8765`` and ``port 9120``: a value swapped; not ``invoice 1042`` and ``invoice
+    1043``, two things), or the new side holds a word of change (:data:`_CHANGE_WORDS`) the old note lacks and the
     two share :data:`_LEAST_SHARED_PART` of the shorter one. At least :data:`_LEAST_SHARED_WORDS` words are shared.
     Two facts about other things in one frame (``4 CPU cores`` and ``16 GB RAM``, ``Nordic Pines pays within 14 days``
-    and ``Blue Harbor pays within 30 days``) share too little or change a word that is no number."""
+    and ``Blue Harbor pays within 30 days``, ``Invoice 1042 is paid`` and ``Invoice 1043 is paid``) share too little,
+    change a word that is no number, or swap a number that names a thing."""
     before: list[str] = _words(older)
     after: list[str] = _words(newer)
     start: int = _shared_start(before, after)
@@ -105,7 +114,7 @@ def wording_replaces(older: str, newer: str) -> bool:
     if len(old_part) > _MOST_CHANGED_WORDS or len(new_part) > _MOST_CHANGED_WORDS:
         return False
     if _numbers(old_part) and _numbers(new_part):
-        return True
+        return start > 0 and before[start - 1] in _BEFORE_VALUE
     cue: bool = any(word in _CHANGE_WORDS and word not in before for word in new_part)
     return cue and shared >= _LEAST_SHARED_PART * min(len(before), len(after))
 
