@@ -24,6 +24,7 @@ from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid, started_by_dot
 from dotagent.browser.profiles import profile_dir
+from dotagent.codemode.sandbox import Probe, code_mode_ready
 from dotagent.config import (
     AntigravityConfig,
     AppConfig,
@@ -653,6 +654,19 @@ def _chrome_row() -> CheckResult:
     )
 
 
+async def _code_mode_row(config: AppConfig) -> CheckResult:
+    """Whether the code of ``code_run`` can run on this Mac (item 1503): the probe of its sandbox, the one ``code_run``
+    itself goes by. Never required: Dot runs without it, and where the sandbox does not hold ``code_run`` runs
+    nothing."""
+    if not config.code.enabled:
+        return _result("code mode", True, False, "off ([code] enabled = false)")
+    probe: Probe = await code_mode_ready(None, (dot_home(), workspace_dir()))
+    where: str = f"{probe.python}, macOS {probe.macos}"
+    if probe.ok:
+        return _result("code mode", True, False, f"the code of code_run runs in a macOS sandbox that holds ({where})")
+    return _result("code mode", False, False, f"code_run runs nothing here: {probe.why} ({where})")
+
+
 def _local_checks() -> list[CheckResult]:
     """Checks that only touch the local filesystem and PATH."""
     env_state: str = "present" if env_file_path().exists() else "absent"
@@ -910,6 +924,7 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
     bundled: tuple[McpServerConfig, ...] = builtin_servers(config, frozenset(server.name for server in configured))
     return [
         *await asyncio.to_thread(_local_checks),
+        await _code_mode_row(config),
         *_check_desktop(config),
         await asyncio.to_thread(_codes_row, config),
         await asyncio.to_thread(_backup_row, config),

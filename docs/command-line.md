@@ -7,7 +7,8 @@ its own agent (one of Zen's free models through OpenCode, or Claude Code's on yo
 Ollama it asks the Ollama of this Mac for `bge-m3`, and where there is none it writes `[memory] embed_enabled = false`
 (the notes are found by their words alone, as `dotx doctor` then expects) and says how to switch it back on.
 
-`dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
+`dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), whether the sandbox of code mode
+starts Python and holds (item 1503: its row `code mode`, which `code_run` goes by: where it fails, no code runs), the macOS version and the
 permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
 (none is opened), the commands and secrets of the configured MCP servers (none is started), Ollama, the keys of OpenAI,
 OpenCode Go, Anthropic, OpenRouter and Google (OpenRouter's row says what its key has spent), the login of a Google
