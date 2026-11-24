@@ -2,6 +2,7 @@
 pinning one from its menu (item 130), keeping what its composer chose (item 199), the helpers its runs started
 (item 227), and its terminal sessions (item 229)."""
 
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -9,6 +10,7 @@ from starlette.responses import StreamingResponse
 
 from dotagent.core.errors import ConfigError, NotFoundError
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
+from dotagent.notify.tell_ledger import mark_opened
 from dotagent.server.context import ServerContext
 from dotagent.server.stream import event_stream
 from dotagent.server.thread_sync import (
@@ -121,6 +123,9 @@ def threads_router(ctx: ServerContext) -> APIRouter:
             await store.pin_thread(thread_id, change.pinned)
         if change.seen is not None:
             await store.see_thread(thread_id, change.seen)
+            if change.seen:
+                # The chat was opened: a tell that opens it, told within the half hour, is answered (item 1743).
+                await mark_opened(store, thread_id, time.time())
         if change.choices is not None:
             await store.set_chat_choices(thread_id, change.choices)
 

@@ -985,7 +985,7 @@ async def _tell(runtime: Runtime, problem: Problem, session: RepairSession) -> N
     if title is None:
         return
     link: str = f" {session.pr_url}" if session.pr_url else ""
-    await tell_owner(runtime.bus, title, f"{problem.title}{link}", _PAGE)
+    await tell_owner(runtime.bus, title, f"{problem.title}{link}", _PAGE, "system", "")
 
 
 def looks_due(book: Book, sessions: Sequence[RepairSession]) -> tuple[tuple[Problem, RepairSession], ...]:
@@ -1136,6 +1136,8 @@ async def repair_night(
             "The code in your checkout of Dot is newer than the code Dot runs (a fix merged, or a pull or commit of "
             "yours), so no repair starts tonight; Dot restarts once no task works.",
             _PAGE,
+            "system",
+            "",
         )
         await restart()
         return ()
@@ -1193,12 +1195,15 @@ async def _pull_and_restart(runtime: Runtime, night: Night, restart: Restart) ->
         pulled: bool = await pull_main(night.repo, night.env)
     except RepairError as error:
         log.warning("repair_pull_failed", error=error.message, context=error.context)
-        await tell_owner(runtime.bus, RESTART_TITLE, f"Tonight's fixes are merged, but pulling your checkout of Dot "
-                         f"failed: {error.message}. Pull it and restart Dot to run them.", _PAGE)  # fmt: skip
+        text: str = (
+            f"Tonight's fixes are merged, but pulling your checkout of Dot failed: {error.message}. "
+            "Pull it and restart Dot to run them."
+        )
+        await tell_owner(runtime.bus, RESTART_TITLE, text, _PAGE, "system", "")
         return
     if not pulled:
         await tell_owner(runtime.bus, RESTART_TITLE, "Tonight's fixes are merged, but your checkout of Dot is not on "
-                         "main, so it was not pulled: Dot runs the code it ran.", _PAGE)  # fmt: skip
+                         "main, so it was not pulled: Dot runs the code it ran.", _PAGE, "system", "")  # fmt: skip
         return
     await restart()
 
