@@ -20,6 +20,7 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import FLEET_ID
 from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT
 from dotagent.notify.leases import ActivityLease, lease_seconds
+from dotagent.notify.settings import PushSettings, forget_push_settings, keep_push_settings, push_settings_of
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
@@ -186,6 +187,7 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         await ctx.runtime.store.delete_apns_device(phone_id)
         await ctx.runtime.store.delete_phone_push_subscriptions(phone_id)
         ctx.leases.forget(phone_id)
+        await forget_push_settings(ctx.runtime.store, phone_id)
         return Response(status_code=204)
 
     @router.post("/phone/apns", status_code=204)
@@ -238,6 +240,26 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         return ActivityLeaseView(
             state="foreground", chat=lease.chat, ttl_s=lease_seconds(request.ttl_s), expires_at=lease.expires_at
         )
+
+    @router.get("/phone/push-settings")
+    async def read_push_settings(http: Request) -> PushSettings:
+        """The three kinds of push the phone that asks is told (item 1421): all on until it says otherwise. Only a
+        phone's own key asks it."""
+        return await push_settings_of(ctx.runtime.store, asking_phone(http))
+
+    @router.put("/phone/push-settings")
+    async def write_push_settings(settings: PushSettings, http: Request) -> PushSettings:
+        """Set which kinds of push the phone that asks is told (item 1421): the three switches together, as given; from
+        the next push on, the daemon sends this phone's app only the kinds that are on. The lock screen's answer to an
+        approval is told as ``needs_you``; the Live Activity is no kind of push and is not touched."""
+        phone_id: str = asking_phone(http)
+        await keep_push_settings(ctx.runtime.store, phone_id, settings)
+        # The phone may have been removed while this request was on its way: its switches must not outlive it.
+        if all(phone.id != phone_id for phone in phones.listed()):
+            await forget_push_settings(ctx.runtime.store, phone_id)
+            raise NotFoundError("that phone is not paired", {})
+        log.info("phone_push_settings_kept", phone=phone_id, **settings.model_dump())
+        return settings
 
     @router.delete("/phone/apns/activity", status_code=204)
     async def forget_live_activity(http: Request, token: str | None = None) -> Response:

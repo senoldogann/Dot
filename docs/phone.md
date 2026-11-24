@@ -151,7 +151,13 @@ code** takes its place. The same by hand:
    holds the end of a run, of a schedule's run and of a campaign are not sent to that phone as alerts, while what asks
    something of you (an approval, a question, a secret, a hand-off), a draft, what Dot tells you and its own warnings
    are sent whatever it says, and so is every Live Activity update. The app of this checkout does not send the lease
-   yet, so until it does every alert goes as before. Once the app sent
+   yet, so until it does every alert goes as before. The app's pushes come in three kinds that each phone switches for itself (item 1421,
+   `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
+   failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
+   an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run, a
+   schedule's run or a campaign that ended); all three are on until the phone says otherwise, a kind that is off is not
+   sent to that phone, and a schedule's own level of notices (Settings › Scheduled tasks) still decides whether the end
+   of its run is told at all. Once the app sent
    the activity's token every change goes to it, and an activity whose token came before its run started waits a
    minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
    "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row is
@@ -461,3 +467,35 @@ hand-off, a draft written for you, what Dot tells you on its own and its own war
 switched off, learning that stopped, a restart). The Live Activity is not touched by the lease, nor are the other phones,
 nor the web push of a browser. A phone that is removed loses its lease. The app of this checkout does not call this
 route yet (`ios/` was left as it was), so until it does the lease is never made and every alert goes.
+
+### GET /api/phone/push-settings and PUT /api/phone/push-settings
+
+Which of the three kinds of push the phone is told (item 1421). The switches are kept for the phone whose key asks
+(a phone has its own; a removed phone loses them) and the daemon reads them for every alert it sends to that phone's
+app through APNs; the Live Activity is not a kind of push and goes as before. A phone that never set them is told all
+three.
+
+- `needs_you`: something waits for your answer: an approval, a question (also one a run left), a secret, a hand-off;
+  and Dot's own failures that you are to look at (a schedule that did not run or was switched off, learning that
+  stopped, a restart after an unexpected stop), so that switching the ends of tasks off does not silence them.
+- `ready`: something is ready for you to look over: a draft written for you to send, and what Dot tells you on its own
+  (the morning brief, what a watcher found).
+- `done`: something finished or failed: the end of a run (done, failed, stopped), of a schedule's run or of a campaign.
+  A schedule's level of notices decides, as before, whether its run's end is told; this switch decides whether the
+  phone hears what was told.
+
+`GET` answers 200 with the switches as they stand:
+
+```json
+{"needs_you": true, "ready": true, "done": true}
+```
+
+`PUT` takes all three switches together (a missing one, one that is not `true` or `false`, or any other key is a 422)
+and answers 200 with what it kept:
+
+```json
+{"needs_you": true, "ready": false, "done": false}
+```
+
+The Mac's token is refused (403). Web push to a browser has its own switch (Settings › General › Notifications) and is
+not changed by these.

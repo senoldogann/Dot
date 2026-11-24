@@ -19,6 +19,8 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify import push
 from dotagent.notify.keys import keys_problem
 from dotagent.notify.push import (
+    PUSH_GROUPS,
+    PUSH_KINDS,
     PushError,
     PushKeys,
     PushMessage,
@@ -26,7 +28,9 @@ from dotagent.notify.push import (
     gone,
     notice_message,
     push_event,
+    push_group,
     push_message,
+    quiet_while_shown,
     read_or_create_keys,
 )
 from dotagent.store.db import Store
@@ -567,3 +571,34 @@ async def test_a_subscription_is_the_phones_that_registered_it_and_goes_with_tha
         assert await store.delete_phone_push_subscriptions("aaaaaaaaaaaa") == 0
     finally:
         await store.close()
+
+
+def test_every_kind_of_push_is_told_as_one_of_three_kinds_the_owner_switches() -> None:
+    """Item 1421: what asks the owner, and Dot's own failures they are to look at, is ``needs_you``; what is ready for
+    them to look over ``ready``; the end of a run, a schedule's run or a campaign ``done``. A kind of push that names no
+    group is not a push, so a new one cannot join ``PUSH_KINDS`` without the owner being able to switch it."""
+    assert PUSH_GROUPS == ("needs_you", "ready", "done")
+    by_group: dict[str, set[str]] = {group: set() for group in PUSH_GROUPS}
+    for kind in PUSH_KINDS:
+        group = push_group(kind)
+        assert group is not None, kind
+        by_group[group].add(kind)
+    assert by_group == {
+        "needs_you": {
+            "approval_requested",
+            "question_left",
+            "schedule_missed",
+            "schedule_stopped",
+            "daemon_restarted",
+            "learning_stalled",
+        },
+        "ready": {"draft_created", "owner_told"},
+        "done": {"run_finished", "campaign_ended", "schedule_run_ended"},
+    }
+    # What a run asks of the owner is what ``push_message`` builds a card's message for: each is ``needs_you``.
+    assert {kind for kind in PUSH_KINDS if push_group(kind) == "needs_you"} >= push._ASKED_KINDS
+    # The events of a run's work that are no push have no group.
+    for kind in ("run_started", "tool_call", "approval_decided", "live_activity_registered"):
+        assert push_group(kind) is None
+    # The alerts the lease of item 1420 holds back are all of the kind that finished.
+    assert all(push_group(kind) == "done" for kind in PUSH_KINDS if quiet_while_shown(kind))
