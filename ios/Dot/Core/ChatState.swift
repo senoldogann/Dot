@@ -293,6 +293,7 @@ struct ChatState: Sendable, Equatable {
             guard isRoot else { return }
             assistant(event)
         case "page_shown":
+            guard isRoot else { return }
             if let page: String = data["page_id"]?.string, page.wholeMatch(of: /page_[A-Za-z0-9_-]{24}/) != nil,
                let title: String = data["title"]?.string, !title.isEmpty {
                 upsert(ChatItem(id: "page:\(page)", kind: .shownPage(id: page, title: title), ts: event.ts))

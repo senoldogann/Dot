@@ -42,6 +42,7 @@ final class ChatStateTests: XCTestCase {
         state.apply(shown)
         state.apply(shown)
         state.apply(event(2, "run_1", "page_shown", ["page_id": .string("../api/status"), "title": .string("Invalid")]))
+        state.apply(event(3, "helper_1", "page_shown", ["page_id": .string(id), "title": .string("Helper page")]))
         XCTAssertEqual(state.items.count, 2)
         XCTAssertEqual(state.items.last?.kind, .shownPage(id: id, title: "Sales"))
     }

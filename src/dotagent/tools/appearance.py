@@ -56,14 +56,23 @@ def _classify_read(args: ReadThemeArgs, ctx: ToolContext) -> ActionInfo:
 
 
 def _classify_apply(args: ApplyThemeArgs, ctx: ToolContext) -> ActionInfo:
-    target: str = ""
+    summary: str = "Restore device appearance" if args.theme is None else f"Apply the theme {args.theme.name}"
+    artwork_path: str = ""
     if args.image_path is not None:
         path: Path = expand_path(args.image_path, ctx.workspace)
         if classify_path(path, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths) != "workspace":
             raise ToolInputError("Use a background image in this chat's workspace.", {"path": args.image_path})
-        target = str(path)
-    summary: str = "Restore device appearance" if args.theme is None else f"Apply the theme {args.theme.name}"
-    return ActionInfo(tool="theme_apply", kind="write", risk="low", summary=summary, target=target, flags=())
+        artwork_path = str(path)
+        summary = f"{summary} with artwork from {path.name}"
+    return ActionInfo(
+        tool="theme_apply",
+        kind="write",
+        risk="low",
+        summary=summary,
+        target=str(dot_home() / "active-theme.json"),
+        flags=("self_change",),
+        body=artwork_path,
+    )
 
 
 def _classify_restore(args: RestoreThemeArgs, ctx: ToolContext) -> ActionInfo:
@@ -72,8 +81,8 @@ def _classify_restore(args: RestoreThemeArgs, ctx: ToolContext) -> ActionInfo:
         kind="write",
         risk="low",
         summary="Restore the previous shared appearance",
-        target="",
-        flags=(),
+        target=str(dot_home() / "active-theme.json"),
+        flags=("self_change",),
     )
 
 
@@ -84,10 +93,8 @@ async def _read(args: ReadThemeArgs, ctx: ToolContext) -> ToolResult:
 
 async def _require_owner(ctx: ToolContext) -> None:
     run: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
-    if ctx.ever_tainted() or run.parent_run_id is not None or run.source != "ui":
-        raise ToolInputError(
-            "Change Dot's appearance in a direct chat that has not read outside content.", {"run_id": ctx.run_id}
-        )
+    if run.parent_run_id is not None or run.source != "ui":
+        raise ToolInputError("Change Dot's appearance in a direct chat.", {"run_id": ctx.run_id})
 
 
 def _read_artwork(path: Path) -> str:
@@ -117,8 +124,8 @@ async def _apply(args: ApplyThemeArgs, ctx: ToolContext, authorized: ActionInfo)
         raise RunConflict("Read the current appearance before changing it.", {"current_revision": current.revision})
     jpeg: str | None = None
     if args.theme is not None and args.theme.artwork == "custom":
-        if authorized.target:
-            jpeg = await asyncio.to_thread(_read_artwork, Path(authorized.target))
+        if args.image_path is not None:
+            jpeg = await asyncio.to_thread(_read_artwork, Path(authorized.body))
         elif current.active is not None:
             jpeg = current.active.jpeg
         if jpeg is None:

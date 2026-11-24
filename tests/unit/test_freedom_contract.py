@@ -40,7 +40,7 @@ from dotagent.agent.gate import RunGate, SiteLocks
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
 from dotagent.config import AppConfig, PaceConfig, load_default_config
-from dotagent.core.errors import PolicyDenied
+from dotagent.core.errors import ApprovalRejected, PolicyDenied
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -1153,6 +1153,14 @@ async def test_the_review_models_check_after_outside_content_is_the_one_refusal_
     read: PreparedCall = await _prepared(room, ROW["shell: read"])
     await refusing.authorize_recorded(read.action, None, read.weighed)
     assert seen == ["shell"], "a step the check does not list was put to the review model"
+    for row, tool in (
+        ("appearance: use the device theme", "theme_apply"),
+        ("appearance: undo a theme change", "theme_undo"),
+    ):
+        appearance: PreparedCall = await _prepared(room, ROW[row])
+        with pytest.raises(ApprovalRejected, match="read outside content"):
+            await refusing.authorize_recorded(appearance.action, None, appearance.weighed)
+        assert seen[-1] == tool
     approving: RunGate = _gate(room, broker, way, reviewer=_reviewing("approve", []), taint_check=True)
     await approving.authorize_recorded(upload.action, None, upload.weighed)
     off: RunGate = _gate(room, broker, way, reviewer=_nobody, taint_check=False)
