@@ -519,7 +519,13 @@ async def test_a_start_that_fails_leaves_no_chat_and_is_not_tried_again_at_once(
         tried: list[str] = []
 
         async def refused(
-            goal: str, opening: str, mode: str, thread_id: str, tainted: bool, model: str | None = None
+            goal: str,
+            opening: str,
+            mode: str,
+            thread_id: str,
+            tainted: bool,
+            model: str | None = None,
+            origin_run_id: str | None = None,
         ) -> RunRecord:
             tried.append(goal)
             raise ConfigError("no such model", {})
@@ -544,10 +550,16 @@ async def test_the_owner_switching_it_off_while_a_look_starts_keeps_it_off(
         start_own = manager.start_own
 
         async def switched_off_meanwhile(
-            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+            goal: str,
+            opening: str,
+            mode: RunMode,
+            thread_id: str,
+            tainted: bool,
+            model: str | None = None,
+            origin_run_id: str | None = None,
         ) -> RunRecord:
             await set_initiative(runtime.store, False)
-            return await start_own(goal, opening, mode, thread_id, tainted, model)
+            return await start_own(goal, opening, mode, thread_id, tainted, model, origin_run_id)
 
         monkeypatch.setattr(manager, "start_own", switched_off_meanwhile)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
@@ -1249,10 +1261,16 @@ async def test_a_costly_try_is_tried_again_with_what_it_found_and_a_second_lets_
         start_own = manager.start_own
 
         async def kept(
-            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+            goal: str,
+            opening: str,
+            mode: RunMode,
+            thread_id: str,
+            tainted: bool,
+            model: str | None = None,
+            origin_run_id: str | None = None,
         ) -> RunRecord:
             openings.append(opening)
-            return await start_own(goal, opening, mode, thread_id, tainted, model)
+            return await start_own(goal, opening, mode, thread_id, tainted, model, origin_run_id)
 
         monkeypatch.setattr(manager, "start_own", kept)
         initiative: Initiative = Initiative(runtime, manager, lambda: _IDLE)
@@ -1293,10 +1311,16 @@ async def test_a_try_is_told_how_the_one_before_ended_from_that_run_and_never_wh
         start_own = manager.start_own
 
         async def kept(
-            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+            goal: str,
+            opening: str,
+            mode: RunMode,
+            thread_id: str,
+            tainted: bool,
+            model: str | None = None,
+            origin_run_id: str | None = None,
         ) -> RunRecord:
             openings.append(opening)
-            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model)
+            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model, origin_run_id)
             runs.append(run.id)
             return run
 
@@ -1337,9 +1361,15 @@ async def test_every_so_many_days_it_counts_what_its_own_work_came_to(
         start_own = manager.start_own
 
         async def kept(
-            goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+            goal: str,
+            opening: str,
+            mode: RunMode,
+            thread_id: str,
+            tainted: bool,
+            model: str | None = None,
+            origin_run_id: str | None = None,
         ) -> RunRecord:
-            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model)
+            run: RunRecord = await start_own(goal, opening, mode, thread_id, tainted, model, origin_run_id)
             openings[run.id] = opening
             return run
 

@@ -347,6 +347,15 @@ comes fenced and marks the reading run untrusted, as that chat was (item 243), s
 another's chat; a chat's title made of a goal that came of a page or a mail (a watcher's, a thing a tainted run put on
 the list) is a third party's words, and `chats` lists it in a fence too.
 
+**Hand-offs have a depth limit** (item 1741). Whatever one agent hands to another counts: a delegated run, a message to an
+agent, a work order's attempt, the lead's run woken by its agent's answer (a hand-back keeps the count of what it reads,
+it does not begin again) and a thing on Dot's list that a run put there for its own initiative. Each is one hop further
+than the run it came from (`runs.hops`, set by Dot and never by a model), and a message of yours, a schedule's firing or
+a watcher's alert starts a chain at 0. Past `[agent] max_hops` (8): in yolo and free mode nothing is refused, the hand-off is made and you are told once; for
+a run that asks, the hand-off is not made, the run that asked is told and goes on, a thing on the list is let go with that
+reason and you are told, and otherwise you get one card, **Allow once** (the run's count goes back to 0) or **Stop**, on
+the run it came from. Chains measured on this Mac went one deep; [Limits](limits.md) and [Freedom](freedom.md) say the rest.
+
 A run can also tell another chat something (item 957): `send_to_chat` hands a note to the run at work in a chat `chats`
 lists, which reads it before its next step, fenced under the chat it came from, as Dot's words, not yours; the chat
 shows it as a line, "Note from another chat", that leads to the chat that sent it. A note starts nothing: a chat where

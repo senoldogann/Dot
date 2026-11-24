@@ -69,6 +69,7 @@ from dotagent.agent.lessons import (
     save_lesson,
     undo_lesson,
 )
+from dotagent.agent.limits import over_the_hop_limit
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.loop_state import LOOP_STATE_EVENT
 from dotagent.agent.mode_words import resolved_mode
@@ -130,6 +131,7 @@ from dotagent.core.errors import (
     ConfigError,
     DotError,
     FailSafeTriggered,
+    HopLimitReached,
     InvalidValueError,
     MissingSecretError,
     ModelUnavailableError,
@@ -165,6 +167,7 @@ from dotagent.llm.types import (
 )
 from dotagent.memory.echo import echoed_notes
 from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
+from dotagent.notify.owner import tell_owner
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, REPLY_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
@@ -243,6 +246,11 @@ QUEUE_CHANGED_EVENT: str = "queue_changed"
 TERMINALS_CHANGED_EVENT: str = "terminals_changed"
 # The source of the run that tells a chat that its command in the background ended (item 229).
 BACKGROUND_SOURCE: str = "background"
+# The key of the card the hop limit leaves (item 1741), by which a second one is not left while one stands.
+HOP_CARD_KEY: str = "hop_limit"
+HOP_CARD_ALLOW: str = "Allow once"
+HOP_CARD_STOP: str = "Stop"
+_HOP_GOAL_CHARS: int = 200
 # The source of the run that tells the lead's chat that a work order it gave came back while no run of it worked
 # (item 1075): its goal is Dot's note, and it reads the agent's answer first.
 WORK_ORDER_SOURCE: str = "work_order"
@@ -602,6 +610,8 @@ class RunManager:
         # The claims on queued messages the store refused to end (:meth:`_end_claim`), by chat, with the store's way to
         # end each: its message started (``Store.drop_claimed``) or could not (``Store.hold_claimed``).
         self._left_claims: dict[str, Callable[[str], Awaitable[None]]] = {}
+        # The runs the owner was told of past the hop limit, so that a fan-out from one tells them once (item 1741).
+        self._hop_told: set[str] = set()
         # The runs at work that other processes (dotx commands) drive, as the relay saw them last
         # (:meth:`relay_elsewhere`).
         self._elsewhere: frozenset[str] = frozenset()
@@ -1201,14 +1211,30 @@ class RunManager:
         return run
 
     async def start_own(
-        self, goal: str, opening: str, mode: RunMode, thread_id: str, tainted: bool, model: str | None = None
+        self,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        thread_id: str,
+        tainted: bool,
+        model: str | None = None,
+        origin_run_id: str | None = None,
     ) -> RunRecord:
         """Queue a run Dot starts on its own initiative (item 715), in the chat ``thread_id``: ``goal`` is Dot's words,
         which the chat shows and no reviewer takes as the owner's instruction (:meth:`_instructions_for` gives none),
         and ``opening`` its first message to the model. Nobody watches it (:data:`INITIATIVE_SOURCE`); it takes the
         configured model and ``[initiative] approvals`` (``yolo`` by default, item 756); it starts tainted when what it
         was given came from a run that had read content third parties can author (``tainted``). ``model`` is the model
-        of the look for work (``[initiative] look_model``, item 910); ``None`` is the configured one."""
+        of the look for work (``[initiative] look_model``, item 910); ``None`` is the configured one. ``origin_run_id``
+        is the run that put the thing it does on Dot's list (item 1741): the run is one hand-off further than it, and
+        ``None`` for a run that no run led to, the look for work and a thing the owner or the review put there."""
+        origin: RunRecord | None = None
+        if origin_run_id is not None:
+            try:
+                origin = await self._runtime.store.get_run(origin_run_id)
+            except NotFoundError:
+                # The run that put the thing on the list was deleted with its chat, which ends the chain of hand-offs.
+                log.info("hop_origin_deleted", origin_run_id=origin_run_id)
         run, _ = await self._launch(
             goal,
             mode,
@@ -1230,6 +1256,9 @@ class RunManager:
                 carried=tuple(run.id for run in await self._runtime.store.list_runs(1, thread_id)),
                 picks=NO_PICKS,
                 tainted=tainted,
+                hops=0 if origin is None else origin.hops + 1,
+                # No question card: the initiative tells the owner of a thing let go by the limit (item 1741).
+                from_run_id=None,
             ),
             None,
             None,
@@ -2041,6 +2070,10 @@ class RunManager:
                     carried=(newest.id,),
                     picks=NO_PICKS,
                     tainted=tainted,
+                    # The helpers' reports are hand-backs: the run they wake is as far from the start of its chain as
+                    # the furthest of them (item 1741).
+                    hops=await self._hops_among((newest.id, *(one.helper_run_id for one in told))),
+                    from_run_id=newest.id,
                 )
                 # The mode is read from Dot's own words, not from the reports, which a third party may have written.
                 mode: RunMode = resolved_mode(choices.mode, goal)
@@ -2059,6 +2092,11 @@ class RunManager:
                     None,
                     newest.agent_id,
                 )
+            except HopLimitReached as exc:
+                # Stopped by the hop limit, the owner has a card: the reports wait for the run that goes on (item 1741).
+                self._put_back_untold(thread_id, entries)
+                log.warning("helper_report_left_by_the_hop_limit", thread_id=thread_id, error=exc.message)
+                return None
             except RunConflict as exc:
                 # A message of the owner's started the chat meanwhile: that run reads the reports at its first step.
                 self._put_back_untold(thread_id, entries)
@@ -2191,6 +2229,8 @@ class RunManager:
                     once=old.once,
                     carried=(),
                     picks=NO_PICKS,
+                    hops=old.hops,
+                    from_run_id=old.id,
                 ),
                 None,
                 old.agent_id,
@@ -2282,6 +2322,9 @@ class RunManager:
                 carried=carried,
                 picks=NO_PICKS,
                 tainted=tainted,
+                # One hand-off further than the run that hands the work on (item 1741).
+                hops=parent.hops + 1,
+                from_run_id=parent.id,
             ),
             None,
             helper_of,
@@ -3264,6 +3307,14 @@ class RunManager:
         """Deliver the answer to a question a run left (see :meth:`decide`). A run whose end is being recorded reads
         nothing more: the answer waits until it has ended and then goes on as one that came after."""
         asked: RunRecord = await self._runtime.store.get_run(question.run_id)
+        if question.args.get(HOP_CARD_KEY) is not None and answer.strip().casefold() == HOP_CARD_ALLOW.casefold():
+            # "Allow once": the owner's word begins a chain of its own. The run that asked and the run at work in its
+            # chat, which the answer is handed to, count their next hand-off from 0; any other answer, "Stop" or
+            # words of their own, leaves the count (item 1741, the review).
+            for run_id in dict.fromkeys(
+                (asked.id, *(handle.run_id for handle in [self._active_on(asked.thread_id)] if handle is not None))
+            ):
+                await self._runtime.store.set_run_hops(run_id, 0)
         text: str = _answer_text(question, answer)
         # The answer to a question a run the owner watches left without waiting (item 508) does what the answer to one
         # it waits for does: it is their instruction, and it clears no mark of untrusted content, in the run at work or
@@ -3492,12 +3543,120 @@ class RunManager:
                 once=old.once,
                 carried=(),
                 picks=NO_PICKS,
+                # A restart does not begin a chain: the run it goes on from is as far from its start as it was.
+                hops=old.hops,
+                from_run_id=old.id,
             ),
             None,
             old.agent_id,
         )
         log.info("run_resumed", run_id=run.id, from_run_id=old.id, cut_off=cut_off, automatic=automatic)
         return run
+
+    async def _hops_among(self, run_ids: Sequence[str]) -> int:
+        """The most hops of the runs ``run_ids``: how far from the start of its chain a run that reads them is (item
+        1741)."""
+        hops: int = 0
+        for run_id in dict.fromkeys(run_ids):
+            hops = max(hops, (await self._runtime.store.get_run(run_id)).hops)
+        return hops
+
+    async def _hands_off_unasked(self, opening: RunOpening) -> bool:
+        """Whether the run the hand-off comes from is a yolo one, or free mode is on: a hand-off such a run makes is
+        refused nothing, whatever mode the run it starts asks in (an agent set to ask, item 1741)."""
+        if self._runtime.approvals.free:
+            return True
+        if opening.from_run_id is None:
+            return False
+        try:
+            return (await self._runtime.store.get_run(opening.from_run_id)).approvals == "yolo"
+        except NotFoundError:
+            return False
+
+    async def _tell_of_the_hop_limit(self, opening: RunOpening, goal: str) -> None:
+        """What a yolo run's hand-off, or any run's while free mode is on, does past ``[agent] max_hops`` (item 1741):
+        it is made all the same, logged, and the owner is told once, at the first hand-off past the limit, with the
+        run it came from to open and stop. Nothing is refused and nothing waits: no question goes through the
+        approval broker."""
+        limit: int = self._runtime.config.agent.max_hops
+        if not over_the_hop_limit(opening.hops, limit):
+            return
+        log.warning(
+            "hop_limit_passed",
+            hops=opening.hops,
+            limit=limit,
+            from_run_id=opening.from_run_id,
+            goal=truncate_tail(" ".join(goal.split()), _HOP_GOAL_CHARS),
+        )
+        told_of: str = "" if opening.from_run_id is None else opening.from_run_id
+        if opening.hops != limit + 1 or told_of in self._hop_told:
+            return
+        self._hop_told.add(told_of)
+        route: str = "#/" if opening.from_run_id is None else f"#/runs/{opening.from_run_id}"
+        await tell_owner(
+            self._runtime.bus,
+            "Agents are handing work to each other",
+            f"{limit} hand-offs in a row since a message of yours, and they go on (yolo and free mode refuse nothing). "
+            "Open the run to see it, and stop it there if it is a loop.",
+            route,
+        )
+
+    async def _keep_to_the_hop_limit(self, opening: RunOpening, goal: str) -> None:
+        """Refuse the run when it is more hand-offs from a message of a person, a schedule or a watcher than ``[agent]
+        max_hops`` allows (item 1741, the stop of an agent-to-agent loop that no run can reset: ``opening.hops`` is
+        set here by the manager from the run the hand-off came from). It is logged, the run it came from gets a card
+        for the owner, and :class:`HopLimitReached` goes to the caller, which does not make the hand-off. 0: no
+        limit. Only for a run that is not a yolo one, while free mode is off (:meth:`_tell_of_the_hop_limit` is the
+        other)."""
+        limit: int = self._runtime.config.agent.max_hops
+        if not over_the_hop_limit(opening.hops, limit):
+            return
+        log.warning(
+            "hop_limit_reached",
+            hops=opening.hops,
+            limit=limit,
+            from_run_id=opening.from_run_id,
+            goal=truncate_tail(" ".join(goal.split()), _HOP_GOAL_CHARS),
+        )
+        if opening.from_run_id is not None:
+            await self._leave_hop_card(opening.from_run_id, opening.hops, limit)
+        raise HopLimitReached(
+            f"this would be hand-off number {opening.hops} from agent to agent in a row since the last message of a "
+            f"person, and {limit} are allowed: it was not made, and the owner has a card to let the work go on or to "
+            "stop it. Do not try it again; say in your answer that the chain stopped here",
+            {"hops": opening.hops, "limit": limit, "from_run_id": opening.from_run_id},
+        )
+
+    async def _leave_hop_card(self, run_id: str, hops: int, limit: int) -> None:
+        """Leave the owner the question of a chain the limit stopped, on the run it came from, once for as long as one
+        stands there: "Allow once" is their answer, which goes to the run as their message and so begins a chain of its
+        own, and "Stop" lets it end."""
+        store: Store = self._runtime.store
+        for left in await store.list_left_questions(run_id):
+            if left.args.get(HOP_CARD_KEY) is not None:
+                return
+        question: str = (
+            f"The agents have handed work to each other {hops - 1} times in a row without a message of yours (the "
+            f"limit is {limit}). Let it go on?"
+        )
+        details: JsonObject = {
+            "question": question,
+            "options": [
+                {
+                    "label": HOP_CARD_ALLOW,
+                    "description": "Let the work go on; the count starts again.",
+                    "recommended": False,
+                },
+                {"label": HOP_CARD_STOP, "description": "Leave it where it stopped.", "recommended": False},
+            ],
+            "multiple": False,
+            HOP_CARD_KEY: hops,
+        }
+        await self._runtime.approvals.leave(run_id, ASK_USER_TOOL, question, "question", details)
+        try:
+            await self._runtime.notify("Dot has a question", question)
+        except Exception as error:  # noqa: BLE001 - a notification that fails must not fail the stop
+            log.warning("hop_card_notify_failed", run_id=run_id, error=str(error))
 
     async def _launch(
         self,
@@ -3576,6 +3735,12 @@ class RunManager:
         runs_on: ModelRef = parse_model_ref(model_ref)
         level: Effort = runtime.config.models.effort if effort is None else effort
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
+        if approval_mode == "yolo" or await self._hands_off_unasked(opening):
+            # A yolo run, whether it hands off or is handed to, and every run while free mode is on are refused nothing
+            # new (docs/freedom.md): past the limit the hand-off is made, and the owner is told once (item 1741).
+            await self._tell_of_the_hop_limit(opening, goal)
+        else:
+            await self._keep_to_the_hop_limit(opening, goal)
         if goal_mode is True and mode == "chat":
             raise ConfigError("goal mode is for task and research runs, not for a chat", {"mode": mode})
         await self._check_picks(opening.picks, mode, runs_on, agent_id, approval_mode, source)
@@ -3840,6 +4005,7 @@ class RunManager:
                 agent_id,
                 self._owner_id(),
                 opening.follows,
+                opening.hops,
             )
 
         run: RunRecord = await self._stored_run(stored)
@@ -4851,6 +5017,10 @@ class RunManager:
                 carried=(*carried, newest.id),
                 picks=NO_PICKS,
                 tainted=tainted,
+                # The answer of an agent is a hand-back: the lead's run is as far from the start of its chain as the
+                # furthest run it reads (item 1741).
+                hops=await self._hops_among((newest.id, *carried)),
+                from_run_id=newest.id,
             )
             try:
                 run, _ = await self._launch(
@@ -4868,6 +5038,11 @@ class RunManager:
                     None,
                     newest.agent_id,
                 )
+            except HopLimitReached as exc:
+                # The chain of hand-offs is as long as the limit lets it be: the owner has a card, and the lead finds
+                # the order with work_orders (item 1741).
+                log.warning("work_order_lead_not_woken_by_the_hop_limit", thread_id=thread_id, error=exc.message)
+                return None
             except RunConflict as exc:
                 # A message of the owner's started the chat meanwhile: that run is told instead (WorkDesk._tell_lead).
                 log.info("work_order_left_to_the_run_that_started", thread_id=thread_id, error=exc.message)

@@ -49,6 +49,18 @@ or free run deny something it allowed is a regression too.
 - A step of a yolo run that read outside content whose words would send a secret Dot holds out of the Mac is refused;
   free mode records it instead (item 1097).
 - The desktop tools stay away from password managers and Keychain Access in every mode.
+- **A hand-off past the hop limit refuses nothing in yolo and free mode** (item 1741). Every hand-off from one agent to
+  another (a run another run delegated or messaged, a work order's attempt, the lead's run woken by its agent's answer,
+  a thing on Dot's list a run put there) is one hop further than the run it came from (`runs.hops`, set by Dot and never
+  by a model); a message of a person, a schedule or a watcher starts a chain at 0. Past `[agent] max_hops` (8; `0` turns
+  it off) a yolo run, work handed on by a yolo run (to an agent set to ask too), and every run while free mode is on make
+  the hand-off all the same: it is logged (`hop_limit_passed`) and the owner is told once for each run that hands off,
+  at the first hand-off past the limit, by a notification that opens the run it came from, where Stop is. No question
+  goes through the approval broker and nothing waits. Only a run that asks (`ask`, `auto`, `supervised`), handed work
+  by a run that asks, is refused past the limit, with one question card on the run it came from; that card is the
+  gate's kind of place, reached by no yolo or free run (`GATE_SITES` of the test). The default is above every chain
+  measured on the owner's Mac (530 runs, none more than one deep). The cost of a runaway chain in yolo is bounded by the
+  owner's own budget setting, not by a refusal.
 
 ## Known asks
 

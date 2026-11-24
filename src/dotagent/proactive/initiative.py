@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from dotagent.agent.manager import RunManager, goes_on_from, thread_title
 from dotagent.agent.resume import RESUME_SOURCE, cut_off_by
 from dotagent.config import InitiativeConfig
-from dotagent.core.errors import DotError, NotFoundError
+from dotagent.core.errors import DotError, HopLimitReached, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.notify.owner import tell_owner
@@ -60,6 +60,8 @@ _TELL_CHARS: int = 140
 # as they said not to do it, let go after its tries (how many is on its page).
 DID_TITLE: str = "Dot did on its own"
 LET_GO_SAID_TITLE: str = "Dot let go of a thing you said not to do"
+# Told when the hop limit stopped a thing a run put on Dot's list (item 1741).
+HOP_STOP_TITLE: str = "Dot stopped a chain of its own work"
 LET_GO_TITLE: str = "Dot let go of a thing"
 _LISTED: int = 30
 # The most things a count of what Dot's own work came to reads (item 914).
@@ -456,8 +458,21 @@ class Initiative:
                 )
             )
             run: RunRecord = await self._start(
-                todo.title, _DO_GOAL.format(title=todo.title), opening, "task", todo.tainted
+                todo.title, _DO_GOAL.format(title=todo.title), opening, "task", todo.tainted, None, todo.source_run_id
             )
+        except HopLimitReached as exc:
+            # A thing that a chain of hand-offs put here, past the limit: it is let go, with the reason, and the owner
+            # is told (item 1741); opened again it would be tried at every tick.
+            await store.set_todo(todo.id, "doing", "dropped", todo.attempts, todo.run_id, exc.message)
+            log.warning("initiative_let_go_by_the_hop_limit", todo_id=todo.id, error=exc.message)
+            if todo.source_run_id is not None:
+                await tell_owner(
+                    self._runtime.bus,
+                    HOP_STOP_TITLE,
+                    one_line(f"{todo.title}: {exc.message}", _TELL_CHARS),
+                    f"#/runs/{todo.source_run_id}",
+                )
+            return
         except BaseException:
             # Its last run stays named (the review of item 790): an owner's resume of it is found by that id. Whatever
             # kept the run from starting (a store, a bug, the daemon stopping), the thing is open again, not left
@@ -584,13 +599,21 @@ class Initiative:
             "research",
             tainted,
             model,
+            None,
         )
         await note_look(store, now)
         log.info("initiative_looking", run_id=run.id, tainted=tainted)
         self._follow(run.id, None)
 
     async def _start(
-        self, title: str, goal: str, opening: str, mode: RunMode, tainted: bool, model: str | None = None
+        self,
+        title: str,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        tainted: bool,
+        model: str | None = None,
+        origin_run_id: str | None = None,
     ) -> RunRecord:
         """Start one of its runs in its chat named ``title``: the one of that name it used last, when no run works there
         (item 952: its look for work opened a chat each time, four a week), else a new one. A start that fails takes the
@@ -606,7 +629,7 @@ class Initiative:
         )
         thread = kept if kept is not None and free else await store.create_thread(titled, INITIATIVE_SOURCE)
         try:
-            return await self._manager.start_own(goal, opening, mode, thread.id, tainted, model)
+            return await self._manager.start_own(goal, opening, mode, thread.id, tainted, model, origin_run_id)
         except DotError:
             self._failed_at = time.monotonic()
             if thread is not kept:

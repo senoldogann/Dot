@@ -262,6 +262,12 @@ class RunRecord(FrozenModel):
     # Why the run ended, stored beside the result text (which stays the words a person reads). ``None`` for a run that
     # has not ended, and for one stored before the reason was a column of its own.
     end_reason: str | None = None
+    # How many hand-offs between agents lie between this run and the message of a person, a schedule or a watcher that
+    # began the chain of work it belongs to (item 1741): a run another run delegated or messaged, a work order's
+    # attempt, the lead's run woken by its answer and a thing on Dot's list a run put there, each one more than the run
+    # it came from. Set by the manager that launches the run and never by a model, so no run can lower it; 0 for a run
+    # that began a chain.
+    hops: int = 0
 
 
 class RewindCut(FrozenModel):
