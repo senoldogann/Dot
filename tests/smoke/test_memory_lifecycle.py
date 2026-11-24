@@ -30,7 +30,15 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.memory.ranking import Vector
-from dotagent.memory.service import OWNER_KEY, REST_TAG, MemoryIndex, OwnerSection, set_owner_section
+from dotagent.memory.service import (
+    OWNER_KEY,
+    REST_TAG,
+    MemoryIndex,
+    OwnerSection,
+    rewrite_memory_note,
+    save_memory,
+    set_owner_section,
+)
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -271,3 +279,34 @@ async def test_a_night_with_nothing_to_merge_asks_the_review_model_nothing_and_w
         reflection = await home.manager.reflect(time.time())
         assert (reflection.merged, reflection.to_forget, reflection.purged) == (0, 0, 0)
         assert await store.kv_get(OWNER_KEY) is None
+
+
+async def test_the_owner_takes_or_drops_a_change_a_run_proposed_for_their_note(login_env: dict[str, str]) -> None:
+    """Audit 2026-11-24, D1: a run's rewrite of the owner's note waits under Changes tasks proposed; the API lists it,
+    refuses a decision on a proposal it did not show, takes one as the owner's words and drops another."""
+    async with _home(login_env, []) as home:
+        index: MemoryIndex = home.runtime.memory
+        kept: MemoryRecord = (
+            await save_memory(index, "Dot answers in Turkish.", ["core"], None, None, None, False)
+        ).record
+        dropped: MemoryRecord = (await save_memory(index, "Dot keeps going.", ["core"], None, None, None, False)).record
+        await rewrite_memory_note(index, kept.id, "Dot answers in Turkish, briefly.", ["core"], "run_a", True, None)
+        await rewrite_memory_note(index, dropped.id, "Dot stops at once.", ["core"], "run_b", False, None)
+        async with _client(home) as client:
+            listed = await client.get("/api/memories/proposed")
+            assert listed.status_code == 200, listed.text
+            proposals: dict[str, float] = {note["id"]: note["proposed"]["at"] for note in listed.json()}
+            assert set(proposals) == {kept.id, dropped.id}
+            stale = await client.post(f"/api/memories/{kept.id}/proposal/take", json={"at": proposals[kept.id] - 1})
+            assert stale.status_code == 409, stale.text
+            taken = await client.post(f"/api/memories/{kept.id}/proposal/take", json={"at": proposals[kept.id]})
+            assert taken.status_code == 200, taken.text
+            assert (taken.json()["content"], taken.json()["tainted"], taken.json()["proposed"]) == (
+                "Dot answers in Turkish, briefly.",
+                False,
+                None,
+            )
+            gone = await client.post(f"/api/memories/{dropped.id}/proposal/drop", json={"at": proposals[dropped.id]})
+            assert gone.status_code == 200, gone.text
+            assert (gone.json()["content"], gone.json()["proposed"]) == ("Dot keeps going.", None)
+            assert (await client.get("/api/memories/proposed")).json() == []

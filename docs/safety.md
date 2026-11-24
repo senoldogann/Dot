@@ -630,7 +630,10 @@ handed to a clean run at all; a run of Dot's own loop that is marked at that mom
 page's text, next to the result of the call that reached its site or failed with its tool, in its own requests alone,
 and nothing stores it (item 1192: [Memory and schedules](memory-and-schedules.md)); a
 `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory and
-`dotx memory list` say of such a note that it was saved while reading outside content. A learned skill whose steps may
+`dotx memory list` say of such a note that it was saved while reading outside content. A run never rewrites a note that is
+yours (written, pinned or corrected by you, item 1711): its words wait beside the note, marked when the run was, for
+your Use it or Drop on the Memory page, and every run is handed your words meanwhile, so what a marked run writes
+reaches every run only through you. A learned skill whose steps may
 come from outside content (its record says so, or is older than the mark) marks the run that reads it with the `skill`
 tool, and a run that starts with one picked in the composer starts marked (item 585). A link in an answer whose words
 name an address it does not go to ("https://accounts.example.com" leading to another site) shows the host it goes to

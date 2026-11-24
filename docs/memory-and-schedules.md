@@ -200,9 +200,21 @@ dotx memory reindex      # embed every note again, for example after changing [m
   many notes the trash holds in all), `POST /api/memories/trash/{id}/restore` and `dotx memory restore` bring it
   back awake, `DELETE /api/memories/trash/{id}` and `dotx memory purge` delete it at once, and the reflection
   deletes the notes that stayed longer, and none else. A note in the trash is in no search, list or count.
-- `memory_update` lets the agent correct a note in place, and the note is then the agent's, even one you wrote: the
-  prompt no longer shows the model's words as yours. You edit one on the Memory page, in a dialog its Edit opens (item
-  615), or with `PATCH /api/memories/{id}`, and it keeps its author. The page also shows who wrote each note and how often runs used it.
+- `memory_update` lets the agent correct a note in place, and the note is then the agent's: the prompt no longer shows
+  the model's words as yours. A note that is yours, one you wrote, pinned or corrected on the Memory page, is not
+  rewritten by a run (item 1711): it keeps your words, its author, its time and its mark, every run is still handed
+  it as it stands, and the run's words wait beside it, the newest of a run's in place of an older, under **Changes
+  tasks proposed** at the head of the Memory page (`GET /api/memories/proposed`), each with the note as runs are handed
+  it, the words proposed, the task that proposed them and "From outside content" when that task had read some. **Use
+  it** (`POST /api/memories/{id}/proposal/take`) makes them your note's words, as your own edit would, which vouches for
+  them; **Drop** (`…/proposal/drop`) leaves the note as it is. Both name when the change was proposed, so a newer one
+  is never taken unseen (409). The run is told that its change waits for you, and nothing asks: the tool works as
+  before in every mode. Before, a run that had read a page rewrote two pinned notes of the owner's; they took its mark
+  and no run was handed them again, and a run's rewrite of the owner's `core` note made the run its author, so it no
+  longer went to every run. The note list marks a pinned note that a task wrote while reading outside content "Not
+  handed to tasks": pinning does not vouch for words, Edit and save does. You edit a note on the Memory page, in a
+  dialog its Edit opens (item 615), or with `PATCH /api/memories/{id}`, and it keeps its author. The page also shows who
+  wrote each note and how often runs used it.
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings, each
   cut to the best `candidate_pool` (30) notes among the ones that may be found: resting and expired notes, and the
   lessons of an agent in the search of another run, take none of those places (item 557).

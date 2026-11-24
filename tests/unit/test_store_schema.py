@@ -22,7 +22,7 @@ from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
     2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
-    3: "90f6c3c14079268b1fdb4ea20ec63fa57c7b92ec0b6267350bc40ec04ac9578f",
+    3: "4817084649467bf3bc624c240ba3399fdd63a714aad517fd8e8709a80363037d",
 }
 
 

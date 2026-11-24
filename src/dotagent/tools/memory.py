@@ -28,7 +28,7 @@ from dotagent.memory.service import (
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import known_secrets
-from dotagent.store.models import MemoryRecord
+from dotagent.store.models import MemoryRecord, MemoryRewrite
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -48,6 +48,11 @@ _TIMEOUT_S: float = 60.0
 _SUMMARY_CHARS: int = 200
 # The longest a note may be saved for a while: past a few years a fact is one that holds until it changes.
 _MOST_VALID_DAYS: int = 3650
+# What a run's rewrite of a note the owner wrote or approved says: it waits for them (audit 2026-11-24, D1).
+_PROPOSED: str = (
+    "Proposed: the owner wrote or approved this note, so your change waits for them on the Memory page and is not "
+    "handed to any run until they take it."
+)
 
 
 def _clip(text: str, limit: int) -> str:
@@ -291,7 +296,7 @@ def _update_tool() -> RegisteredTool:
         refused: ToolResult | None = await _secret_refusal(args.content)
         if refused is not None:
             return refused
-        updated: MemoryRecord = await rewrite_memory_note(
+        rewrite: MemoryRewrite = await rewrite_memory_note(
             ctx.runtime.memory,
             args.memory_id,
             args.content,
@@ -300,7 +305,9 @@ def _update_tool() -> RegisteredTool:
             ctx.ever_tainted(),
             expiry_of(args.valid_days, time.time()),
         )
-        return ok(f"Updated: {render_note(updated)}")
+        if rewrite.proposed:
+            return ok(f"{_PROPOSED} The note runs are handed stays: {render_note(rewrite.record)}")
+        return ok(f"Updated: {render_note(rewrite.record)}")
 
     return make_live_tool(
         name="memory_update",

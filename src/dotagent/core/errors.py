@@ -387,8 +387,8 @@ class InvalidValueError(StoreError):
 
 class RunConflict(DotError):
     """A run cannot be started, steered or stopped, an approval decided, a lesson of a run saved or dismissed, the file
-    changes of a run taken back, a campaign go on, stop or be marked achieved, or a chat deleted, in the state it is
-    in."""
+    changes of a run taken back, a campaign go on, stop or be marked achieved, a chat deleted, or a change a run
+    proposed for a note taken or dropped, in the state it is in."""
 
 
 class UndoError(DotError):

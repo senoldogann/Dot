@@ -84,6 +84,7 @@ from dotagent.store.models import (
     MeetingStatus,
     MemoryOrder,
     MemoryRecord,
+    MemoryRewrite,
     MemoryScore,
     MemoryUseHow,
     MergedSource,
@@ -91,6 +92,7 @@ from dotagent.store.models import (
     ObjectiveRecord,
     ObjectiveStatus,
     ObjectiveWorkflow,
+    ProposedChange,
     PushSubscription,
     QueuedMessage,
     RanStep,
@@ -1177,6 +1179,22 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         pinned_at=row["pinned_at"],
         rested_at=row["rested_at"],
         edited_by=row["edited_by"],
+        proposed=_proposed_change(row),
+    )
+
+
+def _proposed_change(row: aiosqlite.Row) -> ProposedChange | None:
+    """The run's rewrite that waits on a note's row for the owner, ``None`` when none does."""
+    content: str | None = row["proposed_content"]
+    if content is None:
+        return None
+    tags: str = row["proposed_tags"] or ""
+    return ProposedChange(
+        content=content,
+        tags=tuple(tag for tag in tags.split(",") if tag),
+        run_id=row["proposed_by"],
+        tainted=bool(row["proposed_tainted"]),
+        at=row["proposed_at"],
     )
 
 
@@ -1339,7 +1357,17 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("rested_at", "REAL"),
     # The owner corrected a note a run wrote (the Memory page, item 1141). NULL until then, and before the column.
     ("edited_by", "TEXT"),
+    # A run's rewrite of a note the owner wrote or approved, which waits for the owner (``ProposedChange``): its
+    # text, tags (joined as ``tags`` are), run, mark and time. NULL while none waits, and before the columns.
+    ("proposed_content", "TEXT"),
+    ("proposed_tags", "TEXT"),
+    ("proposed_by", "TEXT"),
+    ("proposed_tainted", "INTEGER"),
+    ("proposed_at", "REAL"),
 )
+# The notes the owner wrote or approved, as a condition on ``memories`` with the owner's correction mark as its one
+# parameter: their own, one they pinned, one whose words they corrected on the Memory page.
+_OWNER_APPROVED: str = "(source_run IS NULL OR pinned_at IS NOT NULL OR edited_by = ?)"
 # The status of a schedule switched off because the agent its runs ran as was deleted (item 462); switching it on
 # again, as Dot or as another agent, clears it as it clears item 458's.
 AGENT_DELETED_STATUS: str = "switched off: its agent was deleted"
@@ -6047,17 +6075,56 @@ class Store:
         content: str,
         tags: Sequence[str],
         vector: Sequence[float] | None,
-        source_run: str | None,
+        source_run: str,
         tainted: bool,
         new_expiry: float | None,
-    ) -> MemoryRecord:
-        """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
-        tainted; a clean one leaves the mark a note had. The owner's correction mark comes off: this text is the
-        run's. ``new_expiry`` is when the note now stops holding; ``None`` keeps the time it had, as does the owner's
-        note or a pinned one, judged in the same statement so that a pin made while the rewrite waits holds."""
-        return await self._rewrite_memory(
+    ) -> MemoryRewrite:
+        """A run's rewrite of a memory's text and tags. A note the owner wrote, pinned or corrected
+        (:data:`_OWNER_APPROVED`) keeps its words, author, mark and time: the rewrite waits beside it as a proposal of
+        ``source_run`` for the owner (``proposed``; a newer one of a run takes the place of an older), so that no run,
+        clean or one that read outside content, changes what every run is handed without them. Any other note is
+        written now by ``source_run``: a tainted run's rewrite marks it tainted, a clean one leaves the mark it had, the
+        owner's correction mark comes off (this text is the run's), and ``new_expiry`` is when it now stops holding
+        (``None`` keeps the time it had). Which of the two is judged in the write itself, so that a pin made while the
+        rewrite waits on its embedding holds."""
+        proposed = await self._db.execute(
+            "UPDATE memories SET proposed_content = ?, proposed_tags = ?, proposed_by = ?, proposed_tainted = ?,"
+            f" proposed_at = ? WHERE id = ? AND {_OWNER_APPROVED}",
+            (content, ",".join(tags), source_run, int(tainted), time.time(), memory_id, OWNER_EDIT),
+        )
+        if proposed.rowcount == 1:
+            await self._db.commit()
+            return MemoryRewrite(record=await self.get_memory(memory_id), proposed=True)
+        record: MemoryRecord = await self._rewrite_memory(
             memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted), None, new_expiry
         )
+        return MemoryRewrite(record=record, proposed=False)
+
+    @_writing
+    async def settle_proposed_change(self, memory_id: str, at: float) -> ProposedChange:
+        """Take the run's proposal off note ``memory_id`` at the owner's word, when it is still the one proposed at
+        ``at`` (the one the page showed), and return it; a note with no such proposal is a conflict, so that the owner
+        never takes or drops a change they did not see."""
+        record: MemoryRecord = await self.get_memory(memory_id)
+        if record.proposed is None or record.proposed.at != at:
+            raise RunConflict(
+                "the change proposed for this note is not the one shown; read the note again",
+                {"memory_id": memory_id, "at": at},
+            )
+        await self._db.execute(
+            "UPDATE memories SET proposed_content = NULL, proposed_tags = NULL, proposed_by = NULL,"
+            " proposed_tainted = NULL, proposed_at = NULL WHERE id = ?",
+            (memory_id,),
+        )
+        await self._db.commit()
+        return record.proposed
+
+    async def memories_with_proposals(self, limit: int) -> list[MemoryRecord]:
+        """The notes a run proposed a change of that waits for the owner, the newest proposal first."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE proposed_content IS NOT NULL ORDER BY proposed_at DESC LIMIT ?", (limit,)
+        )
+        return [_memory(row) for row in rows]
 
     @_writing
     async def update_memory_vouched(

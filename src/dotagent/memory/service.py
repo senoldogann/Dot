@@ -35,7 +35,7 @@ from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar,
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
-from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryScore
+from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryRewrite, MemoryScore, ProposedChange
 
 log = get_logger("dotagent.memory")
 
@@ -695,16 +695,34 @@ async def rewrite_memory_note(
     run_id: str,
     tainted: bool,
     new_expiry: float | None,
-) -> MemoryRecord:
-    """A run's rewrite of a note in place, as :func:`update_memory_note`, except that the run becomes its author: the
-    text is the model's now, so a note the user wrote no longer reads as theirs (item 157). A run that had read content
-    third parties can author leaves the note tainted, and a clean one leaves the mark a note had. ``new_expiry`` is
-    when the corrected fact stops holding, so that it does not run out on the old clock (item 1143); ``None`` keeps
-    the time the note had, a lasting note lasting. The owner's note or a pinned one keeps its time, as when a run saves
-    its words again (:func:`_saved_again`); the store judges that in the write itself."""
+) -> MemoryRewrite:
+    """A run's rewrite of a note. A note the owner wrote, pinned or corrected on the Memory page keeps its words,
+    author, mark and time, and the rewrite waits beside it for the owner as a proposal, marked as from outside content
+    when ``tainted`` (``proposed``): every run is handed the owner's words until they take the change, and a run that
+    had read a page never changes what every run starts with (audit 2026-11-24, D1: a tainted run's rewrite of two
+    pinned notes had made them tainted, and no run was handed them since). Any other note is rewritten in place, as
+    :func:`update_memory_note`, except that the run becomes its author: the text is the model's now (item 157). A run
+    that had read content third parties can author leaves the note tainted, and a clean one leaves the mark a note
+    had. ``new_expiry`` is when the corrected fact stops holding, so that it does not run out on the old clock (item
+    1143); ``None`` keeps the time the note had, a lasting note lasting. The store judges which of the two in the write
+    itself."""
     await index.store.get_memory(memory_id)
     text, vector = await _embedded(index, content)
     return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted, new_expiry)
+
+
+async def take_proposed_change(index: MemoryIndex, memory_id: str, at: float) -> MemoryRecord:
+    """The owner takes the change a run proposed for their note at ``at``: the note gets its words and tags as the
+    owner's own correction would (:func:`update_memory_note`, which vouches for the text), and the proposal goes. A
+    proposal that is no longer the one shown is a conflict."""
+    change: ProposedChange = await index.store.settle_proposed_change(memory_id, at)
+    return await update_memory_note(index, memory_id, change.content, change.tags)
+
+
+async def drop_proposed_change(index: MemoryIndex, memory_id: str, at: float) -> MemoryRecord:
+    """The owner drops the change a run proposed for their note at ``at``; the note stays as it is."""
+    await index.store.settle_proposed_change(memory_id, at)
+    return await index.store.get_memory(memory_id)
 
 
 async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | None]:

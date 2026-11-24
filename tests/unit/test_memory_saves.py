@@ -17,7 +17,7 @@ from dotagent.core.text import fold_search
 from dotagent.memory.ranking import Vector
 from dotagent.memory.service import MemoryIndex, SavedMemory, rewrite_memory_note, save_memory
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord
+from dotagent.store.models import MemoryRecord, MemoryRewrite
 
 NOTE: str = "The user's invoices are in the Finance folder."
 OTHER: str = "The user's receipts are scanned on Fridays."
@@ -100,8 +100,8 @@ async def test_a_note_deleted_while_its_rewrite_waits_on_the_embedding_leaves_no
     store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
     index: MemoryIndex = MemoryIndex(store=store, embedder=_SlowEmbedder(), config=config.memory)
     try:
-        saved: SavedMemory = await save_memory(index, NOTE, ["finance"], None, None, None, False)
-        rewriting: asyncio.Task[MemoryRecord] = asyncio.create_task(
+        saved: SavedMemory = await save_memory(index, NOTE, ["finance"], "run_0", None, None, False)
+        rewriting: asyncio.Task[MemoryRewrite] = asyncio.create_task(
             rewrite_memory_note(index, saved.record.id, OTHER, ["receipts"], "run_1", False, None)
         )
         # The rewrite found the note, and waits on the embedder; the owner deletes the note meanwhile.
@@ -150,10 +150,13 @@ async def test_a_note_pinned_while_a_run_rewrites_it_for_a_while_keeps_its_time(
     try:
         saved: SavedMemory = await save_memory(index, NOTE, [], "run_1", None, None, False)
         embedder.memory_id = saved.record.id
-        rewritten: MemoryRecord = await rewrite_memory_note(
+        rewrite: MemoryRewrite = await rewrite_memory_note(
             index, saved.record.id, OTHER, [], "run_1", False, time.time() + 86400.0
         )
     finally:
         await store.close()
-    assert rewritten.pinned_at is not None
-    assert rewritten.expires_at is None
+    # Pinned while the rewrite waited: the rewrite waits for the owner, and the note keeps its words and its time.
+    assert rewrite.proposed is True
+    assert rewrite.record.pinned_at is not None
+    assert rewrite.record.expires_at is None
+    assert rewrite.record.content == NOTE
