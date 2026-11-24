@@ -122,7 +122,7 @@ final class ChatRulesTests: XCTestCase {
         XCTAssertEqual(chatPhase(of: nil), .idle)
         let thread: ThreadRecord = ThreadRecord(id: "thr_1", title: "Chat", source: "ui", createdAt: 1, updatedAt: 1, agentId: nil)
         let working: RunRecord = RunRecord(id: "run_a", threadId: "thr_1", goal: "g", mode: "task", model: "m", status: "running", createdAt: 7,
-            finishedAt: nil, result: "", parentRunId: nil, source: "ui", effort: nil)
+            finishedAt: nil, result: "", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         let view: (Bool) -> ThreadView = { asked in
             ThreadView(revision: 1, thread: thread, summary: nil, runs: [working], older: false, newest: nil, newestEvents: [], newestEventsCut: false,
                 queue: QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil),
@@ -192,7 +192,7 @@ final class ChatRulesTests: XCTestCase {
         let followed: AcceptedMessage = following(sent, in: chat)
         XCTAssertEqual(followed.text, "First, edited")
         let started: RunRecord = RunRecord(id: "run_b", threadId: "thr_1", goal: "First, edited", mode: "task", model: "m", status: "running",
-            createdAt: 2, finishedAt: nil, result: "", parentRunId: nil, source: "phone", effort: nil)
+            createdAt: 2, finishedAt: nil, result: "", parentRunId: nil, source: "phone", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         chat.view = view(QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil), [started])
         XCTAssertNil(delivery(of: followed, in: chat), "the run with the edited words shows: the overlay goes")
         XCTAssertEqual(delivery(of: sent, in: chat), .delivered, "with the old words it would have stayed as Sent")

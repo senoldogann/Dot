@@ -11,7 +11,7 @@ final class ReducerTests: XCTestCase {
     private func record(_ id: String, status: String, at: Double) -> RunRecord {
         RunRecord(
             id: id, threadId: "thr_1", goal: "goal of \(id)", mode: "task", model: "m", status: status, createdAt: at, finishedAt: nil,
-            result: "", parentRunId: nil, source: "ui", effort: nil)
+            result: "", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
     }
 
     private func view(revision: Int, runs: [RunRecord], events: [EventRecord]) -> ThreadView {
@@ -86,10 +86,10 @@ final class ReducerTests: XCTestCase {
             event: "brand_new_kind", data: #"{"id":30,"run_id":"run_a","ts":1,"kind":"brand_new_kind","data":{"x":1}}"#, id: "30")
         let frame: StreamFrame = readFrame(message)
         guard case .event = frame else { return XCTFail("an unknown stored kind is an event, kept for its cursor") }
-        let before: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true)
+        let before: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none)
         chat = ChatReducer.frame(chat, frame, connection: connection).0
         XCTAssertEqual(chat.runs["run_a"]?.cursor, 30)
-        XCTAssertEqual(transcript(of: chat, pending: [], mode: .showAll, streaming: true), before, "nothing is drawn for it")
+        XCTAssertEqual(transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none), before, "nothing is drawn for it")
         let liveOnly: StreamFrame = readFrame(SSEMessage(event: "mystery", data: #"{"id":0,"run_id":"run_a","ts":1,"kind":"mystery","data":{}}"#, id: nil))
         XCTAssertEqual(ChatReducer.frame(chat, liveOnly, connection: connection).0, chat, "a live-only unknown kind changes nothing")
     }
@@ -246,7 +246,7 @@ final class ReducerTests: XCTestCase {
         ]
         for frame in frames { chat = ChatReducer.frame(chat, frame, connection: connection).0 }
         let ids: (ToolCallMode, Bool) -> [String] = { mode, streaming in
-            transcript(of: chat, pending: [], mode: mode, streaming: streaming).map(\.id)
+            transcript(of: chat, pending: [], mode: mode, streaming: streaming, context: .none).map(\.id)
         }
         XCTAssertEqual(ids(.showAll, true), ["u:run_a", "t:c1", "a:12", "t:c2", "w:run_a"])
         XCTAssertEqual(ids(.hideSuccessful, true), ["u:run_a", "a:12", "t:c2", "w:run_a"], "a failure always shows")
@@ -282,9 +282,9 @@ final class ReducerTests: XCTestCase {
     func testARunAHelpersReportStartedOpensWithDotsNoteNotTheOwnersWords() {
         let report: RunRecord = RunRecord(
             id: "run_r", threadId: "thr_1", goal: "A helper that worked in the background ended", mode: "task", model: "m", status: "done",
-            createdAt: 2, finishedAt: 3, result: "", parentRunId: nil, source: "helper_report", effort: nil)
+            createdAt: 2, finishedAt: 3, result: "", parentRunId: nil, source: "helper_report", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         let (chat, _): (ChatProjection, Int) = live(revision: 2, runs: [record("run_a", status: "done", at: 1), report])
-        let items: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true)
+        let items: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none)
         XCTAssertEqual(items.first { $0.id == "u:run_r" }, .note(id: "u:run_r", text: "A helper that worked in the background ended"))
         XCTAssertEqual(items.first { $0.id == "u:run_a" }, .owner(id: "u:run_a", text: "goal of run_a", delivery: nil))
     }
@@ -298,7 +298,7 @@ final class ReducerTests: XCTestCase {
         ] {
             chat = ChatReducer.frame(chat, frame, connection: connection).0
         }
-        let answers: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true).filter {
+        let answers: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none).filter {
             if case .answer = $0 { true } else { false }
         }
         XCTAssertEqual(answers, [.answer(id: "r:run_a", text: "Booked", writing: false)])

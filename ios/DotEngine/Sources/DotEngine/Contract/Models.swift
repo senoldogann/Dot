@@ -110,8 +110,8 @@ public struct RunRecord: Codable, Sendable, Hashable {
 
     public init(
         id: String, threadId: String, goal: String, mode: String, model: String, status: String, createdAt: Double, finishedAt: Double?,
-        result: String, parentRunId: String?, source: String, effort: String?, inputTokens: Int? = nil, outputTokens: Int? = nil,
-        approvals: String? = nil, followsReaction: String? = nil
+        result: String, parentRunId: String?, source: String, effort: String?, inputTokens: Int?, outputTokens: Int?,
+        approvals: String?, followsReaction: String?
     ) {
         self.id = id
         self.threadId = threadId

@@ -218,7 +218,7 @@ public struct TranscriptContext: Sendable, Equatable {
 /// run the window holds without events, its goal and result), then the owner's messages not yet shown in their place.
 /// A finished run's steps fold (`WorkFold`). Pure: `mode` and `streaming` (§20) only filter.
 public func transcript(
-    of chat: ChatProjection, pending: [PendingMessage], mode: ToolCallMode, streaming: Bool, context: TranscriptContext = .none
+    of chat: ChatProjection, pending: [PendingMessage], mode: ToolCallMode, streaming: Bool, context: TranscriptContext
 ) -> [TranscriptItem] {
     var items: [TranscriptItem] = []
     let listed: [RunRecord] = (chat.view?.runs ?? []).filter { $0.parentRunId == nil }
@@ -230,7 +230,7 @@ public func transcript(
         else { return nil }
         return RunRecord(
             id: id, threadId: chat.threadId, goal: first.data["goal"]?.string ?? "", mode: "", model: "", status: "running",
-            createdAt: first.ts, finishedAt: nil, result: "", parentRunId: nil, source: "", effort: nil)
+            createdAt: first.ts, finishedAt: nil, result: "", parentRunId: nil, source: "", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
     }
     let runs: [RunRecord] = (listed + told).sorted { $0.createdAt < $1.createdAt }
     let helpers: [HelperView] = chat.view?.helpers ?? []

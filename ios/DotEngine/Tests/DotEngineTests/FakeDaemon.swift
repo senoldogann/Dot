@@ -152,7 +152,7 @@ final class FakeDaemon: @unchecked Sendable {
         let at: Double = lock.withLock { Double(nextEvent) }
         let record: RunRecord = RunRecord(
             id: id, threadId: thread, goal: goal, mode: "task", model: "scripted", status: status, createdAt: at,
-            finishedAt: nil, result: status == "done" ? "Done: \(goal)" : "", parentRunId: parent, source: "ui", effort: nil)
+            finishedAt: nil, result: status == "done" ? "Done: \(goal)" : "", parentRunId: parent, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         lock.withLock { runs[id] = record }
         var queued: [String: JSONValue] = ["goal": .string(goal)]
         if let parent { queued["parent_run_id"] = .string(parent) }
@@ -184,7 +184,7 @@ final class FakeDaemon: @unchecked Sendable {
                 runs[run] = RunRecord(
                     id: record.id, threadId: record.threadId, goal: record.goal, mode: record.mode, model: record.model,
                     status: data["status"]?.string ?? "done", createdAt: record.createdAt, finishedAt: Double(nextEvent),
-                    result: data["result"]?.string ?? "", parentRunId: record.parentRunId, source: record.source, effort: nil)
+                    result: data["result"]?.string ?? "", parentRunId: record.parentRunId, source: record.source, effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
             }
             return made
         }
