@@ -12,6 +12,7 @@ struct RunInspector: View {
     /// Asks for the sheet's full height (the model picker is a long list).
     var onExpand: () -> Void = {}
     @Environment(\.dismiss) private var dismiss: DismissAction
+    @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -106,7 +107,11 @@ struct RunInspector: View {
 
     /// The run's standing, large: what it does, how many steps it has taken.
     private var statusCard: some View {
-        HStack(spacing: Space.m) {
+        // At the accessibility sizes the three parts stand over each other: side by side the words ("5 helpers working") broke
+        // in the middle of a word.
+        let stacked: Bool = typeSize.isAccessibilitySize
+        let layout: AnyLayout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.m)) : AnyLayout(HStackLayout(spacing: Space.m))
+        return layout {
             DotIcon(statusIcon, size: 22, pulse: model.state.isWorking, relativeTo: .title3)
                 .foregroundStyle(statusTone)
                 .frame(width: 48, height: 48)
@@ -115,14 +120,15 @@ struct RunInspector: View {
                 Text("Status").font(Theme.meta).foregroundStyle(Theme.faint)
                 Text(statusWords).font(.title3.weight(.semibold)).foregroundStyle(Theme.text)
             }
-            Spacer()
+            if !stacked { Spacer() }
             if let run: RunRecord = model.run {
-                VStack(alignment: .trailing, spacing: 2) {
+                VStack(alignment: stacked ? .leading : .trailing, spacing: 2) {
                     Text("Steps").font(Theme.meta).foregroundStyle(Theme.faint)
                     Text(String(run.steps)).font(.title3.weight(.semibold).monospacedDigit()).foregroundStyle(Theme.text)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Space.l)
         .background {
             RoundedRectangle(cornerRadius: Radius.l)
