@@ -62,6 +62,13 @@ replaces it. The setting has a table of its own because `[mcp]` cannot hold a ke
 TOML reads as one array of tables. Settings › Connectors has the same switch and writes it here, `dotx mcp list`
 marks the server `built-in`, and an eval run leaves it out. See [MCP servers](extending.md#mcp-servers).
 
+**A cut Claude Code program** (items 1580 to 1582). `[providers.claude_code] continue_cut` (`2`, 0 or more) is how many
+times Dot starts the program of a run on your Claude plan again, in the same session and the same run (after 2 s the
+first time, 10 s after), when it ends before its result with nobody ending it (killed from outside, crashed); `0` turns
+it off and the run then fails as it did, saying how the program ended. Never after your Stop, the plan's limit, a call
+that may have sent a message, mail, payment or post for you, or the model's own `finish`. See
+[Models and providers](models.md#models-and-providers).
+
 **Code mode** (items 1500 to 1507, [Code mode](code-mode.md)). `[code]` holds `enabled` (`true`: `code_run` is offered; read
 when the daemon starts), `max_seconds` (120, 1 to 900: the code's own time, a `time.sleep` included, not the time a tool call
 takes or the time you take to answer), `max_mb` (512, 64 to 8192: resident memory, which the daemon watches and the kernel does
