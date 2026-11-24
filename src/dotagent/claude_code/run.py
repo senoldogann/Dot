@@ -48,7 +48,6 @@ import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
-from datetime import datetime
 from functools import partial
 from pathlib import Path
 
@@ -68,7 +67,9 @@ from dotagent.agent.handover import (
     agent_tools,
     bridged_outcome,
     door_tool,
+    handed_notes,
     let_go,
+    prompt_facts,
     read_chat,
     tool_context,
     withheld_out,
@@ -88,33 +89,25 @@ from dotagent.agent.loop import (
     EMPTY_NOTE,
     NO_TOOL_NOTE,
     AgentRun,
-    HandedNotes,
     PromptFacts,
     RunEnd,
     RunOutcome,
     SendBack,
     check_goal,
     close_delegated_steps,
-    count_start_notes,
     current_plan,
     free_mode_line,
-    gather_prompt_facts,
-    goal_query,
-    notes_to_hand,
     opening_text,
     plan_note,
     run_end,
-    run_harness_text,
-    run_helpers,
     run_prompt_inputs,
     run_skills,
-    start_notes,
     turn_skills,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.plan import PLAN_EVENT, PlanPayload, open_steps, plan_event_data, plan_lines
 from dotagent.agent.progress import stop_result
-from dotagent.agent.prompt import PromptInputs, build_system_prompt, started_note, turn_note
+from dotagent.agent.prompt import PromptInputs, build_system_prompt
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.review import GoalChecker
@@ -193,7 +186,6 @@ from dotagent.llm.types import (
     tool_message,
     user_message,
 )
-from dotagent.memory.service import Remembered, memory_budget
 from dotagent.opencode.bridge import Door, authorization, new_door
 from dotagent.opencode.run import meanwhile
 from dotagent.process_groups import forget_group, record_group
@@ -204,11 +196,9 @@ from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import NO_PICKS, AgentRecord, EventRecord, RunMode, RunRecord
+from dotagent.store.models import NO_PICKS, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
-from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import ToolContext
-from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import CORE_GROUP, group_of
 from dotagent.tools.meta import (
     FINISH_TOOL,
@@ -1272,30 +1262,6 @@ async def _provider_of(runtime: Runtime, ref: ModelRef) -> ClaudeCodeProvider:
     return provider
 
 
-async def _prompt_facts(agent: AgentRun, ref: ModelRef, offered: frozenset[str]) -> PromptFacts:
-    """What the run's system prompt is built from, gathered as Dot's own loop gathers it (item 1691), for a run whose
-    door offers the tools ``offered``."""
-    runtime: Runtime = agent.runtime
-    run: RunRecord = agent.run
-    record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
-    team: tuple[AgentRecord, ...] = tuple(
-        member for member in await runtime.store.list_agents() if member.id != run.agent_id
-    )
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if offered & {CONSULT_TOOL, DELEGATE_TOOL} else ()
-    return await gather_prompt_facts(
-        agent,
-        await goal_query(runtime, run),
-        await run_skills(runtime, run),
-        record,
-        team,
-        await runtime.accounts.accounts(),
-        helpers,
-        await run_harness_text(runtime, run, held),
-        held,
-    )
-
-
 async def _prompt_of(agent: AgentRun, door: Door, inputs: PromptInputs) -> str:
     """Dot's system prompt for the run (item 1691): the one Dot's own loop builds from ``inputs``, the owner's free
     mode as it stands, and what the harness changes of it."""
@@ -1415,27 +1381,6 @@ async def _agent_leaving_out(agent: AgentRun, bounds: frozenset[str] | None, mis
 def opened_bounds(bounded: frozenset[str], opened: frozenset[str], names: Iterable[str]) -> frozenset[str]:
     """``bounded``, an agent's tools, with those of ``names`` in the groups ``opened`` to it by the owner's picks."""
     return bounded | frozenset(name for name in names if group_of(name) in opened)
-
-
-async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str, inputs: PromptInputs, skills: list[Skill]) -> str:
-    """What the run's message is handed under it (item 1055), as Dot's own loop hands it (``turn_note``,
-    :func:`notes_to_hand`): the time of day, the notes of Dot's memory recalled for the goal and the goals before it in
-    the chat, within the notes' budget, but those ``carried`` holds with the same text (the user messages the program's
-    session took in whole: a note changed since comes again), and the notes it quotes that were forgotten since. Every
-    note recalled counts as used, as in Dot's own loop. Before them, how the run was started (``inputs``, item 1219),
-    and after them the ``skills`` that fit the goal that the prompt does not list (item 1691)."""
-    runtime: Runtime = agent.runtime
-    run: RunRecord = agent.run
-    seen_at: float = time.time()
-    recalled: Remembered = await start_notes(
-        runtime, run, await goal_query(runtime, run), memory_budget(runtime.config.memory, info.context_length)
-    )
-    await count_start_notes(runtime, run, recalled, seen_at)
-    handed: HandedNotes = await notes_to_hand(runtime, run, recalled.records, carried, seen_at)
-    noted: str = turn_note(
-        datetime.now().astimezone(), list(handed.fresh), recalled.tainted_left_out, skills, list(handed.forgotten)
-    )
-    return f"{started_note(inputs)}\n\n{noted}"
 
 
 # What a resumed run on the plan is told after the note of the run it goes on from (item 1076): that note says the
@@ -1810,9 +1755,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     )
     # The notes go after the owner's words as a message of their own, as Dot's own loop stores them, so that no one
     # reads them as the owner's (a group chat's members read the lead's chat); the program gets both in one message.
-    facts: PromptFacts = await _prompt_facts(agent, ref, frozenset(tools.tools))
+    facts: PromptFacts = await prompt_facts(agent, ref, frozenset(tools.tools))
     inputs: PromptInputs = await run_prompt_inputs(agent, facts, door.specs)
-    noted: Message = user_message(await _notes_for(agent, info, carried, inputs, turn_skills(facts)), ())
+    noted: Message = user_message(await handed_notes(agent, info, carried, inputs, turn_skills(facts)), ())
     await runtime.store.append_messages(run.thread_id, [goal, noted])
     prompt: str = await _prompt_of(agent, door, inputs)
     # Before the program starts (item 1400): what Dot itself left out of the run's tools is known already. Outside the

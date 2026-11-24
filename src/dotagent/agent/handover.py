@@ -3,10 +3,13 @@
 :mod:`dotagent.claude_code.run`). Each keeps the program's session of a chat from run to run (:class:`ChatSession`),
 gives the agent Dot's own tools at the chat's door of the bridge, a call of one run as a call of Dot's own loop
 (:func:`bridged_call`, in the context :func:`tool_context` makes), the same tools to both as Dot's own loop gives them
-(:func:`door_tool`, :func:`withheld_out`), and lets go of the questions a run that ends still waits for
-(:func:`let_go`)."""
+(:func:`door_tool`, :func:`withheld_out`), tells it Dot's own system prompt and hands it the notes recalled for its
+message as Dot's own loop does (:func:`prompt_facts`, :func:`handed_notes`, items 1691 and 1695), and lets go of the
+questions a run that ends still waits for (:func:`let_go`)."""
 
 import asyncio
+import time
+from datetime import datetime
 from pathlib import Path
 
 from dotagent.agent.executor import ToolOutcome, execute_calls
@@ -15,20 +18,31 @@ from dotagent.agent.loop import (
     AGENT_CORE_TOOLS,
     NOT_FOR_DELEGATED_RUNS,
     AgentRun,
+    HandedNotes,
+    PromptFacts,
     browser_of,
+    count_start_notes,
+    gather_prompt_facts,
+    goal_query,
+    notes_to_hand,
+    run_harness_text,
     run_helpers,
     run_skills,
+    start_notes,
     withheld_tools,
 )
 from dotagent.agent.progress import can_ask_user, question_mode
+from dotagent.agent.prompt import PromptInputs, started_note, turn_note
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.verify import RunFacts, new_facts
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.llm.router import ModelRef
 from dotagent.llm.types import ModelInfo, ToolCall
+from dotagent.memory.service import Remembered, memory_budget
 from dotagent.runtime import Runtime
-from dotagent.skills.types import SkillCatalog
+from dotagent.secrets import known_secrets
+from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.models import AgentRecord, RunRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
@@ -183,3 +197,50 @@ async def agent_tools(runtime: Runtime, agent_id: str | None) -> frozenset[str] 
     if record is None or not record.tools:
         return None
     return frozenset(record.tools) | frozenset(AGENT_CORE_TOOLS)
+
+
+async def prompt_facts(agent: AgentRun, ref: ModelRef, offered: frozenset[str]) -> PromptFacts:
+    """What the run's system prompt is built from, gathered as Dot's own loop gathers it (items 1691 and 1695), for a
+    run whose door offers the tools ``offered``."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
+    team: tuple[AgentRecord, ...] = tuple(
+        member for member in await runtime.store.list_agents() if member.id != run.agent_id
+    )
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+    helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if offered & {CONSULT_TOOL, DELEGATE_TOOL} else ()
+    return await gather_prompt_facts(
+        agent,
+        await goal_query(runtime, run),
+        await run_skills(runtime, run),
+        record,
+        team,
+        await runtime.accounts.accounts(),
+        helpers,
+        await run_harness_text(runtime, run, held),
+        held,
+    )
+
+
+async def handed_notes(
+    agent: AgentRun, info: ModelInfo, carried: str, inputs: PromptInputs, skills: list[Skill]
+) -> str:
+    """What the run's message is handed under it (item 1055), as Dot's own loop hands it (``turn_note``,
+    :func:`notes_to_hand`): the time of day, the notes of Dot's memory recalled for the goal and the goals before it in
+    the chat, within the notes' budget, but those ``carried`` holds with the same text (the user messages the program's
+    session took in whole: a note changed since comes again), and the notes it quotes that were forgotten since. Every
+    note recalled counts as used, as in Dot's own loop. Before them, how the run was started (``inputs``, item 1219),
+    and after them the ``skills`` that fit the goal that the prompt does not list (item 1691)."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    seen_at: float = time.time()
+    recalled: Remembered = await start_notes(
+        runtime, run, await goal_query(runtime, run), memory_budget(runtime.config.memory, info.context_length)
+    )
+    await count_start_notes(runtime, run, recalled, seen_at)
+    handed: HandedNotes = await notes_to_hand(runtime, run, recalled.records, carried, seen_at)
+    noted: str = turn_note(
+        datetime.now().astimezone(), list(handed.fresh), recalled.tainted_left_out, skills, list(handed.forgotten)
+    )
+    return f"{started_note(inputs)}\n\n{noted}"
