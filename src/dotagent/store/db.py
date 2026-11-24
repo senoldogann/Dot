@@ -1200,6 +1200,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         rested_at=row["rested_at"],
         edited_by=row["edited_by"],
         proposed=_proposed_change(row),
+        subject=row["subject"],
     )
 
 
@@ -1387,6 +1388,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("proposed_by", "TEXT"),
     ("proposed_tainted", "INTEGER"),
     ("proposed_at", "REAL"),
+    # The subject a run gave a note when it saved it (item 1729): a newer note of the same subject replaces it. NULL for
+    # a note saved with none, and for every note stored before the column.
+    ("subject", "TEXT"),
 )
 # The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
 _LESSON_SAVES_KEY: str = "lessons.saved"
@@ -6630,6 +6634,22 @@ class Store:
         return await self.get_memory(memory_id)
 
     @_writing
+    async def set_memory_subject(self, memory_id: str, subject: str) -> MemoryRecord:
+        """Give a note the ``subject`` its run named (item 1729); its text, tags, vector and ``updated_at`` stay."""
+        await self._db.execute("UPDATE memories SET subject = ? WHERE id = ?", (subject, memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    async def memories_with_subject(self, subject: str, agent_id: str | None) -> list[MemoryRecord]:
+        """The notes of ``subject`` that a run of ``agent_id`` (``None`` for Dot) is handed, the oldest first:
+        the notes a newer note of the subject replaces (item 1729)."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE subject = ? AND (agent_id IS ? OR agent_id IS NULL) ORDER BY created_at",
+            (subject, agent_id),
+        )
+        return [_memory(row) for row in rows]
+
+    @_writing
     async def delete_memory(self, memory_id: str) -> bool:
         cursor = await self._db.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
@@ -6996,7 +7016,7 @@ class Store:
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
                 " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
-                " edited_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?)",
+                " edited_by, subject) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?)",
                 (
                     record.id,
                     record.content,
@@ -7012,6 +7032,7 @@ class Store:
                     _MERGED_SOURCES.dump_json(record.merged_from).decode() if record.merged_from else None,
                     record.pinned_at,
                     record.edited_by,
+                    record.subject,
                 ),
             )
             await self._db.execute(

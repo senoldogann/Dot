@@ -26,7 +26,8 @@ from dotagent.core.types import FrozenModel
 from dotagent.evals.memory_cases import CASES, Fact, MemoryCase
 from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Vector
-from dotagent.memory.service import MemoryHit, MemoryIndex, normalize_text, recall_for, save_memory
+from dotagent.memory.service import MemoryHit, MemoryIndex, normalize_text, recall_for
+from dotagent.memory.supersede import save_replacing
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord
 
@@ -123,8 +124,8 @@ class CaseResult(FrozenModel):
 
 
 async def _save_fact(index: MemoryIndex, fact: Fact) -> MemoryRecord:
-    """The fact saved as a run saves a note."""
-    return (await save_memory(index, fact.text, [], RUN_ID, None, None, False)).record
+    """The fact saved as ``memory_save`` saves a note, with the subject the run gave it."""
+    return (await save_replacing(index, fact.text, [], RUN_ID, None, False, fact.subject)).saved.record
 
 
 async def play_case(case: MemoryCase, embedder: Embedder, config: MemoryConfig, folder: Path) -> CaseResult:
