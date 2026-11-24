@@ -186,6 +186,7 @@ import { createDockSheets } from "/js/docksheet.js";
 import { planContent } from "/js/planbubble.js";
 import { t } from "/js/i18n.js";
 const steps = %s;
+window.steps = steps;
 const targets = %s;
 let now = [];
 const sheets = createDockSheets();
@@ -274,6 +275,14 @@ async def test_on_a_phone_the_plans_segment_opens_the_plan_in_a_sheet_that_follo
             await page.evaluate("paint(2, true)")
             await expect(page.get_by_role("dialog", name="Plan 2/3")).to_be_visible()
             await expect(sheet.locator(".plan-step.done")).to_have_count(2)
+            # A step marked done that no tool result shows says so beside its text (item 1745), inside the window.
+            await page.evaluate('window.steps[0].proof = "none"; paint(2, true)')
+            unshown: Locator = sheet.locator(".plan-step.done .unshown")
+            await expect(unshown).to_have_count(1)
+            await expect(unshown).to_have_text("not verified")
+            tag: dict[str, float] = await _box(unshown)
+            assert tag["x"] >= 0 and tag["x"] + tag["width"] <= 390, tag
+            await page.screenshot(path=str(tmp_path / "plan-sheet-unshown.png"), animations="disabled")
             # Escape closes it, the way to the Plan tab closes it too.
             await page.keyboard.press("Escape")
             await expect(sheet).to_be_hidden()

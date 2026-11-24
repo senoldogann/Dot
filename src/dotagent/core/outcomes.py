@@ -325,9 +325,10 @@ def page_did_not_react(waited_s: float) -> OutcomeCheck:
 
 
 class StepTally(FrozenModel):
-    """What the steps of one act call came to, counted (item 1744): each check by how it ended, the steps that went
-    through with nothing checked, and the steps that failed. Kept with the call's result, so that what a run did can
-    be counted from its record without reading the text a model was shown."""
+    """What the steps of one act call came to, counted by step (item 1744): verified when every check of a step held,
+    contradicted when one was refuted, uncertain otherwise; the steps that went through with nothing checked; and the
+    steps that failed. Kept with the call's result, so that what a run did can be counted from its record without
+    reading the text a model was shown."""
 
     verified: int
     contradicted: int
@@ -336,13 +337,21 @@ class StepTally(FrozenModel):
     failed: int
 
 
+def _step_status(checks: Sequence[OutcomeCheck]) -> CheckStatus:
+    statuses: list[CheckStatus] = [check.status for check in checks]
+    if "contradicted" in statuses:
+        return "contradicted"
+    return "verified" if all(status == "verified" for status in statuses) else "uncertain"
+
+
 def tally_of(reports: Sequence[StepReport]) -> StepTally:
-    statuses: list[CheckStatus] = [check.status for report in reports for check in report.checks]
+    done: list[StepReport] = [report for report in reports if report.outcome == "done"]
+    judged: list[CheckStatus] = [_step_status(report.checks) for report in done if report.checks]
     return StepTally(
-        verified=statuses.count("verified"),
-        contradicted=statuses.count("contradicted"),
-        uncertain=statuses.count("uncertain"),
-        not_checked=sum(1 for report in reports if report.outcome == "done" and not report.checks),
+        verified=judged.count("verified"),
+        contradicted=judged.count("contradicted"),
+        uncertain=judged.count("uncertain"),
+        not_checked=sum(1 for report in done if not report.checks),
         failed=sum(1 for report in reports if report.outcome == "failed"),
     )
 
