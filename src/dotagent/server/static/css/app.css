@@ -5340,6 +5340,16 @@ dialog.modal.versions-dialog {
 }
 
 /* What the run observed that closed the step; the goal check reads the same text. */
+/* A done step no tool result of the run shows (item 1745): a word, in the muted ink, never a colour alone. */
+.plan-step .unshown {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
 .plan-step .evidence {
   font-size: var(--text-sm);
   color: var(--muted);

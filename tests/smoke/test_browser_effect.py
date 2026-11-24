@@ -8,6 +8,7 @@ that only sent a request changed the page. The owner's runs repeated 13 clicks t
 30 s for a thank-you text after forms that had not gone.
 """
 
+import asyncio
 import re
 import threading
 from collections.abc import AsyncIterator, Iterator
@@ -39,6 +40,11 @@ _PAGE: str = """<!doctype html><title>Effect page</title>
 <label><input type="checkbox" aria-label="Terms"> Terms</label>
 <label>Note <textarea aria-label="Note"></textarea></label>
 <label>Size <select aria-label="Size"><option>S</option><option>M</option></select></label>"""
+# A page that changes by itself, as a clock or a feed does (item 1744): a change after a click tells nothing there.
+_BUSY: str = """<!doctype html><title>Busy</title>
+<p id="clock">0</p>
+<button aria-label="Nothing">Nothing</button>
+<script>let n = 0; setInterval(() => { document.getElementById("clock").textContent = String(++n); }, 100);</script>"""
 # A page whose controls sit at known pixels, so a click_at can be aimed without a ref (item 1142).
 _PIXEL: str = """<!doctype html><title>Pixels</title>
 <style>
@@ -55,7 +61,9 @@ _PIXEL: str = """<!doctype html><title>Pixels</title>
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = urlsplit(self.path).path
-        page: str = {"/": _PAGE, "/pixel": _PIXEL}.get(path, "<!doctype html><title>Other</title><p>ok</p>")
+        page: str = {"/": _PAGE, "/pixel": _PIXEL, "/busy": _BUSY}.get(
+            path, "<!doctype html><title>Other</title><p>ok</p>"
+        )
         body: bytes = page.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -137,6 +145,18 @@ async def test_a_click_is_checked_by_whether_the_page_reacted_from_the_same_look
     assert await checks("Change", "button") == [(PAGE_REACTED, "verified", "its content changed")]
     assert await checks("Ping", "button") == [(PAGE_REACTED, "verified", "it sent a request")]
     assert [status for _, status, _ in await checks("Note", "textbox")] == ["verified"]
+    # On a page that changes by itself, its content changing after a click that did nothing is no check of it.
+    view: PageView = await browser.open_url("reacted", f"{site}/busy", True)
+    # The model reads the page before it acts, and the clock goes on meanwhile.
+    await asyncio.sleep(0.4)
+    outcome: ActOutcome = await browser.act(
+        "reacted", [Step(action="click", ref=_ref(view, "Nothing", "button"))], False, refuse_secret_field, True
+    )
+    busy: list[tuple[str, str, str]] = [
+        (check.condition, check.status, check.evidence) for check in outcome.steps[0].checks
+    ]
+    assert [(condition, status) for condition, status, _ in busy] == [(PAGE_REACTED, "uncertain")]
+    assert "changing by itself" in busy[0][2]
 
 
 async def test_a_click_that_changed_nothing_is_told_and_one_that_changed_the_page_is_not(

@@ -169,7 +169,7 @@ def proof_words(number: int, proof: StepProof) -> str:
         return ""
     return (
         f"Step {number} is recorded done, but {proof.why}: the run's account lists it as not verified. Look at what "
-        "it changed (read the file, the page or the window) to show it."
+        "it changed (read the file, the page or the window), then mark the step done again with what you saw."
     )
 
 
