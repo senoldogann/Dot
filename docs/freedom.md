@@ -94,7 +94,9 @@ is told so. A run that did what the policy would have asked about can always be 
   ask the owner is asked and nothing else; everywhere else the call goes through unasked and a step the policy would have
   asked about leaves a record saying why.
 - **Every tool of the registry has a row** or says why it has none, so a tool added later without one fails the test.
-- **Every place of the source that asks the owner is named**; a new one fails the test.
+- **Every place of the source that asks the owner is named**; a new one fails the test. It reads a call of the approval
+  broker, its method taken as a value and `getattr`, and which modules import the broker's class; a call made through a name
+  it cannot tie to the broker is for the review to find.
 - **A scripted run through the real loop**, with a browser that presses nothing, ends done in free mode with no approval
   event and no `ask_user`, and records why it would have asked; the same run in yolo alone asks only about the post and the
   payment.
