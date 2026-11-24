@@ -16,7 +16,6 @@ sandbox the probe found working, or with folders it cannot make, it runs nothing
 import asyncio
 import base64
 import os
-import shutil
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -31,6 +30,7 @@ from dotagent.codemode.runner import Ended, Limits, RunPlan
 from dotagent.codemode.sandbox import Interpreter, Layout, code_mode_ready, current_interpreter, layout_for
 from dotagent.codemode.tree import Tree
 from dotagent.config import CodeConfig
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import dot_home
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
@@ -38,6 +38,8 @@ from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
+
+log = get_logger(__name__)
 
 MAX_CODE_CHARS: int = 200_000
 TITLE_CHARS: int = 120
@@ -111,22 +113,28 @@ _pruned: set[Path] = set()
 
 
 def _prune(layout: Layout) -> None:
-    """Remove the folders of runs' code that nothing has written to for three days, once for the daemon. Blocking."""
+    """Remove the folders of runs' code that nothing has written to for three days, once for the daemon. Best effort: a
+    folder that cannot be removed is said in the log and left, and does not stop the code of this run. Done through the
+    descriptors of :class:`~dotagent.codemode.tree.Tree`, entering no link. Blocking."""
     folder: Path = layout.run.parent
-    if folder in _pruned or not folder.is_dir():
+    if folder in _pruned:
         return
     _pruned.add(folder)
+    base: tuple[str, ...] = folder.relative_to(layout.root).parts
     now: float = time.time()
-    with os.scandir(folder) as listing:
-        for entry in listing:
-            if entry.path == str(layout.run) or entry.is_symlink() or not entry.is_dir(follow_symlinks=False):
-                continue
-            newest: float = entry.stat(follow_symlinks=False).st_mtime
-            snippets: Path = Path(entry.path) / "tools" / "snippets"
-            if snippets.is_dir() and not snippets.is_symlink():
-                newest = max(newest, snippets.stat().st_mtime)
-            if now - newest > _KEPT_S:
-                shutil.rmtree(entry.path, ignore_errors=True)
+    try:
+        with Tree(layout.root) as tree:
+            for entry in tree.entries(base):
+                if entry.name == layout.run.name or not entry.is_dir(follow_symlinks=False):
+                    continue
+                written: float = max(
+                    entry.stat(follow_symlinks=False).st_mtime,
+                    tree.modified((*base, entry.name, "tools", "snippets")) or 0.0,
+                )
+                if now - written > _KEPT_S:
+                    tree.remove((*base, entry.name))
+    except OSError as error:
+        log.warning("code_prune_failed", folder=str(folder), error=str(error))
 
 
 def _written_for(layout: Layout, digest: str) -> bool:
@@ -189,7 +197,15 @@ def _handler(
             return BridgeAnswer(ok=False, error=result.text, refused=result.refused)
         pictures: tuple[str, ...] = ()
         if result.images:
-            pictures = await asyncio.to_thread(_save_images, layout, f"{time.time_ns()}", result.images)
+            try:
+                pictures = await asyncio.to_thread(_save_images, layout, f"{time.time_ns()}", result.images)
+            except OSError as error:
+                # The code owns its scratch folder and may have left a link where the pictures go: the call is told, the
+                # picture is not written through it.
+                return BridgeAnswer(
+                    ok=False,
+                    error=f"the picture could not be saved in the scratch folder ({type(error).__name__}: {error})",
+                )
         return BridgeAnswer(ok=True, text=result.text, images=pictures)
 
     return handle
