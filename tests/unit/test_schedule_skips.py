@@ -3,12 +3,13 @@ emergency stop, a paused agent, a task still going, a late firing, a busy chat),
 count, and switching the schedule on again or changing it starts it afresh; the schedule's one line, which `dotx
 schedule list` and the model's `schedule_list` show, says how many from two on."""
 
+import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from dotagent.scheduler.plans import UNSET_OPTIONS, render_schedule
 from dotagent.store.db import Store
-from dotagent.store.models import ScheduleRecord
+from dotagent.store.models import RunRecord, ScheduleRecord, ThreadRecord
 
 _BUSY: str = "skipped: a run is already active on this thread"
 
@@ -90,5 +91,36 @@ async def test_the_schedules_line_says_how_many_firings_were_skipped_in_a_row_fr
             record.model_copy(update={"skipped_in_row": 3, "last_run_at": None, "last_status": _BUSY}), zone
         )
         assert never.endswith(f"last: {_BUSY} (3 skipped in a row)"), never
+    finally:
+        await store.close()
+
+
+async def test_a_task_started_by_hand_ends_the_count_and_a_count_beside_a_status_that_is_no_skip_is_not_said(
+    tmp_path: Path,
+) -> None:
+    """Item 1401's review: the owner presses Play on a loop that was skipped 27 times, its run ends done, and the row
+    still said "27 skipped in a row" beside the green done; a firing that failed to start broke the row too. A task that
+    starts by hand ends the count, and the line says it only while the last status is a skip."""
+    store: Store = await _store(tmp_path)
+    try:
+        record: ScheduleRecord = await _report(store)
+        for _ in range(4):
+            await store.count_schedule_skip(record.id, _BUSY)
+        thread: ThreadRecord = await store.create_thread("Report", "scheduler")
+        run: RunRecord = await store.create_run(
+            thread.id, "Write it.", "task", "ollama:a", None, "scheduler", "medium", "standard", None, "ask", False,
+            None, None, None,
+        )  # fmt: skip
+        await store.record_schedule_hand_run(record.id, time.time(), thread.id, run.id)
+        started: ScheduleRecord = await store.get_schedule(record.id)
+        assert (started.skipped_in_row, started.last_status) == (0, "running")
+        # A count that outlived its status (a write that raced) is not said beside a status that is no skip.
+        stale: ScheduleRecord = started.model_copy(
+            update={"skipped_in_row": 4, "last_status": "done", "last_run_at": 5.0}
+        )
+        assert "skipped in a row" not in render_schedule(stale, ZoneInfo("UTC"))
+        assert "(4 skipped in a row)" in render_schedule(
+            stale.model_copy(update={"last_status": _BUSY}), ZoneInfo("UTC")
+        )
     finally:
         await store.close()

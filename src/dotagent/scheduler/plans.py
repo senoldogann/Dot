@@ -305,7 +305,7 @@ def render_schedule(record: ScheduleRecord, zone: ZoneInfo) -> str:
         last: str = f"last {format_local(record.last_run_at, zone)}: {record.last_status}"
     else:
         last = f"last: {record.last_status}" if record.last_status != "" else "never ran"
-    if record.skipped_in_row > 1:
+    if record.skipped_in_row > 1 and record.last_status.startswith("skipped"):
         last = f"{last} ({record.skipped_in_row} skipped in a row)"
     return (
         f'{record.id} "{record.name}" · {schedule_timing(record, zone)} ({zone.key}) · {options_text(record)} · '

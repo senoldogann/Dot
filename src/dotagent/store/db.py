@@ -6900,9 +6900,10 @@ class Store:
         """A run of the schedule ``schedule_id`` started out of its time at ``started_at`` in the chat ``thread_id``, by
         the owner's hand (item 455): its last run and its chat, and nothing of
         when it fires next nor of whether it is switched on, which :meth:`record_schedule_fire` would change. It says
-        ``running`` only while ``run_id`` works (item 1047): a run that ended first has its outcome written already."""
+        ``running`` only while ``run_id`` works (item 1047): a run that ended first has its outcome written already. A
+        task of the schedule started, so the firings skipped in a row (item 1401) are over."""
         await self._db.execute(
-            "UPDATE schedules SET last_run_at = ?, thread_id = ?,"
+            "UPDATE schedules SET last_run_at = ?, thread_id = ?, skipped_in_row = 0,"
             f" last_status = CASE WHEN {_RUN_WORKS_SQL} THEN 'running' ELSE last_status END WHERE id = ?",
             (started_at, thread_id, run_id, schedule_id),
         )
@@ -6965,8 +6966,8 @@ class Store:
 
     @_writing
     async def clear_schedule_skips(self, schedule_id: str) -> None:
-        """A firing of the schedule started its run: the firings skipped in a row (item 1401) are over. Nothing is
-        written while the schedule has none."""
+        """A firing of the schedule started its run, or failed to start it: the firings skipped in a row (item 1401) are
+        over, as the last status no longer says a skip. Nothing is written while the schedule has none."""
         await self._db.execute(
             "UPDATE schedules SET skipped_in_row = 0 WHERE id = ? AND skipped_in_row != 0", (schedule_id,)
         )

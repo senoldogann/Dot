@@ -489,10 +489,11 @@ earlier runs.
   failure (item 723). A firing that started no run for another reason says "failed to start", in red.
 - A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a busy chat's,
   a task still going, a paused agent's, the emergency stop's and a late one, as the loop that merges pull requests was
-  skipped 27 times in a day with no trace but its last status. The first firing that starts a run ends the count, and
-  switching the schedule on again or changing it starts it afresh. From two on, its row on the Schedules page and its
-  line in a chat's Automations say "Skipped 5 in a row" beside the last status, and `dotx schedule list` and the
-  model's `schedule_list` add "(5 skipped in a row)" to its last result; one skip is the last status's to say.
+  skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
+  with Run now) or firing that fails to start ends the count, and switching the schedule on again or changing it starts
+  it afresh. From two on, and while the last status is a skip, its row on the Schedules page and its line in a chat's
+  Automations say "Skipped 5 in a row" beside the last status, and `dotx schedule list` and the model's `schedule_list`
+  add "(5 skipped in a row)" to its last result; one skip is the last status's to say.
 - How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
   `[scheduler] notify` (`always`, every end, by default, but one that found nothing new: a run told it is a schedule's
   says so when nothing changed for you since its last run, with `nothing_new` in its finish, and that end, done and

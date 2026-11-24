@@ -1113,13 +1113,15 @@ class Scheduler:
                 # A run going on in a recurring schedule's own chat (the owner's message in it, item 257) is no
                 # failure: the firing is skipped, as one under the emergency stop is, and nobody is told of a fault
                 # (item 723). A one-time schedule's is kept as a failure, whose wait spaces its next try.
-                log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message)
                 # Counted with the firings skipped in a row (item 1401), so that where the owner looks it says how many.
-                await store.count_schedule_skip(record.id, f"skipped: {exc.message}")
+                skipped: int | None = await store.count_schedule_skip(record.id, f"skipped: {exc.message}")
+                log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message, skipped_in_row=skipped)
                 return
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
             await store.set_schedule_status(record.id, failed)
+            # A firing that failed to start is no skip: the skips in a row (item 1401) are over.
+            await store.clear_schedule_skips(record.id)
             await record_firing_failure(store, record.id, now, failed)
             await self._tell_missed(record, failed)
             return

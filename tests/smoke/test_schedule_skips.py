@@ -1,7 +1,7 @@
 """Firings skipped in a row (item 1401), where the owner looks: the chat's Automations say "Skipped 5 in a row" beside
 the schedule's last result, and so does the row of the Schedules page, from two on (one skip is the last status's to
-say), at 1280 and at 390 wide, light and dark, with nothing wider than the screen. Served by a real server over a real
-store; no run is made."""
+say) and while the last status is a skip, at 1280 and at 390 wide, light and dark, with nothing wider than the screen.
+Served by a real server over a real store; no run is made."""
 
 import asyncio
 import time
@@ -118,6 +118,9 @@ async def test_the_chats_automations_and_the_schedules_row_say_how_many_firings_
     _, run, five = await _skipped(runtime, "PR merge loop", 5)
     _, once_run, once = await _skipped(runtime, "Nightly check", 1)
     assert (five.skipped_in_row, once.skipped_in_row) == (5, 1)
+    # A count whose status is no skip any more (a run by hand ended done meanwhile) is not said (the review's finding).
+    _, _, answered = await _skipped(runtime, "Weekly digest", 4)
+    await runtime.store.set_schedule_status(answered.id, "done")
     port: int = int(address.rpartition(":")[2])
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
@@ -145,6 +148,10 @@ async def test_the_chats_automations_and_the_schedules_row_say_how_many_firings_
                 await expect(row.locator(".badge", has_text="skipped: a run is already active")).to_be_visible()
                 await expect(
                     page.locator(f'[data-schedule="{once.id}"]').locator(".badge", has_text="in a row")
+                ).to_have_count(0)
+                await expect(page.locator(f'[data-schedule="{answered.id}"]')).to_be_visible()
+                await expect(
+                    page.locator(f'[data-schedule="{answered.id}"]').locator(".badge", has_text="in a row")
                 ).to_have_count(0)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"schedules-{width}-{scheme}.png"), full_page=True)

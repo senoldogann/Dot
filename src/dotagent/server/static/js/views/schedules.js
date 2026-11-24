@@ -115,11 +115,12 @@ function failedInRow(record) {
   return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
 }
 
-/** The row's note of firings skipped one after the other (item 1401), from two on, or null: one skip is the last status's
- * to say, beside it. A skipped firing starts no task, and the count ends with the first that does. */
+/** The row's note of firings skipped one after the other (item 1401), from two on and while the last status is a skip,
+ * or null: one skip is the last status's to say, beside it. A skipped firing starts no task, and the count ends with the
+ * first firing that does. */
 function skippedInRow(record) {
   const count = record.skipped_in_row ?? 0;
-  if (count < 2) {
+  if (count < 2 || !record.last_status.startsWith("skipped")) {
     return null;
   }
   return el("span", { class: "badge b-warn", title: "Its last firings were skipped one after the other, so no task started: the last reason is beside it" }, `Skipped ${count} in a row`);
