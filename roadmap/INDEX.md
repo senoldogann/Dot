@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |
 | [1715](1715.md) | done | 2026-11-24 | A run records why recall chose its notes and which of them it echoed |
 | [1714](1714.md) | done | 2026-11-24 | A run on the Claude plan or OpenCode is asked for its lessons as it ends |
 | [1713](1713.md) | done | 2026-11-24 | The day's room for lessons is counted by time and shared fairly between kinds of tasks |

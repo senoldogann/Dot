@@ -51,7 +51,7 @@ final class FakeDaemon: @unchecked Sendable {
     func decideElsewhere(_ approval: String, status: String) { lock.withLock { decided[approval] = status } }
 
     private func approvalRecord(_ id: String, status: String) -> ApprovalRecord {
-        ApprovalRecord(id: id, runId: "run_1", createdAt: 1, status: status, tool: "shell", summary: "", severity: "medium")
+        ApprovalRecord(id: id, runId: "run_1", createdAt: 1, status: status, tool: "shell", summary: "", severity: "medium", args: nil, note: nil, keptUntil: nil)
     }
     /// No request gets anywhere (`notConnectedToInternet`).
     var offline: Bool {

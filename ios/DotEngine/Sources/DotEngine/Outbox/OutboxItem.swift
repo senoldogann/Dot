@@ -20,7 +20,8 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case steer(run: String, thread: String, text: String, images: [String], uploaded: [String])
         /// A message that starts a chat of its own (`POST /runs`).
         case newChat(text: String, images: [String], uploaded: [String])
-        case decision(approval: String, run: String, thread: String, approve: Bool, note: String)
+        /// An answer to an ask; `remember` is "Always allow in this chat" (item 866), offered only where the daemon keeps it.
+        case decision(approval: String, run: String, thread: String, approve: Bool, note: String, remember: Bool)
         case stop(run: String, thread: String)
         /// Stops a helper by the path its view names.
         case stopHelper(path: String, run: String, thread: String)
@@ -33,6 +34,10 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case rename(thread: String, title: String)
         case pin(thread: String, pinned: Bool)
         case delete(thread: String)
+        /// A reaction put on (`on`) or taken off a message of Dot's (`message` is `answer` or `step-N`).
+        case react(run: String, thread: String, message: String, reaction: String, on: Bool)
+        /// The model and effort the chat's next follow-up starts with (`PATCH /threads/{id}` choices).
+        case choices(thread: String, choices: ChatChoices)
     }
 
     public enum Phase: String, Codable, Sendable {
@@ -88,9 +93,10 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     /// The chat the item belongs to; `nil` for a new chat.
     public var thread: String? {
         switch action {
-        case .message(let thread, _, _, _), .steer(_, let thread, _, _, _), .decision(_, _, let thread, _, _), .stop(_, let thread),
+        case .message(let thread, _, _, _), .steer(_, let thread, _, _, _), .decision(_, _, let thread, _, _, _), .stop(_, let thread),
             .stopHelper(_, _, let thread), .reorder(let thread, _), .removeQueued(let thread, _), .steerQueued(let thread, _),
-            .editQueued(let thread, _, _, _), .resumeQueue(let thread), .rename(let thread, _), .pin(let thread, _), .delete(let thread):
+            .editQueued(let thread, _, _, _), .resumeQueue(let thread), .rename(let thread, _), .pin(let thread, _), .delete(let thread),
+            .react(_, let thread, _, _, _), .choices(let thread, _):
             thread
         case .newChat: nil
         }

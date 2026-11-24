@@ -297,9 +297,9 @@ public actor Outbox {
         case .newChat(let text, _, _):
             let ids: [String] = try await upload(item)
             return .started(item, run: try await api.startChat(NewChatMessage(goal: text, key: item.id, attachments: ids)))
-        case .decision(let approval, _, _, let approve, let note):
+        case .decision(let approval, _, _, let approve, let note, let remember):
             do {
-                return .answered(item, status: try await api.decide(approval: approval, approve: approve, note: note).status)
+                return .answered(item, status: try await api.decide(approval: approval, approve: approve, note: note, remember: remember).status)
             } catch where error.statusCode == 409 || error.statusCode == 404 || error.statusCode == 422 {
                 // The card closed while the phone was away: the card's own record says how it stands.
                 return .expired(item, status: try await api.approval(approval).status)
@@ -345,6 +345,16 @@ public actor Outbox {
             return .done(item)
         case .delete(let thread):
             try await api.delete(threads: [thread])
+            return .done(item)
+        case .react(let run, _, let message, let reaction, let on):
+            do {
+                if on { try await api.react(run: run, message: message, reaction: reaction) } else { try await api.unreact(run: run, message: message, reaction: reaction) }
+            } catch where error.statusCode == 404 && !on {
+                // Not there: nothing to take back.
+            }
+            return .done(item)
+        case .choices(let thread, let choices):
+            try await api.setChoices(thread: thread, choices: choices)
             return .done(item)
         }
     }

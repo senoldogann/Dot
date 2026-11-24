@@ -179,8 +179,8 @@ final class OutboxTests: XCTestCase {
         daemon.decideElsewhere("apr_mac", status: "denied")
         let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
         let outcomes: Collected = await collect(outbox)
-        try await outbox.enqueue(.decision(approval: "apr_ok", run: "run_1", thread: "thr_1", approve: true, note: ""), id: newMessageKey(), images: [])
-        try await outbox.enqueue(.decision(approval: "apr_mac", run: "run_1", thread: "thr_1", approve: true, note: ""), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.decision(approval: "apr_ok", run: "run_1", thread: "thr_1", approve: true, note: "", remember: false), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.decision(approval: "apr_mac", run: "run_1", thread: "thr_1", approve: true, note: "", remember: false), id: newMessageKey(), images: [])
         try await outcomes.wait { $0.count == 2 }
         guard case .answered(_, "approved") = outcomes.all[0] else { return XCTFail("answered: \(outcomes.all[0])") }
         guard case .expired(_, "denied") = outcomes.all[1] else { return XCTFail("already decided on the Mac: \(outcomes.all[1])") }

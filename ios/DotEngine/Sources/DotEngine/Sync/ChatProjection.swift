@@ -104,6 +104,26 @@ public struct ChatProjection: Codable, Sendable, Equatable {
         toldRevision = nil
     }
 
+    /// A chat drawn from a view and stored events with no stream behind it, in the given freshness: the debug build's
+    /// fixtures (the screenshot harness and the UI tests), never the engine's own path.
+    public static func drawn(view: ThreadView, events: [EventRecord], freshness: Freshness) -> ChatProjection {
+        var chat: ChatProjection = ChatProjection(threadId: view.thread.id)
+        chat.view = view
+        for event in events {
+            let timeline: RunTimeline = chat.runs[event.runId] ?? RunTimeline()
+            chat.runs[event.runId] = timeline.adding(event) ?? timeline
+        }
+        chat.freshness = freshness
+        return chat
+    }
+
+    /// The same chat with the words being written of `run` (a fixture's streaming answer).
+    public func writing(_ words: String, run: String) -> ChatProjection {
+        var next: ChatProjection = self
+        next.writing[run] = words
+        return next
+    }
+
     /// The cursors the stream is opened with: each run held, its newest id (the newest 20 runs that hold events).
     public var cursors: [String: Int] {
         let held: [(String, RunTimeline)] = runs.filter { $0.value.cursor > 0 }.sorted { $0.value.cursor > $1.value.cursor }
@@ -222,11 +242,15 @@ public enum ChatReducer {
             guard let added: RunTimeline = timeline.adding(event) else { return (state, []) }
             next.runs[event.runId] = added
             if endsWriting(event) { next.writing[event.runId] = nil }
-            if let view: ThreadView = next.view, let step: HelperStep = helperStep(of: event),
-                let at: Int = view.helpers.firstIndex(where: { $0.runId == event.runId })
-            {
+            if let view: ThreadView = next.view, let at: Int = view.helpers.firstIndex(where: { $0.runId == event.runId }) {
+                // One source for a helper's state (the lead's look at N1c): its own events move its step and, at its end,
+                // its status, so the capsule never counts a helper the agents sheet shows as done.
                 var helpers: [HelperView] = view.helpers
-                helpers[at] = helpers[at].doing(step)
+                if let step: HelperStep = helperStep(of: event) {
+                    helpers[at] = helpers[at].doing(step)
+                } else if event.kind == "run_finished" {
+                    helpers[at] = helpers[at].ended(status: event.data["status"]?.string ?? "done", at: event.ts)
+                }
                 next.view = view.with(helpers: helpers)
             }
             return (next, [])

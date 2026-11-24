@@ -250,7 +250,7 @@ final class ReducerTests: XCTestCase {
         }
         XCTAssertEqual(ids(.showAll, true), ["u:run_a", "t:c1", "a:12", "t:c2", "w:run_a"])
         XCTAssertEqual(ids(.hideSuccessful, true), ["u:run_a", "a:12", "t:c2", "w:run_a"], "a failure always shows")
-        XCTAssertEqual(ids(.hideAll, true), ["u:run_a", "a:12", "w:run_a"])
+        XCTAssertEqual(ids(.hideAll, true), ["u:run_a", "a:12", "t:c2", "w:run_a"], "a failed tool still shows (the mode table)")
         XCTAssertEqual(ids(.zen, true), ["u:run_a", "w:run_a"], "Zen keeps the last answer only")
         XCTAssertEqual(ids(.showAll, false), ["u:run_a", "t:c1", "a:12", "t:c2"], "streaming off: an answer shows once it is whole")
     }
@@ -302,5 +302,16 @@ final class ReducerTests: XCTestCase {
             if case .answer = $0 { true } else { false }
         }
         XCTAssertEqual(answers, [.answer(id: "r:run_a", text: "Booked", writing: false)])
+    }
+
+    func testAHelpersEndOnTheStreamEndsItInTheViewSoTheCapsuleStopsCountingIt() {
+        var (chat, connection): (ChatProjection, Int) = live(revision: 2, runs: [record("run_a", status: "running", at: 1)])
+        let helper: HelperView = HelperView(
+            runId: "run_h", parentRunId: "run_a", threadId: "thr_h", agentId: nil, title: "t", status: "running", startedAt: 1, finishedAt: nil,
+            provider: "p", model: "m", effort: nil, step: nil, blocking: false, stop: "/api/runs/run_h/cancel")
+        chat.view = chat.view?.with(helpers: [helper])
+        chat = ChatReducer.frame(chat, .event(event(30, "run_h", "run_finished", ["status": .string("done")])), connection: connection).0
+        XCTAssertEqual(chat.view?.helpers.first?.status, "done")
+        XCTAssertEqual(chat.view?.helpers.first?.finishedAt, 30)
     }
 }
