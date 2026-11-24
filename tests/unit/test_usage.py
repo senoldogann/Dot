@@ -2,6 +2,7 @@
 last local days, a row for each day with zeros for a day with none, and reads the newest window of each kind its steps
 recorded, and the window of one run for its cost card. Fixture runs in a store, their times set by hand."""
 
+import json
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -141,6 +142,35 @@ async def test_the_usage_sums_each_local_days_runs_with_zeros_for_a_day_without_
     # One day is today alone; a window ends where the first day starts.
     assert [day.runs for day in collect_usage(database, 1, now).days] == [2]
     assert local_day_start(now, 6) == _at(6, 0, today)
+
+
+async def test_a_kind_of_window_that_only_older_steps_saw_is_there_after_many_newer_steps(tmp_path: Path) -> None:
+    """The review of item 1403: the newest steps read for the windows were a count, and a kind seen only before them
+    dropped out; the newest window of each kind is read by its kind, whatever came after."""
+    database: Path = tmp_path / "dot.sqlite3"
+    store: Store = await Store.open(database, tmp_path / "screenshots")
+    now: float = 1_800_000_000.0
+    try:
+        run: RunRecord = await _run(store, "Many steps", 700, 1, 1)
+    finally:
+        await store.close()
+
+    def step(kind: str, utilization: float, seen: float) -> tuple[str, float, str, str]:
+        window: dict[str, object] = {"kind": kind, "status": "allowed", "utilization": utilization, "resets_at": None}
+        return run.id, seen, "assistant", json.dumps({"step": 1, "plan_window": window})
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("UPDATE runs SET created_at = ?", (now - 3600,))
+        connection.executemany(
+            "INSERT INTO events(run_id, ts, kind, data) VALUES(?, ?, ?, ?)",
+            [step("seven_day_opus", 0.9, now - 7200), *[step("five_hour", 0.5, now - 3000 + i) for i in range(650)]],
+        )
+    usage: Usage = collect_usage(database, 2, now)
+    assert [(window.kind, window.utilization) for window in usage.windows] == [
+        ("five_hour", 0.5),
+        ("seven_day_opus", 0.9),
+    ]
+    assert usage.windows[0].seen_at == now - 3000 + 649
 
 
 async def test_a_run_says_the_window_its_newest_step_recorded_and_a_run_off_the_plan_says_none(tmp_path: Path) -> None:

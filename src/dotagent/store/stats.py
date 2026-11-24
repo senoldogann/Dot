@@ -1424,7 +1424,7 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
     finished_at: float = now if run[8] is None else _number(run[8], "finished_at")
     statistics_of_run: RunStatistics = _statistics(rows)
     tools: list[ToolSample] = _tool_samples(rows.tools)
-    seen: list[PlanWindowSeen] = _windows_seen(database, "run_id = ?", (run_id,), 1)
+    seen: list[PlanWindowSeen] = _read_windows(database, _RUN_WINDOW_SQL, (run_id,))
     return RunCosts(
         run_id=str(run[6]),
         status=_STATUS.validate_python(run[1]),
@@ -1438,13 +1438,24 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
     )
 
 
-# The windows of the Claude plan the steps of the runs recorded (item 1403), the newest step first: its kind, status,
-# share used and reset, and when it was taken. A step of a run that did not run on the plan records none.
-_WINDOWS_SQL: str = (
+# The window of the Claude plan the newest step of one run recorded (item 1403): its kind, status, share used and reset,
+# and when the step was taken. A step of a run that did not run on the plan records none.
+_RUN_WINDOW_SQL: str = (
     "SELECT json_extract(data, '$.plan_window.kind'), json_extract(data, '$.plan_window.status'),"
     " json_extract(data, '$.plan_window.utilization'), json_extract(data, '$.plan_window.resets_at'), ts FROM events"
-    " WHERE kind = 'assistant' AND json_extract(data, '$.plan_window.kind') IS NOT NULL AND {scope}"
-    " ORDER BY ts DESC, id DESC LIMIT ?"
+    " WHERE kind = 'assistant' AND run_id = ? AND json_extract(data, '$.plan_window.kind') IS NOT NULL"
+    " ORDER BY ts DESC, id DESC LIMIT 1"
+)
+# The newest window of each kind that any step since a time recorded, the newest first: the step of the latest moment
+# of each kind, however many steps came between (a kind that only older steps saw is still there).
+_NEWEST_WINDOWS_SQL: str = (
+    "SELECT json_extract(e.data, '$.plan_window.kind'), json_extract(e.data, '$.plan_window.status'),"
+    " json_extract(e.data, '$.plan_window.utilization'), json_extract(e.data, '$.plan_window.resets_at'), e.ts"
+    " FROM events AS e JOIN (SELECT json_extract(data, '$.plan_window.kind') AS kind, MAX(ts) AS ts FROM events"
+    " WHERE kind = 'assistant' AND json_extract(data, '$.plan_window.kind') IS NOT NULL AND ts >= ?"
+    " GROUP BY 1) AS newest"
+    " ON e.kind = 'assistant' AND e.ts = newest.ts AND json_extract(e.data, '$.plan_window.kind') = newest.kind"
+    " ORDER BY e.ts DESC, e.id DESC"
 )
 
 
@@ -1452,12 +1463,12 @@ def _optional_number(value: object) -> float | None:
     return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
 
 
-def _windows_seen(database: Path, scope: str, values: tuple[object, ...], limit: int) -> list[PlanWindowSeen]:
-    """The windows the newest ``limit`` steps of ``scope`` (an SQL condition on ``events`` with ``values``) recorded,
-    newest first. Blocking."""
+def _read_windows(database: Path, sql: str, values: tuple[object, ...]) -> list[PlanWindowSeen]:
+    """The windows ``sql`` (:data:`_RUN_WINDOW_SQL` or :data:`_NEWEST_WINDOWS_SQL`) selects with ``values``, in the
+    order it gives them. Blocking."""
     try:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
-            rows = connection.execute(_WINDOWS_SQL.format(scope=scope), (*values, limit)).fetchall()
+            rows = connection.execute(sql, values).fetchall()
     except sqlite3.Error as error:
         raise StoreError(
             "the plan's windows could not be read", {"database": str(database), "error": str(error)}
@@ -1474,8 +1485,6 @@ def _windows_seen(database: Path, scope: str, values: tuple[object, ...], limit:
     ]
 
 
-# The newest steps read for the plan's windows of a period: enough for every kind of window to be among them.
-_WINDOW_STEPS_READ: int = 500
 # One row per local day of the runs created since a time: how many, their steps, tokens and wall time (to now for a run
 # at work). The day is the run's start in the local time zone of the process, as the day of the owner's clock.
 _USAGE_SQL: str = (
@@ -1520,6 +1529,7 @@ def collect_usage(database: Path, days: int, now: float) -> Usage:
             )
         )
     newest: dict[str, PlanWindowSeen] = {}
-    for window in _windows_seen(database, "ts >= ?", (since,), _WINDOW_STEPS_READ):
+    # Two steps of one kind at the same moment are both selected: the first, the later step, stands.
+    for window in _read_windows(database, _NEWEST_WINDOWS_SQL, (since,)):
         newest.setdefault(window.kind, window)
     return Usage(days=tuple(listed), windows=tuple(sorted(newest.values(), key=lambda window: -window.seen_at)))
