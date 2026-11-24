@@ -40,6 +40,7 @@ from dotagent.codemode.sandbox import Interpreter, Layout, launch_words
 from dotagent.codemode.tree import Tree
 from dotagent.codemode.watch import resident_bytes, scratch_usage
 from dotagent.core.types import JsonObject
+from dotagent.process_groups import forget_group, record_group
 from dotagent.tools.env_filter import hides_secret
 from dotagent.tools.shell import kill_group
 
@@ -85,13 +86,15 @@ class Limits:
 @dataclass(frozen=True)
 class RunPlan:
     """One start: the interpreter, the folders (whose ``tools`` hold ``launcher.py`` and ``dot_tools``), the code, its
-    limits and ``serial``, which of the run's codes this is (the file it is kept in)."""
+    limits and ``serial``, which of the run's codes this is (the file it is kept in), for the run ``run_id``, whose
+    group is written down while the code runs (:mod:`dotagent.process_groups`)."""
 
     interpreter: Interpreter
     layout: Layout
     code: str
     limits: Limits
     serial: int
+    run_id: str
 
 
 @dataclass(frozen=True)
@@ -414,6 +417,7 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
         for descriptor in (requests_read, requests_write, replies_read, replies_write):
             os.close(descriptor)
         return Ended("unstartable", "", 0, None, None, f"{type(error).__name__}: {error}", 0, 0.0, 0.0, 0.0)
+    record_group(process.pid, plan.run_id, "codemode", f"code {plan.serial}")
     # The code has its ends; these are the daemon's copies of them, and holding them would keep the bridge open.
     os.close(requests_write)
     os.close(replies_read)
@@ -457,6 +461,7 @@ async def run_code(plan: RunPlan, handler: Handler, cancel: asyncio.Event) -> En
     finally:
         if process.returncode is None:
             kill_group(process.pid)
+        forget_group(process.pid)
         await _cancelled(tasks)
         read_transport.close()
         write_transport.close()

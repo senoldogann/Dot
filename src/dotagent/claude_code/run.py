@@ -174,6 +174,7 @@ from dotagent.llm.types import (
 from dotagent.memory.service import Remembered, memory_budget, owner_prompt_lines, owner_section
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
 from dotagent.opencode.run import meanwhile
+from dotagent.process_groups import forget_group, record_group
 from dotagent.repair.claude import LimitWindow, window_refused
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -1044,6 +1045,7 @@ async def _end_program(process: asyncio.subprocess.Process) -> None:
             async with asyncio.timeout(_TERM_GRACE_S):
                 await process.wait()
     kill_group(process.pid)
+    forget_group(process.pid)
     if process.returncode is None:
         await process.wait()
 
@@ -1363,6 +1365,8 @@ class _Launch:
                 "Claude Code could not be started", {"program": str(self.program), "error": str(error)}
             ) from error
         assert process.stdin is not None and process.stdout is not None and process.stderr is not None
+        # Until :func:`_end_program`: a daemon that dies with the program at work leaves it to the next start.
+        record_group(process.pid, run.id, "claude_code", f"Claude Code ({self.ref.model})")
         log.info(
             "claude_code_run_started",
             run_id=run.id,

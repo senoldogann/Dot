@@ -163,7 +163,7 @@ def _command_check(args: WaitArgs, ctx: ToolContext, command: str) -> Check:
 
     async def check() -> tuple[bool, str, bool]:
         code, output, _seconds, timed_out = await run_command(
-            command, run_sandbox(ctx).commands, cwd, ctx.runtime.shell_env, _CHECK_S
+            command, run_sandbox(ctx).commands, cwd, ctx.runtime.shell_env, _CHECK_S, ctx.run_id
         )
         held: bool = not timed_out and code == 0 and (args.contains is None or args.contains in output)
         tail: str = truncate_middle(output.strip(), _SEEN_CHARS)

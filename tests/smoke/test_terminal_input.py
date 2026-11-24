@@ -66,7 +66,7 @@ async def terminals() -> AsyncIterator[Terminals]:
 
 
 async def _open(terminals: Terminals, thread: str, command: str, cwd: Path) -> TerminalSession:
-    return await terminals.open(thread, command, (), cwd, False)
+    return await terminals.open(thread, command, (), cwd, False, "run_test")
 
 
 async def test_typing_into_a_program_that_does_not_read_returns_at_once(terminals: Terminals, tmp_path: Path) -> None:

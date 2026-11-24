@@ -341,7 +341,7 @@ async def _run(args: CodeRunArgs, ctx: ToolContext) -> ToolResult:
     )
     dealt: _Dealt = _Dealt()
     ended: Ended = await runner.run_code(
-        RunPlan(interpreter, layout, args.code, limits, serial),
+        RunPlan(interpreter, layout, args.code, limits, serial, ctx.run_id),
         _handler(nested, callable_here, layout, dealt),
         ctx.cancel,
     )

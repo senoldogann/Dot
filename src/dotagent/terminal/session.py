@@ -35,6 +35,7 @@ from dotagent.core.errors import TerminalInputFullError, ToolExecutionError, Too
 from dotagent.core.logs import get_logger
 from dotagent.core.text import duration_text, redact_known, truncate_middle
 from dotagent.policy.shell import typed_lines
+from dotagent.process_groups import forget_group, record_group
 from dotagent.secrets import known_secrets
 from dotagent.tools.shell import kill_group
 
@@ -315,6 +316,7 @@ class TerminalSession:
         finally:
             if self._process.returncode is None:
                 kill_group(self._process.pid)
+            forget_group(self._process.pid)
             self._drop_pending()
             if not self.ended:
                 asyncio.get_running_loop().remove_reader(self._master)
@@ -377,11 +379,12 @@ class Terminals:
             self._watcher = None
 
     async def open(
-        self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path, background: bool
+        self, thread_id: str, command: str, confinement: tuple[str, ...], cwd: Path, background: bool, run_id: str
     ) -> TerminalSession:
         """Start ``command`` in zsh on a terminal of its own, started by ``confinement`` (the words of the run's
-        sandbox, or none); ``background`` for a command the run leaves to run on its own (item 229), which a process
-        that tells no chat of its end (a ``dotx`` command, which ends with its run) refuses."""
+        sandbox, or none), for the run ``run_id``, whose group is written down until the session closes
+        (:mod:`dotagent.process_groups`); ``background`` for a command the run leaves to run on its own (item 229),
+        which a process that tells no chat of its end (a ``dotx`` command, which ends with its run) refuses."""
         if background and self._watcher is None:
             raise ToolInputError(
                 "This process tells no chat when a command ends (a dotx command ends with its run): run it with shell, "
@@ -413,6 +416,7 @@ class Terminals:
                 preexec_fn=_controlling_terminal,
             )
             started = True
+            record_group(process.pid, run_id, "terminal", command)
         except OSError as error:
             raise ToolExecutionError(
                 "the terminal session could not start", {"command": command, "cwd": str(cwd), "error": str(error)}

@@ -148,7 +148,7 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
                     {"run_id": run.id, "parent_run_id": run.parent_run_id, "campaign_id": run.campaign_id},
                 )
         session: TerminalSession = await ctx.runtime.terminals.open(
-            ctx.thread_id, args.command, run_sandbox(ctx).commands, cwd, args.background
+            ctx.thread_id, args.command, run_sandbox(ctx).commands, cwd, args.background, ctx.run_id
         )
         head: str = (
             f"[session {session.id}, in the background: {args.command}; you are told when it ends, at your next step, "

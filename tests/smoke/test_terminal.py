@@ -235,9 +235,11 @@ async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told
     watcher: _Watcher = _Watcher()
     terminals.watch(watcher)
     try:
-        idle: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
-        left: TerminalSession = await terminals.open("chat", "sleep 5; echo done", (), workspace_dir(), True)
-        stopped: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True)
+        idle: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False, "run_test")
+        left: TerminalSession = await terminals.open(
+            "chat", "sleep 5; echo done", (), workspace_dir(), True, "run_test"
+        )
+        stopped: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True, "run_test")
         await terminals.close("chat", stopped.id)
         # The reaper looks every half of the idle time.
         await asyncio.sleep(4.0)
@@ -261,9 +263,9 @@ async def test_the_end_of_a_command_in_the_background_is_taken_once(runtime: Run
     watcher: _Watcher = _Watcher()
     terminals.watch(watcher)
     try:
-        ended: TerminalSession = await terminals.open("chat", "exit 3", (), workspace_dir(), True)
-        plain: TerminalSession = await terminals.open("chat", "exit 4", (), workspace_dir(), False)
-        running: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True)
+        ended: TerminalSession = await terminals.open("chat", "exit 3", (), workspace_dir(), True, "run_test")
+        plain: TerminalSession = await terminals.open("chat", "exit 4", (), workspace_dir(), False, "run_test")
+        running: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True, "run_test")
         assert await asyncio.wait_for(watcher.ended.get(), 10.0) == ("chat", ended.id, 3)
         # The plain session's program ended too, and it is no command in the background.
         await asyncio.sleep(1.0)
@@ -288,7 +290,9 @@ async def test_a_close_cancelled_while_it_waits_still_releases_the_terminal(runt
     program running; both go now."""
     terminals: Terminals = Terminals(3, 1.0, runtime.shell_env)
     try:
-        stubborn: TerminalSession = await terminals.open("chat", "trap '' TERM; sleep 30", (), workspace_dir(), False)
+        stubborn: TerminalSession = await terminals.open(
+            "chat", "trap '' TERM; sleep 30", (), workspace_dir(), False, "run_test"
+        )
         # Let the shell set its trap first, so that the close waits out its grace.
         await asyncio.sleep(0.5)
         closing: asyncio.Task[None] = asyncio.create_task(terminals.close("chat", stubborn.id))
@@ -309,7 +313,12 @@ async def test_the_log_line_of_an_opened_terminal_masks_a_key_in_its_command(run
     try:
         with capture_logs() as logs:
             session: TerminalSession = await terminals.open(
-                "chat", "MYSQL_PASSWORD=hunter2hunter2 true --api-key abc123def456", (), workspace_dir(), False
+                "chat",
+                "MYSQL_PASSWORD=hunter2hunter2 true --api-key abc123def456",
+                (),
+                workspace_dir(),
+                False,
+                "run_test",
             )
         opened: list[str] = [str(line["command"]) for line in logs if line["event"] == "terminal_opened"]
         assert opened == ["MYSQL_PASSWORD=*** true --api-key ***"]
@@ -335,7 +344,9 @@ async def test_a_program_that_ends_at_once_leaves_what_it_printed_and_its_sessio
         sessions: list[TerminalSession] = list(
             await asyncio.gather(
                 *(
-                    terminals.open(f"chat{index}", "echo said-$((40 + 2)) >&2; exit 3", (), workspace_dir(), False)
+                    terminals.open(
+                        f"chat{index}", "echo said-$((40 + 2)) >&2; exit 3", (), workspace_dir(), False, "run_test"
+                    )
                     for index in range(40)
                 )
             )
@@ -355,7 +366,12 @@ async def test_a_session_closed_while_its_program_prints_on_its_way_out_closes_i
     terminals: Terminals = Terminals(1, 60.0, runtime.shell_env)
     try:
         talker: TerminalSession = await terminals.open(
-            "chat", "trap 'yes stopping | head -c 400000; exit 0' TERM; sleep 30", (), workspace_dir(), False
+            "chat",
+            "trap 'yes stopping | head -c 400000; exit 0' TERM; sleep 30",
+            (),
+            workspace_dir(),
+            False,
+            "run_test",
         )
         # Let the shell set its trap first.
         await asyncio.sleep(0.5)
@@ -398,10 +414,10 @@ async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime
 async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(runtime: Runtime) -> None:
     terminals: Terminals = Terminals(1, 1.0, runtime.shell_env)
     try:
-        first: str = (await terminals.open("chat", "sleep 30", (), workspace_dir(), False)).id
+        first: str = (await terminals.open("chat", "sleep 30", (), workspace_dir(), False, "run_test")).id
         with pytest.raises(ToolInputError, match="the most it may have"):
-            await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
-        await terminals.open("another chat", "sleep 30", (), workspace_dir(), False)
+            await terminals.open("chat", "sleep 30", (), workspace_dir(), False, "run_test")
+        await terminals.open("another chat", "sleep 30", (), workspace_dir(), False, "run_test")
         # The reaper looks every half of the idle time.
         await asyncio.sleep(2.5)
         with pytest.raises(ToolInputError, match=f"no terminal session {first}"):
@@ -415,8 +431,8 @@ async def test_the_emergency_stop_closes_every_terminal_and_drops_what_waits_to_
     running would go on; the stop closes every session of every chat."""
     terminals: Terminals = Terminals(3, 60.0, runtime.shell_env)
     try:
-        first: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
-        second: TerminalSession = await terminals.open("other", "cat", (), workspace_dir(), False)
+        first: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False, "run_test")
+        second: TerminalSession = await terminals.open("other", "cat", (), workspace_dir(), False, "run_test")
         second.send("x" * 20_000 + "\n")
         assert await terminals.close_all() == 2
         assert terminals.sessions("chat") == [] and terminals.sessions("other") == []
