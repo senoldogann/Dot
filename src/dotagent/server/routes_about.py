@@ -9,6 +9,8 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from dotagent.core.paths import log_dir
+from dotagent.core.types import FrozenModel
+from dotagent.loop_watch import STALL_S, LoopStall
 from dotagent.server.context import ServerContext
 from dotagent.server.diagnostics import (
     MAX_TAIL_LINES,
@@ -22,6 +24,11 @@ from dotagent.server.diagnostics import (
     read_tail,
 )
 from dotagent.server.licences import LicencesView, read_licences
+
+
+class StallsView(FrozenModel):
+    stall_s: float
+    stalls: list[LoopStall]
 
 
 def about_router(ctx: ServerContext) -> APIRouter:
@@ -45,6 +52,12 @@ def about_router(ctx: ServerContext) -> APIRouter:
     async def log_tail(name: str, lines: Annotated[int, Query(ge=1, le=MAX_TAIL_LINES)]) -> LogTail:
         """The last ``lines`` lines of the log ``name``, their secrets masked."""
         return await asyncio.to_thread(read_tail, log_dir(), name, lines)
+
+    @router.get("/diagnostics/stalls")
+    async def stalls() -> StallsView:
+        """The times the daemon's loop stopped answering for more than ``stall_s`` seconds, newest first, each with
+        where it was (item 1672)."""
+        return StallsView(stall_s=STALL_S, stalls=ctx.loop_watch.stalls())
 
     @router.get("/licences")
     async def licences() -> LicencesView:

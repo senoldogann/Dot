@@ -1144,7 +1144,13 @@ keeps takes on disk (the store, the workspace, the profiles of Dot's own Chrome,
 journals, the eval reports, skills and plugins, the logs and the home in all); and the logs, the last 300 lines of the
 one written last, or of another, with a filter. A process is named by its executable alone, as its arguments may carry a
 key, a log's lines come with their secrets masked, and the owner's own Chrome is never measured
-(`GET /api/diagnostics/processes`, `/disk`, `/logs` and `/logs/{name}?lines=`). **Open source licences** (`#/licences`,
+(`GET /api/diagnostics/processes`, `/disk`, `/logs` and `/logs/{name}?lines=`). Its **Pauses** list the last 20 times
+Dot stopped answering for more than 2 s since it started (item 1672), newest first, how long each lasted and, under
+Details, where Dot's work was at that moment: a thread of the daemon asks its event loop to answer every half second,
+and when the loop has not answered for 2 s it reads the loop's stack and logs `loop_stalled` (then `loop_stall_ended`
+with the seconds), which names the call that blocks every run, stream and page at once
+(`GET /api/diagnostics/stalls`: `stall_s`, `stalls` with `began_at`, `seconds`, `ongoing`, `stack`). **Open source
+licences** (`#/licences`,
 item 371) shows the notices that come with the pages (the fonts, the icons, and the code taken from other projects,
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
 and a search, and the tools Dot uses (Google Chrome, Ollama, Node.js, Tailscale, OpenCode), each with where it is on
@@ -1326,12 +1332,13 @@ Ctrl-C stops the daemon: the runs that are going on are cancelled, and the brows
 
 While a run of its own, a run of a `dotx` command it relays, a schedule's run or a meeting works, the daemon keeps the
 Mac from idle sleep (item 1671, `[daemon] keep_awake`, on by default): it holds `caffeinate -i -w <its pid>` from the
-first work on until `[daemon] keep_awake_after_s` (60) seconds after the last one ended, which bridges a run and the next
-one its queue or a schedule starts, and looks every 2 s. It is a child `caffeinate` rather than a power assertion made in
-the daemon's own process: `-w` lets it go when the daemon ends however it ends, a crash too, and `pmset -g assertions`
-names it. It holds on power and on battery; the display still sleeps, and a closed lid still puts a MacBook to sleep.
-`GET /api/health` and `GET /api/status` say `awake`: `holding`, `idle` or `off`, and `dotx service status` says it in a
-line. The phone's `[server] keep_awake` (`caffeinate -s` while the Mac charges, item 271) is a hold of its own.
+first work on until `[daemon] keep_awake_after_s` (60) seconds after the last one ended, which bridges a run and the
+next one its queue or a schedule starts, and looks every 2 s. It is a child `caffeinate` rather than a power assertion
+made in the daemon's own process: `-w` lets it go when the daemon ends however it ends, a crash too, and `pmset -g
+assertions` names it. It holds on power and on battery; the display still sleeps, and a closed lid still puts a MacBook
+to sleep. `GET /api/health` and `GET /api/status` say `awake`: `holding`, `idle` or `off`, and `dotx service status`
+says it in a line. The phone's `[server] keep_awake` (`caffeinate -s` while the Mac charges, item 271) is a hold of its
+own.
 
 The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address: `[server] host` is
 `127.0.0.1`, `localhost` or `::1`, written so (another spelling of a loopback address, such as `127.0.0.2` or `::1` in

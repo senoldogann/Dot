@@ -8,6 +8,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.agent.reactions import Reactions
 from dotagent.channels.service import Channels
 from dotagent.core.errors import ConfigError
+from dotagent.loop_watch import LoopWatch
 from dotagent.notify.health import NotifyHealth
 from dotagent.notify.leases import PhoneLeases
 from dotagent.runtime import Runtime
@@ -49,3 +50,5 @@ class ServerContext:
     phones: PairedPhones | None = None
     notifications: NotifyHealth = field(default_factory=NotifyHealth)
     leases: PhoneLeases = field(default_factory=PhoneLeases)
+    # The watch on the daemon's event loop (item 1672), whose stalls Diagnostics lists; started by the daemon.
+    loop_watch: LoopWatch = field(default_factory=LoopWatch)
