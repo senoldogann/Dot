@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
 from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
 from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
+from dotagent.agent.manager import BACKGROUND_SOURCE
 from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel, JsonObject
@@ -22,8 +23,10 @@ from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
     APPROVAL_CATEGORY,
+    ATTRIBUTES_TYPE,
     DISMISS_AFTER_S,
     FLEET_ID,
+    START_TITLE,
     ApnsError,
     ApnsReply,
     ApnsSender,
@@ -34,6 +37,7 @@ from dotagent.notify.apns import (
     approval_payload,
     badged,
     live_end_payload,
+    live_start_payload,
     live_update_payload,
     load_key,
     provider_token,
@@ -45,12 +49,16 @@ from dotagent.notify.apns_watch import (
     LIVE_REGISTERED_EVENT,
     OPEN_WAIT_S,
     PROGRESS_EVERY_S,
+    START_AFTER_S,
+    START_AT_ONCE,
+    START_EVERY_S,
     TOLD_TITLE,
     ApnsWatch,
     follows_live,
 )
 from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import LiveNow, tool_now
+from dotagent.notify.live_start import keep_live_start_token, live_start_token_of
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.notify.settings import PushSettings, keep_push_settings
 from dotagent.runtime import _guarded_files
@@ -765,5 +773,179 @@ async def test_a_handoffs_alert_is_a_fixed_title_and_line_and_the_route_of_its_r
         }
         for leaked in ("hunter2", "bank.example", "token=abc", "password"):
             assert leaked not in json.dumps(alert), leaked
+    finally:
+        await store.close()
+
+
+def test_the_start_of_a_live_activity_is_the_payload_apple_asks_for_with_a_fixed_alert_and_nothing_else_added() -> None:
+    """Item 1425: ``event`` ``start``, the attributes' type and its attributes, the state it opens with, ``timestamp``,
+    ``input-push-token`` (so that iOS 18 and later give the started activity a token of its own) and the alert Apple
+    requires of a start, fixed words, with no sound; the sources that start at once are the ones the app names."""
+    row = LiveState(
+        runId="run-1", title="Leads", agent="Dot", status="working", kind="thinking", line="Thinking", startedAt=_NOW
+    )
+    state: FleetState = FleetState(active=1, rows=(row,))
+    assert live_start_payload(state, _NOW) == {
+        "aps": {
+            "timestamp": int(_NOW),
+            "event": "start",
+            "content-state": state.model_dump(),
+            "attributes-type": "DotFleetAttributes",
+            "attributes": {"fleetId": "fleet"},
+            "input-push-token": 1,
+            "alert": {"title": START_TITLE, "body": ALERT_BODY},
+            "stale-date": int(_NOW + 4 * 3600),
+        }
+    }
+    assert ATTRIBUTES_TYPE == "DotFleetAttributes" and FLEET_ID == "fleet"
+    aps: object = live_start_payload(state, _NOW)["aps"]
+    assert isinstance(aps, dict) and "sound" not in aps and "sound" not in json.dumps(aps["alert"])
+    # The one source that starts at once is the command that ended in the background, as the manager names it.
+    assert {BACKGROUND_SOURCE} == START_AT_ONCE
+
+
+async def _watch(store: Store, apple: _Apple, leases: PhoneLeases | None = None) -> ApnsWatch:
+    return ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), leases)
+
+
+def _starts(apple: _Apple) -> list[tuple[str, dict[str, str], JsonObject]]:
+    """The pushes that started a Live Activity, as posted."""
+    return [post for post in apple.posted if post[2]["aps"].get("event") == "start"]  # type: ignore[union-attr]  # JSON
+
+
+async def test_a_run_of_dots_own_starts_the_live_activity_on_a_phone_that_shows_none_once_in_ten_minutes(
+    tmp_path: Path,
+) -> None:
+    """Item 1425: a phone that gave its push-to-start token, shows no activity and is not in the foreground is sent the
+    start the moment a command that ended in the background begins to work: to the start token, at priority 10, with
+    the alert Apple requires; a second start waits ten minutes and a run that is new; the same run is never started
+    again."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch: ApnsWatch = await _watch(store, apple)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        first: RunRecord = await _run(store, "background", None)
+        await watch.on_event(_event(first.id, "run_started", {}), _NOW)
+        [(url, headers, body)] = _starts(apple)
+        assert url == f"https://api.sandbox.push.apple.com/3/device/{_START}"
+        assert headers["apns-topic"] == "dev.dotagent.phone.push-type.liveactivity"
+        assert headers["apns-push-type"] == "liveactivity" and headers["apns-priority"] == "10"
+        aps: JsonObject = body["aps"]  # type: ignore[assignment]  # a JSON payload read back
+        assert aps["event"] == "start" and aps["timestamp"] == int(_NOW) and aps["attributes"] == {"fleetId": "fleet"}
+        assert aps["attributes-type"] == "DotFleetAttributes"
+        assert aps["alert"] == {"title": START_TITLE, "body": ALERT_BODY} and "sound" not in aps
+        assert _rows(_starts(apple)[0]) == [(first.id, "working")]
+        # The same run, however often the rows are read, is not started for again, nor another within ten minutes.
+        await watch.flush(_NOW + START_EVERY_S - 1)
+        second: RunRecord = await _run(store, "background", None)
+        await watch.on_event(_event(second.id, "run_started", {}), _NOW + 60)
+        assert len(_starts(apple)) == 1
+        # Past the ten minutes the run that is new earns a start, with both rows; the old one alone would not.
+        await watch.flush(_NOW + START_EVERY_S)
+        assert len(_starts(apple)) == 2 and {run for run, _ in _rows(_starts(apple)[1])} == {first.id, second.id}
+        await watch.flush(_NOW + 2 * START_EVERY_S + 1)
+        assert len(_starts(apple)) == 2
+        # An activity that starts sends its token: the rows go to it as they always did, and no start is sent again.
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW + START_EVERY_S + 1)
+        await watch.on_event(_registered(), _NOW + START_EVERY_S + 1)
+        assert apple.posted[-1][0].endswith(_ACTIVITY) and len(_starts(apple)) == 2
+    finally:
+        await store.close()
+
+
+async def test_a_run_the_owner_started_starts_one_only_after_thirty_seconds_and_never_where_the_phone_shows_dot(
+    tmp_path: Path,
+) -> None:
+    """Item 1425: the owner's own run waits until it has worked :data:`START_AFTER_S`; a phone in the foreground (its
+    lease, item 1420), one that shows an activity, one that gave no token and a run that is no row of the activity (a
+    schedule's, which nobody follows) are sent no start."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        clock: list[float] = [_NOW]
+        leases = PhoneLeases(lambda: clock[0])
+        apple = _Apple({})
+        watch: ApnsWatch = await _watch(store, apple, leases)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p3", "34" * 32, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        await keep_live_start_token(store, "p2", "ab" * 40)
+        # p3 never gave a token; p2 shows an activity already.
+        run: RunRecord = await _run(store, "ui", None)
+        began: float = run.created_at
+        await store.set_live_activity(FLEET_ID, "p2", _ACTIVITY, began)
+        clock[0] = began
+        leases.renew("p1", "foreground", None, 90.0)
+        await watch.on_event(_event(run.id, "run_started", {}), began)
+        await watch.flush(began + START_AFTER_S - 1)
+        assert _starts(apple) == []
+        # Thirty seconds of work, but the phone is in the foreground: no start.
+        await watch.flush(began + START_AFTER_S + 6)
+        assert _starts(apple) == []
+        # The app leaves: the next look starts it, on p1 alone (p2 shows one, p3 has no token).
+        leases.renew("p1", "background", None, None)
+        await watch.flush(began + START_AFTER_S + 12)
+        [(url, _, _)] = _starts(apple)
+        assert url.endswith(_START)
+        # A schedule's run is no row of the activity: nothing to start for.
+        scheduled: RunRecord = await _run(store, "schedule", None)
+        await watch.on_event(_event(scheduled.id, "run_started", {}), began + START_AFTER_S + 13)
+        await watch.flush(scheduled.created_at + START_AFTER_S + START_EVERY_S + 10)
+        assert len(_starts(apple)) == 1
+        assert await live_start_token_of(store, "p1") == _START
+    finally:
+        await store.close()
+
+
+async def test_a_start_token_that_apns_calls_gone_is_forgotten_and_a_push_that_fails_is_not_asked_again_for_ten_minutes(
+    tmp_path: Path,
+) -> None:
+    """Item 1425: a token APNs refuses as gone is forgotten (the phone's device is not: its alerts go on), and one start
+    that could not be sent counts as the try for ten minutes, so a failing push service is not asked every few seconds;
+    the runs count only once a start was sent for them, so when the ten minutes are over it is asked again for them."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({_START: ApnsReply(status=410, reason="Unregistered")})
+        watch: ApnsWatch = await _watch(store, apple)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        run: RunRecord = await _run(store, "background", None)
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW)
+        assert len(_starts(apple)) == 1 and await live_start_token_of(store, "p1") is None
+        assert [device.phone_id for device in await store.list_apns_devices()] == ["p1"]
+
+        class _Down:
+            """APNs that cannot be reached, until it is told it can."""
+
+            posts: int = 0
+            reachable: bool = False
+
+            async def post(self, url: str, headers: Mapping[str, str], body: bytes) -> ApnsReply:
+                self.posts += 1
+                if not self.reachable:
+                    raise ApnsError("APNs could not be reached", {"url": url})
+                return ApnsReply(status=200, reason="")
+
+        down = _Down()
+        failing = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), down))
+        await keep_live_start_token(store, "p1", _START)
+        await failing.on_event(_event(run.id, "run_started", {}), _NOW)
+        for later in (1, 6, 60, START_EVERY_S - 1):
+            await failing.flush(_NOW + later)
+        assert down.posts == 1
+        # The ten minutes are over and nothing was sent for the run: it is tried again, and again while it fails.
+        await failing.flush(_NOW + START_EVERY_S + 6)
+        assert down.posts == 2
+        await failing.flush(_NOW + START_EVERY_S + 12)
+        assert down.posts == 2
+        # Once a start went out for it, it is not started again, however long it works.
+        down.reachable = True
+        await failing.flush(_NOW + 2 * START_EVERY_S + 12)
+        assert down.posts == 3
+        for later in (3 * START_EVERY_S, 4 * START_EVERY_S):
+            await failing.flush(_NOW + later)
+        assert down.posts == 3
     finally:
         await store.close()

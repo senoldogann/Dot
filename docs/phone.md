@@ -149,8 +149,8 @@ code** takes its place. The same by hand:
    a code as a browser is: the code of Settings › Phone typed in the app, which trades it for the phone's own key
    (`POST /api/phone/pair`, no token needed) and keeps it in its Keychain (or the web UI's page hands the key over, one
    `dot.paired` message, taken from the daemon's own page alone). It registers what
-   Apple gives it with the key: `POST /api/phone/apns` (the device token and the environment; the token that would start a
-   Live Activity by push is no longer sent, item 1096) and, for the Live Activity once opened, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
+   Apple gives it with the key: `POST /api/phone/apns` (the device token and the environment; the token that starts a
+   Live Activity by push goes by `POST /api/phone/live-start-token` since item 1425, not here) and, for the Live Activity once opened, `POST /api/phone/apns/activity` (`DELETE` once it was swiped
    away, and when the app opens with none). Only a phone's own key registers
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside
    Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are empty. An alert
@@ -179,8 +179,12 @@ code** takes its place. The same by hand:
    1113). A row's status stays whole on its line; the title gives way. The app opens the activity itself when you
    start a run in it (a message, a
    queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
-   notification (item 1096): the daemon starts none by push, as Apple has a push that starts one bring a notification,
-   and a start is not worth one. A run started on the Mac, or by a schedule, opens no activity; you are notified when a
+   notification (item 1096). A run started on the Mac, or by a schedule, opens no activity, but for a phone that gave
+   its push-to-start token (item 1425, iOS 17.2 and later, `POST /api/phone/live-start-token`): the daemon starts the
+   activity there by push, with the notification Apple requires of a start (a fixed title and line), when the phone shows
+   none and the app is not in the foreground, at once for a command that ended in the background and for any other run
+   once it has worked 30 seconds, and at most once in ten minutes for a phone (a schedule's run is no row of the activity,
+   item 1096, so it starts none). You are notified when a
    run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. The daemon can keep
    the alert of a run's end from a phone whose app shows Dot (item 1420): the app says so with `POST /api/phone/activity`
    (in [the app's calls](#the-iphone-apps-calls) below), a lease that it renews every 25 seconds, and for as long as it
@@ -636,3 +640,51 @@ Answer it as before with `POST /api/approvals/{id}/decision`. What is **not** a 
 "Press & Hold", Turnstile), which Dot passes itself as a standing instruction ([Captcha](captcha.md)), and a login page
 that Dot meets without a step the policy hands over (it asks you with `ask_user`, a `question`, or with `ask_secret`, a
 `secret`): the browser tools give the daemon no sure sign that a page is one only you can pass, so none is recorded.
+
+### POST /api/phone/live-start-token and DELETE /api/phone/live-start-token
+
+The token that starts the phone's Live Activity by push (item 1425; `Activity<DotFleetAttributes>.pushToStartTokenUpdates`,
+iOS 17.2 and later). The app sends it as iOS gives it, and again whenever it changes, with the phone's own key; it need
+not have registered its device (`POST /api/phone/apns`) first, and registering the device never erases it. The Mac's
+token is refused (403).
+
+Body of the `POST`, the token in lowercase hex (64 to 512 characters; any other key or shape is a 422):
+
+```json
+{"token": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718"}
+```
+
+Reply, 204, with no body. `DELETE` (204, no body) forgets the phone's token: the app says it has none (Live Activities
+switched off). A token APNs calls gone, and a removed phone, are forgotten too.
+
+What the daemon does with it: when a row of the Live Activity is at work (a command that ended in the background at once,
+any other run of the owner's after 30 seconds of work), the phone has no activity registered (`POST
+/api/phone/apns/activity`), its lease (`POST /api/phone/activity`) is not foreground, and no start was sent to it in the
+last ten minutes for the runs at work, it posts this to APNs, to the phone's token, with `apns-push-type: liveactivity`,
+`apns-topic: <bundle id>.push-type.liveactivity` and `apns-priority: 10`:
+
+```json
+{
+  "aps": {
+    "timestamp": 1764000000,
+    "event": "start",
+    "content-state": {"active": 1, "rows": [{"runId": "run_mf3k2w9z_a1b2c3", "title": "Deploy the site", "agent": "Dot",
+      "status": "working", "kind": "thinking", "line": "Thinking", "startedAt": 1763999970.0}]},
+    "attributes-type": "DotFleetAttributes",
+    "attributes": {"fleetId": "fleet"},
+    "alert": {"title": "Dot is working", "body": "Open Dot to see it."},
+    "stale-date": 1764014400
+  }
+}
+```
+
+`content-state` and `attributes` are `DotFleetAttributes.ContentState` and `DotFleetAttributes` of `ios/Shared`, exactly as
+the updates of an open activity carry them; the alert is the lock-screen text of the start and is fixed: no run's
+title, command, address or answer goes in it (the chat's short title is in the first row, as in every update). The app
+that gets it starts the activity, is woken, and sends the activity's own token (`POST /api/phone/apns/activity`), after
+which every change goes to that token as before. This follows Apple's "Starting and updating Live Activities with
+ActivityKit push notifications": the push-to-start token comes from `pushToStartTokenUpdates` and goes to the server; a
+start is `event: start` with `attributes-type`, `attributes`, `content-state`, `timestamp` and an `alert`, which is
+required; the headers are `apns-push-type: liveactivity`, `apns-topic: <bundle id>.push-type.liveactivity` and
+`apns-priority` 5 or 10, 10 counting toward the hourly budget, so a start, rare by its rate, goes at 10. A phone whose
+token APNs refuses as gone loses the token and not its device; the app gives a new one when iOS changes it.

@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1425](1425.md) | done as far as the rows allow | 2026-11-24 | The Live Activity starts by push on a phone that shows none (push-to-start, iOS 17.2 and later) |
 | [1424](1424.md) | done | 2026-11-24 | "While you were away" covers what Dot did on its own, not only what a schedule did |
 | [1423](1423.md) | done as far as the data allows | 2026-11-24 | The hand-off state: a step only the owner can do is told by its host and a fixed line, one for a chat |
 | [1422](1422.md) | done | 2026-11-24 | One list of what waits on the owner (`GET /api/needs-you`), and its count on the app's badge |

@@ -252,6 +252,13 @@ class LiveActivityRegistration(FrozenModel):
     token: str = Field(pattern=APNS_TOKEN)
 
 
+class LiveStartRegistration(FrozenModel):
+    """The token that starts the phone's Live Activity by push (item 1425), as ``Activity<DotFleetAttributes>
+    .pushToStartTokenUpdates`` gives it to the app (iOS 17.2 and later), in hex."""
+
+    token: str = Field(pattern=APNS_TOKEN)
+
+
 class ActivityRequest(FrozenModel):
     """What the iPhone app says of itself (item 1420): ``foreground`` (with the chat on screen, a thread id, when it
     shows one, and for how many seconds this holds: 45 when it names none, at most 90) or ``background``, which ends the

@@ -20,6 +20,7 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import FLEET_ID
 from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT
 from dotagent.notify.leases import ActivityLease, lease_seconds
+from dotagent.notify.live_start import forget_live_start_token, keep_live_start_token
 from dotagent.notify.settings import PushSettings, forget_push_settings, keep_push_settings, push_settings_of
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
@@ -31,6 +32,7 @@ from dotagent.server.views import (
     ApnsRegistration,
     AwakeRequest,
     LiveActivityRegistration,
+    LiveStartRegistration,
     PairedView,
     PairingView,
     PairRequest,
@@ -188,6 +190,7 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         await ctx.runtime.store.delete_phone_push_subscriptions(phone_id)
         ctx.leases.forget(phone_id)
         await forget_push_settings(ctx.runtime.store, phone_id)
+        await forget_live_start_token(ctx.runtime.store, phone_id)
         return Response(status_code=204)
 
     @router.post("/phone/apns", status_code=204)
@@ -219,6 +222,28 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
             raise NotFoundError("that phone is not paired", {})
         # The rows changed while the token was on its way: the activity is told them now (notify/apns_watch.py).
         await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_REGISTERED_EVENT, {"phone_id": phone_id}, False)
+        return Response(status_code=204)
+
+    @router.post("/phone/live-start-token", status_code=204)
+    async def register_live_start_token(registration: LiveStartRegistration, http: Request) -> Response:
+        """Keep the token that starts the phone's Live Activity by push (item 1425): the app sends it as iOS gives it,
+        and again whenever it changes. With it the daemon can light the lock screen when the phone shows no activity and
+        a run of Dot's own, or one that works long, goes on (an alert comes with the start, as Apple requires). Only a
+        phone's own key asks it."""
+        phone_id: str = asking_phone(http)
+        await keep_live_start_token(ctx.runtime.store, phone_id, registration.token)
+        # The phone may have been removed while this request was on its way: its token must not outlive it.
+        if all(phone.id != phone_id for phone in phones.listed()):
+            await forget_live_start_token(ctx.runtime.store, phone_id)
+            raise NotFoundError("that phone is not paired", {})
+        log.info("live_start_token_registered", phone=phone_id)
+        return Response(status_code=204)
+
+    @router.delete("/phone/live-start-token", status_code=204)
+    async def forget_live_start(http: Request) -> Response:
+        """Forget the phone's push-to-start token (item 1425): the app says it has none now (Live Activities switched
+        off); no start is sent to the phone until it gives one again."""
+        await forget_live_start_token(ctx.runtime.store, asking_phone(http))
         return Response(status_code=204)
 
     @router.post("/phone/activity")

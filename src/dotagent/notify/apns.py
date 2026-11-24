@@ -44,6 +44,11 @@ TOKEN_EVERY_S: float = 50 * 60.0
 APPROVAL_CATEGORY: str = "DOT_APPROVAL"
 # What an alert says under its title: nothing of what happened, which Apple would read.
 ALERT_BODY: str = "Open Dot to see it."
+# What the alert that comes with a Live Activity started by push says (item 1425): Apple requires one, so that a person
+# is told of an activity they did not start; fixed, like every alert's words.
+START_TITLE: str = "Dot is working"
+# The type of the activity's attributes, as the app declares it (``DotFleetAttributes``).
+ATTRIBUTES_TYPE: str = "DotFleetAttributes"
 # How much of a chat's title a Live Activity shows.
 TITLE_CHARS: int = 40
 # How long a Live Activity of a run whose end never came stays before iOS marks it stale.
@@ -155,6 +160,30 @@ def live_update_payload(state: FleetState, now: float) -> JsonObject:
             "timestamp": int(now),
             "event": "update",
             "content-state": state.model_dump(),
+            "stale-date": int(now + STALE_AFTER_S),
+        }
+    }
+
+
+def live_start_payload(state: FleetState, now: float) -> JsonObject:
+    """The push that starts the Live Activity on a phone whose app is not showing one (item 1425, iOS 17.2 and later),
+    sent to the phone's push-to-start token: ``event`` ``start``, the activity's type and its attributes
+    (``{"fleetId": "fleet"}``), the state it opens with, and the alert Apple requires of a start, a fixed title and the
+    fixed line (Apple's "Starting and updating Live Activities with ActivityKit push notifications", under "Construct
+    the payload that starts a Live Activity"). ``input-push-token`` ``1`` is what that page gives iOS 18 and later to
+    start an activity "and receive a new push token": the app needs the activity's own token to send it to the daemon
+    (``POST /api/phone/apns/activity``), and the daemon updates the activity by it from then on. A phone on iOS 17.2
+    has no such key to read and starts the activity as before. It carries no sound: a start is not worth waking anyone
+    for."""
+    return {
+        "aps": {
+            "timestamp": int(now),
+            "event": "start",
+            "content-state": state.model_dump(),
+            "attributes-type": ATTRIBUTES_TYPE,
+            "attributes": {"fleetId": FLEET_ID},
+            "input-push-token": 1,
+            "alert": {"title": START_TITLE, "body": ALERT_BODY},
             "stale-date": int(now + STALE_AFTER_S),
         }
     }
