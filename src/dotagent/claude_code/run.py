@@ -1311,6 +1311,8 @@ class _Program:
     tail: asyncio.Task[str]
     pumps: tuple[asyncio.Task[None], ...]
     continuing: bool = False
+    # Whether it is a new session that goes on in place of a cut one and is sent the run's brief (item 1581).
+    fresh: bool = False
 
 
 @dataclass(frozen=True)
@@ -1329,8 +1331,9 @@ class _Launch:
     quiet: _Quiet
     silence_s: float
 
-    async def start(self, resume: str | None, continuing: bool) -> _Program:
-        """Start the program in the session ``resume`` names, or in a new one when it is ``None``."""
+    async def start(self, resume: str | None, continuing: bool, fresh: bool = False) -> _Program:
+        """Start the program in the session ``resume`` names, or in a new one when it is ``None``; ``fresh`` says it is
+        the new session of a cut run, which is sent the run's brief."""
         run: RunRecord = self.agent.run
         runtime: Runtime = self.agent.runtime
         argv: tuple[str, ...] = claude_argv(
@@ -1376,6 +1379,7 @@ class _Launch:
                 asyncio.create_task(_watch(self.quiet, self.silence_s, self.queue), name="claude-code-watch"),
             ),
             continuing=continuing,
+            fresh=fresh,
         )
 
 
@@ -1484,7 +1488,10 @@ class _Cuts:
             if follow.quiet.finished is not None:
                 self.at_finish = True
                 return None
-            fresh = current.continuing and not program.inited
+            # A continuation that had not said what the model has could not take its session up. Nor has a new session
+            # that never took in its brief (the run's goal, the chat, what was done) heard anything of the run: a resume
+            # of it would go on from a plan it does not have, so the next one is a new session again.
+            fresh = current.continuing and (not program.inited or (current.fresh and follow.taken == 0))
             refusal = why_not_continued(
                 program=program,
                 resumed=current.continuing,
@@ -1494,7 +1501,7 @@ class _Cuts:
                 allowed=self.allowed,
             )
         else:
-            error.context["stderr"] = await _stderr_now(current.tail, current.process)
+            error.context["stderr"] = await _masked_stderr(current)
             fresh = (
                 isinstance(error, ClaudeCodeBroke)
                 and current.continuing
@@ -1535,7 +1542,7 @@ class _Cuts:
         _drop_stale(self.launch.queue)
         await _pause(agent.cancel, waited, agent.run.id)
         self.continued += 1
-        started: _Program = await self.launch.start(None if fresh else follow.session_id, continuing=True)
+        started: _Program = await self.launch.start(None if fresh else follow.session_id, continuing=True, fresh=fresh)
         lost: list[tuple[str, tuple[ImageData, ...]]] = await follow.restart(started.stdin)
         data: JsonObject = continued_event_data(program, self.continued, self.allowed, fresh, waited)
         log.warning("claude_code_run_continued", run_id=agent.run.id, **data)
@@ -1731,6 +1738,13 @@ async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Proce
         return ""
 
 
+async def _masked_stderr(current: _Program) -> str:
+    """What the program wrote to its error stream, once it ended (:func:`_stderr_now`), masked as everything Dot logs or
+    stores is: a program may print a key in the words of its failure (items 1580 and 1581)."""
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    return redact_known(await _stderr_now(current.tail, current.process), known)
+
+
 async def _cut_of(follow: _Follow, current: _Program) -> ProgramExit:
     """How the program ended that ended before its result (item 1580): its exit code, which it is given a moment to have
     (:func:`exit_seen`; a program still running then is one Dot ends itself, with no exit of its own to report), the
@@ -1740,9 +1754,7 @@ async def _cut_of(follow: _Follow, current: _Program) -> ProgramExit:
     silent_s: float = round(time.monotonic() - follow.quiet.wrote, 1)
     returncode: int | None = await exit_seen(current.process)
     ours: bool = ended_by_dot(current.process)
-    # Masked as everything Dot logs or stores is: a program may print a key in the words of its crash.
-    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
-    stderr: str = redact_known(await _stderr_now(current.tail, current.process), known)
+    stderr: str = await _masked_stderr(current)
     program: ProgramExit = ProgramExit(
         run_id=follow.agent.run.id,
         returncode=returncode,

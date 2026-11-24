@@ -769,7 +769,7 @@ def _starts(room: Room) -> list[dict[str, object]]:
 
 
 def _forget_starts(room: Room) -> None:
-    for name in ("starts.log", "continued.json"):
+    for name in ("starts.log", "continued.json", "fresh-died"):
         (room.record / name).unlink(missing_ok=True)
 
 
@@ -1058,6 +1058,9 @@ async def test_a_resume_the_api_refuses_is_met_with_a_new_session_that_is_told_w
     assert [one["resume"] is not None for one in starts] == [False, True, False]
     events: list[EventRecord] = await _continued_events(room, ended.id)
     assert [(event.data["attempt"], event.data["fresh_session"]) for event in events] == [(1, False), (2, True)]
+    # What the refused program printed before it failed is masked, in the event as everywhere (the pre-push review).
+    refused: object = events[1].data["stderr"]
+    assert isinstance(refused, str) and "resume failed" in refused and "sk-ant" not in refused
     fresh: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
     first: str = str(fresh["messages"][0])  # type: ignore[index]  # what the new session read
     assert "refuse the resume" in first and "What the cut session had done" in first
@@ -1066,6 +1069,30 @@ async def test_a_resume_the_api_refuses_is_met_with_a_new_session_that_is_told_w
     # The new session ended clean, so the chat keeps it.
     kept: dict[str, object] = await asyncio.to_thread(_json, chat_path(ended.thread_id))
     assert kept["session_id"] == starts[2]["session"] != starts[0]["session"]
+
+
+async def test_a_new_session_cut_before_it_took_in_its_brief_is_given_the_brief_again(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581 (the pre-push review): the brief of a new session is sent once; a program that began (it said what the
+    model has) and was cut before it took the brief in has heard nothing of the run, so the next program is a new
+    session again, with the brief, not a resume of a session that has no goal."""
+    await _continuing(room, monkeypatch, 3)
+    _forget_starts(room)
+    goal: str = "Please die by sigkill and refuse the resume and the new session dies first."
+    ended: RunRecord = await _finished(room, await _start(room, goal))
+    assert ended.status == "done" and ended.result == "Continued in a new session.", ended.result
+    assert [one["resume"] is not None for one in _starts(room)] == [False, True, False, False]
+    events: list[EventRecord] = await _continued_events(room, ended.id)
+    assert [(event.data["attempt"], event.data["fresh_session"]) for event in events] == [
+        (1, False),
+        (2, True),
+        (3, True),
+    ]
+    last: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    brief: str = str(last["messages"][0])  # type: ignore[index]  # what the last program read
+    assert "the new session dies first" in brief and "What the cut session had done" in brief
+    assert "--resume" not in last["args"]  # type: ignore[operator]  # a new session
 
 
 async def test_what_the_owner_sent_that_the_cut_program_never_took_in_is_sent_to_the_next(
