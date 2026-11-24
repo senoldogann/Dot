@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 
 /// A chat as the placeholder screens of wave N0 show it; wave N1-client replaces this with the store's projection.
@@ -18,12 +19,6 @@ struct SampleAgent: Identifiable, Hashable, Sendable {
     let status: ChatStatus?
 }
 
-struct HelperStep: Identifiable, Hashable, Sendable {
-    let id: String
-    let agent: String
-    let step: String
-    let status: ChatStatus
-}
 
 /// Made-up content for the placeholder tabs and the gallery: no daemon is read in N0.
 enum Samples {
@@ -59,10 +54,10 @@ enum Samples {
     ]
 
     /// Helpers a run started, each with its current step (R-e #2).
-    static let helpers: [HelperStep] = [
-        HelperStep(id: "h1", agent: "Research", step: String(localized: "Reading the clinic's opening hours", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .working),
-        HelperStep(id: "h2", agent: "Finance", step: String(localized: "Waits for your answer about the deposit", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .waitingOnYou),
-        HelperStep(id: "h3", agent: "Research", step: String(localized: "Compared three clinics", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .done),
+    static let helpers: [HelperLine] = [
+        HelperLine(id: "h1", agent: "Research", step: String(localized: "Reading the clinic's opening hours", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .working),
+        HelperLine(id: "h2", agent: "Finance", step: String(localized: "Waits for your answer about the deposit", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .waitingOnYou),
+        HelperLine(id: "h3", agent: "Research", step: String(localized: "Compared three clinics", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .done),
     ]
 
     /// The Mac's name as the daemon reports it (content, not a UI string).
@@ -153,3 +148,4 @@ enum Samples {
         }
     }
 }
+#endif

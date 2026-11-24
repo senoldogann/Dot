@@ -92,6 +92,17 @@
         }
       }
     },
+    "%lld steps could not be shown": {
+      "comment": "Notice in a chat: frames the app could not read; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld adım gösterilemedi"
+          }
+        }
+      }
+    },
     "%lld working": {
       "comment": "Helper group header, second part; the argument is how many still work",
       "localizations": {
@@ -121,6 +132,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "49 pt, açıklamayla 63; bölüm içinde ayırıcı yok."
+          }
+        }
+      }
+    },
+    "8 letters and digits": {
+      "comment": "Pairing screen: placeholder of the code field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8 harf ve rakam"
           }
         }
       }
@@ -169,6 +191,17 @@
         }
       }
     },
+    "Agents come in a later version": {
+      "comment": "Agents tab: empty state until the agents wave",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanlar sonraki bir sürümde gelecek"
+          }
+        }
+      }
+    },
     "All": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -176,17 +209,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tümü"
-          }
-        }
-      }
-    },
-    "All chats": {
-      "comment": "Chat list filter menu",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tüm sohbetler"
           }
         }
       }
@@ -543,6 +565,17 @@
         }
       }
     },
+    "Connecting…": {
+      "comment": "Settings: the link to the Mac is being opened",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlanıyor…"
+          }
+        }
+      }
+    },
     "Connections": {
       "comment": "Settings section: the Mac, notifications, this phone",
       "localizations": {
@@ -609,17 +642,6 @@
         }
       }
     },
-    "Default": {
-      "comment": "The daemon's default model",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Varsayılan"
-          }
-        }
-      }
-    },
     "Default model": {
       "comment": "Composer model menu: use the daemon's default model",
       "localizations": {
@@ -642,6 +664,17 @@
         }
       }
     },
+    "Delete": {
+      "comment": "Confirmation button that deletes a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sil"
+          }
+        }
+      }
+    },
     "Delete chat": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -653,6 +686,17 @@
         }
       }
     },
+    "Delete this chat with everything it holds?": {
+      "comment": "Confirmation of deleting a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbet içindeki her şeyle birlikte silinsin mi?"
+          }
+        }
+      }
+    },
     "Delete…": {
       "comment": "Context menu of a chat: asks before deleting",
       "localizations": {
@@ -660,6 +704,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sil…"
+          }
+        }
+      }
+    },
+    "Delivered · Dot reads it after this step": {
+      "comment": "Under an owner's message: handed over while a tool of the run is still open",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İletildi · Dot bu adımdan sonra okuyacak"
           }
         }
       }
@@ -741,6 +796,17 @@
         }
       }
     },
+    "Dot": {
+      "comment": "The assistant's name in a chat's subtitle",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot"
+          }
+        }
+      }
+    },
     "Dot waits for you in 2 chats": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -770,6 +836,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot kendi yüzünü taşır; diğer ajanlar yalın bir daire."
+          }
+        }
+      }
+    },
+    "Edit": {
+      "comment": "Under a refused message: puts its words back in the composer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenle"
           }
         }
       }
@@ -862,17 +939,6 @@
         }
       }
     },
-    "Filter": {
-      "comment": "Chat list toolbar: the filter menu",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Süz"
-          }
-        }
-      }
-    },
     "Find a free afternoon slot": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -902,6 +968,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yüzen denetim"
+          }
+        }
+      }
+    },
+    "Forget the key": {
+      "comment": "Confirmation button that forgets the phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarı unut"
+          }
+        }
+      }
+    },
+    "Forget this phone's key": {
+      "comment": "Settings row: forgets the key this phone was paired with",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonun anahtarını unut"
+          }
+        }
+      }
+    },
+    "Forget this phone's key? You pair again with a new code.": {
+      "comment": "Confirmation of forgetting the phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonun anahtarı unutulsun mu? Yeni bir kodla yeniden eşleştirirsin."
           }
         }
       }
@@ -961,6 +1060,17 @@
         }
       }
     },
+    "Helpers Dot starts for this chat show here.": {
+      "comment": "Agents sheet empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un bu sohbet için başlattığı yardımcılar burada görünür."
+          }
+        }
+      }
+    },
     "Helpers and background work": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1016,17 +1126,6 @@
         }
       }
     },
-    "Home chat": {
-      "comment": "Agent profile row: the agent's own chat",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ana sohbet"
-          }
-        }
-      }
-    },
     "Ink": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1067,6 +1166,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Faturalar ve defterler"
+          }
+        }
+      }
+    },
+    "It was signed without its app group. Install a build signed for Dot Next.": {
+      "comment": "Detail when the app group of the app is missing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu derleme uygulama grubu olmadan imzalanmış. Dot Next için imzalanmış bir derleme kur."
+          }
+        }
+      }
+    },
+    "Key refused": {
+      "comment": "Settings: the Mac no longer takes this phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar reddedildi"
           }
         }
       }
@@ -1170,17 +1291,6 @@
         }
       }
     },
-    "Model": {
-      "comment": "Agent profile row: the model the agent runs on",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Model"
-          }
-        }
-      }
-    },
     "Model, %@": {
       "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
       "localizations": {
@@ -1214,8 +1324,19 @@
         }
       }
     },
+    "Name": {
+      "comment": "Rename alert: the field of the chat's new name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ad"
+          }
+        }
+      }
+    },
     "Needs you": {
-      "comment": "Chat list filter menu: only chats that wait for the owner\nChat list section: chats that wait for the owner\nComponent gallery (debug builds): a heading or sample text",
+      "comment": "Chat list section: chats that wait for the owner\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1236,17 +1357,6 @@
         }
       }
     },
-    "New agent": {
-      "comment": "Agents toolbar: creates an agent",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yeni ajan"
-          }
-        }
-      }
-    },
     "New chat": {
       "comment": "Chat list toolbar: starts a new chat\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1254,17 +1364,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni sohbet"
-          }
-        }
-      }
-    },
-    "No agent open": {
-      "comment": "iPad detail column when no agent is selected",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Açık ajan yok"
           }
         }
       }
@@ -1292,12 +1391,78 @@
       }
     },
     "No chats yet": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Chat list empty state title\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Henüz sohbet yok"
+          }
+        }
+      }
+    },
+    "No helpers": {
+      "comment": "Agents sheet empty state: the chat started no helper",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcı yok"
+          }
+        }
+      }
+    },
+    "Not sent: %@": {
+      "comment": "Under an owner's message the Mac refused; the argument is the Mac's own words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: %@"
+          }
+        }
+      }
+    },
+    "Not sent: it waited more than a day": {
+      "comment": "Under an owner's message too old to send again safely",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: bir günden uzun bekledi"
+          }
+        }
+      }
+    },
+    "Not sent: the Mac refused it": {
+      "comment": "Under an owner's message the Mac refused without a reason",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: Mac reddetti"
+          }
+        }
+      }
+    },
+    "Not sent: the Mac's answer could not be read": {
+      "comment": "Under an owner's message whose answer was unreadable",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: Mac'in yanıtı okunamadı"
+          }
+        }
+      }
+    },
+    "Not sent: the run had ended": {
+      "comment": "Under a message meant for a run that ended before it arrived",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: çalışma bitmişti"
           }
         }
       }
@@ -1335,6 +1500,28 @@
         }
       }
     },
+    "Offline": {
+      "comment": "Chat subtitle: the phone has no link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çevrimdışı"
+          }
+        }
+      }
+    },
+    "Offline · saved %@": {
+      "comment": "Chat subtitle: no link; the argument says how long ago the copy was saved, e.g. '4 min ago'",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çevrimdışı · %@ kaydedildi"
+          }
+        }
+      }
+    },
     "Offline · saved 4 min ago": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1353,6 +1540,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açık"
+          }
+        }
+      }
+    },
+    "On your Mac, open Dot › Settings › Phone and make a sign-in code.": {
+      "comment": "Pairing screen: what to do on the Mac first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde Dot › Ayarlar › Telefon'u aç ve bir giriş kodu oluştur."
+          }
+        }
+      }
+    },
+    "On: words appear as Dot writes them. Off: an answer appears once it is whole.": {
+      "comment": "Description of the response streaming switch",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık: sözcükler Dot yazdıkça görünür. Kapalı: yanıt tamamlanınca bir kerede görünür."
           }
         }
       }
@@ -1401,6 +1610,28 @@
         }
       }
     },
+    "Pair": {
+      "comment": "Pairing screen: the button that pairs the phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşleştir"
+          }
+        }
+      }
+    },
+    "Pair with your Mac": {
+      "comment": "Title of the pairing screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inle eşleştir"
+          }
+        }
+      }
+    },
     "Pay the 20 € deposit on the clinic's page?": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1419,17 +1650,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Soldan bir sohbet seç ya da yenisini başlat."
-          }
-        }
-      }
-    },
-    "Pick an agent to see its profile.": {
-      "comment": "iPad detail column when no agent is selected",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Profilini görmek için bir ajan seç."
           }
         }
       }
@@ -1463,6 +1683,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Soru"
+          }
+        }
+      }
+    },
+    "Queued · %lld · starts after this run": {
+      "comment": "Under an owner's message: its place in the chat's queue",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırada · %lld · bu çalışmadan sonra başlar"
+          }
+        }
+      }
+    },
+    "Queued · %lld · the queue is held": {
+      "comment": "Under an owner's message: its place in a held queue",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırada · %lld · sıra bekletiliyor"
+          }
+        }
+      }
+    },
+    "Reaching your Mac…": {
+      "comment": "Chat list while the first list read is under way",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'ine ulaşılıyor…"
           }
         }
       }
@@ -1533,6 +1786,17 @@
         }
       }
     },
+    "Reconnecting…": {
+      "comment": "Chat subtitle: the link to the Mac broke and is being opened again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden bağlanıyor…"
+          }
+        }
+      }
+    },
     "Removed from the queue": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1551,6 +1815,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeniden adlandır"
+          }
+        }
+      }
+    },
+    "Response streaming": {
+      "comment": "Settings switch: answers appear word by word as written",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt akışı"
           }
         }
       }
@@ -1610,17 +1885,6 @@
         }
       }
     },
-    "Schedules": {
-      "comment": "Agent profile row: the agent's scheduled tasks",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Zamanlamalar"
-          }
-        }
-      }
-    },
     "Scroll to the newest message": {
       "comment": "VoiceOver: the round button over the composer",
       "localizations": {
@@ -1676,6 +1940,50 @@
         }
       }
     },
+    "Send as a new message": {
+      "comment": "Under a steer refused because its run ended",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni mesaj olarak gönder"
+          }
+        }
+      }
+    },
+    "Send now into the running task": {
+      "comment": "Composer long-press: steer instead of queue",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan göreve şimdi gönder"
+          }
+        }
+      }
+    },
+    "Sending…": {
+      "comment": "Under an owner's message: it is going to the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderiliyor…"
+          }
+        }
+      }
+    },
+    "Sent": {
+      "comment": "Under an owner's message: the Mac took it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderildi"
+          }
+        }
+      }
+    },
     "Sent 12 mails; 2 bounced and are listed below.": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1683,6 +1991,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "12 e-posta gönderildi; 2'si geri döndü, aşağıda listeli."
+          }
+        }
+      }
+    },
+    "Sent to the running task": {
+      "comment": "Under an owner's message: handed to the run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan göreve gönderildi"
           }
         }
       }
@@ -1698,35 +2017,13 @@
         }
       }
     },
-    "Settle": {
-      "comment": "Swipe and context action: puts a chat away (reversible)",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kaldır"
-          }
-        }
-      }
-    },
     "Settled": {
-      "comment": "Chat list filter menu: chats the owner put away\nComponent gallery (debug builds): a heading or sample text",
+      "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Kaldırılanlar"
-          }
-        }
-      }
-    },
-    "Settled “%@”": {
-      "comment": "Toast after a chat was put away; the argument is its title",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "“%@” kaldırıldı"
           }
         }
       }
@@ -1775,6 +2072,28 @@
         }
       }
     },
+    "Sign-in code": {
+      "comment": "Pairing screen section: the 8-character code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Giriş kodu"
+          }
+        }
+      }
+    },
+    "Start one with the pencil above.": {
+      "comment": "Chat list empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yukarıdaki kalemle bir tane başlat."
+          }
+        }
+      }
+    },
     "Starting": {
       "comment": "Status word: a run is starting",
       "localizations": {
@@ -1804,6 +2123,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Durum · yarı kalın"
+          }
+        }
+      }
+    },
+    "Stop": {
+      "comment": "Chat toolbar: stops the run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durdur"
           }
         }
       }
@@ -1896,6 +2226,17 @@
         }
       }
     },
+    "Syncing…": {
+      "comment": "Chat subtitle: the chat is being brought up to date",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşitleniyor…"
+          }
+        }
+      }
+    },
     "System": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings section: health, version",
       "localizations": {
@@ -1951,6 +2292,17 @@
         }
       }
     },
+    "That code is wrong, used or out of date. Make a new one on your Mac.": {
+      "comment": "Pairing error: the Mac refused the code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kod yanlış, kullanılmış ya da süresi geçmiş. Mac'inde yeni bir tane oluştur."
+          }
+        }
+      }
+    },
     "The Mac refused this phone's key. Pair again.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1958,6 +2310,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac bu telefonun anahtarını reddetti. Yeniden eşleştir."
+          }
+        }
+      }
+    },
+    "The Mac's address": {
+      "comment": "VoiceOver: the pairing screen's address field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in adresi"
           }
         }
       }
@@ -1973,13 +2336,13 @@
         }
       }
     },
-    "The agent's profile, tools and schedules come in a later version.": {
-      "comment": "Footer of the agent placeholder screen",
+    "The code is 8 letters and digits.": {
+      "comment": "Pairing error: the code has the wrong length",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajanın profili, araçları ve zamanlamaları sonraki bir sürümde gelecek."
+            "value": "Kod 8 harf ve rakamdan oluşur."
           }
         }
       }
@@ -1991,6 +2354,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disk dolu."
+          }
+        }
+      }
+    },
+    "The key could not be kept on this phone.": {
+      "comment": "Pairing error: the Keychain refused to keep the key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar bu telefonda saklanamadı."
           }
         }
       }
@@ -2017,6 +2391,39 @@
         }
       }
     },
+    "The run ended": {
+      "comment": "Notice at the end of a run that ended another way",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma sona erdi"
+          }
+        }
+      }
+    },
+    "The run failed": {
+      "comment": "Notice at the end of a failed run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma başarısız oldu"
+          }
+        }
+      }
+    },
+    "The run was stopped": {
+      "comment": "Notice at the end of a stopped run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma durduruldu"
+          }
+        }
+      }
+    },
     "The test failed because the tokenizer read past the end of an **unterminated string**. I stopped the loop at the last character and kept the error the parser already raises; see [the failing case](https://example.invalid/case) and the change below.": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -2039,13 +2446,35 @@
         }
       }
     },
-    "This phone's key": {
-      "comment": "Settings row: the key this phone was paired with",
+    "This build cannot keep anything": {
+      "comment": "Shown when the app group of the app is missing",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bu telefonun anahtarı"
+            "value": "Bu derleme hiçbir şey saklayamıyor"
+          }
+        }
+      }
+    },
+    "This chat was deleted": {
+      "comment": "Chat subtitle: the chat was deleted on the Mac or the web",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbet silindi"
+          }
+        }
+      }
+    },
+    "This phone's key was refused": {
+      "comment": "Chat subtitle: the Mac no longer takes this phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonun anahtarı reddedildi"
           }
         }
       }
@@ -2116,6 +2545,17 @@
         }
       }
     },
+    "Try again": {
+      "comment": "Under a refused message: sends it again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden dene"
+          }
+        }
+      }
+    },
     "Type roles": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2123,6 +2563,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yazı rolleri"
+          }
+        }
+      }
+    },
+    "Type your Mac's tailnet address, like mac.your-tailnet.ts.net.": {
+      "comment": "Pairing error: the address is not a tailnet address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inin tailnet adresini yaz, örneğin mac.your-tailnet.ts.net."
           }
         }
       }
@@ -2139,7 +2590,7 @@
       }
     },
     "Undo": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nToast action that takes the last change back",
+      "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2160,6 +2611,28 @@
         }
       }
     },
+    "Update Dot on your Mac": {
+      "comment": "Chat subtitle: the Mac runs a Dot too old for this app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot'u güncelle"
+          }
+        }
+      }
+    },
+    "Update Dot on your Mac: it is too old for this app.": {
+      "comment": "Pairing error: the Mac's Dot lacks the sync calls",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot'u güncelle: bu uygulama için fazla eski."
+          }
+        }
+      }
+    },
     "Version": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2167,6 +2640,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sürüm"
+          }
+        }
+      }
+    },
+    "Waiting for the link": {
+      "comment": "Under an owner's message: it is kept and goes when the phone is online",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantı bekleniyor"
           }
         }
       }
@@ -2189,6 +2673,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapora için yanıtını bekliyor"
+          }
+        }
+      }
+    },
+    "Was working at %@ · syncing…": {
+      "comment": "Chat subtitle: a cached copy saved while a run worked; the argument is the clock time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ saatinde çalışıyordu · eşitleniyor…"
           }
         }
       }
@@ -2222,6 +2717,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un kendi başına yaptıkları (zamanlamalar, yardımcılar, bekleyen taslaklar) burada görünür."
+          }
+        }
+      }
+    },
+    "What should Dot work on?": {
+      "comment": "New chat sheet: the prompt above the composer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot ne üzerinde çalışsın?"
           }
         }
       }
@@ -2325,6 +2831,39 @@
         }
       }
     },
+    "Your Mac": {
+      "comment": "Pairing screen section: the Mac's address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in"
+          }
+        }
+      }
+    },
+    "Your Mac could not be reached. Check that it is on and on your tailnet.": {
+      "comment": "Pairing error: no answer from the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'ine ulaşılamadı. Açık ve tailnet'inde olduğunu kontrol et."
+          }
+        }
+      }
+    },
+    "Your agents and teams, their chats and schedules will show here.": {
+      "comment": "Agents tab: empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanların ve ekiplerin, sohbetleri ve zamanlamaları burada görünecek."
+          }
+        }
+      }
+    },
     "Your assistant · runs everything": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -2387,6 +2926,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "zemin"
+          }
+        }
+      }
+    },
+    "mac.your-tailnet.ts.net": {
+      "comment": "Pairing screen: placeholder of the Mac's address field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mac.your-tailnet.ts.net"
           }
         }
       }

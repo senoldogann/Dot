@@ -25,6 +25,10 @@ settings:
     # `development` (the sandbox) for an install from Xcode; `production` once a production key and profile exist.
     APS_ENVIRONMENT: development
 
+packages:
+  DotEngine:
+    path: DotEngine
+
 targets:
   Dot:
     type: application
@@ -241,10 +245,16 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # Loopback only (the debug build's end-to-end check against a throwaway daemon on this Mac); the Mac is
+        # reached over the tailnet's HTTPS otherwise.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         CFBundleURLTypes:
           - CFBundleURLName: dev.dotagent.phone.next
             CFBundleURLSchemes:
               - dotnext
+    dependencies:
+      - package: DotEngine
     entitlements:
       path: Next/DotNext.entitlements
       properties:
@@ -255,6 +265,7 @@ targets:
     scheme:
       testTargets:
         - DotNextTests
+        - package: DotEngine/DotEngineTests
 
   # Unit tests of DotNext's pure parts: the palette's contrast, the type rhythm, the reading column, component rules.
   DotNextTests:

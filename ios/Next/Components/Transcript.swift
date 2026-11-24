@@ -329,8 +329,8 @@ struct SpeakerLine: View {
 /// The helpers a run started, as one group (R-e #2): each helper's face, name, current step and status word, behind a
 /// 44 pt disclosure that says how many still work.
 struct HelperGroup: View {
-    let helpers: [HelperStep]
-    let open: (HelperStep) -> Void
+    let helpers: [HelperLine]
+    let open: (HelperLine) -> Void
     @State private var isOpen: Bool = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
@@ -383,4 +383,12 @@ struct HelperGroup: View {
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: isOpen)
     }
+}
+
+/// A helper as the helper group of a transcript shows it: who, its current step, its state.
+struct HelperLine: Identifiable, Hashable, Sendable {
+    let id: String
+    let agent: String
+    let step: String
+    let status: ChatStatus
 }
