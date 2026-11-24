@@ -63,6 +63,8 @@ from dotagent.store.models import (
     CampaignRecord,
     CampaignStatus,
     ChatChoices,
+    ChatHit,
+    ChatMessage,
     ChatTeam,
     Correspondent,
     DraftChannel,
@@ -1549,7 +1551,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
 # or renamed, data rewritten) is a step of ``_MIGRATIONS`` under the next version, and raises this. A database below
 # the version is copied first; one of a later version (a newer Dot wrote it) is refused, so that this one never writes
 # what it does not know. test_store_schema.py pins the tables of the version.
-SCHEMA_VERSION: int = 3
+SCHEMA_VERSION: int = 4
 
 
 async def _drop_trading_tables(connection: aiosqlite.Connection) -> None:
@@ -1577,11 +1579,78 @@ async def _make_run_ledger(connection: aiosqlite.Connection) -> None:
     await connection.execute("CREATE INDEX IF NOT EXISTS run_ledger_created ON run_ledger(created_at DESC)")
 
 
+# The text of a stored message and of a run's answer that the ``search_chats`` tool finds (item 1740). The index holds a
+# copy of what the chats say, nothing a person wrote is kept only here: ``chat_index`` names each indexed text (a
+# message of a chat's history, kind ``m`` with its role; a run's answer, kind ``r`` with its id, place -1) and
+# ``chat_fts`` holds the words, folded as the notes' index is (the tokenizer's case and accents, and the Turkish dotless
+# i written as i). Triggers keep it as the writers change ``messages`` and ``runs``: every insert, delete and rewind of
+# a chat's history, and a run's end or its chat's deletion, with no writer to remember it. Only what a user and an
+# assistant said: a tool's output is a page's or a file's text, which the chat's own reading tools show.
+_MESSAGE_TEXT: str = (
+    "CASE WHEN json_valid({body}) THEN json_extract({body}, '$.role') IN ('user', 'assistant')"
+    " AND coalesce(json_extract({body}, '$.content'), '') != '' ELSE 0 END"
+)
+_CHAT_INDEX_STATEMENTS: tuple[str, ...] = (
+    "CREATE TABLE IF NOT EXISTS chat_index ("
+    " id INTEGER PRIMARY KEY, thread_id TEXT NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL, ref TEXT NOT NULL)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS chat_index_place ON chat_index(kind, thread_id, seq, ref)",
+    "CREATE INDEX IF NOT EXISTS chat_index_ref ON chat_index(ref)",
+    "CREATE VIRTUAL TABLE IF NOT EXISTS chat_fts USING fts5(text, tokenize = 'unicode61 remove_diacritics 2')",
+    "CREATE TRIGGER IF NOT EXISTS chat_index_message_added AFTER INSERT ON messages"
+    f" WHEN {_MESSAGE_TEXT.format(body='NEW.body')} BEGIN"
+    " INSERT INTO chat_index(thread_id, seq, kind, ref)"
+    " VALUES (NEW.thread_id, NEW.seq, 'm', json_extract(NEW.body, '$.role'));"
+    " INSERT INTO chat_fts(rowid, text) VALUES (last_insert_rowid(),"
+    " replace(json_extract(NEW.body, '$.content'), 'ı', 'i')); END",
+    "CREATE TRIGGER IF NOT EXISTS chat_index_message_removed AFTER DELETE ON messages BEGIN"
+    " DELETE FROM chat_fts WHERE rowid IN"
+    " (SELECT id FROM chat_index WHERE kind = 'm' AND thread_id = OLD.thread_id AND seq = OLD.seq);"
+    " DELETE FROM chat_index WHERE kind = 'm' AND thread_id = OLD.thread_id AND seq = OLD.seq; END",
+    "CREATE TRIGGER IF NOT EXISTS chat_index_answer_added AFTER INSERT ON runs WHEN NEW.result != '' BEGIN"
+    " INSERT INTO chat_index(thread_id, seq, kind, ref) VALUES (NEW.thread_id, -1, 'r', NEW.id);"
+    " INSERT INTO chat_fts(rowid, text) VALUES (last_insert_rowid(), replace(NEW.result, 'ı', 'i')); END",
+    "CREATE TRIGGER IF NOT EXISTS chat_index_answer_changed AFTER UPDATE OF result ON runs BEGIN"
+    " DELETE FROM chat_fts WHERE rowid IN (SELECT id FROM chat_index WHERE kind = 'r' AND ref = OLD.id);"
+    " DELETE FROM chat_index WHERE kind = 'r' AND ref = OLD.id;"
+    " INSERT INTO chat_index(thread_id, seq, kind, ref) SELECT NEW.thread_id, -1, 'r', NEW.id WHERE NEW.result != '';"
+    " INSERT INTO chat_fts(rowid, text) SELECT last_insert_rowid(), replace(NEW.result, 'ı', 'i')"
+    " WHERE NEW.result != ''; END",
+    "CREATE TRIGGER IF NOT EXISTS chat_index_answer_removed AFTER DELETE ON runs BEGIN"
+    " DELETE FROM chat_fts WHERE rowid IN (SELECT id FROM chat_index WHERE kind = 'r' AND ref = OLD.id);"
+    " DELETE FROM chat_index WHERE kind = 'r' AND ref = OLD.id; END",
+)
+# What the chats and runs stored before the index say, written into it once, in the transaction that makes it.
+_CHAT_INDEX_BACKFILL: tuple[str, ...] = (
+    "INSERT OR IGNORE INTO chat_index(thread_id, seq, kind, ref)"
+    " SELECT thread_id, seq, 'm', json_extract(body, '$.role')"
+    f" FROM messages WHERE {_MESSAGE_TEXT.format(body='body')}",
+    "INSERT INTO chat_fts(rowid, text)"
+    " SELECT chat_index.id, replace(json_extract(messages.body, '$.content'), 'ı', 'i')"
+    " FROM chat_index JOIN messages ON messages.thread_id = chat_index.thread_id AND messages.seq = chat_index.seq"
+    " WHERE chat_index.kind = 'm' AND NOT EXISTS (SELECT 1 FROM chat_fts WHERE chat_fts.rowid = chat_index.id)",
+    "INSERT OR IGNORE INTO chat_index(thread_id, seq, kind, ref) SELECT thread_id, -1, 'r', id FROM runs"
+    " WHERE result != ''",
+    "INSERT INTO chat_fts(rowid, text) SELECT chat_index.id, replace(runs.result, 'ı', 'i')"
+    " FROM chat_index JOIN runs ON runs.id = chat_index.ref WHERE chat_index.kind = 'r'"
+    " AND NOT EXISTS (SELECT 1 FROM chat_fts WHERE chat_fts.rowid = chat_index.id)",
+)
+
+
+async def _make_chat_index(connection: aiosqlite.Connection) -> None:
+    """Version 4 (item 1740): the index of what the chats say, for the ``search_chats`` tool (the comment above), and
+    what the chats say now written into it."""
+    for statement in _CHAT_INDEX_STATEMENTS:
+        await connection.execute(statement)
+    for statement in _CHAT_INDEX_BACKFILL:
+        await connection.execute(statement)
+
+
 # The steps after the additive layer, each under the version it brings the database to, in order. Version 1 is the
 # additive layer itself, which every open applies: no step.
 _MIGRATIONS: tuple[tuple[int, Callable[[aiosqlite.Connection], Awaitable[None]]], ...] = (
     (2, _drop_trading_tables),
     (3, _make_run_ledger),
+    (4, _make_chat_index),
 )
 # Where the copy made before a migration goes, beside the database, in a folder of the version it was copied from,
 # which keeps its newest two (``_copy_before_upgrade``); runs neither read nor change them (``runtime._guarded_files``),
@@ -3301,6 +3370,66 @@ class Store:
             return [_decoded(message, self._image_dir, index in allowed) for index, message in enumerate(parsed)]
 
         return await asyncio.to_thread(decode_all)
+
+    async def search_chat_text(self, terms: Sequence[str], limit: int) -> list[ChatHit]:
+        """The texts of the chats that have any of ``terms`` (folded words, see :func:`fts_query`), best first by BM25,
+        at most ``limit`` (item 1740): a message of a chat's history, or a run's answer. A message that is not stored
+        as a user's or an assistant's is not in the index, nor is a tool's output."""
+        if not terms:
+            return []
+        rows = await self._all(
+            "SELECT chat_index.thread_id AS thread_id, chat_index.seq AS seq, chat_index.kind AS kind,"
+            " chat_index.ref AS ref, snippet(chat_fts, 0, '[', ']', '...', 24) AS snippet FROM chat_fts"
+            " JOIN chat_index ON chat_index.id = chat_fts.rowid WHERE chat_fts MATCH ?"
+            " ORDER BY bm25(chat_fts) LIMIT ?",
+            (fts_query(terms), limit),
+        )
+        return [
+            ChatHit(
+                thread_id=str(row["thread_id"]),
+                seq=int(row["seq"]),
+                kind="m" if row["kind"] == "m" else "r",
+                ref=str(row["ref"]),
+                snippet=str(row["snippet"]),
+            )
+            for row in rows
+        ]
+
+    async def chat_messages_around(self, thread_id: str, seq: int, before: int, after: int) -> list[ChatMessage]:
+        """The user's and the assistant's messages of the chat's history around place ``seq``: the ``before`` that come
+        at or before it and the ``after`` that come after, in order, with their text whole; a call's own words and a
+        tool's output are not among them (item 1740). The read waits for a write under way, as :meth:`load_messages`
+        does."""
+        async with self._write_lock:
+            rows: list[aiosqlite.Row] = await self._all(
+                "SELECT messages.seq AS seq, messages.body AS body FROM messages WHERE messages.thread_id = ?"
+                " AND messages.seq IN (SELECT seq FROM (SELECT seq FROM chat_index WHERE kind = 'm' AND thread_id = ?"
+                " AND seq <= ? ORDER BY seq DESC LIMIT ?) UNION SELECT seq FROM (SELECT seq FROM chat_index"
+                " WHERE kind = 'm' AND thread_id = ? AND seq > ? ORDER BY seq LIMIT ?)) ORDER BY messages.seq",
+                (thread_id, thread_id, seq, before, thread_id, seq, after),
+            )
+        found: list[ChatMessage] = []
+        for row in rows:
+            parsed: JsonObject = parse_json_object(str(row["body"]), "stored message")
+            role: object = parsed.get("role")
+            content: object = parsed.get("content")
+            if role in ("user", "assistant") and isinstance(content, str):
+                found.append(
+                    ChatMessage(seq=int(row["seq"]), role="user" if role == "user" else "assistant", text=content)
+                )
+        return found
+
+    async def message_run(self, thread_id: str, seq: int) -> RunRecord | None:
+        """The run whose work the message at place ``seq`` of the chat's history belongs to: the newest run of the
+        history's version that started at or before that place, else the chat's first run; ``None`` for a chat with no
+        run. It tells a hit of the chat search when it was said (item 1740)."""
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT runs.* FROM runs JOIN threads ON threads.id = runs.thread_id WHERE runs.thread_id = ?"
+            " AND runs.history_version = threads.history_version AND runs.history_seq <= ?"
+            " ORDER BY runs.history_seq DESC, runs.created_at DESC LIMIT 1",
+            (thread_id, seq),
+        )
+        return await self.first_run(thread_id) if row is None else _run(row)
 
     async def runs_from(self, run_id: str) -> list[RunRecord]:
         """The run ``run_id`` and the later runs still in its chat, oldest first: what :meth:`rewind_chat` would take
