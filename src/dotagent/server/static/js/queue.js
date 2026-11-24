@@ -376,6 +376,17 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         });
       }
     },
+    // The queue as it was last shown, for the copy of the chat the phone keeps (item 1520); null while none was read.
+    view: () => (shownRead === 0 ? null : { held, messages }),
+    // The queue of the copy the chat is drawn from, shown until the daemon's own answer comes; an answer that came first
+    // stands, and a queue that could not be read says so beside it.
+    seed: (view) => {
+      if (shownRead === 0 && view !== null && typeof view === "object" && Array.isArray(view.messages)) {
+        messages = view.messages;
+        held = view.held === true;
+        paint();
+      }
+    },
     steerFirst: () => (messages.length > 0 && active ? steer(messages[0]) : Promise.resolve()),
     setActive: (on) => {
       active = on;

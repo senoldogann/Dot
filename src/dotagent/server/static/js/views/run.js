@@ -6,6 +6,9 @@ import { agentList } from "../agentlist.js";
 import { agentPanel } from "../agentpanel.js";
 import { automationsPanel } from "../automations.js";
 import { api, eventNotShown, follow, query, sharedGet, sse } from "../api.js";
+import { historyOf } from "../cacherules.js";
+import { dropChat, keepChat, keptChat } from "../datacache.js";
+import { noteCopy } from "../linkfacts.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAsksDock } from "../asksdock.js";
@@ -124,6 +127,9 @@ const HELPERS_SETTLE_MS = 1500;
 const COST_REFRESH_MS = 10_000;
 // The newest runs of a chat read for its newest turn, its delegated runs listed among them (item 451).
 const NEWEST_READ = 20;
+// How long after a chat's last event the phone keeps it (item 1520): a run that writes for minutes is kept every so often
+// and once it pauses, not at every word.
+const KEEP_CHAT_AFTER_MS = 1500;
 
 /** What a rewind did (item 282), said in a toast, and the files it left as they are, with why, in one of its own. */
 function tellRewound(cut) {
@@ -1615,6 +1621,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         return;
       }
       drawRecord(fresh);
+      // Dot just said how the run stands: the copy kept for a return to this page, and the one the phone keeps, say so too.
+      kept.detail = fresh;
+      kept.verifiedAt = Date.now();
+      keepChatSoon();
       paintCost();
     } catch (error) {
       // A page left while the read was on its way says nothing of it (item 1036): its 404, a chat deleted meanwhile,
@@ -1626,6 +1636,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // the page is opened again, and says Task not found.
       if (error.status === 404) {
         keptRuns.delete(runId);
+        dropChat(runId);
         reload();
         return;
       }
@@ -2191,6 +2202,31 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
   replaying = false;
   keepRun(runId, kept);
+  // A chat drawn from the copy the phone kept shows the queue kept with it until the daemon's own answer comes (item
+  // 1520), now that the page that draws it stands.
+  queue.seed(kept.queue ?? null);
+  // The phone keeps the chat as it stands (item 1520), so that Dot opens with it drawn on a link that is bad or gone: a
+  // moment after its last event, when the page is put away, and when it is left. `kept.verifiedAt` is when Dot last said
+  // that this is how the chat stands: a copy drawn and not heard of since keeps its own date.
+  const keepChatNow = () => {
+    keepChat({
+      id: runId,
+      detail: kept.detail,
+      history: kept.history,
+      messages: kept.messages,
+      queue: queue.view() ?? kept.queue ?? null,
+      verifiedAt: kept.verifiedAt,
+    });
+  };
+  const keepChatSoon = debounce(keepChatNow, KEEP_CHAT_AFTER_MS);
+  const keepWhenAway = () => {
+    if (document.visibilityState === "hidden") {
+      keepChatNow();
+    }
+  };
+  document.addEventListener("visibilitychange", keepWhenAway);
+  window.addEventListener("pagehide", keepChatNow);
+  keepChatSoon();
   if (kept.messages.length > 0) {
     if (readNow) {
       // What the replay drew of the run's state gives way to its record, which this open read just now (item 646: it
@@ -2219,10 +2255,17 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     onState: (state) => {
       showConnectionNote(state === "reconnecting");
       showReconnecting(state === "reconnecting");
+      if (state === "live") {
+        // The stream took the page from the last event it read: no gap is left, the chat stands as Dot says.
+        kept.verifiedAt = Date.now();
+        keepChatSoon();
+      }
     },
     onMessage: (message) => {
       kept.messages.push(message);
+      kept.verifiedAt = Date.now();
       take(message);
+      keepChatSoon();
     },
   })).catch((error) => {
     if (signal.aborted) {
@@ -2246,6 +2289,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   });
 
   return () => {
+    keepChatNow();
+    document.removeEventListener("visibilitychange", keepWhenAway);
+    window.removeEventListener("pagehide", keepChatNow);
     if (sessionStorage.getItem(shownKey) === runId) {
       sessionStorage.removeItem(shownKey);
     }
@@ -2342,6 +2388,11 @@ export function mount(root, ctx) {
     if (kept === undefined) {
       keptRuns.delete(runId);
     }
+    // The chat as the phone kept it is drawn at once (item 1520), before any read of Dot: what changed since is asked for
+    // once it is drawn, as for a chat the page kept while it lived.
+    if (kept === undefined && !again && (await drawFromCopy())) {
+      return;
+    }
     // What stands here (the chat that goes on here from another of its runs, main.js's `goOn`; this page read again, or
     // the error it failed with) stays until this one is drawn over it, only to be seen: a word typed into it or a click
     // on it would reach a page that is gone.
@@ -2368,6 +2419,10 @@ export function mount(root, ctx) {
     } catch (error) {
       if (controller.signal.aborted) {
         return;
+      }
+      if (error.status === 404) {
+        // Dot no longer has the run: nothing of it stays on the phone.
+        dropChat(runId);
       }
       if (error.status === 404 && openedGone(runId, opening)) {
         shown();
@@ -2400,9 +2455,54 @@ export function mount(root, ctx) {
     if (controller.signal.aborted) {
       return;
     }
-    const fresh = { detail, history, messages };
+    const fresh = { detail, history, messages, verifiedAt: Date.now() };
     stopRun = showRun({ root, ctx, signal: controller.signal, detail, readNow: true, history, historyProblem, reload: () => attempt(() => open(true)), kept: fresh });
     shown();
+  }
+
+  /**
+   * Draw the chat of `runId` from the copy the phone kept of it (item 1520), at once: whether there was one. Its events
+   * go in as the stream's would, the stream goes on after the last of them, and the run's record, its questions and its
+   * lessons are read again once it is drawn (`showRun`, as for a chat the page kept while it lived). A copy that cannot
+   * be drawn is dropped and the chat is read from Dot, as it was before the cache.
+   */
+  async function drawFromCopy() {
+    const saved = await keptChat(runId);
+    if (controller.signal.aborted) {
+      return true;
+    }
+    if (saved === null) {
+      return false;
+    }
+    const copy = {
+      detail: saved.detail,
+      history: historyOf(saved),
+      messages: saved.messages,
+      queue: saved.queue,
+      verifiedAt: saved.savedAt,
+    };
+    try {
+      stopRun = showRun({
+        root,
+        ctx,
+        signal: controller.signal,
+        detail: saved.detail,
+        readNow: false,
+        history: copy.history,
+        historyProblem: null,
+        reload: () => attempt(() => open(true)),
+        kept: copy,
+      });
+    } catch (error) {
+      console.warn("the copy kept of this chat could not be drawn; it is read from Dot", error);
+      keptRuns.delete(runId);
+      dropChat(runId);
+      return false;
+    }
+    opening.found();
+    noteCopy(saved.savedAt);
+    shown();
+    return true;
   }
 
   /** The stored events of the run and of the runs it delegated to: read whole before the chat is drawn, so a chat opens

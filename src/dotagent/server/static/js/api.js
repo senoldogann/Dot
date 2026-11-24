@@ -1,6 +1,9 @@
 // The client of the Dot daemon API: bearer token, JSON requests, server-sent events and images.
 
+import { listKey } from "./cacherules.js";
+import { claim, forget, keepList, keptList } from "./datacache.js";
 import { UNREACHABLE } from "./errors.js";
+import { noteCopy, noteReached, noteUnreachable } from "./linkfacts.js";
 import { toast } from "./ui.js";
 
 const TOKEN_KEY = "dot.token";
@@ -33,6 +36,9 @@ const NOT_SHOWN_TOLD_EVERY_MS = 10000;
 // does, says nothing (item 286).
 export const QUIET_BREAK_MS = 2000;
 let token = null;
+// The key the data cache was claimed for (item 1520): the cache answers only while the page holds that key, so a key that
+// is only being tried (an address that brought one, main.js) is never answered with the chats of the key before it.
+let cacheToken = null;
 // How a phone's own key starts (server/phones.py, item 670).
 const PHONE_KEY_PREFIX = "phone.";
 let authLostHandler = null;
@@ -60,7 +66,22 @@ export function loadToken() {
   } catch {
     // Storage is unavailable here: the token then lives only in memory for this page.
   }
+  keepCacheFor(token);
   return token;
+}
+
+/** The data cache (item 1520) is the key's: claim it for `value`, which drops what it kept for another key or address. */
+function keepCacheFor(value) {
+  if (value === null || value === "") {
+    return;
+  }
+  cacheToken = value;
+  claim(value);
+}
+
+/** Whether the data cache may answer for the key the page holds. */
+function cacheOn() {
+  return token !== null && token === cacheToken;
 }
 
 /** Use `value` as the page's token; `keep` writes it in this browser's storage too, for its next pages. A token that
@@ -75,6 +96,7 @@ export function setToken(value, keep = true) {
   } catch {
     // Same as above: the page keeps working with the in-memory token.
   }
+  keepCacheFor(value);
 }
 
 /**
@@ -108,6 +130,9 @@ export function openPhoneAppSettings() {
 
 export function clearToken() {
   token = null;
+  // The key is forgotten, so are the chats kept on this phone under it (item 1520).
+  cacheToken = null;
+  forget();
   try {
     localStorage.removeItem(TOKEN_KEY);
   } catch {
@@ -218,6 +243,7 @@ async function proveDaemon() {
     const phone = phoneIdOf(token);
     response = await fetch(`/api/proof?nonce=${nonce}${phone === null ? "" : `&phone=${phone}`}`, { cache: "no-store" });
   } catch (cause) {
+    noteUnreachable();
     throw new ApiError(0, UNREACHABLE, { path: "/proof", cause: String(cause) });
   }
   const text = await response.text();
@@ -276,7 +302,34 @@ const AGENT_CHANGE = /^\/(agents(\/|$|\?)|agent-templates\/[^/]+\/use$|agent-tea
  * 1096); one that started none after all opens a card the daemon ends a minute later. */
 const RUN_START = /^\/(runs|runs\/[^/]+\/(resume|loop)|threads\/[^/]+\/queue(\/resume)?)$/;
 
+/**
+ * A request to the daemon. A read of one of the lists the shell draws (cacherules.js `listKey`) is kept on the phone as it
+ * is answered (item 1520), and while Dot cannot be reached it is answered from that copy instead, so that the page opens
+ * with its chats drawn on a link that is bad or gone; `linkfacts.js` says the page shows a copy, and since when. A refusal
+ * of the daemon's, a rejected key among them, is never answered from a copy.
+ */
 export async function request(method, path, body) {
+  if (method !== "GET" || listKey(path) === null) {
+    return ask(method, path, body);
+  }
+  let value;
+  try {
+    value = await ask(method, path, body);
+  } catch (error) {
+    const kept = unreachable(error) && cacheOn() ? await keptList(path) : null;
+    if (kept === null) {
+      throw error;
+    }
+    noteCopy(kept.savedAt);
+    return kept.value;
+  }
+  if (cacheOn()) {
+    keepList(path, value);
+  }
+  return value;
+}
+
+async function ask(method, path, body) {
   await proven();
   const headers = authHeaders();
   let payload;
@@ -288,6 +341,7 @@ export async function request(method, path, body) {
   try {
     response = await fetch(`/api${path}`, { method, headers, body: payload, cache: "no-store" });
   } catch (cause) {
+    noteUnreachable();
     throw new ApiError(0, UNREACHABLE, { path, cause: String(cause) });
   }
   if (method !== "GET") {
@@ -297,6 +351,8 @@ export async function request(method, path, body) {
   if (!response.ok) {
     throw await errorOf(response, path);
   }
+  // Dot answered: what the page shows next is its word of now, not a copy kept on the phone (linkfacts.js).
+  noteReached();
   if (method !== "GET" && SCHEDULE_CHANGE.test(path)) {
     window.dispatchEvent(new CustomEvent(SCHEDULES_CHANGED_EVENT));
   }

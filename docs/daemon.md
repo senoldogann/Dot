@@ -171,6 +171,9 @@ showed and says so. A stream from which nothing came for 45 seconds, not even th
 has stopped without closing (a network that changed, a Mac that slept): the page cuts it and makes it again (item 200).
 A run's stream goes on after the event id the client sends as `after` or as the standard `Last-Event-ID` header, the later of the two (item 1352; the iPhone app sends both).
 `GET /api/runs` takes `before`, a time in epoch seconds, beside `limit` and `thread_id`: only the runs that began before it, newest first (item 1360). The iPhone app reads a long chat back a page at a time with it, the next page starting at the `created_at` of the oldest run it holds, written with every digit so that the run it read last is not read again; a request without it is the newest page, as before.
+The page keeps what it reads of the chats and the lists the shell draws in IndexedDB (`dot-cache`, item 1520) and draws a
+chat it read before from that copy at once, the daemon being asked only for what changed since (the stream goes on after
+the last event of the copy): see [On a bad link: the web app](phone.md). The daemon is not changed by it.
 On a phone, a page back in view after two seconds or more away makes its streams again at once, from the last event it
 saw (a Mac keeps the 20 seconds of silence, as a tab switched from keeps its network): a phone put away for a moment can come back to a connection that stays open and passes nothing (a VPN that woke anew), and a
 question to you showed only once the 45 seconds had passed (item 1152).
