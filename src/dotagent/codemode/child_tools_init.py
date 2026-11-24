@@ -51,10 +51,12 @@ def list_servers() -> list[dict[str, Any]]:
     return [dict(server) for server in _catalog()["servers"]]
 
 
-def _score(words: list[str], tool: dict[str, Any]) -> int:
+def _score(query: str, words: list[str], tool: dict[str, Any]) -> int:
+    """How well a tool fits a query: the whole query as its name counts most, then each word in its name, then each in
+    its description."""
     named: str = f"{tool['module']} {tool['function']}".lower()
     described: str = str(tool["description"]).lower()
-    points: int = 0
+    points: int = 10 if query in (str(tool["function"]).lower(), f"{tool['module']}.{tool['function']}".lower()) else 0
     for word in words:
         if word in named:
             points += 3
@@ -66,15 +68,15 @@ def _score(words: list[str], tool: dict[str, Any]) -> int:
 def search_tools(query: str = "", detail: str = "name", limit: int = 10) -> list[Any]:
     """Find tools by the words of ``query`` among their names and descriptions, best first, at most ``limit`` (and 25).
     ``detail`` is how much of each is returned: ``"name"`` is ``"<server>.<tool>"``, ``"description"`` adds what the
-    tool does and the name to call it by, ``"schema"`` adds its parameters as a JSON schema. An empty ``query`` lists
-    the first tools of every server. Only what the code prints reaches the model: print a few names, not the
-    catalogue."""
+    tool does, the line that imports it and the name ``call`` takes, ``"schema"`` adds its parameters as a JSON
+    schema. An empty ``query`` lists the first tools of every server. Only what the code prints reaches the model:
+    print a few names, not the catalogue."""
     if detail not in _DETAILS:
         raise ValueError(f"detail is one of {', '.join(_DETAILS)}")
     words: list[str] = _WORDS.findall(query.lower())
     ranked: list[tuple[int, dict[str, Any]]] = []
     for tool in _catalog()["tools"]:
-        points: int = _score(words, tool)
+        points: int = _score(query.strip().lower(), words, tool)
         if points > 0 or not words:
             ranked.append((points, tool))
     ranked.sort(key=lambda pair: -pair[0])
@@ -84,7 +86,12 @@ def search_tools(query: str = "", detail: str = "name", limit: int = 10) -> list
         if detail == "name":
             found.append(name)
             continue
-        entry: dict[str, Any] = {"name": name, "tool": tool["tool"], "description": tool["description"]}
+        entry: dict[str, Any] = {
+            "name": name,
+            "import": f"from dot_tools.servers.{tool['module']} import {tool['function']}",
+            "tool": tool["tool"],
+            "description": tool["description"],
+        }
         if detail == "schema":
             entry["parameters"] = tool["parameters"]
         found.append(entry)

@@ -23,7 +23,7 @@ from pathlib import Path
 
 from pydantic import Field
 
-from dotagent.codemode import catalog, install, runner
+from dotagent.codemode import install, runner, toolfiles
 from dotagent.codemode.bridge import BridgeAnswer
 from dotagent.codemode.deny import callable_from_code, refusal_for
 from dotagent.codemode.inner import CODE_RUN_TOOL, NestedCalls, NestedResult
@@ -63,15 +63,16 @@ _EXTENSIONS: dict[str, str] = {"image/png": "png", "image/jpeg": "jpg", "image/g
 
 DESCRIPTION: str = (
     "Run Python 3.13 in a sandbox: no network, no programs, no files but its scratch folder (its working folder, kept "
-    "between the code_runs of this run). Use it for many tool calls, a lot of data, a loop or a poll: call the tools "
-    "from the code, filter and count in Python, and print only what you need (a count and at most 5 rows, never the "
-    "raw dump): only what the code prints reaches you, with the number of tool calls and the time.\n"
-    'Call a tool as `import dot_tools; dot_tools.call("read_file", path="a.txt")`: parameters as keywords; a result is '
-    'the JSON the tool said, as Python objects, else its text. dot_tools.search_tools("words", '
-    'detail="name"|"description"|"schema") finds tools; dot_tools.list_servers() says where they are.\n'
+    "between code_runs). Use it for many tool calls, a lot of data, a loop or a poll: call the tools from the code, "
+    "filter and count in Python, and print only what you need (a count and at most 5 rows, never the raw dump): only "
+    "what the code prints reaches you, with the number of tool calls and the time.\n"
+    "Tools are functions, parameters as keywords: `from dot_tools.servers.dot import read_file` (Dot's own), `from "
+    "dot_tools.servers.<server> import <tool>` (an MCP server's). A result is the JSON the tool said, as Python "
+    'objects, else its text. `import dot_tools`: dot_tools.search_tools("words", detail="name"|"description"|"schema") '
+    'finds tools, dot_tools.list_servers() says where they are, dot_tools.call("<name>", ...) calls one by name.\n'
     "Every call goes through the same approvals as if you made it: a refused call raises dot_tools.ToolRefused (do not "
     "try another way round), a failed one dot_tools.ToolError. Not callable: code_run, finish, ask_user, delegate, "
-    "terminal_*, meeting_*, phone_*. timeout_s is the code's own time (time.sleep counts), at most 200 tool calls."
+    "terminal_*, meeting_*, phone_*. timeout_s is the code's own time (time.sleep counts); 200 tool calls at most."
 )
 
 
@@ -128,10 +129,19 @@ def _prune(layout: Layout) -> None:
                 shutil.rmtree(entry.path, ignore_errors=True)
 
 
-def _prepare(layout: Layout, files: Mapping[tuple[str, ...], bytes]) -> int:
-    """Make the run's folders and write what the code reads, clear a scratch folder that is over its quota, and say
-    which of the run's codes this is. Blocking."""
-    install.install(layout, files)
+def _written_for(layout: Layout, digest: str) -> bool:
+    """Whether the tools folder was written for the tools ``digest`` says: then their files are not written again."""
+    try:
+        return layout.tools.joinpath(*toolfiles.DIGEST_FILE).read_text(encoding="ascii") == digest
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def _prepare(layout: Layout, package: toolfiles.Package) -> int:
+    """Make the run's folders and write what the code reads (the files of its tools only when they are not written for
+    these tools already), clear a scratch folder that is over its quota, and say which of the run's codes this is.
+    Blocking."""
+    install.install(layout, {} if _written_for(layout, package.digest) else package.files)
     runner.clear_scratch_if_full(layout)
     _prune(layout)
     snippets: Path = layout.tools / "snippets"
@@ -300,9 +310,9 @@ async def _run(args: CodeRunArgs, ctx: ToolContext) -> ToolResult:
     if not probe.ok:
         return fail(f"code mode needs the macOS sandbox, which did not start: {probe.why}. Nothing ran.")
     callable_here: dict[str, ToolSpec] = callable_from_code(nested.specs())
-    files: dict[tuple[str, ...], bytes] = {("dot_tools", "_catalog.json"): catalog.render(catalog.build(callable_here))}
+    package: toolfiles.Package = toolfiles.package_of(callable_here)
     try:
-        serial: int = await asyncio.to_thread(_prepare, layout, files)
+        serial: int = await asyncio.to_thread(_prepare, layout, package)
     except OSError as error:
         return fail(
             f"code mode could not make the folders its code runs in ({type(error).__name__}: {error}). Nothing ran."

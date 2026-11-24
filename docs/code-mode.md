@@ -20,14 +20,48 @@ short (`<tools>`, `<scratch>`, `<python>`, `<dot home>`, `~`) and the lines of t
 (its own time, its memory, its calls, its output, its scratch folder, the run's Stop) is an error that says which and what
 to do about it, with what it printed before.
 
-The code calls tools through `dot_tools`: `dot_tools.call("read_file", path="a.txt")`, parameters as keywords. A result is
-the JSON the tool said, as Python objects, when it said JSON, else its text, and a picture is saved in the scratch folder
+The code calls tools as functions of `dot_tools` (see "The tools as files" below), parameters as keywords. A result is the
+JSON the tool said, as Python objects, when it said JSON, else its text, and a picture is saved in the scratch folder
 (`images/`) and replaced in the text by its path. Results are not cut to what a model reads (`[agent] tool_output_chars`,
 item 494: a code reads what it filters); a result is cut at `[code] result_chars` (5,000,000 characters) so that one tool
 cannot flood the code's memory. `dot_tools.search_tools("words", detail="name"|"description"|"schema")` finds tools without
 listing them all, and `dot_tools.list_servers()` says which servers the run's tools are of: Dot's own (`dot`) and each MCP
 server. A code polls, retries and branches in Python: `time.sleep` is fine, and what counts against `[code] max_seconds` is
 the code's own time, not the time a tool call takes or the time you take to answer a question.
+
+### The tools as files (item 1502)
+
+On its first `code_run` a run gets its tools written as files in `tools/dot_tools/`, and the code imports them as it would
+any library:
+
+```python
+from dot_tools.servers.dot import read_file, search_files     # Dot's own tools
+from dot_tools.servers.github import list_issues              # an MCP server's tools, by the server's name
+rows = read_file(path="notes.txt")                            # parameters as keywords
+```
+
+`servers/<server>/<tool>.py` holds one function for each tool the run may call from code: a signature of keyword-only
+parameters made from the tool's JSON schema (a required parameter has no default, an optional one is `None` and is left out
+of the call when it is; `string` is `str`, `integer` `int`, `number` `float`, `boolean` `bool`, an array `list[...]`, an
+object `dict[str, Any]`, an enum a `Literal`, `anyOf` a union), the tool's description and its parameters as the docstring
+(`help(read_file)`), and one call into the bridge. A name that is a keyword of Python, begins with a digit or has a `-` is
+written as Python needs (`class` is `class_`, a server `web-research` is `web_research`; an MCP server called `dot` is
+`dot_mcp`), and the same tools get the same names every time. A server's package imports a tool's file when it is asked for,
+so a code that needs two tools of a server of two hundred reads two files. A tool the code cannot call (the list above) has
+no file, and a tool the run was not given has none either.
+
+The code finds what it needs without a list in any prompt: `dot_tools.search_tools("words", detail="name")` gives
+`["github.create_issue", ...]` (at most 25, the best first: the whole query as a name, then each word in a name, then in a
+description), `detail="description"` adds what each does, the line that imports it and the name `dot_tools.call` takes, and
+`detail="schema"` adds its parameters as a JSON schema; `dot_tools.list_servers()` gives each server, its kind and how many
+tools it has; `dot_tools.call("<name>", ...)` calls a tool by its name. What `code_run`'s own definition costs the model does
+not depend on how many tools the run has: it is the same 1,186 characters for ten tools and for three hundred.
+
+The files are written again only when the tools of the run changed (a digest of the catalogue is kept in
+`dot_tools/.digest`), and then the `servers` folder is removed first, so that a tool the run no longer has is not left to be
+imported; the launcher, the bridge and `dot_tools` itself are written before every start. Measured with 300 tools (ten
+servers of 30, eight parameters each, descriptions of 2,000 characters): 313 files, 2.5 MB, made in 10 ms; the first
+`code_run` of the run, with the sandbox probe and the writing, took 84 ms, the next 29 ms.
 
 ### What it is to the policy
 
