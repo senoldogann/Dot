@@ -1108,6 +1108,8 @@ steered by what a stranger wrote. Two checks hold for such a run, and neither as
   is refused, never followed (item 556). A plugin's MCP servers, and those you added, start with the
   daemon and are given keys from the key store: put a plugin or a skill in place yourself, or install one from
   Settings › Plugins, which takes a gallery plugin's skills alone, as its commit pins them (item 542).
+- The shared appearance also uses the `self_change` approval rule when a chat applies or undoes a theme
+  (`theme_apply`, `theme_undo`).
 - A file git runs as code is asked about like Dot's own files when a file tool writes it (item 1301): the `config` of a
   git directory (`.git/config`, `.git/modules/<name>/config`, a bare repository's `config`, `config.worktree`: it can
   name a program for `core.fsmonitor`, `core.sshCommand`, an alias or a filter) and what lies under its `hooks` run the

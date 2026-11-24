@@ -1033,6 +1033,10 @@ async def test_a_helper_that_is_cut_gives_its_parent_the_final_result_of_the_con
     parent: RunRecord = await _start(room, "Please talk with me.")
     try:
         async with asyncio.timeout(60):
+            async with room.runtime.bus.subscribe(parent.id) as feed:
+                room.manager.tell(parent.id, "The owner reacted ✋: hold on.", "hold")
+                while (await feed.queue.get()).kind != "reaction_hold":
+                    pass
             outcome = await room.manager.delegate(parent.id, "Please die by sigkill once.", "task", None, None)
         helper: RunRecord = outcome.run
         assert helper.status == "done" and helper.result == "Continued." and helper.parent_run_id == parent.id
