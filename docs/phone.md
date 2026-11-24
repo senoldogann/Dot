@@ -458,6 +458,43 @@ copy was kept of it (the first opening from the home screen after the app is add
 it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
 
+**While you were away on the phone** (item 1424): `GET /api/away?since=<seconds since the epoch>` (any token, a phone's
+key too) lists what Dot did on its own since that moment, kept within the last week, and `GET /api/away/read` and `POST
+/api/away/read` keep the moment for every device (item 1356: the iPhone, the Mac and a browser agree on what is news;
+`{"until": <seconds>}` moves it on, never back, never past now). The runs listed are those of every source Dot starts by itself and nobody
+watches (a schedule or a campaign, a watcher's run, Dot's own initiative, a reply to a mail), an agent's work (`team`) and a
+command that ended in the background (`background`), and what ran in an agent's own chat under a source that is not the
+owner's (`ui`, `cli`, a review, an eval, an agent's welcome and a run resumed after one the owner started are theirs: they
+wait for them).
+A reply:
+
+```json
+{
+  "since": 1764000000.0, "until": 1764003600.0,
+  "done": 3, "failed": 1, "cancelled": 0, "working": 1, "campaign_sessions": 0,
+  "runs": [
+    {"run_id": "run_mf3k2x1a_1c04d1", "title": "Deploy the site", "source": "background", "campaign": false,
+     "agent_id": null, "status": "done", "steps": 4, "created_at": 1764000100.0, "finished_at": 1764000160.0,
+     "answer": "The deploy finished."}
+  ],
+  "decisions": {"reviewer_approved": 0, "reviewer_denied": 0, "yolo_approved": 2, "yolo_denied": 0},
+  "decision_runs": [{"run_id": "run_mf3k2x1a_1c04d1", "title": "Deploy the site", "reviewer": 0, "yolo": 2, "denied": 0}],
+  "drafts": 1
+}
+```
+
+`title` is the name of the campaign or the schedule, else of the chat (for a reply, an agent's work or a command in the
+background), else the first line of the goal; `source` says what started the run; `status` is `done`, `failed`,
+`cancelled`, or one of the states of a run that works (`queued`, `running`, `blocked`, `ending`); `answer` is the first
+line of its answer with its secrets masked (200 characters at most). The counts are of every such run since the moment,
+the list is the newest fifty, and the view carries no summary and no arguments of an approval.
+
+`since` is required and a number of 0 or more (a missing or negative one is a 422); the daemon takes it within the last
+seven days and never after now, and `until` is now. `GET /api/away/read` answers `{"read_at": 1764003000.0}` (`null`
+before any device marked it); `POST /api/away/read` takes `{"until": 1764003600.0}` (a number of 0 or more, no other key,
+or a 422) and answers the same shape with where the mark stands, which it never moves back, nor past now. The three
+calls answer 401 without a valid token.
+
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
 ## The iPhone app's calls

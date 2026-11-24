@@ -570,7 +570,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.get("/away")
     async def away(query: Annotated[AwayQuery, Query()]) -> AwayView:
-        """What schedules and campaigns did since ``since`` (item 466), for the Home's "while you were away"."""
+        """What Dot did on its own since ``since`` (items 466 and 1424), for the Home's "while you were away"."""
         return await read_away(store, query.since, time.time())
 
     @router.get("/away/read")

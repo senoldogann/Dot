@@ -1,9 +1,10 @@
-"""While you were away (item 466), through the daemon's routes on a store seeded as schedules, campaigns and the owner's
-own chats leave it: the runs schedules and campaigns started that ended or work since the moment, counted and listed
-with their names; the approvals answered for the owner in them and their helpers, not the owner's own, nor one from
-before the moment, nor one of another chat; the drafts they wrote that wait; nothing of an approval's summary or
-arguments; an answer's secret masked; the moment kept within the week. And the Home's card: nothing on a first visit,
-then the news, Show more, and Mark as read for good."""
+"""While you were away (items 466 and 1424), through the daemon's routes on a store seeded as schedules, campaigns, the
+other starts of Dot's own (a reply's, an agent's work, a command in the background) and the owner's own chats leave it:
+the runs Dot did on its own that ended or work since the moment, counted and listed with their names and their source;
+the approvals answered for the owner in them and their helpers, not the owner's own, nor one from before the moment, nor
+one of another chat; the drafts they wrote that wait; nothing of an approval's summary or arguments; an answer's secret
+masked; the moment kept within the week. And the Home's card: nothing on a first visit, then the news, Show more, and
+Mark as read for good."""
 
 import asyncio
 import time
@@ -188,6 +189,47 @@ async def test_the_digest_counts_what_schedules_and_campaigns_did_and_what_was_d
     assert float(weekly["since"]) >= time.time() - AWAY_WINDOW_S - 60
 
 
+async def test_the_route_lists_what_dot_did_under_every_source_the_card_names_and_not_what_the_owner_started(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 1424: a reply's run, an agent's work (which a run sent, so it has a parent), a watcher's run and a command
+    that ended in the background are listed with their source, named by their chat; so is a run nobody started in an
+    agent's own chat; the owner's own runs, in any chat, and the work an owner's run sent are not."""
+    store: Store = runtime.store
+    plain: ThreadRecord = await store.create_thread("Deploy the site", "ui")
+    agent = await store.create_agent("Scout", "Finds leads", "", OPUS, None, None, (), None, None)
+    agents_chat: ThreadRecord = await store.create_thread("Scout", "ui", None, agent.id)
+    await asyncio.sleep(0.05)
+    since: float = time.time()
+    await asyncio.sleep(0.05)
+    reply: RunRecord = await _run(store, plain.id, "A reply came.", "reply", None, None)
+    wanted: dict[str, RunRecord] = {
+        "reply": reply,
+        "team": await _run(store, agents_chat.id, "Write the offer.", "team", reply.id, None),
+        "background": await _run(store, plain.id, "The command ended.", "background", None, None),
+        "work_order": await _run(store, agents_chat.id, "The order came back.", "work_order", None, None),
+        "watcher": await _run(store, plain.id, "A mail came in.", "watcher", None, None),
+    }
+    mine: RunRecord = await _run(store, agents_chat.id, "Tidy the notes.", "ui", None, None)
+    # The work the owner's own run sent an agent: they wait for that run, and for the work in it.
+    owners_work: RunRecord = await _run(store, agents_chat.id, "Write the offer.", "team", mine.id, None)
+    for run in (*wanted.values(), mine, owners_work):
+        await store.finish_run(run.id, "done", "Done.")
+    shown: httpx.Response = await client.get("/api/away", params={"since": since})
+    assert shown.status_code == 200, shown.text
+    view: JsonObject = shown.json()
+    rows: dict[str, JsonObject] = {str(row["run_id"]): row for row in view["runs"]}  # type: ignore[attr-defined]  # JSON
+    assert set(rows) == {run.id for run in wanted.values()}
+    assert {str(row["source"]): row["title"] for row in rows.values()} == {
+        "reply": "Deploy the site",
+        "team": "Scout",
+        "background": "Deploy the site",
+        "work_order": "Scout",
+        "watcher": "Deploy the site",
+    }
+    assert view["done"] == 5 and mine.id not in rows and owners_work.id not in rows
+
+
 async def _scheduled_runs(store: Store, count: int) -> None:
     """``count`` runs of a schedule, each with an approval YOLO answered."""
     chat: ThreadRecord = await _schedule_chat(store, "news")
@@ -226,7 +268,7 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                 await _scheduled_runs(runtime.store, 3)
                 await page.reload()
                 await expect(card.locator(".away-line")).to_have_text(
-                    "3 scheduled tasks: 3 done · 3 decisions made for you (3 without asking)"
+                    "3 tasks: 3 done · 3 decisions made for you (3 without asking)"
                 )
                 for rows, more in (
                     ("[data-away-run]", '[data-away-more="runs"]'),
@@ -243,7 +285,7 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                 await other.add_init_script("localStorage.setItem('dot.homeDay', 'shown')")
                 await other.goto(ui_url("127.0.0.1", port, TOKEN))
                 await expect(other.locator(".home-away .away-line")).to_have_text(
-                    "3 scheduled tasks: 3 done · 3 decisions made for you (3 without asking)"
+                    "3 tasks: 3 done · 3 decisions made for you (3 without asking)"
                 )
                 await card.get_by_role("button", name="Mark as read").click()
                 await expect(card).to_be_hidden()

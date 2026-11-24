@@ -20,9 +20,9 @@ test("nothing that happened says nothing", () => {
 });
 
 test("one run is one, several are several, and only what happened is said", () => {
-  assert.equal(awayLine({ ...NOTHING, done: 1 }), "1 scheduled task: 1 done");
-  assert.equal(awayLine({ ...NOTHING, done: 5, failed: 1 }), "6 scheduled tasks: 5 done, 1 failed");
-  assert.equal(awayLine({ ...NOTHING, cancelled: 1, working: 2 }), "3 scheduled tasks: 1 stopped, 2 working");
+  assert.equal(awayLine({ ...NOTHING, done: 1 }), "1 task: 1 done");
+  assert.equal(awayLine({ ...NOTHING, done: 5, failed: 1 }), "6 tasks: 5 done, 1 failed");
+  assert.equal(awayLine({ ...NOTHING, cancelled: 1, working: 2 }), "3 tasks: 1 stopped, 2 working");
 });
 
 test("campaign sessions, decisions made for the owner and drafts join the line", () => {
@@ -35,7 +35,7 @@ test("campaign sessions, decisions made for the owner and drafts join the line",
   };
   assert.equal(
     awayLine(view),
-    "2 scheduled tasks: 2 done · 1 campaign session · 14 decisions made for you (9 without asking, 5 by the reviewer; 1 denied) · 2 drafts wait for you",
+    "2 tasks: 2 done · 1 campaign session · 14 decisions made for you (9 without asking, 5 by the reviewer; 1 denied) · 2 drafts wait for you",
   );
   assert.equal(
     awayLine({ ...NOTHING, decisions: { ...NOTHING.decisions, yolo_approved: 1 }, drafts: 1 }),

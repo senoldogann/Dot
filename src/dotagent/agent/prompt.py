@@ -610,7 +610,7 @@ _WATCHED: str = "This run was started by the user's own message."
 _BY_DOT: str = "This run was started by Dot ({source}), not by a new message of the user's."
 # The sources of a run that a message of the owner's starts in the app or with dotx run (a review too), and of an
 # eval's task, whose goal stands for one; a phone's channel has its own line.
-_OWNER_SOURCES: frozenset[str] = frozenset({UI_SOURCE, CLI_SOURCE, REVIEW_SOURCE, EVAL_SOURCE})
+OWNER_SOURCES: frozenset[str] = frozenset({UI_SOURCE, CLI_SOURCE, REVIEW_SOURCE, EVAL_SOURCE})
 
 _STARTED_LEAD: str = (
     "[system note] How this run was started; it holds for this run, in place of what earlier runs of this chat were "
@@ -807,7 +807,7 @@ def _started_lines(inputs: PromptInputs) -> list[str]:
     if not lines:
         # Only a message of the owner's is said to be one: a run Dot started (a notice, a resumed run, a teammate's)
         # is told so, and neither stands under the lead as the owner's word.
-        lines.append(_WATCHED if inputs.source in _OWNER_SOURCES else _BY_DOT.format(source=inputs.source))
+        lines.append(_WATCHED if inputs.source in OWNER_SOURCES else _BY_DOT.format(source=inputs.source))
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(_LEFT_QUESTIONS)

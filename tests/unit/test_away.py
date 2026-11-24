@@ -38,7 +38,7 @@ def _run(run_id: str, goal: str, result: str, campaign_id: str | None, created_a
 
 
 def _unattended(run: RunRecord, schedule_name: str | None, campaign_title: str | None) -> UnattendedRun:
-    return UnattendedRun(run=run, schedule_name=schedule_name, campaign_title=campaign_title)
+    return UnattendedRun(run=run, schedule_name=schedule_name, campaign_title=campaign_title, thread_title=None)
 
 
 def test_the_moment_is_kept_within_the_week_and_never_after_now() -> None:

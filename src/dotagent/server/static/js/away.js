@@ -1,5 +1,6 @@
-// While you were away (item 466): what your schedules and campaigns did since you last marked it read, on any of your
-// devices (item 1356: Dot keeps the moment, `GET` and `POST /away/read`), a card over the Home's Today strip, read from
+// While you were away (items 466 and 1424): what Dot did on its own (your schedules and campaigns, its replies, its
+// agents' work, the commands that ended in the background) since you last marked it read, on any of your devices
+// (item 1356: Dot keeps the moment, `GET` and `POST /away/read`), a card over the Home's Today strip, read from
 // `GET /away` and kept fresh by the lifecycle stream. The first visit from any device marks the moment and shows
 // nothing, so the card never pours out history; Mark as read moves the moment on for every device.
 

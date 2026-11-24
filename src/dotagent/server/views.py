@@ -2262,12 +2262,14 @@ class ActivityCount(FrozenModel):
 
 
 class AwayRun(FrozenModel):
-    """A run a schedule or a campaign started (item 466), as "while you were away" lists it: what names it (the
-    schedule, the campaign, else the first line of its goal), its agent, how it ended or that it works, its steps, and
-    the first line of its answer with its secrets masked."""
+    """A run "while you were away" lists (items 466 and 1424): what names it (the campaign, the schedule, the chat, else
+    the first line of its goal), the source that started it (``schedule``, ``reply``, ``team``, ``background``, or any
+    other of an agent's own chat that is not the owner's), its agent, how it ended or that it works, its steps, and the
+    first line of its answer with its secrets masked."""
 
     run_id: str
     title: str
+    source: str
     campaign: bool
     agent_id: str | None
     status: RunStatus
@@ -2299,10 +2301,11 @@ class AwayDecisionRun(FrozenModel):
 
 
 class AwayView(FrozenModel):
-    """What schedules and campaigns did between ``since`` and ``until`` (item 466): how many of their runs ended done,
-    failed or stopped, how many work and how many were sessions of campaigns; the newest of those runs; the approvals
-    answered for the owner in them and the runs with the most; and the drafts they wrote that wait for the owner. It
-    carries no summary nor the arguments of an approval."""
+    """What Dot did on its own between ``since`` and ``until`` (items 466 and 1424): how many of those runs (a
+    schedule's, a reply's, an agent's work, a command in the background, a run nobody started in an agent's chat) ended
+    done, failed or stopped, how many work and how many were sessions of campaigns; the newest of those runs; the
+    approvals answered for the owner in them and the runs with the most; and the drafts they wrote that wait for the
+    owner. It carries no summary nor the arguments of an approval."""
 
     since: float
     until: float
