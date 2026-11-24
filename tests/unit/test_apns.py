@@ -12,10 +12,13 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
+from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
+from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
 from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import JsonObject
-from dotagent.events import SYSTEM_RUN_ID
+from dotagent.drafts.service import DRAFT_CREATED_EVENT
+from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
     APPROVAL_CATEGORY,
@@ -43,14 +46,17 @@ from dotagent.notify.apns_watch import (
     ApnsWatch,
     follows_live,
 )
+from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import LiveNow, tool_now
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.runtime import _guarded_files
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_RUN_ENDED_EVENT, SCHEDULE_STOPPED_EVENT
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import DraftRecord, EventRecord, RunRecord
 
 _NOW: float = 1_700_000_000.0
 _DEVICE: str = "ab" * 32
+_OTHER_DEVICE: str = "12" * 32
 _START: str = "cd" * 40
 _ACTIVITY: str = "ef" * 40
 _CONFIG: ApnsConfig = ApnsConfig(
@@ -444,5 +450,123 @@ async def test_a_row_whose_run_ended_where_the_feed_did_not_tell_is_ended_within
         assert len(apple.posted) == posted
         await watch.flush(_NOW + 1 + CHECK_EVERY_S)
         assert _rows(apple.posted[-1]) == [(run.id, "failed")]
+    finally:
+        await store.close()
+
+
+def _alerts_to(apple: _Apple, token: str) -> list[JsonObject]:
+    """The alerts posted to the device ``token``, as the phone would read them."""
+    return [body for url, headers, body in apple.posted if headers["apns-push-type"] == "alert" and url.endswith(token)]
+
+
+def _system(kind: str, data: JsonObject) -> EventRecord:
+    """An event of Dot itself: a notice, which belongs to no run."""
+    return EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=kind, data=data)
+
+
+def _draft_written(run: RunRecord) -> EventRecord:
+    """The event of a draft a run wrote for the owner to send."""
+    draft: DraftRecord = DraftRecord(
+        id="drf_1",
+        run_id=run.id,
+        channel="mail",
+        to=("a@example.com",),
+        cc=(),
+        subject="Hi",
+        body="x",
+        status="waiting",
+        created_at=_NOW,
+        decided_at=None,
+        error=None,
+    )
+    return _event(run.id, DRAFT_CREATED_EVENT, draft.model_dump(mode="json"))
+
+
+async def test_a_phone_that_shows_dot_hears_no_alert_of_a_runs_end_and_every_other_alert_still_goes(
+    tmp_path: Path,
+) -> None:
+    """Item 1420: while a phone's lease holds (the app said it is in the foreground), the end of a run, of a schedule's
+    run and of a campaign, which the app shows itself, are not sent to it as alerts, for the chat it shows and for any
+    other; an approval, a question, a secret and a hand-off are, and so are a draft, what Dot tells the owner and the
+    warnings of Dot itself, which the app shows nowhere; every Live Activity update is told all the same. Another phone,
+    and the same phone once the lease ran out or the app said it left, hear all of it. The clock is the test's own."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        clock: list[float] = [_NOW]
+        leases = PhoneLeases(lambda: clock[0])
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), leases)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        leases.renew("p1", "foreground", run.thread_id, None)
+
+        # The end of the run is told to the phone that does not show Dot, and not to the one that does; its Live
+        # Activity is told all the same.
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW + 1)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 2)
+        assert _alerts_to(apple, _DEVICE) == [] and len(_alerts_to(apple, _OTHER_DEVICE)) == 1
+        assert apple.posted[-1][0].endswith(_ACTIVITY) and _rows(apple.posted[-1]) == [(run.id, "done")]
+        # So are a schedule's run and a campaign, ended.
+        ended: JsonObject = {"schedule_id": "sch_1", "run_id": run.id, "status": "done", "result": "x"}
+        await watch.on_event(_system(SCHEDULE_RUN_ENDED_EVENT, ended), _NOW + 3)
+        campaign: JsonObject = {"campaign_id": "cmp_1", "title": "Leads", "status": "achieved", "note": "x"}
+        await watch.on_event(_event(run.id, CAMPAIGN_ENDED_EVENT, campaign), _NOW + 3)
+        assert _alerts_to(apple, _DEVICE) == [] and len(_alerts_to(apple, _OTHER_DEVICE)) == 3
+
+        # What asks something of the owner goes to the phone that shows Dot, whatever it asks.
+        for index, severity in enumerate(("low", "medium", "high", "question", "secret", "handoff")):
+            asked: JsonObject = {"approval_id": f"apr_{index}", "severity": severity, "summary": "x", "args": {}}
+            await watch.on_event(_event(run.id, "approval_requested", asked), _NOW + 5)
+            assert len(_alerts_to(apple, _DEVICE)) == index + 1
+        left: JsonObject = {"approval_id": "apr_9", "severity": "question"}
+        await watch.on_event(_event(run.id, QUESTION_LEFT_EVENT, left), _NOW + 6)
+        assert len(_alerts_to(apple, _DEVICE)) == 7
+        # A draft written for the owner, what Dot tells them on its own and the warnings of Dot itself go too.
+        await watch.on_event(_draft_written(run), _NOW + 6)
+        told: JsonObject = {"title": "Your rent is due", "text": "Pay it", "url": "#/"}
+        await watch.on_event(_system(OWNER_TOLD_EVENT, told), _NOW + 6)
+        missed: JsonObject = {"schedule_id": "sch_1", "name": "Brief", "status": "missed"}
+        await watch.on_event(_system(SCHEDULE_MISSED_EVENT, missed), _NOW + 6)
+        stopped: JsonObject = {"schedule_id": "sch_1", "name": "Brief", "failures": 3}
+        await watch.on_event(_system(SCHEDULE_STOPPED_EVENT, stopped), _NOW + 6)
+        await watch.on_event(_system(LEARNING_STALLED_EVENT, {"reason": "no model"}), _NOW + 6)
+        await watch.on_event(_system(DAEMON_RESTARTED_EVENT, {"runs_cut_off": 0}), _NOW + 6)
+        heard: int = len(_alerts_to(apple, _DEVICE))
+        assert heard == 7 + 6
+
+        # The chat on screen is another one: the phone still shows Dot, and the end of a run stays quiet.
+        leases.renew("p1", "foreground", "thr_another_chat", None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "failed", "result": "x"}), _NOW + 7)
+        assert len(_alerts_to(apple, _DEVICE)) == heard
+
+        # The lease holds its 45 seconds from the last time the app said it, not a moment more.
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 44.9)
+        assert len(_alerts_to(apple, _DEVICE)) == heard
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 45.0)
+        assert len(_alerts_to(apple, _DEVICE)) == heard + 1
+
+        # The app says it left: the alert goes at once, though the time it named has not passed.
+        leases.renew("p1", "foreground", None, 90.0)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 46)
+        assert len(_alerts_to(apple, _DEVICE)) == heard + 1
+        leases.renew("p1", "background", None, None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 47)
+        assert len(_alerts_to(apple, _DEVICE)) == heard + 2
+    finally:
+        await store.close()
+
+
+async def test_a_watch_that_was_given_no_leases_sends_every_alert(tmp_path: Path) -> None:
+    """Item 1420: a daemon that keeps no lease (a test's, an older server) sends the app every alert it did before."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW)
+        assert len(_alerts_to(apple, _DEVICE)) == 1
     finally:
         await store.close()

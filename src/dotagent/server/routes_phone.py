@@ -19,11 +19,14 @@ from dotagent.core.paths import config_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.notify.apns import FLEET_ID
 from dotagent.notify.apns_watch import LIVE_REGISTERED_EVENT
+from dotagent.notify.leases import ActivityLease, lease_seconds
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
 from dotagent.server.phones import MAX_PHONES, PairedPhones, is_phone_id
 from dotagent.server.views import (
+    ActivityLeaseView,
+    ActivityRequest,
     ApnsRegistration,
     AwakeRequest,
     LiveActivityRegistration,
@@ -182,6 +185,7 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
             raise NotFoundError("that phone is not paired", {})
         await ctx.runtime.store.delete_apns_device(phone_id)
         await ctx.runtime.store.delete_phone_push_subscriptions(phone_id)
+        ctx.leases.forget(phone_id)
         return Response(status_code=204)
 
     @router.post("/phone/apns", status_code=204)
@@ -214,6 +218,24 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         # The rows changed while the token was on its way: the activity is told them now (notify/apns_watch.py).
         await ctx.runtime.bus.emit(SYSTEM_RUN_ID, LIVE_REGISTERED_EVENT, {"phone_id": phone_id}, False)
         return Response(status_code=204)
+
+    @router.post("/phone/activity")
+    async def phone_activity(request: ActivityRequest, http: Request) -> ActivityLeaseView:
+        """The app says it is in the foreground, and which chat it shows (item 1420), or that it left it. While the
+        lease lives the daemon sends the phone no alert that is news (a run ended, a draft is ready); an approval, a
+        question, a secret or a hand-off is sent whatever the lease says, and so is every Live Activity update. The app
+        says it again every 25 seconds; a lease it does not renew ends by itself. Only a phone's own key asks it."""
+        phone_id: str = asking_phone(http)
+        lease: ActivityLease | None = ctx.leases.renew(phone_id, request.state, request.chat, request.ttl_s)
+        # The phone may have been removed while this request was on its way: its lease must not outlive it.
+        if all(phone.id != phone_id for phone in phones.listed()):
+            ctx.leases.forget(phone_id)
+            raise NotFoundError("that phone is not paired", {})
+        if lease is None:
+            return ActivityLeaseView(state="background", chat=None, ttl_s=0.0, expires_at=None)
+        return ActivityLeaseView(
+            state="foreground", chat=lease.chat, ttl_s=lease_seconds(request.ttl_s), expires_at=lease.expires_at
+        )
 
     @router.delete("/phone/apns/activity", status_code=204)
     async def forget_live_activity(http: Request, token: str | None = None) -> Response:

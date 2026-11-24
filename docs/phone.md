@@ -145,7 +145,13 @@ code** takes its place. The same by hand:
    queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
    notification (item 1096): the daemon starts none by push, as Apple has a push that starts one bring a notification,
    and a start is not worth one. A run started on the Mac, or by a schedule, opens no activity; you are notified when a
-   run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. Once the app sent
+   run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. The daemon can keep
+   the alert of a run's end from a phone whose app shows Dot (item 1420): the app says so with `POST /api/phone/activity`
+   (in [the app's calls](#the-iphone-apps-calls) below), a lease that it renews every 25 seconds, and for as long as it
+   holds the end of a run, of a schedule's run and of a campaign are not sent to that phone as alerts, while what asks
+   something of you (an approval, a question, a secret, a hand-off), a draft, what Dot tells you and its own warnings
+   are sent whatever it says, and so is every Live Activity update. The app of this checkout does not send the lease
+   yet, so until it does every alert goes as before. Once the app sent
    the activity's token every change goes to it, and an activity whose token came before its run started waits a
    minute for it (one opened by a request that started no run, a message queued behind a held queue, ends then); a step goes at most every four seconds, the latest kept, with APNs's priority that spares the battery; a start,
    "Waiting" while an approval waits, and an end go at once. An ended run stays a row 15 minutes, and once no row is
@@ -411,3 +417,45 @@ it is on and that Dot runs on it, then to try again. A script or a font that can
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
+
+## The iPhone app's calls
+
+What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every call below is
+made with the phone's own key (`Authorization: Bearer phone.<id>.<secret>`, from pairing with the code of Settings ›
+Phone); the Mac's token is refused (403) where a call belongs to a phone, and a key that was removed is refused (401).
+Bodies and answers are JSON; a body with a key that is not named, or a value of another shape, is refused (422).
+
+### POST /api/phone/activity
+
+The app says it is in the foreground, which chat it shows, or that it left (item 1420). The daemon keeps a *lease* for
+the phone in memory: while it holds, the alerts of a run's end are not sent to the phone as APNs alerts (T3 Code keeps
+its mobile alerts quiet in the foreground the same way); the app says it again every 25 seconds, and a lease it does not
+renew (the phone lost its network, iOS suspended the app) ends by itself, which is the safe side: the alerts go.
+
+Body:
+
+```json
+{"state": "foreground", "chat": "thr_mf3k2x1a_9c04d1", "ttl_s": 45}
+```
+
+- `state`: `foreground` or `background`. `background` ends the lease at once.
+- `chat` (optional): the thread id on screen, 1 to 64 characters; `null` or left out when the app shows no chat (the
+  list, Settings). While the lease holds the end of a run is not sent to the phone, for this chat or for another.
+- `ttl_s` (optional): how many seconds the lease holds, more than 0; 45 when left out, and values over 90 are taken as 90.
+
+Reply, 200:
+
+```json
+{"state": "foreground", "chat": "thr_mf3k2x1a_9c04d1", "ttl_s": 45.0, "expires_at": 1764000045.0}
+```
+
+`ttl_s` is the time as the daemon took it (capped), `expires_at` is when it ends, in seconds since the epoch. After
+`background` the reply is `{"state": "background", "chat": null, "ttl_s": 0.0, "expires_at": null}`.
+
+What it changes and what it does not: while a lease holds, the end of a run (done, failed, stopped), of a schedule's run
+and of a campaign are not sent to that phone as alerts, for the chat on screen and for any other, as the app shows them
+itself. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
+hand-off, a draft written for you, what Dot tells you on its own and its own warnings (a schedule that did not run or was
+switched off, learning that stopped, a restart). The Live Activity is not touched by the lease, nor are the other phones,
+nor the web push of a browser. A phone that is removed loses its lease. The app of this checkout does not call this
+route yet (`ios/` was left as it was), so until it does the lease is never made and every alert goes.

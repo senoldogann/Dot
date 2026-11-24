@@ -90,6 +90,18 @@ PUSH_KINDS: frozenset[str] = frozenset(
 )
 
 
+# The pushes whose subject the iPhone app shows itself while it is open: the end of a run, of a schedule's run and of a
+# campaign. While the app says it shows Dot (item 1420) these are not sent to it as alerts. Every other push is: what
+# asks something of the owner, a draft, what Dot tells the owner, and the warnings of Dot itself (a schedule that did
+# not run or was switched off, learning that stopped, a restart), which the app shows nowhere.
+QUIET_WHILE_SHOWN: frozenset[str] = frozenset({"run_finished", CAMPAIGN_ENDED_EVENT, SCHEDULE_RUN_ENDED_EVENT})
+
+
+def quiet_while_shown(kind: str) -> bool:
+    """Whether the alert of an event of ``kind`` is held back from a phone whose app shows Dot (item 1420)."""
+    return kind in QUIET_WHILE_SHOWN
+
+
 class PushError(DotError):
     """A push service refused or could not be reached."""
 

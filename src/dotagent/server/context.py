@@ -9,6 +9,7 @@ from dotagent.agent.reactions import Reactions
 from dotagent.channels.service import Channels
 from dotagent.core.errors import ConfigError
 from dotagent.notify.health import NotifyHealth
+from dotagent.notify.leases import PhoneLeases
 from dotagent.runtime import Runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.phones import PairedPhones
@@ -31,7 +32,8 @@ class ServerContext:
     default refuses, for a daemon nothing would start again. ``channels`` is the owner's messaging apps as ways to reach
     Dot (item 572), ``None`` when the server runs without them. ``reactions`` is the service of the reactions on Dot's
     messages (item 586); a server without one makes its own. ``phones`` are the phones that hold a key of their own
-    (item 670); a server without them reads them from ``<home>/phones.json``."""
+    (item 670); a server without them reads them from ``<home>/phones.json``. ``leases`` are the phones whose app says
+    it shows Dot now (item 1420), which the watch that sends the app's alerts reads."""
 
     runtime: Runtime
     manager: RunManager
@@ -46,3 +48,4 @@ class ServerContext:
     reactions: Reactions | None = None
     phones: PairedPhones | None = None
     notifications: NotifyHealth = field(default_factory=NotifyHealth)
+    leases: PhoneLeases = field(default_factory=PhoneLeases)
