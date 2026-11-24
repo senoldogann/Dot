@@ -176,10 +176,12 @@ def limits_for(config: AgentConfig) -> Limits:
     )
 
 
-def can_ask_user(source: str, parent_run_id: str | None, approvals: ApprovalMode) -> bool:
-    """Whether a run can put a question to a person: not a delegated or scheduled run (nobody is there to answer), and
-    not a yolo run, whose user chose not to be asked."""
-    return parent_run_id is None and source not in _UNATTENDED_SOURCES and approvals != "yolo"
+def can_ask_user(source: str, parent_run_id: str | None, approvals: ApprovalMode, free: bool = False) -> bool:
+    """Whether a run can put a question to a person: not a delegated or scheduled run (nobody is there to answer), not a
+    yolo run, whose user chose not to be asked, and no run at all while free mode is on (``free``: item 922, "no run
+    asks anything, whatever its mode"; item 1563: only the run's own mode was read, so a run in ``ask`` still waited for
+    a person that free mode had said never to ask)."""
+    return parent_run_id is None and source not in _UNATTENDED_SOURCES and approvals != "yolo" and not free
 
 
 def question_mode(setting: QuestionMode, can_ask: bool, answers_reach: bool) -> AskMode:

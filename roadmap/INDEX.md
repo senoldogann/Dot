@@ -16,6 +16,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1582](1582.md) | done | 2026-11-24 | Tests and docs for a cut program that goes on: the stand-in dies mid-run and the run is continued, once and twice, never after a stop |
 | [1581](1581.md) | done | 2026-11-24 | A run whose Claude Code program is cut off from outside goes on in place: the same run, the same session, told what happened |
 | [1580](1580.md) | done | 2026-11-24 | A Claude Code program that ends before its result says how it ended, and programs cut in one second are said in one line |
+| [1563](1563.md) | done | 2026-11-24 | Free mode asks no run's owner anything: `ask_user` no longer waits in a run that is not `yolo` |
 | [1562](1562.md) | done | 2026-11-24 | The review guards the freedom contract on every push |
 | [1561](1561.md) | done | 2026-11-24 | The freedom contract is a test: a table of every kind of tool decided under yolo and free mode, every tool and every place that asks seen |
 | [1560](1560.md) | done | 2026-11-24 | The freedom contract is one page: what yolo and free mode guarantee, the exact exceptions and the code that makes each |

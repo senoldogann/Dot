@@ -17,7 +17,7 @@ contract, and `tests/unit/test_freedom_contract.py` is what makes it executable.
   read of their secrets or of data sent out; all but the exceptions of the first two rows of the table below. The step
   runs and its record says what it would have asked.
 - **Free mode** (`[policy] free = true`, Settings › Rules › How Dot asks, `PUT /api/policy/free`, item 922): the same
-  for every run of every chat, whatever its own approval mode, from its next step on, and the payment, the message or
+  for every run of every chat, whatever its own approval mode, from its next step on (a run reads the switch for its own questions when it starts), and the payment, the message or
   mail sent for the owner, the public post and the release too (the gate's `held` is empty while it is on).
 
 **Freedom costs no speed.** The gate of such a run is one policy decision and one record; it awaits no answer and no kept
@@ -60,7 +60,7 @@ free mode do not waive them. Each is named by file and function in `KNOWN_ASKS` 
 | `meeting_post` | A task's post in the chat of a meeting Dot is in asks, with its words whole, in every mode, free mode included (item 1138). By design, in [Meetings](meetings.md). | `MeetingDesk.post` |
 | `meeting_join` | A join that is not the owner's own word (a run or chat that read outside content, or a chat Dot opened) asks in every mode, free mode included (item 1150). By design, in [Meetings](meetings.md). | `MeetingDesk.join` |
 | `meeting_leave` | A run that read outside content asks before it leaves a meeting, in yolo; free mode does not ask. | `MeetingDesk.leave_asked` |
-| `ask_user`, `ask_secret` | The agent's own question. A yolo run leaves it on the chat and goes on. In free mode a run whose own mode asks may **wait** for the answer: the loop reads the run's own mode (`can_ask_user`, `agent/progress.py`), not free mode, and the stall ladder's `ask` rung comes from the same flag. A gap between the owner's word and the code, pinned by `test_known_ask_in_free_mode_the_agents_own_question_waits_when_the_run_asks_in_its_own_mode`. | `tools/meta.py`, `agent/loop.py` |
+| `ask_user`, `ask_secret` | The agent's own question. A yolo run leaves it on the chat and goes on, and so does **every** run while free mode is on, whatever its own mode (item 1563: `can_ask_user`, `agent/progress.py`, reads free mode; the stall ladder's `ask` rung comes from the same flag); only a message sent with Plan first, the owner's own word for that run, still asks. `ask_secret` follows the same flag: its card is **left** on the chat (parked) and the run goes on, as in yolo; the card keeps waiting for the owner's value, and what a saved value does for the run that parked it is the ask-a-secret work. Pinned by `test_in_free_mode_the_agents_own_question_is_left_whatever_the_runs_own_mode`, `test_in_free_mode_the_agents_secret_card_is_left_and_the_run_goes_on` and, for the modes that can ask with free mode off, `test_outside_free_mode_a_run_in_an_asking_mode_still_waits_for_its_question`. | `tools/meta.py`, `agent/loop.py` |
 
 ## What they record
 

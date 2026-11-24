@@ -146,11 +146,13 @@ KNOWN_ASKS: dict[tuple[str, str], str] = {
         "does not ask (item 1138)"
     ),
     ("tools/meta.py", "_ask_user_tool.run"): (
-        "ask_user: the agent's own question. A yolo run leaves it on the chat and goes on; in free mode a run whose "
-        "own mode asks may wait for the answer, since the loop reads the run's own mode (can_ask_user)"
+        "ask_user: the agent's own question. A yolo run, and every run while free mode is on, leaves it on the chat "
+        "and goes on (item 1563); a watched run in a mode that asks, with free mode off, may wait for the answer"
     ),
     ("tools/meta.py", "_ask_secret_tool.run"): (
-        "ask_secret: the card that asks the owner for a key or a token, left or waited for as ask_user is"
+        "ask_secret: the card that asks the owner for a key or a token. A yolo run, and every run while free mode is "
+        "on, leaves it on the chat (parked) and goes on, as ask_user is left (item 1563); a watched run in a mode "
+        "that asks, with free mode off, may wait for the card"
     ),
 }
 
@@ -1390,14 +1392,41 @@ async def test_known_ask_in_yolo_the_agents_own_question_is_left_and_the_run_goe
     assert "question_left" in kinds and "approval_requested" not in kinds, kinds
 
 
-async def test_known_ask_in_free_mode_the_agents_own_question_waits_when_the_run_asks_in_its_own_mode(
+async def test_in_free_mode_the_agents_own_question_is_left_whatever_the_runs_own_mode(
     loop_factory: Callable[..., Any],
 ) -> None:
-    """KNOWN ASK (docs/freedom.md): in free mode, a run whose own approval mode is not yolo may still wait for the
-    owner's answer to its own question, since the loop reads the run's own mode to decide whether it can ask
-    (``agent.progress.can_ask_user``). Found by this test; the policy is untouched. When it is fixed this test fails:
-    take the entry out of KNOWN_ASKS and docs/freedom.md and delete it."""
+    """Item 1563 (docs/freedom.md): free mode asks no run's owner anything, so a run whose own approval mode asks leaves
+    its question on the chat and goes on, as a yolo run does (``agent.progress.can_ask_user`` reads free mode). It was
+    the one known ask of this kind: the loop read the run's own mode, and the run waited."""
     loop: Loop = await loop_factory(_script(_turn("ask_user", question="Which one?", wait=True)), True)
+    run: RunRecord = await _start(loop, "ask")
+    ended: RunRecord = await _finished(loop, run)
+    assert ended.status == "done"
+    kinds: list[str] = [event.kind for event in await _events(loop, run)]
+    assert "question_left" in kinds and "approval_requested" not in kinds, kinds
+
+
+async def test_in_free_mode_the_agents_secret_card_is_left_and_the_run_goes_on(
+    loop_factory: Callable[..., Any],
+) -> None:
+    """Item 1563: ``ask_secret`` reads the same flag as ``ask_user`` (``tools/meta.py``): with free mode on its card is
+    left on the chat (parked) and the run goes on, whatever the run's own mode, instead of waiting for the owner."""
+    loop: Loop = await loop_factory(
+        _script(_turn("ask_secret", name="API_TOKEN", label="A token", why="To call the API")), True
+    )
+    run: RunRecord = await _start(loop, "ask")
+    ended: RunRecord = await _finished(loop, run)
+    assert ended.status == "done"
+    kinds: list[str] = [event.kind for event in await _events(loop, run)]
+    assert "question_left" in kinds and "approval_requested" not in kinds, kinds
+
+
+async def test_outside_free_mode_a_run_in_an_asking_mode_still_waits_for_its_question(
+    loop_factory: Callable[..., Any],
+) -> None:
+    """The twin of the test above, free mode off: a watched run in a mode that asks still puts its question to the
+    owner and waits (item 1563 changed free mode only)."""
+    loop: Loop = await loop_factory(_script(_turn("ask_user", question="Which one?", wait=True)), False)
     run: RunRecord = await _start(loop, "ask")
     question: ApprovalRecord = await _pending(loop)
     assert (question.run_id, question.tool) == (run.id, "ask_user")

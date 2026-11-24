@@ -29,7 +29,7 @@ from dotagent.claude_code import run as run_module
 from dotagent.claude_code.cut import EndedTogether
 from dotagent.claude_code.run import chat_path
 from dotagent.config import load_config
-from dotagent.core.errors import FailSafeTriggered, InvalidValueError
+from dotagent.core.errors import FailSafeTriggered, InvalidValueError, RunConflict
 from dotagent.core.paths import claude_code_dir
 from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
@@ -1043,7 +1043,10 @@ async def test_a_helper_that_is_cut_gives_its_parent_the_final_result_of_the_con
         assert helper.steps == 2 and len(await _continued_events(room, helper.id)) == 1
         assert [one["resume"] is not None for one in _starts(room)][1:] == [False, True]
     finally:
-        room.manager.cancel(parent.id)
+        # The scripted parent may have ended on its own while the helper worked (a loaded runner): a Stop of a run
+        # that no longer works is refused with RunConflict, and there is nothing left to stop.
+        with contextlib.suppress(RunConflict):
+            room.manager.cancel(parent.id)
         await _finished(room, parent, 30)
 
 
