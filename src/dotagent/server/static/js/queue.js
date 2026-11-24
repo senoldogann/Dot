@@ -34,6 +34,8 @@ function oneLine(text) {
  */
 export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onChange }) {
   const listId = `queue-${threadId}`;
+  // Its reads end when the chat is left (item 1521).
+  const leaving = new AbortController();
   let messages = [];
   let held = false;
   let active = false;
@@ -115,8 +117,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     const mine = ++reads;
     let view;
     try {
-      view = await api.get(`/threads/${threadId}/queue`);
+      view = await api.get(`/threads/${threadId}/queue`, { signal: leaving.signal });
     } catch (error) {
+      if (leaving.signal.aborted) {
+        return;
+      }
       console.warn("the queue could not be read", error);
       if (mine > shownRead) {
         shownRead = mine;
@@ -409,6 +414,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       paint();
     },
     dispose: () => {
+      leaving.abort();
       stopLifecycle();
       stopBack();
     },

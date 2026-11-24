@@ -242,6 +242,7 @@ export const TR = {
   "run.noSuchTask": "{id} kimlikli bir görev yok.",
   "run.liveStoppedReload": "Canlı güncellemeler durdu. Yeniden almak için sayfayı yenileyin.",
   "run.liveStopped": "Canlı güncellemeler durdu.",
+  "run.stepsNotShown": "Bazı adımlar gösterilmiyor: görev uzun süre sürdü ve yalnızca en yeni {count} olay okundu.",
   "run.reload": "Yenile",
   "run.approvals": "Onaylar",
   "sidebar.hide": "Kenar çubuğunu gizle",

@@ -246,6 +246,7 @@ export const EN = {
   "run.noSuchTask": "No task has the ID {id}.",
   "run.liveStoppedReload": "Live updates stopped. Reload the page to get them again.",
   "run.liveStopped": "Live updates stopped.",
+  "run.stepsNotShown": "Some steps are not shown: the task went on for a long while, and only its newest {count} events were read.",
   "run.reload": "Reload",
   "run.approvals": "Approvals",
   "sidebar.hide": "Hide sidebar",
