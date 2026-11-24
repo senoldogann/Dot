@@ -33,6 +33,7 @@ from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.health import NotifyHealth
 from dotagent.notify.leases import PhoneLeases
+from dotagent.notify.needs_you import needs_you_count
 from dotagent.notify.owner import tell_owner
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.oauth.accounts import keep_revoking
@@ -40,12 +41,14 @@ from dotagent.phone.keeper import keep_phone
 from dotagent.proactive.watching import watch_loop
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler.runner import Scheduler
+from dotagent.server.activity import live_runs
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import read_or_create_token, require_loopback
 from dotagent.server.links import base_url, ui_url
 from dotagent.server.phones import PairedPhones
 from dotagent.store.backup import keep_backups
+from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
 
 log = get_logger(__name__)
@@ -180,6 +183,11 @@ def _end_with_scheduler(server: DotServer, scheduler_loop: asyncio.Task[None]) -
 async def _keep_meeting_line(manager: RunManager, thread_id: str, goal: str, text: str) -> None:
     """Keep a meeting's line in its chat (item 1138), as the watchers' tells are kept."""
     await manager.keep_notice(thread_id, goal, text)
+
+
+async def _waiting_on_owner(store: Store, manager: RunManager) -> int:
+    """How many things wait on the owner now (item 1422), which an alert sets the iPhone app's badge to."""
+    return await needs_you_count(store, await live_runs(store, manager), time.time())
 
 
 def _log_push_end(health: NotifyHealth, channel: str, pusher: asyncio.Task[None]) -> None:
@@ -334,7 +342,17 @@ async def run_daemon(config: AppConfig) -> int:
                 sender: ApnsSender = ApnsSender(config.apns, await asyncio.to_thread(read_key, config.apns), transport)
                 apns_feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(APNS_KINDS))
                 apns: asyncio.Task[None] = asyncio.create_task(
-                    watch_apns(ApnsWatch(runtime.store, sender, leases), apns_feed, stopping), name="apns"
+                    watch_apns(
+                        ApnsWatch(
+                            runtime.store,
+                            sender,
+                            leases,
+                            functools.partial(_waiting_on_owner, runtime.store, manager),
+                        ),
+                        apns_feed,
+                        stopping,
+                    ),
+                    name="apns",
                 )
                 phone.mark_live("apns")
                 apns.add_done_callback(functools.partial(_log_push_end, phone, "apns"))

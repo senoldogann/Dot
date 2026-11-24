@@ -16,7 +16,7 @@ from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
 from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
 from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
-from dotagent.core.types import JsonObject
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID
 from dotagent.notify.apns import (
@@ -24,12 +24,15 @@ from dotagent.notify.apns import (
     APPROVAL_CATEGORY,
     DISMISS_AFTER_S,
     FLEET_ID,
+    ApnsError,
     ApnsReply,
     ApnsSender,
     FleetState,
     LiveState,
     alert_payload,
     apns_set,
+    approval_payload,
+    badged,
     live_end_payload,
     live_update_payload,
     load_key,
@@ -656,3 +659,83 @@ async def test_a_schedules_notice_level_still_decides_whether_its_end_is_told_an
         assert len(_alerts_to(apple, _DEVICE)) == 2 and _alerts_to(apple, _OTHER_DEVICE) == []
     finally:
         await store.close()
+
+
+async def test_an_alert_sets_the_badge_to_how_many_things_wait_on_the_owner_and_carries_nothing_more(
+    tmp_path: Path,
+) -> None:
+    """Item 1422: the badge of the app is the count of what waits on the owner, a number in the alert's ``aps`` (the
+    lock-screen approval's too); the lock-screen text is what it was, and the Live Activity carries no badge. A count
+    that cannot be made leaves the alert as it was, and a watch with no count sets no badge."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        waiting: list[int] = [3]
+        calls: list[int] = []
+
+        async def count() -> int:
+            calls.append(waiting[0])
+            return waiting[0]
+
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), None, count)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW)
+        ended: JsonObject = _alerts_to(apple, _DEVICE)[0]
+        assert ended == {**alert_payload("A task is done", f"#/runs/{run.id}"), "aps": {**ended["aps"], "badge": 3}}  # type: ignore[dict-item]  # a JSON payload read back
+        assert ended["aps"]["alert"] == {"title": "A task is done", "body": ALERT_BODY}  # type: ignore[index]  # a JSON payload read back
+        # One count for an alert, whatever the number of phones; both phones read the same number.
+        assert calls == [3] and _alerts_to(apple, _OTHER_DEVICE)[0]["aps"]["badge"] == 3  # type: ignore[index]  # a JSON payload read back
+        # The lock screen's approval carries it too, and the count moves as what waits does.
+        waiting[0] = 4
+        step: JsonObject = {"approval_id": "apr_1", "severity": "low", "summary": "x", "args": {}}
+        await watch.on_event(_event(run.id, "approval_requested", step), _NOW + 1)
+        asked: JsonObject = _alerts_to(apple, _DEVICE)[-1]
+        assert asked["aps"]["badge"] == 4 and asked["aps"]["category"] == APPROVAL_CATEGORY  # type: ignore[index]  # a JSON payload read back
+        # No badge in a Live Activity's push.
+        for url, headers, body in apple.posted:
+            if headers["apns-push-type"] == "liveactivity":
+                assert "badge" not in json.dumps(body), url
+
+        # A count that cannot be made does not cost the alert.
+        async def cannot() -> int:
+            raise ApnsError("the count failed", {})
+
+        broken = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), None, cannot)
+        before: int = len(_alerts_to(apple, _DEVICE))
+        await broken.on_event(_event(run.id, "run_finished", {"status": "failed", "result": "x"}), _NOW + 2)
+        assert len(_alerts_to(apple, _DEVICE)) == before + 1 and "badge" not in _alerts_to(apple, _DEVICE)[-1]["aps"]  # type: ignore[operator]  # a JSON payload read back
+
+        # Nor does a stored record that cannot be read (pydantic's error, which is no DotError): the alert goes, with no
+        # badge, and the watch goes on.
+        class Options(FrozenModel):
+            options: list[str]
+
+        async def unreadable() -> int:
+            return len(Options.model_validate({"options": "not a list"}).options)
+
+        unread = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), None, unreadable)
+        await unread.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 2.5)
+        assert len(_alerts_to(apple, _DEVICE)) == before + 2 and "badge" not in _alerts_to(apple, _DEVICE)[-1]["aps"]  # type: ignore[operator]  # a JSON payload read back
+        # A watch given no count sets none.
+        plain = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await plain.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 3)
+        assert "badge" not in _alerts_to(apple, _DEVICE)[-1]["aps"]  # type: ignore[operator]  # a JSON payload read back
+    finally:
+        await store.close()
+
+
+def test_the_badge_is_a_number_put_into_an_alert_and_nothing_else_is_changed() -> None:
+    alert: JsonObject = alert_payload("A task is done", "#/runs/run-1")
+    assert badged(alert, 2) == {
+        "aps": {"alert": {"title": "A task is done", "body": ALERT_BODY}, "sound": "default", "badge": 2},
+        "route": "#/runs/run-1",
+    }
+    asked: JsonObject = approval_payload("Dot asks for approval", "#/runs/run-1", "apr_1")
+    assert badged(asked, 0)["approval_id"] == "apr_1" and badged(asked, 0)["aps"]["badge"] == 0  # type: ignore[index]  # a JSON payload read back
+    # The payload it was given is not changed.
+    assert "badge" not in alert["aps"]  # type: ignore[operator]  # a JSON payload read back
+    with pytest.raises(ApnsError, match="aps"):
+        badged({"route": "#/"}, 1)

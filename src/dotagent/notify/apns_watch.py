@@ -14,7 +14,9 @@ than Apple lets a Live Activity change, and a run that starts, waits or ends is 
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
+
+from pydantic import ValidationError
 
 from dotagent.core.errors import DotError, NotFoundError
 from dotagent.core.logs import get_logger
@@ -33,6 +35,7 @@ from dotagent.notify.apns import (
     PushPriority,
     alert_payload,
     approval_payload,
+    badged,
     gone,
     live_end_payload,
     live_update_payload,
@@ -151,9 +154,17 @@ class ApnsWatch:
     """Sends the app what the events say, each device and activity on its own: one that fails keeps no other from
     its push, and one APNs calls gone is forgotten."""
 
-    def __init__(self, store: Store, sender: ApnsSender, leases: PhoneLeases | None = None) -> None:
+    def __init__(
+        self,
+        store: Store,
+        sender: ApnsSender,
+        leases: PhoneLeases | None = None,
+        badge: Callable[[], Awaitable[int]] | None = None,
+    ) -> None:
         self._store: Store = store
         self._sender: ApnsSender = sender
+        # How many things wait on the owner (item 1422): the number an alert sets the app's badge to. None: no badge.
+        self._badge: Callable[[], Awaitable[int]] | None = badge
         # Which phones show Dot now (item 1420): the alerts of a run's end are not sent to them. None: every alert goes.
         self._leases: PhoneLeases | None = leases
         # The runs the activity shows, by id (item 1093).
@@ -179,12 +190,28 @@ class ApnsWatch:
         """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""
         return self._leases is not None and self._leases.live(phone_id, now) is not None
 
+    async def _badged(self, payload: JsonObject) -> JsonObject:
+        """``payload`` with the badge of what waits on the owner (item 1422); as it was when that cannot be counted: an
+        alert is not lost for its badge."""
+        if self._badge is None:
+            return payload
+        try:
+            return badged(payload, await self._badge())
+        except DotError as error:
+            log.warning("apns_badge_not_counted", error=error.message)
+            return payload
+        except ValidationError as error:
+            # A stored record that cannot be read ends no push: the alert goes without the badge.
+            log.warning("apns_badge_not_counted", error=str(error))
+            return payload
+
     async def _alert(self, payload: JsonObject, now: float, kind: str) -> None:
         """Send ``payload``, the alert of an event of ``kind``, to every phone that is told pushes of its kind (item
         1421: each phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the
         end of a run, which the app shows itself, is not showing Dot now (item 1420)."""
         group: PushGroup | None = push_group(kind)
         quiet: bool = quiet_while_shown(kind)
+        payload = await self._badged(payload)
         for device in await self._store.list_apns_devices():
             if group is not None and not (await push_settings_of(self._store, device.phone_id)).wants(group):
                 log.info("apns_alert_switched_off", phone=device.phone_id, group=group)
