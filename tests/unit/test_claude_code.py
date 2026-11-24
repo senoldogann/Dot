@@ -178,20 +178,21 @@ def test_the_doors_config_is_a_file_only_the_owner_reads(tmp_path: Path) -> None
     }
 
 
-def test_the_prompt_says_who_the_model_is_its_tools_and_what_it_knows_of_the_owner() -> None:
-    prompt: str = system_prompt(
-        "Dot", DOOR, ["notify", "shell"], Path("/w"), "Friday", "# Team\n- Ada", ["(you said) My name is Ada."]
-    )
-    assert prompt.startswith("You are Dot,") and f"MCP server {DOOR}: notify, shell" in prompt
-    assert "Dot's workspace, /w" in prompt and prompt.endswith("- (you said) My name is Ada.")
-    assert "\n\n# Team\n- Ada\n\nWhat you know about the owner:" in prompt
+def test_the_prompt_is_dots_own_followed_by_what_the_harness_changes() -> None:
+    """Item 1691: a run on the plan was told 3.9 KB of its own instead of the prompt Dot's own loop builds (how to work,
+    trust and safety, the plan, skills, what Dot learned). It is now that prompt whole, then the door, the tools'
+    names and what this harness changes."""
+    prompt: str = system_prompt("DOT PROMPT", DOOR, ["notify", "shell"], Path("/w"))
+    assert prompt.startswith("DOT PROMPT\n\n# This run's harness\n")
+    assert f"MCP server {DOOR} (mcp__{DOOR}__<tool>): notify, shell" in prompt
+    assert "Dot's workspace, /w" in prompt and "Claude Code's own tools" in prompt
 
 
 def test_the_prompt_tells_the_model_to_look_a_tool_up_before_it_calls_it() -> None:
     """Item 1201: only the door's tools' names are in the prompt (item 1053), and runs on the plan called
     ``browser_find`` and ``search_files`` with a ``query`` they had guessed, which neither takes, at 15 times the rate
     of Dot's own loop. The prompt says that a tool's parameters come from its look-up, and how to look it up."""
-    prompt: str = system_prompt("Dot", DOOR, ["browser_find"], Path("/w"), "Friday", "", [])
+    prompt: str = system_prompt("", DOOR, ["browser_find"], Path("/w"))
     assert f"{SEARCH_TOOL} (select:mcp__{DOOR}__<tool>, several at once" in prompt
     assert "before your first call of it" in prompt and "never guess" in prompt
 
@@ -207,8 +208,8 @@ def test_the_tools_in_the_prompt_from_the_start_are_door_tools_the_shell_sends_t
 def test_the_prompt_names_finish_only_to_a_run_that_has_it() -> None:
     """Item 1076's pre-push review: a chat-mode run has no finish, and a prompt that told it to call one lost its
     answer; it ends with its last reply."""
-    task: str = system_prompt("Dot", DOOR, ["finish", "shell"], Path("/w"), "Friday", "", [])
-    chat: str = system_prompt("Dot", DOOR, ["shell"], Path("/w"), "Friday", "", [])
+    task: str = system_prompt("", DOOR, ["finish", "shell"], Path("/w"))
+    chat: str = system_prompt("", DOOR, ["shell"], Path("/w"))
     assert "call finish" in task and "your last reply" not in task
     assert "finish" not in chat and "write your answer as your last reply" in chat
 
@@ -456,7 +457,7 @@ def test_a_step_that_stops_for_a_tool_ends_as_dots_steps_do() -> None:
     tool_use", as Claude names a stop for a tool; the timeline reads Dot's names, and a cut reply still shows."""
     assert dot_finish("tool_use") == "tool_calls" and dot_finish("end_turn") == "stop"
     assert dot_finish("max_tokens") == "max_tokens"
-    said: str = system_prompt("Dot", DOOR, ("read_file",), Path("/w"), "2026-11-07", "", ())
+    said: str = system_prompt("", DOOR, ("read_file",), Path("/w"))
     assert "in the language the owner writes in" in said
 
 

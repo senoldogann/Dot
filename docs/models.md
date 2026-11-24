@@ -400,10 +400,15 @@ answer keeps its words, Ollama's too.
   (`claude_code_version_not_measured`) and runs; a version listed as broken refuses the run, saying which version and to
   install another (none is listed yet). `dotx doctor` shows it in its **claude code** row. A run on one goes whole to
   Claude Code, started without a terminal (`claude -p`, its input and output
-  lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
-  the name you call Dot by, what Dot's nightly reflection keeps of you, and, under your message, the notes of Dot's
-  memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
-  what the memory held), and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
+  lines of JSON) in Dot's workspace, as Dot: the model is told, after Claude Code's own prompt, the system prompt
+  Dot's own loop builds for the run, whole (item 1691: how to work and verify, the plan, how a run ends, trust and
+  safety, the character, what the adopted harness learned, the skills listed for the chat, the team, the environment
+  and what Dot knows of you; before it, a run on the plan was told 3.9 KB of its own, now about 32 KB), then what this
+  harness changes of it (the door, the tools' names, Claude Code's own tools off), passed with
+  `--append-system-prompt` at every start, a `--resume` too, so Claude Code's compaction keeps it; under your message
+  come how the run was started, the notes of Dot's memory recalled for it, as Dot's own loop hands them (item 1055:
+  before it, a run on the plan said it did not know what the memory held), and the skills that fit its goal that the
+  prompt does not list; and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
   chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
   head is read by a new chat instead of written again), every tool a run of Dot's own loop gets (`code_run`, item 1501, among
   them: found with `ToolSearch` like the others) (Claude Code's own are

@@ -84,24 +84,28 @@ from dotagent.agent.limits import (
 from dotagent.agent.loop import (
     AgentRun,
     HandedNotes,
+    PromptFacts,
     RunEnd,
     RunOutcome,
     count_start_notes,
+    free_mode_line,
+    gather_prompt_facts,
     goal_query,
     notes_to_hand,
     opening_text,
+    run_harness_text,
+    run_helpers,
+    run_prompt_inputs,
     run_skills,
     start_notes,
-    team_brief,
-    team_name,
+    turn_skills,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
-from dotagent.agent.prompt import CHARACTER, THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
+from dotagent.agent.prompt import PromptInputs, build_system_prompt, started_note, turn_note
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
-from dotagent.assistant import AssistantView, called_lines, owner_name_lines
 from dotagent.claude_code.cut import (
     CONTINUED_EVENT,
     ProgramExit,
@@ -172,7 +176,7 @@ from dotagent.llm.types import (
     assistant_message,
     user_message,
 )
-from dotagent.memory.service import Remembered, memory_budget, owner_prompt_lines, owner_section
+from dotagent.memory.service import Remembered, memory_budget
 from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
 from dotagent.opencode.run import meanwhile
 from dotagent.process_groups import forget_group, record_group
@@ -183,9 +187,11 @@ from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import NO_PICKS, AgentRecord, EventRecord, RunMode, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, AgentRecord, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
+from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import ToolContext
+from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import group_of
 from dotagent.tools.meta import (
     FINISH_TOOL,
@@ -226,31 +232,28 @@ _ENDS_WITH_FINISH: str = (
 _ENDS_WITH_REPLY: str = "When the work is done, write your answer as your last reply: it is what the owner reads."
 _PRIVATE: int = 0o700
 _SECRET_FILE: int = 0o600
-# What the model is told, before what Dot knows of the owner: who it is, its tools, how a run of Dot's ends.
-_PROMPT: str = (
-    "You are {name}, the owner's autonomous assistant on their Mac, at work on a task they gave you in one of Dot's "
-    "chats. You act through Dot's tools alone, the tools of the MCP server {door}: {tools}. "
+# What the model is told after Dot's own system prompt (item 1691: the one Dot's own loop builds, whole): what this
+# harness changes of it. The tools are Dot's through the door, the definitions of most are looked up (item 1053), Claude
+# Code's own are off, and what Dot knows of the owner is in its memory and the workspace too (item 1055).
+_HARNESS: str = (
+    "# This run's harness\n"
+    "This run works in Claude Code on the owner's Claude plan. Your tools are Dot's tools above, those of the MCP "
+    "server {door} (mcp__{door}__<tool>): {tools}. "
     # Item 1201: with only the names in the prompt (item 1053), runs called browser_find and search_files with a
     # `query` they had guessed, which neither takes.
-    "Only their names are here: look a tool up with "
+    "The definitions of the core ones are in your prompt; look any other up with "
     + SEARCH_TOOL
     + " (select:mcp__{door}__<tool>, several at once with commas) before your first call of it, and call it with "
-    "the parameters its definition names; never guess them. Claude Code's own tools, "
-    "slash commands and skills are not available here; do not offer them. Each call goes through Dot's rules and, "
-    "where they say so, the owner's approval; a refused call says why, and you go on another way. Work on the task "
-    "until it is done, acting without asking what you can find out or decide yourself; ask_user is for what only the "
-    "owner can answer. {ending} Write every message, the "
-    "short lines between tool calls too, in the language the owner writes in. Files you make go in Dot's "
-    "workspace, {workspace}, unless the owner names another place. Today is {today}.\n\n"
+    "the parameters its definition names; never guess them. Claude Code's own tools, slash commands and skills are "
+    "not available here; do not offer them (Dot's skills are, with the skill tool). Each call goes through Dot's "
+    "rules and, where they say so, the owner's approval; a refused call says why, and you go on another way. {ending} "
+    "Write every message, the short lines between tool calls too, in the language the owner writes in. Files you make "
+    "go in Dot's workspace, {workspace}, unless the owner names another place.\n\n"
     # Item 1055: a run on the plan said it did not know what Dot's memory and its agents' files held.
-    "What Dot knows of the owner and of their work is yours too: the lines about the owner below (one marked "
+    "What Dot knows of the owner and of their work is yours too: the lines about the owner above (one marked "
     "(you said) is the owner's own and outranks the others), the notes under their message, Dot's memory "
     "(memory_search, recall) and the files Dot and its agents wrote in the workspace (list_dir, read_file, "
-    "search_files). "
-    "Before you say you do not know something about the owner or their work, look it up there.\n\n"
-    + THOROUGH_AND_BOLD
-    + "\n\n"
-    + CHARACTER
+    "search_files). Before you say you do not know something about the owner or their work, look it up there."
 )
 
 
@@ -502,21 +505,13 @@ def claude_argv(
     )
 
 
-def system_prompt(
-    name: str, door: str, tools: Sequence[str], workspace: Path, today: str, team: str, known: Sequence[str]
-) -> str:
-    """What the model is told besides Claude Code's own prompt: who it is (``name``), the door's ``tools``, how a run of
-    Dot's works and ends, what Dot's own prompt says of the ``team`` (item 1063; empty for none), and the lines
-    ``known`` of the owner."""
+def system_prompt(dot_prompt: str, door: str, tools: Sequence[str], workspace: Path) -> str:
+    """What the model is told besides Claude Code's own prompt (item 1691): ``dot_prompt``, the system prompt Dot's own
+    loop gives a run with the door's ``tools`` (its character, how to work, the owner, the skills, the team, what Dot
+    learned), then what this harness changes of it (:data:`_HARNESS`)."""
     ending: str = _ENDS_WITH_FINISH if FINISH_TOOL in tools else _ENDS_WITH_REPLY
-    lead: str = _PROMPT.format(
-        name=name, door=door, tools=", ".join(tools), workspace=workspace, today=today, ending=ending
-    )
-    parts: list[str] = [lead, team]
-    if known:
-        lines: str = "\n".join(f"- {line}" for line in known)
-        parts.append(f"What you know about the owner:\n{lines}")
-    return "\n\n".join(part for part in parts if part)
+    harness: str = _HARNESS.format(door=door, tools=", ".join(tools), workspace=workspace, ending=ending)
+    return f"{dot_prompt}\n\n{harness}"
 
 
 class OwnerUnread:
@@ -1114,58 +1109,36 @@ async def _provider_of(runtime: Runtime, ref: ModelRef) -> ClaudeCodeProvider:
     return provider
 
 
-async def _prompt_of(agent: AgentRun, door: Door) -> str:
-    """Dot's system prompt for the run: who the model is, the door's tools, and the names of the owner and of Dot."""
+async def _prompt_facts(agent: AgentRun, ref: ModelRef, offered: frozenset[str]) -> PromptFacts:
+    """What the run's system prompt is built from, gathered as Dot's own loop gathers it (item 1691), for a run whose
+    door offers the tools ``offered``."""
     runtime: Runtime = agent.runtime
-    names: AssistantView = runtime.assistant.view()
-    record: AgentRecord | None = (
-        None if agent.run.agent_id is None else await runtime.store.get_agent(agent.run.agent_id)
-    )
-    known: list[str] = list(owner_name_lines(names.owner, names.mac_name))
-    # What Dot's nightly reflection keeps of the owner, as Dot's own loop gives it (item 1055); a value Dot holds is
-    # asked for again, so a line that holds one is left out, as there (``owner_prompt_lines``).
-    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    known.extend(owner_prompt_lines(await owner_section(runtime.store), held))
-    if record is None:
-        known.extend(called_lines(names.name))
-        name: str = "Dot"
-    else:
-        name = f"{record.name}, one of Dot's agents ({record.role})"
-        if record.instructions.strip():
-            known.append(f"Your instructions as {record.name}: {record.instructions.strip()}")
-    tool_names: list[str] = [spec.name for spec in door.specs]
-    return system_prompt(
-        name,
-        door.name,
-        tool_names,
-        runtime.workspace,
-        datetime.now().astimezone().strftime("%A %Y-%m-%d, time zone %Z (UTC%z)"),
-        await _team_text(runtime, agent.run, record, tool_names),
-        known,
-    )
-
-
-def _brief(agent: AgentRecord) -> AgentBrief:
-    """An agent as Dot's own prompt names it among the team: its name, role and ready team."""
-    return AgentBrief(
-        name=agent.name,
-        role=agent.role,
-        instructions="",
-        made_by_dot=agent.made_by is not None,
-        team=team_name(agent.name),
-    )
-
-
-async def _team_text(runtime: Runtime, run: RunRecord, record: AgentRecord | None, tool_names: Sequence[str]) -> str:
-    """What Dot's own prompt says of the team for the run (item 1063): the team its chat is with, which it leads, the
-    agents it may message or give work orders, and when to delegate, as Dot's own loop builds them."""
+    run: RunRecord = agent.run
+    record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
     team: tuple[AgentRecord, ...] = tuple(
         member for member in await runtime.store.list_agents() if member.id != run.agent_id
     )
-    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
-    lead: TeamBrief | None = team_brief(await runtime.store.find_team(thread.team_id), team, run)
-    own: AgentBrief | None = None if record is None else _brief(record)
-    return team_sections(lead, own, [_brief(member) for member in team], tool_names)
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+    helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if offered & {CONSULT_TOOL, DELEGATE_TOOL} else ()
+    return await gather_prompt_facts(
+        agent,
+        await goal_query(runtime, run),
+        await run_skills(runtime, run),
+        record,
+        team,
+        await runtime.accounts.accounts(),
+        helpers,
+        await run_harness_text(runtime, run, held),
+        held,
+    )
+
+
+async def _prompt_of(agent: AgentRun, door: Door, inputs: PromptInputs) -> str:
+    """Dot's system prompt for the run (item 1691): the one Dot's own loop builds from ``inputs``, the owner's free
+    mode as it stands, and what the harness changes of it."""
+    runtime: Runtime = agent.runtime
+    dot_prompt: str = build_system_prompt(inputs) + free_mode_line(runtime)
+    return system_prompt(dot_prompt, door.name, [spec.name for spec in door.specs], runtime.workspace)
 
 
 # What the owner is told of fast mode that ran off, by the program's reason (item 1014): measured on 2.1.318, a plan
@@ -1275,12 +1248,13 @@ def opened_bounds(bounded: frozenset[str], opened: frozenset[str], names: Iterab
     return bounded | frozenset(name for name in names if group_of(name) in opened)
 
 
-async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str) -> str:
+async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str, inputs: PromptInputs, skills: list[Skill]) -> str:
     """What the run's message is handed under it (item 1055), as Dot's own loop hands it (``turn_note``,
     :func:`notes_to_hand`): the time of day, the notes of Dot's memory recalled for the goal and the goals before it in
     the chat, within the notes' budget, but those ``carried`` holds with the same text (the user messages the program's
     session took in whole: a note changed since comes again), and the notes it quotes that were forgotten since. Every
-    note recalled counts as used, as in Dot's own loop."""
+    note recalled counts as used, as in Dot's own loop. Before them, how the run was started (``inputs``, item 1219),
+    and after them the ``skills`` that fit the goal that the prompt does not list (item 1691)."""
     runtime: Runtime = agent.runtime
     run: RunRecord = agent.run
     seen_at: float = time.time()
@@ -1289,9 +1263,10 @@ async def _notes_for(agent: AgentRun, info: ModelInfo, carried: str) -> str:
     )
     await count_start_notes(runtime, run, recalled, seen_at)
     handed: HandedNotes = await notes_to_hand(runtime, run, recalled.records, carried, seen_at)
-    return turn_note(
-        datetime.now().astimezone(), list(handed.fresh), recalled.tainted_left_out, (), list(handed.forgotten)
+    noted: str = turn_note(
+        datetime.now().astimezone(), list(handed.fresh), recalled.tainted_left_out, skills, list(handed.forgotten)
     )
+    return f"{started_note(inputs)}\n\n{noted}"
 
 
 # What a resumed run on the plan is told after the note of the run it goes on from (item 1076): that note says the
@@ -1659,9 +1634,11 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     )
     # The notes go after the owner's words as a message of their own, as Dot's own loop stores them, so that no one
     # reads them as the owner's (a group chat's members read the lead's chat); the program gets both in one message.
-    noted: Message = user_message(await _notes_for(agent, info, carried), ())
+    facts: PromptFacts = await _prompt_facts(agent, ref, frozenset(tools.tools))
+    inputs: PromptInputs = await run_prompt_inputs(agent, facts, door.specs)
+    noted: Message = user_message(await _notes_for(agent, info, carried, inputs, turn_skills(facts)), ())
     await runtime.store.append_messages(run.thread_id, [goal, noted])
-    prompt: str = await _prompt_of(agent, door)
+    prompt: str = await _prompt_of(agent, door, inputs)
     # Before the program starts (item 1400): what Dot itself left out of the run's tools is known already. Outside the
     # try below, whose end lets the chat's session go: the program never touched it.
     lacking: tuple[str, ...] = missing_tools(needed, tools.tools)

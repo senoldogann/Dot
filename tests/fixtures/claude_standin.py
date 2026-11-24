@@ -54,6 +54,7 @@ It calls no model and reaches nothing but Dot's bridge on this Mac."""
 import asyncio
 import json
 import os
+import re
 import secrets
 import signal
 import stat
@@ -431,7 +432,9 @@ def main() -> None:
     )
     first: dict[str, object] = json.loads(sys.stdin.readline())
     message: dict[str, object] = first["message"]  # type: ignore[assignment]  # Dot's user line
-    said: str = json.dumps(message["content"])
+    # What the goal asks of the stand-in is in the owner's words, not in the notes of Dot's under them (item 1691: how
+    # the run was started, whose words, "once" among them, would read as a mode).
+    said: str = re.sub(r"\[system note\] How this run was started.*?(?:\\n\\n|$)", "", json.dumps(message["content"]))
     resumed: str | None = _flag(args, "--resume") if "--resume" in args else None
     plan: dict[str, object] | None = _plan_of(record, said, resumed)
     # As the real program does with --replay-user-messages: it says it took the message in.
