@@ -30,6 +30,8 @@ first message on its input, and answers as the message says:
 - ``die while sending``: a step that calls ``shell`` through the door, and a SIGKILL half a second into the call, which
   the test makes slow and an action the policy keeps for the owner (item 1581: a call of that kind in flight is not
   continued);
+- ``die after finishing``: a call of ``finish`` that succeeded, then a SIGKILL before the program says anything more
+  (item 1581: the run ends as the finish said, it is not a cut to go on from);
 - ``die after sending``: the same call, which returns, then a step that says it went, then a SIGKILL: the model had
   read the result of the call, so nothing of it is in flight (item 1581: that is continued);
 - ``die with a message waiting``: a call of ``shell`` that sleeps 2 s, then a SIGKILL before the program reads its
@@ -187,6 +189,10 @@ async def _work(
         if plan is not None and plan["after_cut"]:
             _go_on(plan, said, resumed is not None)
             return
+        if "die after finishing" in said:
+            _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+            await client.call_tool("finish", {"answer": "Everything is checked.", "success": True})
+            os.kill(os.getpid(), signal.SIGKILL)
         if "die after sending" in said:
             _step([("text", "Sending it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
             await client.call_tool("shell", {"command": "echo sent"})
