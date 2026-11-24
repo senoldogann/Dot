@@ -44,7 +44,12 @@ _PAGE: str = """<!doctype html><title>Effect page</title>
 _BUSY: str = """<!doctype html><title>Busy</title>
 <p id="clock">0</p>
 <button aria-label="Nothing">Nothing</button>
+<button aria-label="Post" onclick="fetch('/save', { method: 'POST', body: 'x' })">Post</button>
 <script>let n = 0; setInterval(() => { document.getElementById("clock").textContent = String(++n); }, 100);</script>"""
+# A page that polls its site and shows nothing new, as a chat with no new message does.
+_POLLING: str = """<!doctype html><title>Polling</title>
+<button aria-label="Nothing">Nothing</button>
+<script>setInterval(() => { fetch("/poll?" + Math.random()); }, 100);</script>"""
 # A page whose controls sit at known pixels, so a click_at can be aimed without a ref (item 1142).
 _PIXEL: str = """<!doctype html><title>Pixels</title>
 <style>
@@ -61,7 +66,7 @@ _PIXEL: str = """<!doctype html><title>Pixels</title>
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = urlsplit(self.path).path
-        page: str = {"/": _PAGE, "/pixel": _PIXEL, "/busy": _BUSY}.get(
+        page: str = {"/": _PAGE, "/pixel": _PIXEL, "/busy": _BUSY, "/polling": _POLLING}.get(
             path, "<!doctype html><title>Other</title><p>ok</p>"
         )
         body: bytes = page.encode()
@@ -70,6 +75,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self) -> None:
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -157,6 +168,33 @@ async def test_a_click_is_checked_by_whether_the_page_reacted_from_the_same_look
     ]
     assert [(condition, status) for condition, status, _ in busy] == [(PAGE_REACTED, "uncertain")]
     assert "changing by itself" in busy[0][2]
+    # There a click whose page posts to its own site is the step's all the same (item 1158).
+    view = await browser.snapshot("reacted", True)
+    await asyncio.sleep(0.4)
+    posted: ActOutcome = await browser.act(
+        "reacted", [Step(action="click", ref=_ref(view, "Post", "button"))], False, refuse_secret_field, True
+    )
+    assert [(check.status, check.evidence) for check in posted.steps[0].checks] == [("verified", "it sent a request")]
+    # A page that polls its site with nothing new to show changes by itself too.
+    view = await browser.open_url("reacted", f"{site}/polling", True)
+    await asyncio.sleep(0.4)
+    polled: ActOutcome = await browser.act(
+        "reacted", [Step(action="click", ref=_ref(view, "Nothing", "button"))], False, refuse_secret_field, True
+    )
+    assert [check.status for check in polled.steps[0].checks] == ["uncertain"]
+    # What a step of the batch set off is not the page changing by itself: a fill, then a click that changes it.
+    view = await browser.open_url("reacted", f"{site}/", True)
+    batch: ActOutcome = await browser.act(
+        "reacted",
+        [
+            Step(action="fill", ref=_ref(view, "Note", "textbox"), text="hello"),
+            Step(action="click", ref=_ref(view, "Change")),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    assert [[check.status for check in report.checks] for report in batch.steps] == [["verified"], ["verified"]]
 
 
 async def test_a_click_that_changed_nothing_is_told_and_one_that_changed_the_page_is_not(

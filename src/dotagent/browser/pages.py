@@ -70,6 +70,9 @@ class Tab:
     # When Dot last looked at the page (``time.monotonic()``; item 1744): a view read, or the end of a step's watch. A
     # page that changed after it and before the next step changes by itself. Zero: not looked at yet.
     looked_at: float = 0.0
+    # How many requests the page had started then (``requests``): a page that asked for more before the next step polls
+    # by itself, which its documents may not show.
+    looked_requests: int = 0
     # Chrome's id of the page, which a tab the page opens names as its opener, and the ids of the tabs Chrome made for
     # the page that its thread has not taken in yet (item 342; see :func:`watch_births`).
     target_id: str = ""
