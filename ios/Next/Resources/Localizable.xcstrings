@@ -1,0 +1,2440 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@, failed": {
+      "comment": "VoiceOver: a tool call that failed; the argument is its line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, başarısız"
+          }
+        }
+      }
+    },
+    "%@, running": {
+      "comment": "VoiceOver: a tool call at work; the argument is its line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, çalışıyor"
+          }
+        }
+      }
+    },
+    "%lld helpers": {
+      "comment": "Helper group header, first part; the argument is how many helpers the run started",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld helper"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld helpers"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcı"
+          }
+        }
+      }
+    },
+    "%lld helpers working": {
+      "comment": "VoiceOver: the capsule segment of helpers at work; the argument is their count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld helper working"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld helpers working"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcı çalışıyor"
+          }
+        }
+      }
+    },
+    "%lld queued": {
+      "comment": "VoiceOver: the capsule segment of queued messages; the argument is their count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sırada"
+          }
+        }
+      }
+    },
+    "%lld working": {
+      "comment": "Helper group header, second part; the argument is how many still work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld çalışıyor"
+          }
+        }
+      }
+    },
+    "3 matches in 2 files": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 dosyada 3 eşleşme"
+          }
+        }
+      }
+    },
+    "49 pt, 63 with a description; no separators inside a section.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "49 pt, açıklamayla 63; bölüm içinde ayırıcı yok."
+          }
+        }
+      }
+    },
+    "A row with no glyph": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simgesiz bir satır"
+          }
+        }
+      }
+    },
+    "About": {
+      "comment": "Settings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hakkında"
+          }
+        }
+      }
+    },
+    "Activity": {
+      "comment": "Tab bar: what Dot did while the owner was away\nTitle of the activity tab",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkinlik"
+          }
+        }
+      }
+    },
+    "Agents": {
+      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nSettings section: models, schedules, rules, memory\nTab bar: the agents and teams tab\nTitle of the agents list\nTitle of the sheet of a chat's helpers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanlar"
+          }
+        }
+      }
+    },
+    "All": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tümü"
+          }
+        }
+      }
+    },
+    "All chats": {
+      "comment": "Chat list filter menu",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm sohbetler"
+          }
+        }
+      }
+    },
+    "Allow once": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir kez izin ver"
+          }
+        }
+      }
+    },
+    "An approval or a question waits.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir onay ya da soru bekliyor."
+          }
+        }
+      }
+    },
+    "Appearance": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nSettings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görünüm"
+          }
+        }
+      }
+    },
+    "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'tan her şeyi isteyebilirsin: bir iş, bir ders, Mac'te bir ayak işi."
+          }
+        }
+      }
+    },
+    "Attach": {
+      "comment": "VoiceOver: the composer's button that adds a photo or file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekle"
+          }
+        }
+      }
+    },
+    "Back up the photo library": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğraf arşivini yedekle"
+          }
+        }
+      }
+    },
+    "Background work": {
+      "comment": "Title of the sheet of what still works for a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arka plan işi"
+          }
+        }
+      }
+    },
+    "Book me the dentist for next week, afternoons if you can.": {
+      "comment": "Sample owner message in the placeholder screen of wave N0",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelecek hafta için dişçiden randevu al, olabilirse öğleden sonra."
+          }
+        }
+      }
+    },
+    "Book the dentist for next week": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelecek hafta dişçi randevusu"
+          }
+        }
+      }
+    },
+    "Book the dentist for next week, afternoons if you can, and tell me the price before you pay anything.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelecek hafta için dişçiden randevu al, olabilirse öğleden sonra; bir şey ödemeden önce fiyatı söyle."
+          }
+        }
+      }
+    },
+    "Buttons": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düğmeler"
+          }
+        }
+      }
+    },
+    "Buttons, chips, status": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düğmeler, çipler, durum"
+          }
+        }
+      }
+    },
+    "Calendar for week 49; free: Tue 10:00, Thu 15:30": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "49. hafta takvimi; boş: Salı 10:00, Perşembe 15:30"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "comment": "Edit sheet toolbar: discards the edits",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vazgeç"
+          }
+        }
+      }
+    },
+    "Changes and files": {
+      "comment": "Chat header quick panel: what the run changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişiklikler ve dosyalar"
+          }
+        }
+      }
+    },
+    "Chat": {
+      "comment": "Settings row: chat preferences",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet"
+          }
+        }
+      }
+    },
+    "Chats": {
+      "comment": "Tab bar: the chats tab\nTitle of the chat list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetler"
+          }
+        }
+      }
+    },
+    "Check the deposit with Finance": {
+      "comment": "Sample helper title (wave N0)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaporayı Finance ile kontrol et"
+          }
+        }
+      }
+    },
+    "Chips": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çipler"
+          }
+        }
+      }
+    },
+    "Clicked “Thu 15:30”": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“Perş 15:30”a tıkladı"
+          }
+        }
+      }
+    },
+    "Client mail, twice a week": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Müşteri e-postaları, haftada iki kez"
+          }
+        }
+      }
+    },
+    "Close": {
+      "comment": "Sheet toolbar: closes an inspector sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapat"
+          }
+        }
+      }
+    },
+    "Code, %@": {
+      "comment": "VoiceOver: a code block; the argument is its language",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kod, %@"
+          }
+        }
+      }
+    },
+    "Collapsed": {
+      "comment": "VoiceOver value of a closed disclosure",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı"
+          }
+        }
+      }
+    },
+    "Colour and type": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renk ve yazı"
+          }
+        }
+      }
+    },
+    "Command": {
+      "comment": "Background work kind: a shell command still running",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Komut"
+          }
+        }
+      }
+    },
+    "Compare three clinics": {
+      "comment": "Sample helper title (wave N0)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üç kliniği karşılaştır"
+          }
+        }
+      }
+    },
+    "Compared three clinics": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üç kliniği karşılaştırdı"
+          }
+        }
+      }
+    },
+    "Composer and floating control": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma alanı ve yüzen denetim"
+          }
+        }
+      }
+    },
+    "Composer at rest": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boştaki yazma alanı"
+          }
+        }
+      }
+    },
+    "Composer expanded": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genişlemiş yazma alanı"
+          }
+        }
+      }
+    },
+    "Connected": {
+      "comment": "Settings: the Mac answers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı"
+          }
+        }
+      }
+    },
+    "Connections": {
+      "comment": "Settings section: the Mac, notifications, this phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantılar"
+          }
+        }
+      }
+    },
+    "Copied": {
+      "comment": "Code block header after a copy",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopyalandı"
+          }
+        }
+      }
+    },
+    "Copy": {
+      "comment": "Code block header button that copies the code\nContext menu of a tool call: copies its line and detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopyala"
+          }
+        }
+      }
+    },
+    "Copy code": {
+      "comment": "VoiceOver: the code block's copy button",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kodu kopyala"
+          }
+        }
+      }
+    },
+    "Dark": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koyu"
+          }
+        }
+      }
+    },
+    "Debug builds only.": {
+      "comment": "Footer of the debug-only design section",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca hata ayıklama derlemeleri."
+          }
+        }
+      }
+    },
+    "Default": {
+      "comment": "The daemon's default model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan"
+          }
+        }
+      }
+    },
+    "Default model": {
+      "comment": "Composer model menu: use the daemon's default model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan model"
+          }
+        }
+      }
+    },
+    "Default · medium": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nComposer model chip: the model and the reasoning effort",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan · orta"
+          }
+        }
+      }
+    },
+    "Delete chat": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbeti sil"
+          }
+        }
+      }
+    },
+    "Delete…": {
+      "comment": "Context menu of a chat: asks before deleting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sil…"
+          }
+        }
+      }
+    },
+    "Deny": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reddet"
+          }
+        }
+      }
+    },
+    "Design": {
+      "comment": "Settings section of debug builds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasarım"
+          }
+        }
+      }
+    },
+    "Dictate": {
+      "comment": "VoiceOver: the composer's microphone button",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesle yaz"
+          }
+        }
+      }
+    },
+    "Disabled": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devre dışı"
+          }
+        }
+      }
+    },
+    "Disclosure · semibold": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açılır ok · yarı kalın"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "comment": "VoiceOver: the ✕ that closes a notice",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapat"
+          }
+        }
+      }
+    },
+    "Done": {
+      "comment": "Status word: the run finished",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti"
+          }
+        }
+      }
+    },
+    "Dot waits for you in 2 chats": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot 2 sohbette seni bekliyor"
+          }
+        }
+      }
+    },
+    "Dot waits for you: pay the 20 € deposit?": {
+      "comment": "Sample notice: Dot waits for a payment approval",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot seni bekliyor: 20 € kapora ödensin mi?"
+          }
+        }
+      }
+    },
+    "Dot wears its face; another agent a neutral disc.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot kendi yüzünü taşır; diğer ajanlar yalın bir daire."
+          }
+        }
+      }
+    },
+    "Edited src/parser/tokens.py": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "src/parser/tokens.py düzenlendi"
+          }
+        }
+      }
+    },
+    "Emergency stop": {
+      "comment": "Settings: stops every run of Dot at once",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acil durdur"
+          }
+        }
+      }
+    },
+    "Empty": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boş"
+          }
+        }
+      }
+    },
+    "Empty, loading, notices, toast": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boş, yükleniyor, uyarılar, bildirim"
+          }
+        }
+      }
+    },
+    "Every 10 min: watch the clinic's calendar": {
+      "comment": "Sample loop title (wave N0)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 dakikada bir: kliniğin takvimini izle"
+          }
+        }
+      }
+    },
+    "Expanded": {
+      "comment": "VoiceOver value of an open disclosure",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nStatus word: the run failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başarısız"
+          }
+        }
+      }
+    },
+    "Files the run changes show here.": {
+      "comment": "Changes panel empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışmanın değiştirdiği dosyalar burada görünür."
+          }
+        }
+      }
+    },
+    "Filter": {
+      "comment": "Chat list toolbar: the filter menu",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Süz"
+          }
+        }
+      }
+    },
+    "Find a free afternoon slot": {
+      "comment": "Sample helper title (wave N0)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boş bir öğleden sonra bul"
+          }
+        }
+      }
+    },
+    "Fix the flaky parser test": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kararsız ayrıştırıcı testini düzelt"
+          }
+        }
+      }
+    },
+    "Floating control": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yüzen denetim"
+          }
+        }
+      }
+    },
+    "Gallery": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nSettings row of debug builds: the component gallery",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Galeri"
+          }
+        }
+      }
+    },
+    "General": {
+      "comment": "Settings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Genel"
+          }
+        }
+      }
+    },
+    "Ground · card and grouped · nested and pressed · sheet · opaque glass for Reduce Transparency.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zemin · kart ve grup · iç içe ve basılı · sayfa · Saydamlığı Azalt için opak cam."
+          }
+        }
+      }
+    },
+    "Haptics while text streams": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metin akarken titreşim"
+          }
+        }
+      }
+    },
+    "Health": {
+      "comment": "Settings row: the daemon's health",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlık"
+          }
+        }
+      }
+    },
+    "Helpers and background work": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcılar ve arka plan işi"
+          }
+        }
+      }
+    },
+    "Hide all": {
+      "comment": "Tool calls setting: no tool call shows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tümünü gizle"
+          }
+        }
+      }
+    },
+    "Hide successful": {
+      "comment": "Tool calls setting: only failed tool calls show",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başarılıları gizle"
+          }
+        }
+      }
+    },
+    "Hide successful keeps failures. Zen shows only final answers. Approvals, questions and errors always show.": {
+      "comment": "Footer of the tool calls setting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başarılıları gizle hataları gösterir. Zen yalnızca son yanıtları gösterir. Onaylar, sorular ve hatalar her zaman görünür."
+          }
+        }
+      }
+    },
+    "Hides the steps": {
+      "comment": "VoiceOver hint of an open work-log group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adımları gizler"
+          }
+        }
+      }
+    },
+    "Home chat": {
+      "comment": "Agent profile row: the agent's own chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ana sohbet"
+          }
+        }
+      }
+    },
+    "Ink": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mürekkep"
+          }
+        }
+      }
+    },
+    "Ink is the only accent. Amber means it waits on you; red means it failed.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tek vurgu mürekkeptir. Kehribar seni bekliyor demek; kırmızı başarısız oldu demek."
+          }
+        }
+      }
+    },
+    "Ink primary · neutral secondary · red words on a neutral fill.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mürekkep birincil · yalın ikincil · yalın zeminde kırmızı yazı."
+          }
+        }
+      }
+    },
+    "Invoices and the books": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faturalar ve defterler"
+          }
+        }
+      }
+    },
+    "Lesson 2 of 5: proposals go down, sizes come up.": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ders 2/5: öneriler aşağı iner, boyutlar yukarı çıkar."
+          }
+        }
+      }
+    },
+    "Light": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
+          }
+        }
+      }
+    },
+    "List rows": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liste satırları"
+          }
+        }
+      }
+    },
+    "List rows · regular": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liste satırları · normal"
+          }
+        }
+      }
+    },
+    "Loading": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükleniyor"
+          }
+        }
+      }
+    },
+    "Looked at the screen": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekrana baktı"
+          }
+        }
+      }
+    },
+    "Loop": {
+      "comment": "Background work kind: a repeating task of the chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Döngü"
+          }
+        }
+      }
+    },
+    "Memory": {
+      "comment": "Settings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bellek"
+          }
+        }
+      }
+    },
+    "Message Dot": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nPlaceholder of the composer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'a yaz"
+          }
+        }
+      }
+    },
+    "Model": {
+      "comment": "Agent profile row: the model the agent runs on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model"
+          }
+        }
+      }
+    },
+    "Model, %@": {
+      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model, %@"
+          }
+        }
+      }
+    },
+    "Models": {
+      "comment": "Settings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modeller"
+          }
+        }
+      }
+    },
+    "Mon": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pzt"
+          }
+        }
+      }
+    },
+    "Needs you": {
+      "comment": "Chat list filter menu: only chats that wait for the owner\nChat list section: chats that wait for the owner\nComponent gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seni bekliyor"
+          }
+        }
+      }
+    },
+    "Needs you, questions, done": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seni bekleyenler, sorular, bitenler"
+          }
+        }
+      }
+    },
+    "New agent": {
+      "comment": "Agents toolbar: creates an agent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni ajan"
+          }
+        }
+      }
+    },
+    "New chat": {
+      "comment": "Chat list toolbar: starts a new chat\nComponent gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni sohbet"
+          }
+        }
+      }
+    },
+    "No agent open": {
+      "comment": "iPad detail column when no agent is selected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık ajan yok"
+          }
+        }
+      }
+    },
+    "No changes yet": {
+      "comment": "Changes panel empty state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz değişiklik yok"
+          }
+        }
+      }
+    },
+    "No chat open": {
+      "comment": "iPad detail column when no chat is selected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık sohbet yok"
+          }
+        }
+      }
+    },
+    "No chats yet": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz sohbet yok"
+          }
+        }
+      }
+    },
+    "Nothing new since you were away": {
+      "comment": "Activity tab empty state title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen yokken yeni bir şey olmadı"
+          }
+        }
+      }
+    },
+    "Notifications": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nSettings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildirimler"
+          }
+        }
+      }
+    },
+    "Off": {
+      "comment": "VoiceOver value of a switch that is off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı"
+          }
+        }
+      }
+    },
+    "Offline · saved 4 min ago": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çevrimdışı · 4 dk önce kaydedildi"
+          }
+        }
+      }
+    },
+    "On": {
+      "comment": "VoiceOver value of a switch that is on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
+          }
+        }
+      }
+    },
+    "Only the checkmark marks the chosen row.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçili satırı yalnızca onay işareti gösterir."
+          }
+        }
+      }
+    },
+    "Opened the clinic's booking page": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kliniğin randevu sayfasını açtı"
+          }
+        }
+      }
+    },
+    "Opens the Mac's live screen; nothing plays until you open it.": {
+      "comment": "Activity tab: footer under Watch the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in canlı ekranını açar; sen açana kadar hiçbir şey oynamaz."
+          }
+        }
+      }
+    },
+    "Opens the helper's chat": {
+      "comment": "VoiceOver hint of a helper row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcının sohbetini açar"
+          }
+        }
+      }
+    },
+    "Pay the 20 € deposit on the clinic's page?": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kliniğin sayfasında 20 € kapora ödensin mi?"
+          }
+        }
+      }
+    },
+    "Pick a chat on the left, or start a new one.": {
+      "comment": "iPad detail column when no chat is selected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Soldan bir sohbet seç ya da yenisini başlat."
+          }
+        }
+      }
+    },
+    "Pick an agent to see its profile.": {
+      "comment": "iPad detail column when no agent is selected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilini görmek için bir ajan seç."
+          }
+        }
+      }
+    },
+    "Pin": {
+      "comment": "Swipe and context action: keeps a chat at the top",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabitle"
+          }
+        }
+      }
+    },
+    "Primary words": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birincil yazı"
+          }
+        }
+      }
+    },
+    "Question": {
+      "comment": "Status word: Dot asked the owner a question",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Soru"
+          }
+        }
+      }
+    },
+    "Read src/parser/tokens.py": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "src/parser/tokens.py okundu"
+          }
+        }
+      }
+    },
+    "Read the insurance terms": {
+      "comment": "Sample helper title (wave N0)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigorta koşullarını oku"
+          }
+        }
+      }
+    },
+    "Reading the clinic's opening hours": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kliniğin çalışma saatlerini okuyor"
+          }
+        }
+      }
+    },
+    "Reading your chats…": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetlerin okunuyor…"
+          }
+        }
+      }
+    },
+    "Reads and summarises sources": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaynakları okur ve özetler"
+          }
+        }
+      }
+    },
+    "Recent": {
+      "comment": "Chat list section: the other chats, newest first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son"
+          }
+        }
+      }
+    },
+    "Removed from the queue": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıradan çıkarıldı"
+          }
+        }
+      }
+    },
+    "Rename": {
+      "comment": "Context menu of a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden adlandır"
+          }
+        }
+      }
+    },
+    "Rows and sections": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satırlar ve bölümler"
+          }
+        }
+      }
+    },
+    "Rules": {
+      "comment": "Settings row: what Dot may do without asking",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurallar"
+          }
+        }
+      }
+    },
+    "Running the unit tests again with the fix": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzeltmeyle birim testlerini yeniden çalıştırıyor"
+          }
+        }
+      }
+    },
+    "Save": {
+      "comment": "Edit sheet toolbar: keeps the edits",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydet"
+          }
+        }
+      }
+    },
+    "Scheduled tasks": {
+      "comment": "Settings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlanmış görevler"
+          }
+        }
+      }
+    },
+    "Schedules": {
+      "comment": "Agent profile row: the agent's scheduled tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlamalar"
+          }
+        }
+      }
+    },
+    "Scroll to the newest message": {
+      "comment": "VoiceOver: the round button over the composer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yeni mesaja kaydır"
+          }
+        }
+      }
+    },
+    "Search chats": {
+      "comment": "Placeholder of the chat list's search field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetlerde ara"
+          }
+        }
+      }
+    },
+    "Searched for \"unterminated string\"": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"unterminated string\" arandı"
+          }
+        }
+      }
+    },
+    "Secondary words": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İkincil yazı"
+          }
+        }
+      }
+    },
+    "Send": {
+      "comment": "VoiceOver: the composer's send button",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönder"
+          }
+        }
+      }
+    },
+    "Sent 12 mails; 2 bounced and are listed below.": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 e-posta gönderildi; 2'si geri döndü, aşağıda listeli."
+          }
+        }
+      }
+    },
+    "Settings": {
+      "comment": "Tab bar: the settings tab\nTitle of the settings tab",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar"
+          }
+        }
+      }
+    },
+    "Settle": {
+      "comment": "Swipe and context action: puts a chat away (reversible)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaldır"
+          }
+        }
+      }
+    },
+    "Settled": {
+      "comment": "Chat list filter menu: chats the owner put away\nComponent gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaldırılanlar"
+          }
+        }
+      }
+    },
+    "Settled “%@”": {
+      "comment": "Toast after a chat was put away; the argument is its title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” kaldırıldı"
+          }
+        }
+      }
+    },
+    "Short one": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kısa bir tane"
+          }
+        }
+      }
+    },
+    "Should I include the two drafts from October?": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekim'deki iki taslağı da ekleyeyim mi?"
+          }
+        }
+      }
+    },
+    "Show all": {
+      "comment": "Tool calls setting: every tool call shows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tümünü göster"
+          }
+        }
+      }
+    },
+    "Shows the steps": {
+      "comment": "VoiceOver hint of a closed work-log group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adımları gösterir"
+          }
+        }
+      }
+    },
+    "Starting": {
+      "comment": "Status word: a run is starting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başlıyor"
+          }
+        }
+      }
+    },
+    "Status words": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durum sözcükleri"
+          }
+        }
+      }
+    },
+    "Status · semibold": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durum · yarı kalın"
+          }
+        }
+      }
+    },
+    "Stop %@": {
+      "comment": "VoiceOver: the Stop button of a helper row; the argument is the helper's title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ durdur"
+          }
+        }
+      }
+    },
+    "Stop everything": {
+      "comment": "Confirmation button of the emergency stop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her şeyi durdur"
+          }
+        }
+      }
+    },
+    "Stop everything Dot is doing?": {
+      "comment": "Confirmation of the emergency stop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un yaptığı her şey durdurulsun mu?"
+          }
+        }
+      }
+    },
+    "Stopped": {
+      "comment": "Helper state: the helper ended because the owner stopped it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durduruldu"
+          }
+        }
+      }
+    },
+    "Stopping…": {
+      "comment": "Helper state: the owner pressed Stop, the helper has not ended yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durduruluyor…"
+          }
+        }
+      }
+    },
+    "Subagent": {
+      "comment": "Background work kind: a helper agent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alt ajan"
+          }
+        }
+      }
+    },
+    "Surfaces (no strokes)": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yüzeyler (çerçevesiz)"
+          }
+        }
+      }
+    },
+    "Symbols": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simgeler"
+          }
+        }
+      }
+    },
+    "System": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nSettings section: health, version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sistem"
+          }
+        }
+      }
+    },
+    "System font, scaled with Dynamic Type; body 16/23.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sistem yazı tipi, Dinamik Yazı ile ölçeklenir; gövde 16/23."
+          }
+        }
+      }
+    },
+    "Tab bar · regular": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sekme çubuğu · normal"
+          }
+        }
+      }
+    },
+    "Teach me how SwiftUI lays out a stack": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SwiftUI'ın bir yığını nasıl yerleştirdiğini öğret"
+          }
+        }
+      }
+    },
+    "Tertiary words": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üçüncül yazı"
+          }
+        }
+      }
+    },
+    "The Mac refused this phone's key. Pair again.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac bu telefonun anahtarını reddetti. Yeniden eşleştir."
+          }
+        }
+      }
+    },
+    "The Mac's screen": {
+      "comment": "Chat header quick panel: the Mac's live screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in ekranı"
+          }
+        }
+      }
+    },
+    "The agent's profile, tools and schedules come in a later version.": {
+      "comment": "Footer of the agent placeholder screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanın profili, araçları ve zamanlamaları sonraki bir sürümde gelecek."
+          }
+        }
+      }
+    },
+    "The disk is full.": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disk dolu."
+          }
+        }
+      }
+    },
+    "The live screen comes in a later version.": {
+      "comment": "Mac screen panel placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı ekran sonraki bir sürümde gelecek."
+          }
+        }
+      }
+    },
+    "The order is the priority when several hold.": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birkaçı birden geçerliyse sıra önceliği gösterir."
+          }
+        }
+      }
+    },
+    "The test failed because the tokenizer read past the end of an **unterminated string**. I stopped the loop at the last character and kept the error the parser already raises; see [the failing case](https://example.invalid/case) and the change below.": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test, belirteçleyici **kapanmamış bir dizenin** sonunu aştığı için başarısız oldu. Döngüyü son karakterde durdurdum ve ayrıştırıcının zaten verdiği hatayı korudum; [başarısız örneğe](https://example.invalid/case) ve aşağıdaki değişikliğe bak."
+          }
+        }
+      }
+    },
+    "This Mac": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nSettings row: the paired Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu Mac"
+          }
+        }
+      }
+    },
+    "This phone's key": {
+      "comment": "Settings row: the key this phone was paired with",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonun anahtarı"
+          }
+        }
+      }
+    },
+    "Thursday at 15:30 is free at the clinic on Main Street. The clinic asks for a **20 € deposit**, so I stopped before paying; the slot is held for ten minutes on [the booking page](https://clinic.example.invalid/book).": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ana Cadde'deki klinikte perşembe 15:30 boş. Klinik **20 € kapora** istiyor, bu yüzden ödemeden önce durdum; yer [randevu sayfasında](https://clinic.example.invalid/book) on dakika tutuluyor."
+          }
+        }
+      }
+    },
+    "Toast and notice · medium": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildirim ve uyarı · orta"
+          }
+        }
+      }
+    },
+    "Toggles": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtarlar"
+          }
+        }
+      }
+    },
+    "Tool calls in chat": {
+      "comment": "Settings section: how much of the work log a chat shows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbette araç çağrıları"
+          }
+        }
+      }
+    },
+    "Toolbar and composer · medium": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Araç çubuğu ve yazma alanı · orta"
+          }
+        }
+      }
+    },
+    "Transcript": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konuşma"
+          }
+        }
+      }
+    },
+    "Type roles": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazı rolleri"
+          }
+        }
+      }
+    },
+    "Typing your name and phone number": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adını ve telefon numaranı yazıyor"
+          }
+        }
+      }
+    },
+    "Undo": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nToast action that takes the last change back",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri al"
+          }
+        }
+      }
+    },
+    "Unpin": {
+      "comment": "Swipe and context action on a pinned chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabitlemeyi kaldır"
+          }
+        }
+      }
+    },
+    "Version": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürüm"
+          }
+        }
+      }
+    },
+    "Waiting on you": {
+      "comment": "Component gallery (debug builds): a heading or sample text\nStatus word: a chat waits for the owner's approval or answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seni bekliyor"
+          }
+        }
+      }
+    },
+    "Waits for your answer about the deposit": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapora için yanıtını bekliyor"
+          }
+        }
+      }
+    },
+    "Watch the Mac": {
+      "comment": "Activity tab row: opens the Mac's live screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'i izle"
+          }
+        }
+      }
+    },
+    "Weekly client mail": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haftalık müşteri e-postası"
+          }
+        }
+      }
+    },
+    "What Dot does on its own (schedules, helpers, drafts that wait) shows here.": {
+      "comment": "Activity tab empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kendi başına yaptıkları (zamanlamalar, yardımcılar, bekleyen taslaklar) burada görünür."
+          }
+        }
+      }
+    },
+    "Which invoices are overdue": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hangi faturaların vadesi geçti"
+          }
+        }
+      }
+    },
+    "Why does the parser test fail only on CI?": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayrıştırıcı testi neden yalnızca CI'da başarısız oluyor?"
+          }
+        }
+      }
+    },
+    "Work log · medium": {
+      "comment": "Symbol sample sheet: a context and the symbol weight used there",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İş günlüğü · orta"
+          }
+        }
+      }
+    },
+    "Worked for 2m 14s · 4 steps": {
+      "comment": "Work-log group summary (sample)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 dk 14 sn çalıştı · 4 adım"
+          }
+        }
+      }
+    },
+    "Worked for 2m 14s · 5 steps · 1 failed": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2 dk 14 sn çalıştı · 5 adım · 1 başarısız"
+          }
+        }
+      }
+    },
+    "Worked for 48s · 4 steps": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "48 sn çalıştı · 4 adım"
+          }
+        }
+      }
+    },
+    "Working": {
+      "comment": "Chat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışıyor"
+          }
+        }
+      }
+    },
+    "Yesterday": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dün"
+          }
+        }
+      }
+    },
+    "You: %@": {
+      "comment": "VoiceOver: the owner's own message; the argument is its text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen: %@"
+          }
+        }
+      }
+    },
+    "Your assistant · runs everything": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asistanın · her şeyi yürütür"
+          }
+        }
+      }
+    },
+    "Zen": {
+      "comment": "Tool calls setting: only final answers show",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zen"
+          }
+        }
+      }
+    },
+    "card": {
+      "comment": "Component gallery (debug builds): the name of a surface colour token",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kart"
+          }
+        }
+      }
+    },
+    "glass fallback": {
+      "comment": "Component gallery (debug builds): the name of a surface colour token",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cam yedeği"
+          }
+        }
+      }
+    },
+    "glyph (3:1)": {
+      "comment": "Component gallery (debug builds): a heading or sample text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "simge (3:1)"
+          }
+        }
+      }
+    },
+    "ground": {
+      "comment": "Component gallery (debug builds): the name of a surface colour token",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "zemin"
+          }
+        }
+      }
+    },
+    "nested": {
+      "comment": "Component gallery (debug builds): the name of a surface colour token",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iç içe"
+          }
+        }
+      }
+    },
+    "sheet": {
+      "comment": "Component gallery (debug builds): the name of a surface colour token",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sayfa"
+          }
+        }
+      }
+    },
+    "uv run pytest tests/unit -q -n 4": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "uv run pytest tests/unit -q -n 4"
+          }
+        }
+      }
+    },
+    "uv run pytest tests/unit/test_parser.py -q": {
+      "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "uv run pytest tests/unit/test_parser.py -q"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
