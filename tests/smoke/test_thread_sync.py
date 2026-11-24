@@ -383,6 +383,54 @@ async def test_a_run_and_a_helper_that_start_while_the_bus_drops_events_still_jo
         await manager.shutdown()
 
 
+async def test_a_drop_does_not_read_again_the_whole_history_of_an_old_runs_finished_helper(
+    served: Served, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The third pre-push review of item 1686: after a drop the stream widened every followed run to its helpers, so
+    the finished helper of a run the phone named in its cursors was read again from its first event at every drop."""
+    store: Store = served.runtime.store
+    bus = served.runtime.bus
+    chat: ThreadRecord = await store.create_thread("Chat", "ui")
+    elsewhere: ThreadRecord = await store.create_thread("Helper's chat", "delegate")
+    other: ThreadRecord = await store.create_thread("Busy elsewhere", "ui")
+    busy: RunRecord = await _run(store, other.id, None)
+    old: RunRecord = await _run(store, chat.id, None)
+    said: EventRecord = await bus.emit(old.id, "assistant", {"step": 1, "text": "done"}, True)
+    helper: RunRecord = await _run(store, elsewhere.id, old.id)
+    helper_ids: set[int] = {(await bus.emit(helper.id, "assistant", {"step": n}, True)).id for n in range(3)}
+    await store.finish_run(helper.id, "done", "ok")
+    await store.finish_run(old.id, "done", "ok")
+    monkeypatch.setattr(events_module, "_QUEUE_SIZE", 4)
+    manager: RunManager = RunManager(served.runtime)
+    monkeypatch.setattr(manager, "active_run_ids", set)
+    context: ServerContext = ServerContext(
+        runtime=served.runtime,
+        manager=manager,
+        scheduler=None,
+        token=TOKEN,
+        host="127.0.0.1",
+        port=1,
+        started_at=time.time(),
+        stopping=asyncio.Event(),
+    )
+    try:
+        async with aclosing(follow_thread(context, chat.id, {old.id: said.id})) as stream:
+            async with asyncio.timeout(_WAIT_S):
+                assert b"event: synchronized" in await anext(stream)
+            for number in range(10):
+                await bus.emit(busy.id, "assistant", {"step": number}, True)
+            after: RunRecord = await _run(store, chat.id, None)
+            wanted: int = (await bus.emit(after.id, "assistant", {"step": 1}, True)).id
+            got: set[int] = set()
+            async with asyncio.timeout(_WAIT_S):
+                while wanted not in got:
+                    for found in re.findall(rb"^id: (\d+)$", await anext(stream), re.MULTILINE):
+                        got.add(int(found))
+            assert not got & helper_ids, "the old run's finished helper was read again after the drop"
+    finally:
+        await manager.shutdown()
+
+
 async def test_a_page_of_older_runs_holds_a_run_made_at_the_same_instant_as_the_one_it_starts_before(
     served: Served,
 ) -> None:

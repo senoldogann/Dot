@@ -59,6 +59,7 @@ from dotagent.server.stream import (
 from dotagent.server.views import QueueView, RunDetail, TerminalView, ThreadAutomation
 from dotagent.store.db import Store
 from dotagent.store.models import (
+    WORKING_STATUSES,
     ApprovalRecord,
     DraftRecord,
     EventRecord,
@@ -84,7 +85,7 @@ NEWEST_EVENTS: int = 200
 # The most helpers a view lists, the newest first.
 MOST_HELPERS: int = 50
 # A helper of a chat is at work while its status is one of these.
-_WORKING: frozenset[str] = frozenset({"queued", "running", "blocked"})
+_WORKING: frozenset[str] = frozenset(WORKING_STATUSES)
 _STARTS: frozenset[str] = frozenset({"run_queued", "run_started"})
 
 
@@ -506,7 +507,13 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
             return _marker(THREAD_CHANGED_EVENT, told.model_dump())
 
         frames: bytes = await stored()
-        synced: Synchronized = Synchronized(revision=await store.thread_revision(thread_id), runs=dict(sent.newest))
+        try:
+            revision: int = await store.thread_revision(thread_id)
+        except NotFoundError:
+            # Deleted in the moment since the route's check: told as the drop path tells it, and the stream ends.
+            yield frames + await changed_now()
+            return
+        synced: Synchronized = Synchronized(revision=revision, runs=dict(sent.newest))
         yield frames + _marker(SYNCHRONIZED_EVENT, synced.model_dump())
         dropped: int = 0
         owed: bool = False
@@ -527,8 +534,11 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
                 family.update(await _members(ctx, thread_id, {}))
                 # And a run of the chat that started and ended while the events were lost.
                 recent, _ = await store.thread_runs_window(thread_id, MOST_RUNS, None)
-                family.update(run.id for run in recent if run.created_at >= opened)
-                for member in tuple(family):
+                started: set[str] = {run.id for run in recent if run.created_at >= opened}
+                family.update(started)
+                # Only the helpers of those runs: a helper of a run followed before is a member already while it works
+                # (``_members``), and the helpers of an old run must not be read again from their first event.
+                for member in started:
                     family.update(child.id for child in await store.list_child_runs(member))
                 caught: bytes = await stored() + await changed_now()
                 owed, written = True, time.monotonic()

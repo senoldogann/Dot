@@ -294,7 +294,7 @@ def build_wait_tools() -> tuple[RegisteredTool, ...]:
             description=(
                 "Wait in code, with no turn spent, until one condition holds: command exits 0, url answers, or file "
                 "is there. Use it instead of sleep and a check. A command that changes or fetches anything is "
-                "refused. The owner's message ends it."
+                "refused. On Dot's own loop and the Claude plan, the owner's message ends it."
             ),
             args_model=WaitArgs,
             modes=ACTING_MODES,
