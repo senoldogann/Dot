@@ -21,6 +21,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1746](1746.md) | done | 2026-11-24 | The run's account: what it did by its record, on the run page and in its detail |
 | [1745](1745.md) | done | 2026-11-24 | A plan step marked done is judged by the run's record |
 | [1744](1744.md) | done | 2026-11-24 | A click that names nothing it expects is checked by whether the page reacted |
+| [1742](1742.md) | done | 2026-11-24 | The prompt cache says why it missed, and a chat that comes back within the hour keeps its Claude cache for an hour |
 | [1741](1741.md) | done | 2026-11-24 | A hop count across agents: a runaway chain of hand-offs is stopped for a run that asks, and reported in yolo and free mode |
 | [1740](1740.md) | done | 2026-11-24 | `search_chats`: a run finds what was said in any chat, by its words |
 | [1731](1731.md) | done | 2026-11-24 | What a task will cost is shown, and caps the owner sets pause a task and ask the owner, in every mode |

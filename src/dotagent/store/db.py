@@ -4441,6 +4441,16 @@ class Store:
         )
         return None if row is None else _event(row)
 
+    async def thread_last_call_at(self, thread_id: str, run_id: str) -> float | None:
+        """When a model last answered in a run of the chat ``thread_id`` other than ``run_id`` (item 1742), or ``None``
+        when the chat has had no call: how long ago the provider's cache of the chat was last written or read."""
+        row = await self._one(
+            "SELECT MAX(e.ts) AS last FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            " WHERE r.thread_id = ? AND r.id != ? AND e.kind = ?",
+            (thread_id, run_id, CALL_EVENT),
+        )
+        return None if row is None or row["last"] is None else float(row["last"])
+
     async def goal_spend(self, since: float, limit: int) -> list[ChatSpend]:
         """The ``limit`` goals that spent the most tokens in the runs created since ``since``, the chats of one title
         together (items 881 and 883), as ``dotx stats`` reads them."""
