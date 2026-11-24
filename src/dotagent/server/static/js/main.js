@@ -3,6 +3,8 @@
 import { isAway, onAway } from "./infront.js";
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp } from "./api.js";
+import { lineOf } from "./linewords.js";
+import { noteRefused } from "./linkfacts.js";
 import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
@@ -235,7 +237,7 @@ function onThisMac() {
  * key and the commands of Terminal are the other ways in, in a fold that is shut unless the key is what failed
  * (`keyFailed`).
  */
-function renderSignIn(message, keyFailed = false) {
+function renderSignIn(message, keyFailed = false, refused = false) {
   // A sign-in code from Settings › Phone (item 267): the way in for an app on a phone's home screen, whose storage is
   // its own, so that it has none of the key Safari was given.
   const code = el("input", {
@@ -288,6 +290,18 @@ function renderSignIn(message, keyFailed = false) {
   onEnter(code, () => attempt(pair));
   onEnter(input, submit);
   const problem = message === "" ? null : el("div", { class: "note bad", role: "alert" }, icon("alert"), el("span", null, message));
+  // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field.
+  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
+  const refusedLine =
+    said === null
+      ? null
+      : el(
+          "div",
+          { class: "link-line", role: "alert", "data-kind": "refused" },
+          el("span", { class: "link-line-mark", "aria-hidden": "true" }, icon("alert")),
+          el("span", { class: "link-line-text" }, said.text),
+          el("button", { class: "btn sm link-line-action", type: "button", onclick: () => code.focus() }, said.action ?? ""),
+        );
   // On the Mac Dot runs on the code is not the way: the Dot app, or Terminal, opens this page signed in. The code is a
   // phone's, said as such under it.
   const intro = local
@@ -297,6 +311,7 @@ function renderSignIn(message, keyFailed = false) {
       ]
     : [el("p", { class: "muted" }, t("signin.phoneIntro"))];
   screen(
+    refusedLine,
     ...intro,
     problem,
     code,
@@ -763,7 +778,8 @@ function handleAuthLost() {
   }
   endSession();
   clearToken();
-  renderSignIn(onThisMac() ? t("signin.keyLostMac") : t("signin.keyLost"));
+  noteRefused();
+  renderSignIn(onThisMac() ? t("signin.keyLostMac") : t("signin.keyLost"), false, true);
 }
 
 async function connect() {
@@ -786,7 +802,8 @@ async function connect() {
         return;
       }
       clearToken();
-      renderSignIn(t("signin.keyRefused"), true);
+      noteRefused();
+      renderSignIn(t("signin.keyRefused"), true, true);
       return;
     }
     // A status is the daemon's answer; without one (0, or no ApiError) nothing that is the daemon answered.

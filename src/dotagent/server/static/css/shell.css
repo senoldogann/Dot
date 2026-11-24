@@ -1359,3 +1359,68 @@ a.stage-name-link {
 .sheet-action > .side-badge {
   flex: none;
 }
+
+/* The line under the bar that says how the link stands (item 1524, connectionline.js): offline, reconnecting, a key refused.
+   Offline and a refused key stand in the bar, so the line takes its own room and covers nothing that is read; reconnecting
+   floats (below). With nothing to say it is not there. It is one thin line, two on a phone as narrow as 320 px, and the one
+   thing that can be pressed in it (the refused key's way to pair again) is a finger tall. */
+.link-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-half) var(--space-2);
+  padding: var(--space-half) var(--space-4);
+  background: var(--warn-weak);
+  color: var(--warn);
+  border-bottom: 1px solid var(--warn-border);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: var(--weight-label);
+}
+
+.link-line[hidden] {
+  display: none;
+}
+
+/* A daemon that cannot be reached on a link that is there is told as it always was, over the room the conversation leaves
+   under the bar, so that what is read never moves when it comes or goes (item 328); the states that last, no link and a key
+   refused, take a row of their own. */
+.link-line[data-kind="reconnecting"] {
+  position: absolute;
+  top: 100%;
+  inset-inline: 0;
+  z-index: 1;
+}
+
+.link-line[data-kind="refused"] {
+  background: var(--bad-weak);
+  color: var(--bad);
+  border-bottom-color: var(--bad-border);
+}
+
+.link-line-mark {
+  display: inline-flex;
+  flex: none;
+}
+
+.link-line-mark .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.link-line-text {
+  flex: 1 1 14ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.link-line .link-line-action.btn.sm {
+  flex: none;
+  min-height: 44px;
+}
+
+/* On the sign-in screen the line stands over the card's words, with the card's own width. */
+.signin .link-line {
+  border: 1px solid var(--bad-border);
+  border-radius: var(--radius-lg);
+}

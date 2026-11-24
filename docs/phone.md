@@ -542,6 +542,17 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   was not used.*), and so does one answered on the Mac meanwhile; a Stop or a queue change that finds nothing to do is
   done. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
   could not reach Dot and the words stay in the box.
+- **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
+  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Reconnecting…*
+  floats over the room the conversation leaves under the bar, as the notes of a lost stream always did (item 328), so that
+  what is read never moves when it comes or goes: *Offline: showing saved chats, last updated 3 min ago*
+  (the copy a chat is drawn from, and how old it is, kept true by a clock that runs only while it is shown), *Offline: 2
+  waiting to send* (what the outbox holds, which says more than the copy does), *Reconnecting…* (Dot not reached for more
+  than a moment on a link that is there; a break that mends at once says nothing), and *This phone's key was refused*
+  with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
+  of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
+  one line on a phone 390 px wide and two at 320 px, in the light and the dark look, and the one thing in it that is
+  pressed is 44 px tall. While it says the link is down, a request that got no answer shows no toast over the chat.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 

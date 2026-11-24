@@ -8,6 +8,7 @@ import { t } from "./i18n.js";
 import { icon } from "./icons.js";
 import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackScrolled, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
+import { createConnectionLine } from "./connectionline.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
 import { breakToldAt } from "./state.js";
@@ -193,11 +194,14 @@ export function buildShell({ homeRoute }) {
   // While the sidebar is closed the bar holds its opener alone (item 273).
   const opener = el("div", { class: "stagebar-left" }, menu);
   const main = el("main", { class: "page", tabindex: "-1" });
+  // The thin line under the bar that says how the link stands (item 1524): offline, reconnecting, a key refused.
+  const link = createConnectionLine();
   const stagebar = el(
     "header",
     { class: "stagebar" },
     // The bar drags the desktop shell's window (item 88); a browser ignores the attribute.
     el("div", { class: "stagebar-row", "data-tauri-drag-region": "" }, opener, stageTitleSlot(), stageToolsSlot(), el("div", { class: "stagebar-right" }, indicators.pills)),
+    link.element,
     ...indicators.banners,
   );
   const stage = el("div", { class: "stage" }, stagebar, main);
@@ -329,6 +333,7 @@ export function buildShell({ homeRoute }) {
       removeShortcuts();
       stopFollowing();
       stopScrollLine();
+      link.dispose();
       sidebar.dispose();
     },
   };
