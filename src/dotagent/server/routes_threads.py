@@ -5,10 +5,26 @@ pinning one from its menu (item 130), keeping what its composer chose (item 199)
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from starlette.responses import StreamingResponse
 
 from dotagent.core.errors import ConfigError, NotFoundError
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.server.context import ServerContext
+from dotagent.server.stream import event_stream
+from dotagent.server.thread_sync import (
+    ThreadStreamQuery,
+    ThreadsView,
+    ThreadsViewQuery,
+    ThreadView,
+    ThreadViewQuery,
+    check_cursors,
+    follow_thread,
+    follow_threads,
+    parse_cursors,
+    terminals_of,
+    thread_view,
+    threads_view,
+)
 from dotagent.server.views import (
     DeletedThreads,
     DeleteThreadsRequest,
@@ -30,6 +46,30 @@ def threads_router(ctx: ServerContext) -> APIRouter:
         rows = await store.list_thread_summaries(query.limit, ctx.runtime.config.scheduler.same_chat)
         return [ctx.manager.as_shown_thread(row) for row in rows]
 
+    @router.get("/threads/view")
+    async def view_threads(query: Annotated[ThreadsViewQuery, Query()]) -> ThreadsView:
+        """The chats with their revisions and asks (item 1686, :mod:`dotagent.server.thread_sync`)."""
+        return await threads_view(ctx, query.limit)
+
+    @router.get("/threads/stream")
+    async def stream_threads() -> StreamingResponse:
+        """The list's stream: the lifecycle kinds and every chat's ``thread_changed`` (item 1686)."""
+        return event_stream(follow_threads(ctx.runtime.bus, ctx.stopping))
+
+    @router.get("/threads/{thread_id}/view")
+    async def view_thread(thread_id: str, query: Annotated[ThreadViewQuery, Query()]) -> ThreadView:
+        """The chat's small state at its revision (item 1686); 404 for no chat."""
+        return await thread_view(ctx, thread_id, query.tail, query.before)
+
+    @router.get("/threads/{thread_id}/stream")
+    async def stream_thread(thread_id: str, query: Annotated[ThreadStreamQuery, Query()]) -> StreamingResponse:
+        """The chat's stream (item 1686): its runs' and helpers' events from the client's cursors, its revision's
+        moves, and ``synchronized``; 404 for no chat or a named run that is not the chat's."""
+        await store.get_thread(thread_id)
+        cursors: dict[str, int] = parse_cursors(query.cursors)
+        await check_cursors(store, thread_id, cursors)
+        return event_stream(follow_thread(ctx, thread_id, cursors))
+
     @router.get("/threads/{thread_id}/helpers")
     async def list_helpers(thread_id: str, query: Annotated[HelpersQuery, Query()]) -> list[RunRecord]:
         """The runs the chat's runs started on their behalf, newest first (the side panel's Agents tab); 404 for no
@@ -42,17 +82,7 @@ def threads_router(ctx: ServerContext) -> APIRouter:
         """The chat's terminal sessions, in the order they opened (item 229): the line over the composer shows those
         whose program runs. 404 for no chat."""
         await store.get_thread(thread_id)
-        return [
-            TerminalView(
-                id=session.id,
-                command=session.command,
-                background=session.background,
-                started_at=session.started_at,
-                ended=session.ended,
-                exit_status=session.exit_status,
-            )
-            for session in ctx.runtime.terminals.sessions(thread_id)
-        ]
+        return terminals_of(ctx, thread_id)
 
     @router.delete("/threads/{thread_id}/terminals/{session_id}", status_code=204)
     async def close_terminal(thread_id: str, session_id: str) -> None:

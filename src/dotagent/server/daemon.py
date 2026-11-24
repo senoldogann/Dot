@@ -50,6 +50,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import read_or_create_token, require_loopback
 from dotagent.server.links import base_url, ui_url
 from dotagent.server.phones import PairedPhones
+from dotagent.server.thread_sync import watch_revisions
 from dotagent.store.backup import keep_backups
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
@@ -272,6 +273,14 @@ def _log_relay_end(relay: asyncio.Task[None]) -> None:
     log.error("relay_ended", error=repr(relay.exception()))
 
 
+def _log_revision_watch_end(watch: asyncio.Task[None]) -> None:
+    """A look at the chats' revisions that stops before the daemon does is logged: the phones' streams hear of no
+    change of a chat until the daemon starts again (item 1686)."""
+    if watch.cancelled() or watch.exception() is None:
+        return
+    log.error("revision_watch_ended", error=repr(watch.exception()))
+
+
 async def _stop_server_on(stop: asyncio.Event, server: DotServer) -> None:
     """The first stop request ends the server gracefully, a second one forces it."""
     await stop.wait()
@@ -422,6 +431,12 @@ async def run_daemon(config: AppConfig) -> int:
             relay: asyncio.Task[None] = asyncio.create_task(manager.relay_elsewhere(), name="relay")
             relay.add_done_callback(_log_relay_end)
             cleanup.push_async_callback(_cancelled, relay)
+            # The chats whose revision moved, whichever process wrote, told to the phones' streams (item 1686).
+            watch: asyncio.Task[None] = asyncio.create_task(
+                watch_revisions(runtime.store, runtime.bus), name="revision-watch"
+            )
+            watch.add_done_callback(_log_revision_watch_end)
+            cleanup.push_async_callback(_cancelled, watch)
             # A copy of the database every [store] backup_every_hours hours, kept where [store] backup_dir says (item
             # 526); the first at once when none is younger.
             if config.store.backup_every_hours > 0:

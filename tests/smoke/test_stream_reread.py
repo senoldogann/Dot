@@ -62,7 +62,7 @@ def _ids(piece: bytes) -> list[int]:
 def _reads(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     """The ids the stream reads the store from, in the order it asks (the lowest of its runs' cursors)."""
     asked: list[int] = []
-    real = stream_module._stored_events
+    real = stream_module.stored_events
 
     async def spy(store: Store, run_ids: Iterable[str], after: int, newest: Mapping[str, int] | None = None) -> list:  # type: ignore[type-arg]
         ids: list[str] = list(run_ids)
@@ -74,7 +74,7 @@ def _reads(monkeypatch: pytest.MonkeyPatch) -> list[int]:
         )
         return await real(store, ids, after, newest)
 
-    monkeypatch.setattr(stream_module, "_stored_events", spy)
+    monkeypatch.setattr(stream_module, "stored_events", spy)
     return asked
 
 

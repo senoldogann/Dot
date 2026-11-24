@@ -192,6 +192,14 @@ class ThreadSummary(FrozenModel):
     campaign_id: str | None = None
 
 
+class ThreadRevision(FrozenModel):
+    """A chat whose revision moved (item 1686): to ``revision``, or ``deleted`` at it."""
+
+    thread_id: str
+    revision: int
+    deleted: bool
+
+
 class RunRecord(FrozenModel):
     """One run. ``effort`` is the reasoning level it was started with (``None`` for runs stored before it was kept);
     ``speed`` is ``fast`` when it was started in fast mode (item 223), which its steps on a model with fast mode use;

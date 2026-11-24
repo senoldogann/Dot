@@ -124,6 +124,8 @@ class UserInput(FrozenModel):
     # A note of Dot's from another run (a chat's note, a work order, a helper's answer: item 974), which is no sign that
     # the owner is there, as their own message, answer or reaction is.
     of_dot: bool = False
+    # The helper whose report the note is (item 1686), which its ``steer`` event names; ``None`` for any other.
+    helper_run_id: str | None = None
 
     def owners_own(self) -> bool:
         """Whether these are the owner's own words: a message, the answer to a question, or a queued message they sent
@@ -426,7 +428,8 @@ def steer_event(sent: UserInput, tainted: bool) -> JsonObject:
     message of the owner clears the run's taint (:func:`dotagent.agent.gate.tainted_after`); one that vouches for
     nothing (item 482) says so, with whether the run is ``tainted``, as it was before it; a note about a reaction of
     the owner (item 586) says which kind it is, and one that carries the owner's own message on says which, for the
-    page to draw."""
+    page to draw. A note of Dot's from another run says ``of_dot``, and a helper's report its ``source``
+    (``helper_report``) and the helper's ``helper_run_id`` (item 1686)."""
     data: JsonObject = {"text": sent.text, "files": attachment_summary(sent.files)}
     if sent.vouches:
         return data
@@ -436,4 +439,8 @@ def steer_event(sent: UserInput, tainted: bool) -> JsonObject:
         "tainted": tainted,
         **({} if sent.reaction is None else {"reaction": sent.reaction}),
         **({} if sent.owner_text == "" else {"owner_text": sent.owner_text}),
+        # A note of Dot's from another run, and a helper's report among them (item 1686), typed for the clients
+        # that draw it as Dot's row rather than read its words.
+        **({"of_dot": True} if sent.of_dot else {}),
+        **({} if sent.helper_run_id is None else {"source": "helper_report", "helper_run_id": sent.helper_run_id}),
     }

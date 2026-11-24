@@ -1,0 +1,2810 @@
+{
+  "$comment": "Made by scripts/thread_sync_schema.py from dotagent.server.thread_sync (item 1686); stream kinds of the thread stream's own: thread_changed, synchronized; keepalive every 5 s.",
+  "$defs": {
+    "AgentLook": {
+      "additionalProperties": false,
+      "description": "How an agent's character looks (item 102): one of the shapes, rest expressions and colours of the character\nengine (``static/js/character/skins.js`` and ``expressions.js``).",
+      "properties": {
+        "colour": {
+          "enum": [
+            "ink",
+            "brown",
+            "red",
+            "orange",
+            "amber",
+            "green",
+            "teal",
+            "blue",
+            "violet",
+            "pink",
+            "grey",
+            "cream"
+          ],
+          "title": "Colour",
+          "type": "string"
+        },
+        "expression": {
+          "enum": [
+            "neutral",
+            "attentive",
+            "surprised",
+            "excited",
+            "happy",
+            "laughing",
+            "angry",
+            "sad",
+            "scared",
+            "suspicious",
+            "confused",
+            "curious",
+            "proud",
+            "shy",
+            "unimpressed",
+            "sleepy"
+          ],
+          "title": "Expression",
+          "type": "string"
+        },
+        "shape": {
+          "enum": [
+            "circle",
+            "pebble",
+            "squircle",
+            "capsule",
+            "triangle",
+            "hexagon",
+            "cloud",
+            "droplet"
+          ],
+          "title": "Shape",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shape",
+        "expression",
+        "colour"
+      ],
+      "title": "AgentLook",
+      "type": "object"
+    },
+    "AgentRecord": {
+      "additionalProperties": false,
+      "description": "An agent the owner made (item 86): a name, a role in one line, the instructions that join the system prompt of\nits runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``\n(``None`` for the configured ones) and ``tools``, the names of the tools it may use (empty for every tool). Its\nface is its ``look`` (item 102), or with ``None`` the shape and colour its id's hue gives it (actors.js).\n``made_by`` is the run that made it with ``create_agent`` (item 99), ``None`` for one the owner made.\n``paused_at`` is when the owner paused it (item 465): its schedules start nothing by themselves until it is resumed;\n``None`` while it works. Dot itself is ``DOT_AGENT``, never stored; its look lives in the kv store under\n``look:dot``.",
+      "properties": {
+        "approvals": {
+          "anyOf": [
+            {
+              "enum": [
+                "supervised",
+                "ask",
+                "auto",
+                "yolo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approvals"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "on",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "instructions": {
+          "title": "Instructions",
+          "type": "string"
+        },
+        "look": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentLook"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "made_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Made By"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "paused_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Paused At"
+        },
+        "refuses": {
+          "default": "",
+          "title": "Refuses",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tools",
+          "type": "array"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role",
+        "instructions",
+        "model",
+        "effort",
+        "approvals",
+        "tools",
+        "created_at",
+        "updated_at",
+        "made_by",
+        "look",
+        "paused_at"
+      ],
+      "title": "AgentRecord",
+      "type": "object"
+    },
+    "ApprovalRecord": {
+      "additionalProperties": false,
+      "description": "A question a run asked: of the policy, of the agent itself, or one answered without a person. A step kept for the\nowner (item 482) also has ``digest``, the fingerprint of its action that keeps it once in its chat, and\n``kept_until``, when it lapses; both are None for any other. The owner's yes to a kept ask (item 483) holds until\n``permit_until`` and is spent at ``used_at``, the first time the run does the step; None for any other. A kept step\nbelongs to the conversation ``scope_thread_id`` and, for the sessions of a campaign, to ``scope_campaign_id``\n(item 484), where it is kept once and its answer holds.",
+      "properties": {
+        "args": {
+          "$ref": "#/$defs/JsonObject"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decided At"
+        },
+        "decided_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decided By"
+        },
+        "digest": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Digest"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kept_until": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Kept Until"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "permit_until": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Permit Until"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "scope_campaign_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scope Campaign Id"
+        },
+        "scope_thread_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Scope Thread Id"
+        },
+        "severity": {
+          "title": "Severity",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "left",
+            "approved",
+            "denied",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "used_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Used At"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "created_at",
+        "decided_at",
+        "status",
+        "tool",
+        "summary",
+        "severity",
+        "args",
+        "decided_by",
+        "note",
+        "digest",
+        "kept_until",
+        "permit_until",
+        "used_at",
+        "scope_thread_id",
+        "scope_campaign_id"
+      ],
+      "title": "ApprovalRecord",
+      "type": "object"
+    },
+    "AttachmentKind": {
+      "enum": [
+        "image",
+        "pdf",
+        "office",
+        "text",
+        "video",
+        "audio"
+      ],
+      "type": "string"
+    },
+    "BackgroundWork": {
+      "additionalProperties": false,
+      "description": "Something that works for the chat with no run of it waiting: a ``helper`` let go to the background, a ``command``\nof its terminal sessions run in the background, or its ``loop`` (a repeating schedule of the chat); ``id`` is the\nrun's, the session's or the schedule's.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "helper",
+            "command",
+            "loop"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "number"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "started_at"
+      ],
+      "title": "BackgroundWork",
+      "type": "object"
+    },
+    "CampaignChip": {
+      "additionalProperties": false,
+      "description": "The campaign a run is a session of, as the run's page names it; ``session`` is the run's number among the\ncampaign's sessions.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "session": {
+          "title": "Session",
+          "type": "integer"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "session"
+      ],
+      "title": "CampaignChip",
+      "type": "object"
+    },
+    "ChatChoices": {
+      "additionalProperties": false,
+      "description": "What the next follow-up of a chat starts with, as its composer shows it (item 199): the mode (``auto`` lets each\nmessage's words settle it, item 495), the model and the reasoning level asked of it, the speed (fast mode, item\n223), the approval mode and goal mode. ``None`` takes the daemon's: its default model, the configured level,\n``[policy] approvals`` and ``[agent] goal_mode``; a chat (the mode) has no goal mode. A chat's choices are those\nits first run started with, until the owner picks others in its composer.",
+      "properties": {
+        "approvals": {
+          "anyOf": [
+            {
+              "enum": [
+                "supervised",
+                "ask",
+                "auto",
+                "yolo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approvals"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "on",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "goal_mode": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Goal Mode"
+        },
+        "mode": {
+          "enum": [
+            "auto",
+            "task",
+            "chat",
+            "research"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "speed": {
+          "enum": [
+            "standard",
+            "fast"
+          ],
+          "title": "Speed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "model",
+        "effort",
+        "speed",
+        "approvals",
+        "goal_mode"
+      ],
+      "title": "ChatChoices",
+      "type": "object"
+    },
+    "ChatTeam": {
+      "additionalProperties": false,
+      "description": "The team a chat is with (item 610), as the chat's row and page name it: ``id`` (the chat's ``actor_id``), the\nteam's name and the ids of its agents in order, whose faces the chat wears.",
+      "properties": {
+        "agents": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Agents",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "agents"
+      ],
+      "title": "ChatTeam",
+      "type": "object"
+    },
+    "CutOff": {
+      "enum": [
+        "daemon_restarted",
+        "daemon_shutdown",
+        "process_ended",
+        "process_died"
+      ],
+      "type": "string"
+    },
+    "Disliked": {
+      "additionalProperties": false,
+      "description": "The earlier run a run follows up after the owner's 👎 or 🔁 (item 654): that run, the reaction, and the notes it\nwas handed that are still kept, with Forget on the page.",
+      "properties": {
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/DoubtedNote"
+          },
+          "title": "Notes",
+          "type": "array"
+        },
+        "reaction": {
+          "enum": [
+            "good",
+            "love",
+            "wrong",
+            "again",
+            "remember",
+            "explain",
+            "hold"
+          ],
+          "title": "Reaction",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "reaction",
+        "notes"
+      ],
+      "title": "Disliked",
+      "type": "object"
+    },
+    "DoubtedNote": {
+      "additionalProperties": false,
+      "description": "A note the disliked run was handed, as its follow-up's page names it: it may be what led that run astray.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "pinned": {
+          "title": "Pinned",
+          "type": "boolean"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "pinned"
+      ],
+      "title": "DoubtedNote",
+      "type": "object"
+    },
+    "DraftRecord": {
+      "additionalProperties": false,
+      "description": "An email or a message a run wrote for the owner (item 314). Nothing goes out until the owner presses Send, and\nthen with the recipients and words as they stand on the card; ``error`` says why the last send failed.",
+      "properties": {
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "cc": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Cc",
+          "type": "array"
+        },
+        "channel": {
+          "enum": [
+            "mail",
+            "message"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "decided_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decided At"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "waiting",
+            "sending",
+            "sent",
+            "discarded",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "type": "string"
+          },
+          "title": "To",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "channel",
+        "to",
+        "cc",
+        "subject",
+        "body",
+        "status",
+        "created_at",
+        "decided_at",
+        "error"
+      ],
+      "title": "DraftRecord",
+      "type": "object"
+    },
+    "EventRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/JsonObject"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "ts": {
+          "title": "Ts",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "run_id",
+        "ts",
+        "kind",
+        "data"
+      ],
+      "title": "EventRecord",
+      "type": "object"
+    },
+    "FollowUpOf": {
+      "additionalProperties": false,
+      "description": "What the follow-up run that a reaction started or queued follows up (item 586): the reaction ``reaction`` of the\nowner on the message ``message`` of the run ``run_id``, and ``context``, what the run reads under the owner's\nwords: that message, quoted as Dot's own earlier text. The owner's words (the run's goal) never hold the quote,\nsince what a reviewer takes as the owner's instruction must be theirs alone; the run starts as untrusted as the run\nof the message, or the chat's last, ended (:meth:`RunManager._carried_by`).",
+      "properties": {
+        "context": {
+          "title": "Context",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "reaction": {
+          "enum": [
+            "good",
+            "love",
+            "wrong",
+            "again",
+            "remember",
+            "explain",
+            "hold"
+          ],
+          "title": "Reaction",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "message",
+        "reaction",
+        "context"
+      ],
+      "title": "FollowUpOf",
+      "type": "object"
+    },
+    "HelperStep": {
+      "additionalProperties": false,
+      "description": "What a helper does now, from its newest stored tool call or reply: the tool (empty for a reply), a short target\nfrom the call's arguments (a command, an address, a path, a query), the plain line the Live Activity says for it\n(\"Running a command\"; empty for a call that says nothing) and when it began.",
+      "properties": {
+        "at": {
+          "title": "At",
+          "type": "number"
+        },
+        "line": {
+          "title": "Line",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "target",
+        "line",
+        "at"
+      ],
+      "title": "HelperStep",
+      "type": "object"
+    },
+    "HelperView": {
+      "additionalProperties": false,
+      "description": "A run that a run of the chat started on its behalf, in a chat of its own (``thread_id``), as a list of helpers\nshows it: ``title``, the first sentence of its goal with no ids in it; its status, start and end; ``provider``,\n``model`` and ``effort``; ``step``, what it does now while it works (``None`` once it ended or before its first);\n``blocking``, whether the run that started it waits for it (``False`` for one let go to work in the background, or\none that ended); and ``stop``, the call that stops it (``POST``).",
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent Id"
+        },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "on",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finished At"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "parent_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Run Id"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "number"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "done",
+            "blocked",
+            "failed",
+            "cancelled",
+            "ending"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HelperStep"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stop": {
+          "title": "Stop",
+          "type": "string"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "parent_run_id",
+        "thread_id",
+        "agent_id",
+        "title",
+        "status",
+        "started_at",
+        "finished_at",
+        "provider",
+        "model",
+        "effort",
+        "step",
+        "blocking",
+        "stop"
+      ],
+      "title": "HelperView",
+      "type": "object"
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LessonState": {
+      "enum": [
+        "proposed",
+        "saved",
+        "dismissed"
+      ],
+      "type": "string"
+    },
+    "LessonView": {
+      "additionalProperties": false,
+      "description": "A lesson of a run as its page shows it: ``memory_id`` is the note it was saved as, ``by`` who decided it\n(``None`` while it is proposed) and ``reason`` why ``auto`` left it out.",
+      "properties": {
+        "by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SavedBy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "memory_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Memory Id"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "state": {
+          "$ref": "#/$defs/LessonState"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "text",
+        "state",
+        "memory_id",
+        "by",
+        "reason"
+      ],
+      "title": "LessonView",
+      "type": "object"
+    },
+    "QueueView": {
+      "additionalProperties": false,
+      "description": "A chat's queue: its messages, the next one first, and whether it waits for the owner to resume it.",
+      "properties": {
+        "beside_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beside Run Id"
+        },
+        "beside_thread_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Beside Thread Id"
+        },
+        "held": {
+          "title": "Held",
+          "type": "boolean"
+        },
+        "messages": {
+          "items": {
+            "$ref": "#/$defs/QueuedMessageView"
+          },
+          "title": "Messages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "held",
+        "messages"
+      ],
+      "title": "QueueView",
+      "type": "object"
+    },
+    "QueuedFile": {
+      "additionalProperties": false,
+      "description": "A file of a queued message, as the composer lists it when the message is edited.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AttachmentKind"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "size": {
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "size",
+        "kind"
+      ],
+      "title": "QueuedFile",
+      "type": "object"
+    },
+    "QueuedMessageView": {
+      "additionalProperties": false,
+      "description": "A queued message with the files it carries named, so editing it puts them back in the box (item 376).",
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent Id"
+        },
+        "approvals": {
+          "anyOf": [
+            {
+              "enum": [
+                "supervised",
+                "ask",
+                "auto",
+                "yolo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approvals"
+        },
+        "attachments": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Attachments",
+          "type": "array"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "on",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/QueuedFile"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "follow_up": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FollowUpOf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "goal_mode": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Goal Mode"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "task",
+            "chat",
+            "research"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "once": {
+          "anyOf": [
+            {
+              "enum": [
+                "ultrathink",
+                "ultracode"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Once"
+        },
+        "picks": {
+          "$ref": "#/$defs/RunPicks"
+        },
+        "position": {
+          "title": "Position",
+          "type": "integer"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "speed": {
+          "enum": [
+            "standard",
+            "fast"
+          ],
+          "title": "Speed",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "thread_id",
+        "position",
+        "text",
+        "attachments",
+        "mode",
+        "model",
+        "effort",
+        "speed",
+        "once",
+        "picks",
+        "approvals",
+        "goal_mode",
+        "agent_id",
+        "source",
+        "created_at",
+        "files"
+      ],
+      "title": "QueuedMessageView",
+      "type": "object"
+    },
+    "ReactionRecord": {
+      "additionalProperties": false,
+      "description": "A reaction of the owner on a message of Dot's that stands now (item 586). ``message`` is ``answer`` for the\nanswer a run ended with, or ``step-<n>`` for what it said in its step ``n``; ``thread_id`` is the chat of the run;\n``follow_up_run_id`` is the run that the reaction started as a follow-up, once it has started (none while it waits\nin the chat's queue, and for a reaction that started none); ``note_id`` is the note a 📌 made, none for one that\nfound the note there already.",
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "follow_up_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Follow Up Run Id"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "note_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Note Id"
+        },
+        "reaction": {
+          "enum": [
+            "good",
+            "love",
+            "wrong",
+            "again",
+            "remember",
+            "explain",
+            "hold"
+          ],
+          "title": "Reaction",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "message",
+        "reaction",
+        "thread_id",
+        "created_at",
+        "follow_up_run_id",
+        "note_id"
+      ],
+      "title": "ReactionRecord",
+      "type": "object"
+    },
+    "RunDetail": {
+      "additionalProperties": false,
+      "description": "A run as its page shows it. ``resumable`` is true when the run was cut off (by the daemon, or by the end of its\n``dotx`` command) and a new run can go on from where it stopped (see ``agent.resume``); ``lessons`` is what became\nof the lessons drawn from the run once it ended, ``None`` when none were (see ``agent.lessons``); ``questions`` are\nthe questions the run left for the user that are still open, oldest first; ``campaign`` is the campaign the run is a\nsession of, ``None`` for any other run; ``held`` is true while the user has taken the run's browser over\n(``POST /runs/{id}/takeover``); ``agent`` is the agent the run belongs to (item 86), ``None`` for Dot;\n``holding`` is true while the owner holds the run with a hold reaction and it waits for their next message\n(item 586); ``keep_going`` is true for a run in goal mode whose goal asks it to keep going until it is done, which\nits goal check is told (item 132). ``active`` is true while the daemon drives the run; ``elsewhere`` while another\nprocess that lives drives it at work (a ``dotx`` command): its page follows it and its Stop asks that process to\nstop it, but it is not steered or taken over from here. ``choices`` are what the next follow-up of the run's chat\nstarts with (item 199), ``None`` for a chat that has none of its own yet. ``title`` is the title of the run's chat,\nwhich the Details of the run's panel show (items 295 and 1101). ``cut_off`` is how the run was cut off\n(``agent.resume.cut_off_by``), which the line that offers to resume it names (item 299); ``None`` for a run that\nended otherwise or works.\n``team`` is the team the run's chat is with (item 610), ``None`` for any other chat.",
+      "properties": {
+        "active": {
+          "title": "Active",
+          "type": "boolean"
+        },
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "campaign": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CampaignChip"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/RunRecord"
+          },
+          "title": "Children",
+          "type": "array"
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChatChoices"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cut_off": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CutOff"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "disliked": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Disliked"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "elsewhere": {
+          "title": "Elsewhere",
+          "type": "boolean"
+        },
+        "held": {
+          "title": "Held",
+          "type": "boolean"
+        },
+        "holding": {
+          "title": "Holding",
+          "type": "boolean"
+        },
+        "keep_going": {
+          "title": "Keep Going",
+          "type": "boolean"
+        },
+        "lessons": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunLessons"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "questions": {
+          "items": {
+            "$ref": "#/$defs/ApprovalRecord"
+          },
+          "title": "Questions",
+          "type": "array"
+        },
+        "resumable": {
+          "title": "Resumable",
+          "type": "boolean"
+        },
+        "run": {
+          "$ref": "#/$defs/RunRecord"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChatTeam"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run",
+        "title",
+        "children",
+        "active",
+        "elsewhere",
+        "resumable",
+        "cut_off",
+        "lessons",
+        "questions",
+        "agent",
+        "campaign",
+        "held",
+        "holding",
+        "keep_going",
+        "choices",
+        "team"
+      ],
+      "title": "RunDetail",
+      "type": "object"
+    },
+    "RunLessons": {
+      "additionalProperties": false,
+      "description": "What became of the lessons of a run: each lesson the review model proposed with what was done with it,\n``tainted`` when the run read content third parties can author, and ``error`` when drawing, checking or saving\nthem failed.",
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "lessons": {
+          "items": {
+            "$ref": "#/$defs/LessonView"
+          },
+          "title": "Lessons",
+          "type": "array"
+        },
+        "tainted": {
+          "title": "Tainted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "lessons",
+        "tainted",
+        "error"
+      ],
+      "title": "RunLessons",
+      "type": "object"
+    },
+    "RunPicks": {
+      "additionalProperties": false,
+      "description": "What the owner picked in the composer for one message (item 318): ``plugins``, the MCP servers whose tools the\nrun starts with (by the server's name, a connected app's among them); ``skills``, the skills whose instructions it\nstarts with (by name); ``plan_first``, that it writes its plan and asks before it changes anything; ``accounts``,\nthe Google and Microsoft accounts signed in whose mail and calendar the run starts with (by address, item 496; the\npicks kept before it name none).",
+      "properties": {
+        "accounts": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Accounts",
+          "type": "array"
+        },
+        "plan_first": {
+          "title": "Plan First",
+          "type": "boolean"
+        },
+        "plugins": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Plugins",
+          "type": "array"
+        },
+        "skills": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Skills",
+          "type": "array"
+        }
+      },
+      "required": [
+        "plugins",
+        "skills",
+        "plan_first"
+      ],
+      "title": "RunPicks",
+      "type": "object"
+    },
+    "RunRecord": {
+      "additionalProperties": false,
+      "description": "One run. ``effort`` is the reasoning level it was started with (``None`` for runs stored before it was kept);\n``speed`` is ``fast`` when it was started in fast mode (item 223), which its steps on a model with fast mode use;\n``once`` is the choice for one message it was started with (item 251; ``effort`` is then the level that choice\nasks for); ``approvals`` and ``goal_mode`` are the approval mode and the goal mode it ran with (runs stored before\nthey were kept hold ``standard``, ``None``, ``ask`` and ``False``, which is how those runs behaved). ``campaign_id``\nis the campaign the run is a session of, ``None`` for any other run. ``agent_id`` is the agent the run belongs to\n(item 86), ``None`` for Dot. ``rewindable`` says whether its chat can be rewound to before its first message (item\n282): Dot kept where that message went in the chat's history, which it does not for a delegated run, nor did for\nruns from before. ``harness_version`` is the version of the harness the run took as it started (item 389), ``None``\nwhen Dot's own text alone was in use and for a run that has not started or is from before; it is how the runs that\nhad a version are told from the others (item 588). ``follows_reaction`` is the reaction of the owner's that the run\nfollows up (item 844), ``None`` for any other run: the conversation draws no message of the owner's for it, its\ngoal being Dot's words for the reaction, which stands as a chip on the message reacted to.",
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent Id"
+        },
+        "approvals": {
+          "enum": [
+            "supervised",
+            "ask",
+            "auto",
+            "yolo"
+          ],
+          "title": "Approvals",
+          "type": "string"
+        },
+        "campaign_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Campaign Id"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "on",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "end_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Reason"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finished At"
+        },
+        "follows_reaction": {
+          "anyOf": [
+            {
+              "enum": [
+                "good",
+                "love",
+                "wrong",
+                "again",
+                "remember",
+                "explain",
+                "hold"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Follows Reaction"
+        },
+        "goal": {
+          "title": "Goal",
+          "type": "string"
+        },
+        "goal_mode": {
+          "title": "Goal Mode",
+          "type": "boolean"
+        },
+        "harness_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Harness Version"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "input_tokens": {
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "mode": {
+          "enum": [
+            "task",
+            "chat",
+            "research"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "once": {
+          "anyOf": [
+            {
+              "enum": [
+                "ultrathink",
+                "ultracode"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Once"
+        },
+        "output_tokens": {
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "parent_run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent Run Id"
+        },
+        "result": {
+          "title": "Result",
+          "type": "string"
+        },
+        "rewindable": {
+          "title": "Rewindable",
+          "type": "boolean"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "speed": {
+          "enum": [
+            "standard",
+            "fast"
+          ],
+          "title": "Speed",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "done",
+            "blocked",
+            "failed",
+            "cancelled",
+            "ending"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "steps": {
+          "title": "Steps",
+          "type": "integer"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "thread_id",
+        "goal",
+        "mode",
+        "model",
+        "status",
+        "created_at",
+        "finished_at",
+        "result",
+        "steps",
+        "input_tokens",
+        "output_tokens",
+        "parent_run_id",
+        "source",
+        "effort",
+        "speed",
+        "once",
+        "approvals",
+        "goal_mode",
+        "campaign_id",
+        "agent_id",
+        "rewindable"
+      ],
+      "title": "RunRecord",
+      "type": "object"
+    },
+    "SavedBy": {
+      "enum": [
+        "auto",
+        "owner"
+      ],
+      "type": "string"
+    },
+    "ScheduleAgent": {
+      "additionalProperties": false,
+      "description": "The agent a schedule's runs run as (item 462), as its row shows it: its name, its face, the approvals its runs\ntake when the schedule leaves them open (``None``: the configured ones), and when the owner paused it (item 465),\nwhich keeps the schedule from firing by itself.",
+      "properties": {
+        "approvals": {
+          "anyOf": [
+            {
+              "enum": [
+                "supervised",
+                "ask",
+                "auto",
+                "yolo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approvals"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "look": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentLook"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "paused_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Paused At"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "look",
+        "approvals",
+        "paused_at"
+      ],
+      "title": "ScheduleAgent",
+      "type": "object"
+    },
+    "ScheduleOptions": {
+      "additionalProperties": false,
+      "description": "How the runs of a schedule are started. ``None`` takes what the configuration says when the schedule fires:\nthe main model, its default reasoning level, the standard speed, the configured approvals, no goal mode, the\nconfigured time zone, ``[scheduler] history_runs`` earlier runs' answers in front of the goal and ``[scheduler]\nsame_chat`` (item 257), and ``[scheduler] stop_after_failures`` for how many failed runs in a row switch a\nrepeating schedule off (item 458), and ``[scheduler] notify`` for how its runs' ends are told (item 461). A\nschedule a run makes keeps that run's choices and its chat (item 291). ``agent_id`` names the owner's agent its runs\nrun as, within that agent's bounds (item 462), and ``None`` is Dot, as every schedule was before.",
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent Id"
+        },
+        "approvals": {
+          "anyOf": [
+            {
+              "enum": [
+                "supervised",
+                "ask",
+                "auto",
+                "yolo"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Approvals"
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "on",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effort"
+        },
+        "from_outside": {
+          "default": false,
+          "title": "From Outside",
+          "type": "boolean"
+        },
+        "goal_mode": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Goal Mode"
+        },
+        "history_runs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "History Runs"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "notify": {
+          "anyOf": [
+            {
+              "enum": [
+                "always",
+                "problems",
+                "never"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Notify"
+        },
+        "same_chat": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Same Chat"
+        },
+        "skills": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Skills",
+          "type": "array"
+        },
+        "speed": {
+          "anyOf": [
+            {
+              "enum": [
+                "standard",
+                "fast"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Speed"
+        },
+        "stop_after_failures": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stop After Failures"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Timezone"
+        }
+      },
+      "required": [
+        "model",
+        "effort",
+        "speed",
+        "approvals",
+        "goal_mode",
+        "timezone",
+        "history_runs",
+        "same_chat",
+        "stop_after_failures",
+        "notify",
+        "agent_id"
+      ],
+      "title": "ScheduleOptions",
+      "type": "object"
+    },
+    "ScheduleRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "cron": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cron"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "goal": {
+          "title": "Goal",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_run_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Run At"
+        },
+        "last_status": {
+          "title": "Last Status",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "task",
+            "chat",
+            "research"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "next_run_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Run At"
+        },
+        "options": {
+          "$ref": "#/$defs/ScheduleOptions"
+        },
+        "run_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run At"
+        },
+        "runs_failed_in_row": {
+          "title": "Runs Failed In Row",
+          "type": "integer"
+        },
+        "skipped_in_row": {
+          "default": 0,
+          "title": "Skipped In Row",
+          "type": "integer"
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Thread Id"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "cron",
+        "run_at",
+        "goal",
+        "mode",
+        "enabled",
+        "created_at",
+        "last_run_at",
+        "next_run_at",
+        "thread_id",
+        "last_status",
+        "options",
+        "runs_failed_in_row"
+      ],
+      "title": "ScheduleRecord",
+      "type": "object"
+    },
+    "ScheduleView": {
+      "additionalProperties": false,
+      "description": "A schedule as the UI shows it; the times are in the schedule's own ``zone``. ``run_at_input`` is the one-time\nmoment as a ``datetime-local`` field takes it (``2026-10-06T09:30``). ``agent`` is the agent its runs run as,\n``None`` for Dot. ``brief`` says that it is the morning brief (item 570), whose card sets it. ``ran_once`` says that\nit is a one-time schedule that ran at its moment and has no run left (item 723), not one switched off by hand.",
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScheduleAgent"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "brief": {
+          "title": "Brief",
+          "type": "boolean"
+        },
+        "last_local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Local"
+        },
+        "next_local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Local"
+        },
+        "ran_once": {
+          "default": false,
+          "title": "Ran Once",
+          "type": "boolean"
+        },
+        "record": {
+          "$ref": "#/$defs/ScheduleRecord"
+        },
+        "run_at_input": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Run At Input"
+        },
+        "when": {
+          "title": "When",
+          "type": "string"
+        },
+        "zone": {
+          "title": "Zone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "record",
+        "when",
+        "next_local",
+        "last_local",
+        "run_at_input",
+        "zone",
+        "agent",
+        "brief"
+      ],
+      "title": "ScheduleView",
+      "type": "object"
+    },
+    "Synchronized": {
+      "additionalProperties": false,
+      "description": "The data of ``synchronized``: the stream sent every run it follows up to its stored tail; ``runs`` is the newest\nevent id sent of each (absent for one that has none yet), ``revision`` the chat's revision then.",
+      "properties": {
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "runs": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Runs",
+          "type": "object"
+        }
+      },
+      "required": [
+        "revision",
+        "runs"
+      ],
+      "title": "Synchronized",
+      "type": "object"
+    },
+    "TerminalView": {
+      "additionalProperties": false,
+      "description": "A terminal session of a chat (item 229), as the line over the composer shows it: its command, whether it runs in\nthe background (its end is told to the chat), when it started (seconds since the epoch), whether its program has\nended, and its exit status once it ended by itself.",
+      "properties": {
+        "background": {
+          "title": "Background",
+          "type": "boolean"
+        },
+        "command": {
+          "title": "Command",
+          "type": "string"
+        },
+        "ended": {
+          "title": "Ended",
+          "type": "boolean"
+        },
+        "exit_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Exit Status"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "started_at": {
+          "title": "Started At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "command",
+        "background",
+        "started_at",
+        "ended",
+        "exit_status"
+      ],
+      "title": "TerminalView",
+      "type": "object"
+    },
+    "ThreadAutomation": {
+      "additionalProperties": false,
+      "description": "A schedule that belongs to a chat as the chat's side panel lists it (item 1333): the schedule as the Schedules\npage shows it, and whether it is the chat's own loop (``/loop 30m <message>``) rather than a schedule a run or the\nowner made in the chat.",
+      "properties": {
+        "loop": {
+          "title": "Loop",
+          "type": "boolean"
+        },
+        "schedule": {
+          "$ref": "#/$defs/ScheduleView"
+        }
+      },
+      "required": [
+        "schedule",
+        "loop"
+      ],
+      "title": "ThreadAutomation",
+      "type": "object"
+    },
+    "ThreadChanged": {
+      "additionalProperties": false,
+      "description": "The data of ``thread_changed``: the chat's revision moved to ``revision``, or it was ``deleted`` at it.",
+      "properties": {
+        "deleted": {
+          "title": "Deleted",
+          "type": "boolean"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "thread_id": {
+          "title": "Thread Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "revision",
+        "deleted"
+      ],
+      "title": "ThreadChanged",
+      "type": "object"
+    },
+    "ThreadRecord": {
+      "additionalProperties": false,
+      "description": "A chat's thread. ``team_id`` is the team the chat is with (item 610), ``None`` for any other chat: every run of\nthe thread is told that team's context, whoever started it. ``agent_id`` is the agent the chat is with, ``None`` for\na chat that is nobody's or Dot's: a message the owner sends in it goes to that agent, and it is the agent's home\nchat however many chats are newer.",
+      "properties": {
+        "agent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent Id"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "team_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Team Id"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "source",
+        "created_at",
+        "updated_at",
+        "team_id"
+      ],
+      "title": "ThreadRecord",
+      "type": "object"
+    },
+    "ThreadRow": {
+      "additionalProperties": false,
+      "description": "A chat of the list, its revision and how many asks wait in it (a helper's among them).",
+      "properties": {
+        "asks": {
+          "title": "Asks",
+          "type": "integer"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "summary": {
+          "$ref": "#/$defs/ThreadSummary"
+        }
+      },
+      "required": [
+        "summary",
+        "revision",
+        "asks"
+      ],
+      "title": "ThreadRow",
+      "type": "object"
+    },
+    "ThreadSummary": {
+      "additionalProperties": false,
+      "description": "One chat of the sidebar: a thread with the runs a person started on it (``run_count`` of them) and the latest of\nthose runs, which the chat opens on. ``updated_at`` is the later of the last message and the start of the latest\nrun; ``latest_created_at`` is when the latest run was created, which a message during the run does not move (the\nsidebar counts a working chat's time from it). ``pinned_at`` is when the owner pinned the chat, ``None`` for one not\npinned (item 130). ``unread`` is true when the latest run ended after the owner last saw the chat, or ended and the\nowner marked the chat unread (item 131). ``actor_id`` names whose face the chat wears (item 277): the agent of the\nlatest run, else the campaign that run is a session of, else the team the chat is with (``team``, item 610);\n``None`` for a chat with Dot, which wears a creature of its own. ``last_message`` is the chat's latest words on one\nplain line: the answer of the latest run once it ended with one, else the message that started it; ``last_role``\nsays whose they are. ``loop_cron`` is the rhythm of the chat's loop (item 580): of the switched-on repeating\nschedule whose runs go on in the chat (``/loop``, or one a run of it made) that fires next, ``None`` for a chat\nwith no such schedule; ``loop_next_at`` is when it fires next. ``campaign_id`` is the campaign whose conversation\nthe chat is (the sidebar marks it, as it marks a loop), ``None`` for any other chat. Threads that only hold\ndelegated runs are not chats and are never listed.",
+      "properties": {
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actor Id"
+        },
+        "campaign_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Campaign Id"
+        },
+        "created_at": {
+          "title": "Created At",
+          "type": "number"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_message": {
+          "title": "Last Message",
+          "type": "string"
+        },
+        "last_role": {
+          "enum": [
+            "user",
+            "assistant"
+          ],
+          "title": "Last Role",
+          "type": "string"
+        },
+        "latest_created_at": {
+          "title": "Latest Created At",
+          "type": "number"
+        },
+        "latest_mode": {
+          "enum": [
+            "task",
+            "chat",
+            "research"
+          ],
+          "title": "Latest Mode",
+          "type": "string"
+        },
+        "latest_run_id": {
+          "title": "Latest Run Id",
+          "type": "string"
+        },
+        "latest_status": {
+          "enum": [
+            "queued",
+            "running",
+            "done",
+            "blocked",
+            "failed",
+            "cancelled",
+            "ending"
+          ],
+          "title": "Latest Status",
+          "type": "string"
+        },
+        "loop_cron": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loop Cron"
+        },
+        "loop_next_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Loop Next At"
+        },
+        "pinned_at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pinned At"
+        },
+        "run_count": {
+          "title": "Run Count",
+          "type": "integer"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "team": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChatTeam"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "unread": {
+          "title": "Unread",
+          "type": "boolean"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "source",
+        "created_at",
+        "updated_at",
+        "pinned_at",
+        "run_count",
+        "latest_run_id",
+        "latest_status",
+        "latest_mode",
+        "latest_created_at",
+        "unread",
+        "actor_id",
+        "last_message",
+        "last_role",
+        "loop_cron",
+        "loop_next_at",
+        "team"
+      ],
+      "title": "ThreadSummary",
+      "type": "object"
+    },
+    "ThreadView": {
+      "additionalProperties": false,
+      "description": "A chat's small state at ``revision`` (module docstring). ``runs`` are its newest runs, oldest first, and\n``older`` whether older ones are left (read them with ``before``); ``newest`` is the chat's newest run's page,\n``newest_events`` the tail of its events (``newest_events_cut`` when older ones were left out), from which its\ncursor goes on; both are empty (``None``, no events) for a page of older runs read with ``before``.",
+      "properties": {
+        "asks": {
+          "items": {
+            "$ref": "#/$defs/ApprovalRecord"
+          },
+          "title": "Asks",
+          "type": "array"
+        },
+        "background": {
+          "items": {
+            "$ref": "#/$defs/BackgroundWork"
+          },
+          "title": "Background",
+          "type": "array"
+        },
+        "drafts": {
+          "items": {
+            "$ref": "#/$defs/DraftRecord"
+          },
+          "title": "Drafts",
+          "type": "array"
+        },
+        "helpers": {
+          "items": {
+            "$ref": "#/$defs/HelperView"
+          },
+          "title": "Helpers",
+          "type": "array"
+        },
+        "newest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunDetail"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "newest_events": {
+          "items": {
+            "$ref": "#/$defs/EventRecord"
+          },
+          "title": "Newest Events",
+          "type": "array"
+        },
+        "newest_events_cut": {
+          "title": "Newest Events Cut",
+          "type": "boolean"
+        },
+        "older": {
+          "title": "Older",
+          "type": "boolean"
+        },
+        "queue": {
+          "$ref": "#/$defs/QueueView"
+        },
+        "reactions": {
+          "items": {
+            "$ref": "#/$defs/ReactionRecord"
+          },
+          "title": "Reactions",
+          "type": "array"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "runs": {
+          "items": {
+            "$ref": "#/$defs/RunRecord"
+          },
+          "title": "Runs",
+          "type": "array"
+        },
+        "schedules": {
+          "items": {
+            "$ref": "#/$defs/ThreadAutomation"
+          },
+          "title": "Schedules",
+          "type": "array"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ThreadSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terminals": {
+          "items": {
+            "$ref": "#/$defs/TerminalView"
+          },
+          "title": "Terminals",
+          "type": "array"
+        },
+        "thread": {
+          "$ref": "#/$defs/ThreadRecord"
+        }
+      },
+      "required": [
+        "revision",
+        "thread",
+        "summary",
+        "runs",
+        "older",
+        "newest",
+        "newest_events",
+        "newest_events_cut",
+        "queue",
+        "asks",
+        "helpers",
+        "background",
+        "schedules",
+        "reactions",
+        "drafts",
+        "terminals"
+      ],
+      "title": "ThreadView",
+      "type": "object"
+    },
+    "ThreadsView": {
+      "additionalProperties": false,
+      "description": "The chats as the sidebar lists them; ``revision`` is the newest of any chat's when they were read.",
+      "properties": {
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "threads": {
+          "items": {
+            "$ref": "#/$defs/ThreadRow"
+          },
+          "title": "Threads",
+          "type": "array"
+        }
+      },
+      "required": [
+        "revision",
+        "threads"
+      ],
+      "title": "ThreadsView",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The root of the contract's schema file (``docs/schemas/thread-sync.schema.json``), never sent: what\n``/threads/{id}/view`` (``thread_view``) and ``/threads/view`` (``threads_view``) answer, the data of every frame\nof the two streams (``stream_event``, an event as ``/runs/{id}/stream`` sends it), and the data of the two kinds\nof the thread stream's own (``thread_changed``, ``synchronized``).",
+  "properties": {
+    "stream_event": {
+      "$ref": "#/$defs/EventRecord"
+    },
+    "synchronized": {
+      "$ref": "#/$defs/Synchronized"
+    },
+    "thread_changed": {
+      "$ref": "#/$defs/ThreadChanged"
+    },
+    "thread_view": {
+      "$ref": "#/$defs/ThreadView"
+    },
+    "threads_view": {
+      "$ref": "#/$defs/ThreadsView"
+    }
+  },
+  "required": [
+    "thread_view",
+    "threads_view",
+    "stream_event",
+    "thread_changed",
+    "synchronized"
+  ],
+  "title": "ThreadSyncContract",
+  "type": "object"
+}

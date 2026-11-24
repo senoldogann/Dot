@@ -612,6 +612,10 @@ paired`) and nothing is kept for it.
 | `GET /api/away?since=<seconds>` | any token | 1424 | 200, what Dot did on its own |
 | `GET /api/away/read` | any token | 1356 | 200, `{read_at}` |
 | `POST /api/away/read` | any token | 1356 | 200, `{read_at}` |
+| `GET /api/threads/view?limit=` | any token | 1686 | 200, the chats with their revisions |
+| `GET /api/threads/stream` | any token | 1686 | the list's event stream |
+| `GET /api/threads/{id}/view?tail=&before=` | any token | 1686 | 200, the chat at its revision |
+| `GET /api/threads/{id}/stream?cursors=` | any token | 1686 | the chat's event stream |
 
 What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
 wait on you (item 1422; [below](#what-the-daemon-pushes-to-the-app)); `GET /api/away` lists more runs and says each run's
@@ -935,6 +939,70 @@ approvals Dot answered for you. Putting the card away marks the `until` of the c
 /api/away/read`), so that the Mac and every phone agree on what is news; the card goes at once, and a mark that does not
 get through (no link, no answer) is kept in `awareness.json` and sent first by the next read, so a card put away stays away.
 The card is drawn from the last read, kept in the same file, before the network answers.
+
+### A chat kept in sync: views, revisions and streams (item 1686)
+
+Four calls keep a client's picture of the chats the same as the daemon's, after any break, on any link. They are new
+beside the old calls, which stay as they were. Their shapes are frozen in
+[`docs/schemas/thread-sync.schema.json`](schemas/thread-sync.schema.json) (JSON Schema, made from the daemon's models by
+`scripts/thread_sync_schema.py`; a test fails when the two differ, and the app's tests read the same file).
+
+**The revision.** Each chat has a `revision`, an integer that grows whenever something its view shows changes: its name,
+pin, seen mark or choices; a run of it or of one of its helpers starts, ends or is rewound; its queue, the queue's hold
+or claim; a reaction; a schedule whose runs go on in it; its campaign; a meeting it holds; an ask or a draft of its runs
+or their helpers; a helper let go to the background or its report handed; its terminal sessions. A step of a run (its tokens, its events, the words being written) moves
+nothing: that comes on the stream. SQLite triggers on those tables move it, in the transaction of the write, whichever
+process writes (a `dotx` command too), and the terminal sessions, which live in the daemon, move it with the same
+statement. Revisions come from one counter for every chat: a chat's revision only grows, not by one, so a client
+compares it for equality, never counts gaps. `tests/unit/test_thread_revision.py` lists every table that names a chat or
+a run and fails for one that neither has the triggers nor says why it is not a chat's state.
+
+**`GET /api/threads/{id}/view`** answers the chat's small state (`ThreadView`): `revision` (read first, so a change made
+while the rest is read moves the chat past it and is told), `thread`, `summary` (the list's row, `null` for a helper's
+chat), `runs` (its newest `tail` runs, 20 by default and 50 at most, oldest first; `older` says more are left, read with
+`before=<run id>`), `newest` (the newest run's page, as `GET /api/runs/{id}`; `null` with no events for a page read with `before`) and
+`newest_events` (the tail of its
+events, 200 at most, `newest_events_cut` when older ones were left out), `queue` (as `GET /api/threads/{id}/queue`),
+`asks` (the approvals and questions waiting, its helpers' among them), `helpers` (the runs its runs started in chats of
+their own, newest first, each with `run_id`, `thread_id` (the helper's own chat, which a row opens), `title` (the first
+sentence of its goal with no ids in it, 80 characters at most), `status`, `started_at`, `finished_at`, `provider`,
+`model`, `effort`, `step` while it works (`tool`, a short `target` from its arguments, the plain `line` such as "Running
+a command", and `at`), `blocking` (whether the run that started it still waits for it, false once let go to the
+background) and `stop`, the path to `POST` to stop it), `background` (what works for the chat with no run of it waiting:
+`kind` `helper` (let go to the background), `command` (a terminal session's background command) or `loop` (its
+switched-on loop), with `id`, `title` and `started_at`), `schedules` (as the chat's Automations), `reactions`, `drafts`
+(waiting, its helpers' among them) and `terminals`. The stream keeps the helpers live: their events come on it, and
+each change of their status moves the chat's revision. 404 for no chat. A cold
+open is this one call, made beside the stream's.
+
+**`GET /api/threads/view`** answers the chats as the list shows them (`ThreadsView`): `revision`, the newest of any
+chat's when read, and for each chat its `summary`, `revision` and `asks` (how many wait in it, a helper's counted in its
+parent's chat).
+
+**`GET /api/threads/{id}/stream?cursors=<run id>:<event id>,...`** is the chat's event stream. `cursors` names, for
+each run the client shows, the newest event id it holds of that run (take it from `newest_events` for the newest run);
+a run named that is neither the chat's nor one of its helpers is a 404, a malformed list a 422. The stream sends each
+named run's stored events after its cursor, then the events of the chat's runs and helpers at work from their start,
+then `synchronized` (`{revision, runs: {run id: newest event id sent}}`), and goes on live: a run that starts later in
+the chat (its `run_queued` first) and every helper a followed run starts come on the same stream, which no run's end
+closes. Each frame is an event as `/api/runs/{id}/stream` sends it (`id:` for a stored one, `event:` its kind, `data:`
+the event); the words being written (`delta`) have id 0 and only add to the step being written, which a client that
+connected mid-step shows as being written until the step's stored event comes. `thread_changed` (`{thread_id,
+revision, deleted}`, id 0) says the chat's revision moved: read the view again. `deleted: true` ends the stream.
+Cursors are per run because event ids are one order for all runs but not told in that order: a run of a `dotx` command
+reaches the daemon half a second late, and two runs stored at once may be told the other way round. A stream that falls
+behind, and a stream opened again from the cursors, read each run a little behind its cursor (64 ids), so an event may
+come again: keep one per id. Nothing stored is lost.
+
+**`GET /api/threads/stream`** is the list's: the kinds of `/api/stream` (a run queued, started or ended, an approval
+asked or decided, a queue changed...) and `thread_changed` of every chat, a deleted one with `deleted: true`; never a
+run's own steps; `resync` when it fell behind (read the list again).
+
+**Freshness.** Both streams write a keepalive (`: keepalive`) every 5 s, so a client may take one silent for 12 s as
+broken (the older streams keep 15 s). A client is live once it read the view after its stream opened and the stream said
+`synchronized`; any break, a `resync` or a `revision` other than the one it holds means reading the view again. The
+daemon tells a moved revision within half a second of the write (it reads the moved revisions every 0.5 s, as it relays
+`dotx` runs). A daemon from before these calls answers them 404: the app says to update Dot on the Mac.
 
 ### What the daemon pushes to the app
 

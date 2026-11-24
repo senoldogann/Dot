@@ -364,7 +364,7 @@ class WorkDesk:
         if live is None:
             return False
         try:
-            self._manager.note(live, text, taints)
+            self._manager.note(live, text, taints, None)
         except RunConflict:
             log.info("work_order_lead_not_told", order_id=order.id, why="its run is ending")
             return False

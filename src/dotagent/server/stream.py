@@ -91,7 +91,7 @@ _KEEPALIVE_S: float = 15.0
 # with the next keepalive, 15 s on, as if the chat had not asked. The keepalive a quarter of a second after the last
 # event hands it over. Both are counted from the stream's own last write: a run's stream hears every run's events,
 # and another run streaming its words must not put them off.
-_FLUSH_S: float = 0.25
+FLUSH_S: float = 0.25
 _FINISHED: str = "run_finished"
 _QUEUED: str = "run_queued"
 _PARENT_KEY: str = "parent_run_id"
@@ -140,7 +140,7 @@ def joins_family(family: set[str], event: EventRecord) -> bool:
 UNREAD_BY_PAGES: tuple[str, ...] = (LOOP_STATE_EVENT,)
 
 
-async def _stored_events(
+async def stored_events(
     store: Store, run_ids: Iterable[str], after: int, newest: Mapping[str, int] | None = None
 ) -> list[EventRecord]:
     """The stored events of the runs after id ``after`` a page reads (not :data:`UNREAD_BY_PAGES`), in the order they
@@ -160,7 +160,7 @@ async def _stored_events(
 
 # How far behind the newest id a stream has sent of a run it reads the store again after a drop (item 1313): two events
 # stored at once may be told to the bus in the other order, so one of them can be lost in the queue while one after it
-# was sent. A few ids is room for that; the ones read twice are passed over by :class:`_Sent`.
+# was sent. A few ids is room for that; the ones read twice are passed over by :class:`SentEvents`.
 _REREAD_SLACK: int = 64
 
 
@@ -173,7 +173,7 @@ def reread_after(after: int, newest: int) -> int:
     return max(after, newest - _REREAD_SLACK)
 
 
-class _Sent:
+class SentEvents:
     """The stored events a stream has sent, and the newest id sent of each run."""
 
     def __init__(self) -> None:
@@ -194,7 +194,7 @@ async def _widen(store: Store, family: set[str]) -> None:
         family.update(child.id for child in await store.list_child_runs(member))
 
 
-async def _next_event(
+async def next_event(
     queue: asyncio.Queue[EventRecord], stopping: asyncio.Event, timeout_s: float = _KEEPALIVE_S
 ) -> EventRecord | None:
     """The next event of ``queue``; ``None`` when none came within ``timeout_s`` (the keepalive interval) or the daemon
@@ -234,7 +234,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
     """
     store: Store = ctx.runtime.store
     family: set[str] = {run_id}
-    sent: _Sent = _Sent()
+    sent: SentEvents = SentEvents()
     async with ctx.runtime.bus.subscribe(None) as feed:
 
         async def stored(upto_end: bool) -> tuple[bytes, bool]:
@@ -246,7 +246,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
             await _widen(store, family)
             # Each run is read from the newest event sent of its own; one that joined only now (its start was one of
             # the events lost) has none, and is read from where the page asked, as its events may be older than any.
-            read: list[EventRecord] = await _stored_events(store, family, after, sent.newest)
+            read: list[EventRecord] = await stored_events(store, family, after, sent.newest)
             fresh: list[EventRecord] = sorted(
                 (event for event in read if event.id not in sent), key=lambda event: event.id
             )
@@ -287,8 +287,8 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
                 if frames:
                     yield frames
                 return
-            due: float = (_FLUSH_S if owed else _KEEPALIVE_S) - (time.monotonic() - written)
-            incoming: EventRecord | None = await _next_event(feed.queue, ctx.stopping, max(0.0, due))
+            due: float = (FLUSH_S if owed else _KEEPALIVE_S) - (time.monotonic() - written)
+            incoming: EventRecord | None = await next_event(feed.queue, ctx.stopping, max(0.0, due))
             if incoming is None:
                 if ctx.stopping.is_set():
                     return
@@ -321,12 +321,12 @@ async def follow_runs(ctx: ServerContext, run_ids: frozenset[str], after: int) -
     not followed (each run's own stream has them). Ends once none of the runs works, and when the daemon starts to
     stop; event ids are the store's, one order for every run, so a client goes on after the last one it read."""
     store: Store = ctx.runtime.store
-    sent: _Sent = _Sent()
+    sent: SentEvents = SentEvents()
     async with ctx.runtime.bus.subscribe(None) as feed:
 
         async def stored() -> bytes:
             fresh: list[EventRecord] = sorted(
-                (event for event in await _stored_events(store, run_ids, after, sent.newest) if event.id not in sent),
+                (event for event in await stored_events(store, run_ids, after, sent.newest) if event.id not in sent),
                 key=lambda event: event.id,
             )
             for event in fresh:
@@ -346,8 +346,8 @@ async def follow_runs(ctx: ServerContext, run_ids: frozenset[str], after: int) -
                 if frames:
                     yield frames
                 return
-            due: float = (_FLUSH_S if owed else _KEEPALIVE_S) - (time.monotonic() - written)
-            incoming: EventRecord | None = await _next_event(feed.queue, ctx.stopping, max(0.0, due))
+            due: float = (FLUSH_S if owed else _KEEPALIVE_S) - (time.monotonic() - written)
+            incoming: EventRecord | None = await next_event(feed.queue, ctx.stopping, max(0.0, due))
             if incoming is None:
                 if ctx.stopping.is_set():
                     return
@@ -381,7 +381,7 @@ async def follow_lifecycle(bus: EventBus, stopping: asyncio.Event) -> AsyncItera
         dropped: int = 0
         owed: bool = False
         while True:
-            event: EventRecord | None = await _next_event(feed.queue, stopping, _FLUSH_S if owed else _KEEPALIVE_S)
+            event: EventRecord | None = await next_event(feed.queue, stopping, FLUSH_S if owed else _KEEPALIVE_S)
             if feed.dropped != dropped:
                 dropped = feed.dropped
                 yield RESYNC
