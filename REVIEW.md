@@ -22,6 +22,8 @@ by what it lets a run do as much as by how it reads.
   the real `DOT_HOME`
 - A change in what Dot does without the matching change under `docs/`
 - A change that makes a line in `CLAUDE.md`, `CONTRIBUTING.md` or `docs/` stale
+- A change that makes a yolo or free run ask the owner something it did not ask before, or that denies in those modes what
+  it allowed: the owner's freedom is a contract ([docs/freedom.md](docs/freedom.md)), and such a change is Important
 
 ## Checks made from reviews
 
@@ -183,6 +185,15 @@ here points at a test that no longer exists.
 - `tests/unit/test_model_refusal.py::test_an_agent_a_campaign_and_a_queued_message_are_judged_by_the_model_they_would_run_on` — the
   first check covered `start_picked` and the queue's default model only, so a message to an agent, Keep going or a team, and an
   agent's own message in the queue, still started and failed with "missing API key" (item 1350's review).
+- `tests/unit/test_freedom_contract.py::test_no_call_of_any_kind_asks_the_owner_but_what_the_contract_names` — the owner's
+  word of 2026-11-24 (yolo and free mode never break): a call of any kind of tool, prepared by its own tool, must go
+  through unasked in a yolo or free run, but for the payment, the message or mail and the post the contract names, and a
+  step the policy would have asked about is recorded with why (item 1561).
+- `tests/unit/test_freedom_contract.py::test_every_tool_of_the_registry_has_a_row_or_says_why_it_has_none` — a tool added
+  without a row of the freedom table could bring an ask into yolo and free mode unseen (item 1561).
+- `tests/unit/test_freedom_contract.py::test_the_owner_is_asked_in_the_places_the_contract_names_and_no_others` — a tool that
+  calls the approval broker itself asks the owner whatever the gate waives, in yolo and free mode too: a new place is a
+  new ask (item 1561).
 
 ## Evidence and format
 
