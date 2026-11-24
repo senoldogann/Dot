@@ -34,6 +34,7 @@ from dotagent.claude_code.run import (
     ended_clean,
     fast_off_words,
     goal_asks_notification,
+    loaded_tools,
     mcp_config,
     missing_tools,
     opened_bounds,
@@ -203,6 +204,14 @@ def test_the_tools_in_the_prompt_from_the_start_are_door_tools_the_shell_sends_t
     shell: str = build_shell_tool().spec.description
     assert {"terminal_open", "wait_until"} == LOADED_TOOLS
     assert all(name in shell and door_tool(name, False) and door_tool(name, True) for name in LOADED_TOOLS)
+
+
+def test_the_core_tools_are_in_the_prompt_whole_and_the_others_are_looked_up() -> None:
+    """Item 1692: the model called core tools it had not looked up with guessed arguments (19 % of runs against 6 % in
+    Dot's own loop); their definitions are in the prompt from the start, as Dot's own loop gives the core group, and a
+    tool of another group is still looked up."""
+    names: list[str] = ["delegate", "notify", "memory_save", "finish", "browser_open", "terminal_open", "mcp__notes__x"]
+    assert loaded_tools(names) == {"delegate", "notify", "memory_save", "finish", "terminal_open"}
 
 
 def test_the_prompt_names_finish_only_to_a_run_that_has_it() -> None:

@@ -192,7 +192,7 @@ from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
-from dotagent.tools.groups import group_of
+from dotagent.tools.groups import CORE_GROUP, group_of
 from dotagent.tools.meta import (
     FINISH_TOOL,
     NOTIFY_TOOL,
@@ -417,6 +417,15 @@ SEARCH_ENV: dict[str, str] = {"ENABLE_TOOL_SEARCH": "true"}
 # guessed (item 1340); each was refused and sent again. A probe with Claude Code 2.1.330 showed it: a tool not looked
 # up was called with a name for its argument the model made up.
 LOADED_TOOLS: frozenset[str] = frozenset({"terminal_open", "wait_until"})
+
+
+def loaded_tools(names: Iterable[str]) -> frozenset[str]:
+    """The tools of ``names`` whose definitions are in the prompt from the start: :data:`LOADED_TOOLS` and every tool of
+    Dot's core group (item 1692), as Dot's own loop gives a run whose tools come in groups the core ones whole and the
+    others by use_tools. The audit of 2026-11-24 measured "Invalid arguments" in 24 of 124 runs on the plan (19 %)
+    against 10 of 162 in Dot's own loop (6 %), most of them core tools called before they were looked up (delegate's
+    step as a string, notify without its title); the 29 core tools add about 27,000 characters to the prompt."""
+    return frozenset(name for name in names if name in LOADED_TOOLS or group_of(name) == CORE_GROUP)
 
 
 def dot_tool(tool: str, door: str) -> str | None:
@@ -1611,7 +1620,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     door: Door = new_door(
         CLAUDE_DOOR,
         door_specs(_offered_specs(run, tools)),
-        LOADED_TOOLS,
+        loaded_tools(tools.tools),
         partial(
             _watched_call,
             quiet,

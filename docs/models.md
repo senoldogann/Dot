@@ -428,7 +428,9 @@ answer keeps its words, Ollama's too.
   the model to look a tool up before its first call of it rather than guess its parameters, item 1201; `terminal_open`
   and `wait_until`, which the shell's description sends the model to, are in the prompt whole from the start, marked
   `anthropic/alwaysLoad` in the door's list, as the model called them by their names alone, with no arguments or
-  guessed ones, item 1341), no settings
+  guessed ones, item 1341; so is every tool of Dot's core group, as Dot's own loop gives a run whose tools come in
+  groups the core ones whole, item 1692: "Invalid arguments" came in 19 % of the plan's runs against 6 % of the loop's,
+  most of them core tools called before they were looked up; about 27,000 characters more in the prompt), no settings
   file of yours, a project's or the workspace's
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
   (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door and the search do
