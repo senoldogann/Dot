@@ -103,6 +103,7 @@ from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
+from dotagent.claude_code.cut import ProgramExit, ended_by_dot, exit_seen, mark_ended, note_cut
 from dotagent.claude_code.env import claude_env
 from dotagent.claude_code.stream import (
     SEARCH_TOOL,
@@ -128,6 +129,7 @@ from dotagent.claude_code.stream import (
 )
 from dotagent.core.errors import (
     ClaudeCodeBroke,
+    ClaudeCodeCut,
     ClaudeCodeError,
     ClaudePlanLimitError,
     FailSafeTriggered,
@@ -528,6 +530,9 @@ class _Quiet:
     heard: float
     queue: "asyncio.Queue[_Item]"
     working: int = 0
+    # When the program last wrote a line (``heard`` also moves when a call of Dot's tool ends): a cut says how long it
+    # had been silent (item 1580).
+    wrote: float = field(default_factory=time.monotonic)
     # What the model's finish said (item 1076): how the run ends, its answer and what it needs from the owner.
     finished: FinishArgs | None = None
     # Since when the owner holds the run with a ✋ (item 1076), None while they do not. ``resting_since`` is when its
@@ -657,7 +662,7 @@ class _Follow:
             self.stdin.write(user_line(text, images).encode("utf-8"))
             await self.stdin.drain()
         except (BrokenPipeError, ConnectionResetError) as error:
-            raise ClaudeCodeBroke(
+            raise ClaudeCodeCut(
                 "Claude Code stopped reading its input before the run ended",
                 {"run_id": self.agent.run.id, "error": str(error)},
             ) from error
@@ -671,7 +676,7 @@ class _Follow:
                 case _Stopped():
                     raise RunCancelled("the run was stopped", {"run_id": self.agent.run.id})
                 case _Ended():
-                    raise ClaudeCodeBroke(
+                    raise ClaudeCodeCut(
                         "Claude Code ended before it answered", {"run_id": self.agent.run.id, "inited": self.inited}
                     )
                 case _Silent(seconds=seconds):
@@ -922,7 +927,7 @@ async def _pump_lines(stream: asyncio.StreamReader, queue: asyncio.Queue[_Item],
         if not raw:
             queue.put_nowait(_Ended())
             return
-        quiet.heard = time.monotonic()
+        quiet.heard = quiet.wrote = time.monotonic()
         queue.put_nowait(raw.decode("utf-8", errors="replace"))
 
 
@@ -956,8 +961,10 @@ async def _read_tail(stream: asyncio.StreamReader) -> str:
 
 
 async def _end_program(process: asyncio.subprocess.Process) -> None:
-    """End the program and everything it started: SIGTERM to its group, then, after :data:`_TERM_GRACE_S`, SIGKILL."""
+    """End the program and everything it started: SIGTERM to its group, then, after :data:`_TERM_GRACE_S`, SIGKILL. A
+    program still running is marked as ended by Dot (item 1580): its end is no cut and counts for no mass cut."""
     if process.returncode is None:
+        mark_ended(process)
         with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(process.pid, signal.SIGTERM)
         with contextlib.suppress(TimeoutError):
@@ -1333,9 +1340,12 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 opening: str = meanwhile(
                     f"{goal.content}\n\n{noted.content}", earlier[0 if chat is None else chat.seen :]
                 )
-                await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
                 try:
+                    await follow.send(opening, await asyncio.to_thread(_images, agent.opening.files, info.vision))
                     answer: str = await follow.follow()
+                except ClaudeCodeCut as cut:
+                    cut.context.update((await _cut_of(follow, process, tail)).context())
+                    raise
                 except ClaudeCodeError as error:
                     error.context["stderr"] = await _stderr_now(tail, process)
                     raise
@@ -1391,3 +1401,27 @@ async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Proce
             return await asyncio.shield(tail)
     except TimeoutError:
         return ""
+
+
+async def _cut_of(follow: _Follow, process: asyncio.subprocess.Process, tail: asyncio.Task[str]) -> ProgramExit:
+    """How the program ended that ended before its result (item 1580): its exit code, which it is given a moment to have
+    (:func:`exit_seen`; a program still running then is one Dot ends itself, with no exit of its own to report), the
+    end of its error stream, whether it had said what the model has, the steps it took and the seconds since its last
+    line. One log line says it (``claude_code_program_cut``), and a program that ended by itself is counted for a mass
+    cut (``claude_code_programs_ended_together``), unless Dot had ended it already."""
+    silent_s: float = round(time.monotonic() - follow.quiet.wrote, 1)
+    returncode: int | None = await exit_seen(process)
+    ours: bool = ended_by_dot(process)
+    stderr: str = await _stderr_now(tail, process)
+    program: ProgramExit = ProgramExit(
+        run_id=follow.agent.run.id,
+        returncode=returncode,
+        stderr=stderr,
+        inited=follow.inited,
+        steps=follow.steps,
+        silent_s=silent_s,
+        session_id=follow.session_id,
+        at=time.time(),
+    )
+    note_cut(program, ours)
+    return program

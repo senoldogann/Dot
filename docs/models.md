@@ -424,7 +424,12 @@ answer keeps its words, Ollama's too.
   limit ends the run failed. When the plan's window is used up, the run ends failed and says which window and when it
   resets: nothing moves the run to another model on its own. A program that writes nothing for
   `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
-  so. A run here ends as Dot's own do (item 1076): the model calls `finish` with its answer (a chat-mode run, which has no `finish`, ends with its last reply), whether it succeeded and
+  so. A program that ends before its result with nobody ending it (killed from outside, crashed, exited by itself)
+  fails the run saying how (item 1580): the error's context and the log line `claude_code_program_cut` carry its exit
+  code, the signal's name (Claude Code ends `128 + n` on SIGTERM, 143, which is read as the signal too), the last 2 KB of
+  its stderr, the steps it took and the seconds since its last line, and `claude_code_programs_ended_together` is
+  logged once, with the run ids and signals, when two or more programs of the daemon are cut inside the same second
+  (the programs Dot ends itself, a Stop's included, are never counted). A run here ends as Dot's own do (item 1076): the model calls `finish` with its answer (a chat-mode run, which has no `finish`, ends with its last reply), whether it succeeded and
   what it needs from you, so a run that could not do its work ends failed and one that waits on you says so (before,
   every run ended done with nothing it needed), and a call it makes after its `finish`, or your message, drops what
   that `finish` said, while a reply it writes after it without a call shows no text: it says the answer again (item

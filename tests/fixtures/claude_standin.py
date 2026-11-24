@@ -18,6 +18,9 @@ first message on its input, and answers as the message says:
   a ``result`` (item 1076);
 - ``slow command``: an init line, then a call of ``shell`` that sleeps before it writes ``late.txt`` in the workspace,
   for a Stop to cut short (item 1076);
+- ``die by sigkill``, ``die by sigterm``, ``die with exit 1``: an init line, one step of the model, then the program
+  ends before any result, as the words say: killed by SIGKILL or SIGTERM (it signals itself), or crashed with a line on
+  its error stream and exit code 1 (item 1580);
 - anything else: an init line naming the door's tools, a step that calls ``write_file`` twice through the door's MCP
   endpoint with the config file it was given (once into the workspace's ``.claude`` folder, once into ``notes.txt``),
   a step that answers with what the calls said, and a ``result``; then it waits for its input to close.
@@ -27,6 +30,7 @@ It calls no model and reaches nothing but Dot's bridge on this Mac."""
 import asyncio
 import json
 import os
+import signal
 import stat
 import sys
 from pathlib import Path
@@ -91,6 +95,18 @@ def _init(door: str, tools: list[str]) -> None:
     )
 
 
+def _die(said: str) -> None:
+    """End this program before any result, as ``said`` asks (item 1580): SIGKILL or SIGTERM sent to itself, or a crash
+    that says why on the error stream and exits 1."""
+    if "die by sigkill" in said:
+        os.kill(os.getpid(), signal.SIGKILL)
+    if "die by sigterm" in said:
+        os.kill(os.getpid(), signal.SIGTERM)
+    sys.stderr.write("stand-in crashed: out of memory\n")
+    sys.stderr.flush()
+    os._exit(1)
+
+
 async def _work(server: dict[str, object], door: str, said: str) -> None:
     """Connect to the door as Claude Code would, say what the model has, then work as ``said`` asks."""
     headers: dict[str, str] = server["headers"]  # type: ignore[assignment]  # the config Dot wrote
@@ -100,6 +116,9 @@ async def _work(server: dict[str, object], door: str, said: str) -> None:
     ):
         listed: ListToolsResult = await client.list_tools()
         _init(door, [f"mcp__{door}__{tool.name}" for tool in listed.tools])
+        if "die by" in said or "die with" in said:
+            _step([("text", "Looking into it.")], "end_turn")
+            _die(said)
         if "limit" in said:
             refused: dict[str, object] = {"status": "rejected", "rateLimitType": "five_hour", "resetsAt": 1_900_000_000}
             _say({"type": "rate_limit_event", "rate_limit_info": refused})

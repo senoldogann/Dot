@@ -13,14 +13,17 @@ import os
 import stat
 import sys
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
+from dotagent.claude_code import cut as cut_module
+from dotagent.claude_code.cut import EndedTogether
 from dotagent.claude_code.run import chat_path
 from dotagent.config import load_config
 from dotagent.core.errors import FailSafeTriggered, InvalidValueError
@@ -643,3 +646,88 @@ async def test_an_agent_whose_tools_leave_out_notify_is_told_so_before_its_progr
     ):
         again: RunRecord = await _run_as(room, goal, source, chat.id)
         assert again.status == "done", (goal, source, again.result)
+
+
+@pytest.fixture
+def ends(monkeypatch: pytest.MonkeyPatch) -> Iterator[EndedTogether]:
+    """The count of programs cut together (item 1580) as a test's own, with a window no test outlasts, so that the cuts
+    of one test never join those of another in the line of the daemon's own."""
+    together: EndedTogether = EndedTogether(window_s=60.0)
+    monkeypatch.setattr(cut_module, "ENDED_TOGETHER", together)
+    yield together
+    together.flush()
+
+
+async def _failed_context(room: Room, ended: RunRecord) -> dict[str, object]:
+    """The context of the error that ended the run, as its ``run_finished`` event keeps it."""
+    (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
+    error: object = finished.data["error"]
+    assert isinstance(error, dict) and error["kind"] == "passing", error
+    context: object = error["context"]
+    assert isinstance(context, dict)
+    return context
+
+
+@pytest.mark.parametrize(
+    ("goal", "returncode", "named", "stderr_says"),
+    [
+        ("Please die by sigkill.", -9, "SIGKILL", ""),
+        ("Please die by sigterm.", -15, "SIGTERM", ""),
+        ("Please die with exit 1.", 1, None, "stand-in crashed: out of memory"),
+    ],
+)
+async def test_a_program_that_ends_before_its_result_says_how_it_ended(
+    room: Room, ends: EndedTogether, goal: str, returncode: int, named: str | None, stderr_says: str
+) -> None:
+    """Item 1580: a program killed from outside ended its run with "Claude Code ended before it answered", its stderr
+    empty and nothing else. The error's context and a log line now carry its exit code and signal, the end of its error
+    stream, that it had said what the model has, the steps it took and the seconds since its last line."""
+    with capture_logs() as logs:
+        ended: RunRecord = await _run(room, goal)
+    assert ended.status == "failed" and ended.result == "Claude Code ended before it answered", ended.result
+    context: dict[str, object] = await _failed_context(room, ended)
+    assert context["returncode"] == returncode and context["signal"] == named and context["exited"] is True
+    assert context["inited"] is True and context["steps"] == 1 and context["claude_session"] == "ses-standin-1"
+    assert isinstance(context["stderr"], str) and stderr_says in context["stderr"]
+    assert isinstance(context["silent_s"], float) and 0 <= context["silent_s"] < 30
+    assert isinstance(context["cut_at"], str) and len(context["cut_at"]) == len("10:44:04")
+    cuts: list[dict[str, object]] = [line for line in logs if line["event"] == "claude_code_program_cut"]
+    assert len(cuts) == 1 and cuts[0]["run_id"] == ended.id and cuts[0]["returncode"] == returncode
+    assert cuts[0]["signal"] == named and cuts[0]["steps"] == 1
+    # The run's own line says the same: its context is in the log (item 1580), where the cause was missing before.
+    failed: list[dict[str, object]] = [line for line in logs if line["event"] == "run failed"]
+    assert failed and failed[0]["context"]["returncode"] == returncode  # type: ignore[index]  # a dict by the lines above
+
+
+async def test_programs_cut_together_are_said_in_one_line(room: Room, ends: EndedTogether) -> None:
+    """Item 1580: five programs ended within 20 ms of each other and nothing said so. Two runs whose programs are cut
+    in the same window are one line, ``claude_code_programs_ended_together``, with their run ids and signals."""
+    with capture_logs() as logs:
+        first, second = await asyncio.gather(_run(room, "Please die by sigkill."), _run(room, "Please die by sigterm."))
+        assert not [line for line in logs if line["event"] == "claude_code_programs_ended_together"]
+        ends.flush()
+    (line,) = [line for line in logs if line["event"] == "claude_code_programs_ended_together"]
+    assert sorted(line["run_ids"]) == sorted([first.id, second.id])  # type: ignore[type-var]  # a list of ids
+    assert sorted(line["signals"], key=str) == ["SIGKILL", "SIGTERM"]  # type: ignore[type-var]  # a list of names
+    assert line["programs"] == 2
+
+
+async def test_a_stop_that_ends_the_program_is_no_cut(room: Room, ends: EndedTogether) -> None:
+    """Item 1580: Dot's own ends are marked and never counted: the program a Stop ends is no cut, and is no part of a
+    mass cut however many runs are stopped together."""
+    with capture_logs() as logs:
+        started: RunRecord = await room.manager.start(
+            "Run the slow command.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+        )
+        deadline: float = time.monotonic() + 30
+        while not await room.runtime.store.events_of_kind(started.id, "tool_call", 5):
+            assert time.monotonic() < deadline, "the program never called its command"
+            await asyncio.sleep(0.1)
+        room.manager.cancel(started.id)
+        async with asyncio.timeout(30):
+            ended: RunRecord = await room.manager.wait(started.id)
+        ends.flush()
+    assert ended.status == "cancelled", ended.result
+    assert not [
+        line for line in logs if line["event"] in ("claude_code_program_cut", "claude_code_programs_ended_together")
+    ]
