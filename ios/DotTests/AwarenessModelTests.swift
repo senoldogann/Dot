@@ -35,14 +35,16 @@ final class AwarenessModelTests: XCTestCase {
         }
     }
 
-    private func make(link: LinkMonitor? = nil, badges: Badges = Badges()) -> AwarenessModel {
+    private func make(
+        link: LinkMonitor? = nil, badges: Badges = Badges(), persist: (@Sendable (AwarenessSnapshot) async -> Void)? = nil
+    ) -> AwarenessModel {
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BodyStub.self]
         let host: DaemonHost = DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!)
         let api: APIClient = APIClient(host: host, key: "phone.a.b", session: URLSession(configuration: configuration), readPolicy: .once)
         // The badge is the test's own: the system's would need a running app.
         return AwarenessModel(
-            api: api, cache: ChatCache(directory: folder), directory: folder, link: link, badge: { badges.add($0) })
+            api: api, cache: ChatCache(directory: folder), directory: folder, link: link, badge: { badges.add($0) }, persist: persist)
     }
 
     /// Waits (up to two seconds) for `condition`: the model's writes run in tasks of their own.
@@ -163,27 +165,57 @@ final class AwarenessModelTests: XCTestCase {
         XCTAssertEqual(model.push.shown, PushSettings(needsYou: true, ready: false, done: false))
     }
 
-    /// Writes are made one after another in the order of the changes (the pre-push review): after a run of flips and reads the file
-    /// holds the newest state, however the writes were scheduled.
-    func testTheFileOnDiskEndsAsTheNewestStateAfterAQuickRunOfChanges() async throws {
+    /// What the writer was given, in the order it finished.
+    private final class Finished: @unchecked Sendable {
+        private let lock: NSLock = NSLock()
+        private var all: [Int] = []
+        func add(_ count: Int) {
+            lock.lock()
+            all.append(count)
+            lock.unlock()
+        }
+        var counts: [Int] {
+            lock.lock()
+            defer { lock.unlock() }
+            return all
+        }
+    }
+
+    /// The snapshot's writes finish in the order they were made, also when an older one is slow (the pre-push review): written
+    /// unordered, the slow old one would end last and the file would hold a state that was already past. Here the older
+    /// snapshot (one thing waits) takes 150 ms and the newer (two) none; the writer must still finish old, then new.
+    func testSnapshotsAreWrittenOneAfterAnotherEvenWhenAnOlderOneIsSlow() async throws {
         begin()
-        BodyStub.reply = #"{"needs_you":true,"ready":true,"done":true}"#
-        let model: AwarenessModel = make()
-        await model.loadPush()
-        BodyStub.respond = { seen in
-            guard seen.method == "PUT", let data: Data = seen.body else { return (200, #"{"needs_you":true,"ready":true,"done":true}"#) }
-            return (200, String(decoding: data, as: UTF8.self))
+        let finished: Finished = Finished()
+        let model: AwarenessModel = make(persist: { snapshot in
+            if snapshot.needsYou?.count == 1 { try? await Task.sleep(for: .milliseconds(150)) }
+            finished.add(snapshot.needsYou?.count ?? -1)
+        })
+        func waiting(_ count: Int) -> String {
+            let items: [String] = (0..<count).map {
+                #"{"id":"apr_\#($0)","kind":"approval","run_id":"run_1","thread_id":"thr_1","agent":"Dot","title":"Run: ls","since":\#($0).0,"route":"dotagent://run/run_1"}"#
+            }
+            return #"{"count":\#(count),"items":[\#(items.joined(separator: ","))]}"#
         }
-        for round in 0..<6 {
-            model.flip(.ready, to: round % 2 == 1)
-            model.flip(.done, to: round % 2 == 0)
-            await model.refreshNeedsYou()
-        }
-        try await until { model.push.sending == nil }
-        let newest: PushSettings = model.push.shown
-        try await until { ChatCache.readAwareness(in: self.folder)?.pushSettings == newest }
-        try await Task.sleep(for: .milliseconds(100))
-        XCTAssertEqual(ChatCache.readAwareness(in: folder)?.pushSettings, newest, "the file holds the newest state, not an older one written later")
+        BodyStub.reply = waiting(1)
+        await model.refreshNeedsYou()
+        BodyStub.reply = waiting(2)
+        await model.refreshNeedsYou()
+        XCTAssertEqual(model.needsYou.count, 2, "both reads reached the model")
+        try await until { finished.counts.count >= 2 }
+        XCTAssertEqual(finished.counts, [1, 2], "the older write finished before the newer began: the file ends as the newest state")
+    }
+
+    /// A finished write is not kept by the model: nothing waits on it (the review's second note).
+    func testAFinishedWriteIsNotKeptByTheModel() async throws {
+        begin()
+        let finished: Finished = Finished()
+        let model: AwarenessModel = make(persist: { snapshot in finished.add(snapshot.needsYou?.count ?? -1) })
+        BodyStub.reply = #"{"count":0,"items":[]}"#
+        await model.refreshNeedsYou()
+        try await until { finished.counts.count >= 1 }
+        try await until { !model.hasWriteInFlight }
+        XCTAssertFalse(model.hasWriteInFlight)
     }
 
     // MARK: What waits on the owner

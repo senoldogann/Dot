@@ -25,20 +25,26 @@ final class AwarenessModel {
     @ObservationIgnored private var held: AwarenessSnapshot
     @ObservationIgnored private var needsYouRead: Task<Void, Never>?
     @ObservationIgnored private var awayReading: Task<Void, Never>?
+    /// Writes the snapshot to the cache folder (the cache's own; a test gives its own).
+    @ObservationIgnored private let persist: @Sendable (AwarenessSnapshot) async -> Void
     /// The last write of the snapshot to disk: each one waits for the one before, so that the file ends as the newest state.
+    /// It is let go once nothing waits on it (`writes` counts them).
     @ObservationIgnored private var writing: Task<Void, Never>?
+    @ObservationIgnored private var writes: Int = 0
     /// Puts a number on the app's icon: after each read of what waits on the owner it is that count.
     @ObservationIgnored private let setBadge: @Sendable (Int) async -> Void
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "awareness")
 
     init(
         api: APIClient, cache: ChatCache, directory: URL, link: LinkMonitor? = nil,
-        badge: @escaping @Sendable (Int) async -> Void = AwarenessModel.systemBadge
+        badge: @escaping @Sendable (Int) async -> Void = AwarenessModel.systemBadge,
+        persist: (@Sendable (AwarenessSnapshot) async -> Void)? = nil
     ) {
         self.api = api
         self.cache = cache
         self.link = link
         self.setBadge = badge
+        self.persist = persist ?? { snapshot in await cache.saveAwareness(snapshot) }
         let kept: AwarenessSnapshot? = ChatCache.readAwareness(in: directory)
         self.held = kept ?? AwarenessSnapshot(savedAt: 0)
         self.push = PushSwitches(known: kept?.pushSettings)
@@ -58,17 +64,24 @@ final class AwarenessModel {
         }
     }
 
+    /// Whether a write of the snapshot is on its way or waits behind one.
+    var hasWriteInFlight: Bool { writing != nil }
+
     /// Writes what is held to the cache folder, off the main actor, one write after another in the order they were made: a flip
     /// followed by a read, or two reads that end together, never leave an older state on disk after a newer one (the
-    /// pre-push review of this item), which a relaunch would draw as a switch or a card that was already put away.
+    /// pre-push review of this item), which a relaunch would draw as a stale switch or a card that was already put away.
     private func keep() {
         held.savedAt = Date().timeIntervalSince1970
         let snapshot: AwarenessSnapshot = held
-        let cache: ChatCache = cache
+        let persist: @Sendable (AwarenessSnapshot) async -> Void = persist
         let before: Task<Void, Never>? = writing
-        writing = Task.detached(priority: .utility) {
+        writes += 1
+        let number: Int = writes
+        writing = Task(priority: .utility) { [weak self] in
             await before?.value
-            await cache.saveAwareness(snapshot)
+            await persist(snapshot)
+            // Nothing waits on this write unless a newer one was made meanwhile: the model does not keep a finished one.
+            if let self, self.writes == number { self.writing = nil }
         }
     }
 
