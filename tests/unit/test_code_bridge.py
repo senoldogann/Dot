@@ -206,7 +206,7 @@ def test_arguments_that_cannot_be_sent_are_an_error_to_that_call_and_the_next_ca
     assert ended.ending == "finished", ended.output
     lines: list[str] = ended.output.splitlines()
     assert len(lines) == 9 and all(line.startswith("error: ") for line in lines[:7])
-    assert ("cannot be sent" in lines[0] and "NaN" in lines[1]) or "Out of range" in lines[1]
+    assert "cannot be sent" in lines[0] and "Out of range" in lines[1]
     assert "bytes: the most one call can carry is" in lines[6]
     assert lines[7:] == ["{'ok': True}", "{'ok': True}"]
     # Only the two calls that were made reached the daemon, as calls 1 and 2, with the values sent as text.
