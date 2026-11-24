@@ -47,6 +47,7 @@ logs), `DOT_CHROME_DIR` (where your own Chrome keeps its profiles, which Dot rea
 | `daemon.running`                                 | left while a daemon runs and removed when it ends without an error   |
 | `STOP`                                           | exists while the emergency stop is engaged                           |
 | `run-owners/`                                    | one lock per process that drives runs (the daemon, `dotx run`)       |
+| `process-groups/`                                | one file per process group a run has at work (item 1670)             |
 | `backups/`                                       | the copies of the database, unless `[store] backup_dir` names a folder |
 | `backups-partial/`                               | the uncompressed file of a copy under way                            |
 | `backups-before-upgrade/`                        | the copy of the database made before a new version changed its tables |

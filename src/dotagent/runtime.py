@@ -213,6 +213,8 @@ class Runtime:
     desktop: "DesktopSession"
     # The daemon's hold on the Mac's sleep while it charges (item 271); off until the daemon starts it.
     awake: KeepAwake
+    # The daemon's hold on the Mac's idle sleep while Dot works (item 1671, ``[daemon] keep_awake``).
+    work_awake: KeepAwake
     # The name the owner calls Dot by and the owner's own (item 420), as the web UI changes them.
     assistant: Assistant
     # The accounts of Google and Microsoft signed in through their official sign-ins (item 422).
@@ -626,7 +628,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             bus=bus,
             approvals=approvals,
             site_locks=SiteLocks(),
-            awake=KeepAwake(),
+            awake=KeepAwake("-s"),
+            work_awake=KeepAwake("-i"),
             assistant=assistant,
             accounts=Accounts(store, Keychain(keychain_file()), None),
             vault=OnePassword(None),
@@ -745,4 +748,5 @@ async def close_runtime(runtime: Runtime) -> None:
             closing.push_async_callback(runtime.phone.aclose)
         closing.push_async_callback(runtime.desktop.close)
         closing.push_async_callback(runtime.awake.stop)
+        closing.push_async_callback(runtime.work_awake.stop)
         closing.push_async_callback(runtime.terminals.aclose)

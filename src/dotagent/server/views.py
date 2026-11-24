@@ -106,12 +106,19 @@ class ErrorView(FrozenModel):
     context: dict[str, JsonValue]
 
 
+# Whether the daemon keeps the Mac from idle sleep while Dot works (item 1671).
+type AwakeState = Literal["holding", "idle", "off"]
+
+
 class HealthView(FrozenModel):
     ok: bool
     version: str
     # Whether the tasks that reach a phone are up. ``ok`` on this view is only that the process answers: a phone can
     # be silent while this is true. ``off`` when no phone watch was started, ``down`` when one that was started died.
     notifications: Literal["ok", "down", "off"] = "off"
+    # Whether the daemon keeps the Mac from idle sleep while Dot works (item 1671): ``holding`` now, ``idle`` (nothing
+    # works, or the minute after the last work is over), ``off`` when ``[daemon] keep_awake`` is off.
+    awake: AwakeState = "off"
 
 
 class ProofView(FrozenModel):
@@ -2204,6 +2211,8 @@ class StatusView(FrozenModel):
     models: ModelsConfig
     # Whether the daemon's next start resumes on its own the runs it cut off (item 231).
     resume: ResumeView
+    # Whether the daemon keeps the Mac from idle sleep while Dot works now (item 1671, :class:`HealthView`).
+    awake: AwakeState
     # The night's learning under way (item 815), which ``dotx service restart --when-idle`` waits for as for the runs.
     night_work: list[NightWork]
     # The names of the Claude plan's models as people know them, by reference (item 1054: "Opus 5.5" for

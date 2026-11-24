@@ -47,6 +47,13 @@ reach = []
 # away; Settings › Phone switches it. A closed lid still puts a MacBook to sleep.
 keep_awake = false
 
+[daemon]
+# Whether the daemon keeps the Mac from idle sleep while Dot works (caffeinate -i, item 1671): from the first run,
+# schedule run or meeting at work until keep_awake_after_s seconds after the last one ended, on power and on battery.
+# The display still sleeps, and a closed lid still puts a MacBook to sleep. `dotx service status` says when it holds.
+keep_awake = true
+keep_awake_after_s = 60
+
 [store]
 # Nothing in the database is deleted by itself. `dotx prune` reports, and `dotx prune --apply` deletes, the events (the
 # steps, tool calls and results of the timeline) of the runs that ended more than retention_days days ago, and with

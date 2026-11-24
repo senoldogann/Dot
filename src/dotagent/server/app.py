@@ -1,6 +1,7 @@
 """The ASGI application: the JSON API, the live streams and the browser UI, behind the local guard."""
 
 import asyncio
+import functools
 import mimetypes
 from pathlib import Path
 
@@ -77,7 +78,7 @@ from dotagent.server.routes_reactions import reactions_router
 from dotagent.server.routes_repair import repair_router
 from dotagent.server.routes_runs import runs_router
 from dotagent.server.routes_snapshots import snapshots_router
-from dotagent.server.routes_system import health_router, proof_router, system_router
+from dotagent.server.routes_system import awake_state, health_router, proof_router, system_router
 from dotagent.server.routes_teach import teach_router
 from dotagent.server.routes_teams import teams_router
 from dotagent.server.routes_themes import themes_router
@@ -194,7 +195,9 @@ def create_app(ctx: ServerContext) -> FastAPI:
     when it was built (item 309, :mod:`dotagent.server.kept_pages`)."""
     pages: KeptPages = keep_pages(STATIC_DIR)
     app: FastAPI = FastAPI(title="Dot", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
-    app.include_router(health_router(ctx.notifications))
+    app.include_router(
+        health_router(ctx.notifications, functools.partial(awake_state, ctx.runtime.config, ctx.runtime.work_awake))
+    )
     phones: PairedPhones = ctx.phones if ctx.phones is not None else PairedPhones.load(phones_path())
     app.include_router(proof_router(ctx.token, phones))
     app.include_router(system_router(ctx, pages.build, phones))

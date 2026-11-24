@@ -21,6 +21,7 @@ from dotagent.agent.loop import warm_help_vectors
 from dotagent.agent.manager import RunManager
 from dotagent.agent.reactions import Reactions
 from dotagent.agent.snapshots import stored_taker
+from dotagent.awake import keep_awake_while_working
 from dotagent.channels.service import Channels
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
@@ -29,6 +30,7 @@ from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, runnin
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, EventBus, Subscription
+from dotagent.meetings.desk import MeetingDesk
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.health import NotifyHealth
@@ -56,6 +58,8 @@ log = get_logger(__name__)
 # Open connections get this long to finish when the daemon stops. Event streams end as soon as it starts to stop (see
 # ``DotServer.shutdown``); this is the limit for a client that does anything else.
 _GRACE_S: int = 3
+# How often the daemon looks whether Dot works, to hold the Mac awake for it (item 1671).
+_AWAKE_LOOK_S: float = 2.0
 _PRIVATE_FILE_MODE: int = 0o600
 _PID_BYTES: int = 32
 _STOP_SIGNALS: tuple[signal.Signals, ...] = (signal.SIGINT, signal.SIGTERM)
@@ -236,6 +240,19 @@ def _log_backups_end(backups: asyncio.Task[None]) -> None:
     if backups.cancelled() or backups.exception() is None:
         return
     log.error("backups_ended", error=repr(backups.exception()))
+
+
+def _dot_works(manager: RunManager, meetings: MeetingDesk) -> bool:
+    """Whether Dot works now (item 1671): a run of its own, one of a ``dotx`` command it relays, or a meeting."""
+    return bool(manager.active_run_ids()) or bool(manager.elsewhere_run_ids()) or meetings.busy() is not None
+
+
+def _log_awake_end(awake_task: asyncio.Task[None]) -> None:
+    """The hold on the Mac's idle sleep that stops before the daemon does is logged (``caffeinate`` could not be
+    started): the Mac sleeps as it would until the daemon starts again."""
+    if awake_task.cancelled() or awake_task.exception() is None:
+        return
+    log.error("keep_awake_while_working_ended", error=repr(awake_task.exception()))
 
 
 def _log_watchers_end(watching: asyncio.Task[None]) -> None:
@@ -424,6 +441,21 @@ async def run_daemon(config: AppConfig) -> int:
             await channels.start()
             cleanup.push_async_callback(channels.stop)
             scheduler_loop: asyncio.Task[None] = await scheduler.start()
+            # The Mac does not idle-sleep while Dot works (item 1671): a run of its own or of a dotx command, a
+            # schedule's run, a meeting.
+            if config.daemon.keep_awake:
+                awake_task: asyncio.Task[None] = asyncio.create_task(
+                    keep_awake_while_working(
+                        runtime.work_awake,
+                        functools.partial(_dot_works, manager, runtime.meetings),
+                        config.daemon.keep_awake_after_s,
+                        _AWAKE_LOOK_S,
+                        stopping,
+                    ),
+                    name="keep-awake",
+                )
+                awake_task.add_done_callback(_log_awake_end)
+                cleanup.push_async_callback(_cancelled, awake_task)
             # The watchers (item 571) look beside the scheduler, from the daemon's own clock: no inbound webhook.
             if config.watchers.enabled:
                 watching: asyncio.Task[None] = asyncio.create_task(

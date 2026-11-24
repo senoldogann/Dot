@@ -107,6 +107,8 @@ def eval_config(config: AppConfig) -> AppConfig:
             "skills": SkillsConfig(dirs=[], elsewhere=False),
             "plugins": PluginsConfig(dirs=[]),
             "desktop": config.desktop.model_copy(update={"enabled": False, "keep_awake": False}),
+            # An attempt keeps no Mac awake (item 1671): evals and tests run no caffeinate of the owner's.
+            "daemon": config.daemon.model_copy(update={"keep_awake": False}),
             "memory": config.memory.model_copy(update={"embed_enabled": False}),
             # The owner's free mode is never an eval's (the pre-push review of item 922): an attempt asks as its task
             # says, and a task the model wrote is held to the workspace by its questions (item 904).

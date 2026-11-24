@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -41,6 +42,7 @@ from dotagent.agent.skill_history import (
     wake_playbook,
 )
 from dotagent.agent.skill_proposals import accept_proposal, dismiss_proposal, waiting_proposals
+from dotagent.awake import KeepAwake
 from dotagent.claude_code.models import model_labels
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, JudgeProvider, ModelsConfig
 from dotagent.config_edit import (
@@ -128,6 +130,7 @@ from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_mcp import service_of
 from dotagent.server.skills_left_out import left_out_view
 from dotagent.server.views import (
+    AwakeState,
     ContextChoice,
     ContextEvidenceQuery,
     ContextSizeRequest,
@@ -283,14 +286,22 @@ async def restart_pending_of(runtime: Runtime, started_at: float) -> RestartPend
     return RestartPending(since=flag.since, asked_by=flag.asked_by, waiting_for=flag.waiting_for, gave_up=flag.gave_up)
 
 
-def health_router(notifications: NotifyHealth | None = None) -> APIRouter:
+def awake_state(config: AppConfig, awake: KeepAwake) -> AwakeState:
+    """Whether the daemon keeps the Mac from idle sleep while Dot works (item 1671): ``off`` when ``[daemon]
+    keep_awake`` is off, else whether it holds now."""
+    if not config.daemon.keep_awake:
+        return "off"
+    return "holding" if awake.on else "idle"
+
+
+def health_router(notifications: NotifyHealth | None, awake: Callable[[], AwakeState]) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     watch: NotifyHealth = notifications if notifications is not None else NotifyHealth()
 
     @router.get("/health")
     async def health() -> HealthView:
         # ``ok`` is the process. ``notifications`` is the phone: a dead push task leaves HTTP answering.
-        return HealthView(ok=True, version=__version__, notifications=watch.summary())
+        return HealthView(ok=True, version=__version__, notifications=watch.summary(), awake=awake())
 
     return router
 
@@ -401,6 +412,7 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             mcp_failures=list(ctx.runtime.mcp.failures),
             models=models_now(),
             resume=resume_now(),
+            awake=awake_state(config, ctx.runtime.work_awake),
             night_work=[] if ctx.scheduler is None else list(ctx.scheduler.night_work()),
             model_labels={f"{CLAUDE_CODE_PROVIDER}:{model}": label for model, label in model_labels().items()},
             notifications=ctx.notifications.summary(),
