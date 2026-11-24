@@ -558,6 +558,9 @@ class RunManager:
         self._releases: set[asyncio.Task[None]] = set()
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
+        # Runs stored and being launched, each with the event set once its handle is registered or its start failed
+        # (:meth:`wait`).
+        self._launching: dict[str, asyncio.Event] = {}
         # One lock an agent, held while its next work's chat is chosen and claimed (item 952).
         self._agent_locks: dict[str, asyncio.Lock] = {}
         self._stopping: bool = False
@@ -2992,7 +2995,12 @@ class RunManager:
         return () if handle is None else handle.gate.instructions
 
     async def wait(self, run_id: str) -> RunRecord:
-        """Block until the run is over (returns immediately for runs that already ended)."""
+        """Block until the run is over (returns immediately for runs that already ended). A run stored but not yet
+        registered is waited for too: its launch first, then its end; a caller that read its id from the store in
+        between was handed it still queued."""
+        launching: asyncio.Event | None = self._launching.get(run_id)
+        if launching is not None:
+            await launching.wait()
         handle: RunHandle | None = self._handles.get(run_id)
         if handle is not None:
             await handle.finished.wait()
@@ -3836,8 +3844,11 @@ class RunManager:
 
         run: RunRecord = await self._stored_run(stored)
         # Until the handle is registered no task will end the stored run: one that fails or is cancelled before
-        # that ends here, failed, instead of staying queued (:meth:`_end_unstarted`).
+        # that ends here, failed, instead of staying queued (:meth:`_end_unstarted`). A wait for it until then waits
+        # for its launch (:meth:`wait`).
         registered: bool = False
+        launched: asyncio.Event = asyncio.Event()
+        self._launching[run.id] = launched
         try:
             if parent_run_id is None:
                 # What the chat's next follow-up starts with, from its first run on (item 199): a move of the run
@@ -3995,8 +4006,12 @@ class RunManager:
                 await runtime.store.clear_thread_taint(thread_id)
             return run, handle
         finally:
-            if not registered:
-                await _uncancelled(self._end_unstarted(run))
+            try:
+                if not registered:
+                    await _uncancelled(self._end_unstarted(run))
+            finally:
+                del self._launching[run.id]
+                launched.set()
 
     async def _stored_run(self, store_run: Callable[[], Awaitable[RunRecord]]) -> RunRecord:
         """Store a new run with ``store_run`` (:meth:`Store.create_run`). A chat on which the run of a ``dotx`` command
