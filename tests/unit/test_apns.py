@@ -12,22 +12,32 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
 from dotagent.agent.approvals import QUESTION_LEFT_EVENT
+from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
+from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
+from dotagent.agent.manager import BACKGROUND_SOURCE
 from dotagent.config import ApnsConfig, AppConfig, load_default_config
 from dotagent.core.errors import ConfigError
-from dotagent.core.types import JsonObject
-from dotagent.events import SYSTEM_RUN_ID
+from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.drafts.service import DRAFT_CREATED_EVENT
+from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID
 from dotagent.notify.apns import (
     ALERT_BODY,
     APPROVAL_CATEGORY,
+    ATTRIBUTES_TYPE,
     DISMISS_AFTER_S,
     FLEET_ID,
+    START_TITLE,
+    ApnsError,
     ApnsReply,
     ApnsSender,
     FleetState,
     LiveState,
     alert_payload,
     apns_set,
+    approval_payload,
+    badged,
     live_end_payload,
+    live_start_payload,
     live_update_payload,
     load_key,
     provider_token,
@@ -39,18 +49,27 @@ from dotagent.notify.apns_watch import (
     LIVE_REGISTERED_EVENT,
     OPEN_WAIT_S,
     PROGRESS_EVERY_S,
+    START_AFTER_S,
+    START_AT_ONCE,
+    START_EVERY_S,
     TOLD_TITLE,
     ApnsWatch,
     follows_live,
 )
+from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import LiveNow, tool_now
+from dotagent.notify.live_start import keep_live_start_token, live_start_token_of
 from dotagent.notify.owner import OWNER_TOLD_EVENT
+from dotagent.notify.settings import PushSettings, keep_push_settings
 from dotagent.runtime import _guarded_files
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_RUN_ENDED_EVENT, SCHEDULE_STOPPED_EVENT
+from dotagent.scheduler.notices import tells
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import DraftRecord, EventRecord, RunRecord
 
 _NOW: float = 1_700_000_000.0
 _DEVICE: str = "ab" * 32
+_OTHER_DEVICE: str = "12" * 32
 _START: str = "cd" * 40
 _ACTIVITY: str = "ef" * 40
 _CONFIG: ApnsConfig = ApnsConfig(
@@ -444,5 +463,489 @@ async def test_a_row_whose_run_ended_where_the_feed_did_not_tell_is_ended_within
         assert len(apple.posted) == posted
         await watch.flush(_NOW + 1 + CHECK_EVERY_S)
         assert _rows(apple.posted[-1]) == [(run.id, "failed")]
+    finally:
+        await store.close()
+
+
+def _alerts_to(apple: _Apple, token: str) -> list[JsonObject]:
+    """The alerts posted to the device ``token``, as the phone would read them."""
+    return [body for url, headers, body in apple.posted if headers["apns-push-type"] == "alert" and url.endswith(token)]
+
+
+def _system(kind: str, data: JsonObject) -> EventRecord:
+    """An event of Dot itself: a notice, which belongs to no run."""
+    return EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=kind, data=data)
+
+
+def _draft_written(run: RunRecord) -> EventRecord:
+    """The event of a draft a run wrote for the owner to send."""
+    draft: DraftRecord = DraftRecord(
+        id="drf_1",
+        run_id=run.id,
+        channel="mail",
+        to=("a@example.com",),
+        cc=(),
+        subject="Hi",
+        body="x",
+        status="waiting",
+        created_at=_NOW,
+        decided_at=None,
+        error=None,
+    )
+    return _event(run.id, DRAFT_CREATED_EVENT, draft.model_dump(mode="json"))
+
+
+async def test_a_phone_that_shows_dot_hears_no_alert_of_a_runs_end_and_every_other_alert_still_goes(
+    tmp_path: Path,
+) -> None:
+    """Item 1420: while a phone's lease holds (the app said it is in the foreground), the end of a run, of a schedule's
+    run and of a campaign, which the app shows itself, are not sent to it as alerts, for the chat it shows and for any
+    other; an approval, a question, a secret and a hand-off are, and so are a draft, what Dot tells the owner and the
+    warnings of Dot itself, which the app shows nowhere; every Live Activity update is told all the same. Another phone,
+    and the same phone once the lease ran out or the app said it left, hear all of it. The clock is the test's own."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        clock: list[float] = [_NOW]
+        leases = PhoneLeases(lambda: clock[0])
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), leases)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        leases.renew("p1", "foreground", run.thread_id, None)
+
+        # The end of the run is told to the phone that does not show Dot, and not to the one that does; its Live
+        # Activity is told all the same.
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW + 1)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 2)
+        assert _alerts_to(apple, _DEVICE) == [] and len(_alerts_to(apple, _OTHER_DEVICE)) == 1
+        assert apple.posted[-1][0].endswith(_ACTIVITY) and _rows(apple.posted[-1]) == [(run.id, "done")]
+        # So are a schedule's run and a campaign, ended.
+        ended: JsonObject = {"schedule_id": "sch_1", "run_id": run.id, "status": "done", "result": "x"}
+        await watch.on_event(_system(SCHEDULE_RUN_ENDED_EVENT, ended), _NOW + 3)
+        campaign: JsonObject = {"campaign_id": "cmp_1", "title": "Leads", "status": "achieved", "note": "x"}
+        await watch.on_event(_event(run.id, CAMPAIGN_ENDED_EVENT, campaign), _NOW + 3)
+        assert _alerts_to(apple, _DEVICE) == [] and len(_alerts_to(apple, _OTHER_DEVICE)) == 3
+
+        # What asks something of the owner goes to the phone that shows Dot, whatever it asks.
+        for index, severity in enumerate(("low", "medium", "high", "question", "secret", "handoff")):
+            asked: JsonObject = {"approval_id": f"apr_{index}", "severity": severity, "summary": "x", "args": {}}
+            await watch.on_event(_event(run.id, "approval_requested", asked), _NOW + 5)
+            assert len(_alerts_to(apple, _DEVICE)) == index + 1
+        left: JsonObject = {"approval_id": "apr_9", "severity": "question"}
+        await watch.on_event(_event(run.id, QUESTION_LEFT_EVENT, left), _NOW + 6)
+        assert len(_alerts_to(apple, _DEVICE)) == 7
+        # A draft written for the owner, what Dot tells them on its own and the warnings of Dot itself go too.
+        await watch.on_event(_draft_written(run), _NOW + 6)
+        told: JsonObject = {"title": "Your rent is due", "text": "Pay it", "url": "#/"}
+        await watch.on_event(_system(OWNER_TOLD_EVENT, told), _NOW + 6)
+        missed: JsonObject = {"schedule_id": "sch_1", "name": "Brief", "status": "missed"}
+        await watch.on_event(_system(SCHEDULE_MISSED_EVENT, missed), _NOW + 6)
+        stopped: JsonObject = {"schedule_id": "sch_1", "name": "Brief", "failures": 3}
+        await watch.on_event(_system(SCHEDULE_STOPPED_EVENT, stopped), _NOW + 6)
+        await watch.on_event(_system(LEARNING_STALLED_EVENT, {"reason": "no model"}), _NOW + 6)
+        await watch.on_event(_system(DAEMON_RESTARTED_EVENT, {"runs_cut_off": 0}), _NOW + 6)
+        heard: int = len(_alerts_to(apple, _DEVICE))
+        assert heard == 7 + 6
+
+        # The chat on screen is another one: the phone still shows Dot, and the end of a run stays quiet.
+        leases.renew("p1", "foreground", "thr_another_chat", None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "failed", "result": "x"}), _NOW + 7)
+        assert len(_alerts_to(apple, _DEVICE)) == heard
+
+        # The lease holds its 45 seconds from the last time the app said it, not a moment more.
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 44.9)
+        assert len(_alerts_to(apple, _DEVICE)) == heard
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 45.0)
+        assert len(_alerts_to(apple, _DEVICE)) == heard + 1
+
+        # The app says it left: the alert goes at once, though the time it named has not passed.
+        leases.renew("p1", "foreground", None, 90.0)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 46)
+        assert len(_alerts_to(apple, _DEVICE)) == heard + 1
+        leases.renew("p1", "background", None, None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 47)
+        assert len(_alerts_to(apple, _DEVICE)) == heard + 2
+    finally:
+        await store.close()
+
+
+async def test_a_watch_that_was_given_no_leases_sends_every_alert(tmp_path: Path) -> None:
+    """Item 1420: a daemon that keeps no lease (a test's, an older server) sends the app every alert it did before."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW)
+        assert len(_alerts_to(apple, _DEVICE)) == 1
+    finally:
+        await store.close()
+
+
+async def test_a_phone_is_told_only_the_kinds_of_push_it_switched_on_each_phone_for_itself(tmp_path: Path) -> None:
+    """Item 1421: an approval, a question, a secret and a hand-off, and the failures of Dot's own work, are
+    ``needs_you``; a draft and what Dot tells the owner are ``ready``; the end of a run, of a schedule's run or of a
+    campaign is ``done``. A kind a phone switched off is not sent to it, and the others are; the phone's lock-screen
+    approval is ``needs_you`` too; the Live Activity is not a kind and follows the run as before."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        third: str = "34" * 32
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p3", third, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        # p1 wants to be asked and nothing more; p2 never said, so it hears all; p3 wants all but being asked.
+        await keep_push_settings(store, "p1", PushSettings(needs_you=True, ready=False, done=False))
+        await keep_push_settings(store, "p3", PushSettings(needs_you=False, ready=True, done=True))
+        run: RunRecord = await _run(store, "chat", None)
+        step: JsonObject = {"approval_id": "apr_1", "severity": "low", "summary": "x", "args": {}}
+        sent: JsonObject = {"schedule_id": "s", "run_id": run.id, "status": "failed", "result": "x"}
+        missed: JsonObject = {"schedule_id": "s", "name": "Brief", "status": "missed"}
+        events: list[EventRecord] = [
+            _event(run.id, "approval_requested", step),
+            _event(run.id, "approval_requested", {**step, "severity": "question"}),
+            _draft_written(run),
+            _system(OWNER_TOLD_EVENT, {"title": "Brief", "text": "x", "url": "#/"}),
+            _event(run.id, "run_finished", {"status": "done", "result": "x"}),
+            _system(SCHEDULE_RUN_ENDED_EVENT, sent),
+            _system(SCHEDULE_MISSED_EVENT, missed),
+        ]
+        for event in events:
+            await watch.on_event(event, _NOW + 1)
+        heard: dict[str, int] = {
+            "p1": len(_alerts_to(apple, _DEVICE)),
+            "p2": len(_alerts_to(apple, _OTHER_DEVICE)),
+            "p3": len(_alerts_to(apple, third)),
+        }
+        assert heard == {"p1": 3, "p2": 7, "p3": 4}
+        # The lock screen's approval is a ``needs_you``: p3 has it off and is sent none, p1 and p2 are.
+        assert [body.get("approval_id") for body in _alerts_to(apple, third)] == [None] * 4
+        assert next(iter(_alerts_to(apple, _DEVICE))).get("approval_id") == "apr_1"
+        # The Live Activity is told the row of the run that ended, to the phone that switched ``done`` off too.
+        told: list[tuple[str, dict[str, str], JsonObject]] = [
+            post for post in apple.posted if post[0].endswith(_ACTIVITY)
+        ]
+        assert told and _rows(told[-1]) == [(run.id, "done")]
+    finally:
+        await store.close()
+
+
+async def test_a_schedules_notice_level_still_decides_whether_its_end_is_told_and_the_done_switch_comes_after(
+    tmp_path: Path,
+) -> None:
+    """Item 1421: the level of a schedule (``never``, ``problems``, ``always``) decides whether the end of its run is an
+    event at all, as it did; a phone that switched ``done`` off is not sent the ends that the level told."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await keep_push_settings(store, "p2", PushSettings(needs_you=True, ready=True, done=False))
+        run: RunRecord = await _run(store, "schedule", None)
+        # (level, how the run ended, what it needs, failures in a row): whether the scheduler emits the event.
+        endings: list[tuple[str, str, str, int, bool]] = [
+            ("never", "failed", "", 1, False),
+            ("problems", "done", "", 1, False),
+            ("problems", "failed", "", 1, True),
+            ("problems", "failed", "", 2, False),
+            ("always", "done", "", 1, True),
+        ]
+        emitted: int = 0
+        for level, status, needs, in_row, told in endings:
+            assert tells(level, status, needs, in_row) is told, (level, status)  # type: ignore[arg-type]  # the level's literal
+            if told:
+                emitted += 1
+                data: JsonObject = {"schedule_id": "s", "run_id": run.id, "status": status, "result": "x"}
+                await watch.on_event(_system(SCHEDULE_RUN_ENDED_EVENT, data), _NOW + emitted)
+        assert emitted == 2
+        assert len(_alerts_to(apple, _DEVICE)) == 2 and _alerts_to(apple, _OTHER_DEVICE) == []
+    finally:
+        await store.close()
+
+
+async def test_an_alert_sets_the_badge_to_how_many_things_wait_on_the_owner_and_carries_nothing_more(
+    tmp_path: Path,
+) -> None:
+    """Item 1422: the badge of the app is the count of what waits on the owner, a number in the alert's ``aps`` (the
+    lock-screen approval's too); the lock-screen text is what it was, and the Live Activity carries no badge. A count
+    that cannot be made leaves the alert as it was, and a watch with no count sets no badge."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        waiting: list[int] = [3]
+        calls: list[int] = []
+
+        async def count() -> int:
+            calls.append(waiting[0])
+            return waiting[0]
+
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), None, count)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW)
+        ended: JsonObject = _alerts_to(apple, _DEVICE)[0]
+        assert ended == {**alert_payload("A task is done", f"#/runs/{run.id}"), "aps": {**ended["aps"], "badge": 3}}  # type: ignore[dict-item]  # a JSON payload read back
+        assert ended["aps"]["alert"] == {"title": "A task is done", "body": ALERT_BODY}  # type: ignore[index]  # a JSON payload read back
+        # One count for an alert, whatever the number of phones; both phones read the same number.
+        assert calls == [3] and _alerts_to(apple, _OTHER_DEVICE)[0]["aps"]["badge"] == 3  # type: ignore[index]  # a JSON payload read back
+        # The lock screen's approval carries it too, and the count moves as what waits does.
+        waiting[0] = 4
+        step: JsonObject = {"approval_id": "apr_1", "severity": "low", "summary": "x", "args": {}}
+        await watch.on_event(_event(run.id, "approval_requested", step), _NOW + 1)
+        asked: JsonObject = _alerts_to(apple, _DEVICE)[-1]
+        assert asked["aps"]["badge"] == 4 and asked["aps"]["category"] == APPROVAL_CATEGORY  # type: ignore[index]  # a JSON payload read back
+        # No badge in a Live Activity's push.
+        for url, headers, body in apple.posted:
+            if headers["apns-push-type"] == "liveactivity":
+                assert "badge" not in json.dumps(body), url
+
+        # A count that cannot be made does not cost the alert.
+        async def cannot() -> int:
+            raise ApnsError("the count failed", {})
+
+        broken = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), None, cannot)
+        before: int = len(_alerts_to(apple, _DEVICE))
+        await broken.on_event(_event(run.id, "run_finished", {"status": "failed", "result": "x"}), _NOW + 2)
+        assert len(_alerts_to(apple, _DEVICE)) == before + 1 and "badge" not in _alerts_to(apple, _DEVICE)[-1]["aps"]  # type: ignore[operator]  # a JSON payload read back
+
+        # Nor does a stored record that cannot be read (pydantic's error, which is no DotError): the alert goes, with no
+        # badge, and the watch goes on.
+        class Options(FrozenModel):
+            options: list[str]
+
+        async def unreadable() -> int:
+            return len(Options.model_validate({"options": "not a list"}).options)
+
+        unread = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), None, unreadable)
+        await unread.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 2.5)
+        assert len(_alerts_to(apple, _DEVICE)) == before + 2 and "badge" not in _alerts_to(apple, _DEVICE)[-1]["aps"]  # type: ignore[operator]  # a JSON payload read back
+        # A watch given no count sets none.
+        plain = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await plain.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW + 3)
+        assert "badge" not in _alerts_to(apple, _DEVICE)[-1]["aps"]  # type: ignore[operator]  # a JSON payload read back
+    finally:
+        await store.close()
+
+
+def test_the_badge_is_a_number_put_into_an_alert_and_nothing_else_is_changed() -> None:
+    alert: JsonObject = alert_payload("A task is done", "#/runs/run-1")
+    assert badged(alert, 2) == {
+        "aps": {"alert": {"title": "A task is done", "body": ALERT_BODY}, "sound": "default", "badge": 2},
+        "route": "#/runs/run-1",
+    }
+    asked: JsonObject = approval_payload("Dot asks for approval", "#/runs/run-1", "apr_1")
+    assert badged(asked, 0)["approval_id"] == "apr_1" and badged(asked, 0)["aps"]["badge"] == 0  # type: ignore[index]  # a JSON payload read back
+    # The payload it was given is not changed.
+    assert "badge" not in alert["aps"]  # type: ignore[operator]  # a JSON payload read back
+    with pytest.raises(ApnsError, match="aps"):
+        badged({"route": "#/"}, 1)
+
+
+async def test_a_handoffs_alert_is_a_fixed_title_and_line_and_the_route_of_its_run_and_nothing_of_the_step(
+    tmp_path: Path,
+) -> None:
+    """Item 1423: the lock-screen text of a hand-off, which Apple reads, is what it was: the fixed title, the fixed
+    line, the run's route; never the host, the page or a credential."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        words: str = "Type hunter2 into the password field of https://bank.example/login?token=abc"
+        step: JsonObject = {
+            "approval_id": "apr_1", "severity": "handoff", "summary": words,
+            "args": {"target": "https://bank.example/login?token=abc", "flags": ["credential"]},
+        }  # fmt: skip
+        await watch.on_event(_event(run.id, "approval_requested", step), _NOW)
+        [alert] = _alerts_to(apple, _DEVICE)
+        assert alert == {
+            "aps": {"alert": {"title": "Dot needs your help", "body": ALERT_BODY}, "sound": "default"},
+            "route": f"#/runs/{run.id}",
+        }
+        for leaked in ("hunter2", "bank.example", "token=abc", "password"):
+            assert leaked not in json.dumps(alert), leaked
+    finally:
+        await store.close()
+
+
+def test_the_start_of_a_live_activity_is_the_payload_apple_asks_for_with_a_fixed_alert_and_nothing_else_added() -> None:
+    """Item 1425: ``event`` ``start``, the attributes' type and its attributes, the state it opens with, ``timestamp``,
+    ``input-push-token`` (so that iOS 18 and later give the started activity a token of its own) and the alert Apple
+    requires of a start, fixed words, with no sound; the sources that start at once are the ones the app names."""
+    row = LiveState(
+        runId="run-1", title="Leads", agent="Dot", status="working", kind="thinking", line="Thinking", startedAt=_NOW
+    )
+    state: FleetState = FleetState(active=1, rows=(row,))
+    assert live_start_payload(state, _NOW) == {
+        "aps": {
+            "timestamp": int(_NOW),
+            "event": "start",
+            "content-state": state.model_dump(),
+            "attributes-type": "DotFleetAttributes",
+            "attributes": {"fleetId": "fleet"},
+            "input-push-token": 1,
+            "alert": {"title": START_TITLE, "body": ALERT_BODY},
+            "stale-date": int(_NOW + 4 * 3600),
+        }
+    }
+    assert ATTRIBUTES_TYPE == "DotFleetAttributes" and FLEET_ID == "fleet"
+    aps: object = live_start_payload(state, _NOW)["aps"]
+    assert isinstance(aps, dict) and "sound" not in aps and "sound" not in json.dumps(aps["alert"])
+    # The one source that starts at once is the command that ended in the background, as the manager names it.
+    assert {BACKGROUND_SOURCE} == START_AT_ONCE
+
+
+async def _watch(store: Store, apple: _Apple, leases: PhoneLeases | None = None) -> ApnsWatch:
+    return ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple), leases)
+
+
+def _starts(apple: _Apple) -> list[tuple[str, dict[str, str], JsonObject]]:
+    """The pushes that started a Live Activity, as posted."""
+    return [post for post in apple.posted if post[2]["aps"].get("event") == "start"]  # type: ignore[union-attr]  # JSON
+
+
+async def test_a_run_of_dots_own_starts_the_live_activity_on_a_phone_that_shows_none_once_in_ten_minutes(
+    tmp_path: Path,
+) -> None:
+    """Item 1425: a phone that gave its push-to-start token, shows no activity and is not in the foreground is sent the
+    start the moment a command that ended in the background begins to work: to the start token, at priority 10, with
+    the alert Apple requires; a second start waits ten minutes and a run that is new; the same run is never started
+    again."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch: ApnsWatch = await _watch(store, apple)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        first: RunRecord = await _run(store, "background", None)
+        await watch.on_event(_event(first.id, "run_started", {}), _NOW)
+        [(url, headers, body)] = _starts(apple)
+        assert url == f"https://api.sandbox.push.apple.com/3/device/{_START}"
+        assert headers["apns-topic"] == "dev.dotagent.phone.push-type.liveactivity"
+        assert headers["apns-push-type"] == "liveactivity" and headers["apns-priority"] == "10"
+        aps: JsonObject = body["aps"]  # type: ignore[assignment]  # a JSON payload read back
+        assert aps["event"] == "start" and aps["timestamp"] == int(_NOW) and aps["attributes"] == {"fleetId": "fleet"}
+        assert aps["attributes-type"] == "DotFleetAttributes"
+        assert aps["alert"] == {"title": START_TITLE, "body": ALERT_BODY} and "sound" not in aps
+        assert _rows(_starts(apple)[0]) == [(first.id, "working")]
+        # The same run, however often the rows are read, is not started for again, nor another within ten minutes.
+        await watch.flush(_NOW + START_EVERY_S - 1)
+        second: RunRecord = await _run(store, "background", None)
+        await watch.on_event(_event(second.id, "run_started", {}), _NOW + 60)
+        assert len(_starts(apple)) == 1
+        # Past the ten minutes the run that is new earns a start, with both rows; the old one alone would not.
+        await watch.flush(_NOW + START_EVERY_S)
+        assert len(_starts(apple)) == 2 and {run for run, _ in _rows(_starts(apple)[1])} == {first.id, second.id}
+        await watch.flush(_NOW + 2 * START_EVERY_S + 1)
+        assert len(_starts(apple)) == 2
+        # An activity that starts sends its token: the rows go to it as they always did, and no start is sent again.
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW + START_EVERY_S + 1)
+        await watch.on_event(_registered(), _NOW + START_EVERY_S + 1)
+        assert apple.posted[-1][0].endswith(_ACTIVITY) and len(_starts(apple)) == 2
+    finally:
+        await store.close()
+
+
+async def test_a_run_the_owner_started_starts_one_only_after_thirty_seconds_and_never_where_the_phone_shows_dot(
+    tmp_path: Path,
+) -> None:
+    """Item 1425: the owner's own run waits until it has worked :data:`START_AFTER_S`; a phone in the foreground (its
+    lease, item 1420), one that shows an activity, one that gave no token and a run that is no row of the activity (a
+    schedule's, which nobody follows) are sent no start."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        clock: list[float] = [_NOW]
+        leases = PhoneLeases(lambda: clock[0])
+        apple = _Apple({})
+        watch: ApnsWatch = await _watch(store, apple, leases)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p3", "34" * 32, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        await keep_live_start_token(store, "p2", "ab" * 40)
+        # p3 never gave a token; p2 shows an activity already.
+        run: RunRecord = await _run(store, "ui", None)
+        began: float = run.created_at
+        await store.set_live_activity(FLEET_ID, "p2", _ACTIVITY, began)
+        clock[0] = began
+        leases.renew("p1", "foreground", None, 90.0)
+        await watch.on_event(_event(run.id, "run_started", {}), began)
+        await watch.flush(began + START_AFTER_S - 1)
+        assert _starts(apple) == []
+        # Thirty seconds of work, but the phone is in the foreground: no start.
+        await watch.flush(began + START_AFTER_S + 6)
+        assert _starts(apple) == []
+        # The app leaves: the next look starts it, on p1 alone (p2 shows one, p3 has no token).
+        leases.renew("p1", "background", None, None)
+        await watch.flush(began + START_AFTER_S + 12)
+        [(url, _, _)] = _starts(apple)
+        assert url.endswith(_START)
+        # A schedule's run is no row of the activity: nothing to start for.
+        scheduled: RunRecord = await _run(store, "schedule", None)
+        await watch.on_event(_event(scheduled.id, "run_started", {}), began + START_AFTER_S + 13)
+        await watch.flush(scheduled.created_at + START_AFTER_S + START_EVERY_S + 10)
+        assert len(_starts(apple)) == 1
+        assert await live_start_token_of(store, "p1") == _START
+    finally:
+        await store.close()
+
+
+async def test_a_start_token_that_apns_calls_gone_is_forgotten_and_a_push_that_fails_is_not_asked_again_for_ten_minutes(
+    tmp_path: Path,
+) -> None:
+    """Item 1425: a token APNs refuses as gone is forgotten (the phone's device is not: its alerts go on), and one start
+    that could not be sent counts as the try for ten minutes, so a failing push service is not asked every few seconds;
+    the runs count only once a start was sent for them, so when the ten minutes are over it is asked again for them."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({_START: ApnsReply(status=410, reason="Unregistered")})
+        watch: ApnsWatch = await _watch(store, apple)
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await keep_live_start_token(store, "p1", _START)
+        run: RunRecord = await _run(store, "background", None)
+        await watch.on_event(_event(run.id, "run_started", {}), _NOW)
+        assert len(_starts(apple)) == 1 and await live_start_token_of(store, "p1") is None
+        assert [device.phone_id for device in await store.list_apns_devices()] == ["p1"]
+
+        class _Down:
+            """APNs that cannot be reached, until it is told it can."""
+
+            posts: int = 0
+            reachable: bool = False
+
+            async def post(self, url: str, headers: Mapping[str, str], body: bytes) -> ApnsReply:
+                self.posts += 1
+                if not self.reachable:
+                    raise ApnsError("APNs could not be reached", {"url": url})
+                return ApnsReply(status=200, reason="")
+
+        down = _Down()
+        failing = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), down))
+        await keep_live_start_token(store, "p1", _START)
+        await failing.on_event(_event(run.id, "run_started", {}), _NOW)
+        for later in (1, 6, 60, START_EVERY_S - 1):
+            await failing.flush(_NOW + later)
+        assert down.posts == 1
+        # The ten minutes are over and nothing was sent for the run: it is tried again, and again while it fails.
+        await failing.flush(_NOW + START_EVERY_S + 6)
+        assert down.posts == 2
+        await failing.flush(_NOW + START_EVERY_S + 12)
+        assert down.posts == 2
+        # Once a start went out for it, it is not started again, however long it works.
+        down.reachable = True
+        await failing.flush(_NOW + 2 * START_EVERY_S + 12)
+        assert down.posts == 3
+        for later in (3 * START_EVERY_S, 4 * START_EVERY_S):
+            await failing.flush(_NOW + later)
+        assert down.posts == 3
     finally:
         await store.close()

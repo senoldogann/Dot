@@ -900,17 +900,31 @@ class ScheduleFiring(FrozenModel):
 type AutoDecider = Literal["reviewer", "yolo"]
 
 
+class AwayRule(FrozenModel):
+    """Which runs "while you were away" reads (items 466 and 1424): those of a source of ``sources`` (Dot's own starts,
+    which nobody waits for), and those of an agent's own chat under a source that is none of ``owners`` (the sources the
+    owner starts a run with, who then waits for it). ``delegated`` names the sources whose runs another run sends by
+    design (an agent's work): they have a parent run, which is no helper's mark for them, and one with a run of
+    ``owners`` above it, however many runs it went through, is left out, as the owner waits for the run at the top."""
+
+    sources: tuple[str, ...]
+    owners: tuple[str, ...]
+    delegated: tuple[str, ...]
+
+
 class UnattendedRun(FrozenModel):
-    """A run that a schedule or a campaign started (item 466), with the name of the schedule whose chat it went in and
-    the title of the campaign it was a session of; a firing from before item 257 names no schedule."""
+    """A run that "while you were away" lists (items 466 and 1424), with the name of the schedule whose chat it went in,
+    the title of the campaign it was a session of and the title of its chat; a firing from before item 257 names no
+    schedule."""
 
     run: RunRecord
     schedule_name: str | None
     campaign_title: str | None
+    thread_title: str | None
 
 
 class UnattendedCount(FrozenModel):
-    """How many of the runs that schedules and campaigns started ended with ``status``, or work (item 466)."""
+    """How many of the runs "while you were away" lists ended with ``status``, or work (items 466 and 1424)."""
 
     status: RunStatus
     campaign: bool
@@ -918,8 +932,8 @@ class UnattendedCount(FrozenModel):
 
 
 class AutoDecisionCount(FrozenModel):
-    """How many approvals ``decided_by`` answered ``status`` for the owner (item 466) in the run ``run``, which a
-    schedule or a campaign started, and in its helpers; with what names the run, as :class:`UnattendedRun` has it."""
+    """How many approvals ``decided_by`` answered ``status`` for the owner (item 466) in the run ``run``, which "while
+    you were away" lists, and in its helpers; with what names the run, as :class:`UnattendedRun` has it."""
 
     run: UnattendedRun
     decided_by: AutoDecider

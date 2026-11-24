@@ -5,16 +5,20 @@ A run of the owner's (no run delegated it, and no schedule, watcher, own initiat
 the activity from its start: it works, waits for the owner (an approval asks), works again once answered, and ends
 done, failed or stopped; an ended row stays :data:`DISMISS_AFTER_S`. The activity shows the runs at work first, then
 those that ended last, at most :data:`FLEET_ROWS`, and how many are at work. The app opens it itself when the owner
-starts a run on the phone, which brings no notification (item 1096: a push-to-start must carry one, and the owner wants
-none at a start); it sends back the activity's token, and every change after goes to that token; once no row is left
-the activity ends and goes. A run started on the Mac opens none. While a run works its row says what it does now
+starts a run on the phone, which brings no notification; it sends back the activity's token, and every change after
+goes to that token; once no row is left the activity ends and goes. A run started on the Mac opens none, but for a
+phone that gave its push-to-start token (item 1425): when the phone shows no activity and is not in the foreground, a
+run of Dot's own that works, or any run that has worked :data:`START_AFTER_S`, starts one by push, with the alert Apple
+requires, at most once in :data:`START_EVERY_S`. While a run works its row says what it does now
 (item 1004: thinking, browsing the web, running a command; :mod:`dotagent.notify.live_now`), the activity changed for
 that at most once every :data:`PROGRESS_EVERY_S`, the latest step kept rather than each one sent: the steps come faster
 than Apple lets a Live Activity change, and a run that starts, waits or ends is told at once."""
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
+
+from pydantic import ValidationError
 
 from dotagent.core.errors import DotError, NotFoundError
 from dotagent.core.logs import get_logger
@@ -33,14 +37,27 @@ from dotagent.notify.apns import (
     PushPriority,
     alert_payload,
     approval_payload,
+    badged,
     gone,
     live_end_payload,
+    live_start_payload,
     live_update_payload,
     short_title,
 )
+from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import PROGRESS_KINDS, THINKING, WAITING, WORKING, LiveNow, live_now
+from dotagent.notify.live_start import forget_live_start_token, live_start_token_of
 from dotagent.notify.owner import OWNER_TOLD_EVENT
-from dotagent.notify.push import PUSH_KINDS, PushMessage, notice_message, push_message
+from dotagent.notify.push import (
+    PUSH_KINDS,
+    PushGroup,
+    PushMessage,
+    notice_message,
+    push_group,
+    push_message,
+    quiet_while_shown,
+)
+from dotagent.notify.settings import push_settings_of
 from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.store.db import Store
 from dotagent.store.models import WORKING_STATUSES, ApnsDevice, EventRecord, LiveActivity, RunRecord
@@ -84,6 +101,18 @@ OPEN_WAIT_S: float = 60.0
 CHECK_EVERY_S: float = 60.0
 # The title of an alert of a message Dot wrote to the owner.
 TOLD_TITLE: str = "Dot has a message for you"
+# When a phone whose app shows no Live Activity is sent one by push (item 1425): at most one start for a phone in this
+# long, for a run nobody watches at once and for any other once it has worked :data:`START_AFTER_S`. The sources that
+# start at once are the runs of Dot's own that are rows of the activity: a command that ended in the background
+# (``agent.manager.BACKGROUND_SOURCE``, which a test pins). A schedule's run is no row (``UNWATCHED_SOURCES``, item
+# 1096), so it cannot start one.
+START_EVERY_S: float = 600.0
+START_AFTER_S: float = 30.0
+START_AT_ONCE: frozenset[str] = frozenset({"background"})
+# How often the rows at work are read for a start they have earned by working long.
+START_CHECK_S: float = 5.0
+# What APNs answers a push it took.
+_APNS_OK: int = 200
 
 
 def approval_answerable(event: EventRecord) -> str | None:
@@ -113,10 +142,11 @@ def live_state(run: RunRecord, title: str, agent: str, status: LiveStatus, now: 
 
 
 class _Row(FrozenModel):
-    """A run as the activity shows it, and when it ended (``None`` while it is at work)."""
+    """A run as the activity shows it, when it ended (``None`` while it is at work) and the source that started it."""
 
     state: LiveState
     ended_at: float | None
+    source: str
 
 
 def fleet_state(rows: Mapping[str, _Row]) -> FleetState:
@@ -141,9 +171,19 @@ class ApnsWatch:
     """Sends the app what the events say, each device and activity on its own: one that fails keeps no other from
     its push, and one APNs calls gone is forgotten."""
 
-    def __init__(self, store: Store, sender: ApnsSender) -> None:
+    def __init__(
+        self,
+        store: Store,
+        sender: ApnsSender,
+        leases: PhoneLeases | None = None,
+        badge: Callable[[], Awaitable[int]] | None = None,
+    ) -> None:
         self._store: Store = store
         self._sender: ApnsSender = sender
+        # How many things wait on the owner (item 1422): the number an alert sets the app's badge to. None: no badge.
+        self._badge: Callable[[], Awaitable[int]] | None = badge
+        # Which phones show Dot now (item 1420): the alerts of a run's end are not sent to them. None: every alert goes.
+        self._leases: PhoneLeases | None = leases
         # The runs the activity shows, by id (item 1093).
         self._rows: dict[str, _Row] = {}
         # When the activity was last told, and whether a step came since that waits its turn (item 1004).
@@ -154,17 +194,53 @@ class ApnsWatch:
         # When the rows at work were last read against their runs (item 1108).
         self._checked_at: float = 0.0
         self._others: set[str] = set()
+        # The phones a Live Activity was started on by push (item 1425), each with when and for which runs: another
+        # start waits :data:`START_EVERY_S` and a run that is new.
+        self._started: dict[str, tuple[float, frozenset[str]]] = {}
+        # When the rows at work were last read for a start.
+        self._start_checked_at: float = 0.0
 
     async def _forget_if_gone(self, device: ApnsDevice, reply: ApnsReply) -> None:
         if gone(reply):
             await self._store.delete_apns_device(device.phone_id)
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
-    async def alert(self, message: PushMessage) -> None:
-        await self._alert(alert_payload(message.title, message.route))
+    async def alert(self, message: PushMessage, now: float, kind: str) -> None:
+        await self._alert(alert_payload(message.title, message.route), now, kind)
 
-    async def _alert(self, payload: JsonObject) -> None:
+    def _shown(self, phone_id: str, now: float) -> bool:
+        """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""
+        return self._leases is not None and self._leases.live(phone_id, now) is not None
+
+    async def _badged(self, payload: JsonObject) -> JsonObject:
+        """``payload`` with the badge of what waits on the owner (item 1422); as it was when that cannot be counted: an
+        alert is not lost for its badge."""
+        if self._badge is None:
+            return payload
+        try:
+            return badged(payload, await self._badge())
+        except DotError as error:
+            log.warning("apns_badge_not_counted", error=error.message)
+            return payload
+        except ValidationError as error:
+            # A stored record that cannot be read ends no push: the alert goes without the badge.
+            log.warning("apns_badge_not_counted", error=str(error))
+            return payload
+
+    async def _alert(self, payload: JsonObject, now: float, kind: str) -> None:
+        """Send ``payload``, the alert of an event of ``kind``, to every phone that is told pushes of its kind (item
+        1421: each phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the
+        end of a run, which the app shows itself, is not showing Dot now (item 1420)."""
+        group: PushGroup | None = push_group(kind)
+        quiet: bool = quiet_while_shown(kind)
+        payload = await self._badged(payload)
         for device in await self._store.list_apns_devices():
+            if group is not None and not (await push_settings_of(self._store, device.phone_id)).wants(group):
+                log.info("apns_alert_switched_off", phone=device.phone_id, group=group)
+                continue
+            if quiet and self._shown(device.phone_id, now):
+                log.info("apns_alert_kept_quiet", phone=device.phone_id)
+                continue
             try:
                 reply: ApnsReply = await self._sender.send(
                     device.environment,
@@ -191,7 +267,7 @@ class ApnsWatch:
             state: LiveState = live_state(run, title, agent, status, doing)
         else:
             state = shown.state.model_copy(update={"status": status, "kind": doing.kind, "line": doing.line})
-        self._rows[run.id] = _Row(state=state, ended_at=ended_at)
+        self._rows[run.id] = _Row(state=state, ended_at=ended_at, source=run.source)
         self._empty_at = None
 
     async def _tell(self, priority: PushPriority, now: float) -> None:
@@ -228,6 +304,53 @@ class ApnsWatch:
         except DotError as error:
             log.warning("apns_live_update_failed", phone=device.phone_id, error=error.message)
 
+    async def _start_where_none_shows(self, now: float) -> None:
+        """Start the Live Activity by push (item 1425, iOS 17.2 and later) on every phone whose app gave its
+        push-to-start token, shows none, is not in the foreground (its lease, item 1420) and was not started on in
+        :data:`START_EVERY_S`, when a row at work is worth it: a run nobody watches, or one that has worked
+        :data:`START_AFTER_S`. The start carries the rows as they stand, and an alert with a fixed title and line, which
+        Apple requires of it. The token the activity then sends goes the way it did when the app opened one
+        (``POST /api/phone/apns/activity``)."""
+        self._start_checked_at = now
+        worth: frozenset[str] = frozenset(
+            run_id
+            for run_id, row in self._rows.items()
+            if row.ended_at is None and (row.source in START_AT_ONCE or now - row.state.startedAt >= START_AFTER_S)
+        )
+        if not worth:
+            return
+        showing: set[str] = {activity.phone_id for activity in await self._store.live_activities_of(FLEET_ID)}
+        state: FleetState = fleet_state(self._rows)
+        for device in await self._store.list_apns_devices():
+            if device.phone_id in showing or self._shown(device.phone_id, now):
+                continue
+            started: tuple[float, frozenset[str]] | None = self._started.get(device.phone_id)
+            if started is not None and (now - started[0] < START_EVERY_S or worth <= started[1]):
+                continue
+            token: str | None = await live_start_token_of(self._store, device.phone_id)
+            if token is None:
+                continue
+            # The attempt counts for the time, sent or not: a push service that fails is not asked again every few
+            # seconds. The runs count only once a start went out for them, so that one that failed is tried again for
+            # them when :data:`START_EVERY_S` is over.
+            self._started[device.phone_id] = (now, frozenset() if started is None else started[1])
+            try:
+                reply: ApnsReply = await self._sender.send(
+                    device.environment, token, "liveactivity", _AT_ONCE, live_start_payload(state, now)
+                )
+            except DotError as error:
+                log.warning("apns_live_start_failed", phone=device.phone_id, error=error.message)
+                continue
+            if gone(reply):
+                # Its start token is no use (the app gives a new one when iOS changes it); the device's own stands.
+                await forget_live_start_token(self._store, device.phone_id)
+                log.info("apns_live_start_token_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
+            elif reply.status == _APNS_OK:
+                self._started[device.phone_id] = (now, worth)
+                log.info("apns_live_started", phone=device.phone_id, runs=len(worth))
+            else:
+                log.warning("apns_live_start_refused", phone=device.phone_id, status=reply.status, reason=reply.reason)
+
     async def on_event(self, event: EventRecord, now: float) -> None:
         """Send what ``event`` says: an alert as Web Push would, and the change of the run's row."""
         if event.kind == LIVE_REGISTERED_EVENT:
@@ -238,7 +361,7 @@ class ApnsWatch:
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
             if notice is not None:
-                await self.alert(apns_message(event, notice))
+                await self.alert(apns_message(event, notice), now, event.kind)
             return
         if event.kind in PROGRESS_KINDS:
             await self.progress(event, now)
@@ -247,9 +370,9 @@ class ApnsWatch:
         message: PushMessage | None = push_message(event, run) if event.kind in PUSH_KINDS else None
         answerable: str | None = approval_answerable(event)
         if message is not None and answerable is not None:
-            await self._alert(approval_payload(message.title, message.route, answerable))
+            await self._alert(approval_payload(message.title, message.route, answerable), now, event.kind)
         elif message is not None:
-            await self.alert(message)
+            await self.alert(message, now, event.kind)
         if not follows_live(run):
             # Known as no row's while it works, so that its steps are passed over without a read.
             if event.kind == "run_finished":
@@ -275,6 +398,8 @@ class ApnsWatch:
         else:
             return
         await self._tell(_AT_ONCE, now)
+        if event.kind == "run_started":
+            await self._start_where_none_shows(now)
 
     async def progress(self, event: EventRecord, now: float) -> None:
         """A step of a run: what it does now (:func:`live_now`) goes to the activity at once when its last push is
@@ -338,6 +463,8 @@ class ApnsWatch:
             await self._tell(_WHEN_IT_SUITS, now)
         elif ended_rows:
             await self._tell(_AT_ONCE, now)
+        if self._rows and now - self._start_checked_at >= START_CHECK_S:
+            await self._start_where_none_shows(now)
 
     async def _end_rows_of_ended_runs(self, now: float) -> bool:
         """Every :data:`CHECK_EVERY_S`, end the rows still at work whose run has ended or is gone (item 1108): a run

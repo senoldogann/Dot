@@ -3,19 +3,20 @@
 
 import { plural } from "./dom.js";
 
-/** How the schedules' tasks went, the campaigns' sessions, the decisions made for the owner and the drafts that wait,
- * in one line; empty when nothing happened. */
+/** How the tasks Dot did on its own went (a schedule's, a reply's, an agent's work, a command in the background: item
+ * 1424), the campaigns' sessions, the decisions made for the owner and the drafts that wait, in one line; empty when
+ * nothing happened. */
 export function awayLine(view) {
   const parts = [];
-  const scheduled = view.done + view.failed + view.cancelled + view.working;
-  if (scheduled > 0) {
+  const own = view.done + view.failed + view.cancelled + view.working;
+  if (own > 0) {
     const how = [
       view.done > 0 ? `${view.done} done` : null,
       view.failed > 0 ? `${view.failed} failed` : null,
       view.cancelled > 0 ? `${view.cancelled} stopped` : null,
       view.working > 0 ? `${view.working} working` : null,
     ].filter((part) => part !== null);
-    parts.push(`${plural(scheduled, "scheduled task", "scheduled tasks")}: ${how.join(", ")}`);
+    parts.push(`${plural(own, "task", "tasks")}: ${how.join(", ")}`);
   }
   if (view.campaign_sessions > 0) {
     parts.push(plural(view.campaign_sessions, "campaign session", "campaign sessions"));

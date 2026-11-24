@@ -40,6 +40,7 @@ from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
+from dotagent.notify.leases import LeaseState
 from dotagent.policy.types import ApprovalMode
 from dotagent.repair.claude import ClaudeAccount, WorkerChoice
 from dotagent.repair.night import FastSeen, LiveSession, RepairSession
@@ -249,6 +250,35 @@ class LiveActivityRegistration(FrozenModel):
 
     run_id: str = Field(min_length=1, max_length=64)
     token: str = Field(pattern=APNS_TOKEN)
+
+
+class LiveStartRegistration(FrozenModel):
+    """The token that starts the phone's Live Activity by push (item 1425), as ``Activity<DotFleetAttributes>
+    .pushToStartTokenUpdates`` gives it to the app (iOS 17.2 and later), in hex."""
+
+    token: str = Field(pattern=APNS_TOKEN)
+
+
+class ActivityRequest(FrozenModel):
+    """What the iPhone app says of itself (item 1420): ``foreground`` (with the chat on screen, a thread id, when it
+    shows one, and for how many seconds this holds: 45 when it names none, at most 90) or ``background``, which ends the
+    lease at once. The daemon only records ``chat`` with the lease and says it back: the quiet holds for every chat, so
+    it changes nothing yet."""
+
+    state: LeaseState
+    chat: str | None = Field(default=None, min_length=1, max_length=64)
+    ttl_s: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+
+class ActivityLeaseView(FrozenModel):
+    """The lease the daemon holds for the phone after :class:`ActivityRequest` (item 1420): how long it holds
+    (``ttl_s``, as capped) and until when (``expires_at``, seconds since the epoch); a ``background`` has none (0 and
+    ``None``)."""
+
+    state: LeaseState
+    chat: str | None
+    ttl_s: float
+    expires_at: float | None
 
 
 class PairedView(FrozenModel):
@@ -2239,12 +2269,14 @@ class ActivityCount(FrozenModel):
 
 
 class AwayRun(FrozenModel):
-    """A run a schedule or a campaign started (item 466), as "while you were away" lists it: what names it (the
-    schedule, the campaign, else the first line of its goal), its agent, how it ended or that it works, its steps, and
-    the first line of its answer with its secrets masked."""
+    """A run "while you were away" lists (items 466 and 1424): what names it (the campaign, the schedule, the chat, else
+    the first line of its goal), the source that started it (``schedule``, ``reply``, ``team``, ``background``, or any
+    other of an agent's own chat that is not the owner's), its agent, how it ended or that it works, its steps, and the
+    first line of its answer with its secrets masked."""
 
     run_id: str
     title: str
+    source: str
     campaign: bool
     agent_id: str | None
     status: RunStatus
@@ -2276,10 +2308,11 @@ class AwayDecisionRun(FrozenModel):
 
 
 class AwayView(FrozenModel):
-    """What schedules and campaigns did between ``since`` and ``until`` (item 466): how many of their runs ended done,
-    failed or stopped, how many work and how many were sessions of campaigns; the newest of those runs; the approvals
-    answered for the owner in them and the runs with the most; and the drafts they wrote that wait for the owner. It
-    carries no summary nor the arguments of an approval."""
+    """What Dot did on its own between ``since`` and ``until`` (items 466 and 1424): how many of those runs (a
+    schedule's, a reply's, an agent's work, a command in the background, a run nobody started in an agent's chat) ended
+    done, failed or stopped, how many work and how many were sessions of campaigns; the newest of those runs; the
+    approvals answered for the owner in them and the runs with the most; and the drafts they wrote that wait for the
+    owner. It carries no summary nor the arguments of an approval."""
 
     since: float
     until: float

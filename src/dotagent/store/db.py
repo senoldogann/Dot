@@ -54,6 +54,7 @@ from dotagent.store.models import (
     ApprovalStatus,
     AutoDecisionCount,
     AwakeNotes,
+    AwayRule,
     Behavior,
     BrowserMode,
     CampaignEntry,
@@ -610,22 +611,49 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
 _CHAT_LOOP: str = "s.thread_id = t.id AND s.enabled = 1 AND s.cron IS NOT NULL AND COALESCE(s.same_chat, ?) = 1"
 
 
-# The runs "while you were away" reads (item 466): of the scheduler's source, no helper's, still in their chat, ended at
-# or after the moment or still working; bound to (source, since). Their names come from the schedule of their chat and
-# from their campaign.
-_UNATTENDED: str = (
-    "runs.source = ? AND runs.parent_run_id IS NULL AND runs.rewound_at IS NULL"
-    " AND (runs.finished_at >= ? OR runs.finished_at IS NULL)"
-)
+def _away_where(rule: AwayRule) -> tuple[str, tuple[str, ...]]:
+    """The runs "while you were away" reads (items 466 and 1424) and the marks the query binds, before ``since``: a
+    run of a source of ``rule.sources``, or one of an agent's own chat (a chat bound to an agent) under a source that
+    is none of ``rule.owners``; no helper's (a run with a parent is one only when its source is one of
+    ``rule.delegated``, an agent's work, which a run sends by design, and then not when a run of the owner's is above
+    it, however many runs it went through: they wait for the run at the top, and for the work in it); still in their
+    chat, ended at or after the moment (``since``, the last mark) or still working."""
+    sources: str = ", ".join("?" * len(rule.sources))
+    owners: str = ", ".join("?" * len(rule.owners))
+    delegated: str = ", ".join("?" * len(rule.delegated))
+    return (
+        f"(runs.source IN ({sources}) OR (runs.source NOT IN ({owners}) AND EXISTS"
+        " (SELECT 1 FROM threads AS home WHERE home.id = runs.thread_id AND home.agent_id IS NOT NULL)))"
+        f" AND (runs.parent_run_id IS NULL OR runs.source IN ({delegated}))"
+        " AND NOT EXISTS (WITH RECURSIVE above(id, parent, source) AS ("
+        " SELECT sender.id, sender.parent_run_id, sender.source FROM runs AS sender"
+        " WHERE sender.id = runs.parent_run_id"
+        " UNION SELECT higher.id, higher.parent_run_id, higher.source FROM runs AS higher JOIN above"
+        " ON higher.id = above.parent)"
+        f" SELECT 1 FROM above WHERE above.source IN ({owners}))"
+        " AND runs.rewound_at IS NULL AND (runs.finished_at >= ? OR runs.finished_at IS NULL)",
+        (*rule.sources, *rule.owners, *rule.delegated, *rule.owners),
+    )
+
+
+# What names a run of that list: the schedule of its chat, its campaign, and its chat's own title (for the runs that no
+# schedule or campaign started).
 _UNATTENDED_JOINS: str = (
     "LEFT JOIN threads ON threads.id = runs.thread_id LEFT JOIN schedules ON schedules.id = threads.schedule_id"
     " LEFT JOIN campaigns ON campaigns.id = runs.campaign_id"
 )
-_UNATTENDED_NAMES: str = "schedules.name AS schedule_name, campaigns.title AS campaign_title"
+_UNATTENDED_NAMES: str = (
+    "schedules.name AS schedule_name, campaigns.title AS campaign_title, threads.title AS thread_title"
+)
 
 
 def _unattended(row: aiosqlite.Row) -> UnattendedRun:
-    return UnattendedRun(run=_run(row), schedule_name=row["schedule_name"], campaign_title=row["campaign_title"])
+    return UnattendedRun(
+        run=_run(row),
+        schedule_name=row["schedule_name"],
+        campaign_title=row["campaign_title"],
+        thread_title=row["thread_title"],
+    )
 
 
 def _family_of(seed: str) -> str:
@@ -3478,45 +3506,51 @@ class Store:
         )
         return [_run(row) for row in rows]
 
-    # ----- while you were away (item 466) ----------------------------------------------------------------------------
+    # ----- while you were away (items 466 and 1424) -------------------------------------------------------------------
 
-    async def unattended_runs(self, source: str, since: float, limit: int) -> list[UnattendedRun]:
-        """The newest ``limit`` runs of ``source`` (the scheduler's: a schedule's firings and runs by hand, and the
-        sessions of campaigns) that are no helper's and ended at or after ``since``, or work; with the schedule's name
-        and the campaign's title."""
+    async def unattended_runs(self, rule: AwayRule, since: float, limit: int) -> list[UnattendedRun]:
+        """The newest ``limit`` runs of ``rule`` (:class:`AwayRule`: what Dot started by itself, and what ran in an
+        agent's own chat without the owner's start) that are no helper's and ended at or after ``since``, or work; with
+        the schedule's name, the campaign's title and the chat's title."""
+        where, marks = _away_where(rule)
         rows = await self._all(
             f"SELECT runs.*, {_UNATTENDED_NAMES} FROM runs {_UNATTENDED_JOINS}"
-            f" WHERE {_UNATTENDED} ORDER BY runs.created_at DESC LIMIT ?",
-            (source, since, limit),
+            f" WHERE {where} ORDER BY runs.created_at DESC LIMIT ?",
+            (*marks, since, limit),
         )
         return [_unattended(row) for row in rows]
 
-    async def unattended_counts(self, source: str, since: float) -> list[UnattendedCount]:
+    async def unattended_counts(self, rule: AwayRule, since: float) -> list[UnattendedCount]:
         """How many of those runs (:meth:`unattended_runs`, all of them) ended so or work, by status, the sessions of
         campaigns apart."""
+        where, marks = _away_where(rule)
         rows = await self._all(
             "SELECT runs.status AS status, runs.campaign_id IS NOT NULL AS campaign, COUNT(*) AS count FROM runs"
-            f" WHERE {_UNATTENDED} GROUP BY runs.status, campaign",
-            (source, since),
+            f" WHERE {where} GROUP BY runs.status, campaign",
+            (*marks, since),
         )
         return [
             UnattendedCount(status=row["status"], campaign=bool(row["campaign"]), count=row["count"]) for row in rows
         ]
 
-    async def auto_decision_counts(self, source: str, since: float) -> list[AutoDecisionCount]:
+    async def auto_decision_counts(self, rule: AwayRule, since: float) -> list[AutoDecisionCount]:
         """The approvals the review model and yolo decided at or after ``since`` in those runs (:meth:`unattended_runs`)
         and in their helpers, counted for each run by who decided and how; neither a summary nor the arguments of one
-        are read."""
+        are read. An agent's work that is a row of its own (``rule.delegated``) is counted under itself, not under the
+        run that sent it."""
+        where, marks = _away_where(rule)
+        delegated: str = ", ".join("?" * len(rule.delegated))
         rows = await self._all(
-            f"WITH unattended AS (SELECT runs.id FROM runs WHERE {_UNATTENDED}),"
-            " decided AS (SELECT COALESCE(ran.parent_run_id, ran.id) AS top_id, approvals.decided_by AS decided_by,"
+            f"WITH unattended AS (SELECT runs.id FROM runs WHERE {where}),"
+            f" decided AS (SELECT CASE WHEN ran.source IN ({delegated}) AND ran.id IN unattended THEN ran.id"
+            " ELSE COALESCE(ran.parent_run_id, ran.id) END AS top_id, approvals.decided_by AS decided_by,"
             " approvals.status AS decision FROM approvals JOIN runs AS ran ON ran.id = approvals.run_id"
             " WHERE (ran.id IN unattended OR ran.parent_run_id IN unattended) AND approvals.decided_by IN (?, ?)"
             " AND approvals.status IN ('approved', 'denied') AND approvals.decided_at >= ?)"
             f" SELECT runs.*, {_UNATTENDED_NAMES}, decided.decided_by AS decided_by, decided.decision AS decision,"
             f" COUNT(*) AS count FROM decided JOIN runs ON runs.id = decided.top_id {_UNATTENDED_JOINS}"
             " GROUP BY decided.top_id, decided.decided_by, decided.decision",
-            (source, since, "reviewer", "yolo", since),
+            (*marks, since, *rule.delegated, "reviewer", "yolo", since),
         )
         return [
             AutoDecisionCount(
@@ -3525,15 +3559,16 @@ class Store:
             for row in rows
         ]
 
-    async def unattended_drafts(self, source: str, since: float) -> int:
+    async def unattended_drafts(self, rule: AwayRule, since: float) -> int:
         """How many drafts those runs (:meth:`unattended_runs`) and their helpers wrote at or after ``since`` that still
         wait for the owner."""
+        where, marks = _away_where(rule)
         row = await self._one(
-            f"WITH unattended AS (SELECT runs.id FROM runs WHERE {_UNATTENDED})"
+            f"WITH unattended AS (SELECT runs.id FROM runs WHERE {where})"
             " SELECT COUNT(*) AS count FROM drafts JOIN runs AS ran ON ran.id = drafts.run_id"
             " WHERE (ran.id IN unattended OR ran.parent_run_id IN unattended) AND drafts.status = 'waiting'"
             " AND drafts.created_at >= ?",
-            (source, since, since),
+            (*marks, since, since),
         )
         return 0 if row is None else int(row["count"])
 

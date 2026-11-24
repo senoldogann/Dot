@@ -133,13 +133,20 @@ seen, so the phone and the desktop agree; the chats there when Dot learnt this a
 while nobody watches, a scheduled one too, leaves its chat unread.
 
 Over the home's **Today** strip, when a new chat shows the day (below), **While you were away** (item 466, `GET
-/api/away?since=`) says what your schedules and
-campaigns did since this browser last marked it read: how many of their runs ended done, failed or stopped, how many
-work and how many were campaign sessions; their newest runs, two then **Show N more**, each with its schedule's or
-campaign's name, how it ended, when, and the first line of its answer with its secrets masked; the approvals the review
-model answered for you and those `yolo` let through without asking in those runs and their helpers, by who and how
-many were denied, with the runs that had
-the most, two then **Show N more** too; and the drafts they wrote that wait for you. It carries no summary and no
+/api/away?since=`) says what Dot did on its own since you last marked it read, on any of your devices (item 1424: until
+then it told of your schedules and campaigns alone): how many tasks ended done, failed or stopped, how many work and how
+many were campaign sessions; their newest runs, two then **Show N more**, each with the name of its campaign, its
+schedule or its chat, how it ended, when, and the first line of its answer with its secrets masked; the approvals the
+review model answered for you and those `yolo` let through without asking in those runs and their helpers, by who and
+how many were denied, with the runs that had the most, two then **Show N more** too; and the drafts they wrote that wait
+for you. The tasks are those of every source Dot starts by itself and nobody watches (a schedule or a campaign, a watcher's run,
+the work Dot does on its own initiative, a reply to a mail), an agent's work (`team`, which a run sent, unless a run of
+yours is above it: you wait for that run, and for the work in it) and a command that ended in the background
+(`background`), whatever chat they ran in, and what ran in an agent's own chat under any other source that is
+not yours: a task you start from a page, a phone or `dotx run` (`ui`, `cli`), a review or an eval of yours, an agent's
+welcome and a run resumed after one you started are ones you wait for, and never listed. Dot keeps no record of who was
+looking while a run worked, so the simplest rule is the one that lists none of those (the chat's unread dot says such a
+run ended). It carries no summary and no
 arguments of an approval. **Mark as read** moves the moment on, and Dot keeps it (item 1356, `GET` and `POST /api/away/read`), so the Mac and the
 phone agree on what is news: marking it on one clears it on the other when it next reads. The first visit from any
 device marks it and shows nothing (a browser that kept its own moment before hands it over once), so the card never pours
@@ -1524,7 +1531,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule; `POST` with `"enabled": false` adds one switched off, its time checked but not the room for one more switched on, which switching it on checks, item 464) |
 | `GET /threads/{id}/automations` | the schedules of a chat, its own loop among them, as the side panel's Automations lists them (item 1333): `[{schedule, loop}]`, `schedule` as `GET /schedules/{id}` gives it, `loop` true for a loop made with `/loop`; switched-on ones first, soonest first; 404 for no chat. Switching one on or off and running it now are the schedule's routes below, read at the next firing |
-| `GET /away` | what schedules and campaigns did since `since` (item 466), clamped to the last week: counts, newest runs, the approvals answered for you, the drafts waiting |
+| `GET /away` | what Dot did on its own since `since` (items 466 and 1424), clamped to the last week: counts, newest runs (each with its `source`), the approvals answered for you, the drafts waiting |
 | `GET /away/read`, `POST /away/read` | when "While you were away" was last marked read on any device (`{read_at}`, `null` before any), and `{until}` that moves it on: never back, never past now (item 1356) |
 | `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |
 | `GET\|PUT /brief` (`{"enabled": true, "time": "08:00", "days": "every"\|"weekdays", "lines": […]}`) | the morning brief (item 570, [Dot comes to you](proactive.md)): its settings and when it fires next and last fired; set it, which makes or changes its schedule (`research`, read-only), shown in `GET /schedules` with `brief: true` (422 for a time that is not `HH:MM`, a line over 300 characters, more than 20 lines, or what the scheduler refuses) |

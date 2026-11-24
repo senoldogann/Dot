@@ -78,8 +78,8 @@ refusal always shows. Every step the policy
 let through keeps what decided it, a question answered or not (item 468, see [Safety](safety.md#safety)), and its row in
 the chat says why it ran when you open it, unless a yolo run did it without asking (item 500); a step refused or handed
 to you has its `policy` event instead. The home's
-**While you were away** counts those automatic answers for the runs of your schedules and campaigns since you last
-looked (item 466), when a new chat shows the day (Settings › General › Chat, item 640; see [The daemon](daemon.md)).
+**While you were away** counts those automatic answers for what Dot did on its own (your schedules and campaigns, its
+replies, its agents' work, the commands that ended in the background; item 1424) since you last looked (item 466), when a new chat shows the day (Settings › General › Chat, item 640; see [The daemon](daemon.md)).
 
 **What only yolo waives.** Every question and every hand-off (item 443): the untrusted content's, Dot's own files', the
 preset's and your `ask` rules', money and credentials', a message or a post in your name, a pre-approved spend, and the

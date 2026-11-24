@@ -74,20 +74,49 @@ type PushState = Literal["idle", "waiting", "done", "failed"]
 # What sending one message to one subscription came to: taken, refused or unreachable (kept), or deleted.
 type PushOutcome = Literal["sent", "failed", "removed"]
 _FINISHED_STATE: dict[str, PushState] = {"done": "done", "failed": "failed"}
-PUSH_KINDS: frozenset[str] = frozenset(
-    {
-        *_ASKED_KINDS,
-        DRAFT_CREATED_EVENT,
-        "run_finished",
-        CAMPAIGN_ENDED_EVENT,
-        SCHEDULE_MISSED_EVENT,
-        SCHEDULE_STOPPED_EVENT,
-        SCHEDULE_RUN_ENDED_EVENT,
-        DAEMON_RESTARTED_EVENT,
-        LEARNING_STALLED_EVENT,
-        OWNER_TOLD_EVENT,
-    }
-)
+type PushGroup = Literal["needs_you", "ready", "done"]
+# The three kinds of push the owner switches, each phone for itself (item 1421), and which kind each event of the pushes
+# below is told as. A new kind of push names its group here, which is how it joins ``PUSH_KINDS``.
+PUSH_GROUPS: tuple[PushGroup, ...] = ("needs_you", "ready", "done")
+_GROUP_OF: dict[str, PushGroup] = {
+    # A run waits on the owner: an approval, a question, a secret or a hand-off (each is a card of
+    # ``approval_requested``, or of ``question_left`` once the run went on without an answer).
+    **{kind: "needs_you" for kind in _ASKED_KINDS},
+    # Dot's own work broke, which the owner is to look at: a schedule that did not run or was switched off, learning
+    # that stopped, a restart after an unexpected stop. They are not "done": a phone that switches the ends of tasks off
+    # still hears them, the only way it learns Dot's own work failed.
+    SCHEDULE_MISSED_EVENT: "needs_you",
+    SCHEDULE_STOPPED_EVENT: "needs_you",
+    DAEMON_RESTARTED_EVENT: "needs_you",
+    LEARNING_STALLED_EVENT: "needs_you",
+    # Something is ready for the owner to look over or hand over: a draft written for them to send, and what Dot tells
+    # them on its own (the morning brief, what a watcher found).
+    DRAFT_CREATED_EVENT: "ready",
+    OWNER_TOLD_EVENT: "ready",
+    # Something finished or failed: a run, a schedule's run (told at its schedule's level, ``scheduler.notices``) and
+    # a campaign.
+    "run_finished": "done",
+    CAMPAIGN_ENDED_EVENT: "done",
+    SCHEDULE_RUN_ENDED_EVENT: "done",
+}
+PUSH_KINDS: frozenset[str] = frozenset(_GROUP_OF)
+
+
+def push_group(kind: str) -> PushGroup | None:
+    """The kind of push an event of ``kind`` is told as (item 1421), ``None`` for an event that is no push."""
+    return _GROUP_OF.get(kind)
+
+
+# The pushes whose subject the iPhone app shows itself while it is open: the end of a run, of a schedule's run and of a
+# campaign. While the app says it shows Dot (item 1420) these are not sent to it as alerts. Every other push is: what
+# asks something of the owner, a draft, what Dot tells the owner, and the warnings of Dot itself (a schedule that did
+# not run or was switched off, learning that stopped, a restart), which the app shows nowhere.
+QUIET_WHILE_SHOWN: frozenset[str] = frozenset({"run_finished", CAMPAIGN_ENDED_EVENT, SCHEDULE_RUN_ENDED_EVENT})
+
+
+def quiet_while_shown(kind: str) -> bool:
+    """Whether the alert of an event of ``kind`` is held back from a phone whose app shows Dot (item 1420)."""
+    return kind in QUIET_WHILE_SHOWN
 
 
 class PushError(DotError):
