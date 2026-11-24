@@ -48,7 +48,7 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "claude_code/run.py:_Follow.step_ended": (True,),
     # The end of the error stream of a program that ended before its result (items 1580 and 1581), of a cut and of a
     # failure that is none: a program may print a key in the words of its crash.
-    "claude_code/run.py:_masked_stderr": (True,),
+    "claude_code/run.py:_masked": (True,),
     "server/diagnostics.py:read_tail": (True,),
     "terminal/session.py:_loggable": (True,),
     "server/routes_runs.py:runs_router.run_changes_view": (True,),
