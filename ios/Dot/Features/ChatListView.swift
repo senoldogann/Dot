@@ -54,6 +54,8 @@ struct ChatListView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .frame(maxWidth: Theme.readingWidth)
+            .frame(maxWidth: .infinity)
             .background { DotBackground() }
             .dotScrollEdges()
             .refreshable { await store.refreshEverything() }
@@ -131,7 +133,7 @@ struct ChatListView: View {
         } catch {
             // The task was replaced by a later tap (or the screen went): that is not a failure to open.
             if Task.isCancelled { return }
-            openFailed = "Could not open that run."
+            openFailed = "Could not open that chat. Is your Mac awake?"
         }
     }
 
@@ -145,6 +147,16 @@ struct ChatListView: View {
 
     /// What Dot did on its own since the owner last looked, as the card says it (none: no card).
     private var awayCard: AwayCard? { store.awareness.away.flatMap(AwayRules.card(from:)) }
+
+    /// What each chat that waits on the owner asks (its newest ask), for the second line of its row: the question, or what Dot wants to
+    /// do, in place of the last words of the run (the review's fix 2).
+    private var asks: [String: String] {
+        var found: [String: String] = [:]
+        for row in NeedsYouRules.rows(from: store.awareness.needsYou) where found[row.item.threadId] == nil {
+            found[row.item.threadId] = NeedsYouRules.preview(of: row)
+        }
+        return found
+    }
 
     /// What the newest thing that waits on the owner asks, for the entry's second line.
     private var inboxPreview: String? {
@@ -164,7 +176,9 @@ struct ChatListView: View {
     @ViewBuilder private func section(_ title: String?, tone: Color, threads: [ThreadSummary]) -> some View {
         Section {
             ForEach(threads) { thread in
-                Button { path.append(thread) } label: { ThreadRow(thread: thread, helpers: store.helpersLive(in: thread)) }
+                Button { path.append(thread) } label: {
+                    ThreadRow(thread: thread, helpers: store.helpersLive(in: thread), ask: thread.isWaitingOnYou ? asks[thread.id] : nil)
+                }
                     .buttonStyle(RowPressStyle())
                     .listRowBackground(Color.clear)
                     .listRowSeparatorTint(Theme.hairline)
@@ -215,9 +229,12 @@ struct ThreadRow: View {
     /// How many of the chat's helpers are live as the phone last read (`ListHelpers`, item 1466): the daemon's list of chats says
     /// only how the newest run stands, so a chat whose run ended while its helpers work would read as at rest.
     var helpers: Int = 0
+    /// What a chat that waits on the owner asks: shown in place of the last words of its run.
+    var ask: String?
     @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
     private var state: ThreadState { thread.state(helpersLive: helpers) }
+    private var preview: String { ask ?? thread.lastMessage }
 
     var body: some View {
         Group { if typeSize.isAccessibilitySize { stacked } else { regular } }
@@ -245,7 +262,7 @@ struct ThreadRow: View {
             }
             Text(thread.title.isEmpty ? "New chat" : thread.title)
                 .font(.body.weight(thread.unread ? .semibold : .regular)).foregroundStyle(Theme.text).lineLimit(3)
-            Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(3)
+            Text(preview).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(3)
             helpersLine
         }
         .padding(.vertical, Space.m)
@@ -265,7 +282,7 @@ struct ThreadRow: View {
                     Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 }
                 HStack(spacing: Space.s) {
-                    Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(state == .idle ? 2 : 1)
+                    Text(preview).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(state == .idle || ask != nil ? 2 : 1)
                     Spacer(minLength: Space.xs)
                     if thread.loopCron != nil {
                         DotIcon(.loop, size: 13, label: "Repeats", relativeTo: .caption).foregroundStyle(Theme.faint)

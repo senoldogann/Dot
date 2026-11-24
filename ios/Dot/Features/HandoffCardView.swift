@@ -14,7 +14,7 @@ struct HandoffCardView: View {
             HStack(alignment: .top, spacing: Space.m) {
                 DotIcon(.globe, size: 22, relativeTo: .title3)
                     .foregroundStyle(Theme.warn)
-                    .frame(width: 28)
+                    .frame(minWidth: 28, alignment: .leading)
                     .accessibilityHidden(true)
                 Text(card.headline).font(.headline).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
             }

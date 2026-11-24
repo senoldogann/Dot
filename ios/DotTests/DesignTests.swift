@@ -103,12 +103,13 @@ final class DotPaletteTests: XCTestCase {
         }
     }
 
-    /// The accent is not a hue: the primary action is the text colour, and its label is the ground.
+    /// The accent is not a hue: the primary action is the text colour, and its label is the ground (in the light look, where a
+    /// card is white on a grey ground, the lightest step).
     func testThePrimaryActionIsTheInkOnTheGround() {
-        for look in looks {
-            XCTAssertEqual(look.palette.action, look.palette.text, look.name)
-            XCTAssertEqual(look.palette.onAction.luminance, look.palette.background.luminance, accuracy: 0.002, look.name)
-        }
+        XCTAssertEqual(DotPalette.dark.action, DotPalette.dark.text)
+        XCTAssertEqual(DotPalette.light.action, DotPalette.light.text)
+        XCTAssertEqual(DotPalette.dark.onAction, DotPalette.dark.background)
+        XCTAssertEqual(DotPalette.light.onAction, DotPalette.light.surface)
     }
 
     private func components(_ color: Color, _ style: UIUserInterfaceStyle) -> (CGFloat, CGFloat, CGFloat) {

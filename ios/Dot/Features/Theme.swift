@@ -55,6 +55,10 @@ enum Theme {
             trait.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.07) : UIColor(white: 0, alpha: 0.06)
         })
 
+    /// The widest the words of a chat and the list of chats run on a wide screen (an iPad): about 70 characters of an answer. On a
+    /// phone nothing is as wide, so nothing changes there.
+    static let readingWidth: CGFloat = 720
+
     /// The corner radius of controls; `Radius` has the rest of the scale.
     static let radius: CGFloat = Radius.s
     static let radiusSmall: CGFloat = Radius.xs

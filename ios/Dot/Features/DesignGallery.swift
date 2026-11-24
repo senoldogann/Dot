@@ -99,27 +99,47 @@ struct DesignGallery: View {
             .padding(.vertical, Space.s)
             VStack(alignment: .leading, spacing: Space.s) {
                 SectionLabel(title: "State marks")
-                HStack(spacing: Space.l) {
-                    StateMark(words: "Running", kind: .working)
-                    StateMark(words: "Waiting on you", kind: .waiting)
-                }
-                HStack(spacing: Space.l) {
-                    StateMark(words: "Failed", kind: .failed)
-                    StateMark(words: "Done", kind: .done)
-                    StateMark(words: "Cancelled", kind: .quiet)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.l) {
+                        StateMark(words: "Running", kind: .working)
+                        StateMark(words: "Waiting on you", kind: .waiting)
+                        StateMark(words: "Failed", kind: .failed)
+                        StateMark(words: "Done", kind: .done)
+                    }
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        StateMark(words: "Running", kind: .working)
+                        StateMark(words: "Waiting on you", kind: .waiting)
+                        StateMark(words: "Failed", kind: .failed)
+                        StateMark(words: "Done", kind: .done)
+                        StateMark(words: "Cancelled", kind: .quiet)
+                    }
                 }
             }
             VStack(alignment: .leading, spacing: Space.s) {
                 SectionLabel(title: "Buttons")
-                HStack(spacing: Space.s) {
-                    Button("Allow once") {}.dotButton(.primary)
-                    Button("Deny") {}.dotButton(.secondary)
-                    Button("Forget") {}.dotButton(.destructive)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.s) {
+                        Button("Allow once") {}.dotButton(.primary).lineLimit(1)
+                        Button("Deny") {}.dotButton(.secondary).lineLimit(1)
+                        Button("Forget") {}.dotButton(.destructive).lineLimit(1)
+                    }
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        Button("Allow once") {}.dotButton(.primary)
+                        Button("Deny") {}.dotButton(.secondary)
+                        Button("Forget") {}.dotButton(.destructive)
+                    }
                 }
-                HStack(spacing: Space.s) {
-                    Button("Send") {}.dotButton(.primary).disabled(true)
-                    Button("Try again") {}.dotButton(.quiet)
-                    GlassCircleButton(icon: .arrowDown, label: "Down") {}
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.s) {
+                        Button("Send") {}.dotButton(.primary).disabled(true).lineLimit(1)
+                        Button("Try again") {}.dotButton(.quiet).lineLimit(1)
+                        GlassCircleButton(icon: .arrowDown, label: "Down") {}
+                    }
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        Button("Send") {}.dotButton(.primary).disabled(true)
+                        Button("Try again") {}.dotButton(.quiet)
+                        GlassCircleButton(icon: .arrowDown, label: "Down") {}
+                    }
                 }
             }
             VStack(alignment: .leading, spacing: Space.s) {
