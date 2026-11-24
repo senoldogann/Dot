@@ -33,6 +33,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
+from dotagent.notify.needs_you import NeedsYou, read_needs_you
 from dotagent.notify.owner import tell_owner
 from dotagent.policy.chat_permits import key_of_record, may_remember
 from dotagent.proactive import INITIATIVE_SOURCE
@@ -41,7 +42,7 @@ from dotagent.scheduler.plans import ScheduleRequest, create_schedule, plan_sche
 from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
-from dotagent.server.activity import current_activity
+from dotagent.server.activity import current_activity, live_runs
 from dotagent.server.away import mark_read, read_away, read_mark
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
 from dotagent.server.chatcontext import ChatContext, chat_context
@@ -587,6 +588,14 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         return ActivityCount(
             waiting=waiting, working=working, state="waiting" if waiting else "working" if working else "idle"
         )
+
+    @router.get("/needs-you", response_model_exclude_none=True)
+    async def needs_you() -> NeedsYou:
+        """Everything that waits on the owner in one list, newest first, and how many things that is, for the iPhone
+        app's list and badge (item 1422): the approvals runs wait for, the questions (with their options, and the one
+        the run recommended when it did), the requests for a secret (who asks, never what it is) and the hand-offs,
+        including those a run left for the owner. The decision routes are the ones they were."""
+        return await read_needs_you(store, await live_runs(store, ctx.manager), time.time())
 
     @router.get("/stream")
     async def lifecycle_stream() -> StreamingResponse:

@@ -129,6 +129,15 @@ def alert_payload(title: str, route: str) -> JsonObject:
     return {"aps": {"alert": {"title": title, "body": ALERT_BODY}, "sound": "default"}, "route": route}
 
 
+def badged(payload: JsonObject, count: int) -> JsonObject:
+    """``payload``, an alert, with the app's badge set to ``count``: how many things wait on the owner (item 1422), a
+    number and nothing of what they are."""
+    aps: object = payload.get("aps")
+    if not isinstance(aps, dict):
+        raise ApnsError("an alert has no aps dictionary to put the badge in", {"keys": ", ".join(sorted(payload))})
+    return {**payload, "aps": {**aps, "badge": count}}
+
+
 def approval_payload(title: str, route: str, approval_id: str) -> JsonObject:
     """The alert of an approval a run waits for (item 1008), which the app's notification answers on the lock screen:
     Approve and Deny, each after Face ID. It carries the approval's id, never what it asks."""

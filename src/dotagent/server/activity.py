@@ -11,6 +11,7 @@ from dotagent.agent.manager import RunManager
 from dotagent.agent.reflection import last_reflection, reflection_failure
 from dotagent.agent.reflection_record import Reflection, ReflectionFailure, summary_line
 from dotagent.memory.service import JOURNAL_TAG
+from dotagent.notify.needs_you import open_asks
 from dotagent.server.views import ActivityRow, ActivityView
 from dotagent.store.db import Store
 from dotagent.store.models import (
@@ -268,6 +269,15 @@ def _reflection_failed_row(failure: ReflectionFailure) -> ActivityRow:
     )
 
 
+async def live_runs(store: Store, manager: RunManager) -> dict[str, RunRecord]:
+    """The runs at work here, by id: this daemon's and, where it relays them, those of the ``dotx`` commands that work
+    on the pages as its own do, whose questions answered here reach the command."""
+    live: dict[str, RunRecord] = {}
+    for run_id in [*manager.active_run_ids(), *manager.elsewhere_run_ids()]:
+        live[run_id] = await store.get_run(run_id)
+    return live
+
+
 async def activity_view(store: Store, manager: RunManager, now: float) -> ActivityView:
     """The three sections at ``now``: waiting (the approvals and questions runs wait for, the questions runs left for
     the user, the runs the user holds),
@@ -278,30 +288,23 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     due (the schedules and campaign sessions due before the day ends)."""
     waiting: list[ActivityRow] = []
     working: list[ActivityRow] = []
-    live: dict[str, RunRecord] = {}
-    # The runs of dotx commands work here too; a question of theirs answered here reaches the command.
-    for run_id in [*manager.active_run_ids(), *manager.elsewhere_run_ids()]:
-        live[run_id] = await store.get_run(run_id)
+    live: dict[str, RunRecord] = await live_runs(store, manager)
     covered: set[str] = set()
-    for approval in await store.list_approvals("pending", _RECENT_RUNS):
-        run: RunRecord | None = live.get(approval.run_id)
-        if run is None:
-            continue
-        kind: str = "question" if approval.severity == "question" else "approval"
-        waiting.append(_approval_row(approval, run, kind, "waits for your answer"))
-        covered.add(run.id)
-    for question in await store.list_approvals("left", _RECENT_RUNS):
-        asked: RunRecord = live.get(question.run_id) or await store.get_run(question.run_id)
-        if question.kept_until is not None:
+    for ask, asking in await open_asks(store, live):
+        if ask.status == "pending":
+            kind: str = "question" if ask.severity == "question" else "approval"
+            waiting.append(_approval_row(ask, asking, kind, "waits for your answer"))
+            covered.add(asking.id)
+        elif ask.kept_until is not None:
             # A step handed to the owner, or a question for their yes, that nobody answered in time (items 482, 483).
             detail: str = (
                 "kept for you; once you did it, saying so carries the work on"
-                if question.severity == "handoff"
+                if ask.severity == "handoff"
                 else "kept for you; allowing it once carries the work on"
             )
-            waiting.append(_approval_row(question, asked, "approval", detail))
+            waiting.append(_approval_row(ask, asking, "approval", detail))
         else:
-            waiting.append(_approval_row(question, asked, "question", "left for you; answering carries the work on"))
+            waiting.append(_approval_row(ask, asking, "question", "left for you; answering carries the work on"))
     for run in live.values():
         if manager.held(run.id):
             waiting.append(await _run_row(store, run, "waiting", "takeover", "you have its browser", _title(run.goal)))

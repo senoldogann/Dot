@@ -120,7 +120,8 @@ code** takes its place. The same by hand:
    (403 for the Mac's token). The daemon pushes through APNs with the key of `[apns]` (`key_path`, a `.p8` file outside
    Dot's home, never logged; `key_id`, `team_id`, `topic`), and pushes nothing through it while they are empty. An alert
    says the title Web Push says and a fixed line ("Open Dot to see it."), never the question, the draft or the result,
-   since Apple reads what APNs carries; a message Dot wrote to you goes as "Dot has a message for you". An approval of a
+   since Apple reads what APNs carries, and sets the app's badge to how many things wait on you (item 1422, the `count`
+   of `GET /api/needs-you`: a number, nothing of what they are); a message Dot wrote to you goes as "Dot has a message for you". An approval of a
    step of low or medium risk has Approve and Deny on the lock screen (item 1008), each after Face ID or the passcode,
    which the app sends as the app's page does (`POST /api/approvals/{id}/decision` with the phone's key, no note, no
    "don't ask again"); a step of high risk (money, a message or a post sent for you, a credential), a question, a
@@ -499,3 +500,46 @@ and answers 200 with what it kept:
 
 The Mac's token is refused (403). Web push to a browser has its own switch (Settings › General › Notifications) and is
 not changed by these.
+
+### GET /api/needs-you
+
+Everything that waits on you, in one list, for the app's list and badge (item 1422): the approvals a run waits for, its
+questions (`ask_user`), its requests for a secret (`ask_secret`) and its hand-offs, newest first, and what a run left for
+you to answer later (a question it went on without, a step it kept for you). Any token reads it, a phone's key too. It
+reads what the web UI's Activity lists as "waiting" and answers with it in the app's own shape; **the decision routes
+are the same as before** (`POST /api/approvals/{id}/decision`, `POST /api/approvals/{id}/secret`).
+
+Reply, 200:
+
+```json
+{
+  "count": 3,
+  "items": [
+    {"id": "apr_mf3k2x1a_1c04d1", "kind": "secret", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
+     "agent": "Dot", "title": "Dot asks for a secret", "since": 1764000300.0},
+    {"id": "apr_mf3k2x00_4e5f6a", "kind": "question", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
+     "agent": "Scout", "title": "Which day should it ship?", "since": 1764000200.0,
+     "choices": ["Friday", "Monday"], "recommended": "Friday"},
+    {"id": "apr_mf3k2wzz_7b8c9d", "kind": "approval", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
+     "agent": "Dot", "title": "Run a command: make deploy", "since": 1764000100.0}
+  ]
+}
+```
+
+- `count`: how many things wait (the length of `items`): the number the app puts on its badge. Every alert the daemon
+  sends sets the badge to it (`aps.badge`, a number); the app sets it again from `count` whenever it reads the list,
+  since an answer given on the Mac sends no alert that would lower it.
+- `id`: the approval's id, which the decision routes take. `run_id`: the run that asks, and `thread_id`: the chat to open
+  (for a helper's run the chat of the run at the top). `agent`: who asks, the owner's agent that works on the run or
+  `Dot`. `since`: when it was asked, in seconds since the epoch.
+- `kind`: `approval` (a step a run asks leave for), `question` (`ask_user`), `secret` (`ask_secret`) or `handoff` (a
+  step only you can do, which the run waits for or kept for you).
+- `title`: what is asked, on one line of at most 120 characters, with secrets masked; for a `secret` a fixed line, never
+  the card's words, and the list carries **no secret's value** (a request for one has none: it is told by its id and who
+  asks).
+- `choices` (a `question` that offers options only): the options' labels, in the order the run gave them. `recommended`:
+  the label of the option the run marked as its recommendation; both keys are left out when there is none. A question
+  that takes several options (`multiple`) and the options' descriptions are on its card in the run's page.
+
+A card of a run that no longer works here is not listed (the leftover of a daemon that stopped), and one whose run is
+gone is skipped. A hand-off the browser raises on a login, a second factor or a CAPTCHA is item 1423's.
