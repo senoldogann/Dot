@@ -143,8 +143,10 @@ export async function keep(made) {
   seq += 1;
   const entry = entryOf({ ...made, id: made.id ?? crypto.randomUUID(), now: Date.now(), seq });
   entries = added(entries, entry);
-  paint();
+  // Written before it is shown, so that the row appears with the entry safe, and the composer that made it is cleared in
+  // the same turn: Edit pressed on the row can never be answered by a box that is cleared after it.
   await write();
+  paint();
   flush();
   return entry;
 }

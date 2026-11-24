@@ -4,7 +4,7 @@ import { listKey } from "./cacherules.js";
 import { claim, forget, keepList, keptList } from "./datacache.js";
 import { UNREACHABLE } from "./errors.js";
 import { noteCopy, noteReached, noteUnreachable } from "./linkfacts.js";
-import { nextStep, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from "./retryrules.js";
+import { isKeptWrite, nextStep, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from "./retryrules.js";
 import { CONNECT_TIMEOUT_MS, createParser, IDLE_TIMEOUT_MS, reconnectWait } from "./sseframes.js";
 import { toast } from "./ui.js";
 
@@ -508,11 +508,12 @@ function sharedRead(path, signal) {
  */
 export async function request(method, path, body, signal) {
   if (method !== "GET") {
-    if (!resilient()) {
+    if (!resilient() || !isKeptWrite(path)) {
       return ask(method, path, body);
     }
-    // A write on a phone gives up after 30 s as a request with no answer does (item 1523): what was done is kept and sent
-    // again with its key, which the daemon answers with what the first made.
+    // A write the outbox keeps (item 1523) gives up after 30 s on a phone, as a request with no answer does: what was done
+    // is kept and sent again with its key, which the daemon answers with what the first made. Any other write may take
+    // as long as it takes (a side answer, a voice, a file), and is left to.
     const limit = new AbortController();
     const timer = setTimeout(() => limit.abort(new ApiError(0, UNREACHABLE, { path, cause: "no answer in time" })), WRITE_TIMEOUT_MS);
     try {

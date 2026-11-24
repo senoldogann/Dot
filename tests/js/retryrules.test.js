@@ -5,6 +5,7 @@ import {
   BUDGET_MS,
   FIRST_WAIT_MS,
   GAP_EVENTS,
+  isKeptWrite,
   longGap,
   MAX_WAIT_MS,
   nextStep,
@@ -113,4 +114,24 @@ test("the tail is added only when the daemon said that it knows `tail`", () => {
 test("events the chat holds already are not added again", () => {
   assert.deepEqual(tailToAdd([{ id: 5 }, { id: 6 }, { id: 7 }], true, 6), [{ id: 7 }]);
   assert.deepEqual(tailToAdd([{ id: 5 }], true, 9), []);
+});
+
+test("only the writes the outbox keeps give up after 30 s: a message, an answer, a Stop and a change of a queue", () => {
+  const kept = [
+    "/runs",
+    "/runs/run_a1/steer",
+    "/runs/run_a1/cancel",
+    "/approvals/ap_9/decision",
+    "/threads/th_3/queue",
+    "/threads/th_3/queue/resume",
+    "/queue/q_7",
+  ];
+  for (const path of kept) {
+    assert.equal(isKeptWrite(path), true, path);
+  }
+  // A rewind, a loop, a queued message's Steer, a schedule, an agent, a file or a voice may take as long as they take.
+  const left = ["/runs/run_a1/rewind", "/runs/run_a1/loop", "/queue/q_7/steer", "/schedules", "/agents", "/files", "/voice", "/threads/th_3/queue/other"];
+  for (const path of left) {
+    assert.equal(isKeptWrite(path), false, path);
+  }
 });

@@ -52,6 +52,14 @@ async def _until_queued(working: Scene, count: int) -> None:
             await asyncio.sleep(0.2)
 
 
+async def _settled(page: Page) -> None:
+    """The page stands as it opened: the curtain is lifted and the run is shown at work, so that the link is lost under
+    a page that has begun, not while it begins."""
+    await expect(page.locator(".waiting")).to_have_count(0, timeout=20_000)
+    await expect(page.locator(".capsule")).to_contain_text("Working", timeout=20_000)
+    await expect(page.locator(".composer textarea").first).to_be_visible()
+
+
 async def _send(page: Page, words: str) -> None:
     """Type ``words`` in the chat's composer and press its send button."""
     box = page.locator(".composer textarea").first
@@ -82,6 +90,7 @@ async def test_a_message_made_with_no_link_waits_survives_the_page_and_goes_once
         browser, context, page = await _phone_at_work(playwright, working)
         try:
             await keep_shell(page)
+            await _settled(page)
             before: list[str] = await _queued(working)
             assert before == [QUEUED]
             await context.set_offline(True)
@@ -153,6 +162,7 @@ async def test_a_message_taken_back_to_be_edited_is_not_sent_and_one_that_waited
         browser, context, page = await _phone_at_work(playwright, working)
         try:
             await keep_shell(page)
+            await _settled(page)
             before: list[str] = await _queued(working)
             await context.set_offline(True)
             await _send(page, "A first thought.")
@@ -163,7 +173,6 @@ async def test_a_message_taken_back_to_be_edited_is_not_sent_and_one_that_waited
             await expect(page.locator(".composer textarea").first).to_have_value("A first thought.")
 
             # A message that waited more than a day: the daemon has forgotten its key, so it is the owner's to resend.
-            await page.locator(".composer textarea").first.fill("")
             await _send(page, "An old thought.")
             await expect(page.locator(".outbox-row")).to_have_count(1)
             await page.evaluate(_MAKE_OLD)
