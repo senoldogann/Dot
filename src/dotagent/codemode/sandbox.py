@@ -103,12 +103,22 @@ class Probe(FrozenModel):
     macos: str
 
 
+def interpreter_at(launcher: str | Path, prefix: str | Path) -> Interpreter:
+    """The interpreter whose ``bin`` program is ``launcher`` and whose installation is ``prefix``, by their real paths.
+    In a framework build (python.org's, Homebrew's) ``bin/python3`` is a stub that works out where it is (a ``realpath``
+    of its own folder, which the profile refuses: it reads what is inside the installation, not the folders above it)
+    and executes the program in the app of the framework: that program is what is started, and what the profile
+    names."""
+    base: Path = Path(os.path.realpath(prefix))
+    app: Path = base / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
+    executable: Path = Path(os.path.realpath(app if app.is_file() else launcher))
+    return Interpreter(executable=executable, prefix=base, version=platform.python_version())
+
+
 def current_interpreter() -> Interpreter:
     """The base interpreter of this process: the executable a virtual environment links to, and the installation's
     folder, both by their real paths."""
-    executable: Path = Path(os.path.realpath(getattr(sys, "_base_executable", sys.executable)))
-    prefix: Path = Path(os.path.realpath(sys.base_prefix))
-    return Interpreter(executable=executable, prefix=prefix, version=platform.python_version())
+    return interpreter_at(getattr(sys, "_base_executable", sys.executable), sys.base_prefix)
 
 
 def layout_for(workspace: Path, run_id: str) -> Layout:
