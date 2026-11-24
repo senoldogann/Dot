@@ -241,9 +241,10 @@ export function changesSection(hooks) {
             "div",
             { class: "note-main" },
             el("div", { class: "muted" }, "Now"),
-            hooks.noteText(clip(record.content, PREVIEW_CHARS)),
+            hooks.noteText(record.content),
             el("div", { class: "muted" }, "Proposed"),
-            hooks.noteText(clip(change.content, PREVIEW_CHARS)),
+            // Whole: Use it makes these very words the owner's, so none of them may stay out of sight.
+            hooks.noteText(change.content),
             el("div", { class: "note-meta" }, change.tags.map((tag) => el("span", { class: "chip" }, tag)), outside, el("span", { class: "note-when" }, proposedAt)),
           ),
           el("div", { class: "note-actions note-decide" }, use, drop),

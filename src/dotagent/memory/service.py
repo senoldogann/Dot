@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from dotagent.config import AppConfig, MemoryConfig
-from dotagent.core.errors import InvalidValueError, ProviderError, StoreError
+from dotagent.core.errors import InvalidValueError, ProviderError, RunConflict, StoreError
 from dotagent.core.learned_text import OWNER_MARK, gate
 from dotagent.core.logs import get_logger
 from dotagent.core.text import estimate_text_tokens
@@ -35,7 +35,7 @@ from dotagent.memory.ranking import Similar, Vector, fused_scores, most_similar,
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.secrets import mask_filled
 from dotagent.store.db import Store
-from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryRewrite, MemoryScore, ProposedChange
+from dotagent.store.models import AwakeNotes, MemoryRecord, MemoryRewrite, MemoryScore
 
 log = get_logger("dotagent.memory")
 
@@ -768,10 +768,17 @@ async def rewrite_memory_note(
 
 async def take_proposed_change(index: MemoryIndex, memory_id: str, at: float) -> MemoryRecord:
     """The owner takes the change a run proposed for their note at ``at``: the note gets its words and tags as the
-    owner's own correction would (:func:`update_memory_note`, which vouches for the text), and the proposal goes. A
-    proposal that is no longer the one shown is a conflict."""
-    change: ProposedChange = await index.store.settle_proposed_change(memory_id, at)
-    return await update_memory_note(index, memory_id, change.content, change.tags)
+    owner's own correction would (:func:`update_memory_note`, which vouches for the text), and the proposal goes, in
+    one write of the store, which checks the proposal again: one that is no longer the one shown is a conflict, and a
+    text the store refuses (a ``[memory] max_chars`` lowered since) leaves the proposal where it was."""
+    record: MemoryRecord = await index.store.get_memory(memory_id)
+    if record.proposed is None or record.proposed.at != at:
+        raise RunConflict(
+            "the change proposed for this note is not the one shown; read the note again",
+            {"memory_id": memory_id, "at": at},
+        )
+    text, vector = await _embedded(index, record.proposed.content)
+    return await index.store.take_proposed_change(memory_id, text, normalize_tags(record.proposed.tags), vector, at)
 
 
 async def drop_proposed_change(index: MemoryIndex, memory_id: str, at: float) -> MemoryRecord:
