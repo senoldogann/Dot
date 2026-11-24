@@ -222,9 +222,11 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
     @router.post("/phone/activity")
     async def phone_activity(request: ActivityRequest, http: Request) -> ActivityLeaseView:
         """The app says it is in the foreground, and which chat it shows (item 1420), or that it left it. While the
-        lease lives the daemon sends the phone no alert that is news (a run ended, a draft is ready); an approval, a
-        question, a secret or a hand-off is sent whatever the lease says, and so is every Live Activity update. The app
-        says it again every 25 seconds; a lease it does not renew ends by itself. Only a phone's own key asks it."""
+        lease lives the daemon does not send the phone the alert of the end of a run, of a schedule's run or of a
+        campaign, which the app shows itself; every other alert is sent whatever the lease says (an approval, a
+        question, a secret, a hand-off, a draft, what Dot tells the owner, its own warnings), and so is every Live
+        Activity update. The app says it again every 25 seconds; a lease it does not renew ends by itself. Only a
+        phone's own key asks it."""
         phone_id: str = asking_phone(http)
         lease: ActivityLease | None = ctx.leases.renew(phone_id, request.state, request.chat, request.ttl_s)
         # The phone may have been removed while this request was on its way: its lease must not outlive it.
