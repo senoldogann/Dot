@@ -16,12 +16,13 @@ import pytest_asyncio
 from dotagent.agent.limits import LIMIT_EVENT, RunLimits
 from dotagent.agent.loop import AgentRun, RunOutcome
 from dotagent.events import EventBus
-from dotagent.opencode.events import PartSeen, Piece, StepEnded, StepStarted
+from dotagent.opencode.events import PartSeen, Piece, StepEnded, StepStarted, ToolSeen
 from dotagent.opencode.run import _Follow, _outcome, _Step
 from dotagent.opencode.server import OpenCodeServer, PromptFile
 from dotagent.store.db import Store
 from dotagent.store.endings import PREFIX_CUT_SHORT, PREFIX_LIMIT, classify_ending
 from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
+from dotagent.tools.meta import FinishArgs
 
 GOAL: str = "Collect the figures of the quarter."
 
@@ -193,3 +194,25 @@ async def test_a_step_s_streamed_words_and_their_held_tail_come_under_the_step_t
     assert "".join(str(data["text"]) for data in deltas) == words == said["text"], shown
     # A task's words on OpenCode may be its answer, which is its last reply: they stream as either (item 1166).
     assert all(data["says"] == "either" for data in deltas), shown
+
+
+async def test_a_call_of_opencodes_own_tool_after_a_finish_drops_it(room: Room, tmp_path: Path) -> None:
+    """Item 1695's pre-push review: a finish ends the run as it says only while the agent makes no call after it; its
+    own tools (bash, write) do not go through Dot's door, and a call of one drops the finish too."""
+    follow: _Follow = _follow(room, _Server(), None, 0.0, tmp_path)
+    follow.finished_calls.append(FinishArgs(answer="All done.", success=True))
+    await follow.tool(
+        ToolSeen(
+            call_id="c1",
+            message_id="m1",
+            tool="bash",
+            status="running",
+            input={"command": "echo more"},
+            output="",
+            error="",
+            title="",
+            started_ms=None,
+            ended_ms=None,
+        )
+    )
+    assert follow.finished_calls == []
