@@ -16,13 +16,15 @@ import pytest
 import pytest_asyncio
 from structlog.testing import capture_logs
 
+from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import ToolInputError, ToolSteer
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
+from dotagent.llm.types import ToolCall
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
 from dotagent.terminal.session import Terminals, TerminalSession, ended_notices
@@ -403,12 +405,24 @@ async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime
         None,
     )
     background: JsonObject = {"command": "sleep 5", "background": True}
-    with pytest.raises(ToolInputError, match="a delegated run or a campaign's session has none"):
+    with pytest.raises(ToolSteer, match="a delegated run or a campaign's session has none"):
         await _call(dataclasses.replace(ctx, run_id=helper.id), "terminal_open", background)
     # No run manager watches this runtime's sessions.
-    with pytest.raises(ToolInputError, match="tells no chat"):
+    with pytest.raises(ToolInputError, match="tells no chat") as failed:
         await _call(ctx, "terminal_open", background)
+    assert not isinstance(failed.value, ToolSteer)
     assert runtime.terminals.sessions(ctx.thread_id) == []
+
+    # Item 1722: as the executor records them, the first is steered, not failed, and the model reads it as an error;
+    # the second is a failure.
+    call: ToolCall = ToolCall(id="call_1", name="terminal_open", arguments=background)
+    for run_id, steered in ((helper.id, True), (ctx.run_id, False)):
+        outcomes: list[ToolOutcome] = await execute_calls(
+            (call,), runtime.registry, {}, dataclasses.replace(ctx, run_id=run_id), ctx.gate, 1, lambda outcome: None
+        )
+        assert outcomes[0].result.is_error and outcomes[0].result.steered is steered
+        recorded: list[EventRecord] = await runtime.store.events_of_kind(run_id, "tool_result", 5)
+        assert (recorded[-1].data["ok"], recorded[-1].data["steered"]) == (steered, steered)
 
 
 async def test_a_chat_keeps_its_limit_of_sessions_and_an_idle_session_is_closed(runtime: Runtime) -> None:
