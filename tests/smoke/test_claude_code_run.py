@@ -1061,6 +1061,9 @@ async def test_a_resume_the_api_refuses_is_met_with_a_new_session_that_is_told_w
     # What the refused program printed before it failed is masked, in the event as everywhere (the pre-push review).
     refused: object = events[1].data["stderr"]
     assert isinstance(refused, str) and "resume failed" in refused and "sk-ant" not in refused
+    # The refused program was running when it said so and Dot ended it: no exit of its own, and what it said instead.
+    assert events[1].data["returncode"] is None and events[1].data["exited"] is False
+    assert "API Error: 400" in str(events[1].data["said"])
     fresh: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
     first: str = str(fresh["messages"][0])  # type: ignore[index]  # what the new session read
     assert "refuse the resume" in first and "What the cut session had done" in first

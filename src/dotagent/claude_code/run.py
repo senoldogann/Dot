@@ -1431,6 +1431,9 @@ async def _what_was_done(runtime: Runtime, run_id: str, steers: Sequence[str]) -
     place when the cut one could not be resumed (item 1581): its first words, which are its plan, the last calls it made
     and how each ended, its last words, and what the owner wrote while it worked."""
     steps: list[EventRecord] = await runtime.store.events_of_kind(run_id, "assistant", _BRIEF_STEPS)
+    if len(steps) == _BRIEF_STEPS:
+        # Past the number read, the oldest are not among them, and the first words are the plan (the review).
+        steps = await runtime.store.events_of_kind_after(run_id, "assistant", 0)
     calls: list[EventRecord] = await runtime.store.events_of_kind(run_id, "tool_result", _BRIEF_CALLS)
     spoken: list[str] = [text for text in (str(event.data.get("text") or "").strip() for event in steps) if text]
     parts: list[str] = [
@@ -1519,6 +1522,7 @@ class _Cuts:
                 silent_s=round(time.monotonic() - follow.quiet.wrote, 1),
                 session_id=follow.session_id,
                 at=time.time(),
+                said=error.message,
             )
             self.exits.append(program)
             refusal = run_refusal(cancelled=self.agent.cancel.is_set(), continued=self.continued, allowed=self.allowed)

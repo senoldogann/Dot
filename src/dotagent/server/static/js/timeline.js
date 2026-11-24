@@ -1578,7 +1578,9 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
     // 1581): one line, which opened says how it ended (`signal`, `returncode`, `steps`, `silent_s`). A new session is said so.
     claude_code_continued(scope, record) {
       const data = record.data;
-      const how = data.signal ? `${data.signal} (${data.returncode})` : `code ${data.returncode}`;
+      // A program Dot ended itself after it failed has no exit of its own: what it said, else that Dot ended it.
+      const noExit = data.said || t("timeline.programEndedByDot");
+      const how = data.signal ? `${data.signal} (${data.returncode})` : data.returncode === null ? noExit : `code ${data.returncode}`;
       const details = t("timeline.programCut", { how, steps: data.steps, silent: data.silent_s });
       const words = data.fresh_session ? "timeline.programContinuedFresh" : "timeline.programContinued";
       note(scope, record.ts, "bolt", t(words, { at: data.cut_at }), "warn", details);

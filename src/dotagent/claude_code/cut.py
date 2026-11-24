@@ -35,6 +35,8 @@ log = get_logger(__name__)
 
 # How much of the program's error stream the context of a cut keeps (the end of it).
 STDERR_CUT_CHARS: int = 2048
+# How much of what a program said when it failed the context of its end keeps (the start of it, which names the error).
+_SAID_CHARS: int = 300
 # How long Dot waits, once the program's output closed, for the program to end by itself before it ends it: a program
 # killed from outside has its exit within milliseconds of its output closing, so one that is still there after this is
 # a program Dot has to end, and its exit is Dot's own.
@@ -84,6 +86,9 @@ class ProgramExit:
     silent_s: float
     session_id: str
     at: float
+    # What the program said when it failed without being cut (item 1581: a resume the API refused), which Dot then
+    # ended itself, so that it has no exit of its own: the page and the terminal say it instead of an exit.
+    said: str = ""
 
     @property
     def signal(self) -> str | None:
@@ -106,6 +111,7 @@ class ProgramExit:
             "silent_s": self.silent_s,
             "claude_session": self.session_id,
             "cut_at": self.clock,
+            **({"said": self.said[:_SAID_CHARS]} if self.said else {}),
         }
 
 
