@@ -93,6 +93,7 @@ from dotagent.store.models import (
     ObjectiveWorkflow,
     PushSubscription,
     QueuedMessage,
+    RanStep,
     ReactionName,
     ReactionRecord,
     ResultStep,
@@ -4183,6 +4184,27 @@ class Store:
                 flags=_step_flags(parse_json_value(row["flags"], "step flags")) if row["flags"] else (),
                 names_dot=str(row["names_dot"] or ""),
                 helper=bool(row["helper"]),
+            )
+            for row in rows
+        ]
+
+    async def ran_steps(self, run_id: str) -> list[RanStep]:
+        """The steps of a run and of the runs it delegated (its family, as :meth:`result_steps` reads it) that the gate
+        let run, oldest first: a ``tool_result`` event that records the decision of the gate, which one of a call that
+        was refused or that never reached its tool does not (item 1404: what the line of steps outside the undo journal
+        counts)."""
+        rows = await self._all(
+            _family_of("SELECT ?") + " SELECT json_extract(e.data, '$.kind') AS kind,"
+            " json_extract(e.data, '$.flags') AS flags, json_extract(e.data, '$.steps') AS steps"
+            " FROM events AS e WHERE e.run_id IN (SELECT id FROM family) AND e.kind = 'tool_result'"
+            " AND json_extract(e.data, '$.decision') IS NOT NULL ORDER BY e.id",
+            (run_id,),
+        )
+        return [
+            RanStep(
+                kind=str(row["kind"] or ""),
+                flags=_step_flags(parse_json_value(row["flags"], "step flags")) if row["flags"] else (),
+                steps=max(int(row["steps"] or 0), 1),
             )
             for row in rows
         ]

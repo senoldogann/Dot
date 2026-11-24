@@ -7489,6 +7489,15 @@ summary:has(> .chev)::-webkit-details-marker {
   margin-left: auto;
 }
 
+/* What the run did with a tool the undo journal does not hold (item 1404): a quiet line of its own under the files, or
+   alone for a run that changed none. */
+.run-changes-outside {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
 /* The pages a turn read on the web (item 1184, sources.js): one quiet line under the answer, the first letters of a few
    of their sites side by side and how many there are; open, a list of each page's title over its site. No colour: a
    site's letter is a mark, not a logo, and colour stays for what asks the owner to look (item 837). */

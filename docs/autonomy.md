@@ -503,7 +503,10 @@ chat's first change to it kept to what is there now. A file where the panel besi
 folder, an application's files, outside the home folder), a binary file, one past 512 KB, one that is gone and one
 whose first change kept no copy show why instead of a diff. Each side of a diff is masked whole, before it is diffed,
 of the secrets Dot holds, so a private key over many lines is masked whatever part of it changed. A command's own writes
-are not in the journals, so they are not there. `dotx undo RUN_ID` shows what taking back the changes of that run and of
+are not in the journals, so they are not there; the run's line says instead how many steps it ran with a command, the
+browser, the screen, a message or a connected app, "Dot also ran 3 commands and 2 browser actions. Undo takes back files
+only, so it cannot take these back" (item 1404), by what the gate let run and the steps' own records, with no claim of
+what they did. `dotx undo RUN_ID` shows what taking back the changes of that run and of
 the runs it delegated to would do: a file the run changed is put back as it was (`restore`), with its permissions, a
 file it created is deleted (`delete`), and the folders it created are removed once they are empty. Nothing is changed
 until `dotx undo RUN_ID --apply`, which exits with 1 when it left a file as it is. A file that changed or was deleted

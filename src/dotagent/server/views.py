@@ -1405,15 +1405,30 @@ class FileEdit(FrozenModel):
     changes: int
 
 
+OutsideCategory = Literal["shell", "browser", "desktop", "message", "app"]
+
+
+class OutsideSteps(FrozenModel):
+    """How many steps of a run and of the runs it delegated acted through one kind of tool that no undo journal holds
+    (item 1404): ``shell`` (a command), ``browser`` (a click, typing), ``desktop`` (the screen, an application),
+    ``message`` (a step that sends a message or mail for the owner) and ``app`` (a connected app's tool that may change
+    things). A count of steps that ran, not of what they did: a command may only have read."""
+
+    category: OutsideCategory
+    steps: int
+
+
 class RunActions(FrozenModel):
     """What a run did and what can be undone: its acting steps, its approvals and questions with their decisions, and
     the files it (or a run it delegated to) changed. ``ended`` says whether the run and its delegated runs have all
-    ended, which the undo of a file needs."""
+    ended, which the undo of a file needs. ``outside`` counts the steps that ran with a tool the undo journal does not
+    hold (:class:`OutsideSteps`), only the kinds there are any of."""
 
     steps: list[ActionStep]
     approvals: list[ApprovalRecord]
     edits: list[FileEdit]
     ended: bool
+    outside: list[OutsideSteps]
 
 
 class UndoRequest(FrozenModel):

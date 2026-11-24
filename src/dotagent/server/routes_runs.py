@@ -41,7 +41,7 @@ from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhyt
 from dotagent.scheduler.plans import ScheduleRequest, create_schedule, plan_schedule
 from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
-from dotagent.server.actions import action_steps, file_edits
+from dotagent.server.actions import action_steps, file_edits, outside_steps
 from dotagent.server.activity import current_activity, live_runs
 from dotagent.server.away import mark_read, read_away, read_mark
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
@@ -338,6 +338,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             approvals=await store.run_approvals(run_id),
             edits=file_edits(plan.steps),
             ended=not active_run_ids(runs) and run_id not in ctx.manager.active_run_ids(),
+            outside=outside_steps(await store.ran_steps(run_id)),
         )
 
     @router.get("/runs/{run_id}/actions")

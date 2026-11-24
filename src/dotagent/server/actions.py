@@ -1,5 +1,6 @@
 """The Actions panel of a run's page: its acting steps from its events, and its file changes from the undo plan."""
 
+from collections import Counter
 from collections.abc import Mapping, Sequence
 
 from pydantic import JsonValue
@@ -7,8 +8,8 @@ from pydantic import JsonValue
 from dotagent.agent.authorization import StepDecision
 from dotagent.core.text import truncate_middle
 from dotagent.policy.types import READ_ONLY_KINDS
-from dotagent.server.views import ActionStep, FileEdit
-from dotagent.store.models import EventRecord
+from dotagent.server.views import ActionStep, FileEdit, OutsideCategory, OutsideSteps
+from dotagent.store.models import EventRecord, RanStep
 from dotagent.undo.restore import UndoStep
 
 _EVIDENCE_CHARS: int = 400
@@ -65,6 +66,34 @@ def action_steps(events: Sequence[EventRecord]) -> list[ActionStep]:
             )
         )
     return steps
+
+
+# The kinds of action that act through a tool whose effect the undo journal does not hold, by the category the owner
+# reads (item 1404). Opening a page reads, and what Dot keeps in its own memory or schedules is no step on the world, so
+# neither is counted; the journal holds `write_file`, `edit_file` and `write_notes`.
+_OUTSIDE_KINDS: dict[str, OutsideCategory] = {
+    "shell": "shell",
+    "browser_input": "browser",
+    "browser_click": "browser",
+    "desktop_input": "desktop",
+    "app_control": "desktop",
+    "mcp": "app",
+}
+_MESSAGE_FLAG: str = "message_send"
+_OUTSIDE_ORDER: tuple[OutsideCategory, ...] = ("shell", "browser", "desktop", "message", "app")
+
+
+def outside_steps(ran: Sequence[RanStep]) -> list[OutsideSteps]:
+    """The steps of ``ran`` that acted through a tool with no inverse in the undo journal, counted by category, only the
+    categories that have any, in a fixed order (item 1404). A step that sends a message or mail (its action raised
+    ``message_send``) is a message, whatever tool it went through; a batched call counts the steps it carried. This says
+    what ran, never what it did."""
+    counts: Counter[OutsideCategory] = Counter()
+    for step in ran:
+        category: OutsideCategory | None = "message" if _MESSAGE_FLAG in step.flags else _OUTSIDE_KINDS.get(step.kind)
+        if category is not None:
+            counts[category] += step.steps
+    return [OutsideSteps(category=category, steps=counts[category]) for category in _OUTSIDE_ORDER if counts[category]]
 
 
 def file_edits(steps: Sequence[UndoStep]) -> list[FileEdit]:
