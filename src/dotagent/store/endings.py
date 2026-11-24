@@ -129,8 +129,9 @@ def _stored_ending(stored: str | None) -> Ending | None:
 
 def classify_ending(status: RunStatus, result: str, stored: str | None = None) -> Ending:
     """The reason a run ended. ``stored`` is the reason written when it ended; it wins over the result text, which a
-    later edit of the words would otherwise reclassify. A run stored before the reason was kept, or one that has not
-    ended, is still read from the text."""
+    later edit of the words would otherwise reclassify, but for a stored ``goal_check_refused``, which the text under
+    the goal check's mark tells again from a check that could not run (item 1402). A run stored before the reason was
+    kept, or one that has not ended, is still read from the text."""
     known: Ending | None = _stored_ending(stored)
     if known == "goal_check_refused" and GOAL_CHECK_MARK in result:
         # Before item 1402 a check that could not run was stored as a refusal too: the note under the mark says which.

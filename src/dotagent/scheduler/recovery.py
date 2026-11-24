@@ -141,8 +141,9 @@ class _EndError(BaseModel):
 
 def retry_why(ending: Ending, kind: FailureKind | None) -> RetryWhy | None:
     """Why a task that ended with ``ending`` (and, when an error ended it, an error of ``kind``) is tried again, or
-    ``None``: the owner's stop, the emergency stop, a limit of the run, its own report of failure, a goal check's no
-    and an error of Dot's or one that lasts are not."""
+    ``None``: the owner's stop, the emergency stop, a limit of the run, its own report of failure, a goal check's no, a
+    goal check that could not run (the work may be done, and a try would do it twice: item 1402) and an error of Dot's
+    or one that lasts are not."""
     match ending:
         case "daemon_restarted" | "daemon_shutdown":
             return "cut_off"
