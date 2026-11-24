@@ -231,14 +231,25 @@ async def test_a_chat_that_was_away_through_a_long_run_reads_the_end_of_it_and_s
             newest: int = (await working.runtime.store.list_events(working.run.id, 0, 5000))[-1].id
 
             page = await context.new_page()
-            page.on("request", lambda request: asked.append(request.url) if "/api/runs/" in request.url else None)
+            streamed: asyncio.Event = asyncio.Event()
+
+            def heard(request: Request) -> None:
+                if "/api/runs/" in request.url:
+                    asked.append(request.url)
+                    if "/stream" in request.url:
+                        streamed.set()
+
+            page.on("request", heard)
             await page.goto(f"{working.address}/#/runs/{working.run.id}")
             note = page.locator(".steps-not-shown")
             await expect(note).to_be_visible(timeout=20_000)
             await expect(note).to_contain_text("Some steps are not shown")
             tails: list[str] = [url for url in asked if "tail=400" in url]
             assert len(tails) == 1, asked
-            # The stream goes on after the last event read, so no history is read again.
+            # The stream goes on after the last event read, so no history is read again. The page opens it once it
+            # has drawn the tail it read, which on a loaded Mac comes after the note is seen.
+            async with asyncio.timeout(20.0):
+                await streamed.wait()
             streams: list[str] = [url for url in asked if "/stream" in url]
             assert streams and f"after={newest}" in streams[-1], (newest, streams)
             await context.close()
