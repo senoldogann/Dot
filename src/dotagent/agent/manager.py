@@ -3784,7 +3784,7 @@ class RunManager:
         asked_level: Effort = level if opening.once is None else ONE_MESSAGE_LEVELS[opening.once]
         parent: RunHandle | None = None if parent_run_id is None else self._handles.get(parent_run_id)
         # The run that delegated a helper a restart cut off, which the next start resumes after that run ended (item
-        # 1658, :meth:`_resume_helper`): the helper's gate takes what that run's had, read again from its record.
+        # 1668, :meth:`_resume_helper`): the helper's gate takes what that run's had, read again from its record.
         ended_parent: RunRecord | None = None
         if parent_run_id is not None and parent is None:
             # A helper takes its parent's taint, guards and where it keeps its steps from the parent's gate: one whose

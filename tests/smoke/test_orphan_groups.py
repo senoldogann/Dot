@@ -109,6 +109,12 @@ def test_a_group_a_dead_dot_left_is_ended_at_start_and_no_other(mine: list[subpr
                 at=time.time(),
             ).model_dump_json()
         )
+    # Half-made files a crash left: an old one goes, a fresh one (a live Dot writing) stays.
+    stale: Path = process_groups_dir() / "4243.making"
+    stale.write_text("{")
+    os.utime(stale, (time.time() - 120.0, time.time() - 120.0))
+    fresh: Path = process_groups_dir() / "4244.making"
+    fresh.write_text("{")
     dead.kill()
     dead.wait()
     assert _alive(orphan), "the group outlives the Dot that started it"
@@ -125,6 +131,8 @@ def test_a_group_a_dead_dot_left_is_ended_at_start_and_no_other(mine: list[subpr
     assert not alive_after
     assert living.poll() is None and working.poll() is None and reused.poll() is None
     assert _files() == sorted([f"{living.pid}.json", f"{working.pid}.json"])
+    assert not stale.exists() and fresh.exists()
+    fresh.unlink()
 
 
 def test_a_group_whose_leader_ended_is_ended_while_its_members_started_after_it() -> None:

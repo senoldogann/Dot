@@ -45,6 +45,8 @@ _WHAT_CHARS: int = 160
 _PRIVATE_DIR_MODE: int = 0o700
 _PRIVATE_FILE_MODE: int = 0o600
 _SUFFIX: str = ".json"
+_MAKING: str = ".making"
+_MAKING_STALE_S: float = 60.0
 # ``proc_pidinfo`` flavor and ``proc_listpids`` type of macOS's libproc (``sys/proc_info.h``).
 _PROC_PIDTBSDINFO: int = 3
 _PROC_PGRP_ONLY: int = 2
@@ -152,7 +154,7 @@ def record_group(pid: int, run_id: str, kind: GroupKind, what: str) -> None:
     )
     directory: Path = process_groups_dir()
     directory.mkdir(mode=_PRIVATE_DIR_MODE, parents=True, exist_ok=True)
-    making: Path = directory / f"{pid}.making"
+    making: Path = directory / f"{pid}{_MAKING}"
     descriptor: int = os.open(making, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, _PRIVATE_FILE_MODE)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         handle.write(record.model_dump_json())
@@ -211,6 +213,12 @@ def stop_orphans(working: frozenset[str], grace_s: float) -> tuple[GroupRecord, 
     directory: Path = process_groups_dir()
     if not directory.is_dir():
         return ()
+    # A file a crash left half made (between its write and its name): never a group's record, and one of a process
+    # that lives is renamed within moments, so only one older than that goes.
+    for making in directory.glob(f"*{_MAKING}"):
+        with contextlib.suppress(FileNotFoundError):
+            if time.time() - making.stat().st_mtime > _MAKING_STALE_S:
+                making.unlink(missing_ok=True)
     orphans: list[tuple[Path, GroupRecord]] = []
     for path in sorted(directory.glob(f"*{_SUFFIX}")):
         record: GroupRecord | None = _read(path)
