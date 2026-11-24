@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1714](1714.md) | done | 2026-11-24 | A run on the Claude plan or OpenCode is asked for its lessons as it ends |
 | [1713](1713.md) | done | 2026-11-24 | The day's room for lessons is counted by time and shared fairly between kinds of tasks |
 | [1712](1712.md) | done | 2026-11-24 | A code review starts with the notes about code alone |
 | [1711](1711.md) | done | 2026-11-24 | A run's rewrite of the owner's note waits for the owner, and the owner's words keep reaching every run |

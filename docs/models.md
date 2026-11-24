@@ -351,8 +351,9 @@ answer keeps its words, Ollama's too.
   (`run_max_minutes`, `run_max_tokens`) bind the agent as they bind Dot's own loop (item 552): the first step that ends
   past one while the agent goes on tells it to stop and answer, and an agent that goes on two steps after that is
   stopped and the run ends failed. A reply that stopped at the model's output limit ends the run failed too ("the
-  model's replies were cut short"), not done with half an answer. What Dot's own runs bring
-  besides (the memory recalled at the start, the checks of a finish, lessons and playbooks) a run here does not have,
+  model's replies were cut short"), not done with half an answer. A run here that ended is asked for its lessons as
+  Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own runs bring
+  besides (the memory recalled at the start, the checks of a finish and playbooks) a run here does not have,
   and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
   apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models
   (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models. The free tier is Zen's to give: it
@@ -473,8 +474,10 @@ answer keeps its words, Ollama's too.
   tool of it meets ends it as the emergency stop, not as an error the model reads; a message sent as it ends is kept or
   marked unread as Dot's own loop does, not dropped; a resumed run says which it goes on from and is told that the steps
   of that run are not in its session; and Claude Code's own limit on a call of Dot's tool is a day, so a question or an
-  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. What Dot's own runs
-  bring besides (the memory recalled at the start, the checks of a finish, lessons and playbooks) a run here does not
+  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. A run here that ended
+  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called, which the store keeps as
+  for any run (item 1714: they waited for the night's reflection before, which reads only some). What Dot's own runs
+  bring besides (the checks of a finish and playbooks) a run here does not
   have, and these models cannot be the fast, vision or standby model chosen on the
   Models page, whose calls include conversations and pictures; they can be the review model (item 1032) and the own
   work model, whose look has its tools there (item 1063). They can be the models of the improvement loop's roles

@@ -23,7 +23,9 @@ import pytest
 import pytest_asyncio
 from structlog.testing import capture_logs
 
+from dotagent.agent.lessons import RunLessons, run_lessons
 from dotagent.agent.manager import RunManager
+from dotagent.agent.review import LESSONS_TOOL
 from dotagent.claude_code import cut as cut_module
 from dotagent.claude_code import run as run_module
 from dotagent.claude_code.cut import EndedTogether
@@ -35,8 +37,10 @@ from dotagent.core.types import JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.catalog import all_tasks
 from dotagent.evals.results import Cut
-from dotagent.evals.runner import _supervise, ended_by_plan_limit
-from dotagent.evals.types import EvalTask
+from dotagent.evals.runner import SCRIPTED_MODEL, _supervise, ended_by_plan_limit
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import EvalTask, ScriptedCall, ScriptedTurn
+from dotagent.llm.router import parse_model_ref
 from dotagent.memory.service import SavedMemory, save_memory, update_memory_note, words_only
 from dotagent.opencode.bridge import Door, ToolBridge
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -52,6 +56,7 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 STAND_IN: Path = Path(__file__).resolve().parents[1] / "fixtures" / "claude_standin.py"
 MODEL: str = "claude_code:sonnet"
+_SCRIPTED: str = parse_model_ref(SCRIPTED_MODEL).provider
 
 
 @dataclass(frozen=True)
@@ -69,7 +74,10 @@ def _lay_out(root: Path) -> tuple[Path, Path, Path, Path]:
     home.mkdir()
     # No embedding service, as on CI: no test reaches one, and a run's notes are recalled by their words.
     (home / "config.toml").write_text(
-        "[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\n\n[memory]\nembed_enabled = false", encoding="utf-8"
+        # Lessons off: a run here that met a failed call would ask the configured review model for its lessons (item
+        # 1714); the test of those lessons scripts that model.
+        '[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\nlessons = "off"\n\n[memory]\nembed_enabled = false',
+        encoding="utf-8",
     )
     record: Path = root / "record"
     record.mkdir()
@@ -1148,3 +1156,67 @@ async def test_what_the_owner_sent_that_the_cut_program_never_took_in_is_sent_to
     messages: list[str] = [str(one) for one in went_on["messages"]]  # type: ignore[attr-defined]  # a list of text
     assert len(messages) == 2 and "Also look in the second folder." in messages[0]
     assert "was cut off at" in messages[1]
+
+
+async def test_a_run_on_the_plan_that_met_a_failed_call_is_asked_for_its_lessons(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Item 1714: a run on the plan ended with no lesson case, so its lessons waited for the night, which reads only
+    some. It is now asked as a run of Dot's own loop is, from the results of Dot's tools the store holds of it: the
+    stand-in's run meets a call the gate refused, and the review model (scripted) is asked about it."""
+    root: Path = Path(await asyncio.to_thread(os.path.realpath, tmp_path_factory.mktemp("claude-code-lessons")))
+    home, _record, program, state = await asyncio.to_thread(_lay_out, root)
+    await asyncio.to_thread(
+        (home / "config.toml").write_text,
+        '[browser]\nheadless = true\n\n[agent]\ngoal_mode = false\nlessons = "propose"\n\n[memory]\n'
+        f'embed_enabled = false\n\n[models]\nreview = "{SCRIPTED_MODEL}"\n',
+        encoding="utf-8",
+    )
+    patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
+    patch.setenv("DOT_HOME", str(home))
+    patch.setenv("DOT_LOG_DIR", str(root / "logs"))
+    patch.setenv("DOT_CHROME_DIR", str(root / "chrome"))
+    patch.setenv("DOT_CLAUDE", str(program))
+    patch.setenv("CLAUDE_CONFIG_DIR", str(state))
+    built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    lesson: str = "Write notes into the workspace itself, never into its .claude folder."
+    script: ScriptedProvider = ScriptedProvider(
+        _SCRIPTED,
+        [ScriptedTurn(text="", calls=(ScriptedCall(tool=LESSONS_TOOL, arguments={"lessons": [lesson]}),))],
+    )
+    await built.router.register(_SCRIPTED, script)
+    manager: RunManager = RunManager(built)
+    try:
+        started: RunRecord = await manager.start(
+            "Write a note in the workspace.",
+            "task",
+            MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "auto",
+            False,
+            (),
+        )
+        ended: RunRecord = await manager.wait(started.id)
+        assert ended.status == "done", ended.result
+        proposed: RunLessons | None = await _lessons_of(built, ended.id)
+    finally:
+        await manager.shutdown()
+        await close_runtime(built)
+        patch.undo()
+    assert proposed is not None
+    assert [(one.text, one.state) for one in proposed.lessons] == [(lesson, "proposed")]
+
+
+async def _lessons_of(runtime: Runtime, run_id: str) -> RunLessons | None:
+    """The lessons of a run once they were drawn, which happens in a task of its own after the run's end."""
+    for _ in range(200):
+        drawn: RunLessons | None = await run_lessons(runtime.store, run_id)
+        if drawn is not None:
+            return drawn
+        await asyncio.sleep(0.05)
+    return None
