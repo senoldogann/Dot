@@ -12,7 +12,7 @@ checks and the threat model (item 1503), and in a second pull request the swap o
 
 ## The tool `code_run` (item 1501)
 
-`code_run` takes the Python 3.13 `code`, a one-line `title` (the row of the step) and `timeout_s`. The model reads only
+`code_run` takes the Python `code` (the daemon's own interpreter, 3.13 or later), a one-line `title` (the row of the step) and `timeout_s`. The model reads only
 what the code prints, stdout and stderr in the order they were written, as a head and a tail when it is long, and a
 footer with the number of tool calls and the seconds: `[3 tool calls, 1.2 s]`. A code that ends by itself with nothing
 printed is told so. A code that fails is an error result with the end of its traceback, in which Dot's own paths are said
@@ -55,7 +55,7 @@ The code finds what it needs without a list in any prompt: `dot_tools.search_too
 description), `detail="description"` adds what each does, the line that imports it and the name `dot_tools.call` takes, and
 `detail="schema"` adds its parameters as a JSON schema; `dot_tools.list_servers()` gives each server, its kind and how many
 tools it has; `dot_tools.call("<name>", ...)` calls a tool by its name. What `code_run`'s own definition costs the model does
-not depend on how many tools the run has: it is the same 1,186 characters for ten tools and for three hundred.
+not depend on how many tools the run has: it is the same 1,183 characters for ten tools and for three hundred.
 
 The files are written again only when the tools of the run changed (a digest of the catalogue is kept in
 `dot_tools/.digest`), and then the `servers` folder is removed first, so that a tool the run no longer has is not left to be
@@ -186,7 +186,9 @@ The way out of the sandbox is two pipes the process inherits: the code writes on
 `{"id", "tool", "args"}`, and reads one back, `{"id", "ok", "text", "images"}` or `{"id", "ok": false, "error",
 "refused"}`. Dot reads each line as exactly that and nothing else: a line past 32 MiB, one that is no JSON, one with another
 key or a key of another type, or a number out of its turn is a malformed frame and ends the code. At most `max_calls` calls
-(200) go over it; the next ends the code. The daemon does not read the next request until the code has read the last answer.
+(200) go over it; the next ends the code. Arguments that cannot be sent (an object that is not JSON, a `NaN`, a cycle, a call
+past about 32 MiB) are a `dot_tools.ToolError` of that call, which the code can catch: the call is not made, and the next
+is numbered as if it had not been tried. A path is sent as its text, a date as its ISO form, a set as a sorted list. The daemon does not read the next request until the code has read the last answer.
 What the code prints is its own stdout, never the protocol.
 
 ### The folders

@@ -180,3 +180,37 @@ def test_a_fault_in_answering_a_call_kills_the_code_at_once_and_is_raised_not_wa
     pid: int = int((code_box.layout.scratch / "pid").read_text(encoding="utf-8"))
     with pytest.raises(ProcessLookupError):
         os.kill(pid, 0)
+
+
+@pytest.mark.macos
+def test_arguments_that_cannot_be_sent_are_an_error_to_that_call_and_the_next_call_is_as_if_it_was_not_made(
+    tmp_path: Path,
+) -> None:
+    """The review of item 1500: the call took its number before its line was made, so one argument that was not JSON
+    (a ``Path``, a ``NaN``) made the next call out of turn, and the daemon ended the code for a frame it never got."""
+    code_box: Box = box(tmp_path)
+    code_box.says("t", '{"ok": true}')
+    show: str = "except dot_tools.ToolError as error:\n    print('error:', error)\n"
+    ended: Ended = code_box.start(
+        "import dot_tools, datetime, pathlib\n"
+        "call = dot_tools.call\n"
+        "for bad in (object(), float('nan'), b'bytes', {1, 2, 3} | {object()}, lambda: 1):\n"
+        "    try:\n        call('t', value=bad)\n    except dot_tools.ToolError as error:\n"
+        "        print('error:', error)\n"
+        "loop = []\nloop.append(loop)\n"
+        f"try:\n    call('t', value=loop)\n{show}"
+        f"try:\n    call('t', value='x' * 40_000_000)\n{show}"
+        "print(call('t', path=pathlib.Path('/a/b'), day=datetime.date(2026, 11, 24), tags={'b', 'a'}))\n"
+        "print(call('t', again=1))\n"
+    )
+    assert ended.ending == "finished", ended.output
+    lines: list[str] = ended.output.splitlines()
+    assert len(lines) == 9 and all(line.startswith("error: ") for line in lines[:7])
+    assert ("cannot be sent" in lines[0] and "NaN" in lines[1]) or "Out of range" in lines[1]
+    assert "bytes: the most one call can carry is" in lines[6]
+    assert lines[7:] == ["{'ok': True}", "{'ok': True}"]
+    # Only the two calls that were made reached the daemon, as calls 1 and 2, with the values sent as text.
+    assert code_box.calls == [
+        ("t", {"path": "/a/b", "day": "2026-11-24", "tags": ["a", "b"]}),
+        ("t", {"again": 1}),
+    ]
