@@ -91,9 +91,18 @@ struct DockSummary: Equatable, Sendable {
 
     static func helperWord(_ count: Int) -> String { count == 1 ? "helper" : "helpers" }
 
-    /// "every 10 minutes" as a capsule has room for it: "every 10 min"; a rhythm too long for that is just "1 loop".
+    /// "every 10 minutes" as a capsule has room for it: "every 10 min"; a rhythm too long for that is just "1 loop". A cron
+    /// expression the daemon did not put into words ("cron 0 */2 * * *") is read when it is a plain step ("every 2 h").
     static func rhythm(_ when: String) -> String {
         var words: String = when.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if words.hasPrefix("cron ") {
+            let fields: [Substring] = words.dropFirst(5).split(separator: " ")
+            if fields.count == 5, fields[2...].allSatisfy({ $0 == "*" }) {
+                if fields[0].hasPrefix("*/"), fields[1] == "*", let every: Int = Int(fields[0].dropFirst(2)), every > 0 { return "every \(every) min" }
+                if fields[0] == "0", fields[1].hasPrefix("*/"), let every: Int = Int(fields[1].dropFirst(2)), every > 0 { return "every \(every) h" }
+            }
+            return "1 loop"
+        }
         for (long, short) in [(" minutes", " min"), (" minute", " min"), (" hours", " h"), (" hour", " h"), (" seconds", " s")] {
             words = words.replacingOccurrences(of: long, with: short)
         }

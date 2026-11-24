@@ -131,4 +131,21 @@ final class GlassShotsTests: XCTestCase {
         sleep(2)
         shot("dock-waiting-on-you")
     }
+
+    /// The chat list with its compose button in the navigation bar (item 1392), and a chat that ended well with the line
+    /// under its last message (item 1393).
+    func testListAndFinishedChat() {
+        app.launch()
+        XCTAssertTrue(app.buttons["new-chat"].waitForExistence(timeout: 25))
+        sleep(3)
+        shot("polish-list")
+    }
+
+    func testFinishedRunSaysSo() throws {
+        app.launchArguments += ["-DotOpenChat", "Summarize what changed"]
+        app.launch()
+        guard app.staticTexts["run-finished"].waitForExistence(timeout: 25) else { throw XCTSkip("the scratch daemon's run has not finished") }
+        sleep(2)
+        shot("polish-done")
+    }
 }

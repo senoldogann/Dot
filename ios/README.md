@@ -183,11 +183,11 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   in both looks, and the Live Activity draws with the same values.
 - **Type** is SF through the system's text styles (`Theme.body` is `.callout`, `small` `.footnote`, `meta` `.caption`) so
   everything follows Dynamic Type; code is SF Mono. Rows and cards re-lay out at the accessibility sizes, and floating
-  chrome (the composer, the capsule, the chips, the new-chat button) is capped at a size where it still fits.
+  chrome (the composer, the capsule, the chips) is capped at a size where it still fits.
 - **Space and radius** are two scales (`Space` 2 to 32; `Radius` 4, 8, 12, 16, 24): controls 8, cards 12, the owner's
   message and the approval card 16, the floating bar 26.
 - **Glass is for floating chrome only**: the composer bar, the capsule over it, the agents' chips, the
-  new-chat button, the jump-to-newest button, the approval card's Allow and Deny, the pairing field. `dotGlass(in:)`
+  the compose and settings buttons of the title bar (iOS 26 draws them as glass), the jump-to-newest button, the approval card's Allow once and Deny, the pairing field. `dotGlass(in:)`
   is Liquid Glass (`glassEffect`) on iOS 26 and a thin material with a hairline before it; `dotButton(.glass|.prominent)`
   are `.glass` and `.glassProminent` on iOS 26 and capsule buttons before it; `DotGlassGroup` is a
   `GlassEffectContainer`. Message text, tool lines and long lists are never glass. With Reduce Transparency it is a solid

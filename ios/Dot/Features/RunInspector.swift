@@ -104,7 +104,7 @@ struct RunInspector: View {
         .padding(Space.l)
         .background {
             RoundedRectangle(cornerRadius: Radius.l)
-                .fill(LinearGradient(colors: [statusTone.opacity(0.14), statusTone.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .fill(statusTone.opacity(0.08))
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.l))
         }
         .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.hairline, lineWidth: 1))

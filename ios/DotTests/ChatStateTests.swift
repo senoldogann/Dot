@@ -58,6 +58,25 @@ final class ChatStateTests: XCTestCase {
         XCTAssertEqual(row.state, .failed)
     }
 
+    func testAFailedStepKeepsWhatItWasAskedAndSaysWhy() {
+        var state: ChatState = started()
+        state.apply(event(2, "run_1", "tool_call", ["call_id": .string("c1"), "tool": .string("shell"), "args": .object(["command": .string("ls -l /nope")])]))
+        state.apply(event(3, "run_1", "tool_result", [
+            "call_id": .string("c1"), "ok": .bool(false), "summary": .string("Unknown tool 'shell'. Available tools: agents_now, ask_secret, ask_user"),
+        ]))
+        guard case .tool(let row) = state.items[1].kind else { return XCTFail("a tool row") }
+        XCTAssertEqual(row.state, .failed)
+        XCTAssertEqual(row.line, "Shell: ls -l /nope", "what it was asked stays on the row")
+        XCTAssertEqual(row.failure, "Unknown tool 'shell'")
+    }
+
+    func testTheFirstSentenceOfAnErrorIsWhatTheRowSays() {
+        XCTAssertEqual(failureSentence("Permission denied. See the log."), "Permission denied")
+        XCTAssertEqual(failureSentence("Timed out\nafter 30 s"), "Timed out")
+        XCTAssertEqual(failureSentence("x"), "x")
+        XCTAssertLessThanOrEqual(failureSentence(String(repeating: "a", count: 300)).count, 90)
+    }
+
     func testAnApprovalCardWaitsThenIsAnswered() {
         var state: ChatState = started()
         state.apply(event(5, "run_1", "approval_requested", [

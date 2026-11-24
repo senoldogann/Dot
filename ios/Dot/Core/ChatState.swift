@@ -10,6 +10,9 @@ struct ToolRow: Sendable, Hashable {
     var state: State
     /// The id of the step's `tool_call` event (0 when it is not stored): where its detail is read from.
     var eventId: Int = 0
+    /// Why a step failed, in one short sentence, when the daemon said (item 1394): the row says it under its line, so that
+    /// two steps that look alike are told apart by what happened to them.
+    var failure: String?
 }
 
 /// A step or a question the run asks the owner about. `question` is set for `ask_user`.
@@ -401,7 +404,10 @@ struct ChatState: Sendable, Equatable {
         else { return }
         let ok: Bool = event.data["ok"]?.bool ?? true
         row.state = ok ? .ok : .failed
-        if let summary: String = event.data["summary"]?.string, !summary.isEmpty { row.line = shortened(summary, 120) }
+        if let summary: String = event.data["summary"]?.string, !summary.isEmpty {
+            // A step that worked is said by what it did; a step that failed keeps what it was asked and says why.
+            if ok { row.line = shortened(summary, 120) } else { row.failure = failureSentence(summary) }
+        }
         items[at].kind = .tool(row)
     }
 
@@ -480,6 +486,15 @@ func toolPhrase(tool: String, args: JSONValue?) -> String {
         if let value: String = args?[key]?.string, !value.isEmpty { return "\(name): \(shortened(value, 80))" }
     }
     return name
+}
+
+/// The first sentence of an error, short enough for a line ("Unknown tool 'shell'. Available tools: a, b" is "Unknown tool
+/// 'shell'"). The whole text is in the step's detail.
+func failureSentence(_ summary: String, limit: Int = 90) -> String {
+    let flat: String = summary.split(whereSeparator: \.isNewline).first.map(String.init) ?? summary
+    var first: String = flat
+    if let stop: Range<String.Index> = flat.range(of: ". ") { first = String(flat[..<stop.lowerBound]) }
+    return shortened(first.trimmingCharacters(in: .whitespacesAndNewlines), limit)
 }
 
 extension String {

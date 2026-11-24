@@ -56,7 +56,7 @@ struct ChatView: View {
         .dotScreenBackground()
         .navigationTitle(model.title)
         .navigationBarTitleDisplayMode(.inline)
-        .dotSubtitle(subtitle)
+        .dotSubtitle(subtitle, tone: subtitleTone)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showsInspector = true } label: { Image(systemName: "info.circle") }
@@ -131,6 +131,12 @@ struct ChatView: View {
         .dotAnimation(Motion.bouncy, value: atBottom)
     }
 
+    /// The subtitle's colour: the warm one while the run waits on the owner, as the capsule's.
+    private var subtitleTone: Color? {
+        if case .waitingOnYou = model.state.line { return Theme.warn }
+        return nil
+    }
+
     private func openDock(_ kind: DockSummary.Kind) {
         switch kind {
         case .queue: showsQueue = true
@@ -143,7 +149,8 @@ struct ChatView: View {
     /// The line under the title (iOS 26): how the run stands.
     private var subtitle: String {
         switch model.state.line {
-        case .idle: ""
+        case .idle:
+            DurationWords.subtitle(status: model.run?.status ?? "", finishedAt: model.run?.finishedAt) ?? ""
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
         case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
@@ -154,6 +161,8 @@ struct ChatView: View {
 
 /// How far the reader is from the end of the transcript, and how tall it is.
 private struct ScrollMetrics: Equatable {
+    /// What floats over the foot of the list (the capsule and the composer): it grows when a segment comes.
+    var bottomInset: CGFloat = 0
     var fromBottom: CGFloat
     var contentHeight: CGFloat
     var viewport: CGFloat
@@ -203,6 +212,11 @@ private struct Transcript: View {
                             .padding(.top, 20)
                             .id(send.id)
                     }
+                    if let words: String = model.finishedWords {
+                        Text(words).font(Theme.meta).foregroundStyle(Theme.faint)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.top, Space.m)
+                            .accessibilityIdentifier("run-finished")
+                    }
                     Color.clear.frame(height: 1).id(bottomId)
                 }
                 .padding(.horizontal, Space.l)
@@ -216,13 +230,18 @@ private struct Transcript: View {
                 // already scrolled (the offset is measured from the top inset), and the inset at the foot (the
                 // composer floats over it) is not a distance the reader has to scroll.
                 ScrollMetrics(
+                    bottomInset: geometry.contentInsets.bottom.rounded(),
                     fromBottom: (geometry.contentSize.height - geometry.containerSize.height
                         - (geometry.contentOffset.y + geometry.contentInsets.top)).rounded(),
                     contentHeight: geometry.contentSize.height.rounded(),
                     viewport: geometry.containerSize.height.rounded())
             } action: { _, now in
                 if abs(now.viewport - viewport) > 1 { viewport = now.viewport }
+                let insetGrew: Bool = now.bottomInset - latest.bottomInset > 1
                 latest = now
+                // A segment of the capsule came while the reader was at the end: the foot is taller, and the last row is
+                // brought up above it instead of left under it.
+                if insetGrew, atBottom, !userScrolling, model.olderAnchor == nil { settle(proxy) }
                 // Content that grew under the reader (words streaming in) is not the reader leaving the bottom: only
                 // the reader's own scrolling says where they are.
                 if userScrolling { atBottom = now.fromBottom <= 32 }
@@ -342,7 +361,7 @@ struct Composer: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Attach a photo")
-                TextField(model.isWorking ? "Queue a message" : "Message Dot", text: $model.draft, axis: .vertical)
+                TextField("", text: $model.draft, prompt: Text(placeholder).foregroundStyle(Theme.muted), axis: .vertical)
                     .font(Theme.body)
                     .lineLimit(1...6)
                     .focused($focused)
@@ -368,6 +387,16 @@ struct Composer: View {
 
     private var showsStop: Bool { model.isWorking && !model.canSend }
 
+    /// The run waits on the owner: the card above asks, and the one thing the box can do meanwhile is queue a note.
+    private var waitingOnYou: Bool {
+        if case .waitingOnYou = model.state.line { return true }
+        return false
+    }
+
+    private var placeholder: String {
+        waitingOnYou ? "Answer above, or queue a note" : (model.isWorking ? "Queue a message" : "Message Dot")
+    }
+
     /// One round button for all three: the arrow, the queue mark, the stop square. Its symbol is replaced in place.
     private var actionButton: some View {
         Button {
@@ -381,13 +410,18 @@ struct Composer: View {
         } label: {
             Image(systemName: showsStop ? "stop.fill" : (model.isWorking ? "text.append" : "arrow.up"))
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(showsStop ? Theme.background : (model.canSend ? Theme.onAccent : Theme.faint))
+                .foregroundStyle(showsStop ? (waitingOnYou ? Theme.text : Theme.background) : (model.canSend ? Theme.onAccent : Theme.muted))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 36, height: 36)
                 .background {
+                    // The white disc of Stop is the loudest thing on the screen: while the run waits on a decision it is a
+                    // quiet tonal one, so that the card is.
                     Circle().fill(
-                        showsStop ? AnyShapeStyle(Theme.text) : (model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
+                        showsStop
+                            ? (waitingOnYou ? AnyShapeStyle(Theme.raised) : AnyShapeStyle(Theme.text))
+                            : (model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
                 }
+                .overlay { if showsStop && waitingOnYou { Circle().strokeBorder(Theme.hairline, lineWidth: 1) } }
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
         }

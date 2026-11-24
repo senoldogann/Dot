@@ -262,7 +262,7 @@ struct NewChatView: View {
                             .frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .accessibilityLabel("Attach a photo")
-                    TextField(agent.map { "Message \($0.record.name)" } ?? "Message Dot", text: $model.draft, axis: .vertical)
+                    TextField("", text: $model.draft, prompt: Text(agent.map { "Message \($0.record.name)" } ?? "Message Dot").foregroundStyle(Theme.muted), axis: .vertical)
                         .font(Theme.body)
                         .lineLimit(1...6)
                         .focused($focused)

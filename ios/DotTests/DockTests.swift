@@ -90,6 +90,9 @@ final class DockTests: XCTestCase {
         XCTAssertEqual(DockSummary.rhythm("every 2 hours"), "every 2 h")
         XCTAssertEqual(DockSummary.rhythm("every weekday at 10:00 and 15:00"), "1 loop")
         XCTAssertEqual(DockSummary.rhythm("  "), "1 loop")
+        XCTAssertEqual(DockSummary.rhythm("cron */10 * * * *"), "every 10 min")
+        XCTAssertEqual(DockSummary.rhythm("cron 0 */2 * * *"), "every 2 h")
+        XCTAssertEqual(DockSummary.rhythm("cron 30 9 * * 1-5"), "1 loop", "a cron the capsule cannot say in a word is just a loop")
     }
 
     func testTheSegmentsStandInOneOrder() throws {

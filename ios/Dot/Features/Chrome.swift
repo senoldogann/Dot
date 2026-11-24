@@ -28,9 +28,14 @@ private struct DotScreenBackground: ViewModifier {
 
 private struct DotSubtitle: ViewModifier {
     let words: String
+    let tone: Color?
 
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 26, *), DotDesign.liquidGlass { content.navigationSubtitle(words) } else { content }
+        if #available(iOS 26, *), DotDesign.liquidGlass {
+            if let tone { content.navigationSubtitle(Text(words).foregroundStyle(tone)) } else { content.navigationSubtitle(words) }
+        } else {
+            content
+        }
     }
 }
 
@@ -53,7 +58,7 @@ extension View {
     func dotScreenBackground(inSheet: Bool = false) -> some View { modifier(DotScreenBackground(inSheet: inSheet)) }
 
     /// A line under the navigation title (iOS 26); nothing before it.
-    func dotSubtitle(_ words: String) -> some View { modifier(DotSubtitle(words: words)) }
+    func dotSubtitle(_ words: String, tone: Color? = nil) -> some View { modifier(DotSubtitle(words: words, tone: tone)) }
 
     /// Soft edges where a scroll view runs under the bars (iOS 26's scroll edge effect).
     func dotScrollEdges() -> some View { modifier(DotScrollEdges()) }

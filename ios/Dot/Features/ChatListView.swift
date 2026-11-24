@@ -45,23 +45,14 @@ struct ChatListView: View {
             .refreshable { await store.refreshList() }
             .navigationTitle("Dot")
             .navigationBarTitleDisplayMode(.large)
-            .safeAreaInset(edge: .bottom, alignment: .trailing, spacing: 0) {
-                Button { composing = .home } label: {
-                    Label("New chat", systemImage: "square.and.pencil")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.onAccent)
-                        .padding(.horizontal, Space.l + 2).frame(minHeight: 52)
-                        .dotProminentGlass(in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-                .accessibilityLabel("New chat")
-                .accessibilityIdentifier("new-chat")
-                .padding(.trailing, Space.l).padding(.bottom, Space.s)
-                .sensoryFeedback(.impact(weight: .light), trigger: composing != nil)
-            }
             .dotAnimation(Motion.smooth, value: store.threads.map { "\($0.id)\($0.state)" })
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { composing = .home } label: { Image(systemName: "square.and.pencil") }
+                        .accessibilityLabel("New chat")
+                        .accessibilityIdentifier("new-chat")
+                        .sensoryFeedback(.impact(weight: .light), trigger: composing != nil)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { model.showsSettings = true } label: { Image(systemName: "gearshape") }
                         .accessibilityLabel("Settings")
@@ -132,7 +123,7 @@ struct ChatListView: View {
             ForEach(threads) { thread in
                 Button { path.append(thread) } label: { ThreadRow(thread: thread) }
                     .buttonStyle(RowPressStyle())
-                    .listRowBackground(Color.clear)
+                    .listRowBackground(thread.isWaitingOnYou ? Theme.warn.opacity(0.08) : Color.clear)
                     .listRowSeparatorTint(Theme.hairline)
                     .alignmentGuide(.listRowSeparatorLeading) { _ in 70 }
                     .listRowInsets(EdgeInsets(top: 0, leading: Space.l, bottom: 0, trailing: Space.l))
@@ -181,7 +172,9 @@ struct ThreadRow: View {
     @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
     var body: some View {
-        if typeSize.isAccessibilitySize { stacked } else { regular }
+        Group { if typeSize.isAccessibilitySize { stacked } else { regular } }
+            .accessibilityElement(children: .combine)
+            .accessibilityValue(thread.isWaitingOnYou ? "Needs you" : (thread.isWorking ? "Working" : ""))
     }
 
     /// At the accessibility sizes a row has no room for two columns: the mark and the age go over the words.
@@ -195,11 +188,6 @@ struct ThreadRow: View {
             }
             Text(thread.title.isEmpty ? "New chat" : thread.title)
                 .font(.body.weight(thread.unread ? .semibold : .regular)).foregroundStyle(Theme.text).lineLimit(3)
-            if thread.isWaitingOnYou {
-                StatusPill(text: "Needs you", symbol: "hand.raised.fill", tone: Theme.warn, pulse: true)
-            } else if thread.isWorking {
-                StatusPill(text: "Working", symbol: "waveform", tone: Theme.accent, pulse: true)
-            }
             Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(3)
         }
         .padding(.vertical, Space.m)
@@ -219,11 +207,6 @@ struct ThreadRow: View {
                     Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 }
                 HStack(spacing: Space.s) {
-                    if thread.isWaitingOnYou {
-                        StatusPill(text: "Needs you", symbol: "hand.raised.fill", tone: Theme.warn, pulse: true)
-                    } else if thread.isWorking {
-                        StatusPill(text: "Working", symbol: "waveform", tone: Theme.accent, pulse: true)
-                    }
                     Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(thread.state == .idle ? 2 : 1)
                     Spacer(minLength: Space.xs)
                     if thread.loopCron != nil {

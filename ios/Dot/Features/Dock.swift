@@ -42,7 +42,7 @@ struct DockCapsule: View {
         let spinning: Bool = segment.kind == .status && (segment.symbol == "circle.dashed" || segment.symbol == "arrow.triangle.2.circlepath")
         return HStack(spacing: Space.s - 2) {
             Image(systemName: segment.symbol)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(tone(segment.tone))
                 .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: segment.symbol == "waveform")
                 .symbolEffect(.pulse, options: .repeating, isActive: spinning)
@@ -113,7 +113,7 @@ struct QueueSheet: View {
                     if model.queue.held { held }
                     CardGroup(
                         title: "Next up",
-                        footer: "The first one starts when the run at work ends. Send now hands one to the run at work instead."
+                        footer: "The first one starts when this run finishes. Send now hands it over immediately."
                     ) {
                         let messages: [QueuedMessage] = model.queue.messages
                         ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in

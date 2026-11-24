@@ -27,7 +27,7 @@ struct PairView: View {
                     step(2, "Press for a new code, and type it here.")
                 }
                 .card()
-                TextField("7KQ2-M9XD", text: $code)
+                TextField("", text: $code, prompt: Text("7KQ2-M9XD").foregroundStyle(Theme.muted))
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
                     .font(.system(.title2, design: .monospaced).weight(.medium))

@@ -140,7 +140,7 @@ code** takes its place. The same by hand:
    › The design) is iOS-native: near-black surfaces in the dark and a cool white in the light, following the system, one
    calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
    chrome only: the composer bar, the capsule over it, the agents' chips (a ring on each that turns while the
-   agent works and is amber while it waits for you), the new-chat button and the Allow and Deny of an approval, which is
+   agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
    the loudest card in a chat; message text and lists are never glass. What it still leaves to the web UI is in
    `roadmap/1353.md`. The
    app's notifications are its own, through APNs: Settings in the app opens the

@@ -306,18 +306,16 @@ struct GlassCircleButton: View {
 
 // MARK: - Surfaces
 
-/// A surface with a hairline border, the 12-point radius, and in the light a breath of shadow.
+/// A surface with a hairline border and the 12-point radius, flat in both looks (no shadow, no gradient: one card recipe).
 struct Card: ViewModifier {
     var fill: Color = Theme.surface
     var radius: CGFloat = Radius.m
-    @Environment(\.colorScheme) private var scheme: ColorScheme
     @Environment(\.colorSchemeContrast) private var contrast: ColorSchemeContrast
 
     func body(content: Content) -> some View {
         content
             .background(fill, in: RoundedRectangle(cornerRadius: radius))
             .overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(contrast == .increased ? Theme.hairlineStrong : Theme.hairline, lineWidth: 1))
-            .shadow(color: scheme == .light ? Color.black.opacity(0.04) : .clear, radius: 6, y: 1)
     }
 }
 

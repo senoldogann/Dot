@@ -47,6 +47,12 @@ final class ChatModel {
     private(set) var queue: QueueView = QueueView(held: false, messages: [], besideRunId: nil, besideThreadId: nil)
     private(set) var automations: [ThreadAutomation] = []
     private(set) var run: RunRecord?
+
+    /// "Done · 3 steps · 1m 12s", under the last message of a run that ended well; nil while it works or when it did not.
+    var finishedWords: String? {
+        guard let run, !isWorking else { return nil }
+        return DurationWords.finished(status: run.status, steps: run.steps, startedAt: run.createdAt, finishedAt: run.finishedAt)
+    }
     /// What the owner sent from here that the Mac has not yet taken, oldest first (the outbox's messages of this chat).
     var pending: [PendingSend] {
         store.outbox.items(for: threadId).compactMap { item in
