@@ -31,6 +31,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
 | [1726](1726.md) | done | 2026-11-24 | DotNext's chat, whole: the work log, the ask dock in the composer's place, the composer, the queue and its edit, the inspector |
 | [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |
+| [1724](1724.md) | decided | 2026-11-24 | MCP servers are not started lazily: measured, and kept as they are |
 | [1723](1723.md) | done | 2026-11-24 | A skill without a frontmatter loads as Claude Code loads it, and a skill left out is logged with what to do |
 | [1722](1722.md) | done | 2026-11-24 | A call Dot's own rule turns another way is recorded as steered, not failed |
 | [1721](1721.md) | done | 2026-11-24 | A shown page that names media by a web address is refused with why, a page too long says how to shrink, and the pages of one step keep the call order |
