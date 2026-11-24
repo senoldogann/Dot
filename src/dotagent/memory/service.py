@@ -19,7 +19,7 @@ vector plus that one batch.
 
 import re
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from pydantic import ValidationError
@@ -601,8 +601,54 @@ def fit_groups(groups: Sequence[Sequence[MemoryRecord]], budget: int) -> tuple[l
     return [note for group in groups for note in group if note.id in picked], spent
 
 
+# The tags of a note about code, the repository and its checks: the only notes a code review starts with (audit
+# 2026-11-24, D3: the pre-push review was handed the owner's business and character notes, 1,606 tokens a review).
+CODE_TAGS: frozenset[str] = frozenset(
+    {
+        "code",
+        "code-review",
+        "review",
+        "repo",
+        "dot-repo",
+        "git",
+        "github",
+        "ci",
+        "tests",
+        "python",
+        "rust",
+        "javascript",
+        "typescript",
+    }
+)
+
+
+def about_code(record: MemoryRecord) -> bool:
+    """Whether ``record`` is tagged as a note about code (:data:`CODE_TAGS`)."""
+    return not CODE_TAGS.isdisjoint(record.tags)
+
+
+def any_note(record: MemoryRecord) -> bool:
+    """Every note may be among a run's starting notes, as far as its subject goes."""
+    return True
+
+
+async def review_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
+    """The notes a code review starts with: :func:`prompt_memories` of the notes tagged as about code alone
+    (:func:`about_code`), the standing ones among them. A review reads a diff, and the owner's other notes, their
+    business and Dot's character, tell it nothing about the code."""
+    return await _starting_notes(index, query, budget, agent_id, about_code)
+
+
 async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id: str | None) -> Remembered:
-    """The notes a run of the agent ``agent_id`` (``None`` for Dot) starts with, without repeats, as many as fit
+    """:func:`_starting_notes` of every note (:func:`any_note`)."""
+    return await _starting_notes(index, query, budget, agent_id, any_note)
+
+
+async def _starting_notes(
+    index: MemoryIndex, query: str, budget: int, agent_id: str | None, admits: Callable[[MemoryRecord], bool]
+) -> Remembered:
+    """The notes a run of the agent ``agent_id`` (``None`` for Dot) starts with, of those ``admits`` takes, without
+    repeats, as many as fit
     ``budget`` tokens, each group within its own share first (:func:`fit_groups`), in this order: the standing ones
     (:func:`stands`: tagged ``core`` and the owner's, newest first), the ones the user wrote (closest to ``query``
     first), the agent's own lessons and then Dot's notes related to ``query`` (the goal and the earlier goals of its
@@ -653,6 +699,7 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     own: list[MemoryRecord] = [record for record in fresh if record.agent_id is not None]
     shared: list[MemoryRecord] = [record for record in fresh if record.agent_id is None]
     groups: tuple[list[MemoryRecord], ...] = (standing, users, own, shared)
+    groups = tuple([record for record in group if admits(record)] for group in groups)
     tainted: int = sum(1 for group in groups for record in group if record.tainted)
     taken, spent = fit_groups(tuple([record for record in group if not record.tainted] for group in groups), budget)
     return Remembered(records=tuple(taken), tokens=spent, tainted_left_out=tainted)

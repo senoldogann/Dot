@@ -79,6 +79,12 @@ dotx memory unmerge NOTE_ID     # take back a merge: its sources wake apart, the
 dotx memory reindex      # embed every note again, for example after changing [memory] embed_model
 ```
 
+- A code review (a run whose source is `review`, as the pre-push review's) starts only with the notes tagged as about
+  code: `code`, `code-review`, `review`, `repo`, `dot-repo`, `git`, `github`, `ci`, `tests`, `python`, `rust`,
+  `javascript` or `typescript`, chosen as below among them alone, standing ones included (item 1712). Measured on the
+  owner's Mac on 2026-11-24: the 216 reviews of the fortnight before were each handed 1,606 tokens of notes on
+  average (the owner's business notes, Dot's character notes), none of them tagged so. `memory_search` still finds
+  every note.
 - A run starts with the standing notes (newest first): tagged `core` and yours, a note you wrote or one you pinned. A
   run may tag a note `core` to ask that it stand; it stands once you pin it on the Memory page, which marks such a note
   **Always, once pinned** until you do, and until then it is handed when it fits the goal, rests and may be proposed to be
