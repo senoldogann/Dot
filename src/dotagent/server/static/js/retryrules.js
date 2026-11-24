@@ -8,6 +8,18 @@
 export const READ_TIMEOUT_MS = 10_000;
 /** How long a write waits: what was done is kept and sent again with its key (the iPhone app gives a write 30 s). */
 export const WRITE_TIMEOUT_MS = 30_000;
+// The writes the outbox keeps (item 1523): a message (a next run, a steer, a place in the queue), an answer to an approval
+// or a question, a Stop, and the changes of a chat's queue. Only they are kept and sent again with their key.
+const KEPT_WRITE = /^\/(runs|runs\/[^/]+\/(steer|cancel)|approvals\/[^/]+\/decision|threads\/[^/]+\/queue(\/resume)?|queue\/[^/]+)$/;
+
+/**
+ * Whether a write to `path` is one the outbox keeps, and so gives up after `WRITE_TIMEOUT_MS` on a phone: any other write
+ * (a voice, a file, a side answer, a rewind) may take as long as it takes and is left to.
+ * @param {string} path the API path, without `/api`
+ */
+export function isKeptWrite(path) {
+  return KEPT_WRITE.test(path);
+}
 /** How many times a read is tried. */
 export const TRIES = 3;
 /** The wait before the second try; each wait after it is twice the one before, up to `MAX_WAIT_MS`. */

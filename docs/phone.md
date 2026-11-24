@@ -532,11 +532,14 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   Stop and a change of a chat's queue (a message edited, taken out, moved, the queue resumed) made while the phone has no
   link, or Dot cannot be reached, go into the outbox, in IndexedDB (the store `outbox` of `dot-cache`), with their key and
   their place in the order, before anything is asked of the network; they survive the page being killed, and the cache
-  being dropped with a key that is forgotten does not take them. A message shows at once under the chat as *Waiting to
-  send* with **Retry now** and **Edit** (Edit takes it back into the composer); an answer, a Stop and a change of the queue
-  are a line that says they wait. They are sent when the phone is online and the page in view (`online`, the page coming
+  being dropped with a key that is forgotten does not take them. A message shows under the chat as *Waiting to send*
+  with **Retry now** and **Edit** (Edit takes it back into the composer), once it is written, so that the row is never
+  shown before its entry is safe and the box that made it is cleared in the same turn: an Edit pressed on the row cannot
+  be answered by a box that is cleared after it; an answer, a Stop and a change of the queue are a line that says they
+  wait. They are sent when the phone is online and the page in view (`online`, the page coming
   back, the stream coming back, and a wait that grows from 0.5 to 15 seconds while Dot cannot be reached), one chat's
-  things in the order they were made, the one that waits holding the ones behind it; a write gives up after 30 seconds.
+  things in the order they were made, the one that waits holding the ones behind it; these writes give up after 30
+  seconds, and any other write (a voice, a file, a side answer) takes as long as it takes.
   A message goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue`, `POST /api/runs/{id}/steer`
   and `POST /api/runs`, item 189: the daemon keeps a key for a day, answers a repeat with what the first made, and refuses
   a second send with 409 while the first is under way, which is waited out), so an answer that was lost after Dot took the
