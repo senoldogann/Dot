@@ -86,6 +86,7 @@ func failureWords(_ failure: OutboxItem.Failure) -> String {
     case .runEnded: String(localized: "Not sent: the run had ended", comment: "Under a message meant for a run that ended before it arrived")
     case .tooOld: String(localized: "Not sent: it waited more than a day", comment: "Under an owner's message too old to send again safely")
     case .unreadable: String(localized: "Not sent: the Mac's answer could not be read", comment: "Under an owner's message whose answer was unreadable")
+    case .photoMissing: String(localized: "Not sent: a photo of it could not be read on this phone", comment: "Under an owner's message whose photo file is gone")
     }
 }
 

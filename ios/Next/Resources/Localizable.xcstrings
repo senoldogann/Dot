@@ -2299,6 +2299,17 @@
         }
       }
     },
+    "Not sent: a photo of it could not be read on this phone": {
+      "comment": "Under an owner's message whose photo file is gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: fotoğraflarından biri bu telefonda okunamadı"
+          }
+        }
+      }
+    },
     "Not sent: it waited more than a day": {
       "comment": "Under an owner's message too old to send again safely",
       "localizations": {

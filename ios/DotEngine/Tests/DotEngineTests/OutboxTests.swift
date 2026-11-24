@@ -155,6 +155,22 @@ final class OutboxTests: XCTestCase {
         XCTAssertEqual((try? FileManager.default.contentsOfDirectory(atPath: images.path)) ?? [], [])
     }
 
+    func testAMessageWhosePhotoIsGoneIsKeptWithTheReasonNeverSentShort() async throws {
+        let link: LinkWatcher = LinkWatcher(initial: .down)
+        let outbox: Outbox = box(link, mayStartChat: { true })
+        try await outbox.enqueue(message("two photos"), id: newMessageKey(), images: [Data("a".utf8), Data("b".utf8)])
+        let images: URL = folder.appending(path: "outbox-images")
+        let first: String = try XCTUnwrap(try FileManager.default.contentsOfDirectory(atPath: images.path).sorted().first)
+        try FileManager.default.removeItem(at: images.appending(path: first))
+        link.report(.up)
+        await outbox.nudge()
+        try await items(outbox, "refused") { $0.first?.phase == .failed }
+        let left: [OutboxItem] = await outbox.current
+        XCTAssertEqual(left.first?.failure, .photoMissing(name: first))
+        XCTAssertEqual(daemon.acceptedTexts, [], "not sent short of a photo")
+        XCTAssertEqual(daemon.uploadCount, 0)
+    }
+
     func testEditTakesAMessageBackWithItsPhotos() async throws {
         let outbox: Outbox = box(LinkWatcher(initial: .down), mayStartChat: { true })
         let key: String = newMessageKey()

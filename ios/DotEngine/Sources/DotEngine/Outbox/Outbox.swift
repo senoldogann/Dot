@@ -227,6 +227,12 @@ public actor Outbox {
             items[now].attempts += 1
             save()
             let item: OutboxItem = items[now]
+            // A photo whose file is gone is not left out in silence (the review's pre-existing finding): the message
+            // stays for the owner with the reason, never sent short of a photo.
+            if let missing: String = item.images.first(where: { !FileManager.default.isReadableFile(atPath: imageFolder.appending(path: $0).path) }) {
+                refuse(item, failure: .photoMissing(name: missing))
+                continue
+            }
             do {
                 let outcome: OutboxOutcome = try await perform(item)
                 finish(item.id, outcome)
@@ -369,7 +375,10 @@ public actor Outbox {
             default: []
             }
         for (number, name) in item.images.enumerated() where number >= uploaded.count {
-            guard let data: Data = try? Data(contentsOf: imageFolder.appending(path: name)) else { continue }
+            // Checked readable before the sending began; read again here, a file gone meanwhile is the same refusal.
+            guard let data: Data = try? Data(contentsOf: imageFolder.appending(path: name)) else {
+                throw DaemonRequestError.undecodable(path: name, detail: "the photo's file could not be read")
+            }
             uploaded.append(try await api.uploadAttachment(name: name, jpeg: data))
             if let at: Int = items.firstIndex(where: { $0.id == item.id }) {
                 items[at] = items[at].with(uploaded: uploaded)

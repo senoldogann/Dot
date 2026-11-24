@@ -58,6 +58,8 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case tooOld
         /// The answer could not be read.
         case unreadable
+        /// A photo of the message could not be read from the phone; the message is kept for the owner.
+        case photoMissing(name: String)
     }
 
     /// The item's id; for a keyed message, the key the daemon starts it once by.

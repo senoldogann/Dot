@@ -222,7 +222,7 @@ public func submittedAnswers(_ entries: [DockEntry], drafts: [String: QuestionDr
     }
 }
 
-/// The shortest secret a card takes (`SECRET_LEAST_CHARS`, held_secrets.py): a shorter one goes as a message instead.
+/// The shortest secret a card takes (`SECRET_LEAST_CHARS` of the web's `approvals.js`): a shorter one goes as a message instead.
 public let secretLeastCharacters: Int = 8
 
 // MARK: The composer

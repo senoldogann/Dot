@@ -7,6 +7,7 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    "Not sent: a photo of it could not be read on this phone": "Gönderilmedi: fotoğraflarından biri bu telefonda okunamadı",
     "Accounts": "Hesaplar",
     "Ask a side question the run does not see": "Çalışmanın görmediği bir yan soru sor",
     "Ask again every so often: /loop 30m <message>": "Belli aralıklarla yeniden sor: /loop 30m <mesaj>",

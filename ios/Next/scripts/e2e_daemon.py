@@ -50,6 +50,8 @@ from dotagent.server.thread_sync import watch_revisions
 
 TOKEN: str = "dotnext-e2e-token"
 MODEL: str = "ollama:scripted"
+# The first line of the config this script writes: a home that holds it is this script's own, and may be used again.
+CONFIG_MARK: str = "# A throwaway home of ios/Next/scripts/e2e_daemon.py"
 
 
 class ScriptProvider:
@@ -197,16 +199,28 @@ class ScriptProvider:
         return None
 
 
-async def serve(port: int) -> None:
-    home: Path = Path(os.environ["DOT_HOME"])
+def prepare_home() -> None:
+    """Refuses a home that may be the owner's, then writes the throwaway home's config (scripted model, supervised)."""
     for name in ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR"):
         if name not in os.environ:
             raise SystemExit(f"{name} must name a throwaway folder")
+    home: Path = Path(os.environ["DOT_HOME"])
+    config: Path = home / "config.toml"
+    # Only a throwaway home: one that does not exist yet, an empty one, or one this script made before (its config
+    # starts with the mark). Anything else may be the owner's own Dot, whose config this would replace.
+    made_here: bool = config.exists() and config.read_text(encoding="utf-8").startswith(CONFIG_MARK)
+    if home.exists() and any(home.iterdir()) and not made_here:
+        raise SystemExit(f"DOT_HOME={home} is not empty and was not made by this script: give it a mktemp -d folder")
     ensure_layout()
-    (home / "config.toml").write_text(
-        f'[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n\n[policy]\napprovals = "supervised"\n',
+    config.write_text(
+        f'{CONFIG_MARK}\n[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n\n'
+        '[policy]\napprovals = "supervised"\n',
         encoding="utf-8",
     )
+
+
+async def serve(port: int) -> None:
+    home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register("ollama", ScriptProvider())
     manager: RunManager = RunManager(runtime)
@@ -238,4 +252,5 @@ async def serve(port: int) -> None:
 
 
 if __name__ == "__main__":
+    prepare_home()
     asyncio.run(serve(int(sys.argv[1])))
