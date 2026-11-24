@@ -26,7 +26,8 @@ first message on its input, and answers as the message says:
   ``continued.json`` and finishes with ``Continued.``, unless the goal says ``die ... once`` no more (it then dies as
   the first did, every time) or ``refuse the resume`` (it answers an API error of the kind that says the session cannot
   be taken up again, and the new session that follows, which has no ``--resume`` and is told so, finishes with
-  ``Continued in a new session.``);
+  ``Continued in a new session.``; with ``the new session dies first`` the first of them is killed before it takes its
+  message in);
 - ``die while sending``: a step that calls ``shell`` through the door, and a SIGKILL half a second into the call, which
   the test makes slow and an action the policy keeps for the owner (item 1581: a call of that kind in flight is not
   continued);
@@ -159,6 +160,8 @@ def _go_on(plan: dict[str, object], said: str, resumed: bool) -> None:
         json.dumps({"args": sys.argv[2:], "messages": seen, "session": SESSION}), encoding="utf-8"
     )
     if plan["refuse"] and resumed:
+        sys.stderr.write("resume failed (key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789)\n")
+        sys.stderr.flush()
         _say(
             {
                 "type": "result",
@@ -188,6 +191,8 @@ async def _work(
     ):
         listed: ListToolsResult = await client.list_tools()
         _init(door, [f"mcp__{door}__{tool.name}" for tool in listed.tools])
+        if plan is not None and plan.get("silent_first"):
+            os.kill(os.getpid(), signal.SIGKILL)
         if plan is not None and plan["after_cut"]:
             _go_on(plan, said, resumed is not None)
             return
@@ -328,7 +333,11 @@ def _plan_of(record: Path, said: str, resumed: str | None) -> dict[str, object] 
         return {**json.loads((record / f"plan-{resumed}.json").read_text(encoding="utf-8")), "after_cut": True}
     if "could not be taken up again" in said:
         SESSION = f"ses-cut-{secrets.token_hex(4)}"
-        return {"always": False, "refuse": False, "how": "sigkill", "after_cut": True}
+        # ``the new session dies first``: the first new session is killed before it takes its message in.
+        silent: bool = "the new session dies first" in said and not (record / "fresh-died").exists()
+        if silent:
+            (record / "fresh-died").write_text("", encoding="utf-8")
+        return {"always": False, "refuse": False, "how": "sigkill", "after_cut": True, "silent_first": silent}
     if "die by" not in said and "die with" not in said and "die after" not in said and "die in a step" not in said:
         return None
     SESSION = f"ses-cut-{secrets.token_hex(4)}"
@@ -372,12 +381,12 @@ def main() -> None:
     )
     first: dict[str, object] = json.loads(sys.stdin.readline())
     message: dict[str, object] = first["message"]  # type: ignore[assignment]  # Dot's user line
-    # As the real program does with --replay-user-messages: it says it took the message in.
-    if "--replay-user-messages" in sys.argv:
-        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
     said: str = json.dumps(message["content"])
     resumed: str | None = _flag(args, "--resume") if "--resume" in args else None
     plan: dict[str, object] | None = _plan_of(record, said, resumed)
+    # As the real program does with --replay-user-messages: it says it took the message in.
+    if "--replay-user-messages" in sys.argv and not (plan is not None and plan.get("silent_first")):
+        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
     with (record / "starts.log").open("a", encoding="utf-8") as starts:
         starts.write(json.dumps({"resume": resumed, "session": SESSION}) + "\n")
     (record / "first.json").write_text(json.dumps(message["content"]), encoding="utf-8")

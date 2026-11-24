@@ -332,7 +332,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   may have sent a message or mail, a payment or a post for you was in flight, starts the program again in the same
   session and the same run, after 2 s and after 10 s, at most `[providers.claude_code] continue_cut` (2) times. It is
   one run all through: its id, its events and its steps go on, the run that delegated it keeps waiting for it, and a
-  helper that works in the background stays one; the page says "The program was cut off at 10:44; Dot continued the
+  helper that works in the background stays one; the page says "The program was cut off at 10:44:04; Dot continued the
   run" each time. A second program that is cut too is continued again until the count is used up; then the run fails
   with the exits of all the cuts in its context. The chat's session is kept only when the run ends clean (see
   [Models](models.md)).
