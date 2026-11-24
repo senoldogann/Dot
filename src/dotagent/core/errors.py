@@ -316,6 +316,13 @@ class ClaudeCodeBroke(ClaudeCodeError):
     (item 1206: a passing failure, which a schedule's task is tried again after)."""
 
 
+class ClaudeCodeCut(ClaudeCodeBroke):
+    """A run's Claude Code program ended before its result with nobody ending it: its output closed or its input broke
+    while the run still waited for it (item 1580). Killed from outside, crashed or exited by itself, it is a passing
+    failure as any :class:`ClaudeCodeBroke` is; the run's context says how it ended (``returncode``, ``signal``,
+    ``stderr``, ``inited``, ``steps``, ``silent_s``), and the run goes on in place when that is safe (item 1581)."""
+
+
 class ClaudePlanLimitError(ClaudeCodeError):
     """The owner's Claude plan's usage limit stopped a run (item 1206). ``resets_at`` is when the plan's window resets,
     in epoch seconds, ``None`` when the plan did not say; it is in the context too, which the run's end keeps."""
