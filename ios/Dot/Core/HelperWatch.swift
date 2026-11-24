@@ -52,3 +52,12 @@ enum HelperWords {
         return runWorking ? "\(count) \(noun) in the background" : "\(count) \(noun) working"
     }
 }
+
+/// What the composer's box says (item 1466 made "waiting on you" possible while the chat's own run is over, when a live helper asks).
+enum ComposerWords {
+    /// While a question waits the box can queue a note behind the run that works; with no run at work a message starts a new one.
+    static func placeholder(waitingOnYou: Bool, working: Bool) -> String {
+        if waitingOnYou { return working ? "Answer above, or queue a note" : "Answer above, or send a message" }
+        return working ? "Queue a message" : "Message Dot"
+    }
+}

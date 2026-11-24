@@ -91,6 +91,14 @@ final class HelperLineTests: XCTestCase {
         XCTAssertEqual(state.line, .helpersInBackground(count: 1), "h0 still works and nothing live asks")
     }
 
+    /// "Queue a note" is for a run that works; with the run over, what is typed starts a new run, and the box says so.
+    func testTheBoxDoesNotPromiseAQueueWhenNoRunWorks() {
+        XCTAssertEqual(ComposerWords.placeholder(waitingOnYou: true, working: true), "Answer above, or queue a note")
+        XCTAssertEqual(ComposerWords.placeholder(waitingOnYou: true, working: false), "Answer above, or send a message")
+        XCTAssertEqual(ComposerWords.placeholder(waitingOnYou: false, working: true), "Queue a message")
+        XCTAssertEqual(ComposerWords.placeholder(waitingOnYou: false, working: false), "Message Dot")
+    }
+
     // MARK: What it says
 
     func testTheHeaderSaysHowManyWorkOnceTheRunIsOverAndNotDoneAMinuteAgo() {
