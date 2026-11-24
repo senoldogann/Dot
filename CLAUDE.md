@@ -61,8 +61,10 @@ npm run check
 ## Review
 
 [REVIEW.md](REVIEW.md) says what the code review looks for here. `.claude/hooks/pre-push-review.sh` runs that review
-before every push, through Dot on the owner's Claude plan (`claude_code:opus`, effort medium), in research mode, so it
-reads the code and cannot change it, in a chat under Dot's **Code reviews**; its header says how to install and skip
+before every push, through Dot on the models the owner chose in Settings › Models › Code review (`[code_review]`, read by
+`dotx review plan`; by default `claude_code:opus` of the owner's Claude plan, effort medium, then DeepSeek), in research
+mode, so it reads the code and cannot change it, in a chat under Dot's **Code reviews**; a review that no model gives a
+verdict on, or that runs past its time limit, stops the push with "could not be reviewed"; its header says how to install and skip
 it. That hook is the one review a change gets: `/code-review` or a review subagent is not run on top of it. A finding is fixed or answered and pushed again, and the hook reads only
 the new commits. `/security-review` runs only when a change touches a path REVIEW.md lists under "Always needs a human".
 

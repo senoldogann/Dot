@@ -1211,6 +1211,36 @@ class CodeConfig(FrozenModel):
     result_chars: int = Field(ge=100_000, le=50_000_000)
 
 
+def _model_or_none(value: str) -> str:
+    """``""`` for none, or a model as :func:`_model_reference` takes it."""
+    return value if value == "" else _model_reference(value)
+
+
+type OptionalModelReference = Annotated[str, AfterValidator(_model_or_none)]
+
+
+class CodeReviewConfig(FrozenModel):
+    """The pre-push review of Dot's own repository (``[code_review]``, docs/command-line.md), as ``dotx review plan``
+    reads it for ``.claude/hooks/pre-push-review.sh``: the model that reviews a change at ``effort``, the models that
+    review it in their order when the one before gave no verdict (refused it, failed) at ``fallback_effort``, the model
+    that reviews a change of at most ``small_max_lines`` changed lines that touches no path REVIEW.md says always needs
+    a human (``""``: ``model`` reviews it too), and the minutes one push's review may take in all before it stops."""
+
+    model: ModelReference
+    effort: Effort
+    fallback: list[ModelReference]
+    fallback_effort: Effort
+    small_model: OptionalModelReference
+    small_max_lines: int = Field(ge=0, le=100_000)
+    max_minutes: int = Field(ge=1, le=240)
+
+    @model_validator(mode="after")
+    def _each_model_once(self) -> Self:
+        if len(set(self.fallback)) != len(self.fallback) or self.model in self.fallback:
+            raise ValueError("[code_review] names a model twice among model and fallback")
+        return self
+
+
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     builtin_mcp: BuiltinMcpConfig
@@ -1246,6 +1276,7 @@ class AppConfig(FrozenModel):
     meetings: MeetingsConfig
     phone: PhoneConfig
     code: CodeConfig
+    code_review: CodeReviewConfig
 
     @field_validator("mcp")
     @classmethod

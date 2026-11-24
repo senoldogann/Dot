@@ -163,7 +163,7 @@ async def _hold_first(page: Page, pattern: str, until: asyncio.Event) -> None:
 
 async def _listed(page: Page) -> list[str]:
     """The standby models the card lists, in their order."""
-    rows: Locator = page.locator(".standby-list .standby-row")
+    rows: Locator = page.locator(".models-standby .standby-list .standby-row")
     return await rows.evaluate_all("(rows) => rows.map((row) => row.dataset.model)")
 
 
@@ -234,6 +234,49 @@ async def test_settings_choose_the_standby_models_in_their_order(runtime: Runtim
                 await card.scroll_into_view_if_needed()
                 await page.mouse.move(0, 0)
                 await page.screenshot(path=str(tmp_path / f"standby-{width}-{scheme}.png"), animations="disabled")
+                await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_settings_choose_the_models_of_the_code_review(runtime: Runtime, served: str, tmp_path: Path) -> None:
+    """Item 1663: Settings › Models › Code review shows `[code_review]` and changes it; the pre-push hook reads the
+    same table through `dotx review plan`. Its fallbacks are a list of their own, apart from the task's."""
+    path: Path = config_path()
+    assert path == Path(os.environ["DOT_HOME"]) / "config.toml"
+    host, port = "127.0.0.1", int(served.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for index, (width, scheme) in enumerate(_SHOTS):
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{served}/#/settings/models")
+                fallbacks: Locator = page.locator(".models-review-fallbacks")
+                minutes: Locator = page.get_by_role("spinbutton", name="Minutes a review may take")
+                review: Locator = page.get_by_role("button", name="Review model: opus (not listed now)")
+                await expect(review).to_be_visible()
+                if index == 0:
+                    await expect(minutes).to_have_value("15")
+                    await expect(fallbacks.locator(".standby-row")).to_have_count(1)
+                    await page.get_by_role("combobox", name="Add a code review fallback").select_option(_HAIKU)
+                    await expect(fallbacks.locator(".standby-row")).to_have_count(2)
+                    await minutes.fill("20")
+                    await minutes.press("Enter")
+                    await expect(page.locator(".toast").last).to_contain_text("stops after 20 minutes")
+                    chosen = load_config(path).code_review
+                    assert (chosen.max_minutes, chosen.fallback) == (20, ["opencode_go:deepseek-v4.1-flash", _HAIKU])
+                    # The task's fallbacks are not the review's.
+                    assert tuple(load_config(path).models.standby) == runtime.roles.standby()
+                else:
+                    await expect(minutes).to_have_value("20")
+                    await expect(fallbacks.locator(".standby-row")).to_have_count(2)
+                assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                await fallbacks.scroll_into_view_if_needed()
+                await page.mouse.move(0, 0)
+                await page.screenshot(path=str(tmp_path / f"code-review-{width}-{scheme}.png"), animations="disabled")
                 await page.close()
         finally:
             await browser.close()

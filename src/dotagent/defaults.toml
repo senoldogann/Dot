@@ -1344,3 +1344,19 @@ max_calls = 200
 # The longest a tool's result may be when it is handed to the code. The model's own results are cut to [agent]
 # tool_output_chars; a code reads what it filters, and only what it prints reaches the model.
 result_chars = 5000000
+
+[code_review]
+# The review that .claude/hooks/pre-push-review.sh asks of Dot before a push of Dot's own repository (docs/command-line.md
+# "Code review before a push"); the hook reads these through `dotx review plan`, and Settings › Models › Code review
+# changes them. model reviews a change at effort; when it gives no verdict (it refused the diff, its plan was spent, it
+# failed), the models of fallback review it in their order at fallback_effort, each once; when none gives one, the push
+# stops. A change of at most small_max_lines changed lines that touches no path REVIEW.md lists under "Always needs a
+# human" is reviewed by small_model first ("" for model). One push's review stops after max_minutes in all, and so does
+# the push.
+model = "claude_code:opus"
+effort = "medium"
+fallback = ["opencode_go:deepseek-v4.1-flash"]
+fallback_effort = "high"
+small_model = ""
+small_max_lines = 150
+max_minutes = 15

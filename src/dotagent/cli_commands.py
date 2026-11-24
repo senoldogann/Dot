@@ -77,6 +77,13 @@ class ReflectCommand(FrozenModel):
     name: Literal["reflect"]
 
 
+class ReviewPlanCommand(FrozenModel):
+    name: Literal["review-plan"]
+    lines: int = Field(ge=0)
+    changed: str
+    guide: str
+
+
 class BrowserLoginCommand(FrozenModel):
     name: Literal["browser-login"]
     url: str | None
@@ -526,6 +533,7 @@ type Command = Annotated[
     | DoctorCommand
     | SetupCommand
     | ReflectCommand
+    | ReviewPlanCommand
     | HarnessListCommand
     | HarnessShowCommand
     | HarnessDiffCommand

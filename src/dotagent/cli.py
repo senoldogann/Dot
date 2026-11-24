@@ -48,6 +48,7 @@ _FAMILIES: dict[str, str] = {
     "doctor": "dotagent.cli_doctor",
     "setup": "dotagent.cli_setup",
     "reflect": "dotagent.cli_reflect",
+    "review-plan": "dotagent.cli_review",
     "browser-login": "dotagent.cli_browser",
     "browser-meetings-login": "dotagent.cli_browser",
     "browser-import-chrome": "dotagent.cli_browser",
@@ -526,6 +527,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    review = commands.add_parser("review", help="the pre-push review of Dot's own repository ([code_review])")
+    review_commands = review.add_subparsers(dest="review_action", required=True)
+    review_plan = review_commands.add_parser(
+        "plan", help="print the models the review of a change tries, in order, and its time limit, for the hook"
+    )
+    review_plan.add_argument("--lines", type=int, required=True, help="the change's changed lines, added and removed")
+    review_plan.add_argument("--changed", required=True, help="a file with the change's paths, one per line")
+    review_plan.add_argument("--guide", required=True, help='REVIEW.md, whose "Always needs a human" paths it reads')
+
     backup = commands.add_parser("backup", help="the copies of Dot's database: make one now, or list them")
     backup_commands = backup.add_subparsers(dest="backup_action", required=True)
     backup_commands.add_parser("now", help="copy the database now into [store] backup_dir and thin the older copies")
@@ -688,6 +698,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     service_action: object = raw.pop("service_action", None)
     eval_action: object = raw.pop("eval_action", None)
     backup_action: object = raw.pop("backup_action", None)
+    review_action: object = raw.pop("review_action", None)
     models_action: object = raw.pop("models_action", None)
     if raw["name"] == "models" and models_action == "profile":
         raw["name"] = "models-profile"
@@ -719,6 +730,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"eval-{eval_action}"
     if raw["name"] == "backup":
         raw["name"] = f"backup-{backup_action}"
+    if raw["name"] == "review":
+        raw["name"] = f"review-{review_action}"
     try:
         return COMMAND_ADAPTER.validate_python(raw)
     except ValidationError as exc:
