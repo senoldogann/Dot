@@ -9,7 +9,9 @@ can go over before it is seen, which :mod:`dotagent.codemode.runner` says as it 
 
 import ctypes
 import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 _LIBPROC: str = "/usr/lib/libproc.dylib"
@@ -70,9 +72,24 @@ def resident_bytes(pid: int) -> int | None:
 
 
 def memory_is_watchable() -> bool:
-    """Whether the memory of a process can be read here: the probe of code mode needs it, since a code mode that cannot
-    watch its memory has no limit on it."""
-    return resident_bytes(os.getpid()) is not None
+    """Whether the memory of another process can be read here: the probe of code mode needs it, since a code mode that
+    cannot watch the memory of the code it starts has no limit on it. A process of this one's own is not the question
+    (a process may read itself where it may not read another): a short-lived one is started and read. Blocking."""
+    child: subprocess.Popen[bytes] = subprocess.Popen(
+        [sys.executable, "-I", "-S", "-c", "import time; time.sleep(5)"],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        for _ in range(100):
+            if resident_bytes(child.pid) is not None:
+                return True
+            time.sleep(0.01)
+        return False
+    finally:
+        child.kill()
+        child.wait()
 
 
 def scratch_usage(folder: Path, most_entries: int) -> tuple[int, int]:

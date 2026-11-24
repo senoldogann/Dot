@@ -98,6 +98,23 @@ class Tree:
             os.close(inside)
         os.rmdir(parts[-1], dir_fd=parent)
 
+    def clear(self, parts: tuple[str, ...]) -> None:
+        """Remove everything in the folder ``parts``, which stays, following no link: a link in it is removed and what
+        it leads to is not touched, and a link in the place of the folder itself is an :class:`OSError`."""
+        _empty(self.folder(parts, create=False))
+
+    def entries(self, parts: tuple[str, ...]) -> list[os.DirEntry[str]]:
+        """What is in the folder ``parts``, read through its descriptor (a link in its place is an :class:`OSError`)."""
+        with os.scandir(self.folder(parts, create=False)) as listing:
+            return list(listing)
+
+    def modified(self, parts: tuple[str, ...]) -> float | None:
+        """When the folder ``parts`` was last changed, or ``None`` when it is not there or is not this user's."""
+        try:
+            return os.fstat(self.folder(parts, create=False)).st_mtime
+        except OSError:
+            return None
+
     def write(self, parts: tuple[str, ...], data: bytes, mode: int = _FILE) -> None:
         """Write ``data`` as the file ``parts`` below the root: whole or not at all, over whatever file is there."""
         inside: int = self.folder(parts[:-1])

@@ -143,8 +143,9 @@ What it cannot do, and the kernel says so (`Operation not permitted`) whatever p
 
 - reach the network: a socket can be made, and every connect, bind and send is refused (`urllib`, DNS and a Unix socket
   too);
-- start a program: `subprocess`, `os.system`, `fork`, `exec` and `posix_spawn` are refused, and the process may hold no
-  second process (`RLIMIT_NPROC` is 1, so a fork bomb dies at its first fork);
+- start a program: `subprocess`, `os.system`, `fork` and `posix_spawn` are refused, and so is `exec` of any program but the
+  interpreter itself (a code that execs it becomes a fresh interpreter in the same sandbox, which reads no more than it
+  did), and the process may hold no second process (`RLIMIT_NPROC` is 1, so a fork bomb dies at its first fork);
 - read or write any file but those two folders: not yours, not Dot's home, not `~/Library`, not the keychain, not even
   the names in `/Users`;
 - reach a service of the system (the clipboard, the keychain, Launch Services) or signal another process;
@@ -156,10 +157,12 @@ What it cannot do, and the kernel says so (`Operation not permitted`) whatever p
   address with a password in it).
 
 The kernel holds the process to limits too: CPU time, the largest file it writes (64 MB), the files it has open (256), one
-process, no core file. What the kernel cannot hold, Dot watches from outside, many times a second, and answers with a
+process, no core file; a limit that cannot be set ends the launcher before the code runs, so a code never runs with fewer
+guards than it is promised. What the kernel cannot hold, Dot watches from outside, many times a second, and answers with a
 kill of the whole process group: the code's own time (`time.sleep` is part of it; the time a tool call takes and the time
 you take to answer are not, they have limits of their own), its resident memory (macOS has no kernel limit for it: this is
-a watch, and a single allocation larger than what is read between two looks goes over before it is seen), what it prints
+a watch, and a single allocation larger than what is read between two looks goes over before it is seen; a process whose
+memory cannot be read for half a second is stopped, as it cannot be limited), what it prints
 (a head and a tail are kept; past 64 MB it is stopped), what it leaves in its scratch folder (256 MB and 5,000 entries; a
 folder over that is emptied before the next code), the run's Stop, and a frame on the bridge that is not a call.
 
@@ -167,7 +170,8 @@ folder over that is emptied before the next code), the run's Stop, and a frame o
 
 The only way Dot starts the code is behind `sandbox-exec`. Before the first `code_run` of the daemon Dot probes it once:
 it starts Python in a throwaway sandbox and checks that the code can use its two folders and that a file outside, a write
-outside, `/Users`, the network, `fork` and a spawn are each refused by the sandbox itself. A success is kept for as long as
+outside, `/Users`, the network, `fork`, a spawn and an `exec` of another program are each refused by the sandbox itself, and
+that the memory of a process it started can be read. A success is kept for as long as
 the daemon runs, a failure for five minutes. A Mac where the probe fails (no `sandbox-exec`, a profile the kernel refuses,
 a sandbox that does not hold) runs no code: `code_run` answers that code mode needs the macOS sandbox, which did not start,
 and why. Nothing is ever run without it.
