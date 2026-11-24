@@ -70,7 +70,7 @@ from dotagent.restart_flag import NOTICE_AFTER_S, RestartFlag, read_flag
 from dotagent.server.daemon import run_daemon
 from dotagent.server.guard import PROOF_PATH, daemon_proof, read_token
 from dotagent.server.links import base_url, health_url, ui_url
-from dotagent.server.views import HealthView, PermissionsView, ProofView
+from dotagent.server.views import AwakeState, HealthView, PermissionsView, ProofView
 
 _OPEN: str = "/usr/bin/open"
 _PBCOPY: str = "/usr/bin/pbcopy"
@@ -349,6 +349,14 @@ def _flag_or_none() -> RestartFlag | None:
         return None
 
 
+# What ``dotx service status`` says of the daemon's hold on the Mac's idle sleep while Dot works (item 1671).
+_AWAKE_LINES: dict[AwakeState, str] = {
+    "holding": "keeps the Mac from idle sleep now: Dot works, or its last work ended less than a minute ago",
+    "idle": "keeps the Mac from idle sleep while Dot works; nothing works now",
+    "off": "the Mac sleeps as it would while Dot works ([daemon] keep_awake = false)",
+}
+
+
 async def cmd_service_status(command: ServiceStatusCommand) -> int:
     config: AppConfig = load_user_config()
     url: str = health_url(config.server.host, config.server.port)
@@ -379,6 +387,7 @@ async def cmd_service_status(command: ServiceStatusCommand) -> int:
         sys.stdout.write(
             f"daemon   answers at {base_url(config.server.host, config.server.port)} (version {health.version})\n"
         )
+        sys.stdout.write(f"awake    {_AWAKE_LINES[health.awake]}\n")
     sys.stdout.write(f"logs     {log_dir()}\n")
     return 0 if status.job is not None and health is not None else 1
 

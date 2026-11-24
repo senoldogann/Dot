@@ -1,10 +1,20 @@
-"""Keeping the Mac awake while it charges (item 271), so that a phone reaches Dot away from home: the daemon holds
-macOS's ``caffeinate -s``, which keeps the system from sleeping while it runs on power, for as long as Settings ›
-Phone asks it to; ``-w`` ends it with the daemon's process. Closing a MacBook's lid still puts it to sleep, as macOS
+"""Keeping the Mac awake: while it charges (item 271), so that a phone reaches Dot away from home, and while Dot works
+(item 1671), so that idle sleep never freezes a run, a schedule's run or a meeting in the middle of a step.
+
+For the phone, the daemon holds macOS's ``caffeinate -s``, which keeps the system from sleeping while it runs on power,
+for as long as Settings › Phone asks it to. While Dot works (``[daemon] keep_awake``), it holds ``caffeinate -i``, which
+keeps the system from idle sleep on power and on battery alike, from the first work on until ``keep_awake_after_s``
+after the last ended (:func:`keep_awake_while_working`); the display still sleeps. Both are a child ``caffeinate`` with
+``-w`` and the daemon's pid rather than an IOKit power assertion made in the daemon's own process: ``-w`` lets the
+assertion go when the daemon ends however it ends (a crash too), ``pmset -g assertions`` names it, and a test points
+``DOT_CAFFEINATE`` at a stand-in that keeps nothing awake. Closing a MacBook's lid still puts it to sleep, as macOS
 does."""
 
 import asyncio
 import os
+import time
+from collections.abc import Callable
+from typing import Literal
 
 from dotagent.core.errors import PhoneSetupError
 from dotagent.core.logs import get_logger
@@ -22,10 +32,16 @@ def caffeinate_program() -> str:
     return override if override is not None and override != "" else _CAFFEINATE
 
 
-class KeepAwake:
-    """The ``caffeinate`` the daemon holds, while it holds one."""
+# The ``caffeinate`` assertion a hold makes: ``-s`` keeps the system awake while it runs on power, ``-i`` keeps it
+# from idle sleep on power and on battery.
+type Assertion = Literal["-s", "-i"]
 
-    def __init__(self) -> None:
+
+class KeepAwake:
+    """The ``caffeinate`` the daemon holds for ``assertion``, while it holds one."""
+
+    def __init__(self, assertion: Assertion) -> None:
+        self._assertion: Assertion = assertion
         self._process: asyncio.subprocess.Process | None = None
 
     @property
@@ -33,14 +49,14 @@ class KeepAwake:
         return self._process is not None and self._process.returncode is None
 
     async def start(self) -> None:
-        """Keep the Mac awake while it charges, from now on; nothing changes when it already is."""
+        """Keep the Mac awake as the assertion says, from now on; nothing changes when it already is."""
         if self.on:
             return
         program: str = caffeinate_program()
         try:
             self._process = await asyncio.create_subprocess_exec(
                 program,
-                "-s",
+                self._assertion,
                 "-w",
                 str(os.getpid()),
                 stdin=asyncio.subprocess.DEVNULL,
@@ -52,7 +68,7 @@ class KeepAwake:
                 f"caffeinate, which keeps a Mac awake, could not be started: {error.strerror or error}",
                 {"program": program},
             ) from error
-        log.info("keep_awake_on", pid=self._process.pid)
+        log.info("keep_awake_on", pid=self._process.pid, assertion=self._assertion)
 
     async def stop(self) -> None:
         """Let the Mac sleep as it would again; nothing changes when it is not kept awake."""
@@ -62,7 +78,7 @@ class KeepAwake:
             return
         process.terminate()
         await process.wait()
-        log.info("keep_awake_off")
+        log.info("keep_awake_off", assertion=self._assertion)
 
     async def switch(self, on: bool) -> None:
         """Keep the Mac awake while it charges when ``on``, else let it sleep as it would."""
@@ -70,3 +86,34 @@ class KeepAwake:
             await self.start()
         else:
             await self.stop()
+
+
+def holds_awake(working: bool, last_work_at: float | None, now: float, after_s: float) -> bool:
+    """Whether the Mac is kept awake for Dot's work now (item 1671): while something works, and for ``after_s``
+    seconds after the last work was seen (``last_work_at``), which bridges a run that ends and the next one its queue
+    or a schedule starts."""
+    return working or (last_work_at is not None and now - last_work_at < after_s)
+
+
+async def keep_awake_while_working(
+    awake: KeepAwake, working: Callable[[], bool], after_s: float, every_s: float, stopping: asyncio.Event
+) -> None:
+    """Hold ``awake`` while ``working`` says Dot works (a run, a schedule's run, a meeting) and ``after_s`` seconds
+    after, looking every ``every_s`` seconds, until ``stopping`` is set (item 1671); it lets go on its way out. A
+    ``caffeinate`` that cannot be started is raised (the daemon logs the end of this task): the Mac then sleeps as it
+    would, and the log says why."""
+    last_work_at: float | None = None
+    try:
+        while not stopping.is_set():
+            now: float = time.monotonic()
+            busy: bool = working()
+            if busy:
+                last_work_at = now
+            await awake.switch(holds_awake(busy, last_work_at, now, after_s))
+            try:
+                async with asyncio.timeout(every_s):
+                    await stopping.wait()
+            except TimeoutError:
+                continue
+    finally:
+        await awake.stop()

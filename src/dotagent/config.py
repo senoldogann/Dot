@@ -114,6 +114,14 @@ class ServerConfig(FrozenModel):
     keep_awake: bool
 
 
+class DaemonConfig(FrozenModel):
+    """What the daemon does for Dot's work (``[daemon]``, item 1671): ``keep_awake`` keeps the Mac from idle sleep while
+    a run, a schedule's run or a meeting works, and ``keep_awake_after_s`` seconds after the last one ended."""
+
+    keep_awake: bool
+    keep_awake_after_s: float = Field(ge=0)
+
+
 class StoreConfig(FrozenModel):
     """What ``dotx prune --apply`` deletes of the database (``[store]``): the events of the runs that ended more than
     ``retention_days`` days ago, and with them the screenshots only those events name. Nothing of the database is
@@ -1207,6 +1215,7 @@ class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     builtin_mcp: BuiltinMcpConfig
     server: ServerConfig
+    daemon: DaemonConfig
     store: StoreConfig
     models: ModelsConfig
     providers: ProvidersConfig
