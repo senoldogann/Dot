@@ -163,6 +163,7 @@ from dotagent.llm.types import (
     Speed,
     user_message,
 )
+from dotagent.memory.echo import echoed_notes
 from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
@@ -201,6 +202,7 @@ from dotagent.store.models import (
     ChatChoices,
     EventRecord,
     FollowUpOf,
+    MemoryRecord,
     QueuedMessage,
     RunMode,
     RunPicks,
@@ -220,6 +222,8 @@ from dotagent.tools.registry import tools_for_mode
 from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
+# The calls of a run whose arguments the trace of its notes reads (item 1715), the newest.
+_TRACED_CALLS: int = 200
 # How long after its last session an active campaign with nothing planned is taken as stalled and planned again by the
 # scheduler (item 1104): longer than a session's end takes to plan the next.
 CAMPAIGN_STALL_S: float = 600.0
@@ -4230,6 +4234,8 @@ class RunManager:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
         if learns and playbook_case(runtime.config, run, status) is not None:
             self._distilling[run.id] = asyncio.create_task(self._distil(run, status))
+        if recorded:
+            await self._trace_notes(run.id, result)
         if not self._stopping:
             # The tabs the run left (item 696): a chat no message goes on from closes them all (a helper's, and one an
             # unwatched run opened, item 1168), another keeps its current one for a message that goes on from it.
@@ -4987,6 +4993,26 @@ class RunManager:
             await self._record_learning("playbooks", outcome)
         finally:
             self._distilling.pop(run.id, None)
+
+    async def _trace_notes(self, run_id: str, answer: str) -> None:
+        """Record which of the notes the run was handed its answer and the arguments of its calls echo (item 1715,
+        :func:`dotagent.memory.echo.echoed_notes`), for later audits of what recall gives runs. A store that fails here
+        is logged: the run's end is recorded already, and nothing waits on this trace."""
+        store: Store = self._runtime.store
+        try:
+            handed: list[MemoryRecord] = await store.get_memories(sorted(await store.handed_memory_ids(run_id)))
+            if not handed:
+                return
+            calls: list[EventRecord] = await store.events_of_kind(run_id, "tool_call", _TRACED_CALLS)
+            said: str = "\n".join(
+                [answer, *(json.dumps(event.data.get("args"), ensure_ascii=False) for event in calls)]
+            )
+            echoed: tuple[str, ...] = echoed_notes(handed, said)
+            await store.mark_memory_echoes(run_id, echoed)
+        except DotError as error:
+            log.warning("notes_trace_failed", run_id=run_id, error=error.message, context=error.context)
+            return
+        log.info("notes_traced", run_id=run_id, handed=len(handed), echoed=len(echoed))
 
     async def _learn(self, case: LessonCase) -> None:
         """Task body of drawing the lessons of a run that ended (:func:`dotagent.agent.lessons.learn`), and the one

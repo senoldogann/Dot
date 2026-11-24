@@ -973,7 +973,15 @@ async def count_start_notes(runtime: Runtime, run: RunRecord, recalled: Remember
     await runtime.bus.emit(
         run.id,
         "memories",
-        {"ids": [*handed], "tokens": recalled.tokens, "fresh": sum(1 for one in handed if one not in before)},
+        {
+            "ids": [*handed],
+            "tokens": recalled.tokens,
+            "fresh": sum(1 for one in handed if one not in before),
+            # Why recall chose what it chose (item 1715): each note's closeness to the goal, and how many notes that
+            # matched were left out as saved while reading outside content.
+            "similarities": {note: score for note, score in recalled.similarities.items()},
+            "tainted_left_out": recalled.tainted_left_out,
+        },
         True,
     )
 

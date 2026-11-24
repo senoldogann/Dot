@@ -543,6 +543,9 @@ class Remembered(FrozenModel):
     records: tuple[MemoryRecord, ...]
     tokens: int
     tainted_left_out: int
+    # How close in meaning each note taken is to the goal (rounded; item 1715), for a note found by meaning; empty when
+    # the notes were found by their words alone.
+    similarities: dict[str, float]
 
 
 class LiveNotes(FrozenModel):
@@ -702,7 +705,12 @@ async def _starting_notes(
     groups = tuple([record for record in group if admits(record)] for group in groups)
     tainted: int = sum(1 for group in groups for record in group if record.tainted)
     taken, spent = fit_groups(tuple([record for record in group if not record.tainted] for group in groups), budget)
-    return Remembered(records=tuple(taken), tokens=spent, tainted_left_out=tainted)
+    return Remembered(
+        records=tuple(taken),
+        tokens=spent,
+        tainted_left_out=tainted,
+        similarities={note.id: round(similarities[note.id], 3) for note in taken if note.id in similarities},
+    )
 
 
 async def live_memories(

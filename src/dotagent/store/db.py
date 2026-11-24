@@ -1485,6 +1485,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     is missing: at every open, inside the migration's transaction (:func:`_migrate`)."""
     added_to_runs: tuple[str, ...] = await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
     await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
+    # Whether the run's answer or calls echoed a note it was handed (item 1715): NULL until it ends, and before.
+    await _add_columns(connection, "memory_uses", (("echoed", "INTEGER"),))
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     # How a continuing piece of work is done (item 1227; an ``ObjectiveWorkflow`` as JSON): an older objective has none.
@@ -6682,6 +6684,15 @@ class Store:
             (since, run_id, OWNER_EDIT),
         )
         return [_memory(row) for row in rows]
+
+    @_writing
+    async def mark_memory_echoes(self, run_id: str, echoed: Sequence[str]) -> None:
+        """Record, on each note run ``run_id`` was handed, whether what the run did echoed it (item 1715,
+        :mod:`dotagent.memory.echo`): 1 for the ids of ``echoed``, 0 for the others."""
+        marks: str = ",".join("?" for _ in echoed)
+        flag: str = f"CASE WHEN memory_id IN ({marks}) THEN 1 ELSE 0 END" if echoed else "0"
+        await self._db.execute(f"UPDATE memory_uses SET echoed = {flag} WHERE run_id = ?", (*echoed, run_id))
+        await self._db.commit()
 
     async def handed_memory_ids(self, run_id: str) -> set[str]:
         """The notes run ``run_id`` was handed so far, however it was handed them (item 308)."""
