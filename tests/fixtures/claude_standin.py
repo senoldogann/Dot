@@ -130,7 +130,7 @@ def _die(how: str) -> None:
         os.kill(os.getpid(), signal.SIGKILL)
     if how == "sigterm":
         os.kill(os.getpid(), signal.SIGTERM)
-    sys.stderr.write("stand-in crashed: out of memory\n")
+    sys.stderr.write("stand-in crashed: out of memory (key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789)\n")
     sys.stderr.flush()
     os._exit(1)
 

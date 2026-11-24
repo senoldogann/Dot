@@ -1740,7 +1740,9 @@ async def _cut_of(follow: _Follow, current: _Program) -> ProgramExit:
     silent_s: float = round(time.monotonic() - follow.quiet.wrote, 1)
     returncode: int | None = await exit_seen(current.process)
     ours: bool = ended_by_dot(current.process)
-    stderr: str = await _stderr_now(current.tail, current.process)
+    # Masked as everything Dot logs or stores is: a program may print a key in the words of its crash.
+    known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+    stderr: str = redact_known(await _stderr_now(current.tail, current.process), known)
     program: ProgramExit = ProgramExit(
         run_id=follow.agent.run.id,
         returncode=returncode,
