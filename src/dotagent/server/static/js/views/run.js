@@ -5,7 +5,7 @@ import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { agentPanel } from "../agentpanel.js";
 import { automationsPanel } from "../automations.js";
-import { api, eventNotShown, follow, query, readEventsTail, sharedGet, sse } from "../api.js";
+import { api, eventNotShown, follow, ONE_SHOT, query, readEventsTail, sharedGet, sse } from "../api.js";
 import { historyOf } from "../cacherules.js";
 import { dropChat, keepChat, keptChat } from "../datacache.js";
 import { noteCopy } from "../linkfacts.js";
@@ -2560,7 +2560,7 @@ export function mount(root, ctx) {
   async function storedMessages() {
     const read = [];
     // Read once, with no retry: a short trip away does not cut it (item 1152), only a silence does.
-    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined, Infinity)) {
+    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined, Infinity, ONE_SHOT)) {
       read.push(message);
     }
     return read;
