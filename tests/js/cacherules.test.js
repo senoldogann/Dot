@@ -93,19 +93,30 @@ test("a cache is another's when the address or the key differs, never when none 
   assert.equal(ownerChanged(ownerOf("http://127.0.0.1:1234", "abc"), mine), true);
 });
 
-test("a snapshot keeps the newest twelve runs of a chat: the run itself and the eleven before it", () => {
-  const snapshot = snapshotOf(source({ earlier: 30 }), 5000);
-  assert.equal(snapshot.earlier.length, RUNS_KEPT - 1);
-  assert.equal(snapshot.earlier[0].id, "run_019");
+test("a snapshot keeps the record of every run before the chat's own, and the events of the newest eleven of them", () => {
+  // As Dot is read: the last turns before the run have their events read, the older ones have only their records.
+  const chat = source({ earlier: 30, read: false });
+  for (const past of chat.history.earlier.slice(-6)) {
+    chat.history.read.set(past.id, { events: events(past.id, 5) });
+  }
+  const snapshot = snapshotOf(chat, 5000);
+  assert.equal(snapshot.earlier.length, 30);
+  assert.equal(snapshot.earlier[0].id, "run_000");
   assert.equal(snapshot.earlier.at(-1).id, "run_029");
-  assert.deepEqual(
-    Object.keys(snapshot.read).toSorted(),
-    snapshot.earlier.map((past) => past.id),
-  );
+  assert.deepEqual(Object.keys(snapshot.read).toSorted(), chat.history.earlier.slice(-6).map((past) => past.id));
+  assert.equal(snapshot.eventsCut, false, "nothing the page read is left out");
   assert.equal(snapshot.id, "run_open");
   assert.equal(snapshot.threadId, "thread_1");
   assert.equal(snapshot.savedAt, 5000);
   assert.equal(snapshot.layout, LAYOUT);
+  assert.equal(historyOf(snapshot).earlier.length, 30, "the earlier turns a copy draws are those Dot would draw");
+});
+
+test("the events of a run older than the newest eleven are not kept, and the copy says so", () => {
+  const snapshot = snapshotOf(source({ earlier: 30 }), 1);
+  assert.equal(snapshot.earlier.length, 30);
+  assert.equal(Object.keys(snapshot.read).length, RUNS_KEPT - 1);
+  assert.equal(snapshot.eventsCut, true);
 });
 
 test("a snapshot keeps the last four hundred events of each run, oldest first", () => {
@@ -291,4 +302,22 @@ test("the budget is 24 MB and one chat takes 2 MB at most", () => {
   assert.equal(RECORD_MAX_BYTES, 2 * 1024 * 1024);
   assert.equal(RUNS_KEPT, 12);
   assert.equal(EVENTS_KEPT, 400);
+});
+
+test("a chat whose events were cut to the newest says so, and stays cut when it is kept again", () => {
+  const long = source({ own: 450 });
+  const cut = snapshotOf(long, 1);
+  assert.equal(cut.messages.length, 400);
+  assert.equal(cut.eventsCut, true);
+  // Drawn from that copy and kept again, the chat holds 400 events and still says that it is cut.
+  const again = snapshotOf({ ...source({ own: 400 }), eventsCut: true }, 2);
+  assert.equal(again.eventsCut, true);
+  assert.equal(snapshotOf(source({ own: 400 }), 3).eventsCut, false, "400 events are all of a run that has 400");
+  assert.equal(snapshotOf(source({ own: 10, earlier: 3 }), 4).eventsCut, false);
+});
+
+test("the events of a run before it that were cut say so too", () => {
+  const long = source({ earlier: 2 });
+  long.history.read.set("run_000", { events: events("run_000", 450) });
+  assert.equal(snapshotOf(long, 1).eventsCut, true);
 });

@@ -232,9 +232,6 @@ async def _page(browser: Browser, port: int, width: int, scheme: Literal["light"
     errors: list[str] = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
-    # These tests are about a page that has nothing kept of the chats (a browser that cannot use IndexedDB): a page that
-    # has copies opens on them instead of on the screen of a daemon out of reach (item 1520, test_phone_cache.py).
-    await page.add_init_script("Object.defineProperty(window, 'indexedDB', { value: undefined, configurable: true })")
     await page.goto(ui_url("127.0.0.1", port, TOKEN))
     return page, errors
 

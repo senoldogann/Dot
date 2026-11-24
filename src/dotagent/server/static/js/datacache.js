@@ -45,6 +45,8 @@ let told = false;
 // Counts the times the cache was forgotten: a write that began before one never lands after it, so that a key forgotten
 // leaves no chat behind, whatever was on its way.
 let generation = 0;
+// The key the cache was last claimed for (null before any, and after `forget`).
+let claimedFor = null;
 
 /**
  * `promise`, or `fallback` when it has not settled within `ms` or fails: what the page waits for from the database never
@@ -171,6 +173,14 @@ function empty(transaction) {
  * @returns {Promise<boolean>}
  */
 export function claim(token) {
+  if (token !== claimedFor) {
+    // A key new to this page: a write that began under the one before never lands after what is dropped for this one.
+    claimedFor = token;
+    generation += 1;
+    pendingLists.clear();
+    written.clear();
+    lastWrite.clear();
+  }
   const claimed = (async () => {
     if (!supported() || token === "") {
       return false;
@@ -200,6 +210,7 @@ export function claim(token) {
  */
 export function forget() {
   const before = ready;
+  claimedFor = null;
   generation += 1;
   ready = Promise.resolve(false);
   pendingLists.clear();

@@ -272,6 +272,7 @@ export const TR = {
   "line.ageDays": "{count} g önce",
   "run.liveStopped": "Canlı güncellemeler durdu.",
   "run.stepsNotShown": "Bazı adımlar gösterilmiyor: görev uzun süre sürdü ve yalnızca en yeni {count} olay okundu.",
+  "run.stepsNotKept": "Bazı adımlar gösterilmiyor: görev uzun süre sürdü ve bu telefon yalnızca en yeni kısmını saklıyor.",
   "run.reload": "Yenile",
   "run.approvals": "Onaylar",
   "sidebar.hide": "Kenar çubuğunu gizle",

@@ -483,10 +483,14 @@ Tailscale, the same works on the Mac itself (`localhost` counts as secure) and o
 
 **On a bad link: the web app (items 1520 to 1524).** The web app on the Home Screen does what the iPhone app does on a bad
 link (above, items 1370, 1371 and 1391), with the same numbers and the same rules; its layout of files is its own. The
-service worker stays what it is, the shell only, and caches nothing under `/api`: the page keeps its data itself.
+service worker stays what it is, the shell only, and caches nothing under `/api`: the page keeps its data itself. All of it is the phone's: a page that is not a phone's touch screen (a pointer that
+hovers) keeps no copy, draws none, has no outbox and shows no line. A Mac's page talks to a Dot on the same Mac, which a
+network that is down does not take away, and `navigator.onLine` is false there while Dot answers: a page that took it
+for a lost link would hold what the owner sends.
 
 - **What it keeps (item 1520).** The list of chats, the agents, the status and the other lists the shell draws, and for
-  each chat it opened its newest 12 runs, their last 400 events and its queue, in IndexedDB (`dot-cache`, with a version
+  each chat it opened the record of every run before the one it was opened at, the last 400 events of that run and of the
+  newest 11 before it, and its queue, in IndexedDB (`dot-cache`, with a version
   in its layout). A chat is one record written in one transaction with the index of what is kept, so it is whole or not
   there; the cache holds 24 MB at most (the chats read longest ago go first, the chat on screen never), one chat never
   takes more than 2 MB (its oldest events go first), and a record that does not read, of another layout or cut short, is
@@ -504,8 +508,10 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   it does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from
   the cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
   looks fresher than it is. What the page needs to open is Dot's status; the agents' looks, the owner's themes and Dot's
-  name are read beside it, and one of them that cannot be read leaves the page with its defaults, not without its chats
-  (a key that is refused among them is refused all the same).
+  name are read beside it, and one of them that cannot be reached, with no copy to answer it, leaves the page with its
+  defaults, not without its chats (any other failure, a key that is refused or an error of Dot's, fails the opening as it
+  always did). A chat whose events were cut to the newest (400 at most, fewer when it passes the 2 MB a chat may take)
+  says *Some steps are not shown* when it is drawn from that copy, as one that was away through a long run does.
 - **Reads that try again (item 1521).** On a phone's touch screen, once Dot has answered the page, one wrapper makes the
   reads (`js/api.js`, the rules in `js/retryrules.js`): a try gives up after 10 seconds, a read is tried three times
   with a wait that grows from 0.4 s to 3 s and has chance in it (half fixed, half random), within 20 seconds in all; a

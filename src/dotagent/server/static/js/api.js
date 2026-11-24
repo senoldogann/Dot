@@ -3,7 +3,7 @@
 import { listKey } from "./cacherules.js";
 import { claim, forget, keepList, keptList } from "./datacache.js";
 import { UNREACHABLE } from "./errors.js";
-import { noteCopy, noteReached, noteUnreachable } from "./linkfacts.js";
+import { noteCopy, noteReached, noteUnreachable, phoneScreen } from "./linkfacts.js";
 import { isKeptWrite, nextStep, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from "./retryrules.js";
 import { CONNECT_TIMEOUT_MS, createParser, IDLE_TIMEOUT_MS, reconnectWait } from "./sseframes.js";
 import { toast } from "./ui.js";
@@ -74,7 +74,8 @@ export function loadToken() {
 
 /** The data cache (item 1520) is the key's: claim it for `value`, which drops what it kept for another key or address. */
 function keepCacheFor(value) {
-  if (value === null || value === "") {
+  // The data cache is the phone's (item 1520): a page that is not a phone's touch screen keeps nothing and draws no copy.
+  if (value === null || value === "" || !phoneScreen()) {
     return;
   }
   cacheToken = value;
@@ -320,11 +321,6 @@ export const FRESH_EVENT = "dot:fresh";
 let reachedOnce = false;
 // The reads on their way, by path (item 1521): the same read asked again while it is under way waits for that one.
 const flights = new Map();
-
-/** Whether this is a phone's touch screen (no pointer that hovers). */
-function phoneScreen() {
-  return typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
-}
 
 /** Whether this page reads as a phone's does on a bad link (item 1521): a touch screen, and after the daemon has answered
  * it once. A computer's page keeps its single try and its own timeouts. */
