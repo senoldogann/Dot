@@ -13,15 +13,24 @@ struct ApprovalPresentation: Equatable, Sendable {
     /// Why Dot asks, as the daemon said it (a note after the command and the policy's reason), nil when it said nothing.
     let why: String?
 
+    /// The words the policy puts before the names it asks for in the aggressive preset (`policy/engine.py`); they say what
+    /// the card's own "Why Dot asks" line says, so they are taken off its start and nowhere else.
+    static let fixedReason: String = "aggressive preset still asks for:"
+
     static func make(tool: String, summary: String) -> ApprovalPresentation {
         let whole: String = summary.trimmingCharacters(in: .whitespacesAndNewlines)
         var head: String = whole
         var reasons: [String] = []
-        if let dash: Range<String.Index> = whole.range(of: " — ") {
+        // The daemon puts its reason after the LAST " — " of the line. The command before it may hold a dash itself
+        // (`echo "a — b" && rm -rf ~`): cut at the first one, the card would show only the beginning of the command and
+        // the owner would allow what they did not read. The reason is the policy's own text and holds none. Whatever
+        // follows the separator is shown, either as the reason or, with the policy's fixed words taken off its start, as
+        // what is left of it.
+        if let dash: Range<String.Index> = whole.range(of: " — ", options: .backwards) {
             head = String(whole[..<dash.lowerBound])
             let tail: String = String(whole[dash.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if let asks: Range<String.Index> = tail.range(of: "still asks for:") {
-                let reason: String = String(tail[asks.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if tail.hasPrefix(Self.fixedReason) {
+                let reason: String = String(tail.dropFirst(Self.fixedReason.count)).trimmingCharacters(in: .whitespacesAndNewlines)
                 if !reason.isEmpty { reasons.append(reason) }
             } else if !tail.isEmpty {
                 reasons.append(tail)

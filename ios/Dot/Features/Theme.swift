@@ -184,10 +184,11 @@ private struct DotProminentGlass<S: Shape>: ViewModifier {
 }
 
 extension View {
-    /// A call to action floating over content (the new-chat button): the accent as glass.
+    /// A call to action floating over content: the accent as glass (no screen uses it now; the compose button is a plain
+    /// glass button of the title bar).
     func dotProminentGlass<S: Shape>(in shape: S) -> some View { modifier(DotProminentGlass(shape: shape)) }
 
-    /// Floating chrome (the composer, the status line, a round button, a chip): glass on iOS 26, a material before.
+    /// Floating chrome (the composer, the capsule over it, a round button, a chip): glass on iOS 26, a material before.
     /// Never on message text or on a long list.
     func dotGlass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
         modifier(DotGlass(shape: shape, tint: tint, interactive: interactive))

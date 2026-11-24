@@ -132,7 +132,7 @@ final class GlassShotsTests: XCTestCase {
         shot("dock-waiting-on-you")
     }
 
-    /// The chat list with its compose button in the navigation bar (item 1392), and a chat that ended well with the line
+    /// The chat list with its compose button in the navigation bar (item 1393), and a chat that ended well with the line
     /// under its last message (item 1393).
     func testListAndFinishedChat() {
         app.launch()
