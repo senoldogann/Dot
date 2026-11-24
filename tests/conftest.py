@@ -29,7 +29,7 @@ tests is the owner's own run on their Mac and keeps what it was given."""
 
 import os
 import pwd
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -40,8 +40,10 @@ from dotagent import secrets
 from dotagent.channels.pictures import Pictures
 from dotagent.channels.staging import STAGED_KEPT_S, Staging
 from dotagent.config import load_default_config, providers_by_key
+from dotagent.core.errors import ProviderAuthError
 from dotagent.core.paths import dot_home, log_dir, plugins_dir
-from dotagent.llm import reach
+from dotagent.llm import antigravity, reach
+from dotagent.llm.antigravity import Credentials
 from dotagent.mcp import builtin
 
 # The marks of the tests that send requests with the owner's keys or reach the world.
@@ -96,14 +98,29 @@ def _needs_keys(item: pytest.Item) -> bool:
     return any(item.get_closest_marker(name) is not None for name in _NEEDS_KEYS)
 
 
+# The real read of the Antigravity login, taken before any fixture stands in for it.
+_READ_ANTIGRAVITY_LOGIN: Callable[[str], Credentials] = antigravity.read_credentials
+
+
+def _no_owners_antigravity_login(pattern: str) -> Credentials:
+    """The Antigravity login a client keeps under the owner's home is a key too (item 1751): a test that listed the
+    models of every provider sent its refresh token to Google and offered the account's models. A login of a test's
+    own, in a pytest folder, is read as it is."""
+    if Path(os.path.expanduser(pattern)).is_relative_to(_owners_home()):
+        raise ProviderAuthError("no Antigravity login was found on this Mac", 0, {"path": pattern})
+    return _READ_ANTIGRAVITY_LOGIN(pattern)
+
+
 @contextmanager
 def _without_the_owners_keys() -> Iterator[None]:
-    """The owner's keys are not in the environment and the Keychain is not asked, until the block ends."""
+    """The owner's keys are not in the environment, the Keychain is not asked and the owner's Antigravity login is not
+    read, until the block ends."""
     with pytest.MonkeyPatch.context() as patch:
         for name, value in _OWNERS.items():
             if os.environ.get(name) == value:
                 patch.delenv(name)
         patch.setattr(secrets, "_from_keychain", lambda name: None)
+        patch.setattr(antigravity, "read_credentials", _no_owners_antigravity_login)
         yield
 
 
