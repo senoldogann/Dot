@@ -264,6 +264,7 @@ from dotagent.memory.service import (
     owner_prompt_lines,
     owner_section,
     prompt_memories,
+    review_memories,
     words_only,
 )
 from dotagent.oauth.providers import PROVIDERS
@@ -274,6 +275,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import schedule_timing
 from dotagent.scheduler.timing import format_local
 from dotagent.secrets import known_secrets
+from dotagent.server import REVIEW_SOURCE
 from dotagent.skills.catalog import load_skills, playbook_root, unreported
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, GOAL_CHECK_UNAVAILABLE, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
@@ -1008,12 +1010,15 @@ async def notes_to_hand(
 
 
 async def start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int) -> Remembered:
-    """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails."""
+    """The notes ``run`` starts with: by meaning and words, or by words alone when the embedding service fails. A code
+    review (the pre-push review, ``source`` review) starts with the notes about code alone (:func:`review_memories`),
+    on Dot's own loop and on the Claude plan alike."""
+    recall = review_memories if run.source == REVIEW_SOURCE else prompt_memories
     try:
-        return await prompt_memories(runtime.memory, query, budget, run.agent_id)
+        return await recall(runtime.memory, query, budget, run.agent_id)
     except ProviderError as error:
         await _embedding_failed(runtime, run, "notes", error)
-        return await prompt_memories(words_only(runtime.memory), query, budget, run.agent_id)
+        return await recall(words_only(runtime.memory), query, budget, run.agent_id)
 
 
 async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], texts: list[str]) -> list[list[int]]:
