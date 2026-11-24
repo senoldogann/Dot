@@ -32,6 +32,10 @@ HELPER_RELEASED_EVENT: str = "helper_released"
 # The source of the run started in a chat to tell it that helpers it was not waiting for ended (item 1351): Dot's own
 # note, none of the owner's words.
 HELPER_SOURCE: str = "helper_report"
+# The live and stored event on the run that let a helper go on, when a restart of the daemon cut that helper off and
+# the next start resumed it (:meth:`RunManager.tell_helper_reports`): its page says "cut by a restart, resuming", not
+# that it failed, and names the run that goes on.
+HELPER_RESUMED_EVENT: str = "helper_resumed"
 # The key of the store that names the helpers whose report no run has been handed yet.
 HELPERS_KEY: str = "detached_helpers"
 # The most helpers one chat lets go on at once: a run that asks for no wait in a loop does not fill the Mac with them.
@@ -41,13 +45,16 @@ _NONCE_BYTES: int = 8
 
 class DetachedHelper(FrozenModel):
     """A helper run that works on after its parent stopped waiting for it, and the chat its report goes to: ``step``
-    is the plan step the parent named for it, which its report does not close."""
+    is the plan step the parent named for it, which its report does not close. ``resumed_from`` is the helper run a
+    restart of the daemon cut off and this one resumes (:meth:`RunManager.tell_helper_reports`), ``None`` for a helper
+    that was not cut."""
 
     helper_run_id: str
     parent_run_id: str
     thread_id: str
     step: int | None
     since: float
+    resumed_from: str | None = None
 
 
 _ADAPTER: TypeAdapter[list[DetachedHelper]] = TypeAdapter(list[DetachedHelper])
@@ -102,7 +109,28 @@ def late_report_note(outcome: DelegateOutcome, entry: DetachedHelper) -> str:
             "the step yourself if it holds."
         )
     )
+    resumed: str = (
+        ""
+        if entry.resumed_from is None
+        else (
+            f"\nA restart of Dot cut this helper off while it worked (run {entry.resumed_from}) and Dot resumed it: "
+            "the report is the resumed helper's, which went on from where the first one stopped."
+        )
+    )
     return (
         "[system note] A helper that kept working in the background ended. Its report reached you as this note, not "
-        f"as the result of a call, so no plan step was marked by it.\n{report}{step}"
+        f"as the result of a call, so no plan step was marked by it.{resumed}\n{report}{step}"
+    )
+
+
+def cut_report_note(outcome: DelegateOutcome, entry: DetachedHelper, why_not: str) -> str:
+    """The note of Dot's that tells a run its helper was cut off by a restart of the daemon (a crash, a stop or a
+    restart) and was not resumed, and why (``why_not``): the helper did not fail, its work stopped half way, so the run
+    delegates it again if the work is still needed rather than taking it as a failure of the part."""
+    report: str = render_outcome(outcome, secrets.token_hex(_NONCE_BYTES), None, None).text
+    step: str = "" if entry.step is None else f"\nIt was started for plan step {entry.step}, which stays as it is."
+    return (
+        "[system note] A helper that kept working in the background did not fail: a restart of Dot cut it off before "
+        f"it ended, and it was not resumed ({why_not}). Its work stopped half way: delegate it again if it is still "
+        f"needed; what it did so far is in its record below.\n{report}{step}"
     )

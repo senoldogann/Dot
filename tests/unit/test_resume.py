@@ -10,14 +10,17 @@ from dotagent.agent.continuity import continuity_note, named_ids, new_ledger, wi
 from dotagent.agent.plan import EMPTY_PLAN, PlanItem, PlanPayload
 from dotagent.agent.prompt import turn_note
 from dotagent.agent.resume import (
+    OUTWARD_FLAGS,
     REPEATABLE_META_TOOLS,
     RESUME_SOURCE,
     CallEnd,
     InterruptedCall,
     Resumption,
     can_resume,
+    cut_by_restart,
     cut_off_by,
     handoff_of,
+    helper_not_resumed,
     identities_of,
     resume_note,
     resumed_event_data,
@@ -25,6 +28,7 @@ from dotagent.agent.resume import (
 )
 from dotagent.config import load_default_config
 from dotagent.llm.types import Message, ToolCall, assistant_message, tool_message, user_message
+from dotagent.policy import engine
 from dotagent.policy.types import ActionKind
 from dotagent.runtime import _tool_groups
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -265,3 +269,32 @@ def test_after_a_compaction_the_handoff_keeps_the_open_plan_and_the_ledger_ids()
     assert named in note and "[in_progress] Write the report" in note and GOAL in note
     now: datetime = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
     assert named not in turn_note(now, [], 0, [], [])
+
+
+HELPER_CUT: RunRecord = _run("cancelled", RESULT_SHUTDOWN, "delegate", "run_parent")
+
+
+def test_a_helper_the_daemons_end_cut_is_resumed_unless_a_rule_says_why_not() -> None:
+    """Item 1668: a helper cut by a crash or a stop of the daemon is resumed at the next start; each refusal names its
+    reason, and an outward call cut while it ran (it pays, sends or posts) is one, as a second try could send twice."""
+    crashed: RunRecord = _run("failed", RESULT_RESTARTED, "delegate", "run_parent")
+    assert cut_by_restart(crashed) and cut_by_restart(HELPER_CUT)
+    assert not cut_by_restart(_run("cancelled", RESULT_STOPPED, "delegate", "run_parent"))
+    write: InterruptedCall = _call("write_file", "write", "cut_off", "")
+    assert helper_not_resumed(HELPER_CUT, "run_1", [write], False, "safe", 10.0, 1800.0) is None
+    assert helper_not_resumed(crashed, "run_1", [], False, "safe", 10.0, 1800.0) is None
+    assert "off" in str(helper_not_resumed(HELPER_CUT, "run_1", [], False, "off", 10.0, 1800.0))
+    assert "longer ago" in str(helper_not_resumed(HELPER_CUT, "run_1", [], False, "safe", 4000.0, 1800.0))
+    assert "another run" in str(helper_not_resumed(HELPER_CUT, "run_2", [], False, "safe", 10.0, 1800.0))
+    assert "not resumed twice" in str(helper_not_resumed(HELPER_CUT, "run_1", [], True, "safe", 10.0, 1800.0))
+    mail: InterruptedCall = InterruptedCall(
+        tool="mail_send", arguments="{}", kind="message", end="cut_off", result="", flags=("message_send",)
+    )
+    assert "mail_send" in str(helper_not_resumed(HELPER_CUT, "run_1", [mail], False, "safe", 10.0, 1800.0))
+    finished: InterruptedCall = mail.model_copy(update={"end": "succeeded"})
+    assert helper_not_resumed(HELPER_CUT, "run_1", [finished], False, "safe", 10.0, 1800.0) is None
+
+
+def test_the_outward_flags_are_the_policys_own() -> None:
+    """The class a resumed helper refuses is what even yolo keeps for the owner (``owners_guard``)."""
+    assert OUTWARD_FLAGS == engine._OWNERS_FLAGS
