@@ -5,7 +5,13 @@ import { actorFace, dotFace, setActorState, teamDuo } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { agentPanel } from "../agentpanel.js";
 import { automationsPanel } from "../automations.js";
-import { api, eventNotShown, follow, query, sharedGet, sse } from "../api.js";
+import { api, eventNotShown, follow, ONE_SHOT, query, readEventsTail, sharedGet, sse } from "../api.js";
+import { historyOf } from "../cacherules.js";
+import { dropChat, keepChat, keptChat } from "../datacache.js";
+import { noteCopy } from "../linkfacts.js";
+import { loadOutbox, viaOutbox } from "../outbox.js";
+import { createOutboxRows } from "../outboxrows.js";
+import { GAP_EVENTS, longGap, TAIL_EVENTS, tailToAdd } from "../retryrules.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { createAsksDock } from "../asksdock.js";
@@ -124,6 +130,9 @@ const HELPERS_SETTLE_MS = 1500;
 const COST_REFRESH_MS = 10_000;
 // The newest runs of a chat read for its newest turn, its delegated runs listed among them (item 451).
 const NEWEST_READ = 20;
+// How long after a chat's last event the phone keeps it (item 1520): a run that writes for minutes is kept every so often
+// and once it pauses, not at every word.
+const KEEP_CHAT_AFTER_MS = 1500;
 
 /** What a rewind did (item 282), said in a toast, and the files it left as they are, with why, in one of its own. */
 function tellRewound(cut) {
@@ -238,7 +247,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The run is stopped from the composer's send while the box is empty, or from a delegated run's pill (item 120).
   function stopRun() {
     attempt(async () => {
-      await api.post(`/runs/${runId}/cancel`, null);
+      // With no link the Stop is kept and sent when the link is back, in order with what else was done (item 1523).
+      const stopped = await viaOutbox({ kind: "stop", chat: run.thread_id, method: "POST", path: `/runs/${runId}/cancel`, body: null }, () =>
+        api.post(`/runs/${runId}/cancel`, null),
+      );
+      if (stopped !== null && typeof stopped === "object" && "kept" in stopped) {
+        return;
+      }
       // The line and the bar over the composer say it stops until it has; the box keeps the focus for what comes next,
       // on a keyboard's device: on a touch screen a focus would bring the keyboard up over the conversation.
       workStatus.stopping();
@@ -709,6 +724,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
           onSettled: (decided) => attempt(() => questionDecided(decided)),
           leftNote: detail.campaign === null ? LEFT_IN_RUN : LEFT_IN_CAMPAIGN,
           onUseHere: null,
+          chat: detail.run.thread_id,
         });
         questionCards.set(question.id, card.node);
         asks.add(card.node);
@@ -1180,7 +1196,12 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
         attachments: files,
         ...frame.picks.body(),
       };
-      await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
+      // With no link the message is kept under its key and sent once when the link is back (item 1523).
+      const queued = { ...body, key: keys.of("queue", run.thread_id, body) };
+      await viaOutbox(
+        { id: queued.key, kind: "message", chat: run.thread_id, method: "POST", path: `/threads/${run.thread_id}/queue`, body: queued, text },
+        () => queue.add(queued),
+      );
       keys.sent();
       choices.sent();
       frame.picks.sent();
@@ -1200,8 +1221,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       }
       const entry = holdMessage(text);
       const body = { text, attachments: files };
+      const steered = { ...body, key: keys.of("steer", runId, body) };
       try {
-        await api.post(`/runs/${runId}/steer`, { ...body, key: keys.of("steer", runId, body) });
+        const sent = await viaOutbox(
+          { id: steered.key, kind: "message", chat: run.thread_id, method: "POST", path: `/runs/${runId}/steer`, body: steered, text },
+          () => api.post(`/runs/${runId}/steer`, steered),
+        );
+        // Kept for the link: the message is the outbox's row, not one sent to the run.
+        if (sent !== null && typeof sent === "object" && "kept" in sent) {
+          releaseMessage(entry);
+        }
       } catch (error) {
         releaseMessage(entry);
         throw error;
@@ -1226,11 +1255,16 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       attachments: files,
       ...frame.picks.body(),
     };
-    const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
+    const started = { ...body, key: keys.of("run", body) };
+    const next = await viaOutbox(
+      { id: started.key, kind: "message", chat: run.thread_id, method: "POST", path: "/runs", body: started, text },
+      () => api.post("/runs", started),
+    );
     keys.sent();
     choices.sent();
     frame.picks.sent();
-    return next.id;
+    // Kept for the link: the chat goes on at its next run once it is sent, whichever page learns of it first (`catchUp`).
+    return next !== null && typeof next === "object" && "kept" in next ? null : next.id;
   }
 
   // Edit from here (item 282): the chat goes back to before the message of the run `past`, and the message
@@ -1610,11 +1644,15 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     refreshes += 1;
     const mine = refreshes;
     try {
-      const fresh = await api.get(`/runs/${runId}`);
+      const fresh = await api.get(`/runs/${runId}`, { signal });
       if (signal.aborted || mine !== refreshes) {
         return;
       }
       drawRecord(fresh);
+      // Dot just said how the run stands: the copy kept for a return to this page, and the one the phone keeps, say so too.
+      kept.detail = fresh;
+      kept.verifiedAt = Date.now();
+      keepChatSoon();
       paintCost();
     } catch (error) {
       // A page left while the read was on its way says nothing of it (item 1036): its 404, a chat deleted meanwhile,
@@ -1626,6 +1664,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // the page is opened again, and says Task not found.
       if (error.status === 404) {
         keptRuns.delete(runId);
+        dropChat(runId);
         reload();
         return;
       }
@@ -1685,7 +1724,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     let runs;
     try {
-      runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`);
+      runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`, { signal });
     } catch (error) {
       if (!signal.aborted) {
         readFailed("readFailed.chat", error);
@@ -1891,6 +1930,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // one was put or taken back, here or on another screen.
   const reactions = createReactions({ threadId: run.thread_id, signal });
   const timeline = createTimeline({
+    // What is answered here with no link is kept under this chat, in order with what else is done in it (item 1523).
+    chat: run.thread_id,
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
     startedAt: run.created_at,
@@ -2040,6 +2081,20 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
   // first message (item 129).
   const earlier = earlierTurns(history, (past) => (past.rewindable ? () => editFromHere(past) : null), signal, reactions);
+  // What was done in this chat with no link and has not gone yet shows under its conversation, with Retry now and Edit
+  // (item 1523); a message taken back to be edited goes to the box, ahead of what was typed there.
+  loadOutbox();
+  const outboxRows = createOutboxRows({
+    chat: run.thread_id,
+    onEdit: (words) => {
+      input.value = input.value.trim() === "" ? words : `${words}\n\n${input.value}`;
+      input.dispatchEvent(new Event("input"));
+      frame.autosize();
+      if (!touchFirst()) {
+        input.focus();
+      }
+    },
+  });
   const thread = el(
     "div",
     { class: "run-thread" },
@@ -2053,6 +2108,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     workStatus.announcer,
     waitingList,
     lessonsPlace,
+    outboxRows.element,
   );
   paintWorking();
   const main = el("div", { class: "run-main" }, thread, dock);
@@ -2181,6 +2237,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // What was read of the stream (before the page left, or whole up to now when it opened, item 734) goes in at once; the
   // stream goes on after its last message. An event the page fails to show is told, as on the stream, and the next one
   // goes in.
+  // A copy that was cut (the phone keeps the newest events of a long chat) says that the first steps are not shown, as a
+  // chat that was away through a long run does (item 1521), instead of leaving them out without a word.
+  if (kept.copy === true && kept.eventsCut === true) {
+    timeline.element.append(el("div", { class: "note steps-not-shown", role: "note" }, icon("info"), el("span", null, t("run.stepsNotKept"))));
+  }
   replaying = true;
   for (const message of kept.messages) {
     try {
@@ -2191,6 +2252,32 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
   replaying = false;
   keepRun(runId, kept);
+  // A chat drawn from the copy the phone kept shows the queue kept with it until the daemon's own answer comes (item
+  // 1520), now that the page that draws it stands.
+  queue.seed(kept.queue ?? null);
+  // The phone keeps the chat as it stands (item 1520), so that Dot opens with it drawn on a link that is bad or gone: a
+  // moment after its last event, when the page is put away, and when it is left. `kept.verifiedAt` is when Dot last said
+  // that this is how the chat stands: a copy drawn and not heard of since keeps its own date.
+  const keepChatNow = () => {
+    keepChat({
+      id: runId,
+      detail: kept.detail,
+      history: kept.history,
+      messages: kept.messages,
+      queue: queue.view() ?? kept.queue ?? null,
+      eventsCut: kept.eventsCut === true,
+      verifiedAt: kept.verifiedAt,
+    });
+  };
+  const keepChatSoon = debounce(keepChatNow, KEEP_CHAT_AFTER_MS);
+  const keepWhenAway = () => {
+    if (document.visibilityState === "hidden") {
+      keepChatNow();
+    }
+  };
+  document.addEventListener("visibilitychange", keepWhenAway);
+  window.addEventListener("pagehide", keepChatNow);
+  keepChatSoon();
   if (kept.messages.length > 0) {
     if (readNow) {
       // What the replay drew of the run's state gives way to its record, which this open read just now (item 646: it
@@ -2207,24 +2294,79 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   }
   const finished = (message) => message.data.kind === "run_finished" && message.data.run_id === runId;
   const ended = kept.messages.some(finished);
+  /**
+   * The id the stream goes on after (item 1521). A chat drawn from a copy that was at work when it was kept may have been
+   * away through a long run: when the run stored `GAP_EVENTS` events or more since the last one the copy holds, the
+   * stream would replay all of them, one round trip after the other on a bad link, to draw steps nobody is waiting for. The
+   * newest `TAIL_EVENTS` are read instead (`GET /runs/{id}/events?tail=`, item 1370), the chat says that some steps are not
+   * shown, and the stream goes on after the last of them. An older daemon answers `tail` with the first events of the run,
+   * no end of it: it is ignored, and the stream replays what was missed as before. A read that fails leaves the stream to
+   * replay, as it did before.
+   */
+  async function afterTheGap(lastId) {
+    if (kept.copy !== true || lastId === 0 || !(kept.detail.active || kept.detail.elsewhere)) {
+      return lastId;
+    }
+    try {
+      const page = await api.get(`/runs/${runId}/events${query({ after: lastId, limit: GAP_EVENTS })}`, { signal });
+      if (!longGap(page.length)) {
+        return lastId;
+      }
+      const { events, tailed } = await readEventsTail(runId, TAIL_EVENTS, signal);
+      const added = tailToAdd(events, tailed, lastId);
+      if (added === null || added.length === 0) {
+        return lastId;
+      }
+      timeline.element.append(
+        el("div", { class: "note steps-not-shown", role: "note" }, icon("info"), el("span", null, t("run.stepsNotShown", { count: added.length }))),
+      );
+      replaying = true;
+      for (const event of added) {
+        const message = { id: event.id, event: event.kind, data: event };
+        kept.messages.push(message);
+        try {
+          take(message);
+        } catch (error) {
+          eventNotShown(`/runs/${runId}/events`, message, error);
+        }
+      }
+      replaying = false;
+      kept.verifiedAt = Date.now();
+      keepChatSoon();
+      return Math.max(lastId, added[added.length - 1].id);
+    } catch (error) {
+      replaying = false;
+      if (!signal.aborted) {
+        console.warn("the end of a long run could not be read; the stream replays what was missed", error);
+      }
+      return lastId;
+    }
+  }
   // The stream goes on after the last stored event read (item 568). A live piece, of a thought or of a message being
   // written, has no id (0): taken for the last event, it made the stream start again from the first, and a chat left
   // and come back to while its run worked drew every message again, once more at each return.
   const lastStored = kept.messages.reduce((highest, message) => Math.max(highest, message.id), 0);
-  (ended ? Promise.resolve() : follow({
+  (ended ? Promise.resolve() : afterTheGap(lastStored).then((after) => follow({
     path: `/runs/${runId}/stream`,
-    after: lastStored,
+    after,
     signal,
     isFinished: finished,
     onState: (state) => {
       showConnectionNote(state === "reconnecting");
       showReconnecting(state === "reconnecting");
+      if (state === "live") {
+        // The stream took the page from the last event it read: no gap is left, the chat stands as Dot says.
+        kept.verifiedAt = Date.now();
+        keepChatSoon();
+      }
     },
     onMessage: (message) => {
       kept.messages.push(message);
+      kept.verifiedAt = Date.now();
       take(message);
+      keepChatSoon();
     },
-  })).catch((error) => {
+  }))).catch((error) => {
     if (signal.aborted) {
       return;
     }
@@ -2246,6 +2388,10 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   });
 
   return () => {
+    keepChatNow();
+    outboxRows.dispose();
+    document.removeEventListener("visibilitychange", keepWhenAway);
+    window.removeEventListener("pagehide", keepChatNow);
     if (sessionStorage.getItem(shownKey) === runId) {
       sessionStorage.removeItem(shownKey);
     }
@@ -2342,6 +2488,11 @@ export function mount(root, ctx) {
     if (kept === undefined) {
       keptRuns.delete(runId);
     }
+    // The chat as the phone kept it is drawn at once (item 1520), before any read of Dot: what changed since is asked for
+    // once it is drawn, as for a chat the page kept while it lived.
+    if (kept === undefined && !again && (await drawFromCopy())) {
+      return;
+    }
     // What stands here (the chat that goes on here from another of its runs, main.js's `goOn`; this page read again, or
     // the error it failed with) stays until this one is drawn over it, only to be seen: a word typed into it or a click
     // on it would reach a page that is gone.
@@ -2355,7 +2506,7 @@ export function mount(root, ctx) {
     let messages = [];
     try {
       // Shared with the side menu, which looks up the run's chat as it opens (item 1169).
-      detail = await sharedGet(`/runs/${runId}`);
+      detail = await sharedGet(`/runs/${runId}`, controller.signal);
       // Found: a later read that finds nothing (a Reload after it was deleted) says Task not found (item 810).
       opening.found();
       // A run is read whole before it is drawn (item 454), not filled in as its stream comes; one at work up to now
@@ -2368,6 +2519,10 @@ export function mount(root, ctx) {
     } catch (error) {
       if (controller.signal.aborted) {
         return;
+      }
+      if (error.status === 404) {
+        // Dot no longer has the run: nothing of it stays on the phone.
+        dropChat(runId);
       }
       if (error.status === 404 && openedGone(runId, opening)) {
         shown();
@@ -2400,9 +2555,56 @@ export function mount(root, ctx) {
     if (controller.signal.aborted) {
       return;
     }
-    const fresh = { detail, history, messages };
+    const fresh = { detail, history, messages, verifiedAt: Date.now() };
     stopRun = showRun({ root, ctx, signal: controller.signal, detail, readNow: true, history, historyProblem, reload: () => attempt(() => open(true)), kept: fresh });
     shown();
+  }
+
+  /**
+   * Draw the chat of `runId` from the copy the phone kept of it (item 1520), at once: whether there was one. Its events
+   * go in as the stream's would, the stream goes on after the last of them, and the run's record, its questions and its
+   * lessons are read again once it is drawn (`showRun`, as for a chat the page kept while it lived). A copy that cannot
+   * be drawn is dropped and the chat is read from Dot, as it was before the cache.
+   */
+  async function drawFromCopy() {
+    const saved = await keptChat(runId);
+    if (controller.signal.aborted) {
+      return true;
+    }
+    if (saved === null) {
+      return false;
+    }
+    const copy = {
+      detail: saved.detail,
+      history: historyOf(saved),
+      messages: saved.messages,
+      queue: saved.queue,
+      eventsCut: saved.eventsCut === true,
+      verifiedAt: saved.savedAt,
+      copy: true,
+    };
+    try {
+      stopRun = showRun({
+        root,
+        ctx,
+        signal: controller.signal,
+        detail: saved.detail,
+        readNow: false,
+        history: copy.history,
+        historyProblem: null,
+        reload: () => attempt(() => open(true)),
+        kept: copy,
+      });
+    } catch (error) {
+      console.warn("the copy kept of this chat could not be drawn; it is read from Dot", error);
+      keptRuns.delete(runId);
+      dropChat(runId);
+      return false;
+    }
+    opening.found();
+    noteCopy(saved.savedAt);
+    shown();
+    return true;
   }
 
   /** The stored events of the run and of the runs it delegated to: read whole before the chat is drawn, so a chat opens
@@ -2410,7 +2612,7 @@ export function mount(root, ctx) {
   async function storedMessages() {
     const read = [];
     // Read once, with no retry: a short trip away does not cut it (item 1152), only a silence does.
-    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined, Infinity)) {
+    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0, stored: true })}`, controller.signal, () => undefined, Infinity, ONE_SHOT)) {
       read.push(message);
     }
     return read;

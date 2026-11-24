@@ -483,6 +483,104 @@ copy was kept of it (the first opening from the home screen after the app is add
 it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
 
+**On a bad link: the web app (items 1520 to 1524).** The web app on the Home Screen does what the iPhone app does on a bad
+link (above, items 1370, 1371 and 1391), with the same numbers and the same rules; its layout of files is its own. The
+service worker stays what it is, the shell only, and caches nothing under `/api`: the page keeps its data itself. All of it is the phone's: a page that is not a phone's touch screen (a pointer that
+hovers) keeps no copy, draws none, has no outbox and shows no line. A Mac's page talks to a Dot on the same Mac, which a
+network that is down does not take away, and `navigator.onLine` is false there while Dot answers: a page that took it
+for a lost link would hold what the owner sends.
+
+- **What it keeps (item 1520).** The list of chats, the agents, the status and the other lists the shell draws, and for
+  each chat it opened the record of every run before the one it was opened at, the last 400 events of that run and of the
+  newest 11 before it, and its queue, in IndexedDB (`dot-cache`, with a version
+  in its layout). A chat is one record written in one transaction with the index of what is kept, so it is whole or not
+  there; the cache holds 24 MB at most (the chats read longest ago go first, the chat on screen never), one chat never
+  takes more than 2 MB (its oldest events go first), and a record that does not read, of another layout or cut short, is
+  dropped and read from Dot again. Everything is dropped when the phone's key is forgotten and when the key or the
+  address is not the one it was kept for, and no part of the key is kept (only a fingerprint of it, to tell whose cache
+  it is). A page that cannot use IndexedDB (a private window, a store that is full) goes on as it was, reading from Dot, and so
+  does one whose IndexedDB does not answer: what the page waits for from it (a copy of a chat or a list, the claim of
+  the cache, the outbox it sends by) is a copy that is not there after two seconds, so that a chat opens and a message
+  goes on a browser whose database hangs.
+- **What it draws first.** A chat read before is drawn from its copy at once, before Dot is asked anything, with its
+  queue; the page then asks only for what changed: the stream goes on after the last event the copy holds, and the run's
+  record, its questions and its lessons are read again. The lists answer from their copy while Dot cannot be reached, so
+  a phone with no link opens on its chats instead of on "Dot cannot be reached"; with a link, Dot is asked at once and
+  the copy is looked for beside it, so that the cache is never on the way of an answer. A refusal of the daemon's (a key
+  it does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from
+  the cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
+  looks fresher than it is. What the page needs to open is Dot's status; the agents' looks, the owner's themes and Dot's
+  name are read beside it, and one of them that cannot be reached, with no copy to answer it, leaves the page with its
+  defaults, not without its chats (any other failure, a key that is refused or an error of Dot's, fails the opening as it
+  always did). A chat whose events were cut to the newest (400 at most, fewer when it passes the 2 MB a chat may take)
+  says *Some steps are not shown* when it is drawn from that copy, as one that was away through a long run does.
+- **Reads that try again (item 1521).** On a phone's touch screen, once Dot has answered the page, one wrapper makes the
+  reads (`js/api.js`, the rules in `js/retryrules.js`): a try gives up after 10 seconds, a read is tried three times
+  with a wait that grows from 0.4 s to 3 s and has chance in it (half fixed, half random), within 20 seconds in all; a
+  refusal (a 4xx but 408 and 429), an answer that cannot be read and a read that was cancelled are never asked again;
+  while the phone has no link at all (`navigator.onLine`) or the page is out of view, a read waits for the link and the
+  view instead of spending its tries; the same read asked while it is on its way is one request, each caller having an
+  answer of its own to change; and a read ends when its page leaves (the chat's reads end when the chat is left). A
+  list the phone holds a copy of is answered from it at once when there is no link, and after three seconds when Dot is
+  slow to answer, Dot's own answer replacing it when it comes. A chat drawn from a copy that was at work when it was
+  kept, and that missed 500 events or more of its run, reads the newest 400 (`GET /api/runs/{id}/events?tail=400`,
+  header `X-Dot-Events-Tail`, item 1370; a daemon without it is ignored and the stream replays what was missed), says
+  *Some steps are not shown*, and its stream goes on after the last event it read. Before Dot has answered the page once,
+  a phone's reads, and the proof Dot gives before the first of them, are tried once and give up after the same 10 seconds,
+  so that a link that carries nothing as Dot opens ends in the screen of a Dot out of reach, which tries again by itself,
+  instead of waiting for the browser's own timeout (a list the phone holds a copy of is drawn from it after three seconds,
+  as above).
+- **A stream that is never silent without being noticed (item 1522).** The page reads its streams with `fetch` and a
+  stream reader, not with `EventSource`, which cannot see the comment lines that are Dot's `: open` and its `: keepalive`
+  every 15 seconds, and so could tell a quiet stream from a dead socket by nothing. A small parser (`js/sseframes.js`)
+  reads them: chunks cut anywhere, `\n`, `\r\n` and `\r` line ends, comments, `data` over several lines, ids, a frame cut by
+  a drop (it is no event) and a frame whose data is not JSON (told of and skipped). A connection that has answered
+  nothing in 8 seconds, and a stream that has said nothing, a keepalive included, for 35 seconds (it was 45), are dropped
+  and made again; a drop is not shown as a failure, the note and the pill come after their usual quiet time. The stream
+  goes on after the last event read, in the address (`after`) and in the standard header `Last-Event-ID`, so that no
+  history is read again; it is made again at once when the page comes back into view and when the phone is back on the
+  network, and otherwise after 0.5, 1, 2, 4, 8 and then every 15 seconds. A chat's stored steps, read once when it
+  opens, keep the 45 seconds they had.
+- **What is done with no link is kept and sent once (item 1523).** A message, an answer to an approval or a question, a
+  Stop and a change of a chat's queue (a message edited, taken out, moved, the queue resumed) made while the phone has no
+  link, or Dot cannot be reached, go into the outbox, in IndexedDB (the store `outbox` of `dot-cache`), with their key and
+  their place in the order, before anything is asked of the network; they survive the page being killed, and the cache
+  being dropped with a key that is forgotten does not take them. A message shows under the chat as *Waiting to send*
+  with **Retry now** and **Edit** (Edit takes it back into the composer), once it is written, so that the row is never
+  shown before its entry is safe and the box that made it is cleared in the same turn: an Edit pressed on the row cannot
+  be answered by a box that is cleared after it; an answer, a Stop and a change of the queue are a line that says they
+  wait. They are sent when the phone is online and the page in view (`online`, the page coming
+  back, the stream coming back, and a wait that grows from 0.5 to 15 seconds while Dot cannot be reached), one chat's
+  things in the order they were made, the one that waits holding the ones behind it; these writes give up after 30
+  seconds, and any other write (a voice, a file, a side answer) takes as long as it takes.
+  A message goes with the key Dot starts a message once by (`POST /api/threads/{id}/queue`, `POST /api/runs/{id}/steer`
+  and `POST /api/runs`, item 189: the daemon keeps a key for a day, answers a repeat with what the first made, and refuses
+  a second send with 409 while the first is under way, which is waited out), so an answer that was lost after Dot took the
+  message, a page killed while it sent and a link that came back twice send it once; the daemon is not changed. A message
+  that waited more than a day is *Not sent*: Dot has forgotten its key, so it is the owner's to **Send again** (under a
+  new key), **Edit** or **Discard**; a message Dot refuses stays with Dot's words and does not hold the next (a 409 on a
+  message is waited out only when it says that the message is being sent already, the first sending still under way,
+  `server/sending.py`; any other, a run that has ended or a chat with a run at work, is Dot's refusal). An answer to a
+  question that had expired when it arrived says so (*That question had expired when your answer reached Dot, so it was
+  not used.*), and so does one answered already, on the Mac, on another screen or by its own first send whose reply was
+  lost; a Stop or a queue change that finds nothing to do is done, and an answer, a Stop or a change that Dot refuses is
+  told and let go, since no row holds it. An answer made with no link is kept under the chat it was made in (its thread,
+  not its run), so that it goes in order with what else was done there. A new chat started with no link is not kept (a chat that does not exist has nowhere to be shown): it says it
+  could not reach Dot and the words stay in the box.
+- **The line (item 1524).** One thin line stands under the bar, and has no height while nothing is said. The states that
+  last, no link and a key refused, take a row of their own in the bar, so that it covers nothing that is read; *Reconnecting…*
+  floats over the room the conversation leaves under the bar, as the notes of a lost stream always did (item 328), so that
+  what is read never moves when it comes or goes: *Offline: showing saved chats, last updated 3 min ago*
+  (the copy a chat is drawn from, and how old it is, kept true by a clock that runs only while it is shown), *Offline: 2
+  waiting to send* (what the outbox holds, which says more than the copy does), *Reconnecting…* (Dot not reached for more
+  than a moment on a link that is there; a break that mends at once says nothing), and *This phone's key was refused*
+  with **Pair again**, on the sign-in screen the refused key leads to, which takes the owner to the field where the code
+  of Settings › Phone is typed. What it says is one pure function of the facts (`js/linewords.js`, English and Turkish),
+  one line on a phone 390 px wide and two at 320 px, in the light and the dark look, and the one thing in it that is
+  pressed is 44 px tall. While it says the link is down, a request that got no answer shows no toast over the chat. The line is the
+  phone's: a page that is not a phone's touch screen shows none, and keeps its toasts (the Dot it talks to is on the
+  same Mac, where a network that is down takes nothing away).
+
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
 ## The iPhone app's calls

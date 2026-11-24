@@ -4206,3 +4206,76 @@ dialog.computer-full::backdrop {
 .sheet-groups > * + * {
   border-top: 0;
 }
+
+
+/* What was done with no link and has not gone yet (item 1523): under the conversation, a row for each. A message is a
+   card of its words, the state under them ("Waiting to send", "Not sent"), and its buttons, each a finger tall; an answer,
+   a Stop and a change of the queue are one line with Retry now. Nothing here is over what is read. */
+.outbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.outbox[hidden] {
+  display: none;
+}
+
+.outbox-row {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.outbox-row[data-state="left"],
+.outbox-row[data-state="refused"] {
+  border-style: solid;
+  border-color: var(--warn-border);
+  background: var(--warn-weak);
+}
+
+.outbox-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+.outbox-state {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.outbox-row[data-state="left"] .outbox-state,
+.outbox-row[data-state="refused"] .outbox-state,
+.outbox-why {
+  color: var(--warn);
+}
+
+.outbox-why {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.outbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.outbox .outbox-button.btn.sm {
+  min-height: 44px;
+}
+
+.outbox-note {
+  margin-top: var(--space-1);
+}

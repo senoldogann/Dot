@@ -117,6 +117,26 @@ size, a radius or a duration in a view's sheet, nor a gap off the 4 px grid; tak
 To check a look, open `#/controls`, `#/settings/appearance`, a chat, a menu and a dialog at 1280 and
 390 px wide, in light and dark (`tests/smoke/test_controls.py` and `test_tour.py` photograph them).
 
+## What the page keeps on the phone (item 1520)
+
+The page keeps the chats it read and the lists of the shell in IndexedDB (`dot-cache`; the rules are `js/cacherules.js`,
+the store `js/datacache.js`), so that Dot opens with a chat drawn on a link that is bad or gone: `views/run.js` draws a
+chat from its copy at once (`drawFromCopy`) and keeps it as it stands (a moment after its last event, when the page is
+put away and when the chat is left), `js/api.js` keeps the lists as they are read and answers a read of one of them from
+the copy while Dot cannot be reached, and `js/linkfacts.js` says that what is shown is a copy and since when. The service
+worker stays the shell's alone. Its reads are made as the iPhone app makes them (item 1521, `js/retryrules.js`: 10 s a
+try, three tries, a wait that grows with chance in it, none spent while there is no link; a read is shared with the same
+read on its way and ends when its page is left), and a chat that was away through 500 events or more of a run reads the
+newest 400 and says that some steps are not shown (`views/run.js`, `afterTheGap`). Its streams are read by
+`js/sseframes.js` (item 1522: a connection that answers nothing in 8 s and a stream that says nothing in 35 s are dropped
+and made again, after 0.5, 1, 2, 4, 8 and 15 s, from the last event, with `Last-Event-ID`). What is done with no link is
+kept by `js/outbox.js` (the rules are `js/outboxrules.js`) and shown under the chat by `js/outboxrows.js`: a message as
+*Waiting to send* with Retry now and Edit, sent once with its key when the link is back (item 1523). The line under the
+bar (`js/connectionline.js`, in the bar's own header, a row of its own for *Offline* and a refused key, floating over the room
+under the bar for *Reconnecting…* so that nothing read moves; the words are `js/linewords.js`) says *Offline: showing saved chats,
+last updated 3 min ago*, *Offline: 2 waiting to send*, *Reconnecting…* or *This phone's key was refused* (item 1524), and a
+failed request shows no toast over the chat while it does. See [On a bad link: the web app](phone.md).
+
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 
 The run page is drawn as a developer tool draws a thread, plain and professional, the same language on a Mac and on a

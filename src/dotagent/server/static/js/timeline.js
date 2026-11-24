@@ -434,7 +434,7 @@ function buildFlock() {
  * for the owner's answer once it stands in its place, and `onAnswered(node)` gives it back to that place once it is
  * answered (item 973: the page holds it at the composer's place meanwhile).
  */
-export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onAsk, onAnswered, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
+export function createTimeline({ chat = null, rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onTool, onMemory, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere, onAsk, onAnswered, onDotReaction = (/** @type {string} */ _reaction) => undefined, reactions = null, onReactionHold = (/** @type {boolean} */ _held) => undefined }) {
   const element = el("div", { class: "timeline" });
   // The sizes of a compaction stay out of the conversation until this is pressed; the record is still in the page, so
   // nothing is thrown away. It shows once the page holds such a record, of this run or of an earlier turn
@@ -1371,7 +1371,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
 
     approval_requested(scope, record) {
-      const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN, onUseHere });
+      const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN, onUseHere, chat });
       // The line that asked says what the card says, word for word: the card stands alone (item 871, after
       // OpenMausBot's quiet approvals). Wherever it stands, a step's row or a thought between them (item 891), but only
       // its own step's: a refusal, with no card, keeps its line, the one record of it (the pre-push review). The card's

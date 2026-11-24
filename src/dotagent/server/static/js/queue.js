@@ -9,6 +9,7 @@ import { api } from "./api.js";
 import { el } from "./dom.js";
 import { goTo } from "./hop.js";
 import { icon } from "./icons.js";
+import { viaOutbox } from "./outbox.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
@@ -34,6 +35,8 @@ function oneLine(text) {
  */
 export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onChange }) {
   const listId = `queue-${threadId}`;
+  // Its reads end when the chat is left (item 1521).
+  const leaving = new AbortController();
   let messages = [];
   let held = false;
   let active = false;
@@ -73,7 +76,9 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     expanded = !expanded;
     paint();
   });
-  resume.addEventListener("click", () => act(() => api.post(`/threads/${threadId}/queue/resume`, null)));
+  resume.addEventListener("click", () =>
+    act(() => api.post(`/threads/${threadId}/queue/resume`, null), { method: "POST", path: `/threads/${threadId}/queue/resume`, body: null }),
+  );
   readAgain.addEventListener("click", async () => {
     readAgain.disabled = true;
     await load();
@@ -115,8 +120,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     const mine = ++reads;
     let view;
     try {
-      view = await api.get(`/threads/${threadId}/queue`);
+      view = await api.get(`/threads/${threadId}/queue`, { signal: leaving.signal });
     } catch (error) {
+      if (leaving.signal.aborted) {
+        return;
+      }
       console.warn("the queue could not be read", error);
       if (mine > shownRead) {
         shownRead = mine;
@@ -128,8 +136,10 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     showNewest(mine, view);
   }
 
-  /** Run one request of the queue at a time, the others being ignored; its answer is the queue as it then is. */
-  async function act(request) {
+  /** Run one request of the queue at a time, the others being ignored; its answer is the queue as it then is. With a
+   * `descriptor` (the method, path and body of the request) a change made with no link is kept and sent when the link is
+   * back, in order with what else was done in the chat (item 1523). */
+  async function act(request, descriptor) {
     if (busy) {
       return;
     }
@@ -138,7 +148,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     try {
       await attempt(async () => {
         const mine = ++reads;
-        showNewest(mine, await request());
+        const answer = descriptor === undefined ? await request() : await viaOutbox({ kind: "queue", chat: threadId, ...descriptor }, request);
+        if (answer !== null && typeof answer === "object" && "kept" in answer) {
+          return;
+        }
+        showNewest(mine, answer);
       });
     } finally {
       busy = false;
@@ -147,7 +161,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   }
 
   function order(ids) {
-    return act(() => api.put(`/threads/${threadId}/queue`, { ids }));
+    return act(() => api.put(`/threads/${threadId}/queue`, { ids }), { method: "PUT", path: `/threads/${threadId}/queue`, body: { ids } });
   }
 
   function moved(id, to) {
@@ -274,7 +288,9 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         { class: "queue-icon", type: "button", "data-id": message.id, "data-part": "remove", "aria-label": "Remove queued message", title: "Remove from queue" },
         icon("x"),
       );
-      remove.addEventListener("click", () => act(() => api.del(`/queue/${message.id}`)));
+      remove.addEventListener("click", () =>
+        act(() => api.del(`/queue/${message.id}`), { method: "DELETE", path: `/queue/${message.id}`, body: null }),
+      );
       actions = el("span", { class: "queue-actions" }, edit, steerButton, remove);
     }
 
@@ -376,6 +392,17 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
         });
       }
     },
+    // The queue as it was last shown, for the copy of the chat the phone keeps (item 1520); null while none was read.
+    view: () => (shownRead === 0 ? null : { held, messages }),
+    // The queue of the copy the chat is drawn from, shown until the daemon's own answer comes; an answer that came first
+    // stands, and a queue that could not be read says so beside it.
+    seed: (view) => {
+      if (shownRead === 0 && view !== null && typeof view === "object" && Array.isArray(view.messages)) {
+        messages = view.messages;
+        held = view.held === true;
+        paint();
+      }
+    },
     steerFirst: () => (messages.length > 0 && active ? steer(messages[0]) : Promise.resolve()),
     setActive: (on) => {
       active = on;
@@ -384,8 +411,13 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     editing: () => editingId,
     saveEdit: async (text) => {
       const mine = ++reads;
-      const view = await api.patch(`/queue/${editingId}`, { text, attachments: frame.attachments.ids() });
+      const body = { text, attachments: frame.attachments.ids() };
+      const path = `/queue/${editingId}`;
+      const view = await viaOutbox({ kind: "queue", chat: threadId, method: "PATCH", path, body }, () => api.patch(path, body));
       endEdit();
+      if (view !== null && typeof view === "object" && "kept" in view) {
+        return;
+      }
       showNewest(mine, view);
     },
     cancelEdit: () => {
@@ -398,6 +430,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       paint();
     },
     dispose: () => {
+      leaving.abort();
       stopLifecycle();
       stopBack();
     },

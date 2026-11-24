@@ -62,7 +62,7 @@ function conversation(runs) {
  * Nothing more is read once `signal` aborted.
  */
 export async function loadHistory(run, signal) {
-  const found = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${THREAD_LIMIT}`);
+  const found = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${THREAD_LIMIT}`, { signal });
   const full = found.length === THREAD_LIMIT;
   const runs = conversation(found);
   const at = runs.findIndex((candidate) => candidate.id === run.id);
@@ -126,7 +126,7 @@ async function allEvents(runId, signal) {
     if (signal.aborted) {
       return null;
     }
-    const page = await api.get(`/runs/${runId}/events${query({ after, limit: EVENTS_PAGE })}`);
+    const page = await api.get(`/runs/${runId}/events${query({ after, limit: EVENTS_PAGE })}`, { signal });
     events.push(...page);
     if (page.length < EVENTS_PAGE) {
       return events;

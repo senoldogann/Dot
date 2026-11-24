@@ -33,10 +33,10 @@ _RESTART_S: float = 5.4
 # Long enough for the page to try again after the daemon is back: its pauses grow to 8 s for a stream, 30 s on the
 # screen of a daemon out of reach, and both try at once when the page comes back into view.
 _BACK_WAIT_MS: float = 20_000
-# A stream silent this long is cut (STALL_MS in static/js/api.js), and then made again.
+# A stream silent this long is cut (IDLE_TIMEOUT_MS in static/js/sseframes.js), and then made again.
 _STALL_WAIT_MS: float = 60_000
-# The pauses of a stream between tries grow from half a second to 1, 2 and 4 s (RECONNECT_MIN_MS in static/js/api.js):
-# after this long without the daemon, the page waits its longest pause, 8 s.
+# The pauses of a stream between tries grow from half a second to 1, 2, 4, 8 and 15 s (RECONNECT_WAITS_MS in
+# static/js/sseframes.js, item 1522): after this long without the daemon, the page waits 8 s on its way to the longest.
 _LONGEST_PAUSE_AFTER_S: float = 8.0
 # Far shorter than what is left of the pause a page is in when it is told to try at once.
 _AT_ONCE_MS: float = 3_000
@@ -50,7 +50,7 @@ _READ_CHUNK: int = 65_536
 _DRAWER_BELOW: int = 860
 _STREAM_REQUEST: bytes = b"GET /api/stream"
 # Longer than a page away may leave its stream silent before it cuts it once back in view (BACK_SILENCE_MS in
-# static/js/api.js), shorter than the silence that cuts a stream in any case (STALL_MS).
+# static/js/api.js), shorter than the silence that cuts a stream in any case (IDLE_TIMEOUT_MS).
 _AWAY_MS: int = 25_000
 # Put the page out of sight or back in view, as a phone does when the app is put away and taken up again.
 _SIGHT: str = """(state) => {

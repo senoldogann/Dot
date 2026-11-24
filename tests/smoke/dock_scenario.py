@@ -138,7 +138,9 @@ async def _asking(runtime: Runtime, run: RunRecord) -> None:
         await asyncio.sleep(0.05)
 
 
-async def _extras(runtime: Runtime, manager: RunManager, run: RunRecord, address: str, home: Path) -> None:
+async def _extras(
+    runtime: Runtime, manager: RunManager, run: RunRecord, address: str, home: Path, advertise: int | None
+) -> None:
     """A message in the chat's queue, a loop of the chat and a command it left in the background."""
     await manager.queue(
         run.thread_id,
@@ -155,8 +157,10 @@ async def _extras(runtime: Runtime, manager: RunManager, run: RunRecord, address
         None,
         UI_SOURCE,
     )
+    # Behind a proxy the daemon answers to the proxy's port by name, so that is the name the request carries.
+    named: dict[str, str] = {} if advertise is None else {"Host": f"127.0.0.1:{advertise}"}
     async with httpx.AsyncClient(
-        base_url=f"{address}/api", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30.0
+        base_url=f"{address}/api", headers={"Authorization": f"Bearer {TOKEN}", **named}, timeout=30.0
     ) as client:
         made: httpx.Response = await client.post(
             f"/runs/{run.id}/loop", json={"every": LOOP_EVERY, "text": LOOP_MESSAGE}
@@ -166,10 +170,11 @@ async def _extras(runtime: Runtime, manager: RunManager, run: RunRecord, address
 
 
 @asynccontextmanager
-async def scene(login_env: dict[str, str], kind: Kind) -> AsyncIterator[Scene]:
+async def scene(login_env: dict[str, str], kind: Kind, advertise: int | None = None) -> AsyncIterator[Scene]:
     """A daemon serving the scene ``kind``: ``work`` (two helpers waited on, a queued message, a loop, a command in the
     background), ``ask`` (the run waits for an approval, with the same queue, loop and command) or ``rest`` (a chat
-    whose run is done)."""
+    whose run is done). ``advertise`` is the port the daemon answers to by name when a proxy stands in front of it (the
+    daemon refuses a request that names another port than its own)."""
     config: AppConfig = eval_config(load_default_config())
     if kind == "ask":
         config = config.model_copy(update={"policy": config.policy.model_copy(update={"preset": "cautious"})})
@@ -200,7 +205,7 @@ async def scene(login_env: dict[str, str], kind: Kind) -> AsyncIterator[Scene]:
                 scheduler=None,
                 token=TOKEN,
                 host="127.0.0.1",
-                port=port,
+                port=port if advertise is None else advertise,
                 started_at=time.time(),
                 stopping=stopping,
             )
@@ -228,10 +233,10 @@ async def scene(login_env: dict[str, str], kind: Kind) -> AsyncIterator[Scene]:
                 helpers: tuple[RunRecord, ...] = ()
                 if kind == "work":
                     helpers = await _both_working(runtime, run.id)
-                    await _extras(runtime, manager, run, address, home)
+                    await _extras(runtime, manager, run, address, home, advertise)
                 elif kind == "ask":
                     await _asking(runtime, run)
-                    await _extras(runtime, manager, run, address, home)
+                    await _extras(runtime, manager, run, address, home, advertise)
                 else:
                     async with asyncio.timeout(WAIT_S):
                         await manager.wait(run.id)

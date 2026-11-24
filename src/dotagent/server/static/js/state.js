@@ -1,6 +1,6 @@
 // What every page shares: the daemon status, the approvals that wait for an answer, and the live event stream.
 
-import { api, eventNotShown, follow, QUIET_BREAK_MS, tellOutOfDate, unreachable } from "./api.js";
+import { api, eventNotShown, follow, FRESH_EVENT, QUIET_BREAK_MS, tellOutOfDate, unreachable } from "./api.js";
 import { debounce, rememberModelLabels } from "./dom.js";
 import { t } from "./i18n.js";
 import { EN } from "./lang/en.js";
@@ -212,6 +212,14 @@ export async function runLifecycle(signal, onAuthRejected) {
   const onFocus = () => refreshSoon();
   window.addEventListener("focus", onFocus);
   signal.addEventListener("abort", () => window.removeEventListener("focus", onFocus), { once: true });
+  // A list that the phone's copy answered while Dot was slow to is answered by Dot after all (item 1521): what was drawn
+  // from the copy is read again.
+  const onFresh = () => {
+    refreshSoon();
+    readAgainSoon();
+  };
+  window.addEventListener(FRESH_EVENT, onFresh);
+  signal.addEventListener("abort", () => window.removeEventListener(FRESH_EVENT, onFresh), { once: true });
   const onBack = () => {
     if (document.visibilityState === "visible") {
       returnedAt = Date.now();
