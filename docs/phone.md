@@ -513,7 +513,10 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   slow to answer, Dot's own answer replacing it when it comes. A chat drawn from a copy that was at work when it was
   kept, and that missed 500 events or more of its run, reads the newest 400 (`GET /api/runs/{id}/events?tail=400`,
   header `X-Dot-Events-Tail`, item 1370; a daemon without it is ignored and the stream replays what was missed), says
-  *Some steps are not shown*, and its stream goes on after the last event it read.
+  *Some steps are not shown*, and its stream goes on after the last event it read. Before Dot has answered the page once,
+  a phone's reads, and the proof Dot gives before the first of them, are tried once and give up after the same 10 seconds,
+  so that a link that dies while Dot opens leaves the page with its copies instead of waiting for the browser's own
+  timeout.
 - **A stream that is never silent without being noticed (item 1522).** The page reads its streams with `fetch` and a
   stream reader, not with `EventSource`, which cannot see the comment lines that are Dot's `: open` and its `: keepalive`
   every 15 seconds, and so could tell a quiet stream from a dead socket by nothing. A small parser (`js/sseframes.js`)

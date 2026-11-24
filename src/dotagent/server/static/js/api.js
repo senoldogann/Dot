@@ -243,7 +243,7 @@ async function proveDaemon() {
   let response;
   // A daemon that does not answer the proof makes every read wait for it: on a phone it is given the time a read has.
   const limit = new AbortController();
-  const timer = resilient() ? setTimeout(() => limit.abort(), READ_TIMEOUT_MS) : null;
+  const timer = phoneScreen() ? setTimeout(() => limit.abort(), READ_TIMEOUT_MS) : null;
   try {
     const phone = phoneIdOf(token);
     response = await fetch(`/api/proof?nonce=${nonce}${phone === null ? "" : `&phone=${phone}`}`, { cache: "no-store", signal: limit.signal });
@@ -321,10 +321,15 @@ let reachedOnce = false;
 // The reads on their way, by path (item 1521): the same read asked again while it is under way waits for that one.
 const flights = new Map();
 
-/** Whether this page reads as a phone's does on a bad link (item 1521): a touch screen with no pointer that hovers, and
- * after the daemon has answered it once. A computer's page keeps its single try and its own timeouts. */
+/** Whether this is a phone's touch screen (no pointer that hovers). */
+function phoneScreen() {
+  return typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
+/** Whether this page reads as a phone's does on a bad link (item 1521): a touch screen, and after the daemon has answered
+ * it once. A computer's page keeps its single try and its own timeouts. */
 function resilient() {
-  return reachedOnce && typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
+  return reachedOnce && phoneScreen();
 }
 
 /** The error a cancelled read ends with, the page's own (a chat left): nothing is told of it. */
@@ -516,7 +521,9 @@ export async function request(method, path, body, signal) {
       clearTimeout(timer);
     }
   }
-  const read = () => (resilient() ? sharedRead(path, signal) : ask(method, path, body, signal));
+  // Before the daemon has answered it, a phone's page asks once and gives up after the time a read has, so that a link that
+  // died while Dot opened leaves the page with its copies instead of waiting for it (item 1521).
+  const read = () => (resilient() ? sharedRead(path, signal) : phoneScreen() ? tryRead(path, signal) : ask(method, path, body, signal));
   if (listKey(path) === null) {
     return read();
   }
