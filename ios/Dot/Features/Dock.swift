@@ -3,7 +3,7 @@ import SwiftUI
 /// The one capsule over the composer (item 1390): a single piece of glass whose segments are
 /// divided by hairlines (the run's status, its helpers, the loops of the chat, the queue), each a button that opens its
 /// detail in a sheet. It is one row and never stacks; with nothing to say it is not drawn. At the accessibility text sizes (item
-/// 1642) the segments stand over each other with their full words, so that no word is cut to "You" and no time to "2m…".
+/// 1643) the segments stand over each other with their full words, so that no word is cut to "You" and no time to "2m…".
 struct DockCapsule: View {
     let summary: DockSummary
     let onOpen: (DockSummary.Kind) -> Void
