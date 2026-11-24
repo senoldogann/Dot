@@ -476,6 +476,16 @@ async def test_a_run_on_the_plan_is_told_dots_own_system_prompt_and_the_skills_o
     assert "How this run was started" in first
 
 
+async def test_a_run_on_the_plan_keeps_dots_plan_with_the_plans_tools(room: Room) -> None:
+    """Item 1693: the plan's tools were Dot's own loop's alone, and no run on the plan had a plan (0 of 124, against
+    22 % of the loop's runs). They are the door's: the plan the owner watches moves as the model writes and marks it."""
+    ended: RunRecord = await _run(room, "Please plan the work.")
+    assert ended.status == "done", ended.result
+    assert "Plan recorded (0/1 done)" in ended.result and "Plan recorded (1/1 done)" in ended.result
+    plans: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "plan", 10)
+    assert [[step["status"] for step in event.data["steps"]] for event in plans] == [["in_progress"], ["done"]]  # type: ignore[union-attr]  # the plan event's steps
+
+
 async def test_plan_first_on_claude_code_is_refused_before_the_run(room: Room) -> None:
     """Plan first is Dot's own loop's plan and ask, which Claude Code does not run: refused, with what to do instead."""
     with pytest.raises(InvalidValueError, match="but not Plan first"):
