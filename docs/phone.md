@@ -481,6 +481,26 @@ copy was kept of it (the first opening from the home screen after the app is add
 it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
 
+**On a bad link: the web app (items 1520 to 1524).** The web app on the Home Screen does what the iPhone app does on a bad
+link (above, items 1370, 1371 and 1391), with the same numbers and the same rules; its layout of files is its own. The
+service worker stays what it is, the shell only, and caches nothing under `/api`: the page keeps its data itself.
+
+- **What it keeps (item 1520).** The list of chats, the agents, the status and the other lists the shell draws, and for
+  each chat it opened its newest 12 runs, their last 400 events and its queue, in IndexedDB (`dot-cache`, with a version
+  in its layout). A chat is one record written in one transaction with the index of what is kept, so it is whole or not
+  there; the cache holds 24 MB at most (the chats read longest ago go first, the chat on screen never), one chat never
+  takes more than 2 MB (its oldest events go first), and a record that does not read, of another layout or cut short, is
+  dropped and read from Dot again. Everything is dropped when the phone's key is forgotten and when the key or the
+  address is not the one it was kept for, and no part of the key is kept (only a fingerprint of it, to tell whose cache
+  it is). A page that cannot use IndexedDB (a private window, a store that is full) goes on as it was, reading from Dot.
+- **What it draws first.** A chat read before is drawn from its copy at once, before Dot is asked anything, with its
+  queue; the page then asks only for what changed: the stream goes on after the last event the copy holds, and the run's
+  record, its questions and its lessons are read again. The lists answer from their copy while Dot cannot be reached, so
+  a phone with no link opens on its chats instead of on "Dot cannot be reached"; a refusal of the daemon's (a key it
+  does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from the
+  cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
+  looks fresher than it is.
+
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
 ## The iPhone app's calls

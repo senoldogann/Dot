@@ -117,6 +117,15 @@ size, a radius or a duration in a view's sheet, nor a gap off the 4 px grid; tak
 To check a look, open `#/controls`, `#/settings/appearance`, a chat, a menu and a dialog at 1280 and
 390 px wide, in light and dark (`tests/smoke/test_controls.py` and `test_tour.py` photograph them).
 
+## What the page keeps on the phone (item 1520)
+
+The page keeps the chats it read and the lists of the shell in IndexedDB (`dot-cache`; the rules are `js/cacherules.js`,
+the store `js/datacache.js`), so that Dot opens with a chat drawn on a link that is bad or gone: `views/run.js` draws a
+chat from its copy at once (`drawFromCopy`) and keeps it as it stands (a moment after its last event, when the page is
+put away and when the chat is left), `js/api.js` keeps the lists as they are read and answers a read of one of them from
+the copy while Dot cannot be reached, and `js/linkfacts.js` says that what is shown is a copy and since when. The service
+worker stays the shell's alone. See [On a bad link: the web app](phone.md).
+
 ## The run page's conversation and panel (items 1331 to 1335, 1345 and 1346)
 
 The run page is drawn as a developer tool draws a thread, plain and professional, the same language on a Mac and on a
