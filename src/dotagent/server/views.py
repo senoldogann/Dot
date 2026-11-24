@@ -1176,6 +1176,25 @@ class SkillProposalsView(FrozenModel):
     items: tuple[ProposalView, ...]
 
 
+class SkillLeftOutView(FrozenModel):
+    """A skill Dot could not offer to a run (item 1405): the file or folder (``path``), why (``reason``, the catalog's
+    own sentence), where Dot looked for it (``source``, as a palette skill's: ``home``, ``config``, ``plugin <name>``,
+    ``learned`` or ``built-in``; ``None`` under no folder Dot reads) and whether nothing is wrong with the file
+    (``shadowed``): another skill has its name, so it is only not offered."""
+
+    path: str
+    reason: str
+    source: str | None
+    shadowed: bool
+
+
+class SkillsLeftOutView(FrozenModel):
+    """The skills left out as the catalog reads them now, those whose file is wrong first (item 1405,
+    ``GET /api/skills/left-out``)."""
+
+    items: tuple[SkillLeftOutView, ...]
+
+
 class SkillShareRequest(FrozenModel):
     """Whether an agent's learned skill is offered to every run (item 94)."""
 
