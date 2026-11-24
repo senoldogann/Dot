@@ -492,7 +492,10 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
   takes more than 2 MB (its oldest events go first), and a record that does not read, of another layout or cut short, is
   dropped and read from Dot again. Everything is dropped when the phone's key is forgotten and when the key or the
   address is not the one it was kept for, and no part of the key is kept (only a fingerprint of it, to tell whose cache
-  it is). A page that cannot use IndexedDB (a private window, a store that is full) goes on as it was, reading from Dot.
+  it is). A page that cannot use IndexedDB (a private window, a store that is full) goes on as it was, reading from Dot, and so
+  does one whose IndexedDB does not answer: what the page waits for from it (a copy of a chat or a list, the claim of
+  the cache, the outbox it sends by) is a copy that is not there after two seconds, so that a chat opens and a message
+  goes on a browser whose database hangs.
 - **What it draws first.** A chat read before is drawn from its copy at once, before Dot is asked anything, with its
   queue; the page then asks only for what changed: the stream goes on after the last event the copy holds, and the run's
   record, its questions and its lessons are read again. The lists answer from their copy while Dot cannot be reached, so

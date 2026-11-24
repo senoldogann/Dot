@@ -31,6 +31,10 @@ const OUTBOX_STORE = "outbox";
 // A list read again and again (the sidebar's, with every event) is written at most this often.
 const LIST_WRITE_EVERY_MS = 2000;
 const FINGERPRINT_CHARS = 32;
+// A browser's IndexedDB that does not answer (a Home Screen app just woken, a database another page holds) must not hold
+// up what the page does without it: past this a read of the cache is a copy that is not there, and the page reads from Dot
+// as it did before the cache.
+const ANSWER_WITHIN_MS = 2000;
 
 /** @type {Promise<IDBDatabase> | null} */
 let opening = null;
@@ -41,6 +45,34 @@ let told = false;
 // Counts the times the cache was forgotten: a write that began before one never lands after it, so that a key forgotten
 // leaves no chat behind, whatever was on its way.
 let generation = 0;
+
+/**
+ * `promise`, or `fallback` when it has not settled within `ms` or fails: what the page waits for from the database never
+ * holds the page up for longer (item 1520). The promise is left to settle on its own.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {T} fallback
+ * @param {number} [ms]
+ * @returns {Promise<T>}
+ */
+export function inTime(promise, fallback, ms = ANSWER_WITHIN_MS) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      unavailable("it did not answer in time", null);
+      resolve(fallback);
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
 
 /** Say once that the cache is off, and why: it is a convenience, so the page goes on without it. */
 function unavailable(why, error) {
@@ -139,7 +171,7 @@ function empty(transaction) {
  * @returns {Promise<boolean>}
  */
 export function claim(token) {
-  const mine = (async () => {
+  const claimed = (async () => {
     if (!supported() || token === "") {
       return false;
     }
@@ -157,6 +189,7 @@ export function claim(token) {
     unavailable("it could not be opened", error);
     return false;
   });
+  const mine = inTime(claimed, false);
   ready = mine;
   return mine;
 }
@@ -251,7 +284,11 @@ export function keepList(path, value) {
  * @param {string} path
  * @returns {Promise<{ value: any, savedAt: number } | null>}
  */
-export async function keptList(path) {
+export function keptList(path) {
+  return inTime(readList(path), null);
+}
+
+async function readList(path) {
   const key = listKey(path);
   if (key === null || !(await ready)) {
     return null;
@@ -334,7 +371,11 @@ export async function dropChat(id) {
  * chat's newest use, so that the chats read longest ago are the first to go.
  * @param {string} id
  */
-export async function keptChat(id) {
+export function keptChat(id) {
+  return inTime(readChat(id), null);
+}
+
+async function readChat(id) {
   if (!(await ready)) {
     return null;
   }
