@@ -3,15 +3,18 @@ import SwiftUI
 
 /// Debug builds only (`-DotGallery 1`): the app's pieces on one screen with made-up data, for looking at what is hard
 /// to reach with a scratch daemon (a step that asks, a secret, a failed step, an empty state, the buttons). It is how
-/// the design pass was checked in the simulator; it ships in no release build.
+/// the design pass was checked in the simulator; it ships in no release build. Page 2 is the look's one language on one screen
+/// (the palette, the state marks, the three buttons, the chip, the card, the row, the section) and page 5 puts the sheet recipe
+/// over it (a real sheet, with the system's "Done").
 struct DesignGallery: View {
     let page: Int
+    @State private var showsSheet: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.l) {
                 switch page {
-                case 2: components
+                case 2, 5: components
                 case 3: states
                 case 4: dock
                 default: rows
@@ -20,6 +23,41 @@ struct DesignGallery: View {
             .padding(Space.l)
         }
         .background { DotBackground() }
+        .sheet(isPresented: $showsSheet) { sheetRecipe.dotSheet().presentationDetents([.medium, .large]) }
+        .task {
+            if page == 5 {
+                try? await Task.sleep(for: .milliseconds(700))
+                showsSheet = true
+            }
+        }
+    }
+
+    /// The sheet recipe in one place: the app's ground, a title, ONE trailing "Done", content in cards, a section header in the
+    /// secondary colour and a footer in the quiet tier.
+    private var sheetRecipe: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.xl) {
+                    CardGroup(title: "A group", footer: "The footer is in the quiet tier, sentence case, plain.") {
+                        CardRow(icon: .cpu, title: "A row", detail: "A monochrome glyph, words, a chevron", showsChevron: true)
+                        CardDivider()
+                        CardRow(icon: .bell, title: "A row with a value") {
+                            Text("Value").font(Theme.small).foregroundStyle(Theme.muted)
+                        }
+                    }
+                    HStack(spacing: Space.s) {
+                        Button { } label: { Text("Deny").frame(maxWidth: .infinity) }.dotButton(.secondary)
+                        Button { } label: { Text("Allow once").frame(maxWidth: .infinity) }.dotButton(.primary)
+                    }
+                    .controlSize(.large)
+                }
+                .padding(Space.l)
+            }
+            .dotScreenBackground(inSheet: true)
+            .navigationTitle("Sheet")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { DoneButton { showsSheet = false } }
+        }
     }
 
     private func item(_ kind: ChatItem.Kind, _ id: String) -> some View {
@@ -59,39 +97,53 @@ struct DesignGallery: View {
                 DotGlyph(size: 44)
             }
             .padding(.vertical, Space.s)
-            HStack(spacing: Space.s) {
-                StatusPill(text: "Needs you", icon: .hand, tone: Theme.warn, pulse: true)
-                StatusPill(text: "Working", icon: .audioWaveform, tone: Theme.accent, pulse: true)
-                StatusPill(text: "Done", icon: .check, tone: Theme.good)
-                StatusPill(text: "Failed", tone: Theme.bad)
+            VStack(alignment: .leading, spacing: Space.s) {
+                SectionLabel(title: "State marks")
+                HStack(spacing: Space.l) {
+                    StateMark(words: "Running", kind: .working)
+                    StateMark(words: "Waiting on you", kind: .waiting)
+                }
+                HStack(spacing: Space.l) {
+                    StateMark(words: "Failed", kind: .failed)
+                    StateMark(words: "Done", kind: .done)
+                    StateMark(words: "Cancelled", kind: .quiet)
+                }
             }
-            DotGlassGroup {
-                HStack(spacing: Space.m) {
-                    Button("Deny") {}.dotButton(.glass)
-                    Button("Allow") {}.dotButton(.prominent)
+            VStack(alignment: .leading, spacing: Space.s) {
+                SectionLabel(title: "Buttons")
+                HStack(spacing: Space.s) {
+                    Button("Allow once") {}.dotButton(.primary)
+                    Button("Deny") {}.dotButton(.secondary)
+                    Button("Forget") {}.dotButton(.destructive)
+                }
+                HStack(spacing: Space.s) {
+                    Button("Send") {}.dotButton(.primary).disabled(true)
+                    Button("Try again") {}.dotButton(.quiet)
                     GlassCircleButton(icon: .arrowDown, label: "Down") {}
                 }
-                .controlSize(.large)
+            }
+            VStack(alignment: .leading, spacing: Space.s) {
+                SectionLabel(title: "Chip")
+                DotChip(icon: .cpu, words: "Opus 5.5 · High") {}
             }
             HStack(spacing: Space.s) {
-                DotIcon(.audioWaveform, size: 16).foregroundStyle(Theme.accent)
+                DotIcon(.audioWaveform, size: 16).foregroundStyle(Theme.text)
                 Text("Working · 2m 9s").font(Theme.meta.weight(.medium).monospacedDigit())
             }
-            .padding(.horizontal, Space.m).frame(minHeight: 32)
+            .padding(.horizontal, Space.m).frame(minHeight: 44)
             .dotGlass(in: Capsule())
-            VStack(spacing: 0) {
+            CardGroup(title: "A group", footer: "Footers are in the quiet tier.") {
                 CardRow(icon: .cpu, title: "Models", detail: "The main and the review model", showsChevron: true)
                 CardDivider()
-                CardRow(icon: .key, tint: Theme.bad, title: "Forget this phone's key")
+                CardRow(icon: .key, title: "Forget this phone's key", destructive: true)
             }
-            .card()
-            NoticeCard(words: "The daemon refused that model.")
+            NoticeCard(words: "Your Mac refused that model. Pick another.")
             Text("Type: title2 / headline / callout / footnote / caption")
                 .font(Theme.body).foregroundStyle(Theme.text)
             Text("SF Mono: let run = try await model.send()").font(Theme.mono).foregroundStyle(Theme.muted)
             HStack(spacing: Space.s) {
-                swatch(Theme.background, "bg"); swatch(Theme.surface, "surface"); swatch(Theme.raised, "raised")
-                swatch(Theme.accentFill, "accent"); swatch(Theme.warn, "warn"); swatch(Theme.bad, "bad"); swatch(Theme.good, "ok")
+                swatch(Theme.background, "ground"); swatch(Theme.surface, "surface"); swatch(Theme.raised, "raised")
+                swatch(Theme.action, "action"); swatch(Theme.warn, "warn"); swatch(Theme.bad, "bad")
             }
         }
     }

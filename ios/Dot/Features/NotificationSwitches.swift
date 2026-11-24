@@ -24,6 +24,7 @@ struct NotificationSwitches: View {
                             isOn: Binding(get: { awareness.push.shown[kind] }, set: { awareness.flip(kind, to: $0) })
                         )
                         .labelsHidden()
+                        .tint(Theme.toggleOn)
                         .accessibilityIdentifier("notify-\(kind.title)")
                         .sensoryFeedback(.selection, trigger: push.shown[kind])
                     }

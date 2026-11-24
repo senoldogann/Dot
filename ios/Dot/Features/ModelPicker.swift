@@ -77,7 +77,7 @@ struct ModelPickerView: View {
             if let detail { Text(detail).font(Theme.meta).foregroundStyle(Theme.faint) }
             Spacer()
             if selected {
-                DotIcon(.check, size: 16, relativeTo: .footnote).foregroundStyle(Theme.accent)
+                DotIcon(.check, size: 16, relativeTo: .footnote).foregroundStyle(Theme.text)
                     .transition(.scale.combined(with: .opacity))
             }
         }

@@ -139,13 +139,15 @@ code** takes its place. The same by hand:
    running; back in front, they open at once from the last event they read, and the list is read again. The system may
    also give it a moment to refresh while it is out of sight (a background refresh, a push that says there is something
    new; iOS decides, and it may never). After the list is read, the chats that moved on are read ahead, six at most,
-   three on a cellular link or a hotspot, and none with Low Data Mode on. A socket that died without a word (a path that died while the phone slept, a Wi-Fi that gave way to the cellular link) is not waited for: a connection that has answered nothing in 8 seconds, and an open stream that has said nothing for 35 seconds (Dot writes a keepalive every 15 seconds), are dropped and the stream goes on, from the last event read, on a new connection. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382, `ios/README.md`
-   › The design) is iOS-native: near-black surfaces in the dark and a cool white in the light, following the system, one
-   calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
-   chrome only: the composer bar, the capsule over it, the agents' chips (Dot wears its own face and every other agent the
-   bot, one neutral disc whatever its id, item 1462; a ring on each that turns, once in four
-   seconds, while the agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
-   the loudest card in a chat; message text and lists are never glass. Its icons are the web app's own, Lucide's
+   three on a cellular link or a hotspot, and none with Low Data Mode on. A socket that died without a word (a path that died while the phone slept, a Wi-Fi that gave way to the cellular link) is not waited for: a connection that has answered nothing in 8 seconds, and an open stream that has said nothing for 35 seconds (Dot writes a keepalive every 15 seconds), are dropped and the stream goes on, from the last event read, on a new connection. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382 and 1640 to 1644, `ios/README.md`
+   › The design) is calm and adult: one neutral graphite family taken from the web app's Graphite theme, in two looks that follow
+   the system (a card is never darker than its ground), no accent hue (the primary action is the ink itself, a link is told by
+   its underline; colour is only amber for what waits on you and a muted red for what failed), flat cards with a hairline, one
+   recipe for every sheet (the app's ground and one "Done"), text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin
+   material before it) for the floating chrome only: the composer bar, the capsule over it, the agents' chips (Dot wears its own
+   face and every other agent the bot, one neutral disc whatever its id, item 1462; a ring on each that turns, once in four
+   seconds, while the agent works and is amber while it waits for you), the compose and settings buttons of the title bar; the
+   Allow once and Deny of an approval are flat buttons on the loudest card in a chat; message text, cards and lists are never glass. Its icons are the web app's own, Lucide's
    (item 1461: `scripts/export_ios_icons.py` writes them from the web app's `icons.js`, so an icon the web app changes
    reaches the phone; the licence reads in Settings › About › Licences; the Live Activity and the share extension, which are
    other targets, still draw the system's symbols). What it still leaves to the web UI is in

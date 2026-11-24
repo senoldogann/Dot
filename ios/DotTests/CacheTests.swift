@@ -125,6 +125,24 @@ final class QueueOrderTests: XCTestCase {
         XCTAssertNil(queueOrder([], moving: "a", by: 1))
     }
 
+    /// A drag of the handles (item 1643): a list's `onMove` says which rows go before which.
+    func testADragMovesRowsBeforeTheRowTheyAreDroppedOn() {
+        let ids: [String] = ["a", "b", "c", "d"]
+        XCTAssertEqual(queueOrder(ids, moving: IndexSet(integer: 3), to: 0), ["d", "a", "b", "c"], "the last to the top")
+        XCTAssertEqual(queueOrder(ids, moving: IndexSet(integer: 0), to: 4), ["b", "c", "d", "a"], "the first to the end")
+        XCTAssertEqual(queueOrder(ids, moving: IndexSet(integer: 0), to: 2), ["b", "a", "c", "d"], "down one place: before the row after it")
+        XCTAssertEqual(queueOrder(ids, moving: IndexSet([0, 1]), to: 4), ["c", "d", "a", "b"], "two rows together keep their order")
+    }
+
+    func testADropWhereTheRowStoodMovesNothing() {
+        let ids: [String] = ["a", "b", "c"]
+        XCTAssertNil(queueOrder(ids, moving: IndexSet(integer: 1), to: 1))
+        XCTAssertNil(queueOrder(ids, moving: IndexSet(integer: 1), to: 2), "just below its own place is its own place")
+        XCTAssertNil(queueOrder(ids, moving: IndexSet(), to: 0))
+        XCTAssertNil(queueOrder(ids, moving: IndexSet(integer: 5), to: 0), "a row that is not there")
+        XCTAssertNil(queueOrder(ids, moving: IndexSet(integer: 0), to: 9), "a place that is not there")
+    }
+
     func testEveryMessageStaysOnceWhateverIsMoved() {
         let ids: [String] = ["a", "b", "c", "d"]
         for id in ids {

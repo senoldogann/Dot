@@ -12,10 +12,9 @@ struct HandoffCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.m) {
             HStack(alignment: .top, spacing: Space.m) {
-                DotIcon(.globe, size: 20, relativeTo: .title3)
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.accent.opacity(0.14), in: Circle())
+                DotIcon(.globe, size: 22, relativeTo: .title3)
+                    .foregroundStyle(Theme.warn)
+                    .frame(width: 28)
                     .accessibilityHidden(true)
                 Text(card.headline).font(.headline).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
             }
@@ -23,13 +22,13 @@ struct HandoffCardView: View {
             Button(action: onOpenWeb) {
                 Label(HandoffCard.buttonTitle, icon: .external, size: 16).frame(maxWidth: .infinity)
             }
-            .dotButton(.glass)
+            .dotButton(.primary)
             .controlSize(.large)
             .accessibilityIdentifier("handoff-open")
         }
         .padding(Space.l)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(radius: Radius.l)
+        .card(border: Theme.warn.opacity(0.45))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("handoff-card")
     }

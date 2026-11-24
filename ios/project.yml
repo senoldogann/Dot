@@ -166,6 +166,7 @@ targets:
       - path: Dot/Adapters/DaemonClient.swift
       - path: Dot/Core/DaemonHost.swift
       - path: Dot/Core/Policy.swift
+      - path: Shared/DotPalette.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.share

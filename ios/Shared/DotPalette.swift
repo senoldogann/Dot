@@ -27,40 +27,48 @@ struct DotRGB: Equatable, Sendable {
         let darker: Double = min(luminance, other.luminance)
         return (lighter + 0.05) / (darker + 0.05)
     }
+
+    /// How far the colour is from a grey: the spread of its channels, 0 (a neutral) to 1.
+    var spread: Double { max(red, green, blue) - min(red, green, blue) }
 }
 
-/// The colour tokens of the iPhone app, in its two looks. Dark is the signature one: near-black ground, raised
-/// surfaces a step lighter, one calm blue. Light keeps the same roles on a cool white. Every text token holds a
-/// contrast of 4.5:1 against the grounds it is drawn on (`DotPaletteTests`).
+/// The colour tokens of the iPhone app, in its two looks (items 1640 to 1647, the owner's order of 2026-11-24: a professional,
+/// calm, adult look). ONE neutral graphite family, taken from the web app's Graphite theme (`static/js/appearance/palettes-more.js`):
+/// a ground, a surface one step above it, a raised step; the ink in three tiers; the primary action is the ink itself (a light
+/// pill with a dark label on the dark ground, a dark pill with a light label on the light one). There is no accent hue. Colour
+/// is for two states only: amber for what waits on the owner and a muted red for what failed. A card is never darker than the
+/// ground it lies on. Every text token holds a contrast of 4.5:1 against the grounds it is drawn on (`DotPaletteTests`).
 struct DotPalette: Sendable {
+    /// The app's ground, and of every sheet.
     let background: DotRGB
+    /// A card, a row group: one step above the ground.
     let surface: DotRGB
+    /// A fill a step off the surface: the owner's message, an avatar's disc, a field, a code block.
     let raised: DotRGB
+    /// The ink in three tiers: the words, the secondary words, the quiet tier (a footer, a time, a placeholder).
     let text: DotRGB
     let muted: DotRGB
     let faint: DotRGB
-    /// The accent as ink (a symbol, a word) on the grounds.
-    let accent: DotRGB
-    /// The accent as a fill that white text sits on: its top and its bottom (a very slight gradient).
-    let accentFillTop: DotRGB
-    let accentFill: DotRGB
-    let onAccent: DotRGB
-    let link: DotRGB
+    /// The primary action: the ink as a fill, and the ground as the label on it.
+    let action: DotRGB
+    let onAction: DotRGB
+    /// Waiting on the owner: an amber ink, and the one amber fill (the capsule over the composer's "Waiting on you").
     let warn: DotRGB
+    let warnSurface: DotRGB
+    /// A failure: a muted red ink for a glyph and its words, never a fill.
     let bad: DotRGB
-    let good: DotRGB
 
     static let dark: DotPalette = DotPalette(
-        background: DotRGB(hex: 0x0A0A0B), surface: DotRGB(hex: 0x121214), raised: DotRGB(hex: 0x1B1B1F),
-        text: DotRGB(hex: 0xEDEDEF), muted: DotRGB(hex: 0xA6A6AF), faint: DotRGB(hex: 0x8E8E98),
-        accent: DotRGB(hex: 0x6AA4FF), accentFillTop: DotRGB(hex: 0x3070E4), accentFill: DotRGB(hex: 0x2762D8),
-        onAccent: DotRGB(hex: 0xFFFFFF), link: DotRGB(hex: 0xB8D6FF), warn: DotRGB(hex: 0xF2BC4E),
-        bad: DotRGB(hex: 0xFF7070), good: DotRGB(hex: 0x5FCB92))
+        background: DotRGB(hex: 0x121212), surface: DotRGB(hex: 0x1F1F1F), raised: DotRGB(hex: 0x2C2C2E),
+        text: DotRGB(hex: 0xF5F5F5), muted: DotRGB(hex: 0xB0B0B0), faint: DotRGB(hex: 0x949494),
+        action: DotRGB(hex: 0xF5F5F5), onAction: DotRGB(hex: 0x121212),
+        warn: DotRGB(hex: 0xF2BC4E), warnSurface: DotRGB(hex: 0x3A2D10), bad: DotRGB(hex: 0xEE8480))
 
+    /// The light look is not the dark one inverted: a light grey ground with white cards above it (a card is never darker than
+    /// its ground), the web's Graphite greys one step across.
     static let light: DotPalette = DotPalette(
-        background: DotRGB(hex: 0xF3F3F6), surface: DotRGB(hex: 0xFFFFFF), raised: DotRGB(hex: 0xE9E9EE),
-        text: DotRGB(hex: 0x131316), muted: DotRGB(hex: 0x4F4F59), faint: DotRGB(hex: 0x666670),
-        accent: DotRGB(hex: 0x2559C9), accentFillTop: DotRGB(hex: 0x3070E4), accentFill: DotRGB(hex: 0x2762D8),
-        onAccent: DotRGB(hex: 0xFFFFFF), link: DotRGB(hex: 0x1B4FBF), warn: DotRGB(hex: 0x8F5200),
-        bad: DotRGB(hex: 0xBA2626), good: DotRGB(hex: 0x1B7447))
+        background: DotRGB(hex: 0xF2F2F2), surface: DotRGB(hex: 0xFFFFFF), raised: DotRGB(hex: 0xE9E9EB),
+        text: DotRGB(hex: 0x0D0D0D), muted: DotRGB(hex: 0x4A4A4A), faint: DotRGB(hex: 0x666666),
+        action: DotRGB(hex: 0x0D0D0D), onAction: DotRGB(hex: 0xFFFFFF),
+        warn: DotRGB(hex: 0x7A4500), warnSurface: DotRGB(hex: 0xF6E8CC), bad: DotRGB(hex: 0xB42318))
 }

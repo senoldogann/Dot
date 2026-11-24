@@ -296,6 +296,16 @@ final class ChatModel {
     /// new order (kept and sent when the link allows); the queue is read again when it answered.
     func moveQueued(_ id: String, by step: Int) {
         guard let order: [String] = queueOrder(queue.messages.map(\.id), moving: id, by: step) else { return }
+        reorder(to: order)
+    }
+
+    /// A drag of the queue's handles: the rows at `offsets` go before the row at `destination` (a list's `onMove`).
+    func moveQueued(from offsets: IndexSet, to destination: Int) {
+        guard let order: [String] = queueOrder(queue.messages.map(\.id), moving: offsets, to: destination) else { return }
+        reorder(to: order)
+    }
+
+    private func reorder(to order: [String]) {
         var moved: [QueuedMessage] = []
         for (position, orderedId) in order.enumerated() {
             if var message: QueuedMessage = queue.messages.first(where: { $0.id == orderedId }) {

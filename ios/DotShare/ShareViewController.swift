@@ -251,10 +251,12 @@ struct ShareView: View {
                 }
                 if let problem: String = model.problem {
                     Section {
-                        Text(problem).foregroundStyle(.red)
+                        Text(problem).foregroundStyle(Color.shareFailure)
                     }
                 }
             }
+            // The app's look (item 1641): no system blue; the buttons are the ink, a failure is the app's muted red.
+            .tint(.primary)
             .navigationTitle("Send to Dot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -273,4 +275,13 @@ struct ShareView: View {
             }
         }
     }
+}
+
+private extension Color {
+    /// A failure's ink, the app's own (`Shared/DotPalette.swift`): muted red in both looks.
+    static let shareFailure: Color = Color(
+        uiColor: UIColor { trait in
+            let rgb: DotRGB = trait.userInterfaceStyle == .dark ? DotPalette.dark.bad : DotPalette.light.bad
+            return UIColor(red: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
+        })
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// A refusal or a failure said on the page where the tap was: a tinted card with its symbol.
+/// A refusal or a failure said on the page where the tap was: a card like every other, with a muted red glyph and the words in
+/// the ink (a failure is a glyph and words, not a coloured box).
 struct NoticeCard: View {
     let words: String
     var tone: Color = Theme.bad
@@ -8,13 +9,12 @@ struct NoticeCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s) {
-            DotIcon(icon, size: 15, relativeTo: .footnote).foregroundStyle(tone).padding(.top, 2)
+            DotIcon(icon, size: 16, relativeTo: .footnote).foregroundStyle(tone).padding(.top, 2)
             Text(words).font(Theme.small).foregroundStyle(Theme.text)
             Spacer(minLength: 0)
         }
         .padding(Space.m)
-        .background(tone.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.m))
-        .overlay(RoundedRectangle(cornerRadius: Radius.m).strokeBorder(tone.opacity(0.35), lineWidth: 1))
+        .card(radius: Radius.m)
         .accessibilityElement(children: .combine)
     }
 }
@@ -26,6 +26,7 @@ struct NativeSettingsView: View {
     let store: NativeStore
     @Environment(\.dismiss) private var dismiss: DismissAction
     @State private var changingAddress: Bool = false
+    @State private var forgetting: Bool = false
     @State private var path: [String] = []
     @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
@@ -41,7 +42,7 @@ struct NativeSettingsView: View {
                         .buttonStyle(.plain)
                         CardDivider()
                         NavigationLink(value: "schedules") {
-                            CardRow(icon: .history, tint: Theme.accentFill, title: "Schedules", detail: "What Dot does on its own, and when", showsChevron: true)
+                            CardRow(icon: .history, title: "Schedules", detail: "What Dot does on its own, and when", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
@@ -52,38 +53,36 @@ struct NativeSettingsView: View {
                             if let url: URL = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                         } label: {
                             CardRow(
-                                icon: .bell, tint: Color(red: 0.9, green: 0.32, blue: 0.3), title: "iPhone notification settings",
+                                icon: .bell, title: "iPhone notification settings",
                                 detail: "Banners, sounds and the badge", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         CardDivider()
                         Button { changingAddress = true } label: {
-                            CardRow(icon: .network, tint: Color(red: 0.2, green: 0.6, blue: 0.62), title: "Change address", showsChevron: true)
+                            CardRow(icon: .network, title: "Change address", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         CardDivider()
-                        Button {
-                            model.forgetKey()
-                            dismiss()
-                        } label: {
-                            CardRow(icon: .key, tint: Theme.bad, title: "Forget this phone's key")
+                        Button { forgetting = true } label: {
+                            CardRow(icon: .key, title: "Forget this phone's key", destructive: true)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("forget-key")
                     }
                     CardGroup(
-                        footer: "The web UI is the full Dot on this Mac's address. This app is the phone's own front for chats, approvals, helpers and schedules."
+                        footer: "This app covers chats, approvals, helpers and schedules. Everything else is in Dot on your Mac."
                     ) {
                         Button {
                             dismiss()
                             model.showsWeb = true
                         } label: {
-                            CardRow(icon: .globe, tint: Color(red: 0.35, green: 0.4, blue: 0.9), title: "Open web UI", showsChevron: true)
+                            CardRow(icon: .globe, title: "Open web UI", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                     }
                     CardGroup(title: "About") {
                         NavigationLink(value: "licences") {
-                            CardRow(icon: .shieldCheck, tint: Theme.muted, title: "Licences", detail: "What the app's icons are drawn from", showsChevron: true)
+                            CardRow(icon: .shieldCheck, title: "Licences", detail: "What the app's icons are drawn from", showsChevron: true)
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("licences")
@@ -104,9 +103,18 @@ struct NativeSettingsView: View {
             .onAppear {
                 if model.debugSchedules { path = ["schedules"] } else if let page: String = model.debugSettingsPage { path = [page] }
             }
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { DoneButton { dismiss() } }
             .sheet(isPresented: $changingAddress) {
                 AddressView(model: model, onSaved: { changingAddress = false; dismiss() }).dotSheet()
+            }
+            .confirmationDialog("Forget this phone's key?", isPresented: $forgetting, titleVisibility: .visible) {
+                Button("Forget the key", role: .destructive) {
+                    model.forgetKey()
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You will need a new code from your Mac to pair this phone again.")
             }
         }
     }
@@ -116,17 +124,16 @@ struct NativeSettingsView: View {
         let layout: AnyLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.m)) : AnyLayout(HStackLayout(spacing: Space.m))
         return layout {
             DotIcon(.laptop, size: 24, relativeTo: .title3)
-                .foregroundStyle(connectionTone)
-                .frame(width: 52, height: 52)
-                .background(connectionTone.opacity(0.14), in: RoundedRectangle(cornerRadius: Radius.m))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 28)
             VStack(alignment: .leading, spacing: 3) {
-                Text(store.host.name).font(.headline).foregroundStyle(Theme.text).lineLimit(1).truncationMode(.middle)
-                StatusPill(text: connectionWords, icon: connectionIcon, tone: connectionTone, pulse: store.connection == .connecting || store.connection == .reconnecting)
+                Text(store.host.name).font(.headline).foregroundStyle(Theme.text).lineLimit(typeSize.isAccessibilitySize ? 3 : 1).truncationMode(.middle)
+                StateMark(words: connectionWords, kind: connectionKind)
             }
             if !typeSize.isAccessibilitySize { Spacer() }
         }
         .padding(Space.l)
-        .card(radius: Radius.l)
+        .card()
         .accessibilityElement(children: .combine)
     }
 
@@ -139,19 +146,12 @@ struct NativeSettingsView: View {
         }
     }
 
-    private var connectionIcon: IconName {
+    /// Connected is quiet; connecting has the moving mark; a refused key waits on the owner, so it is amber.
+    private var connectionKind: StateMark.Kind {
         switch store.connection {
-        case .live: .circleCheck
-        case .connecting, .reconnecting: .refresh
-        case .unauthorized: .key
-        }
-    }
-
-    private var connectionTone: Color {
-        switch store.connection {
-        case .live: Theme.good
-        case .connecting, .reconnecting: Theme.accent
-        case .unauthorized: Theme.warn
+        case .live: .done
+        case .connecting, .reconnecting: .working
+        case .unauthorized: .waiting
         }
     }
 }
@@ -241,7 +241,7 @@ struct ModelChoiceList: View {
                             } label: {
                                 CardRow(icon: nil, title: option.label) {
                                     if option.ref == (chosen ?? current) {
-                                        DotIcon(.check, size: 16, relativeTo: .footnote).foregroundStyle(Theme.accent)
+                                        DotIcon(.check, size: 16, relativeTo: .footnote).foregroundStyle(Theme.text)
                                     }
                                 }
                             }
@@ -327,7 +327,7 @@ struct LicencesView: View {
                     NavigationLink {
                         LicenceTextView(title: "Lucide", resource: "LICENSE-Lucide")
                     } label: {
-                        CardRow(icon: .shieldCheck, tint: Theme.muted, title: "Lucide", detail: "Icons · ISC licence", showsChevron: true)
+                        CardRow(icon: .shieldCheck, title: "Lucide", detail: "Icons · ISC licence", showsChevron: true)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("licence-lucide")

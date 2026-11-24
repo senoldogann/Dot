@@ -8,18 +8,18 @@ final class LinkStyleTests: XCTestCase {
         let styled: AttributedString = LinkStyle.styled("See https://example.com/report for it")
         let link: AttributedString.Runs.Run = try XCTUnwrap(styled.runs.first { $0.link != nil })
         XCTAssertEqual(link.link, URL(string: "https://example.com/report"))
-        XCTAssertNil(link.underlineStyle, "no underline")
+        XCTAssertEqual(link.underlineStyle, .single, "underlined: the look has no link colour")
         XCTAssertNil(link.backgroundColor, "no background")
-        XCTAssertEqual(link.foregroundColor, Theme.link)
+        XCTAssertEqual(link.foregroundColor, Theme.text)
     }
 
     func testAMarkdownLinkKeepsItsWordsAndIsStyledAlike() throws {
         let styled: AttributedString = LinkStyle.styled("Read [the docs](https://example.com/docs) now")
         let link: AttributedString.Runs.Run = try XCTUnwrap(styled.runs.first { $0.link != nil })
         XCTAssertEqual(String(styled[link.range].characters), "the docs")
-        XCTAssertNil(link.underlineStyle)
+        XCTAssertEqual(link.underlineStyle, .single)
         XCTAssertNil(link.backgroundColor)
-        XCTAssertEqual(link.foregroundColor, Theme.link)
+        XCTAssertEqual(link.foregroundColor, Theme.text)
     }
 
     func testTextRoundTheLinkIsLeftAlone() {
@@ -29,13 +29,15 @@ final class LinkStyleTests: XCTestCase {
         XCTAssertTrue(others.allSatisfy { $0.foregroundColor == nil && $0.backgroundColor == nil && $0.underlineStyle == nil })
     }
 
-    func testTheLinkIsAShadeBrighterThanTheTextAndTiltedToTheAccentInTheDark() {
-        // The theme's colours follow the appearance: read the link as the dark look draws it.
+    /// A link wears the text colour (an underline tells it from the words round it); the old blue is gone.
+    func testALinkIsTheInkAndNotAHue() throws {
+        let styled: AttributedString = LinkStyle.styled("See https://example.com/report for it")
+        let link: AttributedString.Runs.Run = try XCTUnwrap(styled.runs.first { $0.link != nil })
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(Theme.link).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)).getRed(&r, green: &g, blue: &b, alpha: &a)
-        XCTAssertGreaterThan(max(r, g, b), CGFloat(Theme.textLevel), "its brightest channel is above the text's")
-        XCTAssertGreaterThan(b, r, "it leans to the blue of the accent")
-        XCTAssertNotEqual(Theme.link, Theme.text)
+        UIColor(try XCTUnwrap(link.foregroundColor)).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+            .getRed(&r, green: &g, blue: &b, alpha: &a)
+        XCTAssertEqual(r, g, accuracy: 0.01, "a grey")
+        XCTAssertEqual(g, b, accuracy: 0.01, "a grey")
     }
 
     func testPlainWordsHaveNoLink() {

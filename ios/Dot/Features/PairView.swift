@@ -13,7 +13,6 @@ struct PairView: View {
             VStack(alignment: .leading, spacing: Space.l) {
                 VStack(spacing: Space.m) {
                     DotGlyph(size: 72)
-                        .shadow(color: Theme.accent.opacity(0.45), radius: 24, y: 6)
                     VStack(spacing: Space.xs) {
                         Text("Pair this phone").font(.title.weight(.semibold)).foregroundStyle(Theme.text)
                         Text(host.name).font(Theme.meta.weight(.medium)).foregroundStyle(Theme.faint)
@@ -23,8 +22,8 @@ struct PairView: View {
                 .padding(.top, Space.xxl).padding(.bottom, Space.s)
                 VStack(alignment: .leading, spacing: 0) {
                     step(1, "On your Mac, open Dot › Settings › Phone.")
-                    CardDivider(inset: 52)
-                    step(2, "Press for a new code, and type it here.")
+                    CardDivider(inset: 54)
+                    step(2, "In Settings › Phone, press New code, then type it here.")
                 }
                 .card()
                 TextField("", text: $code, prompt: Text("7KQ2-M9XD").foregroundStyle(Theme.muted))
@@ -34,40 +33,38 @@ struct PairView: View {
                     .multilineTextAlignment(.center)
                     .padding(Space.l)
                     .frame(minHeight: 64)
-                    .dotGlass(in: RoundedRectangle(cornerRadius: Radius.l))
+                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.l))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Theme.hairline, lineWidth: 1))
                     .onSubmit(pair)
                     .accessibilityIdentifier("pair-code")
                 if let failure { NoticeCard(words: failure) }
                 Button(action: pair) {
                     Text(working ? "Pairing…" : "Pair").frame(maxWidth: .infinity)
                 }
-                .dotButton(.prominent)
+                .dotButton(.primary)
                 .controlSize(.large)
                 .disabled(code.trimmingCharacters(in: .whitespaces).isEmpty || working)
                 HStack {
                     Button("Pair in the web UI instead") { model.showsWeb = true }
+                        .frame(minHeight: 44)
                     Spacer()
                     Button("Change address") { model.showsSettings = true }
+                        .frame(minHeight: 44)
                 }
-                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.muted)
+                .font(Theme.small.weight(.medium)).foregroundStyle(Theme.muted)
                 .padding(.horizontal, Space.xs)
             }
             .padding(.horizontal, Space.xl)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background {
-            ZStack(alignment: .top) {
-                DotBackground(glow: 0.6)
-                DotMesh().frame(height: 460).mask(LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)).ignoresSafeArea()
-            }
-        }
+        .background { DotBackground() }
     }
 
     private func step(_ number: Int, _ words: String) -> some View {
         HStack(spacing: Space.m) {
-            Text("\(number)").font(.footnote.weight(.bold).monospacedDigit()).foregroundStyle(Theme.accent)
-                .frame(width: 26, height: 26).background(Theme.accent.opacity(0.14), in: Circle())
-            Text(words).font(.subheadline).foregroundStyle(Theme.text)
+            Text("\(number)").font(.footnote.weight(.semibold).monospacedDigit()).foregroundStyle(Theme.muted)
+                .frame(width: 26, height: 26).background(Theme.raised, in: Circle())
+            Text(words).font(.subheadline).foregroundStyle(Theme.text).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, Space.l).padding(.vertical, Space.m)

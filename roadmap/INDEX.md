@@ -6,6 +6,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1643](1643.md) | done | 2026-11-24 | Dot for iPhone: every sheet and screen in the new look, the queue with swipe, undo and a drag |
+| [1642](1642.md) | done | 2026-11-24 | Dot for iPhone: one recipe for the card, the row, the sheet, the buttons and the state mark |
+| [1641](1641.md) | done | 2026-11-24 | Dot for iPhone: one neutral graphite family, no accent hue |
 | [1640](1640.md) | done | 2026-11-24 | Dot for iPhone: the audit of everything that makes the app look childish |
 | [1562](1562.md) | done | 2026-11-24 | The review guards the freedom contract on every push |
 | [1561](1561.md) | done | 2026-11-24 | The freedom contract is a test: a table of every kind of tool decided under yolo and free mode, every tool and every place that asks seen |

@@ -3,8 +3,9 @@ import UIKit
 import XCTest
 @testable import Dot
 
-/// The design tokens (item 1380): every text token holds 4.5:1 on the grounds it is drawn on, in both looks, so a
-/// change of a colour that makes words hard to read fails here and not on a phone.
+/// The design tokens (items 1380 and 1641): every text token holds 4.5:1 on the grounds it is drawn on, in both looks, so a
+/// change of a colour that makes words hard to read fails here and not on a phone; the family is neutral (no accent hue), the
+/// primary action is the ink itself, and a card is never darker than the ground it lies on.
 final class DotPaletteTests: XCTestCase {
     private let looks: [(name: String, palette: DotPalette)] = [("dark", .dark), ("light", .light)]
 
@@ -20,10 +21,7 @@ final class DotPaletteTests: XCTestCase {
         for look in looks {
             let p: DotPalette = look.palette
             let grounds: [(String, DotRGB)] = [("background", p.background), ("surface", p.surface), ("raised", p.raised)]
-            let inks: [(String, DotRGB)] = [
-                ("text", p.text), ("muted", p.muted), ("faint", p.faint), ("accent", p.accent), ("link", p.link),
-                ("warn", p.warn), ("bad", p.bad), ("good", p.good),
-            ]
+            let inks: [(String, DotRGB)] = [("text", p.text), ("muted", p.muted), ("faint", p.faint), ("warn", p.warn), ("bad", p.bad)]
             for (inkName, ink) in inks {
                 for (groundName, ground) in grounds {
                     XCTAssertGreaterThanOrEqual(
@@ -33,12 +31,38 @@ final class DotPaletteTests: XCTestCase {
         }
     }
 
-    func testWhiteTextOnTheAccentFillHolds45To1AtBothEnds() {
+    /// Glyphs (a chevron, a state mark, a quiet icon) need 3:1; every ink the app draws a glyph in holds more on every ground.
+    func testEveryGlyphInkHolds3To1OnEveryGround() {
         for look in looks {
             let p: DotPalette = look.palette
-            XCTAssertGreaterThanOrEqual(p.onAccent.contrast(with: p.accentFillTop), 4.5, "\(look.name): the top of the fill")
-            XCTAssertGreaterThanOrEqual(p.onAccent.contrast(with: p.accentFill), 4.5, "\(look.name): the bottom of the fill")
+            for (inkName, ink) in [("muted", p.muted), ("faint", p.faint), ("warn", p.warn), ("bad", p.bad)] {
+                for (groundName, ground) in [("background", p.background), ("surface", p.surface), ("raised", p.raised)] {
+                    XCTAssertGreaterThanOrEqual(ink.contrast(with: ground), 3, "\(look.name): \(inkName) glyph on \(groundName)")
+                }
+            }
         }
+    }
+
+    func testTheActionsLabelHolds45To1OnItsFill() {
+        for look in looks {
+            let p: DotPalette = look.palette
+            XCTAssertGreaterThanOrEqual(p.onAction.contrast(with: p.action), 4.5, "\(look.name): the label of the primary action")
+        }
+    }
+
+    func testTheAmberFillHoldsTheTextAndItsOwnInk() {
+        for look in looks {
+            let p: DotPalette = look.palette
+            XCTAssertGreaterThanOrEqual(p.text.contrast(with: p.warnSurface), 4.5, "\(look.name): text on the amber fill")
+            XCTAssertGreaterThanOrEqual(p.warn.contrast(with: p.warnSurface), 4.5, "\(look.name): the amber ink on the amber fill")
+        }
+    }
+
+    /// The swipe actions of a row are drawn by the system with a white label.
+    func testTheSwipeFillsHoldTheirWhiteLabel() {
+        let white: DotRGB = DotRGB(hex: 0xFFFFFF)
+        XCTAssertGreaterThanOrEqual(white.contrast(with: Theme.swipeNeutralRGB), 4.5)
+        XCTAssertGreaterThanOrEqual(white.contrast(with: Theme.swipeDestructiveRGB), 4.5)
     }
 
     func testTheTextLadderStepsDownInTheDarkAndUpInTheLight() {
@@ -56,24 +80,66 @@ final class DotPaletteTests: XCTestCase {
         XCTAssertLessThan(p.surface.luminance, p.raised.luminance)
     }
 
-    func testThemeColoursFollowTheAppearance() {
-        func components(_ color: Color, _ style: UIUserInterfaceStyle) -> (CGFloat, CGFloat, CGFloat) {
-            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-            UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
-            return (r, g, b)
+    /// The Queued sheet's bug: a card darker than what it lies on. In both looks the surface is at least as light as the ground.
+    func testACardIsNeverDarkerThanItsGround() {
+        for look in looks {
+            XCTAssertGreaterThanOrEqual(look.palette.surface.luminance, look.palette.background.luminance, look.name)
         }
+    }
+
+    /// One neutral family: the grounds, the ink and the action are greys (their channels are within 3/255 of each other). Colour
+    /// is only the amber of what waits on the owner and the muted red of what failed, and each of those leans to red.
+    func testTheFamilyIsNeutralAndOnlyAmberAndRedAreColours() {
+        for look in looks {
+            let p: DotPalette = look.palette
+            let neutral: [(String, DotRGB)] = [
+                ("background", p.background), ("surface", p.surface), ("raised", p.raised), ("text", p.text), ("muted", p.muted),
+                ("faint", p.faint), ("action", p.action), ("onAction", p.onAction),
+            ]
+            for (name, colour) in neutral { XCTAssertLessThanOrEqual(colour.spread, 3.0 / 255, "\(look.name): \(name) is a grey") }
+            for (name, colour) in [("warn", p.warn), ("warnSurface", p.warnSurface), ("bad", p.bad)] {
+                XCTAssertGreaterThan(colour.red, colour.blue, "\(look.name): \(name) is warm, never blue")
+            }
+        }
+    }
+
+    /// The accent is not a hue: the primary action is the text colour, and its label is the ground.
+    func testThePrimaryActionIsTheInkOnTheGround() {
+        for look in looks {
+            XCTAssertEqual(look.palette.action, look.palette.text, look.name)
+            XCTAssertEqual(look.palette.onAction.luminance, look.palette.background.luminance, accuracy: 0.002, look.name)
+        }
+    }
+
+    private func components(_ color: Color, _ style: UIUserInterfaceStyle) -> (CGFloat, CGFloat, CGFloat) {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).resolvedColor(with: UITraitCollection(userInterfaceStyle: style)).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return (r, g, b)
+    }
+
+    func testThemeColoursFollowTheAppearance() {
         let dark: (CGFloat, CGFloat, CGFloat) = components(Theme.background, .dark)
         let light: (CGFloat, CGFloat, CGFloat) = components(Theme.background, .light)
         XCTAssertEqual(Double(dark.0), DotPalette.dark.background.red, accuracy: 0.002)
         XCTAssertEqual(Double(light.0), DotPalette.light.background.red, accuracy: 0.002)
         XCTAssertLessThan(dark.0, 0.1, "near-black in the dark")
-        XCTAssertGreaterThan(light.0, 0.9, "a cool white in the light")
+        XCTAssertGreaterThan(light.0, 0.9, "a light grey in the light")
+        let action: (CGFloat, CGFloat, CGFloat) = components(Theme.action, .dark)
+        XCTAssertEqual(Double(action.0), DotPalette.dark.text.red, accuracy: 0.002, "the primary action is the ink")
     }
 
-    func testALinkIsBrighterThanTheTextInTheDark() {
-        let link: DotRGB = DotPalette.dark.link
-        XCTAssertGreaterThan(max(link.red, link.green, link.blue), Theme.textLevel, "its brightest channel is above the text's")
-        XCTAssertGreaterThan(link.blue, link.red, "it leans to the blue of the accent")
+    /// The `AccentColor` asset is the system tint of every control that sets none (a switch, a text cursor, an alert's button): it
+    /// is the ink, in both looks, so that no control falls back to a blue.
+    func testTheAccentColorAssetIsTheInkInBothLooks() throws {
+        for (style, palette) in [(UIUserInterfaceStyle.dark, DotPalette.dark), (UIUserInterfaceStyle.light, DotPalette.light)] {
+            let traits: UITraitCollection = UITraitCollection(userInterfaceStyle: style)
+            let accent: UIColor = try XCTUnwrap(UIColor(named: "AccentColor", in: Bundle(for: NativeStore.self), compatibleWith: traits))
+            var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+            accent.resolvedColor(with: traits).getRed(&r, green: &g, blue: &b, alpha: &a)
+            XCTAssertEqual(Double(r), palette.text.red, accuracy: 0.004, "\(style.rawValue)")
+            XCTAssertEqual(Double(g), palette.text.green, accuracy: 0.004, "\(style.rawValue)")
+            XCTAssertEqual(Double(b), palette.text.blue, accuracy: 0.004, "\(style.rawValue)")
+        }
     }
 }
 

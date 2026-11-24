@@ -13,7 +13,7 @@ struct AwayCardView: View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(alignment: .top, spacing: Space.m) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("While you were away").font(.caption.weight(.semibold)).foregroundStyle(Theme.accent)
+                    Text("While you were away").font(.caption.weight(.medium)).foregroundStyle(Theme.muted)
                     Text(card.headline).font(.headline).foregroundStyle(Theme.text)
                     if !card.counts.isEmpty { Text(card.counts).font(Theme.small).foregroundStyle(Theme.muted) }
                 }
@@ -51,7 +51,7 @@ struct AwayCardView: View {
         .padding(.horizontal, Space.l)
         .padding(.vertical, Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .card(radius: Radius.l)
+        .card()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("away-card")
     }
@@ -93,11 +93,10 @@ private struct AwayRowView: View {
 
     private var tone: Color {
         switch row.run.status {
-        case "done": Theme.good
         case "failed": Theme.bad
         case "blocked": Theme.warn
         case "cancelled": Theme.faint
-        default: Theme.accent
+        default: Theme.muted
         }
     }
 }
