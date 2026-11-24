@@ -4,6 +4,7 @@ and is answered."""
 
 import json
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -157,3 +158,25 @@ def test_the_code_cannot_make_the_daemon_hold_replies_it_never_reads(tmp_path: P
     assert ended.ending == "timeout"
     assert len(code_box.calls) <= 2
     assert os.path.exists(code_box.layout.scratch)
+
+
+@pytest.mark.macos
+def test_a_fault_in_answering_a_call_kills_the_code_at_once_and_is_raised_not_waited_out(tmp_path: Path) -> None:
+    code_box: Box = box(tmp_path)
+
+    async def broken(_arguments: object) -> BridgeAnswer:
+        raise RuntimeError("the store could not keep the result")
+
+    code_box.answers["t"] = broken  # type: ignore[assignment]
+    started: float = time.monotonic()
+    with pytest.raises(RuntimeError, match="the store could not keep the result"):
+        code_box.start(
+            "import dot_tools._bridge as bridge, os\nopen('pid', 'w').write(str(os.getpid()))\n"
+            "bridge.call('t', {})\nprint('never')",
+            seconds=60.0,
+        )
+    # The code does not wait for an answer that will not come until its time is up: it is gone as the fault is raised.
+    assert time.monotonic() - started < 10.0
+    pid: int = int((code_box.layout.scratch / "pid").read_text(encoding="utf-8"))
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)

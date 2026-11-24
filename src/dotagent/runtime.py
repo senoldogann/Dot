@@ -23,6 +23,7 @@ from dotagent.awake import KeepAwake
 from dotagent.browser.ledger import ledger_files
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
+from dotagent.codemode.tool import build_code_run_tools
 from dotagent.config import AppConfig, McpServerConfig
 from dotagent.core.errors import ElsewhereError, McpError, StoreError
 from dotagent.core.logs import get_logger
@@ -276,6 +277,8 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
     core: tuple[tuple[RegisteredTool, ...], ...] = (
         build_file_tools(),
         (build_shell_tool(),),
+        # Python the model writes, which calls its tools in a sandbox (items 1500 to 1507): a shell line to the policy.
+        *((build_code_run_tools(),) if config.code.enabled else ()),
         build_wait_tools(),
         build_browser_tools(),
         build_web_tools(),

@@ -15,6 +15,7 @@ from dotagent.agent.held_secrets import all_held_values
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.agent.sites import hand_outside_site_lessons
 from dotagent.agent.yolo_log import note_checkpoint
+from dotagent.codemode.inner import CODE_RUN_TOOL, NestedResult
 from dotagent.core.errors import (
     ApprovalNoted,
     ApprovalParked,
@@ -32,7 +33,7 @@ from dotagent.core.errors import (
 from dotagent.core.logs import get_logger
 from dotagent.core.text import mask_known, redact_json, redact_known, strip_blobs_keep_text, truncate_middle
 from dotagent.core.types import JsonObject
-from dotagent.llm.types import ImageData, ToolCall, invalid_arguments_text
+from dotagent.llm.types import ImageData, ToolCall, ToolSpec, invalid_arguments_text
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo
 from dotagent.secrets import known_secrets
 from dotagent.tools.apple import APPLE_SCRIPT_TOOL, script_apps
@@ -84,13 +85,28 @@ _BY_ARGUMENTS: frozenset[str] = frozenset({"mcp", "mcp_read"})
 class ToolOutcome:
     """A call that ended: its result as the chat keeps it, how long it took, the action it was classified as, and
     ``shown``, the lessons saved while reading outside content that its run's requests show next to the result and
-    that are stored nowhere (item 1192; empty for none)."""
+    that are stored nowhere (item 1192; empty for none). ``waited_s`` is the part of the seconds it spent at the gate,
+    ``refused`` whether the gate, the owner or the review refused it (the result is then an error that says so, and
+    nothing was done), and ``nested`` the calls a tool made in it, in order (``code_run``, item 1501): each is a call of
+    the run's own, with its own events, which the run's facts read as they read the calls of the model's."""
 
     call: ToolCall
     result: ToolResult
     seconds: float
     action: ActionInfo | None
     shown: str
+    waited_s: float = 0.0
+    refused: bool = False
+    nested: tuple["ToolOutcome", ...] = ()
+
+
+def with_nested(outcomes: Sequence[ToolOutcome]) -> list[ToolOutcome]:
+    """``outcomes`` and, after each, the calls its tool made in it (item 1501): what the run's facts are read from."""
+    flat: list[ToolOutcome] = []
+    for outcome in outcomes:
+        flat.append(outcome)
+        flat.extend(with_nested(outcome.nested))
+    return flat
 
 
 def _safe_json(value: JsonObject, known: Sequence[str]) -> JsonObject:
@@ -261,9 +277,66 @@ class _Checked:
     # The seconds the call spent in its tool, under the tool's own limit (:class:`_ToolTime`); 0 for a call that never
     # ran.
     ran_s: float = 0.0
+    # Whether the gate, the owner or the review refused the call, or the owner did the step themselves: it did not
+    # happen.
+    refused: bool = False
 
 
-async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
+class _Nesting:
+    """The calls a ``code_run`` makes (item 1501), run by :func:`_execute_one` itself: the same validation and
+    classification, the same check against the other runs, the same gate (the owner's rules, the preset, the taint, the
+    approvals, the review), the same time limit, masking and events as a call of the model's, with the run's own
+    context and gate and no tool group to turn on. A call's events carry ``via`` and the call it was made in
+    (``parent_call_id``), and its id is that call's, a dot and its number. ``ctx`` is the run's own context with room
+    for whole results and no nesting of its own: a call made here cannot make calls."""
+
+    def __init__(self, registry: ToolRegistry, ctx: ToolContext, gate: RunGate, parent_call_id: str) -> None:
+        self._registry: ToolRegistry = registry
+        self._ctx: ToolContext = ctx
+        self._gate: RunGate = gate
+        self._parent: str = parent_call_id
+        self.outcomes: list[ToolOutcome] = []
+
+    def specs(self) -> Mapping[str, ToolSpec]:
+        given: frozenset[str] | None = self._ctx.run_tools
+        if given is None:
+            return {}
+        return {
+            name: tool.spec
+            for name, tool in self._registry.tools.items()
+            if name in given and self._ctx.mode in tool.modes
+        }
+
+    async def call(self, name: str, arguments: JsonObject) -> NestedResult:
+        made: ToolCall = ToolCall(id=f"{self._parent}.{len(self.outcomes) + 1}", name=name, arguments=arguments)
+        outcome: ToolOutcome = await _execute_one(made, self._registry, {}, self._ctx, self._gate, None, self._parent)
+        self.outcomes.append(outcome)
+        return NestedResult(
+            text=outcome.result.text,
+            images=outcome.result.images,
+            is_error=outcome.result.is_error or outcome.refused,
+            untrusted=outcome.result.untrusted,
+            refused=outcome.refused,
+            seconds=outcome.seconds,
+            waited_s=outcome.waited_s,
+        )
+
+
+def _nesting_for(
+    tool: RegisteredTool, call: ToolCall, registry: ToolRegistry, ctx: ToolContext, gate: RunGate
+) -> _Nesting | None:
+    """What a call of ``tool`` makes its own calls with: only ``code_run`` makes any. Its results are not cut to the
+    model's budget (item 494's cap is for what a model reads: code reads what it filters, and only prints reach the
+    model), and the context it makes them in has no nesting of its own."""
+    if tool.spec.name != CODE_RUN_TOOL:
+        return None
+    inner: ToolContext = replace(ctx, output_chars=ctx.runtime.config.code.result_chars, nested=None)
+    return _Nesting(registry, inner, gate, call.id)
+
+
+async def _run_checked(
+    call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate, nesting: "_Nesting | None" = None
+) -> _Checked:
     action: ActionInfo | None = None
     at_gate: _GateTime = _GateTime()
     in_tool: _ToolTime = _ToolTime(ctx.run_id, tool.spec.name, tool.timeout_s)
@@ -312,7 +385,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
                 with in_tool.attempt(at_gate):
                     async with asyncio.timeout(tool.timeout_s) as scope:
                         result: ToolResult = await prepared.run(
-                            replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate))
+                            replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate), nested=nesting)
                         )
             except (RunCancelled, FailSafeTriggered):
                 raise
@@ -372,7 +445,12 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
         failed = await _record_yolo(ctx, tool.spec.name, action, failed)
         return _Checked(
-            result=failed, action=action, waited_s=at_gate.seconds, decision=decision, ran_s=in_tool.seconds
+            result=failed,
+            action=action,
+            waited_s=at_gate.seconds,
+            decision=decision,
+            ran_s=in_tool.seconds,
+            refused=isinstance(exc, PolicyDenied | ApprovalRejected | HandedOff),
         )
     if action is not None and not result.is_error:
         gate.observe(action)
@@ -423,13 +501,17 @@ async def _execute_one(
     ctx: ToolContext,
     gate: RunGate,
     refused: str | None = None,
+    parent: str | None = None,
 ) -> ToolOutcome:
+    """Run one call, as the model's or, with ``parent`` (the id of the ``code_run`` call it is made in, item 1501), as a
+    call a code makes: the same path, and its two events say which (``via`` and ``parent_call_id``)."""
     started: float = time.monotonic()
     # The secrets Dot holds, masked in the step's events as the forms of keys are.
     known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     tool: RegisteredTool | None = registry.tools.get(call.name)
     # The call's own limit goes with it (item 925): the watchdog reads a run inside a call that may take hours (a
     # helper, a wait) as busy until that limit, not as stuck.
+    via: JsonObject = {} if parent is None else {"via": "code", "parent_call_id": parent}
     await ctx.runtime.bus.emit(
         ctx.run_id,
         "tool_call",
@@ -438,12 +520,15 @@ async def _execute_one(
             "tool": call.name,
             "args": _safe_json(call.arguments, known),
             "timeout_s": tool.timeout_s if tool is not None else 0.0,
+            **via,
         },
         True,
     )
     action: ActionInfo | None = None
     waited_s: float = 0.0
     ran_s: float = 0.0
+    was_refused: bool = False
+    nesting: _Nesting | None = None
     decision: StepDecision | None = None
     group: str | None = hidden.get(call.name)
     learned: LessonsNote | None = None
@@ -462,9 +547,12 @@ async def _execute_one(
             f"{truncate_middle(broken, _BROKEN_ARGUMENTS_CHARS)}"
         )
     else:
-        checked: _Checked = await _run_checked(call, tool, ctx, gate)
+        # A call a code makes has no nesting to give: code cannot start code, whatever the list of the tools it cannot
+        # call says (item 1501).
+        nesting = None if parent is not None else _nesting_for(tool, call, registry, ctx, gate)
+        checked: _Checked = await _run_checked(call, tool, ctx, gate, nesting)
         result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
-        ran_s = checked.ran_s
+        ran_s, was_refused = checked.ran_s, checked.refused
         lessons_on: bool = ctx.runtime.config.agent.lessons != "off"
         # A run that is tainted now, in a context that shows them, is handed the lessons saved while reading outside
         # content too (item 1192): fenced, next to the result in its own requests, stored nowhere.
@@ -540,10 +628,20 @@ async def _execute_one(
             # What an MCP call's arguments name of Dot's own places, address or program, which its target does not show
             # (item 585): a place of Dot's, not a secret, so it is stored as it is.
             "names_dot": _names_dot(call, action, ctx),
+            **via,
         },
         True,
     )
-    return ToolOutcome(call=call, result=clipped, seconds=seconds, action=action, shown=outside_words)
+    return ToolOutcome(
+        call=call,
+        result=clipped,
+        seconds=seconds,
+        action=action,
+        shown=outside_words,
+        waited_s=waited_s,
+        refused=was_refused,
+        nested=() if nesting is None else tuple(nesting.outcomes),
+    )
 
 
 def _finish_before_calls(after: Sequence[ToolCall]) -> str:

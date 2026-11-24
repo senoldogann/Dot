@@ -371,7 +371,8 @@ answer keeps its words, Ollama's too.
   memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
   what the memory held), and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
   chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
-  head is read by a new chat instead of written again), every tool a run of Dot's own loop gets (Claude Code's own are
+  head is read by a new chat instead of written again), every tool a run of Dot's own loop gets (`code_run`, item 1501, among
+  them: found with `ToolSearch` like the others) (Claude Code's own are
   off, but its search of the door's tools): the files, commands and the web, the browser with your sign-ins, the Mac's
   applications, memory, schedules, notify, a page in the conversation, skills, a question to you, the apps you
   connected, your mail and calendars, drafts, the vault, Dot's own list, and the team, as the run's mode and agent allow

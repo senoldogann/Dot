@@ -1,25 +1,27 @@
-"""``dot_tools``, the package the code of a ``code_run`` imports its tools from (item 1502).
+"""``dot_tools``, the package the code of a ``code_run`` calls its tools through (items 1501 and 1502).
 
 Standard library only: the daemon copies this file into the run's tools folder as ``dot_tools/__init__.py``, beside
-``_bridge.py`` (the way out), ``_catalog.json`` (every tool the run may call from code, with its description and its
-parameters) and ``servers/<server>/<tool>.py`` (one function for each tool, a call into the bridge). Dot's own tools are
-the server ``dot``; the tools of an MCP server are the server's, under its own name with a ``-`` read as ``_``.
-
-    from dot_tools.servers.dot import read_file
-    from dot_tools.servers.github import list_issues
-
-A tool is called with its parameters as keywords, and answers what it answered: the JSON it said when it said JSON, else
-its text. A call the run's rules refuse raises ``ToolRefused``, one that fails ``ToolError``.
+``_bridge.py`` (the way out) and ``_catalog.json`` (every tool the run may call from code, with its description and
+its parameters). A tool is called with its parameters as keywords, ``dot_tools.call("read_file", path="a.txt")``, and
+answers what it answered: the JSON it said when it said JSON, else its text. A call the run's rules refuse raises
+``ToolRefused``, one that fails ``ToolError``. Dot's own tools are the server ``dot``; the tools of an MCP server are
+the server's, under its own name.
 """
 
+import importlib
 import json
 import os
 import re
 from typing import Any
 
-from dot_tools._bridge import BridgeError, ToolError, ToolRefused  # type: ignore[import-not-found]
+# The bridge is a file beside this one that the daemon writes: found by name, as it is not a module of Dot's.
+_bridge = importlib.import_module("dot_tools._bridge")
 
-__all__ = ["BridgeError", "ToolError", "ToolRefused", "list_servers", "search_tools"]
+BridgeError = _bridge.BridgeError
+ToolError = _bridge.ToolError
+ToolRefused = _bridge.ToolRefused
+
+__all__ = ["BridgeError", "ToolError", "ToolRefused", "call", "list_servers", "search_tools"]
 
 _CATALOG: dict[str, Any] | None = None
 _WORDS: re.Pattern[str] = re.compile(r"[a-z0-9]+")
@@ -36,9 +38,16 @@ def _catalog() -> dict[str, Any]:
     return _CATALOG
 
 
+def call(tool: str, **arguments: object) -> object:
+    """Call the tool named ``tool`` (the name ``search_tools`` gives under ``"tool"``) with its parameters as keywords,
+    and return what it answered: the JSON it said when it said JSON, else its text. A call the run's rules refuse raises
+    ``ToolRefused`` with their words, one that fails ``ToolError``."""
+    return _bridge.call(tool, arguments)
+
+
 def list_servers() -> list[dict[str, Any]]:
     """The servers whose tools can be called from code: Dot's own (``dot``) and each MCP server the run has, with how
-    many tools each has. ``server`` is the name to import from: ``from dot_tools.servers.<server> import <tool>``."""
+    many tools each has."""
     return [dict(server) for server in _catalog()["servers"]]
 
 
@@ -57,8 +66,9 @@ def _score(words: list[str], tool: dict[str, Any]) -> int:
 def search_tools(query: str = "", detail: str = "name", limit: int = 10) -> list[Any]:
     """Find tools by the words of ``query`` among their names and descriptions, best first, at most ``limit`` (and 25).
     ``detail`` is how much of each is returned: ``"name"`` is ``"<server>.<tool>"``, ``"description"`` adds what the
-    tool does and how to import it, ``"schema"`` adds its parameters as a JSON schema. An empty ``query`` lists the
-    first tools of every server. Only what the code prints reaches the model: print a few names, not the catalogue."""
+    tool does and the name to call it by, ``"schema"`` adds its parameters as a JSON schema. An empty ``query`` lists
+    the first tools of every server. Only what the code prints reaches the model: print a few names, not the
+    catalogue."""
     if detail not in _DETAILS:
         raise ValueError(f"detail is one of {', '.join(_DETAILS)}")
     words: list[str] = _WORDS.findall(query.lower())
@@ -74,11 +84,7 @@ def search_tools(query: str = "", detail: str = "name", limit: int = 10) -> list
         if detail == "name":
             found.append(name)
             continue
-        entry: dict[str, Any] = {
-            "name": name,
-            "import": f"from dot_tools.servers.{tool['module']} import {tool['function']}",
-            "description": tool["description"],
-        }
+        entry: dict[str, Any] = {"name": name, "tool": tool["tool"], "description": tool["description"]}
         if detail == "schema":
             entry["parameters"] = tool["parameters"]
         found.append(entry)

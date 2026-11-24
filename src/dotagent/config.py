@@ -1185,6 +1185,21 @@ class PhoneConfig(FrozenModel):
         return urls
 
 
+class CodeConfig(FrozenModel):
+    """Code mode (``[code]``, items 1500 to 1507, docs/code-mode.md): whether ``code_run`` is offered, how long the code
+    itself may run (``max_seconds``: its own time, a ``time.sleep`` included, not the time of the tool calls it waits
+    for), how much memory it may hold (``max_mb``), how many characters of what it prints reach the model
+    (``output_chars``), how many tool calls one run of it may make (``max_calls``), and how large a tool's result may be
+    when it is handed to the code whole (``result_chars``)."""
+
+    enabled: bool
+    max_seconds: int = Field(ge=1, le=900)
+    max_mb: int = Field(ge=64, le=8192)
+    output_chars: int = Field(ge=500, le=200_000)
+    max_calls: int = Field(ge=1, le=5000)
+    result_chars: int = Field(ge=100_000, le=50_000_000)
+
+
 class AppConfig(FrozenModel):
     mcp: list[McpServerConfig]
     builtin_mcp: BuiltinMcpConfig
@@ -1218,6 +1233,7 @@ class AppConfig(FrozenModel):
     recon: ReconConfig
     meetings: MeetingsConfig
     phone: PhoneConfig
+    code: CodeConfig
 
     @field_validator("mcp")
     @classmethod
