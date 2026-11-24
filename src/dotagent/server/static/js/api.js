@@ -528,12 +528,18 @@ export async function request(method, path, body, signal) {
   if (listKey(path) === null) {
     return read();
   }
+  // The read of Dot goes out at once and the copy kept on the phone is looked for beside it: with a link, the cache is never
+  // on the way of an answer (item 1520). With no link at all there is nothing to ask, and the copy answers.
+  const asked = navigator.onLine ? read() : null;
+  asked?.catch(() => undefined);
   const copy = cacheOn() ? await keptList(path) : null;
-  if (copy !== null && !navigator.onLine) {
+  if (asked === null) {
+    if (copy === null) {
+      return read();
+    }
     noteCopy(copy.savedAt);
     return copy.value;
   }
-  const asked = read();
   let value;
   try {
     value = copy === null ? await asked : await answeredInTime(asked, copy, path);

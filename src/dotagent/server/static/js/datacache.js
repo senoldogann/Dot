@@ -294,18 +294,31 @@ async function readList(path) {
     return null;
   }
   try {
-    const transaction = (await database()).transaction("lists", "readwrite");
-    const store = transaction.objectStore("lists");
-    const record = await result(store.get(key));
-    if (record !== undefined && !listReadable(record)) {
-      store.delete(key);
+    // A read, so that the lists the page asks for at its opening do not wait for each other's commits.
+    const record = await result((await database()).transaction("lists").objectStore("lists").get(key));
+    if (record === undefined) {
+      return null;
     }
-    await committed(transaction);
-    return record !== undefined && listReadable(record) ? { value: listFor(path, record.value), savedAt: record.savedAt } : null;
+    if (!listReadable(record)) {
+      dropList(key);
+      return null;
+    }
+    return { value: listFor(path, record.value), savedAt: record.savedAt };
   } catch (error) {
     unavailable("a list could not be read", error);
     return null;
   }
+}
+
+/** Let go of a list that does not read, beside the answer that is on its way. */
+function dropList(key) {
+  database()
+    .then((db) => {
+      const transaction = db.transaction("lists", "readwrite");
+      transaction.objectStore("lists").delete(key);
+      return committed(transaction);
+    })
+    .catch((error) => unavailable("a list that does not read could not be dropped", error));
 }
 
 /**
