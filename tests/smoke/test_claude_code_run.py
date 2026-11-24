@@ -986,6 +986,27 @@ async def test_a_call_whose_result_the_model_read_does_not_stop_the_continuation
     assert len(_starts(room)) == 2 and len(await _continued_events(room, ended.id)) == 1
 
 
+async def test_the_words_of_the_step_the_cut_interrupted_are_dropped_from_the_page(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: the program was cut in the middle of a step, after half a sentence the page already showed. The step
+    never closed and the program that goes on begins its own as step 1 again, so Dot sends the page a ``reset`` for the
+    interrupted one, as it does for a step it sends back: the half sentence is not glued to the new words."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    async with room.runtime.bus.subscribe_kinds(frozenset({"delta"})) as deltas:
+        ended: RunRecord = await _finished(room, await _start(room, "Please die in a step."))
+    shown: list[tuple[object, object]] = []
+    while not deltas.queue.empty():
+        event: EventRecord = deltas.queue.get_nowait()
+        if event.run_id == ended.id:
+            shown.append((event.data["kind"], event.data["step"]))
+    assert ended.status == "done" and ended.steps == 1, (ended.status, ended.result)
+    assert ("text", 1) in shown and ("reset", 1) in shown, shown
+    assert shown.index(("reset", 1)) > shown.index(("text", 1))
+    assert len(_starts(room)) == 2
+
+
 async def test_a_program_cut_after_the_models_finish_ends_the_run_as_the_finish_said(
     room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
 ) -> None:
