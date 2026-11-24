@@ -986,6 +986,20 @@ async def test_a_call_whose_result_the_model_read_does_not_stop_the_continuation
     assert len(_starts(room)) == 2 and len(await _continued_events(room, ended.id)) == 1
 
 
+async def test_a_program_cut_after_the_models_finish_ends_the_run_as_the_finish_said(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581: the model called ``finish`` and the program was cut before it said more: the work is done and its
+    answer is Dot's, so the run ends as the finish said (done, with that answer), not failed with "ended before it
+    answered", and it is not continued. The chat does not keep a session that never ended clean."""
+    await _continuing(room, monkeypatch, 2)
+    _forget_starts(room)
+    ended: RunRecord = await _finished(room, await _start(room, "Please die after finishing."))
+    assert ended.status == "done" and ended.result == "Everything is checked.", ended.result
+    assert len(_starts(room)) == 1 and not await _continued_events(room, ended.id)
+    assert not await asyncio.to_thread(chat_path(ended.thread_id).exists)
+
+
 async def test_a_helper_that_is_cut_gives_its_parent_the_final_result_of_the_continued_run(
     room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
 ) -> None:
