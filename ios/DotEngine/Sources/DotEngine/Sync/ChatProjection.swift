@@ -131,13 +131,6 @@ public struct ChatProjection: Codable, Sendable, Equatable {
         return next
     }
 
-    /// The same chat with the thinking being written of `run`'s step `step` (a fixture's, a test's).
-    public func thinking(_ words: String, step: Int, run: String) -> ChatProjection {
-        var next: ChatProjection = self
-        next.thinking[run] = LiveThought(step: step, text: words)
-        return next
-    }
-
     /// The cursors the stream is opened with: each run held, its newest id (the newest 20 runs that hold events).
     public var cursors: [String: Int] {
         let held: [(String, RunTimeline)] = runs.filter { $0.value.cursor > 0 }.sorted { $0.value.cursor > $1.value.cursor }
@@ -229,7 +222,15 @@ public enum ChatReducer {
         if let newest: RunDetail = view.newest {
             var timeline: RunTimeline = next.runs[newest.run.id] ?? RunTimeline()
             for event in view.newestEvents {
-                if let added: RunTimeline = timeline.adding(event) { timeline = added }
+                if let added: RunTimeline = timeline.adding(event) {
+                    timeline = added
+                    // A step the view brought before the stream did ends its live words and thinking as the stream's
+                    // own event would (the stream's copy then adds nothing, and so ends nothing).
+                    if endsWriting(event) {
+                        next.writing[event.runId] = nil
+                        next.thinking[event.runId] = nil
+                    }
+                }
             }
             next.runs[newest.run.id] = timeline
         }

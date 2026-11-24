@@ -100,6 +100,25 @@ final class ReducerTests: XCTestCase {
         XCTAssertTrue(ChatReducer.broke(chat, connection: connection).thinking.isEmpty, "a break drops the live thinking")
     }
 
+    /// The pre-push review of item 1756: a view read that brings the step's stored reply before the stream does ends the
+    /// live thinking and words, so the stored thought is not drawn beside a live one under the same id.
+    func testAViewThatBringsTheStoredStepFirstEndsTheLiveThinking() {
+        let running: RunRecord = record("run_a", status: "running", at: 1)
+        var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [running])
+        let delta: (String) -> StreamFrame = { kind in
+            .delta(EventRecord(id: 0, runId: "run_a", ts: 0, kind: "delta", data: ["kind": .string(kind), "text": .string("Which day"), "step": .int(1)]))
+        }
+        chat = ChatReducer.frame(chat, delta("thinking"), connection: connection).0
+        chat = ChatReducer.frame(chat, delta("text"), connection: connection).0
+        let stored: EventRecord = event(20, "run_a", "assistant", ["text": .string("Which day"), "thinking": .string("Which day"), "step": .int(1)])
+        chat = ChatReducer.viewLoaded(chat, view: view(revision: 6, runs: [running], events: [stored]), connection: connection).0
+        chat = ChatReducer.frame(chat, .event(stored), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"])
+        XCTAssertNil(chat.writing["run_a"])
+        let ids: [String] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none).map(\.id)
+        XCTAssertEqual(ids.filter { $0 == "th:run_a:1" }.count, 1, "one thought row: \(ids)")
+    }
+
     func testAnUnknownKindMovesTheCursorAndDrawsNothing() {
         var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [record("run_a", status: "running", at: 1)])
         let message: SSEMessage = SSEMessage(
