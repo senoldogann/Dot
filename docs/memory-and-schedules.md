@@ -128,6 +128,13 @@ dotx memory reindex      # embed every note again, for example after changing [m
   proposed to be forgotten. Measured on the owner's 834 lessons of 2026-10-28 to 11-19: 346 were handed to a later
   run, all of them first within 20 days of being written (90% within 14); only 11 merges were made in those nights,
   so `merges_per_night` (20) was never the limit and stays.
+- What a run did with its notes is traced for later audits, with no model asked (item 1715): the `memories` event of
+  its start names, beside the notes and their tokens, how close each was to the goal in meaning (`similarities`, empty
+  when they were found by their words) and how many notes that matched were left out as saved while reading outside
+  content (`tainted_left_out`); and when it ends, each note it was handed is marked in `memory_uses.echoed` (kept when
+  the chat is deleted) as echoed (1) when its answer or the arguments of its calls name the note's id or carry two of
+  its words of five letters or more (one, for a note that has only one), else 0. A rough signal: a run may follow a
+  note in words of its own. Nothing reads it to rank notes yet.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
