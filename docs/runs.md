@@ -263,7 +263,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   this: its turn ends with its reply.
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
   nudged towards `finish`; after `finish_nudges` nudges in a row the reply itself becomes the result. A step with tool
-  calls starts the count again, so a status line written between tool steps does not end the run.
+  calls starts the count again, so a status line written between tool steps does not end the run. A run on your
+  Claude plan ends the same way (item 1694): a turn of Claude Code that ends after the model worked without calling
+  `finish` is answered with the same nudge, a `finish` with plan steps open with the same reminder, and in goal mode
+  its `finish` goes to the same goal check, read from Dot's record of its calls, which settles it or sends it back to
+  work with its reason, `goal_patience` times; its lessons are drawn from that record as for Dot's own runs.
 - A reply the model service cut short (at its output limit, or for another abnormal reason it gave) is never taken
   as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or give the
   complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in a row the
