@@ -107,7 +107,7 @@ private struct LoadErrorView: View {
     var body: some View {
         VStack(spacing: Space.l) {
             DotEmptyState(
-                symbol: "macbook.slash", title: "Dot can't reach your Mac",
+                icon: .monitorOff, title: "Dot can't reach your Mac",
                 message: "\(host.name)\n\(message)\n\nIs the Mac awake, Dot running and Tailscale on here?", tone: Theme.warn,
                 actionTitle: "Try again", action: onRetry)
             Button("Change address", action: onSettings).dotButton(.glass)

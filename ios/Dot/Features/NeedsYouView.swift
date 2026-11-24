@@ -23,7 +23,7 @@ struct NeedsYouEntry: View {
                     }
                 }
                 Spacer(minLength: Space.s)
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.faint)
+                DotIcon(.chevron, size: 14, relativeTo: .caption).foregroundStyle(Theme.faint)
             }
             .padding(Space.l)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,12 +62,12 @@ struct NeedsYouView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.m) {
                     if !awareness.needsYouIsLive {
-                        Label("Showing what the phone last read from Dot.", systemImage: "wifi.slash")
+                        Label("Showing what the phone last read from Dot.", icon: .wifiOff)
                             .font(Theme.meta).foregroundStyle(Theme.faint)
                     }
                     if rows.isEmpty {
                         DotEmptyState(
-                            symbol: "checkmark.circle", title: "Nothing waits on you",
+                            icon: .circleCheck, title: "Nothing waits on you",
                             message: "When Dot needs an answer, it shows here and on your lock screen.", tone: Theme.good
                         )
                         .padding(.top, Space.xl)
@@ -114,14 +114,14 @@ struct NeedsYouRowView: View {
             header
             ask
             if row.answering {
-                Label("Your answer is on its way to Dot.", systemImage: "paperplane").font(Theme.small).foregroundStyle(Theme.muted)
+                Label("Your answer is on its way to Dot.", icon: .send).font(Theme.small).foregroundStyle(Theme.muted)
             } else {
                 answers
             }
             Button(action: onOpenChat) {
                 HStack(spacing: Space.xs) {
                     Text("Open chat")
-                    Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    DotIcon(.chevron, size: 13, relativeTo: .caption)
                 }
                 .font(Theme.small.weight(.medium))
                 .foregroundStyle(Theme.accent)
@@ -146,7 +146,7 @@ struct NeedsYouRowView: View {
 
     private var header: some View {
         HStack(spacing: Space.m) {
-            Avatar(id: row.who == "Dot" ? "dot" : row.who, name: row.who, size: 32, state: .waiting)
+            AgentAvatar(id: row.who == "Dot" ? AgentLook.dotId : row.who, size: 32, state: .waiting)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.who).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.text).lineLimit(1)
                 if let chat: String = row.chat, !chat.isEmpty, chat != row.who {
@@ -187,7 +187,7 @@ struct NeedsYouRowView: View {
         case .question(let text, _):
             Text(text).font(.headline).foregroundStyle(Theme.text)
         case .secret:
-            Label("Dot needs a secret: enter it on your Mac", systemImage: "lock.shield.fill")
+            Label("Dot needs a secret: enter it on your Mac", icon: .lock, size: 16)
                 .font(.subheadline).foregroundStyle(Theme.text)
         case .handoff(let line):
             Text(line).font(.headline).foregroundStyle(Theme.text)
@@ -249,7 +249,7 @@ struct NeedsYouRowView: View {
             }
         case .handoff:
             Button(action: onOpenWeb) {
-                Label(HandoffCard.buttonTitle, systemImage: "arrow.up.forward.app").frame(maxWidth: .infinity)
+                Label(HandoffCard.buttonTitle, icon: .external, size: 16).frame(maxWidth: .infinity)
             }
             .dotButton(.glass)
             .controlSize(.large)

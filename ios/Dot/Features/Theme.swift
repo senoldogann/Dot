@@ -286,15 +286,14 @@ struct QuietButtonStyle: ButtonStyle {
 
 /// A round glass button for the floating chrome (jump to the newest, a toolbar-like action): 44 points.
 struct GlassCircleButton: View {
-    let symbol: String
+    let icon: IconName
     let label: String
     var tint: Color?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
+            DotIcon(icon, size: 18)
                 .foregroundStyle(tint ?? Theme.text)
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
@@ -369,16 +368,14 @@ struct DotMesh: View {
 /// A small status word in a tinted capsule: "Needs you", "Working", "Paused".
 struct StatusPill: View {
     let text: String
-    var symbol: String?
+    var icon: IconName?
     var tone: Color = Theme.accent
     var pulse: Bool = false
 
     var body: some View {
         HStack(spacing: Space.xs) {
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .symbolEffect(.pulse, options: .repeating, isActive: pulse)
+            if let icon {
+                DotIcon(icon, size: 12, pulse: pulse, relativeTo: .caption)
             }
             Text(text).font(.caption.weight(.semibold))
         }
@@ -393,13 +390,12 @@ struct StatusPill: View {
 /// An empty, error or offline state: a layered symbol over a soft mesh, a title, a line, and one button when there is a
 /// way out.
 struct DotEmptyState: View {
-    let symbol: String
+    let icon: IconName
     let title: String
     let message: String
     var tone: Color = Theme.accent
     var actionTitle: String?
     var action: (() -> Void)?
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
     var body: some View {
         VStack(spacing: Space.m) {
@@ -410,11 +406,8 @@ struct DotEmptyState: View {
                 Circle()
                     .strokeBorder(LinearGradient(colors: [tone.opacity(0.5), tone.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 1)
                     .frame(width: 104, height: 104)
-                Image(systemName: symbol)
-                    .font(.system(size: 40, weight: .light))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(tone, tone.opacity(0.45))
-                    .symbolEffect(.pulse, options: .repeating.speed(0.4), isActive: !reduceMotion)
+                DotIcon(icon, size: 36, pulse: true, relativeTo: .largeTitle)
+                    .foregroundStyle(tone)
                     .frame(width: 88, height: 88)
                     .dotGlass(in: Circle(), tint: tone.opacity(0.10))
             }
@@ -449,45 +442,10 @@ struct SectionLabel: View {
     }
 }
 
-// MARK: - Avatar
+// MARK: - The ring of an avatar
 
-/// An agent's avatar: a circle with a gradient in a hue taken from its id, its initial, and a ring that says how it
-/// stands: a sweep that turns while it works, a steady amber one while it waits for the owner.
-struct Avatar: View {
-    let id: String
-    let name: String
-    var size: CGFloat = 40
-    var state: ThreadState = .idle
-
-    var body: some View {
-        Group {
-            if id == "dot" {
-                // Dot itself wears the app's own mark; the agents wear their initial in a hue of their own.
-                DotGlyph(size: size)
-            } else {
-                let base: Double = hue(of: id)
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hue: base, saturation: 0.50, brightness: 0.78), Color(hue: base, saturation: 0.62, brightness: 0.50)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.75))
-                    .overlay(
-                        Text(name.prefix(1).uppercased())
-                            .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
-                    )
-            }
-        }
-        .frame(width: size, height: size)
-        .overlay { StateRing(state: state).padding(-size * 0.11) }
-        .accessibilityHidden(true)
-    }
-}
-
-/// The ring round an avatar. It turns only while the run works, and stands still under Reduce Motion.
+/// The ring round an avatar. It turns only while the run works (once in `RingMotion.secondsPerTurn`), and stands still
+/// under Reduce Motion.
 struct StateRing: View {
     let state: ThreadState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
@@ -504,12 +462,13 @@ struct StateRing: View {
                     lineWidth: 2.5
                 )
                 .rotationEffect(.degrees(turning ? 360 : 0))
-                .animation(turning ? .linear(duration: 1.4).repeatForever(autoreverses: false) : nil, value: turning)
+                .animation(
+                    turning ? .linear(duration: RingMotion.secondsPerTurn).repeatForever(autoreverses: false) : nil, value: turning)
                 // It turns every time the chat comes back to work (a ring that left with the state starts again) and it
                 // follows Reduce Motion while it turns.
-                .onAppear { turning = !reduceMotion }
+                .onAppear { turning = RingMotion.turns(state: state, reduceMotion: reduceMotion) }
                 .onDisappear { turning = false }
-                .onChange(of: reduceMotion) { _, still in turning = !still }
+                .onChange(of: reduceMotion) { turning = RingMotion.turns(state: state, reduceMotion: reduceMotion) }
         case .waiting:
             Circle().strokeBorder(Theme.warn, lineWidth: 2.5)
                 .shadow(color: Theme.warn.opacity(0.45), radius: 3)
@@ -517,19 +476,8 @@ struct StateRing: View {
     }
 }
 
-func hue(of id: String) -> Double {
-    Double(id.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) % 360 }) / 360
-}
-
-/// How a chat or an agent stands.
-enum ThreadState: Sendable {
-    case idle, working, waiting
-
+extension ThreadState {
     var color: Color { self == .waiting ? Theme.warn : Theme.accent }
-}
-
-extension ThreadSummary {
-    var state: ThreadState { isWaitingOnYou ? .waiting : isWorking ? .working : .idle }
 }
 
 /// "2 min", "3 h", "Mon", "12 Oct": the age of a moment in the fewest characters.

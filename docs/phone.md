@@ -91,10 +91,13 @@ code** takes its place. The same by hand:
    API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
-   waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351),
+   waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
+   or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
+   "Done · 1 min ago", and the chat's row in the list, item 1466; while the chat is open the app asks for the list of helpers
+   every 8 seconds as long as one is live, and keeps the last count, dimmed, with no link),
    the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
-   a run inspector (plan, helpers, the chat's schedules and loops with switches), the Schedules list and the models; the
+   a run inspector (plan, helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
    web UI stays as it is and opens full screen from Settings › Open web UI. The second slice (item 1361) adds a new chat
    (the pencil of the list: a message starts a chat of its own on the model and reasoning level picked, as the web's home
    does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the
@@ -139,9 +142,13 @@ code** takes its place. The same by hand:
    three on a cellular link or a hotspot, and none with Low Data Mode on. A socket that died without a word (a path that died while the phone slept, a Wi-Fi that gave way to the cellular link) is not waited for: a connection that has answered nothing in 8 seconds, and an open stream that has said nothing for 35 seconds (Dot writes a keepalive every 15 seconds), are dropped and the stream goes on, from the last event read, on a new connection. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382, `ios/README.md`
    › The design) is iOS-native: near-black surfaces in the dark and a cool white in the light, following the system, one
    calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
-   chrome only: the composer bar, the capsule over it, the agents' chips (a ring on each that turns while the
-   agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
-   the loudest card in a chat; message text and lists are never glass. What it still leaves to the web UI is in
+   chrome only: the composer bar, the capsule over it, the agents' chips (Dot wears its own face and every other agent the
+   bot, one neutral disc whatever its id, item 1462; a ring on each that turns, once in four
+   seconds, while the agent works and is amber while it waits for you), the compose and settings buttons of the title bar and the Allow once and Deny of an approval, which is
+   the loudest card in a chat; message text and lists are never glass. Its icons are the web app's own, Lucide's
+   (item 1461: `scripts/export_ios_icons.py` writes them from the web app's `icons.js`, so an icon the web app changes
+   reaches the phone; the licence reads in Settings › About › Licences; the Live Activity and the share extension, which are
+   other targets, still draw the system's symbols). What it still leaves to the web UI is in
    `roadmap/1353.md`. The
    app's notifications are its own, through APNs: Settings in the app opens the
    iPhone's Settings › Dot, where they are switched (item 1005; the web push switches do nothing in the app). The

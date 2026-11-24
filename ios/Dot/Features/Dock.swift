@@ -39,13 +39,14 @@ struct DockCapsule: View {
 
     private func label(_ segment: DockSummary.Segment, fit: Fit) -> some View {
         let short: Bool = fit == .compact || (fit == .mixed && segment.kind != .status)
-        let spinning: Bool = segment.kind == .status && (segment.symbol == "circle.dashed" || segment.symbol == "arrow.triangle.2.circlepath")
+        // What is at work breathes: the working mark, the helpers waited for, a stream that reconnects, and the helpers at work in
+        // the background (not while their count is only the last one read).
+        let alive: Bool =
+            (segment.kind == .status && [.audioWaveform, .circleDashed, .refresh].contains(segment.icon))
+            || (segment.kind == .helpers && !segment.dimmed)
         return HStack(spacing: Space.s - 2) {
-            Image(systemName: segment.symbol)
-                .font(.footnote.weight(.semibold))
+            DotIcon(segment.icon, size: 16, pulse: alive, relativeTo: .footnote)
                 .foregroundStyle(tone(segment.tone))
-                .symbolEffect(.variableColor.iterative.reversing, options: .repeating, isActive: segment.symbol == "waveform")
-                .symbolEffect(.pulse, options: .repeating, isActive: spinning)
                 .frame(minWidth: 16)
             if let since: Double = segment.since {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -62,6 +63,7 @@ struct DockCapsule: View {
         }
         .padding(.horizontal, Space.m)
         .frame(minHeight: 44)
+        .opacity(segment.dimmed ? 0.5 : 1)
         .contentShape(Rectangle())
     }
 
@@ -74,7 +76,7 @@ struct DockCapsule: View {
     }
 
     private func accessibilityLabel(_ segment: DockSummary.Segment) -> String {
-        [segment.words, segment.detail].compactMap { $0 }.joined(separator: ", ")
+        [segment.words, segment.detail, segment.dimmed ? "last known" : nil].compactMap { $0 }.joined(separator: ", ")
     }
 
     private func hint(_ kind: DockSummary.Kind) -> String {
@@ -136,7 +138,7 @@ struct QueueSheet: View {
 
     private var held: some View {
         HStack(alignment: .center, spacing: Space.m) {
-            Image(systemName: "pause.circle.fill").font(.system(size: 20)).foregroundStyle(Theme.warn)
+            DotIcon(.circlePause, size: 22).foregroundStyle(Theme.warn)
             Text("The queue is paused: a stop or a failed run held it.")
                 .font(Theme.small).foregroundStyle(Theme.text)
             Spacer(minLength: Space.s)
@@ -158,7 +160,7 @@ struct QueueSheet: View {
             }
             HStack(spacing: 0) {
                 Button { model.steerQueued(message.id) } label: {
-                    Label("Send now", systemImage: "arrow.up.forward").font(Theme.meta.weight(.semibold))
+                    Label("Send now", icon: .cornerUpRight, size: 14).font(Theme.meta.weight(.semibold))
                         .foregroundStyle(model.isWorking ? Theme.accent : Theme.faint)
                         .padding(.horizontal, Space.m).frame(minHeight: 44).contentShape(Rectangle())
                 }
@@ -166,19 +168,19 @@ struct QueueSheet: View {
                 .disabled(!model.isWorking)
                 .accessibilityIdentifier("queue-send-now")
                 Spacer(minLength: 0)
-                arrow("chevron.up", label: "Move up", enabled: index > 0) { model.moveQueued(message.id, by: -1) }
-                arrow("chevron.down", label: "Move down", enabled: index < count - 1) { model.moveQueued(message.id, by: 1) }
-                arrow("trash", label: "Remove", enabled: true) { model.removeQueued(message.id) }
+                arrow(.chevronUp, label: "Move up", enabled: index > 0) { model.moveQueued(message.id, by: -1) }
+                arrow(.chevronDown, label: "Move down", enabled: index < count - 1) { model.moveQueued(message.id, by: 1) }
+                arrow(.trash, label: "Remove", enabled: true) { model.removeQueued(message.id) }
             }
             .padding(.leading, 18 + Space.m)
         }
         .padding(.horizontal, Space.l).padding(.top, Space.m).padding(.bottom, Space.xs)
     }
 
-    private func arrow(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+    private func arrow(_ icon: IconName, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(enabled ? (symbol == "trash" ? Theme.bad : Theme.muted) : Theme.faint.opacity(0.45))
+            DotIcon(icon, size: 17)
+                .foregroundStyle(enabled ? (icon == .trash ? Theme.bad : Theme.muted) : Theme.faint.opacity(0.45))
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }

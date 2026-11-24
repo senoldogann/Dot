@@ -15,7 +15,7 @@ struct DockSummary: Equatable, Sendable {
 
     struct Segment: Equatable, Sendable, Identifiable {
         let kind: Kind
-        let symbol: String
+        let icon: IconName
         /// The long form, and the short one (a count or a word) for a width that cannot hold the long one.
         let words: String
         let short: String
@@ -24,6 +24,9 @@ struct DockSummary: Equatable, Sendable {
         var since: Double?
         /// What follows in a quieter shade: what the first helper does, "Reconnecting…".
         var detail: String?
+        /// What it says is only the last thing read, for the phone has no link or Dot cannot be reached: it is drawn dimmed
+        /// (the helpers' count, item 1466) and VoiceOver says "last known".
+        var dimmed: Bool = false
 
         var id: Kind { kind }
     }
@@ -33,17 +36,20 @@ struct DockSummary: Equatable, Sendable {
     var isEmpty: Bool { segments.isEmpty }
 
     /// The run waits on the owner: the capsule takes a warm tint, the one thing on the screen that does.
-    var asksTheOwner: Bool { segments.contains { $0.kind == .status && $0.tone == .warn && $0.symbol == "bell.fill" } }
+    var asksTheOwner: Bool { segments.contains { $0.kind == .status && $0.tone == .warn && $0.icon == .bell } }
 
     func segment(_ kind: Kind) -> Segment? { segments.first { $0.kind == kind } }
 
-    /// The capsule for a chat: its run's line, the state of its stream, its queue and its schedules.
-    static func make(line: RunLine, connection: FeedState, queue: QueueView, automations: [ThreadAutomation]) -> DockSummary {
+    /// The capsule for a chat: its run's line, the state of its stream, its queue and its schedules. `offline` is the phone's
+    /// link being down: the helpers' count, which only a read of the daemon changes (item 1466), stays as last read and dims.
+    static func make(
+        line: RunLine, connection: FeedState, queue: QueueView, automations: [ThreadAutomation], offline: Bool = false
+    ) -> DockSummary {
         var segments: [Segment] = []
         var reconnecting: Segment?
         if case .reconnecting(_, let unauthorized) = connection {
             reconnecting = Segment(
-                kind: .status, symbol: unauthorized ? "key" : "arrow.triangle.2.circlepath",
+                kind: .status, icon: unauthorized ? .key : .refresh,
                 words: unauthorized ? "Key refused · pair again" : "Reconnecting…",
                 short: unauthorized ? "Key" : "…", tone: unauthorized ? .warn : .plain)
         }
@@ -53,37 +59,41 @@ struct DockSummary: Equatable, Sendable {
         case .working(let since):
             segments.append(
                 Segment(
-                    kind: .status, symbol: reconnecting == nil ? "waveform" : "wifi.exclamationmark", words: "Working",
+                    kind: .status, icon: reconnecting == nil ? .audioWaveform : .wifiOff, words: "Working",
                     short: "Working", tone: .accent, since: since,
                     detail: reconnecting.map { _ in "Reconnecting…" }))
         case .waitingOnYou(let count):
             segments.append(
                 Segment(
-                    kind: .status, symbol: "bell.fill", words: count > 1 ? "Waiting on you · \(count)" : "Waiting on you",
+                    kind: .status, icon: .bell, words: count > 1 ? "Waiting on you · \(count)" : "Waiting on you",
                     short: count > 1 ? "You · \(count)" : "You", tone: .warn))
         case .waitingOnSubagents(let count, let now):
             segments.append(
                 Segment(
-                    kind: .status, symbol: "circle.dashed", words: "Waiting on \(count) \(helperWord(count))",
+                    kind: .status, icon: .circleDashed, words: "Waiting on \(count) \(helperWord(count))",
                     short: "\(count) \(helperWord(count))", tone: .accent, detail: now))
         case .helpersInBackground(let count):
             if let reconnecting { segments.append(reconnecting) }
+            // Helpers at work are the accent; a count that was only the last one read is the quiet shade, dimmed.
+            let lastKnown: Bool = HelperWatch.isLastKnown(online: !offline, reconnecting: reconnecting != nil)
             segments.append(
-                Segment(kind: .helpers, symbol: "person.2", words: "\(count) \(helperWord(count))", short: "\(count)", tone: .plain))
+                Segment(
+                    kind: .helpers, icon: .users, words: "\(count) \(helperWord(count))", short: "\(count)",
+                    tone: lastKnown ? .plain : .accent, dimmed: lastKnown))
         }
         let loops: [ThreadAutomation] = automations.filter { $0.loop && $0.schedule.record.enabled }
         if !loops.isEmpty {
             let one: String? = loops.count == 1 ? rhythm(loops[0].schedule.when) : nil
             segments.append(
                 Segment(
-                    kind: .loops, symbol: "arrow.triangle.2.circlepath", words: one ?? "\(loops.count) loops",
+                    kind: .loops, icon: .loop, words: one ?? "\(loops.count) loops",
                     short: "\(loops.count)", tone: .plain))
         }
         if !queue.messages.isEmpty {
             let count: Int = queue.messages.count
             segments.append(
                 Segment(
-                    kind: .queue, symbol: queue.held ? "pause.circle" : "list.number",
+                    kind: .queue, icon: queue.held ? .circlePause : .listOrdered,
                     words: queue.held ? "Queued · paused" : "\(count) queued", short: "\(count)", tone: queue.held ? .warn : .plain))
         }
         return DockSummary(segments: segments)

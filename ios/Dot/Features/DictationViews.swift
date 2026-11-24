@@ -14,10 +14,9 @@ struct MicButton: View {
                 case .starting:
                     ProgressView().controlSize(.small).tint(Theme.accent)
                 case .listening:
-                    Image(systemName: "waveform").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.accent)
-                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                    DotIcon(.audioWaveform, size: 19, pulse: true).foregroundStyle(Theme.accent)
                 default:
-                    Image(systemName: "mic").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.muted)
+                    DotIcon(.mic, size: 19).foregroundStyle(Theme.muted)
                 }
             }
             .frame(width: 36, height: 36)
@@ -41,15 +40,14 @@ struct DictationLine: View {
         switch dictation.state {
         case .listening:
             HStack(spacing: Space.s) {
-                Image(systemName: "circle.fill").font(.system(size: 7)).foregroundStyle(Theme.accent)
-                    .symbolEffect(.pulse, options: .repeating)
+                Circle().fill(Theme.accent).frame(width: 7, height: 7).modifier(DictationPulse())
                 Text("Listening… tap the microphone to stop").font(Theme.meta).foregroundStyle(Theme.muted)
                 Spacer()
             }
             .padding(.horizontal, Space.l)
         case .failed(let words):
             HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 12)).foregroundStyle(Theme.warn)
+                DotIcon(.alert, size: 14, relativeTo: .caption).foregroundStyle(Theme.warn)
                 Text(words).font(Theme.meta).foregroundStyle(Theme.warn).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 4)
                 if dictation.blocked?.opensSettings == true {
@@ -59,7 +57,7 @@ struct DictationLine: View {
                     .font(Theme.meta.weight(.semibold))
                 }
                 Button { dictation.clearFailure() } label: {
-                    Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).frame(width: 32, height: 32)
+                    DotIcon(.x, size: 13, relativeTo: .caption).frame(width: 32, height: 32)
                 }
                 .foregroundStyle(Theme.faint)
                     .accessibilityLabel("Dismiss")
@@ -69,5 +67,18 @@ struct DictationLine: View {
         default:
             EmptyView()
         }
+    }
+}
+
+/// The red dot of a recording breathes while it listens, and stands still when the reader asked for less motion.
+private struct DictationPulse: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @State private var dim: Bool = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(dim && !reduceMotion ? 0.3 : 1)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: dim)
+            .onAppear { dim = true }
     }
 }

@@ -52,36 +52,37 @@ struct DesignGallery: View {
     private var components: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
             HStack(spacing: Space.l) {
-                Avatar(id: "dot", name: "Dot", size: 44, state: .working)
-                Avatar(id: "agt1", name: "Invoices", size: 44, state: .waiting)
-                Avatar(id: "agt2", name: "Research", size: 44)
+                AgentAvatar(id: "dot", size: 44, state: .working)
+                AgentAvatar(id: "agt1", size: 44, state: .waiting)
+                AgentAvatar(id: "agt2", size: 44, state: .working)
+                AgentAvatar(id: "agt3", size: 44)
                 DotGlyph(size: 44)
             }
             .padding(.vertical, Space.s)
             HStack(spacing: Space.s) {
-                StatusPill(text: "Needs you", symbol: "hand.raised.fill", tone: Theme.warn, pulse: true)
-                StatusPill(text: "Working", symbol: "waveform", tone: Theme.accent, pulse: true)
-                StatusPill(text: "Done", symbol: "checkmark", tone: Theme.good)
+                StatusPill(text: "Needs you", icon: .hand, tone: Theme.warn, pulse: true)
+                StatusPill(text: "Working", icon: .audioWaveform, tone: Theme.accent, pulse: true)
+                StatusPill(text: "Done", icon: .check, tone: Theme.good)
                 StatusPill(text: "Failed", tone: Theme.bad)
             }
             DotGlassGroup {
                 HStack(spacing: Space.m) {
                     Button("Deny") {}.dotButton(.glass)
                     Button("Allow") {}.dotButton(.prominent)
-                    GlassCircleButton(symbol: "arrow.down", label: "Down") {}
+                    GlassCircleButton(icon: .arrowDown, label: "Down") {}
                 }
                 .controlSize(.large)
             }
             HStack(spacing: Space.s) {
-                Image(systemName: "waveform").foregroundStyle(Theme.accent)
+                DotIcon(.audioWaveform, size: 16).foregroundStyle(Theme.accent)
                 Text("Working · 2m 9s").font(Theme.meta.weight(.medium).monospacedDigit())
             }
             .padding(.horizontal, Space.m).frame(minHeight: 32)
             .dotGlass(in: Capsule())
             VStack(spacing: 0) {
-                CardRow(symbol: "cpu", title: "Models", detail: "The main and the review model", showsChevron: true)
+                CardRow(icon: .cpu, title: "Models", detail: "The main and the review model", showsChevron: true)
                 CardDivider()
-                CardRow(symbol: "key.slash.fill", tint: Theme.bad, title: "Forget this phone's key")
+                CardRow(icon: .key, tint: Theme.bad, title: "Forget this phone's key")
             }
             .card()
             NoticeCard(words: "The daemon refused that model.")
@@ -121,7 +122,7 @@ struct DesignGallery: View {
                     HStack(spacing: Space.s) {
                         DockCapsule(
                             summary: DockSummary.make(line: line, connection: connection, queue: queue, automations: automations), onOpen: { _ in })
-                        GlassCircleButton(symbol: "arrow.down", label: "Jump to the newest message") {}
+                        GlassCircleButton(icon: .arrowDown, label: "Jump to the newest message") {}
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -150,10 +151,10 @@ struct DesignGallery: View {
     private var states: some View {
         VStack(spacing: Space.xxl) {
             DotEmptyState(
-                symbol: "bubble.left.and.text.bubble.right", title: "No chats yet",
+                icon: .message, title: "No chats yet",
                 message: "Message Dot from the Mac, or start a chat here.", actionTitle: "New chat", action: {})
             DotEmptyState(
-                symbol: "macbook.slash", title: "Dot can't reach your Mac",
+                icon: .monitorOff, title: "Dot can't reach your Mac",
                 message: "Is the Mac awake, Dot running and Tailscale on here?", tone: Theme.warn, actionTitle: "Try again",
                 action: {})
         }

@@ -78,20 +78,32 @@ final class DotPaletteTests: XCTestCase {
 }
 
 final class ToolGlyphTests: XCTestCase {
-    func testToolsGetTheSymbolOfWhatTheyDo() {
-        XCTAssertEqual(ToolGlyph.symbol(for: "run_shell"), "terminal")
-        XCTAssertEqual(ToolGlyph.symbol(for: "shell"), "terminal")
-        XCTAssertEqual(ToolGlyph.symbol(for: "read_file"), "doc.text")
-        XCTAssertEqual(ToolGlyph.symbol(for: "write_file"), "square.and.pencil")
-        XCTAssertEqual(ToolGlyph.symbol(for: "delegate"), "person.2")
-        XCTAssertEqual(ToolGlyph.symbol(for: "web_search"), "magnifyingglass")
-        XCTAssertEqual(ToolGlyph.symbol(for: "send_email"), "envelope")
-        XCTAssertEqual(ToolGlyph.symbol(for: "ask_user"), "questionmark.bubble")
+    /// Dot's own tools wear the icon the web app gives them (`toolIconName` of icons.js), so a run reads the same on the
+    /// phone and on the Mac.
+    func testDotsToolsGetTheIconOfTheWebApp() {
+        let web: [(String, IconName)] = [
+            ("shell", .terminal), ("terminal_send", .terminal), ("read_file", .eye), ("write_file", .file), ("edit_file", .file),
+            ("find_files", .search), ("search_files", .search), ("list_dir", .list), ("web_search", .globe), ("web_fetch", .globe),
+            ("browser_click", .globe), ("desktop_act", .monitor), ("apple_script", .monitor), ("desktop_clipboard_read", .copy),
+            ("memory_save", .database), ("schedule_create", .calendar), ("delegate", .branch), ("update_plan", .list),
+            ("ask_user", .help), ("ask_secret", .key), ("notify", .bell), ("use_tools", .layers), ("skill", .puzzle),
+            ("mcp__tavily__tavily_search", .plug),
+        ]
+        for (tool, icon) in web { XCTAssertEqual(ToolGlyph.icon(for: tool), icon, tool) }
+    }
+
+    /// A name that is another harness's is read by its words.
+    func testAnotherHarnessesToolsAreReadByTheirWords() {
+        XCTAssertEqual(ToolGlyph.icon(for: "run_shell"), .terminal)
+        XCTAssertEqual(ToolGlyph.icon(for: "Bash"), .terminal)
+        XCTAssertEqual(ToolGlyph.icon(for: "send_email"), .mail)
+        XCTAssertEqual(ToolGlyph.icon(for: "message_agent"), .users, "an agent's name is not a mail's")
+        XCTAssertEqual(ToolGlyph.icon(for: "NotebookEdit"), .squarePen)
     }
 
     func testAnUnknownToolGetsTheWrench() {
-        XCTAssertEqual(ToolGlyph.symbol(for: "frobnicate"), "wrench.and.screwdriver")
-        XCTAssertEqual(ToolGlyph.symbol(for: ""), "wrench.and.screwdriver")
+        XCTAssertEqual(ToolGlyph.icon(for: "frobnicate"), .wrench)
+        XCTAssertEqual(ToolGlyph.icon(for: ""), .wrench)
     }
 
     func testALineSplitsAtItsFirstColonIntoVerbAndWhatItDid() {

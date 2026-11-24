@@ -25,7 +25,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `Coalescer`, `BackgroundGrace`.
   - `Features/`: the screens: `ChatListView`, `ChatView` with `Composer`, `Dock` (the capsule over the composer and the queue's sheet; `Core/DockSummary` says what it holds),
     `RunInspector`, `SettingsViews` (models, schedules), `PairView`, `NewChatView`, `ModelPicker`, and the design system
-    (`Theme`, `Chrome`, `ToolGlyph`, `DesignGallery` in debug builds); `Shared/DotPalette.swift` is its colour tokens.
+    (`Theme`, `Chrome`, `DotIcon`, `ToolGlyph`, `DesignGallery` in debug builds); `Shared/DotPalette.swift` is its colour tokens.
   - `Adapters/` the Keychain, UserDefaults and the push/share HTTP client; `Push/` the token registration;
     `Views/` the address screen and the web UI fallback (`DotWebView`).
 - `DotTests/`: the unit tests (XCTest) of the reducer, the SSE parser and feed, the cache, the queue order, the link
@@ -51,13 +51,17 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 Native: pairing with the code of Settings › Phone, the chat list (working, waiting on you, unread; pull to refresh; drawn
 from disk at launch), a chat (messages that stream in, a tool step as one line, approval and question cards with Allow
 and Deny, and over the composer ONE capsule of glass (item 1390) whose segments are the
-run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background,
+run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background
+(also once the chat's own run has ended: a run that ends done leaves its helpers at work, and then the capsule says "5 helpers",
+the line under the chat's title "5 helpers working" instead of "Done · 1 min ago" and the chat's row in the list says so too,
+item 1466),
 the chat's loops ("every 10 min") and the queue ("3 queued"), divided by hairlines, each opening its own sheet and none
 stacked; a segment exists only while it has something to say, so a chat at rest has no capsule; the queue's sheet gives
 each message an up and a down arrow, Send now (to the run at work) and Remove, and Resume when a stop held the queue;
 the round button to the newest message stands beside the capsule; Send queues while a run works, and Stop with an empty
 box; a photo to attach), the
-run inspector (the run, its plan, its helpers, the chat's schedules and loops with their switches), the Schedules list and
+run inspector (the run, its plan, its helpers in two groups, **Working** first and **Finished** after, each newest first and
+with its count in its header, `Core/HelperOrder` and item 1467, the chat's schedules and loops with their switches), the Schedules list and
 the models (the default and the review model) in Settings, notifications and the Live Activity. Slice 2 (item 1361):
 
 - **New chat**: the pencil of the list opens a sheet whose message starts a chat of its own (`POST /api/runs`, `mode`
@@ -189,6 +193,17 @@ shares the Mac's CPU and disk, so only the shape carries to a phone, and no real
   loses none. Past 500 events of a run, the newest 400 are read instead (`?tail=`) and a line says that steps are not
   shown. A read that failed says "reconnecting", keeps the rows and tries again by itself (0.5 s doubling to 15 s, with
   jitter), or waits for the link when there is none. A state the screen already has is not handed over again.
+- **Helpers that go on after their run ended** (item 1466): the daemon lets the helpers a run that ended done started work on
+  (item 1351) and the run's stream ends with it, so nothing tells the phone that one of them ended. `ChatState.line` is
+  `.helpersInBackground(count:)` for a chat whose run is over while a helper is live (`.waitingOnYou` when a live one asks the owner
+  something). While the chat is open and one is live,
+  `ChatSession` asks for the list of helpers (`GET /api/threads/{id}/helpers`, one small request, nothing else) every 8 seconds
+  (`HelperWatch.seconds`), reads the chat whole when one that was live has ended (its report may have started a run, which the
+  chat then follows) and stops when none is live; with no link it asks nothing and the capsule keeps the last count, dimmed. The
+  app coming to the front and a message of the lifecycle stream read the chat at once, as before. The daemon's list of chats
+  (`GET /api/threads`) has no field for helpers (its `latest_status` is the newest run's), so a chat's row in the list says
+  what the phone itself last read of the chat's helpers, in this run of the app and only while it was read at the chat's newest
+  run (`ListHelpers`): "5 helpers working", the ring turning, the chat among the working ones.
 - **Requests** (`APIClient`): reads time out after 10 s, writes after 30 s, a session waits for connectivity up to 45 s
   (photos 10 minutes), reads are tried three times, a refresh of the list is one request however often it is asked, and
   leaving a chat cancels its reads. Both the lifecycle stream and a run's stream wait for the link instead of trying.
@@ -250,10 +265,31 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   raised surface, with Increase Contrast the hairline is stronger, and `dotAnimation` stays still under Reduce Motion.
   Sheets keep the system's own glass on iOS 26 (`dotSheet()`), and a title's subtitle and the soft scroll edges are
   iOS 26's own.
-- **Behaviour of the look**: a working chat's avatar has a ring that turns, a waiting one an amber ring; a tool step has
+- **Behaviour of the look**: a working chat's avatar has a ring that turns, once in four seconds and evenly (item 1460:
+  `RingMotion.secondsPerTurn`, the one line to change; it was 1.4 s, "far too fast", and it stands still under Reduce
+  Motion), a waiting one an amber ring. **Agents are bots, not letters** (item 1462): one `AgentAvatar` draws every agent,
+  Dot with its own face and every other agent with Lucide's `bot` on one neutral disc (the theme's raised ground and a
+  hairline), whatever its id: no hue taken from the id, no initial (`AgentLook.face(ofAgent:)` is the rule, tested). It stands
+  in the agents strip, the chat list's rows, the inbox's rows, the new-chat hero, the inspector's helpers (the bot, ringed
+  while the helper works) and, at the leading edge of the first line of an agent's since someone else spoke, in the chat itself
+  (`AgentLane`; the lines that follow line up with its words; at the accessibility sizes the face stands over the line,
+  as there is no room for a lane, and `SpeakerRule.wearsFace` says which line). VoiceOver says "Research, working" or "Research,
+  waits for you" (`AgentLook.words`). The Live Activity draws no avatar. A tool step has
   its tool's symbol that pulses while it runs; the send button is one symbol that changes (arrow, queue, stop); an
   approval is the loudest thing in a chat (an amber card with Allow and Deny as large glass buttons), and once answered
   folds into a quiet line; haptics are `sensoryFeedback` (an approval, a send, a stop, a switch, a selection).
+- **Icons** (item 1461): the web app's own set, Lucide, drawn as templates (`DotIcon(.bot, size: 16)`, which takes the colour
+  of the text round it and grows with Dynamic Type, and `Label(_:icon:)`/`Label(_:menuIcon:)`). `Core/IconName.swift` is the
+  list, one case a line: a screen can only draw a case, so a name the catalog lacks does not compile. The images are
+  `Dot/Resources/Icons.xcassets/<name>.imageset/<name>.svg` (single scale, vectors kept, template rendering), written by
+  `uv run python scripts/export_ios_icons.py` from `src/dotagent/server/static/js/icons.js` with the frame and stroke the web
+  page draws them with (item 849), and from the few Lucide shapes the script keeps for what the web app does not draw yet (the
+  bot, the chip, the wifi that is off: `EXTRA`, which the test empties of any icon the web app gains). The web app's icons
+  change and the phone's set must follow: `tests/unit/test_ios_icons.py` fails until the script was run, and `IconTests`
+  draws every icon through the system's renderer and checks it takes the colour it is given. The Lucide licence ships in the
+  app (`Resources/Licences/LICENSE-Lucide.txt`, a copy of the web app's file the script keeps current) and reads in Settings ›
+  About › Licences. SF Symbols stay only where the system's own meaning matters (the actions of a notification) and in the Live
+  Activity and the share extension, two other targets that do not read the catalog.
 - **Debug-only aids**: `-DotGallery 1|2|3|4` shows the pieces on one screen with made-up data (a step that asks, a
   secret, a failed step, the buttons, the empty states), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
   look an iOS 18 phone gets, on an iOS 26 simulator.
@@ -302,7 +338,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) and `-DotSettingsPage <models|schedules|licences>` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the

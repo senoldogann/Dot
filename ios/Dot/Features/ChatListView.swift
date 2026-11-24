@@ -35,7 +35,7 @@ struct ChatListView: View {
                 }
                 if let words: String = openFailed {
                     Button { openFailed = nil } label: {
-                        Label(words, systemImage: "exclamationmark.circle").font(Theme.small).foregroundStyle(Theme.warn)
+                        Label(words, icon: .circleAlert).font(Theme.small).foregroundStyle(Theme.warn)
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
@@ -44,7 +44,7 @@ struct ChatListView: View {
                 if !others.isEmpty { section(waiting.isEmpty && working.isEmpty ? nil : "Chats", tone: Theme.faint, threads: others) }
                 if store.threads.isEmpty && !store.refreshing {
                     DotEmptyState(
-                        symbol: "bubble.left.and.text.bubble.right", title: "No chats yet",
+                        icon: .message, title: "No chats yet",
                         message: "Message Dot from the Mac, or start a chat here.", actionTitle: "New chat",
                         action: { composing = .home }
                     )
@@ -62,13 +62,13 @@ struct ChatListView: View {
             .dotAnimation(Motion.smooth, value: store.threads.map { "\($0.id)\($0.state)" })
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { composing = .home } label: { Image(systemName: "square.and.pencil") }
+                    Button { composing = .home } label: { DotIcon(.squarePen, size: 20) }
                         .accessibilityLabel("New chat")
                         .accessibilityIdentifier("new-chat")
                         .sensoryFeedback(.impact(weight: .light), trigger: composing != nil)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { model.showsSettings = true } label: { Image(systemName: "gearshape") }
+                    Button { model.showsSettings = true } label: { DotIcon(.settings, size: 20) }
                         .accessibilityLabel("Settings")
                 }
             }
@@ -146,14 +146,19 @@ struct ChatListView: View {
     }
 
     private var waiting: [ThreadSummary] { store.threads.filter(\.isWaitingOnYou) }
-    private var working: [ThreadSummary] { store.threads.filter { $0.isWorking && !$0.isWaitingOnYou } }
-    private var others: [ThreadSummary] { store.threads.filter { !$0.isWorking && !$0.isWaitingOnYou } }
+    /// A chat whose own run is over but whose helpers still work is at work too (item 1466): it stands with the working ones.
+    private var working: [ThreadSummary] {
+        store.threads.filter { !$0.isWaitingOnYou && ($0.isWorking || store.helpersLive(in: $0) > 0) }
+    }
+    private var others: [ThreadSummary] {
+        store.threads.filter { !$0.isWorking && !$0.isWaitingOnYou && store.helpersLive(in: $0) == 0 }
+    }
 
     /// One group of chats: a small header with its count, then the rows, each with the mark-as-read swipe.
     @ViewBuilder private func section(_ title: String?, tone: Color, threads: [ThreadSummary]) -> some View {
         Section {
             ForEach(threads) { thread in
-                Button { path.append(thread) } label: { ThreadRow(thread: thread) }
+                Button { path.append(thread) } label: { ThreadRow(thread: thread, helpers: store.helpersLive(in: thread)) }
                     .buttonStyle(RowPressStyle())
                     .listRowBackground(thread.isWaitingOnYou ? Theme.warn.opacity(0.08) : Color.clear)
                     .listRowSeparatorTint(Theme.hairline)
@@ -161,7 +166,7 @@ struct ChatListView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: Space.l, bottom: 0, trailing: Space.l))
                     .swipeActions(edge: .leading, allowsFullSwipe: true) {
                         if thread.unread {
-                            Button { store.markSeen(thread.id) } label: { Label("Read", systemImage: "envelope.open") }
+                            Button { store.markSeen(thread.id) } label: { Label("Read", menuIcon: .mailOpen) }
                                 .tint(Theme.accentFill)
                         }
                     }
@@ -201,19 +206,33 @@ enum NewChatTarget: Identifiable {
 /// asks), working (a ring that turns and a moving mark), unread (a dot).
 struct ThreadRow: View {
     let thread: ThreadSummary
+    /// How many of the chat's helpers are live as the phone last read (`ListHelpers`, item 1466): the daemon's list of chats says
+    /// only how the newest run stands, so a chat whose run ended while its helpers work would read as at rest.
+    var helpers: Int = 0
     @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
+
+    private var state: ThreadState { thread.state(helpersLive: helpers) }
 
     var body: some View {
         Group { if typeSize.isAccessibilitySize { stacked } else { regular } }
             .accessibilityElement(children: .combine)
-            .accessibilityValue(thread.isWaitingOnYou ? "Needs you" : (thread.isWorking ? "Working" : ""))
+            .accessibilityValue(state == .waiting ? "Needs you" : (state == .working ? "Working" : ""))
+    }
+
+    /// "5 helpers working" under the words of a chat whose helpers are at work.
+    @ViewBuilder private var helpersLine: some View {
+        if helpers > 0 {
+            Label(HelperWords.header(count: helpers, runWorking: thread.isWorking), icon: .users, size: 13)
+                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.accent).lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                .accessibilityIdentifier("row-helpers")
+        }
     }
 
     /// At the accessibility sizes a row has no room for two columns: the mark and the age go over the words.
     private var stacked: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.m) {
-                Avatar(id: thread.actorId ?? "dot", name: thread.title, size: 36, state: thread.state)
+                AgentAvatar(id: thread.actorId, size: 36, state: state)
                 Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 Spacer(minLength: 0)
                 if thread.unread { Circle().fill(Theme.accent).frame(width: 10, height: 10).accessibilityLabel("Unread") }
@@ -221,6 +240,7 @@ struct ThreadRow: View {
             Text(thread.title.isEmpty ? "New chat" : thread.title)
                 .font(.body.weight(thread.unread ? .semibold : .regular)).foregroundStyle(Theme.text).lineLimit(3)
             Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(3)
+            helpersLine
         }
         .padding(.vertical, Space.m)
         .contentShape(Rectangle())
@@ -228,7 +248,7 @@ struct ThreadRow: View {
 
     private var regular: some View {
         HStack(alignment: .top, spacing: Space.m + 2) {
-            Avatar(id: thread.actorId ?? "dot", name: thread.title, size: 40, state: thread.state)
+            AgentAvatar(id: thread.actorId, size: 40, state: state)
                 .padding(.top, Space.xs)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: Space.s) {
@@ -239,14 +259,14 @@ struct ThreadRow: View {
                     Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 }
                 HStack(spacing: Space.s) {
-                    Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(thread.state == .idle ? 2 : 1)
+                    Text(thread.lastMessage).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(state == .idle ? 2 : 1)
                     Spacer(minLength: Space.xs)
                     if thread.loopCron != nil {
-                        Image(systemName: "repeat").font(.system(size: 11, weight: .medium)).foregroundStyle(Theme.faint)
-                            .accessibilityLabel("Repeats")
+                        DotIcon(.loop, size: 13, label: "Repeats", relativeTo: .caption).foregroundStyle(Theme.faint)
                     }
                     if thread.unread { Circle().fill(Theme.accent).frame(width: 8, height: 8).accessibilityLabel("Unread") }
                 }
+                helpersLine
             }
         }
         .padding(.vertical, Space.m)
@@ -265,15 +285,15 @@ struct AgentStrip: View {
             DotGlassGroup(spacing: Space.s) {
                 HStack(spacing: Space.s) {
                     ForEach(store.agents) { agent in
-                        let current: ThreadState = state(of: agent)
+                        let current: ThreadState = agent.state
                         Button {
                             onOpen(agent)
                         } label: {
                             HStack(spacing: Space.s) {
-                                Avatar(id: agent.id, name: agent.record.name, size: 28, state: current)
+                                AgentAvatar(id: agent.id, size: 28, state: current)
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text(agent.record.name).font(.subheadline.weight(.medium)).foregroundStyle(Theme.text).lineLimit(1)
-                                    if current != .idle || agent.record.pausedAt != nil {
+                                    if current != .idle || agent.isPaused {
                                         Text(current == .waiting ? "Needs you" : current == .working ? "Working" : "Paused")
                                             .font(Theme.tiny.weight(.semibold))
                                             .foregroundStyle(current == .waiting ? Theme.warn : current == .working ? Theme.accent : Theme.faint)
@@ -284,18 +304,13 @@ struct AgentStrip: View {
                             .dotGlass(in: Capsule(), tint: current == .waiting ? Theme.warn.opacity(0.18) : nil, interactive: true)
                         }
                         .buttonStyle(.plain)
-                        .opacity(agent.record.pausedAt == nil ? 1 : 0.6)
-                        .accessibilityLabel("\(agent.record.name)\(current == .idle ? "" : ", \(current == .waiting ? "waiting on you" : "working")")")
+                        .opacity(agent.isPaused ? 0.6 : 1)
+                        .accessibilityLabel(agent.spokenWords)
                     }
                 }
             }
             .padding(.horizontal, Space.l).padding(.vertical, Space.s)
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-    }
-
-    private func state(of agent: AgentSummary) -> ThreadState {
-        guard let status: String = agent.latest?.status else { return .idle }
-        return status == "blocked" ? .waiting : status.isActiveRunStatus ? .working : .idle
     }
 }

@@ -36,6 +36,9 @@ struct Helper: Sendable, Hashable, Identifiable {
     var status: RunStatus
     /// What it does now, in a few words ("Running swift test").
     var words: String?
+    /// When the daemon queued it, in epoch seconds (0 when this state has not heard): the order the lists show helpers in
+    /// (`HelperOrder`, item 1467).
+    var createdAt: Double = 0
 
     var isLive: Bool { status.isActiveRunStatus }
 }
@@ -103,10 +106,18 @@ struct ChatState: Sendable, Equatable {
 
     /// What the line over the composer says.
     var line: RunLine {
-        guard isWorking else { return .idle }
+        let live: [Helper] = liveHelpers
+        // The chat's own run is over, but a run that ends done leaves the helpers it started at work (item 1351): the chat is not
+        // at rest while any is live, and says so (item 1466; before, the line was idle and nothing said that five helpers worked).
+        guard isWorking else {
+            if live.isEmpty { return .idle }
+            // A live helper that asks the owner something is the chat waiting on the owner, as it is while the run works.
+            let liveIds: Set<String> = Set(live.map(\.id))
+            let asking: Int = pendingApprovals.filter { liveIds.contains($0.runId) }.count
+            return asking > 0 ? .waitingOnYou(count: asking) : .helpersInBackground(count: live.count)
+        }
         let asking: Int = pendingApprovals.count
         if asking > 0 { return .waitingOnYou(count: asking) }
-        let live: [Helper] = liveHelpers
         let waitedFor: [Helper] = live.filter { !released.contains($0.id) }
         if !waitedFor.isEmpty {
             let first: Helper = waitedFor[0]
@@ -185,9 +196,10 @@ struct ChatState: Sendable, Equatable {
         for run in runs.reversed() where run.parentRunId != nil {
             if let at: Int = helpers.firstIndex(where: { $0.id == run.id }) {
                 helpers[at].status = run.status
+                helpers[at].createdAt = run.createdAt
                 if !run.status.isActiveRunStatus { helpers[at].words = nil }
             } else {
-                helpers.append(Helper(id: run.id, goal: run.goal, status: run.status, words: nil))
+                helpers.append(Helper(id: run.id, goal: run.goal, status: run.status, words: nil, createdAt: run.createdAt))
             }
         }
     }
@@ -252,7 +264,7 @@ struct ChatState: Sendable, Equatable {
         case "run_queued":
             if data["parent_run_id"]?.string != nil {
                 if !helpers.contains(where: { $0.id == event.runId }) {
-                    helpers.append(Helper(id: event.runId, goal: data["goal"]?.string ?? "", status: "queued", words: nil))
+                    helpers.append(Helper(id: event.runId, goal: data["goal"]?.string ?? "", status: "queued", words: nil, createdAt: event.ts))
                 }
             } else if !isRoot {
                 rootRunIds.append(event.runId)

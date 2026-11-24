@@ -40,6 +40,8 @@ struct PickedImage: Identifiable, Equatable {
 @Observable
 final class ChatModel {
     let threadId: String
+    /// The agent the chat is with (`nil`: Dot's own chat): whose face the agent's lines wear.
+    let agentId: String?
     let store: NativeStore
     private(set) var state: ChatState
     private(set) var title: String
@@ -90,6 +92,7 @@ final class ChatModel {
 
     init(thread: ThreadSummary, store: NativeStore) {
         self.threadId = thread.id
+        self.agentId = thread.actorId
         self.store = store
         self.title = thread.title
         let warm: ChatState? = store.warmState(for: thread.id)
@@ -104,6 +107,8 @@ final class ChatModel {
     var handoff: HandoffCard? { HandoffCard.card(forChat: threadId, in: store.awareness.needsYou) }
 
     var isWorking: Bool { state.isWorking }
+    /// The phone has no link: what the capsule says of the helpers is the count last read, and is drawn dimmed (item 1466).
+    var offline: Bool { !store.linkState.online }
     var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty }
 
     // MARK: Life

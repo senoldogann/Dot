@@ -83,10 +83,10 @@ struct CardGroup<Content: View>: View {
     }
 }
 
-/// A row of a `CardGroup`: a symbol in a tinted square, a title, a value or a detail, and a chevron when it opens
+/// A row of a `CardGroup`: an icon in a tinted square, a title, a value or a detail, and a chevron when it opens
 /// something.
 struct CardRow<Trailing: View>: View {
-    let symbol: String?
+    let icon: IconName?
     var tint: Color = Theme.accent
     let title: String
     var detail: String?
@@ -97,9 +97,8 @@ struct CardRow<Trailing: View>: View {
     var body: some View {
         let layout: AnyLayout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.s)) : AnyLayout(HStackLayout(spacing: Space.m))
         layout {
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .semibold))
+            if let icon {
+                DotIcon(icon, size: 16)
                     .foregroundStyle(.white)
                     .frame(width: 30, height: 30)
                     .background(
@@ -114,7 +113,7 @@ struct CardRow<Trailing: View>: View {
             Spacer(minLength: Space.s)
             trailing
             if showsChevron {
-                Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.faint)
+                DotIcon(.chevron, size: 14, relativeTo: .caption).foregroundStyle(Theme.faint)
             }
         }
         .padding(.horizontal, Space.l)
@@ -125,8 +124,8 @@ struct CardRow<Trailing: View>: View {
 }
 
 extension CardRow where Trailing == EmptyView {
-    init(symbol: String?, tint: Color = Theme.accent, title: String, detail: String? = nil, showsChevron: Bool = false) {
-        self.init(symbol: symbol, tint: tint, title: title, detail: detail, showsChevron: showsChevron) { EmptyView() }
+    init(icon: IconName?, tint: Color = Theme.accent, title: String, detail: String? = nil, showsChevron: Bool = false) {
+        self.init(icon: icon, tint: tint, title: title, detail: detail, showsChevron: showsChevron) { EmptyView() }
     }
 }
 
