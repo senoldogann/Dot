@@ -74,12 +74,21 @@ def search_tools(query: str = "", detail: str = "name", limit: int = 10) -> list
     if detail not in _DETAILS:
         raise ValueError(f"detail is one of {', '.join(_DETAILS)}")
     words: list[str] = _WORDS.findall(query.lower())
+    catalog: dict[str, Any] = _catalog()
     ranked: list[tuple[int, dict[str, Any]]] = []
-    for tool in _catalog()["tools"]:
-        points: int = _score(query.strip().lower(), words, tool)
-        if points > 0 or not words:
-            ranked.append((points, tool))
-    ranked.sort(key=lambda pair: -pair[0])
+    if words:
+        for tool in catalog["tools"]:
+            points: int = _score(query.strip().lower(), words, tool)
+            if points > 0:
+                ranked.append((points, tool))
+        ranked.sort(key=lambda pair: -pair[0])
+    else:
+        # No words: the first tools of each server in turn, so that no server is the whole of the answer.
+        queues: list[list[dict[str, Any]]] = [
+            [tool for tool in catalog["tools"] if tool["module"] == server["server"]] for server in catalog["servers"]
+        ]
+        for position in range(max((len(queue) for queue in queues), default=0)):
+            ranked.extend((0, queue[position]) for queue in queues if position < len(queue))
     found: list[Any] = []
     for _, tool in ranked[: max(1, min(limit, _MOST))]:
         name: str = f"{tool['module']}.{tool['function']}"

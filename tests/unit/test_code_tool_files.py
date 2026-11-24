@@ -442,3 +442,30 @@ def test_the_definition_the_model_reads_is_the_same_whatever_the_run_has_to_call
     toolfiles.package_of({f"mcp__s__t{n}": _spec(f"mcp__s__t{n}", SCHEMA, "d" * 3000) for n in range(300)})
     assert entry.spec.model_dump_json() == before
     assert len(before) < 2600 and list(entry.spec.parameters["properties"]) == ["code", "title", "timeout_s"]  # type: ignore[call-overload]
+
+
+def test_an_empty_search_names_the_first_tools_of_every_server_in_turn(tmp_path: Path) -> None:
+    """The review of item 1502: it listed the first tools of the first server, which was the whole answer."""
+    specs: dict[str, ToolSpec] = {
+        **{f"mcp__aaa__tool_{n}": _spec(f"mcp__aaa__tool_{n}") for n in range(20)},
+        **{f"mcp__bbb__tool_{n}": _spec(f"mcp__bbb__tool_{n}") for n in range(3)},
+        "read_file": _spec("read_file"),
+    }
+    layout = layout_for(Path(os.path.realpath(tmp_path)), "run_empty_search")
+    install.install(layout, toolfiles.package_of(specs).files)
+    sys.path.insert(0, str(layout.tools))
+    try:
+        dot_tools: Any = importlib.import_module("dot_tools")
+        assert dot_tools.search_tools("", limit=6) == [
+            "dot.read_file",
+            "aaa.tool_0",
+            "bbb.tool_0",
+            "aaa.tool_1",
+            "bbb.tool_1",
+            "aaa.tool_10",
+        ]
+        assert len(dot_tools.search_tools("", limit=100)) == 24
+    finally:
+        sys.path.remove(str(layout.tools))
+        for name in [name for name in sys.modules if name == "dot_tools" or name.startswith("dot_tools.")]:
+            del sys.modules[name]
