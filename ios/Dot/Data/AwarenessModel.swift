@@ -25,6 +25,8 @@ final class AwarenessModel {
     @ObservationIgnored private var held: AwarenessSnapshot
     @ObservationIgnored private var needsYouRead: Task<Void, Never>?
     @ObservationIgnored private var awayReading: Task<Void, Never>?
+    /// The last write of the snapshot to disk: each one waits for the one before, so that the file ends as the newest state.
+    @ObservationIgnored private var writing: Task<Void, Never>?
     /// Puts a number on the app's icon: after each read of what waits on the owner it is that count.
     @ObservationIgnored private let setBadge: @Sendable (Int) async -> Void
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "awareness")
@@ -56,12 +58,18 @@ final class AwarenessModel {
         }
     }
 
-    /// Writes what is held to the cache folder, off the main actor.
+    /// Writes what is held to the cache folder, off the main actor, one write after another in the order they were made: a flip
+    /// followed by a read, or two reads that end together, never leave an older state on disk after a newer one (the
+    /// pre-push review of this item), which a relaunch would draw as a switch or a card that was already put away.
     private func keep() {
         held.savedAt = Date().timeIntervalSince1970
         let snapshot: AwarenessSnapshot = held
         let cache: ChatCache = cache
-        Task.detached(priority: .utility) { await cache.saveAwareness(snapshot) }
+        let before: Task<Void, Never>? = writing
+        writing = Task.detached(priority: .utility) {
+            await before?.value
+            await cache.saveAwareness(snapshot)
+        }
     }
 
     // MARK: Push switches (item 1441)

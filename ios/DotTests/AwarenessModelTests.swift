@@ -163,6 +163,29 @@ final class AwarenessModelTests: XCTestCase {
         XCTAssertEqual(model.push.shown, PushSettings(needsYou: true, ready: false, done: false))
     }
 
+    /// Writes are made one after another in the order of the changes (the pre-push review): after a run of flips and reads the file
+    /// holds the newest state, however the writes were scheduled.
+    func testTheFileOnDiskEndsAsTheNewestStateAfterAQuickRunOfChanges() async throws {
+        begin()
+        BodyStub.reply = #"{"needs_you":true,"ready":true,"done":true}"#
+        let model: AwarenessModel = make()
+        await model.loadPush()
+        BodyStub.respond = { seen in
+            guard seen.method == "PUT", let data: Data = seen.body else { return (200, #"{"needs_you":true,"ready":true,"done":true}"#) }
+            return (200, String(decoding: data, as: UTF8.self))
+        }
+        for round in 0..<6 {
+            model.flip(.ready, to: round % 2 == 1)
+            model.flip(.done, to: round % 2 == 0)
+            await model.refreshNeedsYou()
+        }
+        try await until { model.push.sending == nil }
+        let newest: PushSettings = model.push.shown
+        try await until { ChatCache.readAwareness(in: self.folder)?.pushSettings == newest }
+        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(ChatCache.readAwareness(in: folder)?.pushSettings, newest, "the file holds the newest state, not an older one written later")
+    }
+
     // MARK: What waits on the owner
 
     private static let waiting: String = """
