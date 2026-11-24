@@ -15,7 +15,7 @@ else ends failed at once
 (:func:`tools_needed`: ``finish`` where its mode has it, ``notify`` for a goal that asks for a notification), whether
 Dot's own list for it leaves the tool out (checked before the program starts) or the program's first line does not list
 it (item 1400); the run's result says which tool and why. Each call of a tool of Dot's runs as a call of Dot's own loop
-(:func:`dotagent.agent.handover.bridged_call`: the run's gate, the tool's time limit, the run's timeline under the
+(:func:`dotagent.agent.handover.bridged_outcome`: the run's gate, the tool's time limit, the run's timeline under the
 tool's own name). The door's secret is in a 0600 file of a private folder of the run, removed as it ends, never in the
 program's arguments, which ``ps`` shows every process of the owner.
 
@@ -44,7 +44,7 @@ import shutil
 import signal
 import tempfile
 import time
-from collections.abc import AsyncIterator, Iterable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime
@@ -60,10 +60,11 @@ from dotagent.agent.attachments import (
     steer_event,
 )
 from dotagent.agent.continuity import new_ledger
+from dotagent.agent.executor import ToolOutcome
 from dotagent.agent.handover import (
     ChatSession,
     agent_tools,
-    bridged_call,
+    bridged_outcome,
     door_tool,
     let_go,
     read_chat,
@@ -87,6 +88,7 @@ from dotagent.agent.loop import (
     PromptFacts,
     RunEnd,
     RunOutcome,
+    close_delegated_steps,
     count_start_notes,
     free_mode_line,
     gather_prompt_facts,
@@ -101,6 +103,7 @@ from dotagent.agent.loop import (
     turn_skills,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
+from dotagent.agent.plan import PLAN_EVENT, plan_event_data
 from dotagent.agent.prompt import PromptInputs, build_system_prompt, started_note, turn_note
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
@@ -177,7 +180,7 @@ from dotagent.llm.types import (
     user_message,
 )
 from dotagent.memory.service import Remembered, memory_budget
-from dotagent.opencode.bridge import CallRunner, Door, authorization, new_door
+from dotagent.opencode.bridge import Door, authorization, new_door
 from dotagent.opencode.run import meanwhile
 from dotagent.process_groups import forget_group, record_group
 from dotagent.repair.claude import LimitWindow, window_refused
@@ -595,7 +598,10 @@ class _Quiet:
     owner: OwnerUnread = field(default_factory=OwnerUnread)
 
 
-async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolResult:
+type _OutcomeRunner = Callable[[ToolCall], Awaitable[ToolOutcome]]
+
+
+async def _watched_call(quiet: _Quiet, agent: AgentRun, run: _OutcomeRunner, call: ToolCall) -> ToolResult:
     """Run a call of Dot's tool for the program. It runs in the bridge's task, not the run's (item 1076): the owner's
     emergency stop that it meets (the pointer in a corner of the screen) ends the run as one, as in Dot's own loop, not
     as an error the model reads and goes past. (A Stop cuts it already: the program ended, its request is cancelled.)"""
@@ -605,7 +611,8 @@ async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolR
     if call.name != FINISH_TOOL:
         quiet.finished = None
     try:
-        result: ToolResult = await run(call)
+        outcome: ToolOutcome = await run(call)
+        result: ToolResult = await _after_call(agent, outcome)
         # The model's finish, as Dot's own loop reads its own (item 1076): the run ends as it says, not "done" whatever
         # it said; a finish the gate refused or that did not parse says nothing.
         if call.name == FINISH_TOOL and not result.is_error:
@@ -617,6 +624,16 @@ async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolR
     finally:
         quiet.working -= 1
         quiet.heard = time.monotonic()
+
+
+async def _after_call(agent: AgentRun, outcome: ToolOutcome) -> ToolResult:
+    """What the model reads of a call of Dot's tool, once Dot's own loop has done what it does after one (item 1693): a
+    delegate call that named a step of the plan closes it (:func:`close_delegated_steps`), and when it could not, the
+    result says so, as the loop's note does."""
+    note: str | None = await close_delegated_steps(agent, (outcome,))
+    if note is None:
+        return outcome.result
+    return outcome.result.model_copy(update={"text": f"{outcome.result.text}\n\n{note}"})
 
 
 def _noting_outward(quiet: _Quiet, tools: ToolRegistry) -> ToolRegistry:
@@ -1600,6 +1617,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     # A resumed run says which it goes on from, as Dot's own loop's does (item 1076): its page links that run.
     if agent.opening.resumed is not None:
         await runtime.bus.emit(run.id, RESUMED_EVENT, resumed_event_data(agent.opening.resumed), True)
+        # The plan of the run it resumes becomes this run's plan, as in Dot's own loop (item 1693).
+        if agent.opening.resumed.plan.steps:
+            await runtime.bus.emit(run.id, PLAN_EVENT, plan_event_data(agent.opening.resumed.plan), True)
     if agent.opening.files:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(agent.opening.files)}, True)
     ref: ModelRef = parse_model_ref(run.model)
@@ -1624,8 +1644,9 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         partial(
             _watched_call,
             quiet,
+            agent,
             partial(
-                bridged_call,
+                bridged_outcome,
                 _noting_outward(quiet, tools),
                 await tool_context(agent, ref, info, frozenset(tools.tools), quiet.owner),
                 agent.gate,

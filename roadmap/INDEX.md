@@ -41,6 +41,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1713](1713.md) | done | 2026-11-24 | The day's room for lessons is counted by time and shared fairly between kinds of tasks |
 | [1712](1712.md) | done | 2026-11-24 | A code review starts with the notes about code alone |
 | [1711](1711.md) | done | 2026-11-24 | A run's rewrite of the owner's note waits for the owner, and the owner's words keep reaching every run |
+| [1693](1693.md) | done | 2026-11-24 | A run on the owner's Claude plan keeps Dot's plan |
 | [1692](1692.md) | done | 2026-11-24 | A run on the owner's Claude plan has the core tools' definitions from the start |
 | [1691](1691.md) | done | 2026-11-24 | A run on the owner's Claude plan is told Dot's own system prompt |
 | [1690](1690.md) | done | 2026-11-24 | memory_save and memory_update name the longest note they take |

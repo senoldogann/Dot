@@ -35,7 +35,7 @@ from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import OwnerWords, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL
-from dotagent.tools.meta import MARK_PLAN_STEP_TOOL, REACT_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.meta import REACT_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry
 
@@ -43,12 +43,13 @@ log = get_logger(__name__)
 
 # How long a run that ends lets the questions it still decides finish (:func:`let_go`).
 ASK_GRACE_S: float = 10.0
-# The tools of Dot's own loop, which a program's agent does not get: it runs its own loop, so it plans and finds its
-# tools in its own way (use_tools is Claude Code's search of the door, item 1053), and a reaction is on a message of the
-# owner's in Dot's own chat. Every other tool of Dot's is the agent's, as a run of Dot's own loop has it (item 1063: a
-# run on the plan had no tool to message an agent, give it work or delegate, nor the mail, the drafts, the vault or
-# Dot's own list).
-LOOP_OWN: frozenset[str] = frozenset({UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, REACT_TOOL})
+# The tools of Dot's own loop, which a program's agent does not get: it finds its tools in its own way (use_tools is
+# Claude Code's search of the door, item 1053), and a reaction is on a message of the owner's in Dot's own chat. finish
+# is the door's since item 1076, where its mode has it, and the plan's tools since item 1693 (the plan the owner
+# watches, which the goal check reads: 0 plans in 124 runs on the plan, against 22 % of the loop's runs). Every
+# other tool of Dot's is the agent's, as a run of Dot's own loop has it (item 1063: a run on the plan had no tool to
+# message an agent, give it work or delegate, nor the mail, the drafts, the vault or Dot's own list).
+LOOP_OWN: frozenset[str] = frozenset({USE_TOOLS_TOOL, REACT_TOOL})
 
 
 def door_tool(name: str, delegated: bool) -> bool:
@@ -118,12 +119,18 @@ def _ignore(outcome: ToolOutcome) -> None:
     """A call of the agent to one of Dot's tools ends alone: only its caller waits for its outcome."""
 
 
-async def bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunGate, call: ToolCall) -> ToolResult:
+async def bridged_outcome(registry: ToolRegistry, context: ToolContext, gate: RunGate, call: ToolCall) -> ToolOutcome:
     """A call of the agent to one of Dot's tools, run as Dot's loop runs a call of its own model's: checked, decided by
     the run's gate (the owner's rules, the preset and the approvals), held to the tool's time limit and shown in the
-    run's timeline under the tool's own name."""
+    run's timeline under the tool's own name; its outcome, as the loop reads it (the action the gate weighed, the
+    result)."""
     outcomes: list[ToolOutcome] = await execute_calls((call,), registry, {}, context, gate, 1, _ignore)
-    return outcomes[0].result
+    return outcomes[0]
+
+
+async def bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunGate, call: ToolCall) -> ToolResult:
+    """The result of :func:`bridged_outcome`."""
+    return (await bridged_outcome(registry, context, gate, call)).result
 
 
 async def tool_context(

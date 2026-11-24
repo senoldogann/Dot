@@ -417,8 +417,10 @@ answer keeps its words, Ollama's too.
   connected, your mail and calendars, drafts, the vault, Dot's own list, and the team, as the run's mode and agent allow
   them (item 1063: before it, a run on the plan had no tool to message an agent, give it a work order or delegate). Its
   prompt names the team as Dot's own does: the team its chat is with, the agents it may message by name and role, and
-  how to give them work orders. Only the tools of Dot's own loop stay out (finish, the plan, `use_tools` and a reaction:
-  the program runs its own loop), and a run another run handed its work to asks you nothing and hands nothing on, as
+  how to give them work orders. Only the tools of Dot's own loop stay out (`use_tools` and a reaction: the program
+  finds its tools in its own way; `finish` is the door's since item 1076, and `update_plan` and `mark_plan_step` since
+  item 1693, so the plan you watch moves as on Dot's own runs, a resumed run takes the plan of the run it goes on from,
+  and a `delegate` that names a step closes it), and a run another run handed its work to asks you nothing and hands nothing on, as
   in Dot's own loop. An agent a run on the plan messages works on its own model, or on the plan when it names none.
   Each call goes through the run's approvals, sandbox,
   shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The

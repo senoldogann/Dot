@@ -1338,7 +1338,7 @@ def _delegated_closings(outcomes: Sequence[ToolOutcome]) -> list[tuple[int, Tool
     return closings
 
 
-async def _close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome]) -> str | None:
+async def close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome]) -> str | None:
     """Close the plan steps the delegate calls of this step named: done with the report as evidence when the delegated
     run ended done, failed otherwise. The loop does this, not the tool, because delegate calls run side by side and the
     plan is rewritten whole. Returns the note for the model when a step of a run that ended done could not be closed
@@ -3436,7 +3436,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     if outcome.shown
                 }
             )
-            delegated_note: str | None = await _close_delegated_steps(agent, outcomes)
+            delegated_note: str | None = await close_delegated_steps(agent, outcomes)
             if delegated_note is not None:
                 history.append(await _stored_note(agent, delegated_note))
             finished: ToolOutcome | None = next(

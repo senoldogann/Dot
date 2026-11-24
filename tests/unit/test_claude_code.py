@@ -238,8 +238,11 @@ def test_the_model_gets_every_tool_of_dots_own_loop_but_the_loops_own() -> None:
         "mail_search",
     ):
         assert door_tool(name, False), name
-    for name in ("update_plan", "mark_plan_step", "use_tools", "react"):
+    for name in ("use_tools", "react"):
         assert not door_tool(name, False), name
+    # Item 1693: the plan is the model's, as in Dot's own loop.
+    for name in ("update_plan", "mark_plan_step"):
+        assert door_tool(name, False) and door_tool(name, True), name
     for name in ("delegate", "message_agent", "ask_user", "ask_secret"):
         assert not door_tool(name, True), name
     assert door_tool("read_file", True)

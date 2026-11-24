@@ -331,6 +331,22 @@ async def _work(
             _step([("text", heard)], "end_turn")
             _say({"type": "result", "subtype": "success", "is_error": False, "result": heard, "session_id": SESSION})
             return
+        if "plan the work" in said:
+            # Item 1693: the plan's tools are the door's, as Dot's own loop gives them.
+            _step([("tool_use", f"mcp__{door}__update_plan")], "tool_use")
+            planned: CallToolResult = await client.call_tool(
+                "update_plan", {"steps": [{"text": "Write the note", "status": "in_progress"}]}
+            )
+            _step([("tool_use", f"mcp__{door}__mark_plan_step")], "tool_use")
+            marked: CallToolResult = await client.call_tool(
+                "mark_plan_step", {"step": 1, "status": "done", "evidence": "notes.txt read back: from claude"}
+            )
+            said_back: str = f"Planned: {_text(planned)} | {_text(marked)}"
+            _step([("text", said_back)], "end_turn")
+            _say(
+                {"type": "result", "subtype": "success", "is_error": False, "result": said_back, "session_id": SESSION}
+            )
+            return
         if "slow command" in said:
             _step([("text", "Running it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
             await client.call_tool("shell", {"command": "sleep 2; echo late > late.txt"})
