@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1420](1420.md) | done | 2026-11-24 | The app's alerts stay quiet while it shows Dot: an activity lease per phone |
 | [1402](1402.md) | done | 2026-11-24 | A run whose goal check could not run has an ending of its own, and is no longer "refused" |
 | [1401](1401.md) | done | 2026-11-24 | A schedule counts the firings skipped in a row, and says it where the owner looks |
 | [1400](1400.md) | done | 2026-11-24 | A run on the Claude plan that lacks a tool it cannot work without ends failed at once, and says which |

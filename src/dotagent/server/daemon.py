@@ -32,6 +32,7 @@ from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestart
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
 from dotagent.notify.apns_watch import APNS_KINDS, ApnsWatch, watch_apns
 from dotagent.notify.health import NotifyHealth
+from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.owner import tell_owner
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.oauth.accounts import keep_revoking
@@ -311,6 +312,8 @@ async def run_daemon(config: AppConfig) -> int:
             # The phone hears what the desktop notifications say, from before the start's own work (the restart below,
             # the firings the scheduler's first tick finds missed) until the runs are stopped on the way out.
             phone: NotifyHealth = NotifyHealth()
+            # Which phones show Dot now: the route the app renews it through and the watch of its alerts share them.
+            leases: PhoneLeases = PhoneLeases()
             feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(PUSH_KINDS))
             pusher: asyncio.Task[None] = asyncio.create_task(
                 watch_pushes(runtime.store, feed, runtime.push_keys, stopping, runtime.config.notify.push_hosts),
@@ -331,7 +334,7 @@ async def run_daemon(config: AppConfig) -> int:
                 sender: ApnsSender = ApnsSender(config.apns, await asyncio.to_thread(read_key, config.apns), transport)
                 apns_feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(APNS_KINDS))
                 apns: asyncio.Task[None] = asyncio.create_task(
-                    watch_apns(ApnsWatch(runtime.store, sender), apns_feed, stopping), name="apns"
+                    watch_apns(ApnsWatch(runtime.store, sender, leases), apns_feed, stopping), name="apns"
                 )
                 phone.mark_live("apns")
                 apns.add_done_callback(functools.partial(_log_push_end, phone, "apns"))
@@ -428,6 +431,7 @@ async def run_daemon(config: AppConfig) -> int:
                 reactions=reactions,
                 phones=phones,
                 notifications=phone,
+                leases=leases,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))

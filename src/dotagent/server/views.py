@@ -40,6 +40,7 @@ from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
+from dotagent.notify.leases import LeaseState
 from dotagent.policy.types import ApprovalMode
 from dotagent.repair.claude import ClaudeAccount, WorkerChoice
 from dotagent.repair.night import FastSeen, LiveSession, RepairSession
@@ -249,6 +250,28 @@ class LiveActivityRegistration(FrozenModel):
 
     run_id: str = Field(min_length=1, max_length=64)
     token: str = Field(pattern=APNS_TOKEN)
+
+
+class ActivityRequest(FrozenModel):
+    """What the iPhone app says of itself (item 1420): ``foreground`` (with the chat on screen, a thread id, when it
+    shows one, and for how many seconds this holds: 45 when it names none, at most 90) or ``background``, which ends the
+    lease at once. The daemon only records ``chat`` with the lease and says it back: the quiet holds for every chat, so
+    it changes nothing yet."""
+
+    state: LeaseState
+    chat: str | None = Field(default=None, min_length=1, max_length=64)
+    ttl_s: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+
+class ActivityLeaseView(FrozenModel):
+    """The lease the daemon holds for the phone after :class:`ActivityRequest` (item 1420): how long it holds
+    (``ttl_s``, as capped) and until when (``expires_at``, seconds since the epoch); a ``background`` has none (0 and
+    ``None``)."""
+
+    state: LeaseState
+    chat: str | None
+    ttl_s: float
+    expires_at: float | None
 
 
 class PairedView(FrozenModel):

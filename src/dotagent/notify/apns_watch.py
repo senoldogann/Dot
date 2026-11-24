@@ -38,9 +38,10 @@ from dotagent.notify.apns import (
     live_update_payload,
     short_title,
 )
+from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import PROGRESS_KINDS, THINKING, WAITING, WORKING, LiveNow, live_now
 from dotagent.notify.owner import OWNER_TOLD_EVENT
-from dotagent.notify.push import PUSH_KINDS, PushMessage, notice_message, push_message
+from dotagent.notify.push import PUSH_KINDS, PushMessage, notice_message, push_message, quiet_while_shown
 from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.store.db import Store
 from dotagent.store.models import WORKING_STATUSES, ApnsDevice, EventRecord, LiveActivity, RunRecord
@@ -141,9 +142,11 @@ class ApnsWatch:
     """Sends the app what the events say, each device and activity on its own: one that fails keeps no other from
     its push, and one APNs calls gone is forgotten."""
 
-    def __init__(self, store: Store, sender: ApnsSender) -> None:
+    def __init__(self, store: Store, sender: ApnsSender, leases: PhoneLeases | None = None) -> None:
         self._store: Store = store
         self._sender: ApnsSender = sender
+        # Which phones show Dot now (item 1420): the alerts of a run's end are not sent to them. None: every alert goes.
+        self._leases: PhoneLeases | None = leases
         # The runs the activity shows, by id (item 1093).
         self._rows: dict[str, _Row] = {}
         # When the activity was last told, and whether a step came since that waits its turn (item 1004).
@@ -160,11 +163,20 @@ class ApnsWatch:
             await self._store.delete_apns_device(device.phone_id)
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
-    async def alert(self, message: PushMessage) -> None:
-        await self._alert(alert_payload(message.title, message.route))
+    async def alert(self, message: PushMessage, now: float, quiet: bool = False) -> None:
+        await self._alert(alert_payload(message.title, message.route), now, quiet)
 
-    async def _alert(self, payload: JsonObject) -> None:
+    def _shown(self, phone_id: str, now: float) -> bool:
+        """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""
+        return self._leases is not None and self._leases.live(phone_id, now) is not None
+
+    async def _alert(self, payload: JsonObject, now: float, quiet: bool = False) -> None:
+        """Send ``payload`` as an alert to every phone. A ``quiet`` one (the end of a run, which the app shows itself)
+        is not sent to a phone whose app shows Dot (item 1420); any other is sent to all."""
         for device in await self._store.list_apns_devices():
+            if quiet and self._shown(device.phone_id, now):
+                log.info("apns_alert_kept_quiet", phone=device.phone_id)
+                continue
             try:
                 reply: ApnsReply = await self._sender.send(
                     device.environment,
@@ -238,7 +250,7 @@ class ApnsWatch:
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
             if notice is not None:
-                await self.alert(apns_message(event, notice))
+                await self.alert(apns_message(event, notice), now, quiet_while_shown(event.kind))
             return
         if event.kind in PROGRESS_KINDS:
             await self.progress(event, now)
@@ -247,9 +259,9 @@ class ApnsWatch:
         message: PushMessage | None = push_message(event, run) if event.kind in PUSH_KINDS else None
         answerable: str | None = approval_answerable(event)
         if message is not None and answerable is not None:
-            await self._alert(approval_payload(message.title, message.route, answerable))
+            await self._alert(approval_payload(message.title, message.route, answerable), now)
         elif message is not None:
-            await self.alert(message)
+            await self.alert(message, now, quiet_while_shown(event.kind))
         if not follows_live(run):
             # Known as no row's while it works, so that its steps are passed over without a read.
             if event.kind == "run_finished":
