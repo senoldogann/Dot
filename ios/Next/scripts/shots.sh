@@ -37,7 +37,12 @@ for udid in "$@"; do
                     done
                     # The mark comes from the app's first task; a loaded Mac can still be compositing the first frame.
                     perl -e 'select(undef, undef, undef, 0.6)'
-                    xcrun simctl io "$udid" screenshot --type=png "$out/$name-$lang-$look-$size-$scene.png" >/dev/null 2>&1
+                    shot="$out/$name-$lang-$look-$size-$scene.png"
+                    if ! xcrun simctl io "$udid" screenshot --type=png "$shot" >"$out/.shot.log" 2>&1; then
+                        echo "could not capture $shot:" >&2
+                        cat "$out/.shot.log" >&2
+                        exit 1
+                    fi
                 done
             done
         done
@@ -45,4 +50,5 @@ for udid in "$@"; do
     xcrun simctl ui "$udid" content_size large
     xcrun simctl status_bar "$udid" clear
 done
+rm -f "$out/.shot.log"
 echo "shots in $out"

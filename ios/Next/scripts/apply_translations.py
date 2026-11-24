@@ -1,6 +1,7 @@
 """Writes the Turkish translations (and English plural forms) of `translations_tr.py` into the String Catalog.
 
-Usage: python3 ios/Next/scripts/apply_translations.py   (run after `check_strings.sh --sync` added new keys)
+Usage: python3 ios/Next/scripts/apply_translations.py
+Run it after `check_strings.sh` named new keys and its synced catalog was copied over Resources/Localizable.xcstrings.
 It fails, naming them, when a key of the catalog has no Turkish entry, so a new string cannot slip through untranslated.
 """
 

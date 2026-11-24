@@ -36,12 +36,13 @@ struct ChatsTab: View {
     @State private var selection: SampleChat?
     @State private var query: String = ""
     @State private var toast: ToastMessage?
-    @State private var chats: [SampleChat] = Samples.chats
+    @Binding var chats: [SampleChat]
     @State private var removed: (SampleChat, Int)?
 
     let initialPanel: ChatPanel?
 
-    init(opensSampleChat: Bool, initialPanel: ChatPanel?) {
+    init(chats: Binding<[SampleChat]>, opensSampleChat: Bool, initialPanel: ChatPanel?) {
+        _chats = chats
         _selection = State(initialValue: opensSampleChat ? Samples.chats[0] : nil)
         self.initialPanel = initialPanel
     }

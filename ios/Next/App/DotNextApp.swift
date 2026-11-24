@@ -120,6 +120,8 @@ struct AppShell: View {
     @State private var tab: AppTab
     let opensSampleChat: Bool
     let initialPanel: ChatPanel?
+    /// One source for the list and the Chats badge (review S1): a settled chat leaves both at once.
+    @State private var chats: [SampleChat] = Samples.chats
 
     init(initialTab: AppTab, opensSampleChat: Bool, initialPanel: ChatPanel?) {
         _tab = State(initialValue: initialTab)
@@ -130,9 +132,9 @@ struct AppShell: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab(String(localized: "Chats", comment: "Tab bar: the chats tab"), systemImage: "bubble.left.and.bubble.right", value: AppTab.chats) {
-                ChatsTab(opensSampleChat: opensSampleChat, initialPanel: initialPanel)
+                ChatsTab(chats: $chats, opensSampleChat: opensSampleChat, initialPanel: initialPanel)
             }
-            .badge(Samples.chats.filter { $0.status == .waitingOnYou || $0.status == .question }.count)
+            .badge(chats.filter { $0.status == .waitingOnYou || $0.status == .question }.count)
             Tab(String(localized: "Agents", comment: "Tab bar: the agents and teams tab"), systemImage: "person.2", value: AppTab.agents) { AgentsTab() }
             Tab(String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"), systemImage: "clock.arrow.circlepath", value: AppTab.activity) { ActivityTab() }
             Tab(String(localized: "Settings", comment: "Tab bar: the settings tab"), systemImage: "gearshape", value: AppTab.settings) { SettingsTab() }

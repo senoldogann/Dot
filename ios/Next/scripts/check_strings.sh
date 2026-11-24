@@ -16,7 +16,11 @@ data=$(find "$derived" -path '*DotNext.build*' -name '*.stringsdata' ! -name 'Ex
 [ -n "$data" ] || { echo "no .stringsdata under $derived: build DotNext first" >&2; exit 2; }
 cp "$next/Resources/Localizable.xcstrings" "$work/Localizable.xcstrings"
 # shellcheck disable=SC2086
-xcrun xcstringstool sync "$work/Localizable.xcstrings" --stringsdata $data >/dev/null 2>&1
+if ! xcrun xcstringstool sync "$work/Localizable.xcstrings" --stringsdata $data >"$work/sync.log" 2>&1; then
+    echo "xcstringstool sync failed; its output:" >&2
+    cat "$work/sync.log" >&2
+    exit 2
+fi
 # Raw literals in SwiftUI calls bypass the comment rule: every UI string goes through String(localized:comment:).
 raw=$(grep -rnE '(Text|Button|Label|Tab|navigationTitle|accessibilityLabel|accessibilityHint|confirmationDialog)\("[^"]*[A-Za-z]' \
     "$next/App" "$next/Components" "$next/Design" | grep -v 'Text(verbatim:' || true)
