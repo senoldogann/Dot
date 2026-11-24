@@ -563,7 +563,8 @@ _FETCH_NOTES: int = 200
 
 def note_tokens(record: MemoryRecord) -> int:
     """The tokens a note takes in the prompt, estimated: its text, its tags and the line around them."""
-    return estimate_text_tokens(record.content + "".join(f" #{tag}" for tag in record.tags)) + _NOTE_LINE_TOKENS
+    about: str = "" if record.subject is None else f" about {record.subject}"
+    return estimate_text_tokens(record.content + "".join(f" #{tag}" for tag in record.tags) + about) + _NOTE_LINE_TOKENS
 
 
 def memory_budget(config: MemoryConfig, context_length: int | None) -> int:
