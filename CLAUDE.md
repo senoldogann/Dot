@@ -42,6 +42,8 @@ npm run check
 - On Linux (a cloud agent), `uv run pytest tests/unit` runs every unit test but those that need macOS
   ([Development](docs/development.md)); the smoke tests and `dotx eval check` need a Mac.
 - A change to a tool, the policy or the loop: `dotx eval check` must pass.
+- A change to a tool, the policy, the gate or the loop: `tests/unit/test_freedom_contract.py` must pass, and a yolo or free
+  run must ask nothing new and deny nothing it allowed ([Freedom](docs/freedom.md)).
 - A change the browser tests cover: add them with `-m "not live and not internet and not hosted and not desktop"`.
 - `desktop/src-tauri`: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`.
 - A web UI change: `npm run check` (Biome, `tsc` over the JSDoc, `node --test tests/js`; `npm ci` once, Node 22 or later,

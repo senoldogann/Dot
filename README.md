@@ -171,6 +171,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Models and providers](docs/models.md)
 - [Runs and tools](docs/runs.md): how a run works, its tools, delegation
 - [Autonomy](docs/autonomy.md): approvals, goal mode and the end of a run
+- [Freedom](docs/freedom.md): what yolo and free mode guarantee, the exact exceptions, and the test that keeps them
 - [The harness](docs/harness.md): what Dot improves around its model, and how a change is adopted
 - [Self-repair](docs/repair.md): Claude Code fixes the problems Dot finds in its own record, each night
 - [Safety and privacy](docs/safety.md): what leaves this Mac, the policy, the sandbox

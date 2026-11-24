@@ -61,6 +61,8 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   secret Dot holds out of the Mac is refused, but in free mode (item 1097). A refusal is not a question: a `research` run's limit stands, and no rule
   of yours can refuse — its behaviours are allow, preapproved, ask and hand off.
 
+What `yolo` and free mode guarantee, the exact exceptions and the test that keeps them: [Freedom](freedom.md).
+
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
 Allowed, the run makes the change with the file tools; a command line never makes it, and neither does OpenCode's own
