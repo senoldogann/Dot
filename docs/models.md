@@ -346,10 +346,15 @@ answer keeps its words, Ollama's too.
   data, state and cache they write and whose config they do not, and nothing it starts reaches the server's own port
   (where the password its environment holds would answer its own asks); a `yolo` run's agent works in the other server,
   as before. Its web fetches reach no address of this Mac or its network
-  unless `[web] allow_private_hosts` says so. Besides its own, the agent has Dot's tools for what OpenCode has none for
-  (item 284): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page in the
-  conversation, skills, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
-  them. Dot serves them to the OpenCode server it started as an MCP server of its own on a loopback port, one door per
+  unless `[web] allow_private_hosts` says so. Besides its own, the agent has every tool of Dot's a run on your Claude plan has
+  (item 284, item 1720): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page
+  in the conversation, Dot's look (`theme_*`), a video watched, a draft, a wait (`wait_until`, which your message does
+  not cut short here: OpenCode does not say when it takes one in), skills and saving one, the team and helpers, your
+  mail and calendars, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
+  them and as Dot's own loop withholds them (no accounts, no skills, no helpers). It has none of Dot's for what its own
+  tools do (files, commands, web fetch and search) and no `finish`: the run ends with its last answer.
+  `tests/unit/test_harness_tool_parity.py` lists each tool one way lacks and why. OpenCode puts every one of a
+  server's tools in its prompt, so the agent's tool definitions are about 75,000 characters (43 tools, 41,000, before). Dot serves them to the OpenCode server it started as an MCP server of its own on a loopback port, one door per
   chat (`dot_` and eight hex digits, with a secret of its own), and a chat's session sees its own door's tools only;
   each call goes through the run's approvals and time limit as a call of Dot's own loop does, and shows on the timeline
   under the tool's own name. A call that waits for your answer tells OpenCode so every 20 s, so a slow approval does not

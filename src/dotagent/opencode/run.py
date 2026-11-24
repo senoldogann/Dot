@@ -9,13 +9,13 @@ done with the agent's last answer once the agent has nothing left to do, and fai
 last reply was cut short (the model's output limit) and when it goes on past the run's limits (``run_max_minutes``,
 ``run_max_tokens``), which it is told of once.
 
-The agent has Dot's own tools besides its own (item 284): those of what OpenCode has no tool for (Dot's browser, the
-Mac's applications, memory, schedules, a notification, a page in the conversation, skills, a question to the owner and
-the apps the owner connected), served by Dot's bridge (:mod:`dotagent.opencode.bridge`) at the chat's door while the run
-works. A call of one runs as a call of Dot's own loop (:func:`dotagent.agent.executor.execute_calls`: the run's gate,
-the tool's time limit, the run's timeline under the tool's own name), and the session keeps to its own chat's door. A
-run here has none of the rest of what Dot's own runs bring (the memory recalled at the start, the checks of a finish,
-the lessons and playbooks)."""
+The agent has Dot's own tools besides its own (item 284): every one a run on Claude Code gets but those of what
+OpenCode's own tools do and finish (:data:`OPENCODE_OWN`, item 1720), served by Dot's bridge
+(:mod:`dotagent.opencode.bridge`) at the chat's door while the run works. A call of one runs as a call of Dot's own
+loop (:func:`dotagent.agent.executor.execute_calls`: the run's gate, the tool's time limit, the run's timeline under the
+tool's own name), and the session keeps to its own chat's door. A run here has none of the
+rest of what Dot's own runs bring (Dot's own prompt, the memory recalled at the start, the checks of a finish, the
+lessons and playbooks)."""
 
 import asyncio
 import time
@@ -43,9 +43,11 @@ from dotagent.agent.handover import (
     ChatSession,
     agent_tools,
     bridged_call,
+    door_tool,
     let_go,
     read_chat,
     tool_context,
+    withheld_out,
     write_chat,
 )
 from dotagent.agent.limits import (
@@ -79,7 +81,6 @@ from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import ChatProvider, Message, ModelInfo, StreamDelta, assistant_message
 from dotagent.llm.wire import get_obj, get_str
-from dotagent.mcp.naming import PREFIX as MCP_PREFIX
 from dotagent.opencode.bridge import Door, ToolBridge, door_name, new_door, server_config, session_rules
 from dotagent.opencode.events import (
     MessageSeen,
@@ -102,10 +103,11 @@ from dotagent.policy.types import ActionInfo, Flag, Risk
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.endings import PREFIX_CUT_SHORT
-from dotagent.store.models import RunMode
+from dotagent.store.models import RunRecord
 from dotagent.tools.channels import Channel
 from dotagent.tools.files import read_action, write_action
 from dotagent.tools.groups import BROWSER_GROUP, group_of
+from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.web.addresses import is_public_address
 
@@ -150,12 +152,26 @@ LOCAL_TARGET_NOTE: str = (
     "That address is on this Mac or its local network, which the web tools do not open ([web] allow_private_hosts)."
 )
 _WEB_TOOLS: frozenset[str] = frozenset({"webfetch", "websearch", "codesearch"})
-# Dot's tools the agent gets besides its own (item 284): the groups of what OpenCode has no tool for, every connected
-# app's (``mcp__<server>``), and a few of the core group's. The agent's own tools read, write and search files, run
-# commands and fetch and search the web, so Dot's for those stay out, and so do those of Dot's own loop (the plan,
-# finish, the tool groups, helpers, teammates and a campaign's).
-_BRIDGED_GROUPS: frozenset[str] = frozenset({"browser", "desktop", "schedule", "memory_admin", "pages"})
-_BRIDGED_CORE: frozenset[str] = frozenset({"memory_save", "memory_search", "notify", "ask_user", "skill"})
+# Dot's tools the agent does not get although a run on Claude Code does (:func:`dotagent.agent.handover.door_tool`):
+# those of what the agent's own tools do (read, write, edit, list, glob and grep for the files, bash for a command,
+# webfetch and websearch for the web; item 284), and finish, since a run here ends with the agent's last answer once it
+# has nothing left to do (item 283). Every other tool of Dot's is the agent's, as a run on Claude Code has it
+# (item 1720): Dot's look, a video, a draft, a wait, a skill saved, the team, the mail and calendars, the office and
+# the rest.
+OPENCODE_OWN: frozenset[str] = frozenset(
+    {
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_dir",
+        "find_files",
+        "search_files",
+        "shell",
+        "web_fetch",
+        "web_search",
+        FINISH_TOOL,
+    }
+)
 # What a run says when Zen's free tier turns a request down. Its own words say that the free tier serves OpenCode alone,
 # but it says them to OpenCode's own command line as well, for a few minutes after many requests in a short time
 # (measured 2026-10-15: refused from 17:48 to about 17:56, answered at 17:57, the same program and setup throughout).
@@ -210,20 +226,21 @@ def agent_failed(text: str, error: JsonObject) -> OpenCodeError:
     return OpenCodeError(f"OpenCode's agent failed: {text}", {"error": error})
 
 
-def bridged(name: str) -> bool:
-    """Whether Dot's tool ``name`` is one the agent gets besides its own."""
-    group: str = group_of(name)
-    return group in _BRIDGED_GROUPS or group.startswith(MCP_PREFIX) or name in _BRIDGED_CORE
+def bridged(name: str, delegated: bool) -> bool:
+    """Whether Dot's tool ``name`` is one the agent gets besides its own: one a run on Claude Code gets, for a run
+    another run handed its work to (``delegated``) too, but for those of :data:`OPENCODE_OWN`."""
+    return door_tool(name, delegated) and name not in OPENCODE_OWN
 
 
-def bridged_tools(registry: ToolRegistry, mode: RunMode, agent_tools: frozenset[str] | None) -> ToolRegistry:
-    """The tools of Dot's a run in ``mode`` gives the agent: the :func:`bridged` ones of the mode, and of those only the
-    ones ``agent_tools`` names when the run is an agent's whose tools are bounded (item 86)."""
+def bridged_tools(registry: ToolRegistry, run: RunRecord, agent_tools: frozenset[str] | None) -> ToolRegistry:
+    """The tools of Dot's ``run`` gives the agent: the :func:`bridged` ones of its mode, and of those only the ones
+    ``agent_tools`` names when the run is an agent's whose tools are bounded (item 86)."""
+    delegated: bool = run.parent_run_id is not None
     return ToolRegistry(
         tools={
             tool.spec.name: tool
-            for tool in tools_for_mode(registry, mode)
-            if bridged(tool.spec.name) and (agent_tools is None or tool.spec.name in agent_tools)
+            for tool in tools_for_mode(registry, run.mode)
+            if bridged(tool.spec.name, delegated) and (agent_tools is None or tool.spec.name in agent_tools)
         }
     )
 
@@ -871,7 +888,10 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     variant: str | None = run.effort if run.effort is not None and run.effort in info.efforts else None
     directory: Path = runtime.workspace
     earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
-    tools: ToolRegistry = bridged_tools(runtime.registry, run.mode, await agent_tools(runtime, run.agent_id))
+    # Those Dot's own loop withholds from the run as it starts are left out here too (items 1063 and 1068).
+    tools: ToolRegistry = await withheld_out(
+        runtime, run, bridged_tools(runtime.registry, run, await agent_tools(runtime, run.agent_id)), ref.label
+    )
     # Settings › Browser may keep every run off the browser (item 354), OpenCode's agent too.
     if not runtime.browser.config.enabled:
         tools = ToolRegistry(
