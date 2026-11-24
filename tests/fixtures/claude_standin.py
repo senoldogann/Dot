@@ -23,11 +23,12 @@ first message on its input, and answers as the message says:
   its error stream and exit code 1 (item 1580). Each program of such a goal has a session of its own (``ses-cut-...``)
   and every start is a line of ``starts.log``. A program started with ``--resume`` of such a session goes on after the
   cut (item 1581): it reads the messages that come (the note about the cut ends them), writes them to
-  ``continued.json`` and finishes with ``Continued.``, unless the goal says ``die ... once`` no more (it then dies as
-  the first did, every time) or ``refuse the resume`` (it answers an API error of the kind that says the session cannot
-  be taken up again, and the new session that follows, which has no ``--resume`` and is told so, finishes with
-  ``Continued in a new session.``; with ``the new session dies first`` the first of them is killed before it takes its
-  message in);
+  ``continued.json`` and finishes with ``Continued.``, but dies as the first did when the goal says ``die ... twice``
+  (the first two programs die, the note about the cut is taken in late so that what the owner sent after it is sent
+  first) or has no number (every program dies), or answers an API error of the kind that says the session cannot be
+  taken up again when the goal says ``refuse the resume`` (the new session that follows, which has no ``--resume`` and
+  is told so, finishes with ``Continued in a new session.``; with ``the new session dies first`` the first of them is
+  killed before it takes its message in);
 - ``die while sending``: a step that calls ``shell`` through the door, and a SIGKILL half a second into the call, which
   the test makes slow and an action the policy keeps for the owner (item 1581: a call of that kind in flight is not
   continued);
@@ -53,6 +54,7 @@ import signal
 import stat
 import sys
 import threading
+import time
 from pathlib import Path
 
 import httpx2
@@ -147,6 +149,12 @@ def _read_message() -> str | None:
     return json.dumps(message["content"])
 
 
+def _starts_of(session: str) -> int:
+    """How many programs of the session were started, this one included."""
+    lines: list[str] = (RECORD / "starts.log").read_text(encoding="utf-8").splitlines()
+    return sum(1 for line in lines if json.loads(line)["session"] == session)
+
+
 def _go_on(plan: dict[str, object], said: str, resumed: bool) -> None:
     """A program that goes on after a cut (item 1581), once its init line is said: it reads what is sent up to the note
     about the cut, then dies again, refuses the resume or finishes, as the plan of its goal says."""
@@ -167,12 +175,15 @@ def _go_on(plan: dict[str, object], said: str, resumed: bool) -> None:
                 "type": "result",
                 "subtype": "error_during_execution",
                 "is_error": True,
-                "result": "API Error: 400 invalid_request_error: `tool_use` ids were found without `tool_result`",
+                "result": (
+                    "API Error: 400 invalid_request_error: `tool_use` ids were found without `tool_result` "
+                    "(key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789)"
+                ),
                 "session_id": SESSION,
             }
         )
         return
-    if plan["always"]:
+    if _starts_of(SESSION) <= int(str(plan["times"])):
         _step([("text", "Trying again.")], "end_turn")
         _die(str(plan["how"]))
     _step([("text", "Picking up where it was cut.")], "end_turn")
@@ -323,6 +334,15 @@ def _list_models(record: Path) -> None:
     sys.stdout.flush()
 
 
+def _times_of(said: str) -> int:
+    """How many programs of a session die: the first, and after it as many as ``twice`` says; a goal of ``die by ...``
+    or ``die with exit 1`` with no number dies every time; the other modes cut the first program once."""
+    if " twice" in said:
+        return 2
+    every_time: bool = ("die by" in said or "die with exit" in said) and " once" not in said
+    return 10**6 if every_time and "refuse the resume" not in said else 1
+
+
 def _plan_of(record: Path, said: str, resumed: str | None) -> dict[str, object] | None:
     """What a program of a ``die`` goal does, and the session it is in (item 1581): the first program of the goal makes
     a session of its own and writes its plan beside it; the program that goes on after a cut, started with ``--resume``
@@ -337,16 +357,16 @@ def _plan_of(record: Path, said: str, resumed: str | None) -> dict[str, object] 
         silent: bool = "the new session dies first" in said and not (record / "fresh-died").exists()
         if silent:
             (record / "fresh-died").write_text("", encoding="utf-8")
-        return {"always": False, "refuse": False, "how": "sigkill", "after_cut": True, "silent_first": silent}
+        return {"times": 0, "refuse": False, "how": "sigkill", "after_cut": True, "silent_first": silent}
     if "die by" not in said and "die with" not in said and "die after" not in said and "die in a step" not in said:
         return None
     SESSION = f"ses-cut-{secrets.token_hex(4)}"
     plan: dict[str, object] = {
-        "always": ("die by" in said or "die with exit" in said)
-        and " once" not in said
-        and "refuse the resume" not in said,
+        "times": _times_of(said),
         "refuse": "refuse the resume" in said,
         "how": _how_of(said),
+        # ``twice``: the note about the cut is taken in late, so that what the owner sent after it is sent first.
+        "slow_taken": " twice" in said,
     }
     (record / f"plan-{SESSION}.json").write_text(json.dumps(plan), encoding="utf-8")
     return {**plan, "after_cut": False}
@@ -386,6 +406,8 @@ def main() -> None:
     plan: dict[str, object] | None = _plan_of(record, said, resumed)
     # As the real program does with --replay-user-messages: it says it took the message in.
     if "--replay-user-messages" in sys.argv and not (plan is not None and plan.get("silent_first")):
+        if plan is not None and plan.get("slow_taken") and plan.get("after_cut"):
+            time.sleep(0.4)
         _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
     with (record / "starts.log").open("a", encoding="utf-8") as starts:
         starts.write(json.dumps({"resume": resumed, "session": SESSION}) + "\n")

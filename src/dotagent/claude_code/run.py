@@ -666,9 +666,11 @@ class _Follow:
     # waits for a turn of its own; one taken before a step is that step's to answer).
     taken: int = 0
     taken_since_step: bool = False
-    # The messages sent to the program that it has not taken in yet, in the order sent, which a program that is cut
-    # never will (item 1581): the next one is sent them again. And how many steps the run had when this program began.
-    pending: list[tuple[str, tuple[ImageData, ...]]] = field(default_factory=list)
+    # One entry for each message sent to the program that it has not taken in yet, in the order sent: the message, for
+    # one the next program is sent again if this one is cut before it takes it in (item 1581); ``None`` for a note of
+    # Dot's about the cut, which is not sent again but which the program takes in all the same, so that each ``Taken``
+    # takes out its own message. And how many steps the run had when this program began.
+    pending: list[tuple[str, tuple[ImageData, ...]] | None] = field(default_factory=list)
     steps_before: int = 0
     # Why fast mode was off though the run asked for it, said with its answer (item 1014); "" when it was not.
     fast_off: str = ""
@@ -700,8 +702,7 @@ class _Follow:
         """A message to the model, on the program's input. ``keep`` says it is sent again to the program that goes on
         when this one is cut before it takes the message in (item 1581): not a note of Dot's about the cut."""
         self.sent += 1
-        if keep:
-            self.pending.append((text, images))
+        self.pending.append((text, images) if keep else None)
         try:
             self.stdin.write(user_line(text, images).encode("utf-8"))
             await self.stdin.drain()
@@ -883,7 +884,7 @@ class _Follow:
         streaming, as it does for a step it sends back. Returns the messages the cut program had not taken in."""
         if self.step is not None:
             await self.stream(StreamDelta(kind="reset", text=""))
-        lost: list[tuple[str, tuple[ImageData, ...]]] = self.pending
+        lost: list[tuple[str, tuple[ImageData, ...]]] = [one for one in self.pending if one is not None]
         self.pending = []
         self.stdin = stdin
         self.sent = self.taken = 0
@@ -1522,7 +1523,7 @@ class _Cuts:
                 silent_s=round(time.monotonic() - follow.quiet.wrote, 1),
                 session_id=follow.session_id,
                 at=time.time(),
-                said=error.message,
+                said=await _masked(error.message),
             )
             self.exits.append(program)
             refusal = run_refusal(cancelled=self.agent.cancel.is_set(), continued=self.continued, allowed=self.allowed)
@@ -1756,11 +1757,16 @@ async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Proce
         return ""
 
 
-async def _masked_stderr(current: _Program) -> str:
-    """What the program wrote to its error stream, once it ended (:func:`_stderr_now`), masked as everything Dot logs or
-    stores is: a program may print a key in the words of its failure (items 1580 and 1581)."""
+async def _masked(text: str) -> str:
+    """``text`` of a program that ended, what it printed or said, masked as everything Dot logs or stores is (items 1580
+    and 1581): a program may print a key in the words of its failure, and the event of a continuation carries them."""
     known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
-    return redact_known(await _stderr_now(current.tail, current.process), known)
+    return redact_known(text, known)
+
+
+async def _masked_stderr(current: _Program) -> str:
+    """What the program wrote to its error stream, once it ended (:func:`_stderr_now`), masked (:func:`_masked`)."""
+    return await _masked(await _stderr_now(current.tail, current.process))
 
 
 async def _cut_of(follow: _Follow, current: _Program) -> ProgramExit:

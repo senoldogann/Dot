@@ -1063,7 +1063,7 @@ async def test_a_resume_the_api_refuses_is_met_with_a_new_session_that_is_told_w
     assert isinstance(refused, str) and "resume failed" in refused and "sk-ant" not in refused
     # The refused program was running when it said so and Dot ended it: no exit of its own, and what it said instead.
     assert events[1].data["returncode"] is None and events[1].data["exited"] is False
-    assert "API Error: 400" in str(events[1].data["said"])
+    assert "API Error: 400" in str(events[1].data["said"]) and "sk-ant" not in str(events[1].data["said"])
     fresh: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
     first: str = str(fresh["messages"][0])  # type: ignore[index]  # what the new session read
     assert "refuse the resume" in first and "What the cut session had done" in first
@@ -1096,6 +1096,30 @@ async def test_a_new_session_cut_before_it_took_in_its_brief_is_given_the_brief_
     brief: str = str(last["messages"][0])  # type: ignore[index]  # what the last program read
     assert "the new session dies first" in brief and "What the cut session had done" in brief
     assert "--resume" not in last["args"]  # type: ignore[operator]  # a new session
+
+
+async def test_a_message_that_comes_while_dot_waits_is_not_lost_when_the_next_program_is_cut_too(
+    room: Room, ends: EndedTogether, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1581 (the pre-push review): the owner writes while Dot waits to start the program again. The new program
+    takes in the note about the cut, not that message, and is cut again before it reads it: the one after it must be
+    sent the message, which a note counted as taken in place of it once lost."""
+    await _continuing(room, monkeypatch, 2, wait_s=1.0)
+    _forget_starts(room)
+    with capture_logs() as logs:
+        started: RunRecord = await _start(room, "Please die by sigkill twice.")
+        deadline: float = time.monotonic() + 30
+        while not any(line["event"] == "claude_code_program_cut" for line in logs):
+            assert time.monotonic() < deadline, "the program was never cut"
+            await asyncio.sleep(0.05)
+        room.manager.steer(started.id, "Also look in the second folder.", ())
+        ended: RunRecord = await _finished(room, started)
+    assert ended.status == "done" and ended.result == "Continued.", ended.result
+    assert len(_starts(room)) == 3 and len(await _continued_events(room, ended.id)) == 2
+    last: dict[str, object] = await asyncio.to_thread(_json, room.record / "continued.json")
+    messages: list[str] = [str(one) for one in last["messages"]]  # type: ignore[attr-defined]  # a list of text
+    assert len(messages) == 2 and "Also look in the second folder." in messages[0], messages
+    assert "was cut off at" in messages[1]
 
 
 async def test_what_the_owner_sent_that_the_cut_program_never_took_in_is_sent_to_the_next(
