@@ -56,6 +56,8 @@ struct ChatView: View {
             .padding(.horizontal, Space.s + 2)
             .padding(.bottom, Space.xs)
             .padding(.top, Space.xs)
+            .frame(maxWidth: Theme.readingWidth)
+            .frame(maxWidth: .infinity)
         }
         .dotScreenBackground()
         .navigationTitle(model.title)
@@ -256,6 +258,9 @@ private struct Transcript: View {
                 .padding(.vertical, Space.m)
                 // A short chat sits at the bottom, by the composer, as a long one ends there.
                 .frame(minHeight: viewport, alignment: .bottom)
+                // On a wide screen the words keep to a readable width, in the middle.
+                .frame(maxWidth: Theme.readingWidth)
+                .frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
             .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
@@ -618,7 +623,7 @@ private struct ToolDetailSheet: View {
                 VStack(alignment: .leading, spacing: Space.l) {
                     HStack(spacing: Space.m) {
                         DotIcon(ToolGlyph.icon(for: row.tool), size: 22, relativeTo: .title3).foregroundStyle(tone)
-                            .frame(width: 28)
+                            .frame(minWidth: 28, alignment: .leading)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(row.tool.replacingOccurrences(of: "_", with: " ").capitalizedFirst)
                                 .font(.headline).foregroundStyle(Theme.text)

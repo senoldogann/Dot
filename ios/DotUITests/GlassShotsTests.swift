@@ -108,10 +108,11 @@ final class GlassShotsTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Next up"].waitForExistence(timeout: 10))
         sleep(1)
         shot("dock-queue-sheet")
-        let down: XCUIElement = app.buttons["Move down"].firstMatch
-        if down.exists { down.tap() }
+        // The order is dragged by handles (item 1643): "Reorder" shows them.
+        let reorder: XCUIElement = app.buttons["queue-reorder"]
+        if reorder.exists { reorder.tap() }
         sleep(1)
-        shot("dock-queue-sheet-moved")
+        shot("dock-queue-sheet-reordering")
         app.buttons["Done"].tap()
         let status: XCUIElement = app.buttons["dock-status"]
         if status.waitForExistence(timeout: 5) {

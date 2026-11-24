@@ -115,6 +115,7 @@ struct CodeBlock: View {
 /// the step runs and gives way to a check when it is done.
 struct ToolLine: View {
     let row: ToolRow
+    @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
     var body: some View {
         let words: (verb: String, rest: String) = ToolGlyph.split(row.line)
@@ -123,8 +124,10 @@ struct ToolLine: View {
                 .foregroundStyle(row.state == .running ? Theme.text : Theme.faint)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
+                // One line, cut in the middle so that the end of a path stays; at the accessibility sizes it may take three
+                // (the review's fix 5 and an AX3 shot: "Opened pegasus.example" read "Opene…xample").
                 line(words)
-                    .lineLimit(1)
+                    .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                     .truncationMode(.middle)
                 if row.state == .failed, let why: String = row.failure {
                     Text("Failed · \(why)").font(Theme.meta).foregroundStyle(Theme.bad).lineLimit(1)
@@ -146,6 +149,9 @@ struct ToolLine: View {
         .frame(minHeight: 28)
         // The line is 28 points tall and quiet; a finger gets 44 (it reaches over the gap above and below).
         .contentShape(Rectangle().inset(by: -8))
+        // A step's line is the quiet kind of text: from AX2 up it stays at AX1, so that a name in it ("pegasus.example") is not
+        // broken in the middle at the largest sizes.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .dotAnimation(Motion.snappy, value: row.state)
         .accessibilityElement(children: .combine)
         .accessibilityValue(row.state == .running ? "running" : row.state == .failed ? "failed" + (row.failure.map { ": " + $0 } ?? "") : "done")
@@ -184,7 +190,7 @@ struct ApprovalCardView: View {
             HStack(spacing: Space.m) {
                 DotIcon(icon, size: 22, relativeTo: .title3)
                     .foregroundStyle(Theme.warn)
-                    .frame(width: 28)
+                    .frame(minWidth: 28, alignment: .leading)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(card.question != nil ? "Dot has a question" : "Waiting for your OK")
                         .font(.caption.weight(.semibold)).foregroundStyle(Theme.warn)
@@ -201,6 +207,7 @@ struct ApprovalCardView: View {
                 Button { expanded.toggle() } label: {
                     Text(presentation.command)
                         .font(Theme.mono)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                         .foregroundStyle(Theme.text)
                         .lineLimit(expanded ? nil : 4)
                         .multilineTextAlignment(.leading)

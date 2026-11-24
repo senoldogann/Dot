@@ -116,7 +116,7 @@ struct CardRow<Trailing: View>: View {
             if let icon {
                 DotIcon(icon, size: 22, relativeTo: .title3)
                     .foregroundStyle(destructive ? Theme.bad : Theme.muted)
-                    .frame(width: 28)
+                    .frame(minWidth: 28, alignment: .leading)
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 2) {

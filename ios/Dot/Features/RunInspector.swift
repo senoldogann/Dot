@@ -113,7 +113,7 @@ struct RunInspector: View {
         return layout {
             DotIcon(statusIcon, size: 24, pulse: model.state.isWorking, relativeTo: .title3)
                 .foregroundStyle(statusTone)
-                .frame(width: 28)
+                .frame(minWidth: 28, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Status").font(Theme.meta).foregroundStyle(Theme.faint)
                 Text(statusWords).font(.title3.weight(.semibold)).foregroundStyle(Theme.text)
@@ -258,7 +258,7 @@ struct ScheduleRow: View {
             HStack(spacing: Space.m) {
                 DotIcon(isLoop ? .loop : .clock, size: 22, relativeTo: .title3)
                     .foregroundStyle(schedule.record.enabled ? Theme.muted : Theme.faint)
-                    .frame(width: 28)
+                    .frame(minWidth: 28, alignment: .leading)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(schedule.record.name.isEmpty ? shortened(schedule.record.goal, 60) : schedule.record.name)

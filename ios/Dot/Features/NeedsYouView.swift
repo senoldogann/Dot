@@ -6,16 +6,20 @@ struct NeedsYouEntry: View {
     let count: Int
     let preview: String?
     let onOpen: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: Space.m) {
-                Text("\(count)")
-                    .font(.footnote.weight(.bold).monospacedDigit())
-                    .foregroundStyle(Theme.background)
-                    .frame(minWidth: 28, minHeight: 28)
-                    .background(Theme.warn, in: Capsule())
-                    .accessibilityHidden(true)
+                // The count is in the words beside it: at the accessibility sizes the badge would only stand tall and say it twice.
+                if !typeSize.isAccessibilitySize {
+                    Text("\(count)")
+                        .font(.footnote.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Theme.warn)
+                        .frame(minWidth: 28, minHeight: 28)
+                        .background(Theme.warnSurface, in: Capsule())
+                        .accessibilityHidden(true)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(NeedsYouRules.entry(count: count)).font(.headline).foregroundStyle(Theme.text)
                     if let preview {
@@ -159,6 +163,7 @@ struct NeedsYouRowView: View {
                 Button { expanded.toggle() } label: {
                     Text(command)
                         .font(Theme.mono)
+                        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                         .foregroundStyle(Theme.text)
                         .lineLimit(expanded ? nil : 4)
                         .multilineTextAlignment(.leading)

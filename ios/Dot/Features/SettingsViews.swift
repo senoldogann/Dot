@@ -125,7 +125,7 @@ struct NativeSettingsView: View {
         return layout {
             DotIcon(.laptop, size: 24, relativeTo: .title3)
                 .foregroundStyle(Theme.muted)
-                .frame(width: 28)
+                .frame(minWidth: 28, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(store.host.name).font(.headline).foregroundStyle(Theme.text).lineLimit(typeSize.isAccessibilitySize ? 3 : 1).truncationMode(.middle)
                 StateMark(words: connectionWords, kind: connectionKind)
@@ -186,7 +186,7 @@ struct ModelsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await store.loadModels()
-            do { providers = try await store.api.models() } catch { failure = "Could not read the models." }
+            do { providers = try await store.api.models() } catch { failure = "Could not read the models from your Mac. Is it awake?" }
             loading = false
         }
     }
@@ -235,7 +235,7 @@ struct ModelChoiceList: View {
                                         failure = nil
                                         await reload()
                                     } catch {
-                                        failure = "The daemon refused that model."
+                                        failure = "Your Mac refused that model. Pick another."
                                     }
                                 }
                             } label: {
@@ -302,7 +302,7 @@ struct SchedulesView: View {
             schedules = try await store.api.schedules()
             failure = nil
         } catch {
-            failure = schedules.isEmpty ? "Could not read the schedules." : "Showing the schedules saved on this phone."
+            failure = schedules.isEmpty ? "Could not read the schedules from your Mac. Is it awake?" : "Showing the schedules saved on this phone."
         }
         loading = false
     }
