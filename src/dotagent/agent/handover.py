@@ -21,7 +21,7 @@ from dotagent.llm.types import ModelInfo, ToolCall
 from dotagent.runtime import Runtime
 from dotagent.store.models import AgentRecord
 from dotagent.tools.base import ToolResult
-from dotagent.tools.context import ToolContext
+from dotagent.tools.context import OwnerWords, ToolContext
 from dotagent.tools.registry import ToolRegistry
 
 log = get_logger(__name__)
@@ -78,9 +78,13 @@ async def bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunGa
     return outcomes[0].result
 
 
-async def tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo, run_tools: frozenset[str]) -> ToolContext:
+async def tool_context(
+    agent: AgentRun, ref: ModelRef, info: ModelInfo, run_tools: frozenset[str], owner_words: OwnerWords | None
+) -> ToolContext:
     """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, its ``run_tools``
-    (the tools the agent was given) and the run's spawner, through which the team's tools hand work on (item 1063)."""
+    (the tools the agent was given) and the run's spawner, through which the team's tools hand work on (item 1063).
+    ``owner_words`` are the owner's messages the program has not taken in, which end a wait (item 1685); ``None`` for
+    a program that says nothing of when it takes one in."""
     runtime: Runtime = agent.runtime
     run = agent.run
     scaffold: Scaffold = scaffold_for(
@@ -114,6 +118,7 @@ async def tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo, run_tool
         user_text=lambda: "\n".join(agent.gate.instructions),
         tainted=lambda: agent.gate.tainted,
         ever_tainted=lambda: agent.gate.ever_tainted,
+        owner_words=owner_words,
     )
 
 

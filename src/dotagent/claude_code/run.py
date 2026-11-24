@@ -537,6 +537,50 @@ def system_prompt(
     return "\n\n".join(part for part in parts if part)
 
 
+class OwnerUnread:
+    """The owner's own messages sent to the program that it has not taken in yet (item 1685): the program takes a
+    message in at the end of the tool call at work, which it says (``Taken``), so a wait of Dot's (``wait_until``) that
+    gives way to one has the model read it at once (measured on Claude Code 2.1.331). The run counts them; a wait gives
+    way to a message once."""
+
+    def __init__(self) -> None:
+        self._sent: int = 0
+        self._taken: int = 0
+        self._heeded: int = 0
+        self._changed: asyncio.Event = asyncio.Event()
+
+    def sent(self) -> None:
+        """An owner's own message went to the program."""
+        self._sent += 1
+        self._changed.set()
+
+    def taken(self) -> None:
+        """The program took one of them in."""
+        self._taken += 1
+
+    def owner_unread(self) -> bool:
+        return self._sent > max(self._taken, self._heeded)
+
+    def heed_owner(self) -> None:
+        self._heeded = self._sent
+
+    async def owner_arrival(self) -> None:
+        while not self.owner_unread():
+            self._changed.clear()
+            await self._changed.wait()
+
+
+@dataclass(frozen=True)
+class _Pending:
+    """A message sent to the program that it has not taken in: ``keep`` says it is sent again to the program that goes
+    on when this one is cut before it takes it in (item 1581), ``own`` that it is the owner's own (item 1685)."""
+
+    text: str
+    images: tuple[ImageData, ...]
+    keep: bool
+    own: bool
+
+
 @dataclass
 class _Quiet:
     """When the program last wrote a line or a call of Dot's tool for it ended, and how many of those are at work: the
@@ -561,6 +605,8 @@ class _Quiet:
     # ✋ but cannot be held mid-step.
     held_since: float | None = None
     resting_since: float | None = None
+    # The owner's own messages the program has not taken in, which end a wait of Dot's (item 1685).
+    owner: OwnerUnread = field(default_factory=OwnerUnread)
 
 
 async def _watched_call(quiet: _Quiet, run: CallRunner, call: ToolCall) -> ToolResult:
@@ -667,11 +713,10 @@ class _Follow:
     # waits for a turn of its own; one taken before a step is that step's to answer).
     taken: int = 0
     taken_since_step: bool = False
-    # One entry for each message sent to the program that it has not taken in yet, in the order sent: the message, for
-    # one the next program is sent again if this one is cut before it takes it in (item 1581); ``None`` for a note of
-    # Dot's about the cut, which is not sent again but which the program takes in all the same, so that each ``Taken``
+    # One entry for each message sent to the program that it has not taken in yet, in the order sent (a note of Dot's
+    # about the cut too, which is not sent again but which the program takes in all the same), so that each ``Taken``
     # takes out its own message. And how many steps the run had when this program began.
-    pending: list[tuple[str, tuple[ImageData, ...]] | None] = field(default_factory=list)
+    pending: list[_Pending] = field(default_factory=list)
     steps_before: int = 0
     # Why fast mode was off though the run asked for it, said with its answer (item 1014); "" when it was not.
     fast_off: str = ""
@@ -699,11 +744,12 @@ class _Follow:
     async def emit(self, kind: str, data: JsonObject, persisted: bool) -> None:
         await self.runtime.bus.emit(self.agent.run.id, kind, data, persisted)
 
-    async def send(self, text: str, images: tuple[ImageData, ...], keep: bool = True) -> None:
+    async def send(self, text: str, images: tuple[ImageData, ...], keep: bool, own: bool) -> None:
         """A message to the model, on the program's input. ``keep`` says it is sent again to the program that goes on
-        when this one is cut before it takes the message in (item 1581): not a note of Dot's about the cut."""
+        when this one is cut before it takes the message in (item 1581): not a note of Dot's about the cut; ``own``
+        that it is the owner's own words (item 1685)."""
         self.sent += 1
-        self.pending.append((text, images) if keep else None)
+        self.pending.append(_Pending(text=text, images=images, keep=keep, own=own))
         try:
             self.stdin.write(user_line(text, images).encode("utf-8"))
             await self.stdin.drain()
@@ -776,8 +822,8 @@ class _Follow:
             case Taken():
                 self.taken += 1
                 self.taken_since_step = True
-                if self.pending:
-                    del self.pending[0]
+                if self.pending and self.pending.pop(0).own:
+                    self.quiet.owner.taken()
                 return False
             case Result():
                 return await self.result(event)
@@ -878,14 +924,14 @@ class _Follow:
         """Whether the program at work has begun a step of its own: the model answered something in it."""
         return self.step is not None or self.steps > self.steps_before
 
-    async def restart(self, stdin: asyncio.StreamWriter) -> list[tuple[str, tuple[ImageData, ...]]]:
+    async def restart(self, stdin: asyncio.StreamWriter) -> list[_Pending]:
         """Go on with a new program in the same run (item 1581): what the cut one had of its own (its input, the
         messages it took in, the step it was in, what it said of the model's tools) is gone; what the run has is not
         (its steps, its answer so far, its session, its limits). The page drops the words of the step that was
         streaming, as it does for a step it sends back. Returns the messages the cut program had not taken in."""
         if self.step is not None:
             await self.stream(StreamDelta(kind="reset", text=""))
-        lost: list[tuple[str, tuple[ImageData, ...]]] = [one for one in self.pending if one is not None]
+        lost: list[_Pending] = [one for one in self.pending if one.keep]
         self.pending = []
         self.stdin = stdin
         self.sent = self.taken = 0
@@ -916,7 +962,7 @@ class _Follow:
         self.told = reached
         log.info("claude_code_limit_reached", run_id=self.agent.run.id, spent=limit_spent(reached))
         await self.emit(LIMIT_EVENT, limit_event_data(reached), True)
-        await self.send(_LIMIT_NOTE.format(spent=limit_spent(reached)), ())
+        await self.send(_LIMIT_NOTE.format(spent=limit_spent(reached)), (), True, False)
 
     async def _next(self) -> _Item:
         """What comes next for the run; while the owner holds it, within ``[reactions] hold_minutes`` of the hold, past
@@ -974,7 +1020,10 @@ class _Follow:
         await runtime.store.append_messages(self.agent.run.thread_id, [note])
         self.added += 1
         await self.emit("steer", steer_event(sent, self.agent.gate.tainted), True)
-        await self.send(note.content, await asyncio.to_thread(_images, sent.files, self.vision))
+        own: bool = sent.owners_own()
+        if own:
+            self.quiet.owner.sent()
+        await self.send(note.content, await asyncio.to_thread(_images, sent.files, self.vision), True, own)
 
 
 def _images(files: tuple[StoredAttachment, ...], vision: bool) -> tuple[ImageData, ...]:
@@ -1301,9 +1350,6 @@ async def _picked_opening(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> st
     return await opening_text(agent.opening, offered, scaffold.tool_output_chars, playbook_root(runtime.config), {})
 
 
-type _Outgoing = tuple[str, tuple[ImageData, ...], bool]
-
-
 @dataclass
 class _Program:
     """One start of the ``claude`` program in a run: its process and input, the end of its error stream and the pumps of
@@ -1478,7 +1524,7 @@ class _Cuts:
     # Whether the program was cut after the model's finish: the run ends as the finish says, with nothing continued.
     at_finish: bool = False
 
-    async def after(self, error: ClaudeCodeError, current: _Program) -> tuple[_Program, list[_Outgoing]] | None:
+    async def after(self, error: ClaudeCodeError, current: _Program) -> tuple[_Program, list[_Pending]] | None:
         """What the run does when ``error`` ended the program ``current`` before its result: the program that goes on,
         with what it is sent first, when the run is continued; ``None`` when the program was cut after the model's
         finish, which ends the run as the finish says; otherwise it raises: ``error`` with what the cuts were
@@ -1541,7 +1587,7 @@ class _Cuts:
             raise error
         return await self._go_on(program, current, fresh)
 
-    async def _go_on(self, program: ProgramExit, current: _Program, fresh: bool) -> tuple[_Program, list[_Outgoing]]:
+    async def _go_on(self, program: ProgramExit, current: _Program, fresh: bool) -> tuple[_Program, list[_Pending]]:
         """Start the program again after ``program`` ended: in the session it had (told it was cut and to look at the
         real state), or in a new one when ``fresh``; the run's page gets its line."""
         follow: _Follow = self.follow
@@ -1562,24 +1608,28 @@ class _Cuts:
 
     async def _first_messages(
         self, program: ProgramExit, started: _Program, fresh: bool, waited: float
-    ) -> list[_Outgoing]:
+    ) -> list[_Pending]:
         """The run takes the new program up (what it had of the cut one's is gone, the page is told) and what is sent
         it first: what the owner sent that the cut program never took in, as sent, then the note about the cut; or, for
         a new session, the run's brief."""
         agent: AgentRun = self.agent
-        lost: list[tuple[str, tuple[ImageData, ...]]] = await self.follow.restart(started.stdin)
+        lost: list[_Pending] = await self.follow.restart(started.stdin)
         data: JsonObject = continued_event_data(program, self.continued, self.allowed, fresh, waited)
         log.warning("claude_code_run_continued", run_id=agent.run.id, **data)
         await self.follow.emit(CONTINUED_EVENT, data, True)
         note: str = continuation_note(program, fresh)
         if not fresh:
-            return [*((text, shown, True) for text, shown in lost), (note, (), False)]
+            return [*lost, _Pending(text=note, images=(), keep=False, own=False)]
+        # A new session is told what the owner sent in its brief, a message of Dot's: none of theirs waits any more.
+        for one in lost:
+            if one.own:
+                self.follow.quiet.owner.taken()
         runtime: Runtime = agent.runtime
         sent: list[Message] = await runtime.store.load_messages(agent.run.thread_id, 0)
         steers: list[str] = [message.content for message in sent[len(self.earlier) + 2 :] if message.role == "user"]
         briefing: str = await _what_was_done(runtime, agent.run.id, steers)
         text: str = f"{meanwhile(self.opening, self.earlier)}\n\n{briefing}\n\n{note}"
-        return [(text, self.pictures, False)]
+        return [_Pending(text=text, images=self.pictures, keep=False, own=False)]
 
 
 async def run_in_claude_code(agent: AgentRun) -> RunEnd:
@@ -1617,7 +1667,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             partial(
                 bridged_call,
                 _noting_outward(quiet, tools),
-                await tool_context(agent, ref, info, frozenset(tools.tools)),
+                await tool_context(agent, ref, info, frozenset(tools.tools), quiet.owner),
                 agent.gate,
             ),
         ),
@@ -1691,18 +1741,23 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
             )
             clean: bool = False
             try:
-                outgoing: list[_Outgoing] = [
-                    (meanwhile(opening, earlier[0 if chat is None else chat.seen :]), pictures, True)
+                outgoing: list[_Pending] = [
+                    _Pending(
+                        text=meanwhile(opening, earlier[0 if chat is None else chat.seen :]),
+                        images=pictures,
+                        keep=True,
+                        own=False,
+                    )
                 ]
                 # A program that is cut goes on in place (item 1581): the same run, the same session, the same events.
                 while True:
                     try:
-                        for text, shown, keep in outgoing:
-                            await follow.send(text, shown, keep)
+                        for one in outgoing:
+                            await follow.send(one.text, one.images, one.keep, one.own)
                         answer: str = await follow.follow()
                         break
                     except ClaudeCodeError as error:
-                        gone: tuple[_Program, list[_Outgoing]] | None = await cuts.after(error, current)
+                        gone: tuple[_Program, list[_Pending]] | None = await cuts.after(error, current)
                         if gone is None:
                             answer = follow.answer
                             break

@@ -882,7 +882,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
         tuple(tool.spec for tool in tools.tools.values()),
         # OpenCode puts every tool of a server in its prompt: none is looked up.
         frozenset(),
-        partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools)), agent.gate),
+        partial(bridged_call, tools, await tool_context(agent, ref, info, frozenset(tools.tools), None), agent.gate),
     )
     async with server.hold():
         chat: ChatSession = await _session(

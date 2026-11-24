@@ -40,6 +40,21 @@ def _no_user_text() -> str:
     return ""
 
 
+class OwnerWords(Protocol):
+    """The owner's own messages that reached a run and that its model has not read yet (item 1685): a tool that waits
+    (``wait_until``) gives way to one, so that the model reads it at once rather than when the wait ends. Only the
+    owner's own words count, not a note about a reaction nor one of Dot's from another run. A wait gives way to a
+    message once: :meth:`heed_owner` says it did, and a later wait does not end on the same message again."""
+
+    def owner_unread(self) -> bool: ...
+
+    def heed_owner(self) -> None: ...
+
+    async def owner_arrival(self) -> None:
+        """Return once :meth:`owner_unread` holds."""
+        ...
+
+
 @dataclass(frozen=True)
 class ChatNote:
     """A note a run sends to the run at work in another chat (item 957, ``send_to_chat``): ``text`` is what that run
@@ -173,6 +188,9 @@ class ToolContext:
     # the call, with the run's own registry and gate behind it; ``None`` for every other tool, and inside the calls it
     # makes.
     nested: "NestedCalls | None" = None
+    # The owner's own messages that reached the run and its model has not read (item 1685), which end a wait; ``None``
+    # where no message reaches the run while a tool works (a resumed run's look back, a hand-over, OpenCode).
+    owner_words: OwnerWords | None = None
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:

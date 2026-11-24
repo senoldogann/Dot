@@ -236,3 +236,67 @@ async def test_a_link_that_comes_where_the_file_is_awaited_is_never_read(
         await linking
     assert not said[0][0] and "is there but is no file Dot reads" in said[0][1], said
     assert "42" not in said[0][1]
+
+
+async def test_the_owners_own_message_ends_a_wait_once_and_dots_notes_do_not(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1685: a run sat 13.7 minutes in a wait while the owner's message waited in its inbox. The owner's own
+    message ends the wait now, not as a failure, with words that tell the model to read it; a note about a reaction
+    and a note of Dot's from another run do not, and a second wait of the same step does not end on the message the
+    first gave way to (the loop reads it at the next step)."""
+    turns: list[ScriptedTurn] = [
+        ScriptedTurn(
+            text="",
+            calls=(
+                ScriptedCall(tool=WAIT_UNTIL_TOOL, arguments={"file": "never/there.txt", "every_s": 2}),
+                ScriptedCall(
+                    tool=WAIT_UNTIL_TOOL, arguments={"file": "never/there.txt", "every_s": 2, "within_minutes": 0.05}
+                ),
+            ),
+        ),
+        _call(FINISH_TOOL, answer="Waited.", success=True),
+    ]
+    async with _dot(tmp_path, monkeypatch, turns, private_ok=False) as runtime:
+        manager: RunManager = RunManager(runtime)
+        try:
+            async with runtime.bus.subscribe(None) as heard:
+                run: RunRecord = await manager.start(
+                    "Wait for the build",
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    "ui",
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    "yolo",
+                    False,
+                    (),
+                )
+                async with asyncio.timeout(RUN_WAIT_S):
+                    while (await heard.queue.get()).kind != "tool_call":
+                        pass
+                manager.tell(run.id, "The owner reacted 👍.", "quiet")
+                manager.note(run.id, "A helper reported: the tests pass.", False)
+                await asyncio.sleep(4.5)
+                assert not await runtime.store.events_of_kind(run.id, "tool_result", 5)
+                steered: float = time.monotonic()
+                manager.steer(run.id, "Stop waiting, the build is broken.", ())
+                async with asyncio.timeout(RUN_WAIT_S):
+                    while (await heard.queue.get()).kind != "tool_result":
+                        pass
+                assert time.monotonic() - steered < 10.0
+            async with asyncio.timeout(RUN_WAIT_S):
+                assert (await manager.wait(run.id)).status == "done"
+        finally:
+            await manager.shutdown()
+        said: list[tuple[bool, str]] = [
+            (bool(event.data.get("ok")), str(event.data.get("text", "")))
+            for event in await runtime.store.list_events(run.id, 0, 500)
+            if event.kind == "tool_result" and event.data.get("tool") == WAIT_UNTIL_TOOL
+        ]
+    assert said[0][0] and "The owner wrote while you waited; their message follows this result." in said[0][1]
+    assert "Read it and answer before waiting again." in said[0][1] and "not there yet" in said[0][1]
+    assert not said[1][0] and "did not hold within 0.05 min" in said[1][1], said

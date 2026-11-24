@@ -2785,6 +2785,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         run_tools=frozenset(spec.name for spec in specs),
         # Shown next to their call's result in this run's requests (``shown_lessons``), stored nowhere (item 1192).
         shows_outside_lessons=True,
+        # The loop reads the inbox between steps: an owner's message in it ends a wait of the step (item 1685).
+        owner_words=agent.inbox,
     )
     checker: GoalChecker | None = (
         goal_checker_with_standby(

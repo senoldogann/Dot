@@ -231,6 +231,42 @@ async def test_a_hold_keeps_the_run_waiting_for_the_owners_next_message(room: Ro
     assert let_go.data["reason"] == "message"
 
 
+async def test_the_owners_message_ends_a_wait_of_dots_once_and_the_program_takes_it_in_after_it(room: Room) -> None:
+    """Item 1685: the program takes a message in at the end of the tool call at work (measured on Claude Code
+    2.1.331), and a ``wait_until`` of a minute held the owner's words until it ran out. Their message now ends the wait
+    at once, with words that tell the model to read it; a second wait before the program took it in runs its course."""
+    async with room.runtime.bus.subscribe(None) as heard:
+        started: RunRecord = await room.manager.start(
+            "Please wait for the owner.", "task", MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(30):
+            while True:
+                event: EventRecord = await heard.queue.get()
+                if event.run_id == started.id and event.kind == "tool_call" and event.data["tool"] == "wait_until":
+                    break
+        await asyncio.sleep(2.5)
+        steered: float = time.monotonic()
+        room.manager.steer(started.id, "Stop waiting, the build is broken.", ())
+        async with asyncio.timeout(30):
+            while True:
+                event = await heard.queue.get()
+                if event.run_id == started.id and event.kind == "tool_result":
+                    break
+    assert time.monotonic() - steered < 10.0
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "done", ended.result
+    first, second = json.loads(await asyncio.to_thread((room.record / "waits.json").read_text, encoding="utf-8"))
+    assert first.startswith("The owner wrote while you waited; their message follows this result."), first
+    assert "The condition had not held after" in first and "not there yet" in first
+    assert "did not hold within 0.05 min" in second, second
+    results: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "tool_result", 10)
+    assert [(event.data["tool"], event.data["ok"]) for event in results] == [
+        ("wait_until", True),
+        ("wait_until", False),
+    ]
+
+
 async def test_the_emergency_stop_a_tool_meets_ends_the_run_as_one(room: Room) -> None:
     """Item 1076: a call of Dot's tool runs in the bridge's task, so the emergency stop it met (the pointer in a corner
     of the screen) went to Claude Code as a failed call and the run went on. Now it ends the run as the emergency
