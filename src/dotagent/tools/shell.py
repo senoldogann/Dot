@@ -18,6 +18,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.policy.paths import classify_path, expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo, Flag
+from dotagent.process_groups import forget_group, record_group
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool
 from dotagent.tools.context import ToolContext, run_sandbox
 from dotagent.tools.env_filter import hides_secret
@@ -127,10 +128,11 @@ def kill_group(pid: int) -> None:
 
 
 async def run_command(
-    command: str, confinement: tuple[str, ...], cwd: Path, env: dict[str, str], timeout_s: float
+    command: str, confinement: tuple[str, ...], cwd: Path, env: dict[str, str], timeout_s: float, run_id: str
 ) -> tuple[int | None, str, float, bool]:
-    """Run ``command`` in zsh, started by ``confinement`` (the words of the run's sandbox, or none); returns ``(exit
-    code or None if killed, output, seconds, timed out)``."""
+    """Run ``command`` in zsh, started by ``confinement`` (the words of the run's sandbox, or none), for the run
+    ``run_id``, whose group is written down while it works (:mod:`dotagent.process_groups`); returns ``(exit code or
+    None if killed, output, seconds, timed out)``."""
     started: float = time.monotonic()
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         *confinement,
@@ -144,6 +146,7 @@ async def run_command(
         stderr=asyncio.subprocess.STDOUT,
         start_new_session=True,
     )
+    record_group(process.pid, run_id, "shell", command)
     window: OutputWindow = OutputWindow()
     stream: asyncio.StreamReader | None = process.stdout
     if stream is None:
@@ -162,6 +165,8 @@ async def run_command(
     finally:
         if process.returncode is None:
             kill_group(process.pid)
+        # Before the process is reaped: its pid leads no other group until then.
+        forget_group(process.pid)
         reader.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await reader
@@ -215,6 +220,7 @@ def build_shell_tool() -> RegisteredTool:
             cwd,
             {**ctx.runtime.shell_env, **held, RUN_ID_MARKER: ctx.run_id},
             timeout_s,
+            ctx.run_id,
         )
         header: str = (
             f"[timed out after {timeout_s}s and was killed]" if timed_out else f"[exit {code} in {seconds:.1f}s]"

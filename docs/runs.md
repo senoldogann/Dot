@@ -324,6 +324,19 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   resume it. A resumed run keeps the ledger and the progress ladder of the run it goes on from when those were stored,
   and its note says so; when they were not, the note says they start again (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+- What a run starts in a process group of its own (a shell command, a terminal session, a Claude Code program, a
+  code-mode script) is written down while it works, one file under `process-groups` in Dot's home (its process group,
+  when its leader started, the run, the start of its command, and the Dot process that started it), and forgotten when
+  Dot ends it or is done with it (item 1670). A crash or a `kill -9` of the daemon leaves those groups at work, adopted
+  by the system: a `claude` program spending your plan, a build or a loop, out of reach of any Stop. When Dot starts
+  again, before anything else runs, it ends each group whose Dot process is gone and whose run no longer works, with
+  SIGTERM and, 3 s later, SIGKILL, and logs `orphan_group_stopped` (the group, the run, the kind, the signal). It ends
+  a group only while it is still the one written down: its leader started at the same microsecond, or, its leader gone,
+  each process left in it started after that leader did; a process that only reuses the number is never signalled.
+  The groups of a `dotx run` that still works are left. The note of a run that goes on from one of those runs (a
+  resumed run, a resumed helper) names what was stopped ("a shell command started at 10:41:05: npm run build") and says
+  it no longer runs. A clean stop or restart ends its runs' groups itself, as a Stop does; what a terminal session the
+  daemon's end closed was doing is not named.
 - The Claude Code program of a run on your Claude plan that is cut off from outside (it ends before its result and
   nobody ended it: killed, crashed) does not end the run (items 1580 to 1582). Dot logs how it ended
   (`claude_code_program_cut`: exit code, signal, the end of its stderr, its steps, the seconds since its last line;
@@ -993,12 +1006,12 @@ meanwhile. A chat lets at most eight helpers work in the background. Stop is not
 its helpers too, those it still waited for and those it stopped waiting for, and their ends are stored before its own;
 what a stop ended is told to nobody. A run that ends done leaves its helpers at work; one that fails or is stopped stops them. The
 reports not yet told are kept in the store (the key `detached_helpers`): when the daemon stops or crashes, a helper
-ends with it as every run does (a run the daemon's stop cuts keeps the helpers it let go on, as it did not fail), and the
-next start resumes it (item 1668): a new helper run of the same parent in the helper's chat, with its goal and choices,
-whose first message is the resume note (how it was cut, the calls of its step and how each ended, its plan), and which
-is kept in the old one's place, so that the chat is told its report when it really ends. The parent's page gets a
-`helper_resumed` event (`run_id`, `from_run_id`, `step`), and the report the chat reads says a restart cut the helper off
-and Dot resumed it. A helper is not resumed when `[agent] resume` is `off`, when it was cut longer ago than
+ends with it as every run does (a run the daemon's stop cuts keeps the helpers it let go on, as it did not fail), and
+the next start resumes it (item 1668): a new helper run of the same parent in the helper's chat, with its goal and
+choices, whose first message is the resume note (how it was cut, the calls of its step and how each ended, its plan),
+and which is kept in the old one's place, so that the chat is told its report when it really ends. The parent's page
+gets a `helper_resumed` event (`run_id`, `from_run_id`, `step`), and the report the chat reads says a restart cut the
+helper off and Dot resumed it. A helper is not resumed when `[agent] resume` is `off`, when it was cut longer ago than
 `resume_within_s`, when another run went on in its chat, when it was itself resumed after a restart (no loop of
 restarts), or when a call that pays, sends or posts for you was cut while it ran (a second try could send twice): its
 chat is then told that a restart cut it off, that it did not fail and why it was not resumed, so the run delegates the

@@ -85,7 +85,12 @@ class Box:
         install.install(self.layout)
         self.starts += 1
         plan: RunPlan = RunPlan(
-            self.interpreter, self.layout, code, Limits(seconds, memory_mb, calls, window_bytes), self.starts
+            self.interpreter,
+            self.layout,
+            code,
+            Limits(seconds, memory_mb, calls, window_bytes),
+            self.starts,
+            "run_test",
         )
         return await runner.run_code(plan, self.handler, cancel or asyncio.Event())
 

@@ -136,6 +136,12 @@ def running_mark_path() -> Path:
     return dot_home() / "daemon.running"
 
 
+def process_groups_dir() -> Path:
+    """The process groups Dot started for runs and has not ended yet, one file each, so that a start after a crash ends
+    those its dead self left behind (:mod:`dotagent.process_groups`, item 1670)."""
+    return dot_home() / "process-groups"
+
+
 def run_owners_dir() -> Path:
     """The lock files of the processes that drive runs (the daemon, ``dotx run``), one per process, each held while its
     process lives (:mod:`dotagent.agent.owners`)."""

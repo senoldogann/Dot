@@ -15,6 +15,7 @@ on its own, when it starts, the runs that :func:`resumes_on_start` allows. Every
 """
 
 import asyncio
+import time
 from collections.abc import Collection, Mapping, Sequence
 from typing import Literal
 
@@ -34,6 +35,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.desktop.types import DESKTOP_ACT_TOOL
 from dotagent.llm.types import ToolCall
 from dotagent.policy.types import READ_ONLY_KINDS, ActionInfo, ActionKind, Flag
+from dotagent.process_groups import GroupKind, GroupRecord
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
@@ -71,6 +73,12 @@ _ADDING_TOOLS: frozenset[str] = frozenset({SHOW_PAGE_TOOL})
 # are not classified again. None of their kinds only reads.
 _SCREEN_CLASSIFIED: frozenset[str] = frozenset({DESKTOP_ACT_TOOL})
 _STEP_EVENT: str = "assistant"
+_GROUP_NAMES: dict[GroupKind, str] = {
+    "shell": "a shell command",
+    "terminal": "a terminal session",
+    "claude_code": "the Claude Code program",
+    "codemode": "a code-mode script",
+}
 _ARGUMENTS_CHARS: int = 200
 _RESULT_CHARS: int = 300
 
@@ -131,6 +139,9 @@ class Resumption(FrozenModel):
     # Whether the ledger and the progress ladder are restored from the run this goes on from. ``unsaid`` leaves the
     # note as it was before that snapshot existed.
     ladder: Literal["restored", "reset", "unsaid"] = "unsaid"
+    # The work the run had going on its own (a shell command, a terminal session, a Claude Code program, a code-mode
+    # script) that the daemon's start ended, as it outlived the daemon that started it (item 1670): one line each.
+    stopped: tuple[str, ...] = ()
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
@@ -289,6 +300,12 @@ def resume_note(goal: str, resumption: Resumption) -> str:
         )
     if resumption.plan.steps:
         parts.append(f"Its plan, which is your plan now:\n{plan_lines(resumption.plan)}")
+    if resumption.stopped:
+        parts.append(
+            "Work it had going in the background outlived the Dot that started it and was stopped when Dot started "
+            "again; it no longer runs, so start it again if it is still needed:\n"
+            + "\n".join(f"- {line}" for line in resumption.stopped)
+        )
     if resumption.identities:
         parts.append(
             "Ids of Dot's records named so far, which a compaction keeps (read one back with recall): "
@@ -306,6 +323,13 @@ def resume_note(goal: str, resumption: Resumption) -> str:
         "finish the goal."
     )
     return "\n\n".join(parts)
+
+
+def stopped_line(group: GroupRecord) -> str:
+    """How a resumed run's note names a process group the daemon's start ended (item 1670): its kind, what it ran and
+    when it started, on the owner's clock."""
+    started: str = time.strftime("%H:%M:%S", time.localtime(group.started))
+    return f"{_GROUP_NAMES[group.kind]} started at {started}: {group.what}"
 
 
 def identities_of(messages: Sequence[str]) -> tuple[str, ...]:

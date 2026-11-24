@@ -115,6 +115,7 @@ from dotagent.agent.resume import (
     interrupted_calls,
     resume_note,
     resumes_on_start,
+    stopped_line,
 )
 from dotagent.agent.review import reviewer_for, shorten_reason
 from dotagent.agent.welcome import WELCOME_SOURCE
@@ -167,6 +168,7 @@ from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, REPLY_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.proactive.text import one_line
+from dotagent.process_groups import TERM_GRACE_S, GroupRecord, stop_orphans
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
@@ -583,6 +585,9 @@ class RunManager:
         self._untold: dict[str, list[DetachedHelper]] = {}
         # The wakes of chats whose helpers' reports wait for the Claude plan's window to reset (item 1669), by chat.
         self._timed_wakes: dict[str, asyncio.Task[None]] = {}
+        # The process groups :meth:`recover` ended for each run, by run id, which the run that goes on from it is told
+        # of (item 1670).
+        self._stopped_groups: dict[str, list[GroupRecord]] = {}
         # Why each helper the daemon's own end cut off was not resumed at this start (item 1668), until its report is
         # told, by helper run id.
         self._not_resumed: dict[str, str] = {}
@@ -611,7 +616,8 @@ class RunManager:
         self.desk: WorkDesk = WorkDesk(runtime, self)
 
     async def recover(self) -> int:
-        """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
+        """Close out what processes that are gone left behind: the runs they left active, the process groups those
+        runs had at work (item 1670, :func:`~dotagent.process_groups.stop_orphans`), the approvals of runs no
         longer active, the drafts the daemon was sending (item 314), and their lock files; and hold the queue of each
         chat (:meth:`queue`) whose run the daemon's stop did not cut. The runs of a process that lives (``dotx run``
         in a terminal) go on, with the approvals they wait on. Returns the number of runs closed."""
@@ -622,6 +628,12 @@ class RunManager:
             if owner is not None and not await asyncio.to_thread(owner_alive, directory, owner):
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
+        # The process groups the processes that are gone left at work (item 1670): a shell command, a terminal, a
+        # Claude Code program or a code-mode script of a run that no longer works is ended, and named to the run that
+        # goes on from it (:meth:`_resumption`).
+        working: frozenset[str] = frozenset(run.id for run in await store.working_runs())
+        for stopped in await asyncio.to_thread(stop_orphans, working, TERM_GRACE_S):
+            self._stopped_groups.setdefault(stopped.run_id, []).append(stopped)
         for decided in await store.expire_pending_approvals(_EXPIRED_ON_START):
             self._runtime.bus.publish(decided)
         await fail_unsettled_drafts(store, self._runtime.bus)
@@ -3418,6 +3430,7 @@ class RunManager:
             plan=EMPTY_PLAN if plan is None else plan_from_event(plan),
             identities=await self._ledger_ids(old.thread_id),
             ladder="restored" if snapshot is not None else "reset",
+            stopped=tuple(stopped_line(group) for group in self._stopped_groups.get(old.id, [])),
         )
 
     async def _continuation(self, thread_id: str) -> tuple[str, Resumption] | None:

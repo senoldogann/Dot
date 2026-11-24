@@ -25,11 +25,13 @@ from dotagent.agent.resume import (
     resume_note,
     resumed_event_data,
     resumes_on_start,
+    stopped_line,
 )
 from dotagent.config import load_default_config
 from dotagent.llm.types import Message, ToolCall, assistant_message, tool_message, user_message
 from dotagent.policy import engine
 from dotagent.policy.types import ActionKind
+from dotagent.process_groups import GroupRecord
 from dotagent.runtime import _tool_groups
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
@@ -298,3 +300,25 @@ def test_a_helper_the_daemons_end_cut_is_resumed_unless_a_rule_says_why_not() ->
 def test_the_outward_flags_are_the_policys_own() -> None:
     """The class a resumed helper refuses is what even yolo keeps for the owner (``owners_guard``)."""
     assert OUTWARD_FLAGS == engine._OWNERS_FLAGS
+
+
+def test_the_note_names_the_work_in_the_background_the_start_stopped() -> None:
+    """Item 1670: a group the daemon's start ended is named to the run that goes on, with when it started."""
+    group: GroupRecord = GroupRecord(
+        pgid=4242,
+        started=datetime(2026, 11, 24, 10, 41, 5).timestamp(),
+        run_id="run_1",
+        kind="shell",
+        what="npm run build",
+        dot_pid=1,
+        dot_started=0.0,
+        at=0.0,
+    )
+    line: str = stopped_line(group)
+    assert line == "a shell command started at 10:41:05: npm run build"
+    resumption: Resumption = Resumption(
+        from_run_id="run_1", cut_off="daemon_restarted", automatic=True, calls=(), plan=EMPTY_PLAN, stopped=(line,)
+    )
+    note: str = resume_note(GOAL, resumption)
+    assert "was stopped when Dot started again; it no longer runs" in note and f"- {line}" in note
+    assert "no longer runs" not in resume_note(GOAL, resumption.model_copy(update={"stopped": ()}))
