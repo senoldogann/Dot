@@ -107,6 +107,18 @@ test("the commands at work are counted, and a list that could not be read says s
   assert.deepEqual([unread.label, unread.tone], ["Could not read", "warn"]);
 });
 
+test("a read that failed after one that worked keeps its count, in the warning's tone, and its name says so", () => {
+  const running = dockSegments(state({ running: { count: 2, problem: true } }))[0];
+  assert.deepEqual([running.label, running.tone, running.name], ["2 running", "warn", "2 running. Could not read"]);
+  const one = dockSegments(state({ loops: { count: 1, rhythm: "every 10 min", problem: true } }))[0];
+  assert.deepEqual([one.label, one.tone, one.name], ["every 10 min", "warn", "Loop, every 10 min. Could not read"]);
+  const many = dockSegments(state({ loops: { count: 3, rhythm: null, problem: true } }))[0];
+  assert.deepEqual([many.label, many.tone, many.name], ["3 loops", "warn", "3 loops. Could not read"]);
+  // The queue says it as well: a count with a problem is in the warning's tone.
+  const queue = dockSegments(state({ queue: { count: 2, held: false, problem: true, sending: false } }))[0];
+  assert.deepEqual([queue.label, queue.tone], ["2 queued", "warn"]);
+});
+
 test("the segments come in one order, and the chat's own stand when no run works", () => {
   const everything = dockSegments(
     state({

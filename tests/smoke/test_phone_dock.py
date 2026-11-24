@@ -302,11 +302,16 @@ async def test_the_queue_in_its_sheet_moves_edits_and_removes_a_message_as_the_p
                 _open_sheet(page).locator(".queue-row").first.get_by_role("button", name="Remove queued message").tap()
             )
             await expect(_segment(page, "queue")).to_have_attribute("aria-label", "1 queued")
-            await (
-                _open_sheet(page).locator(".queue-row").first.get_by_role("button", name="Remove queued message").tap()
+            # From the keyboard, so that the focus stands on the button being removed: when the last message goes, the
+            # focus does not go to the box behind the sheet, where a phone's keyboard would rise.
+            last: Locator = (
+                _open_sheet(page).locator(".queue-row").first.get_by_role("button", name="Remove queued message")
             )
+            await last.focus()
+            await last.press("Enter")
             await expect(_segment(page, "queue")).to_be_hidden()
             await expect(_open_sheet(page)).to_have_count(0)
+            await expect(box_of_the_chat).not_to_be_focused()
             assert await sc.runtime.store.list_queued(sc.run.thread_id) == []
         finally:
             await browser.close()

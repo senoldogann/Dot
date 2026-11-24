@@ -228,8 +228,11 @@ async def test_slash_loop_shows_the_loop_over_the_composer_and_its_stop_ends_it(
                 loops: Locator = page.get_by_role("region", name="Loops of this chat")
                 phone: bool = is_phone(page)
                 if phone:
-                    # A phone says it in the capsule ("every 30 min") and shows the loop in the sheet its segment opens
-                    # (item 1383), whose rows are open whatever the fold of the line over the composer was.
+                    # The loop's message goes at once as the chat's next run and the page goes on to it: a new page,
+                    # which says the loop in the capsule ("every 30 min") and shows it in the sheet its segment opens
+                    # (item 1383), whose rows are open whatever the fold of the line over the composer was. The sheet
+                    # is opened once the page has gone on, since a page that goes on takes its sheet away.
+                    await expect(page.get_by_role("heading", name="check the build", level=1)).to_have_count(1)
                     await expect(page.locator('[data-segment="loops"]')).to_have_attribute(
                         "aria-label", "Loop, every 30 min"
                     )
@@ -240,10 +243,6 @@ async def test_slash_loop_shows_the_loop_over_the_composer_and_its_stop_ends_it(
                 # The message itself went at once, as the chat's next run.
                 await expect(page.locator(".run-thread")).to_contain_text("check the build")
                 # The page of that run shows the chat's loop too.
-                if phone:
-                    # The page goes on to the run the loop sent: a new page, its sheet shut, which its segment opens.
-                    await expect(page.get_by_role("heading", name="check the build", level=1)).to_have_count(1)
-                    await open_sheet(page, "loops")
                 await expect(loops).to_contain_text("every 30 minutes")
                 await page.screenshot(path=tmp_path / f"loop-{width}-{scheme}.png")
                 # A loop at rest is one folded line: its Stop is a press on the line away (a phone's sheet has no line).

@@ -100,7 +100,6 @@ export function createDockBar({ onWork, onStop, onEnd, sheets }) {
       }
     }
     capsule.hidden = segments.length === 0;
-    capsule.dataset.count = String(segments.length);
     element.hidden = capsule.hidden && !endShown;
     // A sheet whose segment went with what it told of (the last queued message started) has nothing to show.
     for (const id of SHEETED) {

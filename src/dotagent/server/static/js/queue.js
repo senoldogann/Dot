@@ -299,7 +299,8 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     paused.hidden = !held;
     resume.disabled = busy;
     // The rows are drawn anew, on every change of the queue from any page: the control that has the focus hands it to
-    // its like in the new rows (the arrow pressed moved with its message), or to the box once that is gone.
+    // its like in the new rows (the arrow pressed moved with its message), or to the box once that is gone; in a phone's
+    // sheet (item 1383), which covers the box, to the sheet, so that no keyboard rises behind it.
     const active = document.activeElement;
     const focused = active instanceof HTMLElement && list.contains(active) ? active : null;
     list.replaceChildren(...messages.map(row));
@@ -310,7 +311,12 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
       const next = parts
         .map((part) => /** @type {HTMLButtonElement | null} */ (list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${part}"]`)))
         .find((button) => button !== null && !button.disabled);
-      (next ?? frame.textarea).focus();
+      const sheet = element.closest(".dock-sheet-panel");
+      if (next === undefined && sheet instanceof HTMLElement) {
+        sheet.focus({ preventScroll: true });
+      } else {
+        (next ?? frame.textarea).focus();
+      }
     }
     tell();
   }

@@ -103,10 +103,12 @@ export function dockSegments(state) {
     } else if (loops.count === 1) {
       const said = loops.rhythm !== null && loops.rhythm.length <= RHYTHM_CHARS;
       const label = said ? /** @type {string} */ (loops.rhythm) : t("dock.loopOne");
-      segments.push({ id: "loops", label, short: "1", name: said ? t("dock.loopNamed", { rhythm: label }) : label, tone: "quiet", sheet: true });
+      const name = said ? t("dock.loopNamed", { rhythm: label }) : label;
+      // A read that failed after one that worked keeps the count it knew, and says that the list could not be read.
+      segments.push({ id: "loops", label, short: "1", name: loops.problem ? `${name}. ${t("dock.unread")}` : name, tone: loops.problem ? "warn" : "quiet", sheet: true });
     } else {
       const label = t("dock.loopMany", { count: loops.count });
-      segments.push({ id: "loops", label, short: String(loops.count), name: label, tone: "quiet", sheet: true });
+      segments.push({ id: "loops", label, short: String(loops.count), name: loops.problem ? `${label}. ${t("dock.unread")}` : label, tone: loops.problem ? "warn" : "quiet", sheet: true });
     }
   }
   const { queue } = state;
@@ -123,7 +125,9 @@ export function dockSegments(state) {
   const { running } = state;
   if (running.count > 0 || running.problem) {
     const label = running.count > 0 ? t("dock.running", { count: running.count }) : t("dock.unread");
-    segments.push({ id: "running", label, short: running.count > 0 ? String(running.count) : "!", name: label, tone: running.count > 0 ? "quiet" : "warn", sheet: true });
+    // As with the loops, a failed read that knew a count keeps it, and says so.
+    const name = running.count > 0 && running.problem ? `${label}. ${t("dock.unread")}` : label;
+    segments.push({ id: "running", label, short: running.count > 0 ? String(running.count) : "!", name, tone: running.count > 0 && !running.problem ? "quiet" : "warn", sheet: true });
   }
   return segments;
 }

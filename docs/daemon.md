@@ -798,8 +798,9 @@ closed by a tap outside it, by Escape, by its handle or by a swipe down: the que
 never a drag), pencil, **Steer** and ×; the loops with how often and when next, and **Stop repeating**; the commands
 with their words wrapped whole, how long they ran and **Stop**; the helpers with what the task waits on, what each does
 now, **Details** and **Stop**; the plan. The status opens the panel's Task tab. What Dot asks is its own card over the
-capsule, never in it, and the capsule goes on saying the run waits for you. A window wider than a phone's keeps the
-panes and draws no capsule. When the run ends done, the next message starts and the
+capsule, never in it, and the capsule goes on saying the run waits for you; the Continue of a task that was cut off is a
+card of its own over it too. A window wider than a phone's keeps the panes and draws no capsule. When the run ends
+done, the next message starts and the
 page follows it; every open page shows the queue as it changes, and only your messages wait in it: the end of a command
 in the background is never queued (see [Runs and tools](runs.md#tools)). A message sent to the chat on another screen
 (the phone, another window) starts its run there, and every page that shows the chat's newest run goes on at it at

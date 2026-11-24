@@ -295,7 +295,8 @@ fewer words (the counts alone for the secondary segments, then the Stop without 
 a scroll or a cut. A tap on a segment opens its detail as a sheet from the foot of the screen, one
 at a time, which closes by a tap outside, by Escape, by its handle or by a swipe down: the queue's rows with their
 arrows, the loops with when next and **Stop repeating**, the commands with their words wrapped and **Stop**, the helpers
-with **Details** and **Stop**, the plan. What Dot asks is its own card directly over the capsule, never folded into it.
+with **Details** and **Stop**, the plan. What Dot asks, and the Continue of a task that was cut off, are cards of their
+own directly over the capsule, never folded into it.
 It respects reduced motion and its segments have focus rings, names and `aria-expanded`. A window wider than 720 px
 keeps the bar of item 401 and the panes over the composer.
 A list row (Campaigns, Scheduled tasks, agents, notes) is its face or switch, its title and its buttons on one line, and
