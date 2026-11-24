@@ -549,7 +549,8 @@ export async function request(method, path, body, signal) {
 const LATE = Symbol("late");
 
 /** The daemon's answer, or `LATE` once `COPY_PATIENCE_MS` has passed with the copy in hand: the answer that comes after is
- * kept and told to the page (`FRESH_EVENT`), which reads again what it drew from the copy. */
+ * kept and, when it is not what the copy said, told to the page (`FRESH_EVENT`), which reads again what it drew from the
+ * copy (an answer that says the same would only make the page ask again, and a slow link ask for ever). */
 async function answeredInTime(asked, copy, path) {
   let patient = null;
   const slow = new Promise((resolve) => {
@@ -563,7 +564,9 @@ async function answeredInTime(asked, copy, path) {
           if (cacheOn()) {
             keepList(path, value);
           }
-          window.dispatchEvent(new CustomEvent(FRESH_EVENT, { detail: { path } }));
+          if (JSON.stringify(value) !== JSON.stringify(copy.value)) {
+            window.dispatchEvent(new CustomEvent(FRESH_EVENT, { detail: { path } }));
+          }
         },
         () => undefined,
       );
