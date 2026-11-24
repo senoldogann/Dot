@@ -289,7 +289,8 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(page.locator(".dock .btn.send")).to_have_attribute("aria-label", "Stop")
                     child_card = page.locator("details.child")
                     await expect(child_card).to_have_count(1)
-                    await expect(child_card.locator(".child-progress")).to_contain_text("step")
+                    # Its last line says what it does now, the shell call it waits in (item 310), read from its events.
+                    await expect(child_card.locator(".child-progress")).to_contain_text("Running while [")
                     await expect(child_card.locator("a.child-open")).to_have_attribute("href", f"#/runs/{delegated.id}")
                     await page.screenshot(path=str(tmp_path / f"delegated-{width}-{scheme}.png"))
                     # The delegated run's own page: the parent's goal in the bar as a link, the pill under the
