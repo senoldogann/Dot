@@ -28,7 +28,7 @@ final class AppModel {
     var debugOpenChat: String?
     var debugInspector: Bool = false
     var debugSchedules: Bool = false
-    /// A page of Settings to open at launch (`models`, `schedules`, `licences`, `appearance`): debug builds only.
+    /// A page of Settings to open at launch (`models`, `schedules`, `licences`): debug builds only.
     var debugSettingsPage: String?
     /// Debug builds only: `-DotShowInbox 1` opens the inbox of what waits on the owner at launch (item 1442).
     var debugInbox: Bool = false
