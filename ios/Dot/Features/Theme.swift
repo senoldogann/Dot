@@ -503,10 +503,12 @@ struct StateRing: View {
                     lineWidth: 2.5
                 )
                 .rotationEffect(.degrees(turning ? 360 : 0))
-                .onAppear {
-                    guard !reduceMotion else { return }
-                    withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) { turning = true }
-                }
+                .animation(turning ? .linear(duration: 1.4).repeatForever(autoreverses: false) : nil, value: turning)
+                // It turns every time the chat comes back to work (a ring that left with the state starts again) and it
+                // follows Reduce Motion while it turns.
+                .onAppear { turning = !reduceMotion }
+                .onDisappear { turning = false }
+                .onChange(of: reduceMotion) { _, still in turning = !still }
         case .waiting:
             Circle().strokeBorder(Theme.warn, lineWidth: 2.5)
                 .shadow(color: Theme.warn.opacity(0.45), radius: 3)

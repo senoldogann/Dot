@@ -180,8 +180,8 @@ struct RunInspector: View {
         case .idle: (model.state.runStatus ?? "Idle").capitalizedFirst
         case .working: "Working"
         case .waitingOnYou: "Waiting on you"
-        case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
-        case .helpersInBackground(let count): "\(count) subagent\(count == 1 ? "" : "s") in the background"
+        case .waitingOnSubagents(let count, _): "Waiting on \(count) helper\(count == 1 ? "" : "s")"
+        case .helpersInBackground(let count): "\(count) helper\(count == 1 ? "" : "s") in the background"
         }
     }
 

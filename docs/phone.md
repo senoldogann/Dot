@@ -112,7 +112,7 @@ code** takes its place. The same by hand:
    their run (`dotagent://run/<run id>`, or the alert's `#/runs/<id>` route). What it still leaves to the web UI is in
    `roadmap/1353.md`.
 
-   **On a bad link (items 1370 and 1371)** the app draws what it holds first and never makes the owner wait for the
+   **On a bad link (items 1370, 1371 and 1391)** the app draws what it holds first and never makes the owner wait for the
    network. The list, the agents, each chat (its newest runs and their last 400 events, its queue, schedules and
    reactions), the models and the schedules are kept on the phone, one file each, written whole or not at all, in a
    layout with a version, within 24 MB (the chats read longest ago go first); a file that does not read is dropped and
@@ -136,7 +136,7 @@ code** takes its place. The same by hand:
    running; back in front, they open at once from the last event they read, and the list is read again. The system may
    also give it a moment to refresh while it is out of sight (a background refresh, a push that says there is something
    new; iOS decides, and it may never). After the list is read, the chats that moved on are read ahead, six at most,
-   three on a cellular link or a hotspot, and none with Low Data Mode on. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382, `ios/README.md`
+   three on a cellular link or a hotspot, and none with Low Data Mode on. A socket that died without a word (a path that died while the phone slept, a Wi-Fi that gave way to the cellular link) is not waited for: a connection that has answered nothing in 8 seconds, and an open stream that has said nothing for 35 seconds (Dot writes a keepalive every 15 seconds), are dropped and the stream goes on, from the last event read, on a new connection. It adds what a page on iOS cannot have: the runs at work on the lock screen and in the Dynamic Island (a Live Activity). Its look (items 1380 to 1382, `ios/README.md`
    › The design) is iOS-native: near-black surfaces in the dark and a cool white in the light, following the system, one
    calm blue, text that follows Dynamic Type, and Liquid Glass on iOS 26 (a thin material before it) for the floating
    chrome only: the composer bar, the capsule over it, the agents' chips (a ring on each that turns while the
