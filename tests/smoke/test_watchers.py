@@ -44,6 +44,7 @@ from dotagent.events import SYSTEM_RUN_ID, EventBus
 from dotagent.llm.router import ModelRouter
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.notify.owner import OWNER_TOLD_EVENT
+from dotagent.notify.tellkinds import TellKind
 from dotagent.oauth.tokens import Account
 from dotagent.proactive import watching
 from dotagent.proactive.github import GITHUB_TOKEN_NAME
@@ -790,8 +791,8 @@ async def test_a_look_cut_while_it_tells_has_told_and_kept_each_item_or_neither(
     WORLD.gmail = _rents(3)
     tell = watching.tell_owner
 
-    async def dawdling(bus: EventBus, title: str, text: str, url: str) -> None:
-        await tell(bus, title, text, url)
+    async def dawdling(bus: EventBus, title: str, text: str, url: str, kind: TellKind, subject: str) -> None:
+        await tell(bus, title, text, url, kind, subject)
         await asyncio.sleep(0.4)
 
     monkeypatch.setattr(watching, "tell_owner", dawdling)

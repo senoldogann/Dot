@@ -4,7 +4,7 @@
 
 import { plural } from "./dom.js";
 
-export const KIND_LABELS = {
+const KIND_LABELS = {
   brief: "Morning brief",
   checkin: "Evening check-in",
   watcher: "Watchers",
