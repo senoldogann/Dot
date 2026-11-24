@@ -270,7 +270,14 @@ Both modes share what follows.
   does not have, a click something in front took, a click whose element was not shown, enabled and still in time (a
   button that stayed disabled too) or a hover whose element was not shown and still, which Playwright's own log
   tells as tried and never made, item 1158), sent, or may have been sent.
-  The line above the result counts them.
+  The line above the result counts them. A click, a double click, a click at a point, a drag at a point or Enter that
+  has no check of its own (it wrote nothing that is read back and named nothing it expects) is checked by whether the
+  page reacted to it (item 1744), from the same looks as item 739 and with no wait of its own: **verified** with what
+  changed (its address, a tab, a dialog or a download, a request it sent, its content, the field that has the
+  keyboard), or **uncertain** when nothing did within half a second. That says that the page did something, not that it
+  did what the step was for: a wrong button that opens a menu reacts too. A step that named what it expects is judged
+  by that alone. The counts of each call (`tally` of its `tool_result` event) feed the run's account
+  ([runs](runs.md)).
 - A press (a click, a double or right click, a check or uncheck) first looks whether its element takes the pointer
   (item 1153): Playwright's own trial of it, which sends nothing and lets the cookie banner's decliner run, twice for at
   most 1.5 s. The same thing still in front of the element on both looks is said at once, named, with how to close it
@@ -329,9 +336,9 @@ Both modes share what follows.
   a page that keeps its work in itself sends nothing either, and the page below shows which it is. It is not said of
   a page that holds a socket open, which may have sent its form there, of a press that opened a tab still on its way
   (a form sent to a new tab goes out from that tab), nor of a dialog's form. A step that was not sent says nothing of
-  what its page sent meanwhile: that was the page's own. None of this is a
-  check: an answer of 200 says that the server took a request, not that what the step was for happened, so such a
-  step stays not checked unless something of it was read back or awaited. It needs no word from the model: a click
+  what its page sent meanwhile: that was the page's own. An answer of 200 is no
+  check of what the step was for: it says that the server took a request. That the page sent one is the page's
+  reaction (above), and nothing more. It needs no word from the model: a click
   that names nothing it expects is still told by what it sent.
 - `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
   text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an

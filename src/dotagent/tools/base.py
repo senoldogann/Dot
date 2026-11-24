@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, BeforeValidator, ConfigDict, JsonValue, ValidationError
 
 from dotagent.core.errors import ToolExecutionError, ToolInputError
+from dotagent.core.outcomes import StepTally
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.policy.types import ActionInfo
@@ -49,6 +50,8 @@ class ToolResult(FrozenModel):
     is_error: bool
     untrusted: bool = False
     shown_images: tuple[ImageData, ...] = ()
+    # What the steps of an act call came to, counted (item 1744): ``None`` for every other call.
+    tally: StepTally | None = None
 
 
 def ok(text: str) -> ToolResult:

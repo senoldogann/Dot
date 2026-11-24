@@ -620,6 +620,8 @@ async def _execute_one(
             "target": shown.target if shown is not None else "",
             "site": redact_known(_site(call, action), known),
             "steps": batch_steps(call.arguments),
+            # What the steps of an act call came to, counted (item 1744): the run's account reads it.
+            "tally": None if clipped.tally is None else clipped.tally.model_dump(mode="json"),
             "channel": channel_of(call.name),
             # Whether the run is tainted after this result: a run that goes on from it takes it over (item 243).
             "tainted": gate.tainted,
