@@ -287,7 +287,8 @@ The look is one system, in `Features/Theme.swift`, `Features/Chrome.swift` and `
   change and the phone's set must follow: `tests/unit/test_ios_icons.py` fails until the script was run, and `IconTests`
   draws every icon through the system's renderer and checks it takes the colour it is given. The Lucide licence ships in the
   app (`Resources/Licences/LICENSE-Lucide.txt`, a copy of the web app's file the script keeps current) and reads in Settings ›
-  About › Licences. SF Symbols stay only where the system's own meaning matters: the actions of a notification.
+  About › Licences. SF Symbols stay only where the system's own meaning matters (the actions of a notification) and in the Live
+  Activity and the share extension, two other targets that do not read the catalog.
 - **Debug-only aids**: `-DotGallery 1|2|3|4` shows the pieces on one screen with made-up data (a step that asks, a
   secret, a failed step, the buttons, the empty states), and `-DotMaterialLook 1` turns the iOS 26 look off to see the
   look an iOS 18 phone gets, on an iOS 26 simulator.
@@ -336,7 +337,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) and `-DotSettingsPage <models|schedules|licences|appearance>` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) and `-DotSettingsPage <models|schedules|licences>` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the

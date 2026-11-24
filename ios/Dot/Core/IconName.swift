@@ -6,7 +6,7 @@ import Foundation
 /// here (one case a line, in order) and `uv run python scripts/export_ios_icons.py`, which writes its image from icons.js
 /// (or from the Lucide shapes the script keeps for what the web app does not draw yet); `tests/unit/test_ios_icons.py`
 /// fails until the catalog is that. SF Symbols stay only where the system's own meaning matters (a notification action,
-/// the share sheet, the keyboard).
+/// the share sheet, the keyboard) and in the Live Activity and the share extension, other targets that do not read the catalog.
 enum IconName: String, CaseIterable, Sendable {
     case alert
     case arrowDown
