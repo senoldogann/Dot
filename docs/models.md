@@ -391,8 +391,9 @@ answer keeps its words, Ollama's too.
   schedule's firing, which nobody reads as it ends, and its goal asks for a notification ("notify me", "send me a
   notification", "show me a notification", Turkish "bildirim gönder" and "bana bildir", Finnish "lähetä ilmoitus" and
   "ilmoita minulle"; a goal that only mentions one, names a thing that is none ("a notification email") or says not
-  to send one asks for none; it is a list of phrases, not a reading of the goal). A run short of one ends failed at once, before its model says a word,
-  and its result says which tool and why: an agent whose own list of tools leaves `notify` out is named before the
+  to send one asks for none; it is a list of phrases, not a reading of the goal). A run short of one ends failed at
+  once, before its model says a word, and its result says which tool and why: an agent whose own list of tools leaves
+  `notify` out is named before the
   program starts (add the tool to the agent; no try again follows, and the chat keeps its session), and a bridge's list
   that came up short is a passing failure, which a schedule tries once more. That is all the check is: a run that
   calls no tool is not a failed run, and a schedule's row says `failed`, not `done`, for one that ended so.
