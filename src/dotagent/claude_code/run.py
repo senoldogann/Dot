@@ -298,6 +298,10 @@ def door_tools(registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] |
 _NOT_REFUSED: str = r"(?<!not )(?<!n't )(?<!never )"
 _NOT_REFUSED_FI: str = r"(?<!älä )(?<!ei )"
 _OWNER: str = r"(?:me|us|the\s+(?:owner|user))"
+# Finnish: who is told ("minulle", "meille", the owner, the user), and the notification's own forms (ilmoitus,
+# ilmoitusta, ilmoituksen, ilmoituksia).
+_TOLD_FI: str = r"(?:minulle|meille|omistajalle|käyttäjälle)"
+_FI_NOTIFICATION: str = r"ilmoitu(?:s|sta|ksen|ksia)"
 # What follows "a notification" when it names another thing ("notification email"), not the notification itself.
 _NOT_A_THING: str = (
     r"(?!\s+(?:e-?mails?|badges?|settings?|screens?|banners?|cent(?:er|re)s?|templates?|texts?|preferences?"
@@ -322,7 +326,11 @@ _NOTIFICATION_REQUESTS: tuple[re.Pattern[str], ...] = tuple(
         r"\bbildirim\w*\s+(?:gönder(?:in|iniz|mek)?|at|atın|yap(?:ın|mak)?|ver(?:in|mek)?|göster(?:in|mek)?"
         r"|yolla(?:yın|mak)?)\b",
         r"\bbana\s+bildir(?:in|iniz)?\b",
-        _NOT_REFUSED_FI + r"\b(?:lähetä|näytä|anna)\b(?:\s+\w+){0,2}?\s+ilmoitu\w*",
+        # "ilmoitus" is also an ad ("hakemus tähän ilmoitukseen": an application to this ad): only the
+        # notification's own forms (not the ad's "ilmoitukseen", "ilmoituksesta"), and only right after the verb or
+        # after the one who is told, name a notification.
+        _NOT_REFUSED_FI + r"\blähetä\s+(?:" + _TOLD_FI + r"\s+)?" + _FI_NOTIFICATION + r"\b",
+        _NOT_REFUSED_FI + r"\b(?:näytä|anna)\s+" + _TOLD_FI + r"\s+" + _FI_NOTIFICATION + r"\b",
         _NOT_REFUSED_FI + r"\bilmoita\s+(?:minulle|meille)\b",
     )
 )

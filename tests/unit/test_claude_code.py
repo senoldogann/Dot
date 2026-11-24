@@ -542,6 +542,7 @@ def test_a_goal_that_asks_for_a_notification_is_told_in_the_owners_three_languag
         "Saat 15:30'da bana bildir.",
         "Lähetä ilmoitus puhelimeeni kello 15.30.",
         "Lähetä minulle ilmoitus kun kurssi alkaa.",
+        "Näytä minulle ilmoitus kello 15.30.",
         "Ilmoita minulle kello 15.30.",
     ):
         assert goal_asks_notification(goal), goal
@@ -568,6 +569,9 @@ def test_a_goal_that_only_mentions_a_notification_or_refuses_one_asks_for_none()
         "Bana bildirme, sadece raporu yaz.",
         "Lue tämä ilmoitus ja tee hakemus.",
         "Tarkista myynti-ilmoitus ja vastaa siihen.",
+        "Lähetä hakemus tähän ilmoitukseen.",
+        "Anna palaute ilmoituksesta.",
+        "Näytä ilmoitus ja kerro mitä se vaatii.",
         "Älä lähetä ilmoitusta, kirjoita vain raportti.",
         "Remind me about the course at 16:00.",
         "Register for the course (ilmoittautua).",
