@@ -175,11 +175,8 @@ class SaveArgs(ToolArgs):
         default=None,
         max_length=_MOST_SUBJECT_CHARS,
         description=(
-            "What the note is about, as a short name, when the fact has one current value that a newer fact "
-            "replaces (the user's city, a rate, a client's state): 'user-city', 'standup-time', "
-            "'nordic-pines-status'. A newer note with the same subject replaces the older one, which is kept, "
-            "resting. Use the subject a recalled note shows ('about ...'). Leave it out for a fact that adds to "
-            "others (a language the user speaks, a hobby)."
+            "A short name for the fact's slot when it has one current value, like 'user-city'; a newer note with the "
+            "same subject replaces the older. Omit for facts that add up."
         ),
     )
 
@@ -219,8 +216,7 @@ def _save_tool() -> RegisteredTool:
         name="memory_save",
         description=(
             "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, "
-            "a convention that will apply again. One fact per call. When a fact changes, save the new value with the "
-            "same subject as the old note and the old one is replaced. Do not save secrets (one that holds a key is "
+            "a convention that will apply again. One fact per call. Do not save secrets (one that holds a key is "
             "refused: record where the key lives), progress on the current task, or what is easy to look up again."
         ),
         args_model=SaveArgs,
