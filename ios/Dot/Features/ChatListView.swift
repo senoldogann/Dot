@@ -223,7 +223,7 @@ struct ThreadRow: View {
     @ViewBuilder private var helpersLine: some View {
         if helpers > 0 {
             Label(HelperWords.header(count: helpers, runWorking: thread.isWorking), icon: .users, size: 13)
-                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.accent).lineLimit(1)
+                .font(Theme.meta.weight(.medium)).foregroundStyle(Theme.accent).lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 .accessibilityIdentifier("row-helpers")
         }
     }
