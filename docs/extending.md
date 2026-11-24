@@ -705,7 +705,8 @@ its folder's (a plugin's `canva-brand-check` in `brand-check`: the skill goes by
 takes it) nor a description past the specification's 1,024 characters (cut there with an ellipsis; item 948). Dot's
 own learned and taught skills still carry their folders' names, by which they are kept. A `SKILL.md` may begin with blank lines before its opening `---` line. One of yours or a plugin's with no frontmatter at all (its first line is
 not `---`) loads as Claude Code loads it (item 1723): named for its folder, the whole file its instructions, its first
-line of words that is no heading its description (a Twilio plugin's `twilio-agent-connect` opens with a title); Dot's own
+line of words outside a fenced block that is no heading, table row, list item or quote its description (else its first
+heading) (a Twilio plugin's `twilio-agent-connect` opens with a title); Dot's own
 learned and taught skills still need their frontmatter.
 A skill left out is logged once while its file stays as it is (`skill_skipped`, item 1305), not at every run, with what
 to do (`fix`: correct the SKILL.md as the reason says, or remove its folder or plugin; item 1723); Doctor's

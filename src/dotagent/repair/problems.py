@@ -30,6 +30,7 @@ from typing import Literal
 
 from dotagent.core.types import FrozenModel
 from dotagent.store.db import Store
+from dotagent.store.failed import failed_result
 from dotagent.store.models import EventRecord, HarnessStep
 
 type ProblemKind = Literal["tool_error", "stall", "harness", "daemon"]
@@ -277,7 +278,7 @@ def run_sightings(run_id: str, events: Iterable[EventRecord]) -> list[Sighting]:
     alert."""
     sightings: dict[str, Sighting] = {}
     for event in events:
-        if event.kind == "tool_result" and event.data.get("ok") is False and event.data.get("steered") is not True:
+        if event.kind == "tool_result" and failed_result(event.data):
             tool: object = event.data.get("tool")
             text: object = event.data.get("text")
             if not isinstance(tool, str) or not isinstance(text, str) or not is_defect(text):

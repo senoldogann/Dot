@@ -12,6 +12,7 @@ from dotagent.evals.results import RunMetrics, TraceStep
 from dotagent.evals.types import EasyWay
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import invalid_arguments_text
+from dotagent.store.failed import failed_result
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.store.stats import ACT_TOOLS, WEB_TOOLS, failure_cause
 from dotagent.tools.help import FIND_HELP_TOOL
@@ -221,14 +222,14 @@ def run_metrics(
     results: list[EventRecord] = [event for event in events if event.kind == "tool_result"]
     acts: list[EventRecord] = [event for event in results if event.data.get("tool") in ACT_TOOLS]
     failures: list[tuple[str, str]] = [
-        (str(event.data.get("tool")), _failure_text(event)) for event in results if event.data.get("ok") is False
+        (str(event.data.get("tool")), _failure_text(event)) for event in results if failed_result(event.data)
     ]
     return RunMetrics(
         steps=run.steps,
         input_tokens=run.input_tokens + delegated_input,
         output_tokens=run.output_tokens + delegated_output,
         tool_calls=sum(1 for event in events if event.kind == "tool_call"),
-        tool_errors=sum(1 for event in results if event.data.get("ok") is False),
+        tool_errors=sum(1 for event in results if failed_result(event.data)),
         invalid_arguments=sum(1 for event in events if event.kind == "tool_call" and _has_broken_arguments(event)),
         stalls=sum(1 for event in events if event.kind == "stall"),
         compactions=sum(1 for event in events if event.kind == "compacted"),
