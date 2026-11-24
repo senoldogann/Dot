@@ -1,6 +1,6 @@
 import Foundation
 
-/// What the capsule over the composer says (item 1390). T3 Code's phone shows ONE floating capsule above its composer,
+/// What the capsule over the composer says (item 1390). A good agent app's phone shows ONE floating capsule above its composer,
 /// its segments divided by hairlines, and each segment opens its own detail; nothing is stacked. Dot's segments are the
 /// run's status, its helpers, the loops of the chat and the queue, each drawn only when it has something to say, so a
 /// chat at rest has no capsule at all. This is the pure part: which segments there are and what they say.

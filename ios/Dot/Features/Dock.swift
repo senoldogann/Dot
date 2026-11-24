@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The one capsule over the composer (item 1390), as T3 Code's phone has it: a single piece of glass whose segments are
+/// The one capsule over the composer (item 1390): a single piece of glass whose segments are
 /// divided by hairlines (the run's status, its helpers, the loops of the chat, the queue), each a button that opens its
 /// detail in a sheet. It is one row and never stacks; with nothing to say it is not drawn.
 struct DockCapsule: View {

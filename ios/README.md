@@ -46,7 +46,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 
 Native: pairing with the code of Settings › Phone, the chat list (working, waiting on you, unread; pull to refresh; drawn
 from disk at launch), a chat (messages that stream in, a tool step as one line, approval and question cards with Allow
-and Deny, and over the composer ONE capsule of glass (item 1390, the way T3 Code's phone does it) whose segments are the
+and Deny, and over the composer ONE capsule of glass (item 1390) whose segments are the
 run's status (working with its clock, waiting on you, waiting on N helpers), the helpers that work on in the background,
 the chat's loops ("every 10 min") and the queue ("3 queued"), divided by hairlines, each opening its own sheet and none
 stacked; a segment exists only while it has something to say, so a chat at rest has no capsule; the queue's sheet gives
@@ -104,7 +104,7 @@ way to the cellular link, holds a connection the system believes in for 45 s. Th
 a connection that has answered nothing within 8 s (`connectTimeout`) and an open stream that says nothing for 35 s
 (`idleTimeout`; the daemon writes a keepalive every 15 s, so two missed and a little more) are dropped and the feed goes on,
 from the last event it read, on a new one (`SilentSocketTests`: the silence, the connection that never answers, the keepalives
-that keep a stream, the kick that still reconnects at once). T3 Code's phone does the same with a probe; Dot needs no probe
+that keep a stream, the kick that still reconnects at once). Other phone apps do the same with a probe; Dot needs no probe
 because its stream writes its own heartbeat.
 
 What was measured, and what each part does now. Numbers are from the iPhone 17 Pro simulator against `FakeDaemon` with

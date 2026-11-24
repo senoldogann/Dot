@@ -90,7 +90,7 @@ code** takes its place. The same by hand:
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now) is a native SwiftUI app over the daemon's own
    API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
-   over the composer (item 1390, as T3 Code's phone has it) whose segments are the run's status (working with its clock, waiting on you,
+   over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351),
    the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
