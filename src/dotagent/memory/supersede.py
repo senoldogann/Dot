@@ -51,11 +51,12 @@ _MOST_CHANGED_WORDS: int = 4
 # With a word of change the sentences must share this part of the shorter one.
 _LEAST_SHARED_PART: float = 0.6
 # The words a value follows in a sentence that states one (``is 20 minutes``, ``at 09:00``, ``on port 8765``, ``has 4
-# cores``): a number straight after another word (``invoice 1042``, ``server 1``, ``PR 12``) names a thing, and two
+# cores``; not ``for``, ``of``, ``in``, ``to`` or ``from``, which come as often before an issue or a file): a number
+# straight after another word (``invoice 1042``, ``server 1``, ``PR 12``) names a thing, and two
 # things of one kind are both true.
 _BEFORE_VALUE: frozenset[str] = frozenset(
-    {"is", "are", "was", "were", "at", "on", "in", "to", "by", "of", "for", "from", "until", "than", "within", "has"}
-    | {"have", "had", "port", "about", "around", "costs", "cost"}
+    {"is", "are", "was", "were", "at", "on", "by", "until", "than", "within", "has", "have", "had", "port", "costs"}
+    | {"about", "around", "cost"}
 )
 # Words that say the fact changed: "the call is now on Wednesdays", "no longer drinks coffee".
 _CHANGE_WORDS: frozenset[str] = frozenset({"now", "longer", "anymore", "instead", "moved", "switched", "changed"})

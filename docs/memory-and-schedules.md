@@ -274,7 +274,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   pass over it, so the run reads the fact as it stands; the answer to the save lists what it replaced. With no subject,
   a save replaces a note close to it (`similar_threshold`, so only with embeddings on) only when its words say the
   fact changed and nothing else: the same sentence with a number, a time or a version swapped after a word a value follows (`at 09:00` and
-  `at 10:30`, `port 8765` and `port 9120`; not `invoice 1042` and `invoice 1043`, which are two things) or with a word of change added (`now`, `no longer`, `moved`, `switched`), with at
+  `at 10:30`, `port 8765` and `port 9120`; not `invoice 1042` and `invoice 1043`, which are two things, nor `for 1077`
+  and `for 1080`, nor a time that keeps its hour) or with a word of change added (`now`, `no longer`, `moved`, `switched`), with at
   least three words shared. A cosine alone cannot tell the two apart (measured with `bge-m3`: facts that changed lie at
   0.68 to 0.97, two facts that are both true at 0.68 to 0.84), and no model is asked in the save: a note reworded into
   another sentence, or two values that are names, wait for a subject or for the night, when the reflection asks the
