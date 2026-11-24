@@ -509,7 +509,11 @@ of the secrets Dot holds, so a private key over many lines is masked whatever pa
 are not in the journals, so they are not there; the run's line says instead how many steps it ran with a command, the
 browser, the screen, a message or a connected app, "Dot also ran 3 commands and 2 browser actions. Undo takes back files
 only, so it cannot take these back" (item 1404), by what the gate let run and the steps' own records, with no claim of
-what they did. `dotx undo RUN_ID` shows what taking back the changes of that run and of
+what they did. Under it stands the run's account (item 1746), built from its tool results and its plan, never from what
+the model said: how many browser and desktop steps were seen to hold and how many were not (not checked, uncertain,
+contradicted) or failed, what it sent for the owner or in public, the plan steps marked done that no tool result shows,
+and those left open. `GET /api/runs/{id}` and `GET /api/runs/{id}/actions` carry it as `account`, so the phone has it
+with the run's detail. `dotx undo RUN_ID` shows what taking back the changes of that run and of
 the runs it delegated to would do: a file the run changed is put back as it was (`restore`), with its permissions, a
 file it created is deleted (`delete`), and the folders it created are removed once they are empty. Nothing is changed
 until `dotx undo RUN_ID --apply`, which exits with 1 when it left a file as it is. A file that changed or was deleted

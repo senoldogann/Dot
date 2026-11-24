@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
+from dotagent.agent.account import RunAccount
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
@@ -1366,6 +1367,8 @@ class RunDetail(FrozenModel):
     questions: list[ApprovalRecord]
     agent: AgentRecord | None
     campaign: CampaignChip | None
+    # What the run did by its record, not by its model (item 1746), as the run's Changes tab shows it.
+    account: RunAccount
     held: bool
     holding: bool
     keep_going: bool
@@ -1454,6 +1457,9 @@ class RunActions(FrozenModel):
     edits: list[FileEdit]
     ended: bool
     outside: list[OutsideSteps]
+    # What the run did by its record (item 1746): what it changed, ran and sent, what its act steps came to and its
+    # plan steps that are open or done with no tool result that shows them.
+    account: RunAccount
 
 
 class UndoRequest(FrozenModel):

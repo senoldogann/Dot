@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { changedWords, outsideWords, shownEdits, undoQuestion } from "../../src/dotagent/server/static/js/runchanges.js";
+import { accountWords, changedWords, outsideWords, shownEdits, undoQuestion } from "../../src/dotagent/server/static/js/runchanges.js";
 
 /** A file of the run's undo plan (`GET /runs/{id}/actions`): what taking it back does, and whether it can. */
 function edit(path, action, state = "ready", tool = action === "delete" ? "write_file" : "edit_file") {
@@ -68,4 +68,36 @@ test("the steps no undo can take back are counted by what ran, in one sentence t
   );
   // A category this page does not know is left out, never drawn as a word of its own.
   assert.equal(outsideWords([{ category: "teleport", steps: 4 }]), "");
+});
+
+/** A run's account (`account` of `GET /runs/{id}/actions`, item 1746) with nothing in it but what is given. */
+function account(over) {
+  return {
+    calls: 0,
+    failed_calls: 0,
+    changed: [],
+    changed_count: 0,
+    commands: 0,
+    sent: [],
+    sent_count: 0,
+    acts: { verified: 0, contradicted: 0, uncertain: 0, not_checked: 0, failed: 0 },
+    plan_done: 0,
+    unshown: [],
+    open_steps: [],
+    ...over,
+  };
+}
+
+test("the account says what was seen to hold, what was sent and what is left, from the record (item 1746)", () => {
+  assert.deepEqual(accountWords(account({})), []);
+  assert.deepEqual(accountWords(account({ acts: { verified: 4, contradicted: 0, uncertain: 1, not_checked: 2, failed: 1 } })), [
+    "Checked on the page or the screen: 4 seen to hold, 3 not (2 not checked, 1 uncertain). 1 step failed.",
+  ]);
+  assert.deepEqual(accountWords(account({ acts: { verified: 2, contradicted: 0, uncertain: 0, not_checked: 0, failed: 0 } })), [
+    "Checked on the page or the screen: 2 seen to hold.",
+  ]);
+  assert.deepEqual(
+    accountWords(account({ sent: ["Send a mail to a@b.c"], sent_count: 1, unshown: ["2. Book the table"], open_steps: ["3. Tell Ada"] })),
+    ["Sent 1 thing: Send a mail to a@b.c.", "Marked done with no tool result that shows it: 2. Book the table.", "Left open: 3. Tell Ada."],
+  );
 });
