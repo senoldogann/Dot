@@ -675,6 +675,20 @@ Answer it as before with `POST /api/approvals/{id}/decision`. What is **not** a 
 that Dot meets without a step the policy hands over (it asks you with `ask_user`, a `question`, or with `ask_secret`, a
 `secret`): the browser tools give the daemon no sure sign that a page is one only you can pass, so none is recorded.
 
+**The iPhone app's inbox** (item 1442). The app reads this list when it starts, when it comes to the front or the link is
+back, when the chat list is pulled down, when an alert arrives or a push wakes it, and when a notice of its stream says a
+card was asked or answered, a question was left or a run ended; it draws the list from the last read at once (`awareness.json`
+in the cache folder) and puts `count` on the app's icon after every read (`UNUserNotificationCenter.setBadgeCount`). While
+anything waits, the chat list has one card at its top (the count on a badge, and what the newest asks) that opens the
+inbox, newest first. Each row says who asks and in which chat, and what: an approval says what Dot wants to do (the line
+taken apart as the chat's card takes it) with **Allow once** and **Deny**; a question shows its options as buttons, the
+recommended one marked, or a field for words when it offers none; both answer through the outbox and the decision route
+above, as the chat's card does. **Allow once is not offered for an approval whose line is 120 characters long**: the
+daemon cuts a title there and says nothing of it, so that line may be the start of a longer one, and the row says to read
+all of it in the chat (Deny stays). **A secret is never answered on the phone**: its row says "Dot needs a secret: enter it
+on your Mac" and has no field or button that takes a value. A hand-off and a kind the app does not know are answered in
+the chat, which each row opens (`dotagent://run/<run id>`).
+
 ### POST /api/phone/live-start-token and DELETE /api/phone/live-start-token
 
 The token that starts the phone's Live Activity by push (item 1425; `Activity<DotFleetAttributes>.pushToStartTokenUpdates`,

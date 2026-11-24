@@ -25,6 +25,8 @@ struct ExtrasSnapshot: Codable, Sendable, Equatable {
 /// network only brings it up to date. A field a build does not know yet reads as none.
 struct AwarenessSnapshot: Codable, Sendable, Equatable {
     var pushSettings: PushSettings?
+    /// What waited on the owner at the last read, so that the inbox and its badge are drawn at once.
+    var needsYou: NeedsYouList?
     var savedAt: Double
     var schema: Int? = ChatCache.schema
 }

@@ -92,4 +92,16 @@ final class AwarenessRequestTests: XCTestCase {
         XCTAssertEqual(body["done"] as? Bool, true)
         XCTAssertEqual(kept, PushSettings(needsYou: false, ready: false, done: true))
     }
+
+    // MARK: Item 1442, what waits on the owner
+
+    func testWhatWaitsIsReadFromItsRouteWithThePhonesKey() async throws {
+        BodyStub.reply = #"{"count":1,"items":[{"id":"apr_1","kind":"approval","run_id":"run_1","thread_id":"thr_1","agent":"Dot","title":"Run: ls","since":5.0,"route":"dotagent://run/run_1"}]}"#
+        let list: NeedsYouList = try await api().needsYou()
+        XCTAssertEqual(BodyStub.seen.last?.method, "GET")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/needs-you")
+        XCTAssertEqual(BodyStub.seen.last?.authorization, "Bearer phone.a.b")
+        XCTAssertEqual(list.count, 1)
+        XCTAssertEqual(list.items.first?.kind, .approval)
+    }
 }

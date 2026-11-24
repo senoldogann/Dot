@@ -13,7 +13,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     Resilience rules live here too (item 1371): `RetryPolicy` (tries, waits, jitter, what is worth repeating),
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
     `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
-    `PushSettings` (item 1441) the three push switches and what a flip does.
+    `PushSettings` (item 1441) the three push switches and what a flip does; `NeedsYou` (item 1442) the inbox's list, its rows
+    and what may be answered from them.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -110,6 +111,15 @@ did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app'
   the phone knew are shown dimmed and do not move. `AwarenessModel` (one per store) draws them from `awareness.json` in the
   cache folder before the network answers. The old row that opens the iPhone's own page of this app's settings is now
   "iPhone notification settings".
+- **Needs-you inbox** (item 1442): `GET /api/needs-you` is read on start, on foreground, on a pull to refresh, when an alert
+  arrives or a push wakes the app, and on the stream's notices that change it (`NeedsYouRules.refreshes`); the last read is
+  kept in `awareness.json` and drawn at once, and the app icon's number follows `count` after every read
+  (`AwarenessModel.systemBadge`). The chat list has one card at the top while anything waits (`NeedsYouEntry`) that opens
+  `NeedsYouView`: one row each (`Core/NeedsYou`), newest first, who asks and in which chat. An approval has Allow once and
+  Deny (the line taken apart by `ApprovalPresentation`; no Allow once when the line is as long as the daemon cuts a title,
+  which it does without a mark), a question its choices as buttons with the recommended one marked or a field for words,
+  both through the outbox like the chat's card; a secret has no way to answer (its row says "Dot needs a secret: enter it
+  on your Mac"); a hand-off is answered in the chat. A row opens its chat.
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 
@@ -269,7 +279,7 @@ the iPhone. To look at the app in the simulator, start a daemon on a scratch hom
 `DOT_CHROME_DIR` at throwaway folders, as `tests/smoke/test_stream_last_event_id.py` does with a scripted model), pair a
 key (`POST /api/phone/pairing`, then `POST /api/phone/pair`), and launch a Debug build with
 `-DotDevOrigin http://127.0.0.1:<port> -DotDevKey <phone key>`; `-DotOpenChat <title prefix>`, `-DotShowInspector 1`,
-`-DotShowSettings 1` and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
+`-DotShowSettings 1`, `-DotShowInbox 1` (the inbox of what waits on the owner) and `-DotShowSchedules 1` (with the settings) open a screen at launch, `-DotGallery 1|2|3|4` the design gallery, `-DotMaterialLook 1` the pre-iOS 26 look, `-DotOpenURL dotagent://run/<run id>` opens a link as
 a Live Activity's tap does, and `-DotClearDrafts 1` starts with no drafts. These arguments exist in Debug builds only.
 
 Taps and screenshots (slice 2): start a scratch daemon with a scripted model that streams, asks and lists models (the

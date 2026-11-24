@@ -62,6 +62,7 @@ final class NativeStore {
     @ObservationIgnored private var lifecycleTask: Task<Void, Never>?
     @ObservationIgnored private var listTask: Task<Void, Never>?
     @ObservationIgnored private var listRefresh: Task<Void, Never>?
+    @ObservationIgnored private var needsYouTask: Task<Void, Never>?
     @ObservationIgnored private var linkTask: Task<Void, Never>?
     @ObservationIgnored private var outcomeTask: Task<Void, Never>?
     @ObservationIgnored private var preloadTask: Task<Void, Never>?
@@ -146,6 +147,7 @@ final class NativeStore {
         outbox.start()
         Task { await refreshList() }
         Task { await loadModels() }
+        Task { await awareness.refreshNeedsYou() }
     }
 
     func stop() {
@@ -160,6 +162,7 @@ final class NativeStore {
         prefetchTask?.cancel()
         listTask?.cancel()
         listRefresh?.cancel()
+        needsYouTask?.cancel()
         preloadTask?.cancel()
         let feed: EventFeed? = lifecycleFeed
         Task { await feed?.stop() }
@@ -208,6 +211,13 @@ final class NativeStore {
         listRefresh = nil
     }
 
+    /// A pull to refresh: the list and what waits on the owner are read together.
+    func refreshEverything() async {
+        async let listed: Void = refreshList()
+        async let waiting: Void = awareness.refreshNeedsYou()
+        _ = await (listed, waiting)
+    }
+
     private func readList() async {
         // No link: nothing is asked (the banner says so, and the list the phone holds stays); the link coming back reads it.
         guard link.state.online else { return }
@@ -249,6 +259,16 @@ final class NativeStore {
             try? await Task.sleep(for: .milliseconds(300))
             if Task.isCancelled { return }
             await self?.refreshList()
+        }
+    }
+
+    /// What waits on the owner is read again soon (a moment of waiting joins the notices that come together).
+    private func refreshNeedsYouSoon() {
+        needsYouTask?.cancel()
+        needsYouTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            if Task.isCancelled { return }
+            await self?.awareness.refreshNeedsYou()
         }
     }
 
@@ -409,6 +429,7 @@ final class NativeStore {
             }
         case .notice(let kind):
             refreshListSoon()
+            if NeedsYouRules.refreshes(onNotice: kind) { refreshNeedsYouSoon() }
             for session in open.values { Task { await session.lifecycle(kind) } }
         case .events, .unreadable:
             break
@@ -428,6 +449,8 @@ final class NativeStore {
         Task { await feed?.kick() }
         for session in open.values { Task { await session.kick() } }
         if Date().timeIntervalSince(lastListAt) > 5 { refreshListSoon() }
+        // What waits on the owner may have changed on the Mac while the phone was away.
+        Task { await awareness.refreshNeedsYou() }
         outbox.start()
     }
 
@@ -461,6 +484,8 @@ final class NativeStore {
             for await _ in await box.outcomes() {
                 guard let self else { return }
                 self.refreshListSoon()
+                // An answer given from the phone closes a card (or finds it closed): the inbox and the badge follow.
+                self.refreshNeedsYouSoon()
             }
         }
     }
@@ -511,6 +536,7 @@ final class NativeStore {
             wasDown = false
             startLifecycle()
             refreshListSoon()
+            Task { await awareness.refreshNeedsYou() }
             for session in open.values { Task { await session.kick() } }
             outbox.start()
         } else {
@@ -523,7 +549,10 @@ final class NativeStore {
     func refreshInBackground(seconds: Double = 20) async -> Bool {
         // Reached only when the list was read now: a refresh that asked nothing (no link) or failed says so to the system.
         let began: Date = Date()
+        // What waits on the owner is read beside the list: the badge is set from it while iOS gives the app its seconds.
+        async let waiting: Void = awareness.refreshNeedsYou()
         await refreshList()
+        await waiting
         guard link.state.online, lastListAt >= began else { return false }
         prefetch(budget: min(3, link.state.prefetchBudget), force: true)
         let task: Task<Void, Never>? = prefetchTask

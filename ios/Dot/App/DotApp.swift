@@ -99,6 +99,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
+        // An alert arrived while the app is open: what waits on the owner may have changed (item 1442).
+        Task { @MainActor in await self.model.native?.awareness.refreshNeedsYou() }
         completionHandler([.banner, .list, .sound])
     }
 

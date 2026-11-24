@@ -19,12 +19,30 @@ final class AwarenessModelTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: made) }
     }
 
-    private func make(link: LinkMonitor? = nil) -> AwarenessModel {
+    /// The numbers put on the app's icon, in order.
+    private final class Badges: @unchecked Sendable {
+        private let lock: NSLock = NSLock()
+        private var all: [Int] = []
+        func add(_ count: Int) {
+            lock.lock()
+            all.append(count)
+            lock.unlock()
+        }
+        var counts: [Int] {
+            lock.lock()
+            defer { lock.unlock() }
+            return all
+        }
+    }
+
+    private func make(link: LinkMonitor? = nil, badges: Badges = Badges()) -> AwarenessModel {
         let configuration: URLSessionConfiguration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [BodyStub.self]
         let host: DaemonHost = DaemonHost(name: "mac.example.ts.net", origin: URL(string: "https://mac.example.ts.net")!)
         let api: APIClient = APIClient(host: host, key: "phone.a.b", session: URLSession(configuration: configuration), readPolicy: .once)
-        return AwarenessModel(api: api, cache: ChatCache(directory: folder), directory: folder, link: link)
+        // The badge is the test's own: the system's would need a running app.
+        return AwarenessModel(
+            api: api, cache: ChatCache(directory: folder), directory: folder, link: link, badge: { badges.add($0) })
     }
 
     /// Waits (up to two seconds) for `condition`: the model's writes run in tasks of their own.
@@ -143,5 +161,67 @@ final class AwarenessModelTests: XCTestCase {
         XCTAssertEqual(all[0], ["needs_you": true, "ready": false, "done": true])
         XCTAssertEqual(all[1], ["needs_you": true, "ready": false, "done": false], "the second write carries the latest of all three")
         XCTAssertEqual(model.push.shown, PushSettings(needsYou: true, ready: false, done: false))
+    }
+
+    // MARK: What waits on the owner
+
+    private static let waiting: String = """
+        {"count":2,"items":[
+        {"id":"apr_2","kind":"question","run_id":"run_1","thread_id":"thr_1","agent":"Scout","title":"Which day should it ship?",
+         "since":200.0,"route":"dotagent://run/run_1","choices":["Friday","Monday"],"recommended":"Friday"},
+        {"id":"apr_1","kind":"approval","run_id":"run_1","thread_id":"thr_1","agent":"Dot","title":"Run: make deploy",
+         "since":100.0,"route":"dotagent://run/run_1"}]}
+        """
+
+    func testWhatWaitsOnTheOwnerIsReadAndTheBadgeFollowsTheCount() async throws {
+        begin()
+        BodyStub.reply = Self.waiting
+        let badges: Badges = Badges()
+        let model: AwarenessModel = make(badges: badges)
+        XCTAssertEqual(model.needsYou.count, 0)
+        await model.refreshNeedsYou()
+        XCTAssertEqual(BodyStub.seen.last?.method, "GET")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/needs-you")
+        XCTAssertEqual(model.needsYou.count, 2)
+        XCTAssertEqual(model.needsYou.items.map(\.id), ["apr_2", "apr_1"])
+        XCTAssertTrue(model.needsYouIsLive)
+        XCTAssertEqual(badges.counts, [2], "the icon's number is the count of every read")
+        try await until { ChatCache.readAwareness(in: self.folder)?.needsYou?.count == 2 }
+        XCTAssertEqual(ChatCache.readAwareness(in: folder)?.needsYou?.items.count, 2)
+
+        // Answered on the Mac: the next read lowers the number.
+        BodyStub.reply = #"{"count":0,"items":[]}"#
+        await model.refreshNeedsYou()
+        XCTAssertEqual(model.needsYou, .empty)
+        XCTAssertEqual(badges.counts, [2, 0])
+    }
+
+    func testTheInboxIsDrawnFromDiskAtOnceAndAFailedReadLeavesItButSaysItIsOld() async throws {
+        begin()
+        BodyStub.reply = Self.waiting
+        let first: AwarenessModel = make()
+        await first.refreshNeedsYou()
+        try await until { ChatCache.readAwareness(in: self.folder)?.needsYou != nil }
+
+        BodyStub.status = 503
+        BodyStub.reply = #"{"message":"down"}"#
+        let badges: Badges = Badges()
+        let second: AwarenessModel = make(badges: badges)
+        XCTAssertEqual(second.needsYou.count, 2, "drawn before any network answer")
+        XCTAssertFalse(second.needsYouIsLive)
+        await second.refreshNeedsYou()
+        XCTAssertEqual(second.needsYou.count, 2, "what the phone held stays")
+        XCTAssertFalse(second.needsYouIsLive, "and says it was not read now")
+        XCTAssertEqual(badges.counts, [], "a read that failed does not change the icon's number")
+    }
+
+    func testTwoReadsAtOnceAreOneRequest() async throws {
+        begin()
+        BodyStub.reply = Self.waiting
+        let model: AwarenessModel = make()
+        async let first: Void = model.refreshNeedsYou()
+        async let second: Void = model.refreshNeedsYou()
+        _ = await (first, second)
+        XCTAssertEqual(BodyStub.seen.filter { $0.path == "/api/needs-you" }.count, 1, "a pull to refresh and a push arriving read it once")
     }
 }

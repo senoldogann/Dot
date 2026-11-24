@@ -36,4 +36,10 @@ extension APIClient {
     func setPushSettings(_ settings: PushSettings) async throws -> PushSettings {
         try await send("PUT", "/api/phone/push-settings", body: settings)
     }
+
+    // MARK: What waits on the owner (item 1442)
+
+    /// Everything that waits on the owner, newest first, with how many things that is (`GET /api/needs-you`): the approvals a
+    /// run asks, its questions, its requests for a secret and its hand-offs. Any token reads it, a phone's key too.
+    func needsYou() async throws -> NeedsYouList { try await get("/api/needs-you") }
 }
