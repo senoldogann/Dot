@@ -324,6 +324,18 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   resume it. A resumed run keeps the ledger and the progress ladder of the run it goes on from when those were stored,
   and its note says so; when they were not, the note says they start again (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
+- The Claude Code program of a run on your Claude plan that is cut off from outside (it ends before its result and
+  nobody ended it: killed, crashed) does not end the run (items 1580 to 1582). Dot logs how it ended
+  (`claude_code_program_cut`: exit code, signal, the end of its stderr, its steps, the seconds since its last line;
+  `claude_code_programs_ended_together` when several programs are cut in one second) and, unless the cause is Dot's own
+  (your Stop, the emergency stop, the daemon's stop, the plan's limit, the run's limits, the silence watch) or a call that
+  may have sent a message or mail, a payment or a post for you was in flight, starts the program again in the same
+  session and the same run, after 2 s and after 10 s, at most `[providers.claude_code] continue_cut` (2) times. It is
+  one run all through: its id, its events and its steps go on, the run that delegated it keeps waiting for it, and a
+  helper that works in the background stays one; the page says "The program was cut off at 10:44; Dot continued the
+  run" each time. A second program that is cut too is continued again until the count is used up; then the run fails
+  with the exits of all the cuts in its context. The chat's session is kept only when the run ends clean (see
+  [Models](models.md)).
 - A message sent to a running run (steering) reaches the model at once: a step whose model is still answering is cut
   short and asked again with the message (item 509); a tool already at work finishes first, and a step past the run's
   limit ends with its finish. It also clears the run's untrusted mark (see [Safety](safety.md#safety)); a reaction
