@@ -267,3 +267,12 @@ def test_a_subject_is_kept_as_lowercase_words_joined_by_hyphens_and_one_without_
     assert len(normalize_subject("x" * 200)) == 48
     with pytest.raises(InvalidValueError, match="no letter or digit"):
         normalize_subject(" -- ")
+
+
+async def test_a_subject_with_no_word_refuses_the_save_and_no_note_is_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with _index(tmp_path, monkeypatch, None) as index:
+        with pytest.raises(InvalidValueError, match="no letter or digit"):
+            await _save(index, OULU, "--")
+        assert await index.store.count_memories() == 0
