@@ -104,27 +104,33 @@ function sizeOf(record) {
  * @property {{ id: number, event: string, data: any }[]} messages the run's stream as the page read it, the live pieces
  *   (no id) among them
  * @property {any | null} queue the chat's queue (`GET /threads/{id}/queue`), null when it was not read
+ * @property {boolean} [eventsCut] whether the copy this chat was drawn from was cut (some of its events were not kept): it
+ *   stays cut when it is kept again
  * @property {number} [verifiedAt] when Dot last said that this is how the chat stands (ms); a chat drawn from a copy and
  *   not heard of since keeps the time of the copy, so that "last updated" never says a copy is fresher than it is
  */
 
 /**
- * The record that keeps a chat: its newest `RUNS_KEPT` runs, the last `EVENTS_KEPT` events of each, and its queue,
- * within `RECORD_MAX_BYTES` (the oldest events go first, then the oldest runs). Only what the daemon stored is kept: a
- * live piece of a thought or of a message being written has no id and is not read again from Dot.
+ * The record that keeps a chat: the record of every run before the one the page was opened at (small, and what makes the
+ * earlier turns the page shows, and the count of those it leaves out, the same from a copy as from Dot), the last
+ * `EVENTS_KEPT` events of the run and of the newest `RUNS_KEPT - 1` runs before it, and its queue, within
+ * `RECORD_MAX_BYTES` (the oldest events go first, then the oldest runs). Only what the daemon stored is kept: a live piece
+ * of a thought or of a message being written has no id and is not read again from Dot.
  * @param {ChatSource} source
  * @param {number} now
  */
 export function snapshotOf(source, now) {
-  const earlier = lastOf(source.history.earlier, RUNS_KEPT - 1);
+  const earlier = source.history.earlier;
   /** @type {Record<string, any[]>} */
   const read = {};
-  for (const past of earlier) {
+  for (const past of lastOf(earlier, RUNS_KEPT - 1)) {
     const found = source.history.read.get(past.id);
     if (found !== undefined && Array.isArray(found.events)) {
       read[past.id] = found.events;
     }
   }
+  // Events the page read of a run older than those kept are left out: the copy says so.
+  const leftOut = [...source.history.read].some(([id, found]) => Array.isArray(found.events) && read[id] === undefined);
   const stored = source.messages.filter((message) => message.id > 0);
   let keep = EVENTS_KEPT;
   let runs = earlier;
@@ -135,6 +141,15 @@ export function snapshotOf(source, now) {
         byRun[past.id] = lastOf(read[past.id], keep);
       }
     }
+    const messages = lastOf(stored, keep);
+    // Some of the events of the run, or of a run before it, are not kept: a chat drawn from this says so, as one that was
+    // away through a long run does. Once cut it stays cut, whatever is kept of it again.
+    const eventsCut =
+      source.eventsCut === true ||
+      leftOut ||
+      messages.length < stored.length ||
+      runs.length < earlier.length ||
+      Object.keys(byRun).some((id) => byRun[id].length < read[id].length);
     const record = {
       layout: LAYOUT,
       id: source.id,
@@ -144,7 +159,8 @@ export function snapshotOf(source, now) {
       earlier: runs,
       read: byRun,
       cut: source.history.cut,
-      messages: lastOf(stored, keep),
+      eventsCut,
+      messages,
       queue: source.queue,
       bytes: 0,
     };

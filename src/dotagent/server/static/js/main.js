@@ -2,7 +2,7 @@
 
 import { isAway, onAway } from "./infront.js";
 import { loadLooks } from "./actors.js";
-import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp } from "./api.js";
+import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp, unreachable } from "./api.js";
 import { lineOf } from "./linewords.js";
 import { noteRefused } from "./linkfacts.js";
 import { loadOwnThemes } from "./appearance/own.js";
@@ -789,18 +789,19 @@ async function connect() {
   loadMacVoice();
   try {
     // What the page needs to open is the daemon's status; the agents' looks, the owner's themes and Dot's name are read
-    // beside it, and one that cannot be read leaves the page with its defaults rather than without its chats (a phone on a
-    // bad link opens on the copies it holds, item 1520). A refused key among them is refused all the same.
+    // beside it, and one that cannot be reached, with no copy to answer it, leaves the page with its defaults rather than
+    // without its chats (a phone on a bad link opens on the copies it holds, item 1520). Anything else (a refused key, an
+    // error of Dot's, a fault of the page) fails the opening as it always did.
     const [status, ...others] = await Promise.allSettled([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
     if (status.status === "rejected") {
       throw status.reason;
     }
     for (const other of others) {
       if (other.status === "rejected") {
-        if (other.reason instanceof ApiError && other.reason.status === 401) {
+        if (!unreachable(other.reason)) {
           throw other.reason;
         }
-        console.warn("something the page opens with could not be read; it goes on with its defaults", other.reason);
+        console.warn("something the page opens with could not be reached; it goes on with its defaults", other.reason);
       }
     }
   } catch (error) {

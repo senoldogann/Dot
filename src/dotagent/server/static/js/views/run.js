@@ -2234,6 +2234,11 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // What was read of the stream (before the page left, or whole up to now when it opened, item 734) goes in at once; the
   // stream goes on after its last message. An event the page fails to show is told, as on the stream, and the next one
   // goes in.
+  // A copy that was cut (the phone keeps the newest events of a long chat) says that the first steps are not shown, as a
+  // chat that was away through a long run does (item 1521), instead of leaving them out without a word.
+  if (kept.copy === true && kept.eventsCut === true) {
+    timeline.element.append(el("div", { class: "note steps-not-shown", role: "note" }, icon("info"), el("span", null, t("run.stepsNotKept"))));
+  }
   replaying = true;
   for (const message of kept.messages) {
     try {
@@ -2257,6 +2262,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       history: kept.history,
       messages: kept.messages,
       queue: queue.view() ?? kept.queue ?? null,
+      eventsCut: kept.eventsCut === true,
       verifiedAt: kept.verifiedAt,
     });
   };
@@ -2570,6 +2576,7 @@ export function mount(root, ctx) {
       history: historyOf(saved),
       messages: saved.messages,
       queue: saved.queue,
+      eventsCut: saved.eventsCut === true,
       verifiedAt: saved.savedAt,
       copy: true,
     };

@@ -276,6 +276,7 @@ export const EN = {
   "line.ageDays": "{count} d ago",
   "run.liveStopped": "Live updates stopped.",
   "run.stepsNotShown": "Some steps are not shown: the task went on for a long while, and only its newest {count} events were read.",
+  "run.stepsNotKept": "Some steps are not shown: the task went on for a long while, and this phone keeps only the newest part of it.",
   "run.reload": "Reload",
   "run.approvals": "Approvals",
   "sidebar.hide": "Hide sidebar",
