@@ -78,4 +78,10 @@ async def test_a_run_records_why_its_notes_were_recalled_and_which_it_echoed(run
     assert recalled[0].data["tainted_left_out"] == 0
     # Found by their words alone: no closeness in meaning to record.
     assert recalled[0].data["similarities"] == {}
-    assert await asyncio.to_thread(_echoes, ended.id) == {folder.id: 1, english.id: 0}
+    # The trace is written right after the run's end is recorded, which already woke ``wait``: wait for it.
+    echoes: dict[str, int | None] = await asyncio.to_thread(_echoes, ended.id)
+    async with asyncio.timeout(10.0):
+        while None in echoes.values():
+            await asyncio.sleep(0.05)
+            echoes = await asyncio.to_thread(_echoes, ended.id)
+    assert echoes == {folder.id: 1, english.id: 0}
