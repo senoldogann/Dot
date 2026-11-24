@@ -32,7 +32,7 @@ from dotagent.agent.rewind import (
 from dotagent.browser.remote_input import InputBatch, InputResult
 from dotagent.coding_work import CODING_WORK_EVENT, CodingWork
 from dotagent.config import BudgetConfig
-from dotagent.config_edit import BUDGET_SETTINGS, set_setting
+from dotagent.config_edit import BUDGET_SETTINGS, BudgetSetting, set_budget
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path, workspace_dir
@@ -368,17 +368,18 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.put("/budget")
     async def change_budget(request: BudgetConfig, http: Request) -> BudgetView:
-        """Change the caps: each that changed is written to the config file (a file that cannot be changed leaves the
-        caps as they were), and the runs are held to them from their next step on. A phone may lower or set a cap, not
-        raise or take one off (item 678)."""
+        """Change the caps: those that changed are written to the config file in one edit (a file that cannot be changed
+        leaves the file and the caps as they were), and the runs are held to them from their next step on. A phone
+        may lower or set a cap, not raise or take one off (item 678)."""
         async with changing_budget:
             before: BudgetConfig = ctx.runtime.budget.config
             if loosens(before, request):
                 refuse_from_a_phone(http.scope, "raise or take off a cap of what the tasks spend")
-            for key in BUDGET_SETTINGS:
-                value: int = getattr(request, key)
-                if value != getattr(before, key):
-                    await asyncio.to_thread(set_setting, config_path(), "budget", key, value)
+            changed: tuple[tuple[BudgetSetting, int], ...] = tuple(
+                (key, getattr(request, key)) for key in BUDGET_SETTINGS if getattr(request, key) != getattr(before, key)
+            )
+            if changed:
+                await asyncio.to_thread(set_budget, config_path(), changed)
             ctx.runtime.budget.apply(request)
         return await _budget_view()
 

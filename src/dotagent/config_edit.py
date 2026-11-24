@@ -474,6 +474,23 @@ def set_code_review(path: Path, settings: tuple[tuple[CodeReviewSetting, Setting
     )
 
 
+def set_budget(path: Path, settings: tuple[tuple[BudgetSetting, int], ...]) -> None:
+    """Write each ``[budget] key = value`` of ``settings`` (item 1731, the caps of what the runs spend) into the config
+    file at ``path`` in one edit: all of them are written, or, when one cannot be, none."""
+    _edit_all(
+        path,
+        tuple((("budget", key), value) for key, value in settings),
+        lambda text: _with_budget(text, settings),
+        "set " + ", ".join(f"{key} = {value}" for key, value in settings) + " under [budget]",
+    )
+
+
+def _with_budget(text: str, settings: tuple[tuple[BudgetSetting, int], ...]) -> str:
+    for key, value in settings:
+        text = with_setting(text, "budget", key, value)
+    return text
+
+
 def _with_code_review(text: str, settings: tuple[tuple[CodeReviewSetting, SettingValue], ...]) -> str:
     for key, value in settings:
         text = with_setting(text, "code_review", key, value)

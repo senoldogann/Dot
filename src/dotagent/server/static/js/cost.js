@@ -13,7 +13,7 @@ import { budgetLine, usedSoFar } from "./usagewords.js";
 const HINTS = {
   sofar: "What this task has used since it began: its time, what was sent to the model and what it wrote, and its steps",
   window: "How full the window of your Claude plan was when the task's newest step ran, and when it resets",
-  budget: "The tokens of this task and its helpers against the cap you set in Settings › Models › Usage, and what tasks like it (same model, mode and source, last 30 days) usually used",
+  budget: "The tokens of this task and its helpers against the cap you set in Settings › Models › Caps, and what tasks like it (same model, mode and source, last 30 days) usually used",
   model: "The seconds the model took to answer: its steps and its side calls together",
   summaries: "The time spent summing up the older part of the chat, and its share of the task",
   tools: "The seconds the actions took, with the time spent waiting for your answer",
