@@ -1335,6 +1335,8 @@ your choice, as a command that measured a token's length was refused; in `yolo` 
 prompt) is typed as in `yolo`, and the sandbox stays as the run's own mode has it. An eval never runs in it (`eval_config`). Off, every run asks as its mode says. A phone may switch it off, not on (item 678, [Phone](phone.md): it would
 outlast the phone's removal).
 
+What free mode and `yolo` guarantee, the exact exceptions and the test that keeps them: [Freedom](freedom.md).
+
 **Messages from a channel** (item 572, [Channels](channels.md)). With iMessage on (Settings › Channels), a message you
 send to yourself starts a run as one typed in the web UI does: it is yours and trusted, so the run starts untainted, in
 the mode and with the approvals its chat keeps (Auto and `[policy] approvals` until you choose others in the chat's

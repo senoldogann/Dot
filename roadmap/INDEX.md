@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1560](1560.md) | done | 2026-11-24 | The freedom contract is one page: what yolo and free mode guarantee, the exact exceptions and the code that makes each |
 | [1503](1503.md) | done | 2026-11-24 | Code mode's checks: the doctor's row, the settings in the docs and the threat model of the first pull request, tried whole |
 | [1502](1502.md) | done | 2026-11-24 | The tools of a run as files: a typed function for each tool a code may call, found with `search_tools` |
 | [1501](1501.md) | done | 2026-11-24 | `code_run`: Python the model writes calls its tools through the run's own gate, as a shell line to the policy |
