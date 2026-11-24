@@ -125,6 +125,8 @@ final class AppModel {
 
     /// Removes the phone's key from the Keychain and stops registering.
     func forgetKey() {
+        // The daemon is told first, with the key that is about to go: it forgets the token that starts this phone's Live Activity.
+        registrar.forgetStartToken()
         registrar.stop()
         let forgotten: NativeStore? = native
         Task { await forgotten?.clearCache() }

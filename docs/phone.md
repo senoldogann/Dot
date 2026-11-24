@@ -180,7 +180,8 @@ code** takes its place. The same by hand:
    start a run in it (a message, a
    queued message, a resume or a loop: the page posts `{type: "working"}`), unless one is up, and it comes without a
    notification (item 1096). A run started on the Mac, or by a schedule, opens no activity, but for a phone that gave
-   its push-to-start token (item 1425, iOS 17.2 and later, `POST /api/phone/live-start-token`): the daemon starts the
+   its push-to-start token (items 1425 and 1445, iOS 17.2 and later, `POST /api/phone/live-start-token`, which the app sends as
+   soon as iOS hands it over): the daemon starts the
    activity there by push, with the notification Apple requires of a start (a fixed title and line), when the phone shows
    none and the app is not in the foreground, at once for a command that ended in the background and for any other row
    of the activity (a run of yours, or the run that goes on in your chat when an agent's order came back or a run was
@@ -191,8 +192,7 @@ code** takes its place. The same by hand:
    (in [the app's calls](#the-iphone-apps-calls) below), a lease that it renews every 25 seconds, and for as long as it
    holds the end of a run, of a schedule's run and of a campaign are not sent to that phone as alerts, while what asks
    something of you (an approval, a question, a secret, a hand-off), a draft, what Dot tells you and its own warnings
-   are sent whatever it says, and so is every Live Activity update. The app of this checkout does not send the lease
-   yet, so until it does every alert goes as before. The app's pushes come in three kinds that each phone switches for itself (item 1421,
+   are sent whatever it says, and so is every Live Activity update. The app sends the lease (item 1440). The app's pushes come in three kinds that each phone switches for itself (item 1421,
    `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
    failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
    an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run, a
@@ -717,6 +717,15 @@ Reply, 204, with no body. `DELETE` (204, no body) forgets the phone's token: the
 switched off). A token APNs calls gone, and a removed phone, are forgotten too. Errors: 403 for the Mac's token; 422 for
 a token that is not lowercase hex of 64 to 512 characters or a body with another key; 404 for a phone removed while the
 call was on its way (nothing is kept).
+
+The iPhone app sends the token (item 1445) as `Activity<DotFleetAttributes>.pushToStartTokenUpdates` gives it, the one it
+holds when it starts and each change after, once each (a token the daemon already has is not sent again, and one that is
+not 64 to 512 characters of lowercase hex is not sent at all); it needs iOS 18, which is above the 17.2 it asks. The
+device's registration still carries `start_token: null`. The app sends the `DELETE` when the phone's key is forgotten
+(Settings › Forget this phone's key, or a changed address), before the key goes, and when Live Activities are switched off
+for Dot in the iPhone's settings (switched on again, the token goes again); a `DELETE` that does not get through (no link)
+leaves the token with the daemon until the phone is removed there, which forgets it too. The activity's own token, which
+ActivityKit gives once the activity started, goes as it did (`POST /api/phone/apns/activity`).
 
 What the daemon does with it: when a row of the Live Activity is at work (a command that ended in the background at once,
 any other row after 30 seconds of work: a run of the owner's, or the run that goes on in their chat when an agent's order

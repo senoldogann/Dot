@@ -14,7 +14,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
     `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
     `PushSettings` (item 1441) the three push switches and what a flip does; `NeedsYou` (item 1442) the inbox's list, its rows
-    and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it; `Handoff` (item 1444) the card of a step only the owner can do.
+    and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it; `Handoff` (item 1444) the card of a step only the owner can do; `LiveStartToken` (item 1445) when the token that starts the Live
+    Activity is sent.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -132,6 +133,11 @@ did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app'
   (`https://<mac>/#/runs/<id>`) in the system's browser; the chat is still `dotagent://run/<id>`. The card carries only the host
   the daemon's fixed line names (and only when it is plainly a host), never a credential or page text; the inbox's row has
   the same words and button.
+- **Live Activity push-to-start** (item 1445): `PushRegistrar` sends the token `Activity<DotFleetAttributes>.pushToStartTokenUpdates`
+  gives (iOS 17.2 and later; the app needs 18) to `POST /api/phone/live-start-token` (`StartTokenGate`: once each, only lowercase
+  hex of 64 to 512 characters), so that Dot can start the phone's Live Activity by push when a run begins on the Mac or by a
+  schedule. `DELETE` goes when the phone's key is forgotten (`AppModel.forgetKey`, before the key is deleted) and when Live
+  Activities are switched off for Dot; the activity's own token goes as it did. `DotFleetAttributes` is unchanged.
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 
