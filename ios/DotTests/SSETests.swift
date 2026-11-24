@@ -97,6 +97,12 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         var chunks: [String] = []
         /// After the chunks the connection fails, as a dropped network does; otherwise it ends cleanly.
         var failsAfter: Bool = false
+        /// No answer at all, as a path that died while the phone slept: the request waits.
+        var hangs: Bool = false
+        /// More chunks, each after its delay in seconds, counted from the answer (a daemon's keepalives).
+        var trickle: [(after: Double, chunk: String)] = []
+        /// The connection stays open after its chunks and its trickle, saying nothing more (a socket that is dead).
+        var staysOpen: Bool = false
     }
 
     nonisolated(unsafe) static var answers: [Answer] = []
@@ -111,10 +117,15 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         Self.requests.append(request)
         let answer: Answer = Self.answers.isEmpty ? Answer(status: 500) : Self.answers.removeFirst()
         Self.lock.unlock()
+        if answer.hangs { return }
         let response: HTTPURLResponse = HTTPURLResponse(
             url: request.url!, statusCode: answer.status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/event-stream"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         for chunk in answer.chunks { client?.urlProtocol(self, didLoad: Data(chunk.utf8)) }
+        for (delay, chunk) in answer.trickle {
+            DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [self] in client?.urlProtocol(self, didLoad: Data(chunk.utf8)) }
+        }
+        if answer.staysOpen { return }
         // A dropped network fails after the bytes it had delivered were read, not in the same breath.
         DispatchQueue.global().asyncAfter(deadline: .now() + (answer.failsAfter ? 0.15 : 0)) { [self] in
             if answer.failsAfter {

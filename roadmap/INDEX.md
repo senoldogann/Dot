@@ -6,6 +6,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1391](1391.md) | done | 2026-11-24 | Dot for iPhone: a socket that is dead and does not say so is dropped and replaced |
+| [1390](1390.md) | done | 2026-11-24 | Dot for iPhone: one capsule over the composer (status, helpers, loops, queue), each opening its own sheet |
 | [1382](1382.md) | done | 2026-11-23 | Dot for iPhone: an app icon, a launch screen and a Live Activity on the app's own tokens |
 | [1381](1381.md) | done | 2026-11-23 | Dot for iPhone: every screen redrawn on the design system, row by row |
 | [1380](1380.md) | done | 2026-11-23 | Dot for iPhone: a design system (tokens, glass, type, motion, haptics) and the audit that asked for it |
