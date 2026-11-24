@@ -435,7 +435,8 @@ earlier runs.
   way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).
 - A schedule's task is tried once more on its own (item 1206, `scheduler/recovery.py`) when Dot's restart or crash cut
   it off, an error of the model service that may pass ended it (a broken connection, a 429 or 5xx, an answer out of
-  form, a Claude Code session that broke off or went silent), or it stopped without getting anywhere (the progress
+  form, a Claude Code session that broke off or went silent, or whose bridge listed fewer tools than the task needs:
+  item 1400), or it stopped without getting anywhere (the progress
   watchdog, empty replies): 15 seconds after its end, or at the next start of Dot. One the Claude plan's usage limit
   stopped starts again a minute after the plan's reset, when that is at most 12 hours away. The schedule says
   `retrying at …` meanwhile. The try is a new task of the schedule, started as a firing is, with its own choices, in

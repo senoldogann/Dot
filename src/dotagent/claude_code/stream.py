@@ -279,6 +279,14 @@ def tool_prefix(door: str) -> str:
 SEARCH_TOOL: str = "ToolSearch"
 
 
+def listed_tools(init: Init, door: str) -> frozenset[str]:
+    """The names of Dot's tools the init line lists from the door ``door``, as Dot named them (``mcp__dot__finish`` is
+    ``finish``): what the program was given from the bridge, whether or not its model looks them up (item 1400; measured
+    on 2.1.330, the line lists the tools Claude Code defers too)."""
+    prefix: str = tool_prefix(door)
+    return frozenset(tool.removeprefix(prefix) for tool in init.tools if tool.startswith(prefix))
+
+
 def init_problem(init: Init, door: str) -> str | None:
     """What is wrong with what the model was given, ``None`` when it has the tools of the door ``door`` and Claude
     Code's search of them (:data:`SEARCH_TOOL`, item 1053), and nothing else: no other tool of Claude Code's own nor
