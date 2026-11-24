@@ -3,12 +3,21 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { loopRhythm, nextFiring, onceAt, repeatCron } from "../../src/dotagent/server/static/js/rhythm.js";
+import { loopRhythm, nextFiring, onceAt, repeatCron, shortRhythm } from "../../src/dotagent/server/static/js/rhythm.js";
 
 test("the rhythms /loop makes read as they are written", () => {
   assert.equal(loopRhythm("*/30 * * * *"), "every 30 minutes");
   assert.equal(loopRhythm("0 * * * *"), "every hour");
   assert.equal(loopRhythm("0 */2 * * *"), "every 2 hours");
+});
+
+test("a rhythm in minutes is said in fewer words for the phone's capsule (item 1383), the others as they are", () => {
+  assert.equal(shortRhythm("*/10 * * * *"), "every 10 min");
+  assert.equal(shortRhythm("*/30 * * * *"), "every 30 min");
+  assert.equal(shortRhythm("0 * * * *"), "every hour");
+  assert.equal(shortRhythm("0 */2 * * *"), "every 2 hours");
+  assert.equal(shortRhythm("0 10 * * *"), "every day at 10:00");
+  assert.equal(shortRhythm("0 9 1 * *"), null);
 });
 
 test("a schedule a run made reads by its days and times, as the owner's own three do", () => {
