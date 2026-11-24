@@ -794,7 +794,8 @@ class Scheduler:
             return
         paused: AgentRecord | None = await self._paused_agent(record)
         if paused is not None:
-            # A pause is the owner's: neither a failure nor a missed firing, so nothing counts it and nobody is told.
+            # A pause is the owner's: not a failure, so nobody is told. The firing it skips is counted (item 1401),
+            # so the count of firings skipped in a row grows for as long as the pause lasts.
             if one_time:
                 waiting: str = f"waiting: {paused.name} is paused"
                 if record.last_status != waiting:
