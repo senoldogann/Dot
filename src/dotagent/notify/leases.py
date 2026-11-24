@@ -1,11 +1,12 @@
 """The activity lease of a phone (item 1420): the app says every 25 seconds that it is in the foreground and which
 chat it shows, and the daemon keeps the alerts of a run's end to that phone quiet for as long as the lease lives.
 
-A lease is held in memory alone and expires by itself: the app renews it at a third of the way to its end, and a daemon
-that starts again, a phone that lost its network or an app that iOS suspended without a word ends up with none, which is
-the safe side (the alerts go). ``background`` ends the lease at once. It holds back the alerts of a run's end alone
-(:func:`dotagent.notify.push.quiet_while_shown`); what asks something of the owner (an approval, a question, a secret, a
-hand-off) is never held back by it, and neither is the Live Activity, which the lease does not touch."""
+A lease is held in memory alone and expires by itself: the app renews it every 25 seconds, well before its 45 seconds
+are over, and a daemon that starts again, a phone that lost its network or an app that iOS suspended without a word
+ends up with none, which is the safe side (the alerts go). ``background`` ends the lease at once. It holds back the
+alerts of a run's end alone (:func:`dotagent.notify.push.quiet_while_shown`); what asks something of the owner (an
+approval, a question, a secret, a hand-off) is never held back by it, and neither is the Live Activity, which the lease
+does not touch."""
 
 import time
 from collections.abc import Callable

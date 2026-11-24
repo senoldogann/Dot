@@ -17,9 +17,9 @@ _KEY_PREFIX: str = "phone.push."
 
 
 class PushSettings(FrozenModel):
-    """The three kinds of push a phone is told: ``needs_you`` (something waits for the owner's answer: an approval, a
-    question, a secret, a hand-off), ``ready`` (something is ready for them to look over: a draft, what Dot tells them)
-    and ``done`` (something finished or failed)."""
+    """The three kinds of push a phone is told: ``needs_you`` (something waits for the owner's answer or look: an
+    approval, a question, a secret, a hand-off, and Dot's own failures), ``ready`` (something is ready for them to look
+    over: a draft, what Dot tells them) and ``done`` (the end of a run, of a schedule's run or of a campaign)."""
 
     needs_you: StrictBool
     ready: StrictBool
