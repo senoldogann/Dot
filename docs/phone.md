@@ -499,9 +499,10 @@ service worker stays what it is, the shell only, and caches nothing under `/api`
 - **What it draws first.** A chat read before is drawn from its copy at once, before Dot is asked anything, with its
   queue; the page then asks only for what changed: the stream goes on after the last event the copy holds, and the run's
   record, its questions and its lessons are read again. The lists answer from their copy while Dot cannot be reached, so
-  a phone with no link opens on its chats instead of on "Dot cannot be reached"; a refusal of the daemon's (a key it
-  does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from the
-  cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
+  a phone with no link opens on its chats instead of on "Dot cannot be reached"; with a link, Dot is asked at once and
+  the copy is looked for beside it, so that the cache is never on the way of an answer. A refusal of the daemon's (a key
+  it does not accept, a run it no longer has) is never answered from a copy, and a run Dot no longer has is dropped from
+  the cache. A copy is dated by when Dot last said that this is how the chat stands: one that was only drawn again never
   looks fresher than it is. What the page needs to open is Dot's status; the agents' looks, the owner's themes and Dot's
   name are read beside it, and one of them that cannot be read leaves the page with its defaults, not without its chats
   (a key that is refused among them is refused all the same).
