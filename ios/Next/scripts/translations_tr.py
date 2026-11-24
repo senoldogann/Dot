@@ -7,6 +7,11 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    "Fill in the pending answers": "Bekleyen yanıtları doldur",
+    "Submit %lld answers": "%lld yanıtı gönder",
+    "Submit answer": "Yanıtı gönder",
+    "%@ (Recommended)": "%@ (Önerilen)",
+    "Skip this question": "Bu soruyu atla",
     "And book the car service too": "Araba servisini de ayarla",
     "Waiting for a condition": "Bir koşul bekleniyor",
     "Changes": "Değişiklikler",

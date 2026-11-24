@@ -197,4 +197,28 @@ final class ChatRulesTests: XCTestCase {
         XCTAssertNil(delivery(of: followed, in: chat), "the run with the edited words shows: the overlay goes")
         XCTAssertEqual(delivery(of: sent, in: chat), .delivered, "with the old words it would have stayed as Sent")
     }
+
+    func testOneSubmitSendsEveryAnsweredQuestionAndTheRecommendedOptionComesFirst() {
+        let options: [AskOption] = [AskOption(label: "Keep", detail: "", recommended: false), AskOption(label: "Close both", detail: "", recommended: true)]
+        XCTAssertEqual(shownOptions(options).map(\.label), ["Close both", "Keep"])
+        let one: QuestionDraft = QuestionDraft.empty.picking("Keep", multiple: false).picking("Close both", multiple: false)
+        XCTAssertEqual(one.chosen, ["Close both"], "one answer: the new pick replaces the old")
+        let several: QuestionDraft = QuestionDraft.empty.picking("Keep", multiple: true).picking("Close both", multiple: true)
+        XCTAssertEqual(several.chosen, ["Keep", "Close both"])
+        let asks: [ApprovalRecord] = [
+            record("q1", at: 1, severity: "question", args: ["question": .string("A?"), "options": .array([.string("Keep"), .string("Close both")])]),
+            record("q2", at: 2, severity: "question", args: ["question": .string("B?")]),
+            record("q3", at: 3, severity: "question", args: ["question": .string("C?")]),
+            record("a1", at: 4),
+        ]
+        let entries: [DockEntry] = dockEntries(
+            asks: asks, chatRuns: ["run_a"], outbox: [], online: true, local: ["q3": .submitting], shown: [], decided: [:], answeredHere: [])
+        let drafts: [String: QuestionDraft] = [
+            "q1": QuestionDraft(chosen: ["Close both", "Keep"], written: "today"), "q2": .empty, "q3": QuestionDraft(chosen: [], written: "x"),
+            "a1": QuestionDraft(chosen: [], written: "y"),
+        ]
+        let sent = submittedAnswers(entries, drafts: drafts)
+        XCTAssertEqual(sent.map(\.ask.id), ["q1"], "unanswered, already sending and non-questions are left")
+        XCTAssertEqual(sent.first?.answer, "Keep; Close both\ntoday", "the labels in Dot's order, then the words")
+    }
 }

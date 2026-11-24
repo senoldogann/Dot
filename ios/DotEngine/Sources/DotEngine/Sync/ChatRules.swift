@@ -52,6 +52,8 @@ public struct Ask: Sendable, Equatable, Identifiable {
     /// What the action acts on, whole (a command, a path, a URL), shown in a code box.
     public let target: String
     public let options: [AskOption]
+    /// A question's short topic label (`header`), empty when Dot gave none.
+    public let topic: String
     public let multiple: Bool
     /// "Always allow in this chat" is offered (item 866: never for money, credentials, Dot's own files, a question).
     public let rememberable: Bool
@@ -129,7 +131,7 @@ public func ask(of record: ApprovalRecord, chatRuns: Set<String>) -> Ask {
         id: record.id, runId: record.runId, kind: kind, tool: record.tool, text: text,
         why: kind == .secret ? (args["why"]?.string ?? "") : "",
         target: [args["target"]?.string, args["body"]?.string].compactMap { $0 }.filter { !$0.isEmpty && !text.contains($0) }.joined(separator: "\n\n"),
-        options: options, multiple: args["multiple"]?.bool == true, rememberable: rememberable, kept: kept,
+        options: options, topic: args["header"]?.string ?? "", multiple: args["multiple"]?.bool == true, rememberable: rememberable, kept: kept,
         fromHelper: !chatRuns.contains(record.runId), createdAt: record.createdAt)
 }
 
@@ -181,6 +183,43 @@ public func dockEntries(
 /// (`chosen_answer` of dotagent.agent.questions). Empty when nothing was chosen or written.
 public func chosenAnswer(chosen: [String], written: String) -> String {
     [chosen.joined(separator: "; "), written.trimmingCharacters(in: .whitespacesAndNewlines)].filter { !$0.isEmpty }.joined(separator: "\n")
+}
+
+/// What the owner chose and wrote for one question while the dock shows it (PLAN §21: choices are picked, one Submit
+/// sends every answered question).
+public struct QuestionDraft: Sendable, Equatable {
+    public var chosen: [String]
+    public var written: String
+
+    public init(chosen: [String], written: String) {
+        self.chosen = chosen
+        self.written = written
+    }
+
+    public static let empty: QuestionDraft = QuestionDraft(chosen: [], written: "")
+
+    /// The draft with `option` picked: alone for a question of one answer, added or taken away for one of several.
+    public func picking(_ option: String, multiple: Bool) -> QuestionDraft {
+        guard multiple else { return QuestionDraft(chosen: chosen == [option] ? [] : [option], written: written) }
+        let next: [String] = chosen.contains(option) ? chosen.filter { $0 != option } : chosen + [option]
+        return QuestionDraft(chosen: next, written: written)
+    }
+}
+
+/// A question's options as the card shows them: the recommended first, the others in the order Dot gave.
+public func shownOptions(_ options: [AskOption]) -> [AskOption] {
+    options.filter(\.recommended) + options.filter { !$0.recommended }
+}
+
+/// The answers one Submit sends (PLAN §21): each question of the dock that can take an answer and has one, in the
+/// dock's order, with its text (the labels chosen in the order Dot gave them, then what was written).
+public func submittedAnswers(_ entries: [DockEntry], drafts: [String: QuestionDraft]) -> [(ask: Ask, answer: String)] {
+    entries.compactMap { entry in
+        guard entry.ask.kind == .question, entry.phase.answerable, let draft: QuestionDraft = drafts[entry.id] else { return nil }
+        let picked: [String] = entry.ask.options.map(\.label).filter { draft.chosen.contains($0) }
+        let answer: String = chosenAnswer(chosen: picked, written: draft.written)
+        return answer.isEmpty ? nil : (entry.ask, answer)
+    }
 }
 
 /// The shortest secret a card takes (`SECRET_LEAST_CHARS`, held_secrets.py): a shorter one goes as a message instead.

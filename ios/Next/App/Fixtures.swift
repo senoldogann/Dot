@@ -10,6 +10,8 @@
         case work = "n2-chat"
         /// Two asks: an approval with a long command and a question with options.
         case asks = "n2-asks"
+        /// Two questions answered with one Submit (PLAN §21).
+        case question = "n2-question"
         /// A secret ask.
         case secret = "n2-secret"
         /// A hand-off.
@@ -74,8 +76,16 @@
                   "summary":"Run a command that deletes the build folder and rebuilds the app",
                   "args":{"kind":"shell","target":"rm -rf ~/Projects/site/build -- --force && npm run build -- --mode=production"}},
                  {"id":"apr_2","run_id":"run_b","created_at":2,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
-                  "args":{"question":"Which day suits you for the dentist?","multiple":false,
+                  "args":{"header":"Appointment","question":"Which day suits you for the dentist?","multiple":false,
                     "options":[{"label":"Tuesday afternoon","description":"14:00 or 15:30 are free","recommended":true},{"label":"Thursday morning"}]}}]
+                """#
+            case .question:
+                #"""
+                [{"id":"apr_q1","run_id":"run_b","created_at":1,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
+                  "args":{"header":"MCP","question":"Playwright and chrome-devtools start with every launch of Dot and were not used in 14 days. Close them?","multiple":false,
+                    "options":[{"label":"Keep them on","description":"Nothing changes."},{"label":"Close both","description":"Dot's own browser tools do the same; launches get faster. One tap in Settings › Connectors turns them back on.","recommended":true}]}},
+                 {"id":"apr_q2","run_id":"run_b","created_at":2,"status":"pending","tool":"ask_user","severity":"question","summary":"q",
+                  "args":{"header":"Appointment","question":"Which day suits you for the dentist?","options":[{"label":"Tuesday afternoon","recommended":true},{"label":"Thursday morning"}]}}]
                 """#
             case .secret:
                 #"""
@@ -166,7 +176,7 @@
 
         private func rowsJSON(now: Double) -> String {
             """
-            [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks ? 2 : 0)}]
+            [{"summary":{"id":"thr_fixture","title":"Dentist and the website","source":"phone","created_at":\(now - 3600),"updated_at":\(now),"pinned_at":null,"run_count":2,"latest_run_id":"run_b","latest_status":"running","latest_created_at":\(now - 2475),"unread":false,"actor_id":null,"last_message":"Book me the dentist","last_role":"user"},"revision":7,"asks":\(self == .asks || self == .question ? 2 : 0)}]
             """
         }
     }

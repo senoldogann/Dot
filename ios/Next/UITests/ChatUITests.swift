@@ -24,6 +24,21 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(app.textFields["composer.field"].waitForExistence(timeout: 3), "folded, the composer is back")
     }
 
+    func testQuestionsArePickedAndSentWithOneSubmit() {
+        let app: XCUIApplication = launch("n2-question")
+        XCTAssertTrue(app.staticTexts["Fill in the pending answers"].waitForExistence(timeout: 10))
+        let submit: XCUIElement = app.buttons["ask.submit"]
+        XCTAssertFalse(submit.isEnabled, "nothing picked yet")
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Close both (Recommended)")).firstMatch.tap()
+        XCTAssertTrue(submit.isEnabled)
+        XCTAssertEqual(submit.label, "Submit answer")
+        app.buttons["Next ask"].tap()
+        let tuesday: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Tuesday afternoon (Recommended)")).firstMatch
+        XCTAssertTrue(tuesday.waitForExistence(timeout: 3))
+        tuesday.tap()
+        XCTAssertEqual(submit.label, "Submit 2 answers", "the pick of the first question is kept while paging")
+    }
+
     func testEditingAQueuedMessageKeepsTheLiveDraftForCancel() {
         let app: XCUIApplication = launch("n2-editing")
         XCTAssertTrue(app.staticTexts["Editing queued message"].waitForExistence(timeout: 10))

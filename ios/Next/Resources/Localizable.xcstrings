@@ -1,6 +1,17 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ (Recommended)": {
+      "comment": "Ask dock: the option Dot recommends; the argument is its label",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (Önerilen)"
+          }
+        }
+      }
+    },
     "%@, failed": {
       "comment": "VoiceOver: a tool call that failed; the argument is its line",
       "localizations": {
@@ -1518,6 +1529,17 @@
         }
       }
     },
+    "Fill in the pending answers": {
+      "comment": "Ask dock title while a question shows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekleyen yanıtları doldur"
+          }
+        }
+      }
+    },
     "Find a free afternoon slot": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -2805,17 +2827,6 @@
         }
       }
     },
-    "Recommended": {
-      "comment": "Ask dock: the option Dot recommends",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Önerilen"
-          }
-        }
-      }
-    },
     "Reconnecting…": {
       "comment": "Chat subtitle: the link to the Mac broke and is being opened again",
       "localizations": {
@@ -3113,17 +3124,6 @@
         }
       }
     },
-    "Send answer": {
-      "comment": "Ask dock: sends the answer to a question",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yanıtı gönder"
-          }
-        }
-      }
-    },
     "Send as a message": {
       "comment": "Ask dock: sends a short code in words instead of as a secret",
       "localizations": {
@@ -3351,6 +3351,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Atla"
+          }
+        }
+      }
+    },
+    "Skip this question": {
+      "comment": "Ask dock: skips one question without an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu soruyu atla"
           }
         }
       }
@@ -3593,6 +3604,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alt ajan"
+          }
+        }
+      }
+    },
+    "Submit %lld answers": {
+      "comment": "Ask dock: sends the answers of several questions; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yanıtı gönder"
+          }
+        }
+      }
+    },
+    "Submit answer": {
+      "comment": "Ask dock: sends the answer of the question",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtı gönder"
           }
         }
       }
