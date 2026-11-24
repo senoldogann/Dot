@@ -549,8 +549,8 @@ def test_a_goal_that_asks_for_a_notification_is_told_in_the_owners_three_languag
 
 def test_a_goal_that_only_mentions_a_notification_or_refuses_one_asks_for_none() -> None:
     """Item 1400's review: a goal that merely names a notification (a screen to review, a job ad, a sale listing), names
-    another's (an email, a team), or says not to send one, must not make a run fail for want of ``notify``, in any of
-    the owner's three languages."""
+    a thing that is none (an email, a badge), or says not to send one, must not make a run fail for want of ``notify``,
+    in any of the owner's three languages."""
     for goal in (
         "Review the push notification settings screen.",
         "Explain how notifications work on macOS.",
