@@ -45,6 +45,8 @@ from dotagent.agent.lessons import (
     LessonCase,
     RunLessons,
     learn_from,
+    may_learn,
+    may_learn_from_dislike,
     repeats,
     run_lessons,
     same_way_round,
@@ -256,6 +258,26 @@ def stored_case(run: RunRecord, events: Sequence[EventRecord], tainted: bool) ->
         tainted=tainted or read_outside(results),
         reached_goal=run.status == "done",
     )
+
+
+async def whole_run_case(runtime: Runtime, run: RunRecord, ever_tainted: bool) -> LessonCase | None:
+    """The lesson case of a run that ended on a harness that runs the whole run in its own program (the Claude plan,
+    OpenCode; ``WHOLE_RUN_AGENTS``), drawn as the reflection draws one (:func:`stored_case`) from the results of Dot's
+    tools the run called, which the store holds as for any run; ``None`` when the run may not be asked for lessons
+    (:func:`dotagent.agent.lessons.may_learn`, or a chat that may only learn from a dislike, item 654). Such a run ends
+    with no case of its own, so its lessons waited for the night, which reads only some (audit 2026-11-24, I2: 26
+    lessons from the surviving Claude-plan runs against 147 from Dot's own loop). ``ever_tainted`` is the run's gate's
+    mark; a stored result that read outside content marks it too."""
+    setting = runtime.config.agent.lessons
+    chat: bool = may_learn_from_dislike(setting, run.mode, run.parent_run_id, run.status)
+    if not chat and not may_learn(setting, run.mode, run.parent_run_id, run.status):
+        return None
+    case: LessonCase = stored_case(
+        run,
+        await runtime.store.events_of_kind(run.id, "tool_result", _RESULTS_READ),
+        ever_tainted or await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS)),
+    )
+    return case.model_copy(update={"only_if_disliked": chat})
 
 
 def _close(older: MemoryRecord, newer: MemoryRecord, vectors: Mapping[str, Vector]) -> bool:

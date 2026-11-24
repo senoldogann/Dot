@@ -98,7 +98,7 @@ from dotagent.agent.playbooks import (
 from dotagent.agent.progress import can_ask_user
 from dotagent.agent.reaction_words import ANSWER as ANSWER_MESSAGE
 from dotagent.agent.reaction_words import RELEASE_NOTE, follow_up_goal, queued_reaction_note
-from dotagent.agent.reflection import reflect
+from dotagent.agent.reflection import reflect, whole_run_case
 from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
     RESUME_SOURCE,
@@ -4218,6 +4218,14 @@ class RunManager:
             recorded: bool = await self._close(run, status, result, needs, error, inbox, finished, restated)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
         learns: bool = recorded and not self._stopping and not self._learning_dropped
+        if learns and lessons is None and parse_model_ref(run.model).provider in WHOLE_RUN_AGENTS:
+            # A run on the Claude plan or OpenCode ends with no case of its own: its lessons are drawn from what the
+            # store holds of it, as the reflection draws them (item 1714).
+            try:
+                lessons = await whole_run_case(runtime, await runtime.store.get_run(run.id), gate.ever_tainted)
+            except NotFoundError:
+                # Its chat was deleted as it ended: nothing of it is left to learn from.
+                log.info("lessons_skipped", run_id=run.id, reason="the run was deleted as it ended")
         if learns and lessons is not None:
             self._learning[run.id] = asyncio.create_task(self._learn(lessons))
         if learns and playbook_case(runtime.config, run, status) is not None:
