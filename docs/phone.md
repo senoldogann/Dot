@@ -182,9 +182,10 @@ code** takes its place. The same by hand:
    notification (item 1096). A run started on the Mac, or by a schedule, opens no activity, but for a phone that gave
    its push-to-start token (item 1425, iOS 17.2 and later, `POST /api/phone/live-start-token`): the daemon starts the
    activity there by push, with the notification Apple requires of a start (a fixed title and line), when the phone shows
-   none and the app is not in the foreground, at once for a command that ended in the background and for any other run
-   once it has worked 30 seconds, and at most once in ten minutes for a phone (a schedule's run is no row of the activity,
-   item 1096, so it starts none). You are notified when a
+   none and the app is not in the foreground, at once for a command that ended in the background and for any other row
+   of the activity (a run of yours, or the run that goes on in your chat when an agent's order came back or a run was
+   resumed) once it has worked 30 seconds, and at most once in ten minutes for a phone (a schedule's run is no row of the
+   activity, item 1096, so it starts none). You are notified when a
    run of yours ends or waits for you, as you allowed Dot's notifications in the iPhone's Settings. The daemon can keep
    the alert of a run's end from a phone whose app shows Dot (item 1420): the app says so with `POST /api/phone/activity`
    (in [the app's calls](#the-iphone-apps-calls) below), a lease that it renews every 25 seconds, and for as long as it
@@ -462,51 +463,46 @@ copy was kept of it (the first opening from the home screen after the app is add
 it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
 Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
 
-**While you were away on the phone** (item 1424): `GET /api/away?since=<seconds since the epoch>` (any token, a phone's
-key too) lists what Dot did on its own since that moment, kept within the last week, and `GET /api/away/read` and `POST
-/api/away/read` keep the moment for every device (item 1356: the iPhone, the Mac and a browser agree on what is news;
-`{"until": <seconds>}` moves it on, never back, never past now). The runs listed are those of every source Dot starts by itself and nobody
-watches (a schedule or a campaign, a watcher's run, Dot's own initiative, a reply to a mail), an agent's work (`team`) and a
-command that ended in the background (`background`), and what ran in an agent's own chat under a source that is not the
-owner's (`ui`, `cli`, a review, an eval, an agent's welcome and a run resumed after one the owner started are theirs: they
-wait for them).
-A reply:
-
-```json
-{
-  "since": 1764000000.0, "until": 1764003600.0,
-  "done": 3, "failed": 1, "cancelled": 0, "working": 1, "campaign_sessions": 0,
-  "runs": [
-    {"run_id": "run_mf3k2x1a_1c04d1", "title": "Deploy the site", "source": "background", "campaign": false,
-     "agent_id": null, "status": "done", "steps": 4, "created_at": 1764000100.0, "finished_at": 1764000160.0,
-     "answer": "The deploy finished."}
-  ],
-  "decisions": {"reviewer_approved": 0, "reviewer_denied": 0, "yolo_approved": 2, "yolo_denied": 0},
-  "decision_runs": [{"run_id": "run_mf3k2x1a_1c04d1", "title": "Deploy the site", "reviewer": 0, "yolo": 2, "denied": 0}],
-  "drafts": 1
-}
-```
-
-`title` is the name of the campaign or the schedule, else of the chat (for a reply, an agent's work or a command in the
-background), else the first line of the goal; `source` says what started the run; `status` is `done`, `failed`,
-`cancelled`, or one of the states of a run that works (`queued`, `running`, `blocked`, `ending`); `answer` is the first
-line of its answer with its secrets masked (200 characters at most). The counts are of every such run since the moment,
-the list is the newest fifty, and the view carries no summary and no arguments of an approval.
-
-`since` is required and a number of 0 or more (a missing or negative one is a 422); the daemon takes it within the last
-seven days and never after now, and `until` is now. `GET /api/away/read` answers `{"read_at": 1764003000.0}` (`null`
-before any device marked it); `POST /api/away/read` takes `{"until": 1764003600.0}` (a number of 0 or more, no other key,
-or a 422) and answers the same shape with where the mark stands, which it never moves back, nor past now. The three
-calls answer 401 without a valid token.
-
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
 ## The iPhone app's calls
 
-What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every call below is
-made with the phone's own key (`Authorization: Bearer phone.<id>.<secret>`, from pairing with the code of Settings ›
-Phone); the Mac's token is refused (403) where a call belongs to a phone, and a key that was removed is refused (401).
-Bodies and answers are JSON; a body with a key that is not named, or a value of another shape, is refused (422).
+What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every path is under
+`/api` of the tailnet address the app was given (`https://<mac>.<tailnet>.ts.net`); bodies and answers are JSON.
+
+**Auth.** `Authorization: Bearer phone.<id>.<secret>`: the phone's own key, from pairing with the code of Settings › Phone
+(`POST /api/phone/pair`). A call that belongs to one phone (its lease, its switches, its tokens) answers **403** to the
+Mac's own token, which belongs to none; `GET /api/needs-you`, `GET /api/away` and `GET` and `POST /api/away/read` are
+read with either. With no valid token every call is a **401** (`a valid bearer token is required`), also with the key of a
+phone that was removed. A request from another origin is a 403 and one to a host that is not Dot's a 421, before that.
+
+**Errors.** Every error is `{"message": "...", "context": {...}}`. A body with a key that is not named, a value of another
+shape or a query that is not valid is a **422** whose `context.errors` names each field (`type`, `loc`, `msg`; never the
+value refused), and nothing was changed. A phone removed while its call was on its way is a **404** (`that phone is not
+paired`) and nothing is kept for it.
+
+**The calls at a glance** (the sections below have the bodies, the replies and what each changes):
+
+| Call | Auth | Item | Answer |
+| ---- | ---- | ---- | ------ |
+| `POST /api/phone/activity` | the phone's key | 1420 | 200, the lease |
+| `GET /api/phone/push-settings` | the phone's key | 1421 | 200, the three switches |
+| `PUT /api/phone/push-settings` | the phone's key | 1421 | 200, the switches kept |
+| `GET /api/needs-you` | any token | 1422, 1423 | 200, `{count, items}` |
+| `POST /api/phone/live-start-token` | the phone's key | 1425 | 204 |
+| `DELETE /api/phone/live-start-token` | the phone's key | 1425 | 204 |
+| `GET /api/away?since=<seconds>` | any token | 1424 | 200, what Dot did on its own |
+| `GET /api/away/read` | any token | 1356 | 200, `{read_at}` |
+| `POST /api/away/read` | any token | 1356 | 200, `{read_at}` |
+
+What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
+wait on you (item 1422; [below](#what-the-daemon-pushes-to-the-app)); `GET /api/away` lists more runs and says each run's
+`source` (item 1424); and removing a phone (`DELETE /api/phone/phones/{id}`, the Mac's token alone) also drops its lease,
+its switches and its push-to-start token. The registrations the app made before are as they were: `POST
+/api/phone/apns` (`{"device_token", "start_token", "environment"}`: the device token in lowercase hex; `start_token`,
+a key that must be there, `null` (a token in it is kept and never read: the token that starts a Live Activity goes by
+`POST /api/phone/live-start-token`); and `"sandbox"` or `"production"`), `POST /api/phone/apns/activity` (`{"run_id":
+"fleet", "token"}`) and `DELETE /api/phone/apns/activity` (with `?token=` to forget one activity's token), each 204.
 
 ### POST /api/phone/activity
 
@@ -545,6 +541,10 @@ switched off, learning that stopped, a restart). The Live Activity is not touche
 nor the web push of a browser. A phone that is removed loses its lease. The app of this checkout does not call this
 route yet (`ios/` was left as it was), so until it does the lease is never made and every alert goes.
 
+Errors: 403 for the Mac's token; 422 for a `state` that is neither `foreground` nor `background`, a `chat` that is empty
+or over 64 characters, a `ttl_s` that is not a number above 0, or any other key (the lease is as it was); 404 for a phone
+removed while the call was on its way.
+
 ### GET /api/phone/push-settings and PUT /api/phone/push-settings
 
 Which of the three kinds of push the phone is told (item 1421). The switches are kept for the phone whose key asks
@@ -574,8 +574,9 @@ and answers 200 with what it kept:
 {"needs_you": true, "ready": false, "done": false}
 ```
 
-The Mac's token is refused (403). Web push to a browser has its own switch (Settings › General › Notifications) and is
-not changed by these.
+Errors: 403 for the Mac's token; 422 for a `PUT` that is not the three booleans (the switches are as they were); 404 for a
+phone removed while its `PUT` was on its way. Web push to a browser has its own switch (Settings › General ›
+Notifications) and is not changed by these.
 
 ### GET /api/needs-you
 
@@ -626,6 +627,15 @@ Reply, 200:
 A card of a run that no longer works here is not listed (the leftover of a daemon that stopped), one whose run is gone is
 skipped, and a step kept for you whose time is over has lapsed and is no longer listed.
 
+**Answering what the list holds** (the decision routes, which this item did not change; `id` is the item's `id`):
+
+| `kind` | Answer |
+| ------ | ------ |
+| `approval` | `POST /api/approvals/{id}/decision` with `{"approve": true}` or `{"approve": false}`; `"note"` (text, optional), `"remember": true` (with a yes: do not ask again in this chat), `"by": "ui"` or `"cli"` are the other keys. 200, the approval as it is stored; 409 when it was answered already. |
+| `question` | The same route; `"note"` carries the answer: the label of the option chosen (several joined with `"; "` when the question takes several), then what was written on a line of its own. `{"approve": false}` skips it. |
+| `secret` | `POST /api/approvals/{id}/secret` with `{"value": "<the secret>"}` (1 to 8192 characters), which the daemon holds for the chat's commands for 24 hours and writes nowhere else; `{"approve": false}` on the decision route skips it (a yes there is a 422). |
+| `handoff` | The decision route: `{"approve": true}` says you did it and the run goes on, `{"approve": false}` skips it. |
+
 **Hand-offs** (item 1423). A step only you can do is a hand-off: the policy hands a credential (a password or a code the
 run was not given, a login) and a payment to you in every mode that asks, and the run parks at it: it waits for your
 answer and, unanswered in time, the step is refused or, with `[policy] unanswered = "park"`, kept for you while the run
@@ -655,10 +665,13 @@ Body of the `POST`, the token in lowercase hex (64 to 512 characters; any other 
 ```
 
 Reply, 204, with no body. `DELETE` (204, no body) forgets the phone's token: the app says it has none (Live Activities
-switched off). A token APNs calls gone, and a removed phone, are forgotten too.
+switched off). A token APNs calls gone, and a removed phone, are forgotten too. Errors: 403 for the Mac's token; 422 for
+a token that is not lowercase hex of 64 to 512 characters or a body with another key; 404 for a phone removed while the
+call was on its way (nothing is kept).
 
 What the daemon does with it: when a row of the Live Activity is at work (a command that ended in the background at once,
-any other run of the owner's after 30 seconds of work), the phone has no activity registered (`POST
+any other row after 30 seconds of work: a run of the owner's, or the run that goes on in their chat when an agent's order
+came back or a run was resumed), the phone has no activity registered (`POST
 /api/phone/apns/activity`), its lease (`POST /api/phone/activity`) is not foreground, and no start was sent to it in the
 last ten minutes for the runs at work, it posts this to APNs, to the phone's token, with `apns-push-type: liveactivity`,
 `apns-topic: <bundle id>.push-type.liveactivity` and `apns-priority: 10`:
@@ -672,6 +685,7 @@ last ten minutes for the runs at work, it posts this to APNs, to the phone's tok
       "status": "working", "kind": "thinking", "line": "Thinking", "startedAt": 1763999970.0}]},
     "attributes-type": "DotFleetAttributes",
     "attributes": {"fleetId": "fleet"},
+    "input-push-token": 1,
     "alert": {"title": "Dot is working", "body": "Open Dot to see it."},
     "stale-date": 1764014400
   }
@@ -685,6 +699,103 @@ that gets it starts the activity, is woken, and sends the activity's own token (
 which every change goes to that token as before. This follows Apple's "Starting and updating Live Activities with
 ActivityKit push notifications": the push-to-start token comes from `pushToStartTokenUpdates` and goes to the server; a
 start is `event: start` with `attributes-type`, `attributes`, `content-state`, `timestamp` and an `alert`, which is
-required; the headers are `apns-push-type: liveactivity`, `apns-topic: <bundle id>.push-type.liveactivity` and
+required, and, for iOS 18 and later, `input-push-token: 1` "to start a Live Activity and receive a new push token" (the
+daemon needs the started activity's own token, which the app sends it; iOS 17.2 does not read the key; not tried on a
+phone); the headers are `apns-push-type: liveactivity`, `apns-topic: <bundle id>.push-type.liveactivity` and
 `apns-priority` 5 or 10, 10 counting toward the hourly budget, so a start, rare by its rate, goes at 10. A phone whose
 token APNs refuses as gone loses the token and not its device; the app gives a new one when iOS changes it.
+
+### GET /api/away, GET /api/away/read and POST /api/away/read
+
+What Dot did on its own while you were away (item 1424), and the moment you last looked, which Dot keeps for every device
+(item 1356: the iPhone, the Mac and a browser agree on what is news). Any token reads and moves them, a phone's key too.
+
+`GET /api/away?since=<seconds since the epoch>`. `since` is required and a number of 0 or more (a missing or negative one
+is a 422); the daemon takes it within the last seven days and never after now. Reply, 200 (`until` is now):
+
+```json
+{
+  "since": 1764000000.0, "until": 1764003600.0,
+  "done": 3, "failed": 1, "cancelled": 0, "working": 1, "campaign_sessions": 0,
+  "runs": [
+    {"run_id": "run_mf3k2x1a_1c04d1", "title": "Deploy the site", "source": "background", "campaign": false,
+     "agent_id": null, "status": "done", "steps": 4, "created_at": 1764000100.0, "finished_at": 1764000160.0,
+     "answer": "The deploy finished."}
+  ],
+  "decisions": {"reviewer_approved": 0, "reviewer_denied": 0, "yolo_approved": 2, "yolo_denied": 0},
+  "decision_runs": [{"run_id": "run_mf3k2x1a_1c04d1", "title": "Deploy the site", "reviewer": 0, "yolo": 2, "denied": 0}],
+  "drafts": 1
+}
+```
+
+- The runs are those of every source Dot starts by itself and nobody watches (a schedule or a campaign, a watcher's run,
+  Dot's own initiative, a reply to a mail), an agent's work (`team`: a run sent it, so it has a parent; not one with a run
+  of the owner's above it, which they wait for with the work in it) and a command that ended in the background
+  (`background`), and what ran in an agent's own chat under a source that is not the owner's (`ui`, `cli`, a review, an
+  eval, an agent's welcome and a run resumed after one the owner started are theirs: they wait for them, and are not
+  listed). Dot keeps no record of who was looking while a run worked, so a run the owner started and walked away from is
+  not listed either; the chat's unread dot says it ended.
+- `title` is the name of the campaign or the schedule, else of the chat (for a reply, an agent's work or a command in the
+  background), else the first line of the goal; `source` says what started the run; `status` is `done`, `failed`,
+  `cancelled`, or a state of a run that works (`queued`, `running`, `blocked`, `ending`); `answer` is the first line of its
+  answer with its secrets masked (200 characters at most). The counts are of every such run since the moment, `runs` is
+  the newest fifty, and the view carries no summary and no arguments of an approval.
+- `decisions` and `decision_runs` count the approvals the review model and `yolo` answered for you in those runs and
+  their helpers (the ten runs with the most); `drafts` is how many drafts they wrote that still wait for you.
+
+`GET /api/away/read` answers 200 `{"read_at": 1764003000.0}` (`null` before any device marked it). `POST
+/api/away/read` takes `{"until": 1764003600.0}` (the `until` of the card that was shown: a number of 0 or more, no other
+key, or a 422) and answers 200 with the same shape, where the mark stands now: it never moves back and never past now. The
+first visit from any device marks it and shows nothing, so the card never pours out history.
+
+### What the daemon pushes to the app
+
+Pushes go through APNs to every phone that registered a device (`POST /api/phone/apns`), signed with the key of `[apns]`,
+as `POST https://api.push.apple.com/3/device/<device token>` (`api.sandbox.push.apple.com` for a phone that said
+`"sandbox"`); nothing is pushed while `[apns]` is empty. Headers: `apns-topic: <bundle id>` and `apns-push-type: alert` for
+an alert, `apns-topic: <bundle id>.push-type.liveactivity` and `apns-push-type: liveactivity` for the Live Activity, and
+`apns-priority: 10`, or `5` for a step of a run at work.
+
+**What a payload may carry.** Apple reads what APNs carries, so a push holds a title that is one of Dot's fixed lines, the
+fixed line "Open Dot to see it.", a route, an id and a number, and nothing a person did or was asked: **never a command, an
+address, page text, a file name, a credential, a question or an answer.** What a thing asks is read in the app, over the
+phone's own key, after Face ID (`GET /api/needs-you`, the run's page). The Live Activity alone holds the chat's title (40
+characters at most), the agent's name and a fixed word for what the run does now ("Thinking", "Browsing the web").
+
+An **alert** (`alert_payload`):
+
+```json
+{
+  "aps": {"alert": {"title": "A task is done", "body": "Open Dot to see it."}, "sound": "default", "badge": 2},
+  "route": "#/runs/run_mf3k2w9z_a1b2c3"
+}
+```
+
+- `aps.badge` (item 1422) is how many things wait on you at that moment, the `count` of `GET /api/needs-you`: a number,
+  nothing of what they are. It is left out when the daemon cannot count: an alert is not held back for its badge. Set the
+  badge again from `count` whenever the app reads the list, since an answer given on the Mac sends no alert that would
+  lower it.
+- `title` is one of: "Dot asks for approval", "Dot has a question", "Dot needs your help" (a hand-off, item 1423), "A task
+  is done", "A task failed", "A task was stopped", "A task has ended", "A campaign is achieved", "A campaign stopped", "Dot drafted an email",
+  "Dot drafted a message", "A schedule did not run", "A schedule was switched off", "Dot's learning has stopped", "Dot
+  restarted after an unexpected stop" and, for a message Dot wrote to you, "Dot has a message for you" (never its own
+  words). `route` is a route of Dot's own pages that the tap opens, always starting `#/`: `#/runs/<run id>`,
+  `#/campaigns/<id>`, `#/settings/schedules`, `#/settings/memory` or `#/runs`.
+- An **approval** of a step of low or medium risk adds `"category": "DOT_APPROVAL"` to `aps` and `"approval_id":
+  "<approval id>"` next to `route`: the app's notification offers Approve and Deny, each after Face ID, and answers with
+  `POST /api/approvals/{id}/decision`. A step of high risk, a question, a secret and a hand-off are alerts without the
+  category: they open the app.
+
+The **Live Activity** (`DotFleetAttributes` of `ios/Shared`) is told with `live_update_payload` (`"event": "update"`,
+`content-state`, `stale-date`), ended with `live_end_payload` (`"event": "end"`, the last `content-state`,
+`dismissal-date`), and started, on a phone that gave its push-to-start token, with the payload under `POST
+/api/phone/live-start-token` above (`"event": "start"`, `attributes-type`, `attributes`, `input-push-token`, an `alert` of
+the fixed title "Dot is working" and the fixed line). A change goes at most every four seconds, the latest kept, at
+priority 5; a start, a wait and an end go at once at priority 10.
+
+**Which pushes a phone is told.** Each event is one of three kinds, switched by `PUT /api/phone/push-settings`: `needs_you`
+(`approval_requested`, `question_left`, a schedule that did not run or was switched off, learning that stopped, a restart
+after an unexpected stop), `ready` (a draft written for you, what Dot tells you on its own) and `done` (the end of a run,
+of a schedule's run at its schedule's level of notices, of a campaign). A kind that is off is not sent to that phone. While
+the phone's lease (`POST /api/phone/activity`) holds, the `done` kind's three events are not sent to it as alerts; nothing
+else is held back by it. A phone that is removed is sent nothing.
