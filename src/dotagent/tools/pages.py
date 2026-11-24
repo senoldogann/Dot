@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 from typing import Annotated, Self
 
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from dotagent.agent.pages import (
     LIBRARY_HOSTS,
@@ -25,7 +25,7 @@ from dotagent.store.models import ShownPage
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, make_path_tool, ok
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_action
-from dotagent.tools.page_files import PageFiles, with_its_files
+from dotagent.tools.page_files import PageFiles, remote_media, with_its_files
 from dotagent.tools.third_party import holds_third_party
 
 SHOW_PAGE_TOOL: str = "show_page"
@@ -46,7 +46,9 @@ _DESCRIPTION: str = (
     "box that needs its own ground 16px of padding and var(--radius) corners. Keep its top right corner (about 72 by "
     "40 pixels) free of controls: Full screen and Open sit there, always on a phone. Write a whole document or only "
     "its body. Its scripts run but fetch nothing except the libraries "
-    f"they load from {', '.join(LIBRARY_HOSTS)}: put the data in the page itself. "
+    f"they load from {', '.join(LIBRARY_HOSTS)}: put the data in the page itself. A picture, a sound or a video loads "
+    "only written into the page: name a file of the workspace by its relative path (it is written in) or write a "
+    "data: address; a page that names one by a web address (http:, https:) is refused, as it would stand empty. "
     "Give charts and 3D views a height in pixels: a height in vh follows the frame, which grows with the page, so "
     "the page grows again (clamp one between pixels if you must). Take the look of the user's theme, light or dark, "
     f"from the CSS variables {', '.join(name for name, _ in THEME_VARIABLES)}. "
@@ -61,6 +63,18 @@ _DESCRIPTION: str = (
     "answer gives the page's address: open it with your browser at a phone's width and the conversation's to see "
     "what you showed, and show it again if something is cut, crowded or unreadable."
 )
+
+
+def too_long(name: str, chars: int) -> str:
+    """What a page longer than :data:`PAGE_MAX_CHARS` is refused with: how long it is and how to make it shorter
+    (item 1721). Every picture or video in it counts, written in by Dot (a file named by its path) or by the run."""
+    return (
+        f"{name} is {chars:,} characters, longer than a page may be ({PAGE_MAX_CHARS:,}). A picture or a video written "
+        "in (as data: base64, or a workspace file named by its path, which is written in the same way) takes a third "
+        "more than its file: make pictures smaller (fewer pixels, JPEG or WebP at a lower quality), show a video as a "
+        "few frames or a short low-resolution clip, draw a chart or a table from its data rather than a picture of it, "
+        "or show the parts as pages of their own."
+    )
 
 
 # Where a page given as html stands for the files it names: in the workspace, its relative paths resolving there.
@@ -78,6 +92,14 @@ class ShowPageArgs(ToolArgs):
         default=None,
         description="Instead of html, a page you made in the workspace. Relative paths resolve against the workspace.",
     )
+
+    @field_validator("html", mode="before")
+    @classmethod
+    def fits(cls, value: object) -> object:
+        """A page too long is refused with how to make it shorter, before the length constraint says only its limit."""
+        if isinstance(value, str) and len(value.strip()) > PAGE_MAX_CHARS:
+            raise ValueError(too_long("The page", len(value.strip())))
+        return value
 
     @model_validator(mode="after")
     def one_page(self) -> Self:
@@ -114,17 +136,13 @@ def page_file(path: Path, workspace: Path) -> str:
     except OSError as exc:
         raise ToolInputError(f"there is no page at {path}", {"path": str(path), "error": str(exc)}) from exc
     if len(data) > _PAGE_MAX_BYTES:
-        raise ToolInputError(
-            f"{path.name} is longer than a page may be ({PAGE_MAX_CHARS:,} characters)", {"path": str(path)}
-        )
+        raise ToolInputError(too_long(path.name, len(data)), {"path": str(path)})
     try:
         text: str = data.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ToolInputError(f"{path.name} is not text in UTF-8", {"path": str(path)}) from exc
     if len(text) > PAGE_MAX_CHARS:
-        raise ToolInputError(
-            f"{path.name} is longer than a page may be ({PAGE_MAX_CHARS:,} characters)", {"path": str(path)}
-        )
+        raise ToolInputError(too_long(path.name, len(text)), {"path": str(path)})
     if not text.strip():
         raise ToolInputError(f"{path.name} is empty", {"path": str(path)})
     return text
@@ -156,7 +174,8 @@ def shown_words(page: ShownPage, address: str, files: PageFiles | None) -> str:
     if files.too_large:
         words += (
             f" Left out as the page would have been longer than {PAGE_MAX_CHARS:,} characters with them: "
-            f"{', '.join(dict.fromkeys(files.too_large))} (make them smaller to show them)."
+            f"{', '.join(dict.fromkeys(files.too_large))} (make them smaller to show them: fewer pixels, JPEG or WebP, "
+            "a video as a few frames or a short low-resolution clip)."
         )
     if files.framed:
         words += (
@@ -214,6 +233,16 @@ def _show_page_tool() -> RegisteredTool:
             html = files.html
         else:
             raise ToolInputError("give the page as html or by its path", {})
+        # A picture, a sound or a video named by a web address stands empty in a shown page (item 1721): refused, so
+        # that the run writes it in rather than the owner seeing a broken picture or an empty player.
+        remote: tuple[str, ...] = remote_media(html)
+        if remote:
+            raise ToolInputError(
+                "The page was not shown: a shown page loads pictures, sound and video only written into it, so these "
+                f"would stand empty: {', '.join(remote)}. Save each in the workspace and name it by its relative path "
+                "(it is written in), write it in as a data: address, or leave it out; then show the page again.",
+                {"remote": list(remote)},
+            )
         page: ShownPage = await ctx.runtime.store.add_shown_page(ctx.run_id, args.title, html)
         await ctx.runtime.bus.emit(ctx.run_id, PAGE_EVENT, {"page_id": page.id, "title": page.title}, True)
         server = ctx.runtime.config.server
@@ -224,7 +253,9 @@ def _show_page_tool() -> RegisteredTool:
         description=_DESCRIPTION,
         args_model=ShowPageArgs,
         modes=ALL_MODES,
-        parallel_safe=True,
+        # The pages of one step stand in the conversation in the order of the calls (item 1721): each is placed as its
+        # call ends, so calls run at once would place them as they happen to end.
+        parallel_safe=False,
         timeout_s=30.0,
         classify=classify,
         run=run,

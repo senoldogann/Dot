@@ -31,6 +31,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
 | [1726](1726.md) | done | 2026-11-24 | DotNext's chat, whole: the work log, the ask dock in the composer's place, the composer, the queue and its edit, the inspector |
 | [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |
+| [1721](1721.md) | done | 2026-11-24 | A shown page that names media by a web address is refused with why, a page too long says how to shrink, and the pages of one step keep the call order |
 | [1720](1720.md) | done | 2026-11-24 | OpenCode's agent gets every tool of Dot's a run on the Claude plan gets, and a test holds the three harnesses' tools together |
 | [1715](1715.md) | done | 2026-11-24 | A run records why recall chose its notes and which of them it echoed |
 | [1714](1714.md) | done | 2026-11-24 | A run on the Claude plan or OpenCode is asked for its lessons as it ends |
