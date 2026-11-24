@@ -464,7 +464,7 @@ enum LatencyProbe {
                 }
                 let text: String = "probe \(number) \(UUID().uuidString.prefix(6))"
                 model.probeSent[text] = Date()
-                await model.send(text, thread: thread, steerInto: nil, photos: [])
+                await model.send(text, thread: thread, steerInto: nil, photos: [], picks: .none)
                 for _ in 0..<200 where model.probeSent[text] != nil { try? await Task.sleep(for: .milliseconds(100)) }
                 try? await Task.sleep(for: .milliseconds(300))
             }

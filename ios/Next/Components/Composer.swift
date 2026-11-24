@@ -94,12 +94,11 @@ struct ComposerIconButton: View {
     }
 }
 
-/// What the composer offers after `/` and `@`.
-struct ComposerSuggestions: Equatable {
-    let commands: [String]
-    let agents: [String]
+/// What the composer's pickers offer for a trigger (PLAN §22): the sections of one panel.
+struct ComposerSuggestions: Sendable {
+    let sections: @Sendable (PickerTrigger) -> [PickerSection]
 
-    static let none: ComposerSuggestions = ComposerSuggestions(commands: [], agents: [])
+    static let none: ComposerSuggestions = ComposerSuggestions(sections: { _ in [] })
 }
 
 /// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
@@ -307,30 +306,45 @@ struct ComposerView: View {
         .scrollIndicators(.hidden)
     }
 
+    /// The one panel above the composer (§22): a quiet uppercase header per section, rows of icon · name · description,
+    /// filtered as the owner types; a tap puts the token in the text.
     @ViewBuilder private var suggestionList: some View {
-        let shown: [String] = matches
-        if !shown.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(shown, id: \.self) { word in
-                    Button {
-                        text = completing(text, with: word)
-                    } label: {
-                        Text(word).textRole(.body).foregroundStyle(Tone.text).frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, Space.m).frame(minHeight: Metric.hit).contentShape(Rectangle())
+        let sections: [PickerSection] = pickerTrigger(in: text).map(suggestions.sections) ?? []
+        if !sections.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    ForEach(sections) { section in
+                        Text(pickerHeader(section.kind)).textRole(.label).fontWeight(.semibold).textCase(.uppercase).tracking(1.2)
+                            .foregroundStyle(Tone.tertiary).padding(.horizontal, Space.m).padding(.top, Space.xs)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach(section.items) { item in
+                            Button {
+                                text = completing(text, with: item.token)
+                            } label: {
+                                HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                                    Symbol(name: pickerSymbol(item.kind), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
+                                    Text(item.kind == .command || item.kind == .skill ? item.token : item.name).textRole(.body).foregroundStyle(Tone.text)
+                                        .lineLimit(1).layoutPriority(1)
+                                    Text(item.detail).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, Space.m)
+                                .frame(minHeight: Metric.hit)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("picker.row")
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.vertical, Space.xs)
             }
-            .padding(.vertical, Space.xxs)
+            .scrollBounceBehavior(.basedOnSize)
+            // Bounded, so the composer under it stays above the keyboard.
+            .frame(maxHeight: 230)
+            .fixedSize(horizontal: false, vertical: true)
             .background(Tone.card, in: rounded(Radius.bubble))
-        }
-    }
-
-    private var matches: [String] {
-        switch composerTrigger(in: text) {
-        case .command(let typed): return Array(suggestions.commands.filter { typed.isEmpty || $0.dropFirst().localizedStandardContains(typed) }.prefix(6))
-        case .agent(let typed): return Array(suggestions.agents.filter { typed.isEmpty || $0.dropFirst().localizedStandardContains(typed) }.prefix(6))
-        case nil: return []
         }
     }
 }
@@ -451,7 +465,7 @@ struct FloatingWorkingControl: View {
                     HStack(spacing: Space.xxs + 1) {
                         StatusWord(status: status)
                         if let elapsed = summary.elapsed {
-                            Text(elapsed).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
+                            Text(elapsed).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
                         }
                     }
                 }
@@ -459,7 +473,7 @@ struct FloatingWorkingControl: View {
             if summary.queued > 0 {
                 if summary.status != nil { divider }
                 segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")) {
-                    Label { Text(String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")) } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
+                    Label { Text(String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")).lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
                         .foregroundStyle(Tone.secondary)
                 }
                 .accessibilityIdentifier("capsule.queue")

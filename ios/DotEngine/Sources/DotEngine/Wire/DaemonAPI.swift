@@ -142,11 +142,23 @@ public struct QueueMessage: Codable, Sendable, Hashable {
     public let text: String
     public let key: String
     public let attachments: [String]
+    /// The skills and accounts picked in the composer (PLAN §22) and "plan first" (`/plan`).
+    public let skills: [String]
+    public let accounts: [String]
+    public let planFirst: Bool
 
-    public init(text: String, key: String, attachments: [String]) {
+    public init(text: String, key: String, attachments: [String], skills: [String], accounts: [String], planFirst: Bool) {
         self.text = text
         self.key = key
         self.attachments = attachments
+        self.skills = skills
+        self.accounts = accounts
+        self.planFirst = planFirst
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case text, key, attachments, skills, accounts
+        case planFirst = "plan_first"
     }
 }
 
@@ -200,6 +212,11 @@ private struct DecisionBody: Encodable {
 }
 private struct SecretBody: Encodable { let value: String }
 private struct ReactionBody: Encodable { let reaction: String }
+private struct AsideBody: Encodable { let text: String }
+private struct LoopBody: Encodable {
+    let every: String
+    let text: String
+}
 private struct ChoicesBody: Encodable { let choices: ChatChoices }
 private struct QueueEditBody: Encodable {
     let text: String
@@ -274,6 +291,23 @@ extension DaemonAPI {
         let path: String = "/api/images/\(name)"
         return try await data(request(method: "GET", path: path, query: [], body: nil), path: path)
     }
+
+    /// A side question the run answers without seeing it (`/btw`, item 650's aside): the answer's words.
+    public func aside(run: String, question: String) async throws(DaemonRequestError) -> AsideAnswer {
+        try await send("POST", "/api/runs/\(run)/btw", body: Self.json(AsideBody(text: question)))
+    }
+
+    /// A loop of the chat (`/loop 30m <message>`, item 281): the message asked again on that rhythm.
+    public func loop(run: String, every: String, text: String) async throws(DaemonRequestError) {
+        try await sendVoid("POST", "/api/runs/\(run)/loop", body: Self.json(LoopBody(every: every, text: text)))
+    }
+
+    /// What the composer's menus offer: skills and accounts (`GET /api/palette`).
+    public func palette() async throws(DaemonRequestError) -> PaletteView { try await get("/api/palette", query: []) }
+
+    public func agents() async throws(DaemonRequestError) -> [AgentSummary] { try await get("/api/agents", query: []) }
+
+    public func teams() async throws(DaemonRequestError) -> [TeamSummary] { try await get("/api/teams", query: []) }
 
     /// What a run did that undo can or cannot take back (`GET /api/runs/{id}/actions`).
     public func runActions(run: String) async throws(DaemonRequestError) -> RunActions { try await get("/api/runs/\(run)/actions", query: []) }

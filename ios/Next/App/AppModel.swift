@@ -43,6 +43,10 @@ final class AppModel {
 
     /// The models the daemon offers (`GET /api/models`), for the composer's chip.
     var models: [ProviderModels] = []
+    /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
+    var palette: PaletteView?
+    var agents: [AgentSummary] = []
+    var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
@@ -173,11 +177,11 @@ final class AppModel {
 
     /// The owner's words for a chat: queued behind the run at work (D10 default) or, with `steer`, into it.
     @discardableResult
-    func send(_ text: String, thread: String, steerInto run: String?, photos: [Data]) async -> String? {
+    func send(_ text: String, thread: String, steerInto run: String?, photos: [Data], picks: MessagePicks) async -> String? {
         guard let engine else { return nil }
         do {
             if let run { return try await engine.steer(text, run: run, thread: thread, photos: photos) }
-            return try await engine.send(text, thread: thread, photos: photos)
+            return try await engine.send(text, thread: thread, photos: photos, picks: picks)
         } catch {
             // Only writing the message's photos beside the outbox can fail here.
             logger.error("a message could not be kept thread=\(thread, privacy: .public) error=\(String(describing: error), privacy: .public)")
@@ -262,6 +266,39 @@ extension AppModel {
         }
     }
 
+    /// The pickers' lists, read once per launch; a list that cannot be read stays empty and says so in the log.
+    func loadPalette() async {
+        guard let engine, palette == nil else { return }
+        do {
+            palette = try await engine.api.palette()
+            agents = try await engine.api.agents()
+            teams = try await engine.api.teams()
+        } catch {
+            logger.warning("the composer's lists could not be read error=\(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// A side question (`/btw`): the run's answer, or why there is none.
+    func aside(run: String, question: String) async -> String {
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        do {
+            return try await engine.api.aside(run: run, question: question).answer
+        } catch {
+            return String(localized: "The side question could not be asked: \(String(describing: error))", comment: "Composer: /btw failed; the argument is why")
+        }
+    }
+
+    /// A loop of the chat (`/loop`); `nil` when it was made, else why not.
+    func loop(run: String, every: String, text: String) async -> String? {
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        do {
+            try await engine.api.loop(run: run, every: every, text: text)
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+
     /// A screenshot a tool returned, kept in memory for the session.
     func image(named name: String) async -> UIImage? {
         if let held: UIImage = images.object(forKey: name as NSString) { return held }
@@ -299,9 +336,13 @@ extension AppModel {
     }
 
     /// The owner's half-written words of a chat, kept across launches (per-chat drafts).
-    func draft(of thread: String) -> String { UserDefaults.standard.string(forKey: "draft.\(thread)") ?? "" }
+    /// A fixture's chat (debug builds) starts with no draft and keeps none, so a scene draws the same each time.
+    func draft(of thread: String) -> String {
+        fixtureMac != nil ? "" : UserDefaults.standard.string(forKey: "draft.\(thread)") ?? ""
+    }
 
     func keep(draft: String, of thread: String) {
+        guard fixtureMac == nil else { return }
         if draft.isEmpty { UserDefaults.standard.removeObject(forKey: "draft.\(thread)") } else { UserDefaults.standard.set(draft, forKey: "draft.\(thread)") }
     }
 }

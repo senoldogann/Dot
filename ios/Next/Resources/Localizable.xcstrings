@@ -363,6 +363,17 @@
         }
       }
     },
+    "Accounts": {
+      "comment": "Composer picker header: the accounts signed in",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hesaplar"
+          }
+        }
+      }
+    },
     "Activity": {
       "comment": "Tab bar: what Dot did while the owner was away\nTitle of the activity tab",
       "localizations": {
@@ -535,6 +546,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'tan her şeyi isteyebilirsin: bir iş, bir ders, Mac'te bir ayak işi."
+          }
+        }
+      }
+    },
+    "Ask a side question the run does not see": {
+      "comment": "Composer command: what /btw does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışmanın görmediği bir yan soru sor"
+          }
+        }
+      }
+    },
+    "Ask again every so often: /loop 30m <message>": {
+      "comment": "Composer command: what /loop does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belli aralıklarla yeniden sor: /loop 30m <mesaj>"
           }
         }
       }
@@ -843,6 +876,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Komut"
+          }
+        }
+      }
+    },
+    "Commands": {
+      "comment": "Composer picker header: Dot's commands",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Komutlar"
           }
         }
       }
@@ -1518,6 +1562,17 @@
         }
       }
     },
+    "Files of this chat": {
+      "comment": "Composer picker header: the files this chat's runs changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbetin dosyaları"
+          }
+        }
+      }
+    },
     "Files the run changes show here.": {
       "comment": "Changes panel empty state detail",
       "localizations": {
@@ -1998,6 +2053,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Döngüler ve arka plan işleri"
+          }
+        }
+      }
+    },
+    "Make a plan first, then do it": {
+      "comment": "Composer command: what /plan does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce bir plan yap, sonra uygula"
           }
         }
       }
@@ -2981,6 +3047,17 @@
         }
       }
     },
+    "Same as /btw": {
+      "comment": "Composer command: what /side does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/btw ile aynı"
+          }
+        }
+      }
+    },
     "Save": {
       "comment": "Edit sheet toolbar: keeps the edits",
       "localizations": {
@@ -3333,6 +3410,17 @@
         }
       }
     },
+    "Side answer": {
+      "comment": "Title of the alert with a /btw answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yan yanıt"
+          }
+        }
+      }
+    },
     "Sign-in code": {
       "comment": "Pairing screen section: the 8-character code",
       "localizations": {
@@ -3340,6 +3428,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Giriş kodu"
+          }
+        }
+      }
+    },
+    "Skills": {
+      "comment": "Composer picker header: the skills a run can use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceriler"
           }
         }
       }
@@ -3553,6 +3652,17 @@
         }
       }
     },
+    "Stop the run at work": {
+      "comment": "Composer command: what /stop does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan işi durdur"
+          }
+        }
+      }
+    },
     "Stop this run?": {
       "comment": "Confirmation of Stop from the chat header",
       "localizations": {
@@ -3641,6 +3751,17 @@
         }
       }
     },
+    "Switch the model of this chat": {
+      "comment": "Composer command: what /model does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbetin modelini değiştir"
+          }
+        }
+      }
+    },
     "Symbols": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -3703,6 +3824,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "SwiftUI'ın bir yığını nasıl yerleştirdiğini öğret"
+          }
+        }
+      }
+    },
+    "Teams": {
+      "comment": "Composer picker header: the owner's teams",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekipler"
           }
         }
       }
@@ -3872,6 +4004,17 @@
         }
       }
     },
+    "The loop was not made: %@": {
+      "comment": "Composer: /loop failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Döngü kurulamadı: %@"
+          }
+        }
+      }
+    },
     "The microphone is off for Dot. Turn it on in Settings › Dot Next › Microphone.": {
       "comment": "Composer: dictation cannot start, microphone permission denied",
       "localizations": {
@@ -3945,6 +4088,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışma durduruldu"
+          }
+        }
+      }
+    },
+    "The side question could not be asked: %@": {
+      "comment": "Composer: /btw failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yan soru sorulamadı: %@"
           }
         }
       }

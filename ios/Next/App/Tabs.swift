@@ -41,6 +41,8 @@ enum ChatPanel: String, Identifiable, Sendable {
     case queue
     /// The run inspector.
     case inspector
+    /// The model of this chat (`/model`).
+    case model
 
     var id: String { rawValue }
 }

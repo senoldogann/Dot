@@ -526,3 +526,46 @@ public struct RunChanges: Codable, Sendable, Hashable {
     public let added: Int
     public let removed: Int
 }
+
+/// A side question's answer (`POST /api/runs/{id}/btw`).
+public struct AsideAnswer: Codable, Sendable, Hashable {
+    public let question: String
+    public let answer: String
+}
+
+public struct PaletteSkill: Codable, Sendable, Hashable {
+    public let name: String
+    public let description: String
+}
+
+public struct PaletteAccount: Codable, Sendable, Hashable {
+    public let address: String
+    public let providerName: String
+    public let reads: String
+
+    enum CodingKeys: String, CodingKey {
+        case address, reads
+        case providerName = "provider_name"
+    }
+}
+
+/// `GET /api/palette`, the part the composer reads.
+public struct PaletteView: Codable, Sendable, Hashable {
+    public let skills: [PaletteSkill]
+    public let accounts: [PaletteAccount]
+}
+
+public struct NamedRecord: Codable, Sendable, Hashable {
+    public let id: String
+    public let name: String
+    public let role: String?
+}
+
+/// An agent or a team as `/api/agents` and `/api/teams` list them, the part the `@` menu reads.
+public struct AgentSummary: Codable, Sendable, Hashable {
+    public let record: NamedRecord
+}
+
+public struct TeamSummary: Codable, Sendable, Hashable {
+    public let record: NamedRecord
+}

@@ -224,3 +224,40 @@ func composerActionWords(_ action: ComposerAction) -> String {
     case .confirmEdit: String(localized: "Save the queued message", comment: "Composer: confirms the edit of a queued message")
     }
 }
+
+/// A picker section's header (PLAN §22).
+func pickerHeader(_ kind: PickerKind) -> String {
+    switch kind {
+    case .command: String(localized: "Commands", comment: "Composer picker header: Dot's commands")
+    case .skill: String(localized: "Skills", comment: "Composer picker header: the skills a run can use")
+    case .agent: String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers")
+    case .team: String(localized: "Teams", comment: "Composer picker header: the owner's teams")
+    case .chat: String(localized: "Chats", comment: "Title of the chat list")
+    case .account: String(localized: "Accounts", comment: "Composer picker header: the accounts signed in")
+    case .file: String(localized: "Files of this chat", comment: "Composer picker header: the files this chat's runs changed")
+    }
+}
+
+func pickerSymbol(_ kind: PickerKind) -> String {
+    switch kind {
+    case .command: "apple.terminal"
+    case .skill: "sparkles"
+    case .agent: "person"
+    case .team: "person.3"
+    case .chat: "bubble.left"
+    case .account: "envelope"
+    case .file: "doc.text"
+    }
+}
+
+/// Dot's own commands in the `/` panel (PLAN §22), each with what it does.
+func composerCommands() -> [PickerItem] {
+    [
+        PickerItem(kind: .command, token: "/btw", name: "/btw", detail: String(localized: "Ask a side question the run does not see", comment: "Composer command: what /btw does")),
+        PickerItem(kind: .command, token: "/side", name: "/side", detail: String(localized: "Same as /btw", comment: "Composer command: what /side does")),
+        PickerItem(kind: .command, token: "/loop", name: "/loop", detail: String(localized: "Ask again every so often: /loop 30m <message>", comment: "Composer command: what /loop does")),
+        PickerItem(kind: .command, token: "/plan", name: "/plan", detail: String(localized: "Make a plan first, then do it", comment: "Composer command: what /plan does")),
+        PickerItem(kind: .command, token: "/model", name: "/model", detail: String(localized: "Switch the model of this chat", comment: "Composer command: what /model does")),
+        PickerItem(kind: .command, token: "/stop", name: "/stop", detail: String(localized: "Stop the run at work", comment: "Composer command: what /stop does")),
+    ]
+}

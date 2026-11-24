@@ -39,6 +39,25 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(submit.label, "Submit 2 answers", "the pick of the first question is kept while paging")
     }
 
+    func testSlashOpensTheCommandsPanelFilteredAsTheOwnerTypes() {
+        let app: XCUIApplication = launch("n2-chat")
+        // The field is a text field at rest and a text view once it grows: found by its identifier, whatever its kind.
+        let field: XCUIElement = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("/")
+        XCTAssertTrue(app.staticTexts["COMMANDS"].waitForExistence(timeout: 3) || app.staticTexts["Commands"].exists)
+        XCTAssertEqual(app.buttons.matching(identifier: "picker.row").count, 6)
+        // A row puts its token in the text (tapped on the bare "/": XCUITest's typed letters stay as the keyboard's
+        // candidate, which a tap does not replace; a hand-typed word is replaced, seen on the simulator).
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "/loop")).firstMatch.tap()
+        let completed: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "/loop"), object: field)
+        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 3), .completed, "the row puts its token in the text: \(String(describing: field.value))")
+        let cleared: XCUIElement = field
+        cleared.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "picker.row").count, 1, "\"/lo\" leaves only /loop")
+    }
+
     func testEditingAQueuedMessageKeepsTheLiveDraftForCancel() {
         let app: XCUIApplication = launch("n2-editing")
         XCTAssertTrue(app.staticTexts["Editing queued message"].waitForExistence(timeout: 10))

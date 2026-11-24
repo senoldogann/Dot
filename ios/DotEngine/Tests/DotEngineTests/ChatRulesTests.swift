@@ -86,10 +86,6 @@ final class ChatRulesTests: XCTestCase {
     }
 
     func testSlashAndAtOfferTheWordBeingTyped() {
-        XCTAssertEqual(composerTrigger(in: "/lo"), .command("lo"))
-        XCTAssertNil(composerTrigger(in: "see /lo"), "a command is the message's first word")
-        XCTAssertEqual(composerTrigger(in: "ask @res"), .agent("res"))
-        XCTAssertNil(composerTrigger(in: "ask @res "))
         XCTAssertEqual(completing("ask @res", with: "@research"), "ask @research ")
     }
 

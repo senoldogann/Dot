@@ -344,7 +344,7 @@ struct SampleChatScreen: View {
             switch panel {
             case .agents: AgentsSheet(runs: Samples.helperRuns(now: .now), close: { self.panel = nil })
             case .background: BackgroundWorkSheet(items: Samples.backgroundWork, close: { self.panel = nil })
-            case .files, .queue, .inspector:
+            case .files, .queue, .inspector, .model:
                 EmptyState(
                     title: String(localized: "No changes yet", comment: "Changes panel empty state"), systemImage: "folder",
                     detail: String(localized: "Files the run changes show here.", comment: "Changes panel empty state detail"),

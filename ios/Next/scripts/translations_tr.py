@@ -7,6 +7,20 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    "Accounts": "Hesaplar",
+    "Ask a side question the run does not see": "Çalışmanın görmediği bir yan soru sor",
+    "Ask again every so often: /loop 30m <message>": "Belli aralıklarla yeniden sor: /loop 30m <mesaj>",
+    "Commands": "Komutlar",
+    "Files of this chat": "Bu sohbetin dosyaları",
+    "Make a plan first, then do it": "Önce bir plan yap, sonra uygula",
+    "Same as /btw": "/btw ile aynı",
+    "Side answer": "Yan yanıt",
+    "Skills": "Beceriler",
+    "Stop the run at work": "Çalışan işi durdur",
+    "Switch the model of this chat": "Bu sohbetin modelini değiştir",
+    "Teams": "Ekipler",
+    "The loop was not made: %@": "Döngü kurulamadı: %@",
+    "The side question could not be asked: %@": "Yan soru sorulamadı: %@",
     "Fill in the pending answers": "Bekleyen yanıtları doldur",
     "Submit %lld answers": "%lld yanıtı gönder",
     "Submit answer": "Yanıtı gönder",

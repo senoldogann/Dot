@@ -33,6 +33,10 @@ struct ChatScreen: View {
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
     @State private var confirmingStop: Bool = false
+    /// The answer of a side question (`/btw`), shown in an alert.
+    @State private var aside: SideAnswer?
+    /// This chat's changed files, for the `#` picker.
+    @State private var changedFiles: RunChanges?
     @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.locale) private var locale: Locale
@@ -105,6 +109,7 @@ struct ChatScreen: View {
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
             .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
             .task { await model.loadModels() }
+            .modifier(ComposerLists(thread: thread, lastRun: view?.runs.last(where: { $0.parentRunId == nil })?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
             .onKeyPress(.escape) {
                 if panel != nil {
@@ -321,9 +326,9 @@ struct ChatScreen: View {
                         runActive: activeRun != nil && !stopping, followUp: followUp, editing: edit != nil),
                     perform: perform,
                     model: currentModel, models: modelChoices, chooseModel: { choose($0) },
-                    suggestions: ComposerSuggestions(
-                        commands: ["/loop", "/btw"],
-                        agents: Array(Set(model.snapshot.list.rows.compactMap(\.summary.actorId))).sorted().map { "@" + $0 }))
+                    suggestions: ComposerSuggestions(sections: { trigger in
+                        pickerSections(trigger, commands: composerCommands(), catalog: catalog, limit: 8)
+                    }))
                 .disabled(chat?.freshness == .deleted)
             }
         }
@@ -352,15 +357,64 @@ struct ChatScreen: View {
         case .confirmEdit:
             confirmEdit()
         case .send, .queue, .steer:
-            let words: String = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            let typed: String = draft.trimmingCharacters(in: .whitespacesAndNewlines)
             let photos: [Data] = attachments.map(\.jpeg)
-            guard !words.isEmpty || !photos.isEmpty else { return }
+            guard !typed.isEmpty || !photos.isEmpty else { return }
+            // A command the composer does itself (PLAN §22) leaves the draft only once it is done or understood.
+            switch composerCommand(typed) {
+            case .stop:
+                draft = ""
+                stop()
+                return
+            case .model:
+                draft = ""
+                panel = .model
+                return
+            case .loopHow:
+                toast = ToastMessage(id: UUID(), text: String(localized: "Ask again every so often: /loop 30m <message>", comment: "Composer command: what /loop does"), systemImage: "info.circle", actionTitle: nil)
+                return
+            case .aside(let question):
+                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                draft = ""
+                Task { aside = SideAnswer(question: question, answer: await model.aside(run: run.id, question: question)) }
+                return
+            case .loop(let every, let text):
+                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                draft = ""
+                Task {
+                    if let problem = await model.loop(run: run.id, every: every, text: text) {
+                        toast = ToastMessage(id: UUID(), text: String(localized: "The loop was not made: \(problem)", comment: "Composer: /loop failed; the argument is why"), systemImage: "exclamationmark.triangle", actionTitle: nil)
+                        draft = typed
+                        return
+                    }
+                    await model.send(text, thread: thread, steerInto: nil, photos: photos, picks: .none)
+                }
+                attachments = []
+                return
+            case .message:
+                break
+            }
+            let (words, picks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
             draft = ""
             attachments = []
             model.keep(draft: "", of: thread)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            Task { await model.send(words, thread: thread, steerInto: action == .steer ? activeRun?.id : nil, photos: photos) }
+            Task { await model.send(words, thread: thread, steerInto: action == .steer ? activeRun?.id : nil, photos: photos, picks: picks) }
         }
+    }
+
+    /// What the pickers offer (PLAN §22): the daemon's skills, agents, teams and accounts, the other chats, this chat's
+    /// changed files.
+    private var catalog: ComposerCatalog {
+        ComposerCatalog(
+            skills: (model.palette?.skills ?? []).map { PickerItem(kind: .skill, token: "/" + $0.name, name: $0.name, detail: $0.description) },
+            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role ?? "") },
+            teams: model.teams.map { PickerItem(kind: .team, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: "") },
+            chats: model.snapshot.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
+                PickerItem(kind: .chat, token: "@\"" + row.summary.title + "\"", name: row.summary.title, detail: rowTime(row.summary.latestCreatedAt, now: .now))
+            },
+            accounts: (model.palette?.accounts ?? []).map { PickerItem(kind: .account, token: "@" + $0.address, name: $0.address, detail: [$0.providerName, $0.reads].filter { !$0.isEmpty }.joined(separator: " · ")) },
+            files: (changedFiles?.files ?? []).map { PickerItem(kind: .file, token: "#" + $0.path, name: $0.path, detail: "+\($0.added) −\($0.removed)") })
     }
 
     private func stop() {
@@ -380,7 +434,7 @@ struct ChatScreen: View {
     /// Try again / Resume: the newest run's goal sent again as a message of the chat.
     private func retryLast() {
         guard let last = view?.runs.last(where: { $0.parentRunId == nil }), !last.goal.isEmpty else { return }
-        Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: []) }
+        Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: [], picks: .none) }
     }
 
     // MARK: The queue's edit (§20)
@@ -490,6 +544,22 @@ struct ChatScreen: View {
             QueueSheet(thread: thread, edit: { beginEdit($0) }, close: { self.panel = nil })
         case .inspector, .files, .screen:
             RunInspector(thread: thread, close: { self.panel = nil })
+        case .model:
+            List(modelChoices.keys.sorted(), id: \.self) { provider in
+                Section(provider) {
+                    ForEach(modelChoices[provider] ?? []) { choice in
+                        Button {
+                            choose(choice)
+                            self.panel = nil
+                        } label: {
+                            InspectorRow(title: [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · "), systemImage: "cpu",
+                                accessory: choice == currentModel ? .detail("✓") : .none)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .inspectorSheet(title: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), close: { self.panel = nil })
         }
     }
 
@@ -501,5 +571,37 @@ struct ChatScreen: View {
     private var proseWidth: CGFloat? {
         guard sizeClass == .regular else { return nil }
         return ProseColumn.width(charactersPerLine: ProseColumn.target, font: ProseColumn.bodyFont(dynamicTypeSize))
+    }
+}
+
+/// A side question and the run's answer (`/btw`).
+struct SideAnswer: Identifiable, Equatable {
+    let question: String
+    let answer: String
+    var id: String { question + answer }
+}
+
+/// The lists the composer's pickers read (the daemon's palette, this chat's changed files) and the side answer's alert.
+private struct ComposerLists: ViewModifier {
+    let thread: String
+    let lastRun: String?
+    @Binding var changedFiles: RunChanges?
+    @Binding var aside: SideAnswer?
+    @Environment(AppModel.self) private var model: AppModel
+
+    func body(content: Content) -> some View {
+        content
+            .task { await model.loadPalette() }
+            .task(id: lastRun) {
+                if let lastRun { changedFiles = await model.changes(of: lastRun) }
+            }
+            .alert(
+                String(localized: "Side answer", comment: "Title of the alert with a /btw answer"),
+                isPresented: Binding(get: { aside != nil }, set: { if !$0 { aside = nil } }), presenting: aside
+            ) { _ in
+                Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), role: .cancel) { aside = nil }
+            } message: { answer in
+                Text(verbatim: answer.question + "\n\n" + answer.answer)
+            }
     }
 }

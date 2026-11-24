@@ -264,19 +264,6 @@ public func composerButtons(hasContent: Bool, runActive: Bool, followUp: FollowU
     return ComposerButtons(primary: .send, alternate: nil, enabled: hasContent)
 }
 
-/// What `/` and `@` offer at the caret: the word being typed after either mark at the start of the text or after a space.
-public enum ComposerTrigger: Sendable, Equatable {
-    case command(String)
-    case agent(String)
-}
-
-public func composerTrigger(in text: String) -> ComposerTrigger? {
-    guard let last: Substring = text.split(separator: " ", omittingEmptySubsequences: false).last, !last.contains("\n") else { return nil }
-    if last.hasPrefix("/"), text.hasPrefix("/") { return .command(String(last.dropFirst())) }
-    if last.hasPrefix("@") { return .agent(String(last.dropFirst())) }
-    return nil
-}
-
 /// The text with the word being typed after its mark replaced by `chosen` and a space.
 public func completing(_ text: String, with chosen: String) -> String {
     var words: [Substring] = text.split(separator: " ", omittingEmptySubsequences: false)

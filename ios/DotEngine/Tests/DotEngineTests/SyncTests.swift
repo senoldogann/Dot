@@ -254,7 +254,7 @@ final class SyncTests: XCTestCase {
         // link says up.
         daemon.offline = false
         let sleeps: Int = rig.clock.askedCount
-        let key: String = try await rig.engine.send("Thursday afternoon please", thread: "thr_1", photos: [])
+        let key: String = try await rig.engine.send("Thursday afternoon please", thread: "thr_1", photos: [], picks: .none)
         let waiting: EngineSnapshot = try await snapshot(of: rig.store, "in the outbox") { !$0.outbox.isEmpty }
         XCTAssertEqual(waiting.pending(in: "thr_1").map(\.delivery), [.offline])
         // The outbox waits for the link (30 s at most, or until it comes back) instead of sending.
@@ -293,7 +293,7 @@ final class SyncTests: XCTestCase {
     func testAMessageThatStartedARunLeavesTheOverlayOnceTheRunIsInThePicture() async throws {
         daemon.say("run_1", "run_finished", ["status": .string("done"), "result": .string("Booked")])
         _ = try await openLive()
-        _ = try await rig.engine.send("And add it to my calendar", thread: "thr_1", photos: [])
+        _ = try await rig.engine.send("And add it to my calendar", thread: "thr_1", photos: [], picks: .none)
         let shown: EngineSnapshot = try await snapshot(of: rig.store, "the new run is in the view and the overlay gone") {
             $0.outbox.isEmpty && $0.accepted.isEmpty && $0.chats["thr_1"]?.view?.runs.contains { $0.goal == "And add it to my calendar" } == true
         }

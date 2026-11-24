@@ -25,7 +25,7 @@ final class OutboxTests: XCTestCase {
         Outbox(directory: folder, api: daemon.api(), link: link, clock: clock, policy: quick, jitter: { 0 }, mayStartChat: mayStartChat)
     }
 
-    private func message(_ text: String) -> OutboxItem.Action { .message(thread: "thr_1", text: text, images: [], uploaded: []) }
+    private func message(_ text: String) -> OutboxItem.Action { .message(thread: "thr_1", text: text, images: [], uploaded: [], picks: .none) }
 
     private func onDisk() -> [OutboxItem] { Outbox.read(folder.appending(path: "outbox.json")) }
 
