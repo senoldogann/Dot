@@ -58,7 +58,7 @@ async def test_the_list_of_what_waits_on_the_owner_has_the_shape_the_app_reads_a
             assert body["count"] == 3
             items: list[dict[str, object]] = body["items"]  # type: ignore[assignment]  # JSON read back
             assert [item["id"] for item in items] == [secret.id, handoff.id, question.id]
-            common: set[str] = {"id", "kind", "run_id", "thread_id", "agent", "title", "since"}
+            common: set[str] = {"id", "kind", "run_id", "thread_id", "agent", "title", "since", "route"}
             by_kind: dict[object, dict[str, object]] = {item["kind"]: item for item in items}
             assert set(by_kind) == {"question", "handoff", "secret"}
             assert set(by_kind["question"]) == common | {"choices", "recommended"}
@@ -66,6 +66,8 @@ async def test_the_list_of_what_waits_on_the_owner_has_the_shape_the_app_reads_a
             assert by_kind["question"]["recommended"] == "Friday" and by_kind["question"]["title"] == "Which day?"
             assert by_kind["question"]["run_id"] == run.id and by_kind["question"]["thread_id"] == thread.id
             assert by_kind["question"]["agent"] == "Dot" and by_kind["question"]["since"] == question.created_at
+            assert by_kind["question"]["route"] == f"dotagent://run/{run.id}"
+            assert by_kind["handoff"]["title"] == "Dot needs your help" and by_kind["handoff"]["agent"] == "Dot"
             # A hand-off and a secret have neither choices nor a recommendation: the keys are not there.
             assert set(by_kind["handoff"]) == common and set(by_kind["secret"]) == common
             # The secret is its id, who asks and a fixed line: not the card's words, and no value.

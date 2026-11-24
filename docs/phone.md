@@ -548,15 +548,20 @@ Reply, 200:
 
 ```json
 {
-  "count": 3,
+  "count": 4,
   "items": [
     {"id": "apr_mf3k2x1a_1c04d1", "kind": "secret", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
-     "agent": "Dot", "title": "Dot asks for a secret", "since": 1764000300.0},
+     "agent": "Dot", "title": "Dot asks for a secret", "since": 1764000400.0,
+     "route": "dotagent://run/run_mf3k2w9z_a1b2c3"},
+    {"id": "apr_mf3k2x11_7e8f9a", "kind": "handoff", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
+     "agent": "Dot", "title": "Dot needs you on bank.example", "since": 1764000300.0,
+     "route": "dotagent://run/run_mf3k2w9z_a1b2c3"},
     {"id": "apr_mf3k2x00_4e5f6a", "kind": "question", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
      "agent": "Scout", "title": "Which day should it ship?", "since": 1764000200.0,
-     "choices": ["Friday", "Monday"], "recommended": "Friday"},
+     "route": "dotagent://run/run_mf3k2w9z_a1b2c3", "choices": ["Friday", "Monday"], "recommended": "Friday"},
     {"id": "apr_mf3k2wzz_7b8c9d", "kind": "approval", "run_id": "run_mf3k2w9z_a1b2c3", "thread_id": "thr_mf3k2w00_9d8e7f",
-     "agent": "Dot", "title": "Run a command: make deploy", "since": 1764000100.0}
+     "agent": "Dot", "title": "Run a command: make deploy", "since": 1764000100.0,
+     "route": "dotagent://run/run_mf3k2w9z_a1b2c3"}
   ]
 }
 ```
@@ -566,15 +571,31 @@ Reply, 200:
   since an answer given on the Mac sends no alert that would lower it.
 - `id`: the approval's id, which the decision routes take. `run_id`: the run that asks, and `thread_id`: the chat to open
   (for a helper's run the chat of the run at the top). `agent`: who asks, the owner's agent that works on the run or
-  `Dot`. `since`: when it was asked, in seconds since the epoch.
+  `Dot`. `since`: when it was asked, in seconds since the epoch. `route`: the link that opens the run in the app
+  (`dotagent://run/<run id>`; an alert's own route is `#/runs/<run id>`, as before).
 - `kind`: `approval` (a step a run asks leave for), `question` (`ask_user`), `secret` (`ask_secret`) or `handoff` (a
-  step only you can do, which the run waits for or kept for you).
+  step only you can do, which the run waits for or kept for you: see Hand-offs below).
 - `title`: what is asked, on one line of at most 120 characters, with secrets masked; for a `secret` a fixed line, never
   the card's words, and the list carries **no secret's value** (a request for one has none: it is told by its id and who
-  asks).
+  asks); for a `handoff` a fixed line with the host of the page alone (below).
 - `choices` (a `question` that offers options only): the options' labels, in the order the run gave them. `recommended`:
   the label of the option the run marked as its recommendation; both keys are left out when there is none. A question
   that takes several options (`multiple`) and the options' descriptions are on its card in the run's page.
 
-A card of a run that no longer works here is not listed (the leftover of a daemon that stopped), and one whose run is
-gone is skipped. A hand-off the browser raises on a login, a second factor or a CAPTCHA is item 1423's.
+A card of a run that no longer works here is not listed (the leftover of a daemon that stopped), one whose run is gone is
+skipped, and a step kept for you whose time is over has lapsed and is no longer listed.
+
+**Hand-offs** (item 1423). A step only you can do is a hand-off: the policy hands a credential (a password or a code the
+run was not given, a login) and a payment to you in every mode that asks, and the run parks at it: it waits for your
+answer and, unanswered in time, the step is refused or, with `[policy] unanswered = "park"`, kept for you while the run
+goes on without it (`GET /api/needs-you` lists it either way). It is one of the
+cards above, so it is **told as `needs_you` and pushed as such** ("Dot needs your help", the run's route and the fixed
+line, nothing more), and it closes with the card: when you say you did it or skip it, when the run's wait ends, when the
+step's time kept for you is over, or when the run ends. What the list says of it is the host of the page the step is on
+and a fixed line, `Dot needs you on <host>` (`Dot needs your help` when the step names no web page), never the step's
+own words, the address's user, path, query or fragment, what was typed, or anything the page showed; and **one hand-off
+for a chat**: the newest (the ones kept before it wait behind it, and show once it is answered), counted once in `count`.
+Answer it as before with `POST /api/approvals/{id}/decision`. What is **not** a hand-off here: a human check (a CAPTCHA,
+"Press & Hold", Turnstile), which Dot passes itself as a standing instruction ([Captcha](captcha.md)), and a login page
+that Dot meets without a step the policy hands over (it asks you with `ask_user`, a `question`, or with `ask_secret`, a
+`secret`): the browser tools give the daemon no sure sign that a page is one only you can pass, so none is recorded.

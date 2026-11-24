@@ -739,3 +739,31 @@ def test_the_badge_is_a_number_put_into_an_alert_and_nothing_else_is_changed() -
     assert "badge" not in alert["aps"]  # type: ignore[operator]  # a JSON payload read back
     with pytest.raises(ApnsError, match="aps"):
         badged({"route": "#/"}, 1)
+
+
+async def test_a_handoffs_alert_is_a_fixed_title_and_line_and_the_route_of_its_run_and_nothing_of_the_step(
+    tmp_path: Path,
+) -> None:
+    """Item 1423: the lock-screen text of a hand-off, which Apple reads, is what it was: the fixed title, the fixed
+    line, the run's route; never the host, the page or a credential."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        run: RunRecord = await _run(store, "chat", None)
+        words: str = "Type hunter2 into the password field of https://bank.example/login?token=abc"
+        step: JsonObject = {
+            "approval_id": "apr_1", "severity": "handoff", "summary": words,
+            "args": {"target": "https://bank.example/login?token=abc", "flags": ["credential"]},
+        }  # fmt: skip
+        await watch.on_event(_event(run.id, "approval_requested", step), _NOW)
+        [alert] = _alerts_to(apple, _DEVICE)
+        assert alert == {
+            "aps": {"alert": {"title": "Dot needs your help", "body": ALERT_BODY}, "sound": "default"},
+            "route": f"#/runs/{run.id}",
+        }
+        for leaked in ("hunter2", "bank.example", "token=abc", "password"):
+            assert leaked not in json.dumps(alert), leaked
+    finally:
+        await store.close()

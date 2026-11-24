@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dotagent.core.types import JsonObject
 from dotagent.notify.needs_you import (
+    HANDOFF_TITLE_NO_HOST,
     SECRET_TITLE,
     TITLE_CHARS,
     NeedsYou,
@@ -74,7 +75,11 @@ async def test_what_waits_on_the_owner_is_one_list_newest_first_with_its_kinds_a
         assert by_id[free.id].choices is None and by_id[free.id].recommended is None
         # A hand-off of a helper's run is read in the chat of the run at the top.
         assert by_id[handoff.id].kind == "handoff" and by_id[handoff.id].thread_id == helper_of.thread_id
-        assert by_id[handoff.id].run_id == helper.id
+        assert by_id[handoff.id].run_id == helper.id and by_id[handoff.id].title == HANDOFF_TITLE_NO_HOST
+        # Every item names the link that opens its run in the app.
+        assert {item.id: item.route for item in listed.items} == {
+            item.id: f"dotagent://run/{item.run_id}" for item in listed.items
+        }
         # The secret is told by its id, who asks and a fixed title: nothing of the card's words.
         assert by_id[secret.id].kind == "secret" and by_id[secret.id].title == SECRET_TITLE
         assert by_id[secret.id].choices is None
@@ -166,5 +171,52 @@ async def test_a_step_kept_for_the_owner_whose_time_is_over_is_no_longer_theirs_
         assert [item.id for item in (await read_needs_you(store, {}, _NOW + 99.9)).items] == [kept.id]
         assert (await read_needs_you(store, {}, _NOW + 100)).count == 0
         assert await needs_you_count(store, {}, _NOW + 100) == 0
+    finally:
+        await store.close()
+
+
+async def test_a_handoff_is_told_by_the_host_of_its_page_and_a_fixed_line_with_nothing_of_the_step_and_one_for_a_chat(
+    tmp_path: Path,
+) -> None:
+    """Item 1423: a run parks at a step only the owner can do (a credential, a payment). The list says on which host,
+    in a fixed line, and carries nothing of the step, the page or a credential: not its words, its path, its query, its
+    user, its port, nor what was typed. A chat has one hand-off at most, the newest; it goes when the run goes on (the
+    owner did it) or ends."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        run: RunRecord = await _run(store, "Pay the invoice")
+        other: RunRecord = await _run(store, "Renew the domain")
+        gone: RunRecord = await _run(store, "Ended")
+        live: dict[str, RunRecord] = {run.id: run, other.id: other}
+        words: str = "Type hunter2 into the password field of https://bank.example/login?token=abc: credential"
+        page: str = "https://user:pw@Bank.Example:8443/login/step-two?token=abc#frag"
+        step: JsonObject = {"tool": "browser_act", "kind": "browser_input", "summary": words, "target": page}
+        older = await store.create_approval(
+            run.id, "browser_act", words, "handoff", {**step, "target": "https://a.test"}
+        )
+        newer = await store.create_approval(run.id, "browser_act", words, "handoff", step)
+        on_desktop = await store.create_approval(
+            other.id, "desktop_act", words, "handoff", {**step, "target": "Safari - Sign in"}
+        )
+        broken = await store.create_approval(other.id, "browser_act", words, "handoff", {**step, "target": "http://[x"})
+        await store.create_approval(gone.id, "browser_act", words, "handoff", step)
+        listed: NeedsYou = await read_needs_you(store, live, _NOW)
+        by_id = {item.id: item for item in listed.items}
+        # One for each chat: the newest of the run's two, and the newest of the other run's two; the run that is over
+        # has none.
+        assert set(by_id) == {newer.id, broken.id} and listed.count == 2
+        assert by_id[newer.id].title == "Dot needs you on bank.example"
+        assert by_id[broken.id].title == HANDOFF_TITLE_NO_HOST
+        dumped: str = json.dumps(listed.model_dump(exclude_none=True))
+        for leaked in ("hunter2", "token=abc", "pw", "login", "step-two", "8443", "frag", "password", "credential"):
+            assert leaked not in dumped, leaked
+        assert on_desktop.id not in by_id
+        # The owner did the step: the card is decided, and the one kept before it is the chat's next.
+        await store.decide_approval(newer.id, "approved", "ui", "")
+        after: NeedsYou = await read_needs_you(store, live, _NOW)
+        assert {item.id for item in after.items} == {older.id, broken.id}
+        assert next(item for item in after.items if item.id == older.id).title == "Dot needs you on a.test"
+        # The run ends: what it parked at is no longer waited for.
+        assert {item.id for item in (await read_needs_you(store, {other.id: other}, _NOW)).items} == {broken.id}
     finally:
         await store.close()

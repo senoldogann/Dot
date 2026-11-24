@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1423](1423.md) | done as far as the data allows | 2026-11-24 | The hand-off state: a step only the owner can do is told by its host and a fixed line, one for a chat |
 | [1422](1422.md) | done | 2026-11-24 | One list of what waits on the owner (`GET /api/needs-you`), and its count on the app's badge |
 | [1421](1421.md) | done | 2026-11-24 | Three kinds of push, each with a switch for each phone |
 | [1420](1420.md) | done | 2026-11-24 | The app's alerts stay quiet while it shows Dot: an activity lease per phone |
