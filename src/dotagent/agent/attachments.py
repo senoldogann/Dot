@@ -125,6 +125,12 @@ class UserInput(FrozenModel):
     # the owner is there, as their own message, answer or reaction is.
     of_dot: bool = False
 
+    def owners_own(self) -> bool:
+        """Whether these are the owner's own words: a message, the answer to a question, or a queued message they sent
+        on; not a note about a reaction nor a note of Dot's from another run (a helper's report, a work order). Only
+        these end a wait of the run's (``wait_until``, item 1685)."""
+        return not self.of_dot and self.reaction is None
+
 
 class RunInbox(asyncio.Queue[UserInput]):
     """What reaches a run at work (a steer, the answer to a question it left), in the order sent. :meth:`arrival`
@@ -138,14 +144,22 @@ class RunInbox(asyncio.Queue[UserInput]):
         self._order: deque[UserInput] = deque()
         # Whether the run waits on this inbox for the owner, who held it with a ✋ (item 586); the loop says so.
         self.holding: bool = False
+        # The owner's own messages put and taken so far, and how many of them a wait of the run gave way to already
+        # (:meth:`owner_unread`, item 1685).
+        self._owners_put: int = 0
+        self._owners_taken: int = 0
+        self._owners_heeded: int = 0
 
     def _put(self, item: UserInput) -> None:
         super()._put(item)
         self._order.append(item)
+        if item.owners_own():
+            self._owners_put += 1
         self._arrived.set()
 
     def _get(self) -> UserInput:
-        self._order.popleft()
+        if self._order.popleft().owners_own():
+            self._owners_taken += 1
         return super()._get()
 
     def first(self) -> UserInput:
@@ -162,6 +176,21 @@ class RunInbox(asyncio.Queue[UserInput]):
     async def arrival(self) -> None:
         """Return once the inbox holds a message that asks the step to give way (:meth:`asks`)."""
         while not self.asks():
+            self._arrived.clear()
+            await self._arrived.wait()
+
+    def owner_unread(self) -> bool:
+        """Whether the inbox holds an owner's own message (:meth:`UserInput.owners_own`) that no wait of the run gave
+        way to yet (item 1685): a wait gives way to a message once, and the loop reads it at the next step."""
+        return self._owners_put > max(self._owners_taken, self._owners_heeded)
+
+    def heed_owner(self) -> None:
+        """A wait gave way to the owner's messages in the inbox: a later wait does not end on them again."""
+        self._owners_heeded = self._owners_put
+
+    async def owner_arrival(self) -> None:
+        """Return once :meth:`owner_unread` holds."""
+        while not self.owner_unread():
             self._arrived.clear()
             await self._arrived.wait()
 

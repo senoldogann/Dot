@@ -20,9 +20,14 @@ What holds:
   followed along its path: a link that came there since the call was allowed ends the wait unread. Only whether it is
   there and holds ``contains`` comes back.
 - The run is stopped as any call is: the emergency stop and the owner's stop end the wait at once.
+- The owner's own message to the run ends the wait (item 1685), not as a failure: the model reads it with the result
+  rather than when the condition holds or the minutes run out (a run sat 13.7 minutes in a wait while the owner's
+  words waited). A note about a reaction, a helper's report or a work order does not end it, and a wait does not end
+  twice on the same message.
 """
 
 import asyncio
+import contextlib
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -35,7 +40,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.policy.shell import assess_shell
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_path_tool
-from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.context import OwnerWords, ToolContext, run_sandbox
 from dotagent.tools.files import _opened, read_action, resolve_path
 from dotagent.tools.shell import ShellArgs, _classify_shell, run_command
 from dotagent.tools.third_party import holds_third_party, mentions_third_party
@@ -221,6 +226,25 @@ def _checks(count: int) -> str:
     return f"{count} check{'s' if count != 1 else ''}"
 
 
+def owner_wrote_text(checks: int, seen: str) -> str:
+    """What a wait the owner's message ended says to the model (item 1685)."""
+    return (
+        "The owner wrote while you waited; their message follows this result. Read it and answer before waiting "
+        f"again. The condition had not held after {_checks(checks)}; the last saw: {seen}"
+    )
+
+
+async def _pause(seconds: float, owner: OwnerWords | None) -> None:
+    """Wait ``seconds``, or less when the owner's own message reaches the run first: the wait checks once more then,
+    and gives way to it."""
+    if owner is None:
+        await asyncio.sleep(seconds)
+        return
+    with contextlib.suppress(TimeoutError):
+        async with asyncio.timeout(seconds):
+            await owner.owner_arrival()
+
+
 def _minutes(seconds: float) -> str:
     whole: int = round(seconds)
     return f"{whole // 60} min {whole % 60} s" if whole >= 60 else f"{whole} s"
@@ -252,11 +276,15 @@ async def _wait(args: WaitArgs, ctx: ToolContext, authorized: ActionInfo) -> Too
         if held:
             text = f"The condition held after {waited} ({_checks(checks)}): {seen}"
             return ToolResult(text=text, images=(), is_error=False, untrusted=untrusted)
+        owner: OwnerWords | None = ctx.owner_words
+        if owner is not None and owner.owner_unread():
+            owner.heed_owner()
+            return ToolResult(text=owner_wrote_text(checks, seen), images=(), is_error=False, untrusted=untrusted)
         if time.monotonic() + args.every_s > deadline:
             within: str = f"{args.within_minutes:g} min"
             text = f"The condition did not hold within {within} ({_checks(checks)}); the last saw: {seen}"
             return ToolResult(text=text, images=(), is_error=True, untrusted=untrusted)
-        await asyncio.sleep(args.every_s)
+        await _pause(args.every_s, owner)
 
 
 def build_wait_tools() -> tuple[RegisteredTool, ...]:
@@ -265,8 +293,8 @@ def build_wait_tools() -> tuple[RegisteredTool, ...]:
             name=WAIT_UNTIL_TOOL,
             description=(
                 "Wait in code, with no turn spent, until one condition holds: command exits 0, url answers, or file "
-                "is there. Use it instead of sleep and a check. A command that changes something or reaches the "
-                "network is refused."
+                "is there. Use it instead of sleep and a check. A command that changes or fetches anything is "
+                "refused. The owner's message ends it."
             ),
             args_model=WaitArgs,
             modes=ACTING_MODES,

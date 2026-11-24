@@ -40,6 +40,9 @@ first message on its input, and answers as the message says:
   read the result of the call, so nothing of it is in flight (item 1581: that is continued);
 - ``die with a message waiting``: a call of ``shell`` that sleeps 2 s, then a SIGKILL before the program reads its
   input again, so that a message sent meanwhile is never taken in (item 1581: the next program is sent it again);
+- ``wait for the owner``: a call of ``wait_until`` for a file that never comes (a minute), then a second one of three
+  seconds, both before the program reads its input again, then the message that came meanwhile is taken in and the
+  model answers with what the two waits said (item 1685: the owner's message ends the first wait, not the second);
 - anything else: an init line naming the door's tools, a step that calls ``write_file`` twice through the door's MCP
   endpoint with the config file it was given (once into the workspace's ``.claude`` folder, once into ``notes.txt``),
   a step that answers with what the calls said, and a ``result``; then it waits for its input to close.
@@ -303,6 +306,20 @@ async def _work(
             late: str = "The payment was declined after all."
             _step([("text", late)], "end_turn")
             _say({"type": "result", "subtype": "success", "is_error": False, "result": late, "session_id": SESSION})
+            return
+        if "wait for the owner" in said:
+            _step([("text", "Waiting."), ("tool_use", f"mcp__{door}__wait_until")], "tool_use")
+            first: CallToolResult = await client.call_tool(
+                "wait_until", {"file": "never/there.txt", "every_s": 2, "within_minutes": 1}
+            )
+            second: CallToolResult = await client.call_tool(
+                "wait_until", {"file": "never/there.txt", "every_s": 2, "within_minutes": 0.05}
+            )
+            (RECORD / "waits.json").write_text(json.dumps([_text(first), _text(second)]), encoding="utf-8")
+            _read_message()
+            heard: str = "Read what the owner wrote."
+            _step([("text", heard)], "end_turn")
+            _say({"type": "result", "subtype": "success", "is_error": False, "result": heard, "session_id": SESSION})
             return
         if "slow command" in said:
             _step([("text", "Running it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")

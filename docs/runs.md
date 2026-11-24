@@ -351,9 +351,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   with the exits of all the cuts in its context. The chat's session is kept only when the run ends clean (see
   [Models](models.md)).
 - A message sent to a running run (steering) reaches the model at once: a step whose model is still answering is cut
-  short and asked again with the message (item 509); a tool already at work finishes first, and a step past the run's
-  limit ends with its finish. It also clears the run's untrusted mark (see [Safety](safety.md#safety)); a reaction
-  on one of its messages reaches it the same way and clears nothing (see
+  short and asked again with the message (item 509); a tool already at work finishes first (a `wait_until` ends at
+  its next check, item 1685), and a step past the run's limit ends with its finish. It also clears the run's
+  untrusted mark (see [Safety](safety.md#safety)); a reaction on one of its messages reaches it the same way and
+  clears nothing (see
   [Reactions on Dot's messages](#reactions-on-dots-messages)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
@@ -884,6 +885,18 @@ status and whether the page holds the text come back. A file is judged as `read_
 asks, and it is opened as `read_file` opens one, with no link followed along its path (item 681). A link that came there
 after the call was allowed ends the wait, and it is not read. Only whether it is there and holds the text comes back.
 The owner's stop and the emergency stop end a wait as they end any call.
+
+**Your message ends a wait (item 1685).** A message you send to a run while it is in `wait_until` (a steer, a queued
+message you send on with Send now, the answer to a question) ends the wait at its next check, not as a failure: the
+result says "The owner wrote while you waited; their message follows this result. Read it and answer before waiting
+again." with the number of checks and what the last saw, and the model reads your message with it. Before, a run sat
+13.7 minutes in a wait while your words waited for it. Only your own words end a wait: a note about a reaction, a
+helper's report, a work order or a note from another chat does not. A wait ends once on a message: a second wait that
+starts before the model read it runs its course. In Dot's own loop the message waits in the run's inbox until the next
+step; on the Claude plan (`claude_code:`) the program takes it in right after the result of the tool at work, which
+it says (measured on Claude Code 2.1.331), and until then it counts as unread. A run on OpenCode is not ended early yet,
+and neither are the other long waits (`delegate` already is, item 1351; a long `shell`, `terminal` waits, browser waits,
+`watch_video`).
 
 A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
 (`[shell] max_timeout_s`), or for minutes while the run has other work to do (item 508), goes to a terminal session in
