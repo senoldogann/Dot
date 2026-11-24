@@ -759,9 +759,12 @@ beside its label as the facts are: where the minutes went (the model, the summar
 for you), the steps, the input tokens with the share the provider served from its cache, the output tokens, the
 compactions (with their rate per
 100 steps), the runs
-it delegated and the web searches by engine, and a figure of none has no line (item 452). It is
+it delegated and the web searches by engine, and a figure of none has no line (item 452). A run that is still at work
+says first what it has used so far (**Used so far**: its time, the tokens in and out and its steps), and, when it runs on
+your Claude plan, the window of the plan its newest step saw ("5-hour window: 62% used · resets in 1h 19m"), so that
+a run with no limit of minutes or tokens shows what it has spent as it spends it (item 1403). It is
 `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
-ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
+ID`, with `plan_window`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
 of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
 finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
 danger colour with a square) and cancels it; a word typed turns it back into the send, and while a queued message is edited the send saves it. That Stop is the only one (items

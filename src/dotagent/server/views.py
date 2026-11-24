@@ -361,6 +361,13 @@ class EventsQuery(FrozenModel):
     tail: int | None = Field(default=None, ge=1, le=2000)
 
 
+class UsageQuery(FrozenModel):
+    """``GET /api/usage``: how many local days back the usage is summed, today among them (item 1403): a week unless
+    asked, at most a quarter."""
+
+    days: int = Field(default=7, ge=1, le=92)
+
+
 class RunsStreamQuery(FrozenModel):
     """The runs one stream follows, their ids joined by commas (item 889), and the event id it goes on after."""
 

@@ -15,6 +15,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1406](1406.md) | done | 2026-11-24 | A call's result says how long its tool ran, and a tool that runs well past its limit is logged |
 | [1405](1405.md) | done | 2026-11-24 | A skill Dot could not offer is listed on the Skills page, with its file and its reason |
 | [1404](1404.md) | done | 2026-11-24 | A run's Changes line says how many steps ran that no undo can take back |
+| [1403](1403.md) | done | 2026-11-24 | What the tasks used is shown: so far on a task at work, and by day in Settings |
 | [1402](1402.md) | done | 2026-11-24 | A run whose goal check could not run has an ending of its own, and is no longer "refused" |
 | [1401](1401.md) | done | 2026-11-24 | A schedule counts the firings skipped in a row, and says it where the owner looks |
 | [1400](1400.md) | done | 2026-11-24 | A run on the Claude plan that lacks a tool it cannot work without ends failed at once, and says which |

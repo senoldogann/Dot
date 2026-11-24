@@ -52,6 +52,7 @@ import { modelPicker } from "../modelpicker.js";
 import { anchoredPopover } from "../popover.js";
 import { voiceLanguage } from "../readaloud.js";
 import { reasoningSelect } from "../reasoning.js";
+import { buildUsage } from "../usagesection.js";
 import { approvalLabel } from "../runmodes.js";
 import { t, UI_LANGUAGE_KEY, UI_LANGUAGES, uiLanguage } from "../i18n.js";
 import { removePref, writePref } from "../prefs.js";
@@ -2890,11 +2891,15 @@ export function mountModels(root, ctx) {
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("model") ?? "";
   const models = buildModels(() => disposed, asked, ctx.head);
   ctx.head.setLead("Which AI model does each job, and which one takes over when a model cannot answer.");
+  // What the tasks used in the last week (item 1403) stands before the long list of every model, which is last.
+  const usage = buildUsage();
+  models.element.insertBefore(usage.element, models.element.lastElementChild);
   root.append(models.element);
   const stop = onChange(() => models.paint());
   models.paint();
   attempt(refresh);
   attempt(models.load);
+  attempt(usage.load);
   return () => {
     disposed = true;
     stop();

@@ -56,7 +56,11 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   so what bounds the cost is the stop button, the progress watchdog, `goal_patience` for the send-backs of goal mode,
   the concurrency limits (`max_concurrent_runs`; 0, the default, sets no limit) and the default ceilings of 120 minutes
   and 10,000,000 tokens (set `run_max_minutes` or `run_max_tokens` to 0 for no bound; a lower limit to spend less). A
-  run that varies its steps without getting anywhere still ends at a ceiling unless you turn both off.
+  run that varies its steps without getting anywhere still ends at a ceiling unless you turn both off. With no bound
+  there is no "left", so Dot shows what is spent: a run at work says what it has used so far on its Cost card, and
+  Settings › Models › Usage sums the last days (`GET /api/usage`, item 1403). Dot records time, tokens and the windows of
+  your Claude plan, and keeps no price for a model, so none of this shows money; the plan's window is what a Claude plan
+  has instead of a price, and the usage says only what the steps recorded of it.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
   What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
   item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and

@@ -5739,3 +5739,24 @@
 .plugin-tile a.plugin-name::after {
   border-radius: 0;
 }
+
+/* A day or a window of the plan in Settings › Models › Usage (item 1403): its words, and a thin bar of how much. */
+.usage-bar {
+  height: 4px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.usage-bar-fill {
+  display: block;
+  width: var(--share, 0%);
+  height: 100%;
+  border-radius: var(--radius-xs);
+  background: var(--accent);
+}
+
+.usage-card .set-row-lead {
+  font-variant-numeric: tabular-nums;
+}

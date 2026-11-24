@@ -88,6 +88,7 @@ from dotagent.server.views import (
     StuckRequest,
     StuckView,
     UndoRequest,
+    UsageQuery,
     picks_of,
 )
 from dotagent.store.db import Store
@@ -107,7 +108,7 @@ from dotagent.store.models import (
     ThreadRecord,
     chat_team,
 )
-from dotagent.store.stats import RunCosts
+from dotagent.store.stats import RunCosts, Usage
 from dotagent.tools.schedule import chat_options, schedule_mode
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -328,6 +329,13 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """What the run cost and where it went (item 53), as ``dotx stats --run`` reads it."""
         await store.get_run(run_id)
         return await store.run_costs(run_id)
+
+    @router.get("/usage")
+    async def usage(query: Annotated[UsageQuery, Query()]) -> Usage:
+        """What the owner's runs used in the last ``days`` days (item 1403): for each local day the runs started on it,
+        their steps, the tokens in and out and their minutes, and the last window of the Claude plan each kind of
+        window was seen in. Time and tokens are what Dot records; it holds no price per model, so it shows no money."""
+        return await store.usage(query.days)
 
     async def actions(run_id: str) -> RunActions:
         run: RunRecord = await store.get_run(run_id)

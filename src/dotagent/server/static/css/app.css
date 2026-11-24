@@ -7498,6 +7498,32 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-xs);
 }
 
+/* What a task at work has used so far (item 1403), above the details of the Cost card: its own quiet block. */
+.cost-so-far {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--msg-agent);
+  font-size: var(--text-sm);
+}
+
+.cost-so-far-label {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.cost-so-far-line {
+  color: var(--text);
+  font-weight: var(--weight-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-so-far-window {
+  color: var(--text-2);
+}
+
 /* The pages a turn read on the web (item 1184, sources.js): one quiet line under the answer, the first letters of a few
    of their sites side by side and how many there are; open, a list of each page's title over its site. No colour: a
    site's letter is a mark, not a logo, and colour stays for what asks the owner to look (item 837). */

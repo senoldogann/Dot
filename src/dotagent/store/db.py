@@ -136,8 +136,10 @@ from dotagent.store.stats import (
     ContextEvidence,
     ModelProfile,
     RunCosts,
+    Usage,
     chat_spend,
     collect_run_costs,
+    collect_usage,
     read_context_evidence,
     read_model_profile,
 )
@@ -4288,6 +4290,11 @@ class Store:
         """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a
         read-only connection."""
         return await asyncio.to_thread(read_context_evidence, self._database, model, days, time.time())
+
+    async def usage(self, days: int) -> Usage:
+        """What the runs of the last ``days`` local days used, a row for each day, and the Claude plan's windows their
+        steps recorded (item 1403), read on a read-only connection."""
+        return await asyncio.to_thread(collect_usage, self._database, days, time.time())
 
     async def run_costs(self, run_id: str) -> RunCosts:
         """What the run cost and where it went, read on a read-only connection; its minutes run to now while it
