@@ -39,6 +39,10 @@ async def login_env() -> dict[str, str]:
     return await read_login()
 
 
+# A browser whose IndexedDB never answers: a request that neither succeeds nor fails (a Home Screen app just woken).
+_NO_ANSWER: str = "indexedDB.open = () => ({});"
+
+
 async def _queued(working: Scene) -> list[str]:
     """The words of the messages in the chat's queue, as the daemon holds them."""
     held: list[QueuedMessage] = await working.runtime.store.list_queued(working.run.thread_id)
@@ -120,6 +124,29 @@ async def test_a_message_made_with_no_link_waits_survives_the_page_and_goes_once
             await _until_queued(working, 2)
             await asyncio.sleep(1.5)
             assert await _queued(working) == [*before, _WORDS]
+            await context.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_database_that_never_answers_does_not_hold_up_what_is_sent(login_env: dict[str, str]) -> None:
+    """The page keeps what it reads and what waits in IndexedDB, and what it does is never held up by it: with a
+    database that does not answer, the chat opens and a message made with the link well goes at once, with no row
+    left waiting."""
+    async with scene(login_env, "work") as working, async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(
+            channel=working.runtime.config.browser.channel, headless=True
+        )
+        try:
+            context: BrowserContext = await phone(browser, playwright, workers="block")
+            await context.add_init_script(_NO_ANSWER)
+            page: Page = await open_chat(context, working.address, working.token, working.run.id)
+            await _settled(page)
+            before: list[str] = await _queued(working)
+            await _send(page, _WORDS)
+            await _until_queued(working, len(before) + 1)
+            assert await _queued(working) == [*before, _WORDS]
+            await expect(page.locator(".outbox-row")).to_have_count(0)
             await context.close()
         finally:
             await browser.close()

@@ -10,7 +10,7 @@
 // the page lives.
 
 import { request, unreachable } from "./api.js";
-import { canKeep, openDatabase } from "./datacache.js";
+import { canKeep, inTime, openDatabase } from "./datacache.js";
 import { t } from "./i18n.js";
 import { noteWaiting } from "./linkfacts.js";
 import { added, afterKill, entryOf, leaveOld, nextDue, ofChat, sendAgain, settled, verdictOf, waitingCount } from "./outboxrules.js";
@@ -47,8 +47,13 @@ function warn(error) {
   }
 }
 
-/** Write the entries, all of them or none, in one transaction. */
-async function write() {
+/** Write the entries, all of them or none, in one transaction. A database that does not answer in time leaves them in
+ * memory, as a browser without one does: what is sent is never held up by it. */
+function write() {
+  return inTime(writeEntries(), undefined);
+}
+
+async function writeEntries() {
   if (!canKeep()) {
     return;
   }
@@ -95,7 +100,7 @@ async function read() {
 export function loadOutbox() {
   if (loading === null) {
     loading = (async () => {
-      const kept = afterKill(await read());
+      const kept = afterKill(await inTime(read(), []));
       // Entries made before the load (a message sent while it ran) stay, those kept before come first.
       const fresh = entries;
       entries = [];
