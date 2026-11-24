@@ -36,16 +36,7 @@ struct RunInspector: View {
                         .buttonStyle(.plain)
                     }
                     if !model.state.plan.isEmpty { planCard }
-                    CardGroup(title: "Helpers", footer: model.state.helpers.isEmpty ? nil : "Subagents Dot started for this chat.") {
-                        if model.state.helpers.isEmpty {
-                            EmptyRow(icon: .users, words: "No helpers in this chat.")
-                        }
-                        ForEach(Array(model.state.helpers.enumerated()), id: \.element.id) { index, helper in
-                            if index > 0 { CardDivider(inset: 48) }
-                            HelperRow(helper: helper)
-                        }
-                    }
-                    .id(Focus.helpers)
+                    helpersSection
                     CardGroup(title: "Schedules and loops") {
                         if model.automations.isEmpty {
                             EmptyRow(icon: .history, words: "None bound to this chat.")
@@ -78,6 +69,39 @@ struct RunInspector: View {
             }
             }
         }
+    }
+
+    /// The helpers (item 1467): the ones at work first, newest first, then the finished ones, newest first, each group with its
+    /// count in its header, so that the five that work are not below sixty that ended. A chat with none says so. The capsule's
+    /// helpers segment scrolls here (`Focus.helpers`), to the first group.
+    @ViewBuilder private var helpersSection: some View {
+        let groups: HelperOrder.Groups = HelperOrder.groups(model.state.helpers)
+        if groups.isEmpty {
+            CardGroup(title: "Helpers") {
+                EmptyRow(icon: .users, words: "No helpers in this chat.")
+            }
+            .id(Focus.helpers)
+        }
+        if !groups.working.isEmpty {
+            helperGroup(.working, groups.working, footer: nil).id(Focus.helpers)
+        }
+        if !groups.finished.isEmpty {
+            if groups.working.isEmpty {
+                helperGroup(.finished, groups.finished, footer: "Subagents Dot started for this chat.").id(Focus.helpers)
+            } else {
+                helperGroup(.finished, groups.finished, footer: "Subagents Dot started for this chat.")
+            }
+        }
+    }
+
+    private func helperGroup(_ group: HelperOrder.Group, _ helpers: [Helper], footer: String?) -> some View {
+        CardGroup(title: HelperOrder.title(group, count: helpers.count), footer: footer) {
+            ForEach(Array(helpers.enumerated()), id: \.element.id) { index, helper in
+                if index > 0 { CardDivider(inset: 48) }
+                HelperRow(helper: helper)
+            }
+        }
+        .accessibilityIdentifier(group == .working ? "helpers-working" : "helpers-finished")
     }
 
     /// The run's standing, large: what it does, how many steps it has taken.
@@ -218,7 +242,7 @@ private struct HelperRow: View {
                 }
             }
             Spacer(minLength: Space.s)
-            StatusPill(text: helper.status.capitalizedFirst, icon: helper.isLive ? .audioWaveform : nil, tone: helper.isLive ? Theme.accent : Theme.faint, pulse: helper.isLive)
+            StatusPill(text: HelperOrder.badge(for: helper), icon: helper.isLive ? .audioWaveform : nil, tone: helper.isLive ? Theme.accent : Theme.faint, pulse: helper.isLive)
         }
         .padding(.horizontal, Space.l).padding(.vertical, Space.m - 2)
         .accessibilityElement(children: .combine)

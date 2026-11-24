@@ -94,7 +94,7 @@ code** takes its place. The same by hand:
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351),
    the chat's loops and the queue, each a button that opens its own sheet (the queue's has an up and a down arrow, Send now and Remove for each message,
    and Resume when a stop held it), never stacked and not drawn when there is nothing to say,
-   a run inspector (plan, helpers, the chat's schedules and loops with switches), the Schedules list and the models; the
+   a run inspector (plan, helpers with the ones at work first, each group newest first with its count, item 1467, the chat's schedules and loops with switches), the Schedules list and the models; the
    web UI stays as it is and opens full screen from Settings › Open web UI. The second slice (item 1361) adds a new chat
    (the pencil of the list: a message starts a chat of its own on the model and reasoning level picked, as the web's home
    does since item 1350, `POST /api/runs`; a model that cannot answer is refused by name with a button that sends the

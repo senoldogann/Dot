@@ -57,7 +57,8 @@ stacked; a segment exists only while it has something to say, so a chat at rest 
 each message an up and a down arrow, Send now (to the run at work) and Remove, and Resume when a stop held the queue;
 the round button to the newest message stands beside the capsule; Send queues while a run works, and Stop with an empty
 box; a photo to attach), the
-run inspector (the run, its plan, its helpers, the chat's schedules and loops with their switches), the Schedules list and
+run inspector (the run, its plan, its helpers in two groups, **Working** first and **Finished** after, each newest first and
+with its count in its header, `Core/HelperOrder` and item 1467, the chat's schedules and loops with their switches), the Schedules list and
 the models (the default and the review model) in Settings, notifications and the Live Activity. Slice 2 (item 1361):
 
 - **New chat**: the pencil of the list opens a sheet whose message starts a chat of its own (`POST /api/runs`, `mode`
