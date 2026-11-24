@@ -10,6 +10,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1502](1502.md) | done | 2026-11-24 | The tools of a run as files: a typed function for each tool a code may call, found with `search_tools` |
 | [1501](1501.md) | done | 2026-11-24 | `code_run`: Python the model writes calls its tools through the run's own gate, as a shell line to the policy |
 | [1500](1500.md) | done | 2026-11-24 | Code mode's sandbox: the code of a `code_run` runs in a deny-default macOS profile, behind a bridge of two pipes, and fails closed |
+| [1467](1467.md) | done | 2026-11-24 | Dot for iPhone: the helpers list puts the ones at work first |
 | [1462](1462.md) | done | 2026-11-24 | Dot for iPhone: agents are bots, not letters |
 | [1461](1461.md) | done | 2026-11-24 | Dot for iPhone draws the web app's own icons: Lucide as vector images, not SF Symbols |
 | [1460](1460.md) | done | 2026-11-24 | Dot for iPhone: the ring of a working agent turns slowly |

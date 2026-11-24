@@ -36,6 +36,9 @@ struct Helper: Sendable, Hashable, Identifiable {
     var status: RunStatus
     /// What it does now, in a few words ("Running swift test").
     var words: String?
+    /// When the daemon queued it, in epoch seconds (0 when this state has not heard): the order the lists show helpers in
+    /// (`HelperOrder`, item 1467).
+    var createdAt: Double = 0
 
     var isLive: Bool { status.isActiveRunStatus }
 }
@@ -185,9 +188,10 @@ struct ChatState: Sendable, Equatable {
         for run in runs.reversed() where run.parentRunId != nil {
             if let at: Int = helpers.firstIndex(where: { $0.id == run.id }) {
                 helpers[at].status = run.status
+                helpers[at].createdAt = run.createdAt
                 if !run.status.isActiveRunStatus { helpers[at].words = nil }
             } else {
-                helpers.append(Helper(id: run.id, goal: run.goal, status: run.status, words: nil))
+                helpers.append(Helper(id: run.id, goal: run.goal, status: run.status, words: nil, createdAt: run.createdAt))
             }
         }
     }
@@ -252,7 +256,7 @@ struct ChatState: Sendable, Equatable {
         case "run_queued":
             if data["parent_run_id"]?.string != nil {
                 if !helpers.contains(where: { $0.id == event.runId }) {
-                    helpers.append(Helper(id: event.runId, goal: data["goal"]?.string ?? "", status: "queued", words: nil))
+                    helpers.append(Helper(id: event.runId, goal: data["goal"]?.string ?? "", status: "queued", words: nil, createdAt: event.ts))
                 }
             } else if !isRoot {
                 rootRunIds.append(event.runId)
