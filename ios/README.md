@@ -195,7 +195,8 @@ shares the Mac's CPU and disk, so only the shape carries to a phone, and no real
   jitter), or waits for the link when there is none. A state the screen already has is not handed over again.
 - **Helpers that go on after their run ended** (item 1466): the daemon lets the helpers a run that ended done started work on
   (item 1351) and the run's stream ends with it, so nothing tells the phone that one of them ended. `ChatState.line` is
-  `.helpersInBackground(count:)` for a chat whose run is over while a helper is live. While the chat is open and one is live,
+  `.helpersInBackground(count:)` for a chat whose run is over while a helper is live (`.waitingOnYou` when a live one asks the owner
+  something). While the chat is open and one is live,
   `ChatSession` asks for the list of helpers (`GET /api/threads/{id}/helpers`, one small request, nothing else) every 8 seconds
   (`HelperWatch.seconds`), reads the chat whole when one that was live has ended (its report may have started a run, which the
   chat then follows) and stops when none is live; with no link it asks nothing and the capsule keeps the last count, dimmed. The

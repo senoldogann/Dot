@@ -71,6 +71,26 @@ final class HelperLineTests: XCTestCase {
         XCTAssertEqual(state.line, .idle)
     }
 
+    /// A helper the run left at work may ask the owner something: the chat waits on the owner (the warm line), as it does while the run
+    /// works. A card of a helper that has ended, or of the ended run, is not a helper at work asking.
+    func testAHelperThatAsksTheOwnerAfterTheRunEndedMakesTheChatWaitOnYou() {
+        var state: ChatState = chat(live: 2)
+        let question: [String: JSONValue] = [
+            "approval_id": .string("apr_1"), "tool": .string("ask_user"), "summary": .string("Asks"), "severity": .string("ask"),
+            "args": .object(["question": .string("Which folder?")]),
+        ]
+        state.apply(event(9, "h0", "approval_requested", question))
+        XCTAssertEqual(state.pendingApprovals.count, 1)
+        XCTAssertEqual(state.line, .waitingOnYou(count: 1), "not \"2 helpers working\": the owner is needed")
+        state.apply(event(10, "h0", "approval_decided", ["approval_id": .string("apr_1"), "status": .string("approved")]))
+        XCTAssertEqual(state.line, .helpersInBackground(count: 2), "answered, they work on")
+        // The same question from a helper that has since ended asks no one: its card waits for the daemon's list to close it.
+        state.apply(event(11, "h1", "approval_requested", question.merging(["approval_id": .string("apr_2")]) { _, new in new }))
+        XCTAssertEqual(state.line, .waitingOnYou(count: 1))
+        state.apply(event(12, "h1", "run_finished", ["status": .string("failed"), "result": .string("")]))
+        XCTAssertEqual(state.line, .helpersInBackground(count: 1), "h0 still works and nothing live asks")
+    }
+
     // MARK: What it says
 
     func testTheHeaderSaysHowManyWorkOnceTheRunIsOverAndNotDoneAMinuteAgo() {
