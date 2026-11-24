@@ -88,6 +88,7 @@ struct ChatState: Sendable, Equatable {
     /// The highest stored event id applied (deltas have none): where a reconnect goes on from.
     private(set) var lastEventId: Int = 0
     private(set) var rootRunIds: [String] = []
+    private(set) var latestCodingWorkCapture: EventRecord?
     /// The newest root run's status and when it started.
     private(set) var runStatus: RunStatus?
     private(set) var runStartedAt: Double?
@@ -298,6 +299,8 @@ struct ChatState: Sendable, Equatable {
                let title: String = data["title"]?.string, !title.isEmpty {
                 upsert(ChatItem(id: "page:\(page)", kind: .shownPage(id: page, title: title), ts: event.ts))
             }
+        case "coding_work_captured":
+            if isRoot, event.id > (latestCodingWorkCapture?.id ?? 0) { latestCodingWorkCapture = event }
         case "tool_call":
             toolCall(event, isRoot: isRoot)
         case "tool_result":

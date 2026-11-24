@@ -12,6 +12,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1670](1670.md) | done | 2026-11-24 | The process groups a crashed Dot left at work are ended when it starts again, and named to the run that goes on |
 | [1669](1669.md) | done | 2026-11-24 | A helper's report wakes a chat whose newest run a restart or the Claude plan's limit ended, never your Stop |
 | [1668](1668.md) | done | 2026-11-24 | A helper that a restart of Dot cut off is resumed at the next start and reports when it really ends |
+| [1658](1658.md) | done | 2026-11-24 | Attach a coding run to its Git worktree and pull request |
 | [1657](1657.md) | done | 2026-11-24 | Open generated preview pages from native iPhone conversations |
 | [1656](1656.md) | done | 2026-11-24 | Describe an appearance in chat and apply it across Dot clients |
 | [1644](1644.md) | done | 2026-11-24 | Dot for iPhone: the new look seen on every screen, before and after |

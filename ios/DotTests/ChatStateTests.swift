@@ -47,6 +47,19 @@ final class ChatStateTests: XCTestCase {
         XCTAssertEqual(state.items.last?.kind, .shownPage(id: id, title: "Sales"))
     }
 
+    func testTheLatestWorktreeCapturePersistsAcrossFollowUps() {
+        var state: ChatState = started()
+        let first: EventRecord = event(2, "run_1", "coding_work_captured", [:])
+        state.apply(first)
+        state.apply(event(3, "helper_1", "coding_work_captured", [:]))
+        state.apply(event(4, "run_2", "run_queued", ["goal": .string("Follow up")]))
+        XCTAssertEqual(state.latestCodingWorkCapture, first)
+        let second: EventRecord = event(5, "run_2", "coding_work_captured", [:])
+        state.apply(second)
+        state.apply(first)
+        XCTAssertEqual(state.latestCodingWorkCapture, second)
+    }
+
     func testAToolStepIsOneLineThatCompletes() {
         var state: ChatState = started()
         state.apply(event(2, "run_1", "tool_call", ["call_id": .string("c1"), "tool": .string("shell"), "args": .object(["command": .string("swift test")])]))

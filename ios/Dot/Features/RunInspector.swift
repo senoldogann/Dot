@@ -1,3 +1,4 @@
+import os
 import SwiftUI
 
 /// The run inspector, a bottom sheet: the run's status, its plan, its helpers (subagents) and the schedules and loops
@@ -11,10 +12,13 @@ struct RunInspector: View {
     let onModels: () -> Void
     /// Asks for the sheet's full height (the model picker is a long list).
     var onExpand: () -> Void = {}
+    @State private var codingWork: CodingWorkSnapshot?
+    private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "coding-work")
     @Environment(\.dismiss) private var dismiss: DismissAction
     @Environment(\.dynamicTypeSize) private var typeSize: DynamicTypeSize
 
     var body: some View {
+        let capture: EventRecord? = model.state.latestCodingWorkCapture
         NavigationStack {
             ScrollViewReader { proxy in
             ScrollView {
@@ -36,6 +40,7 @@ struct RunInspector: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    if let codingWork { CodingWorkCard(snapshot: codingWork) }
                     if !model.state.plan.isEmpty { planCard }
                     helpersSection
                     if !model.automations.isEmpty {
@@ -65,6 +70,7 @@ struct RunInspector: View {
                 await model.refreshAutomations()
                 await model.store.loadProviders()
             }
+            .onChange(of: capture, initial: true) { _, capture in readCodingWork(capture) }
             .task(id: focus) {
                 // A segment of the dock's capsule asked for a part of the sheet: it is brought to the top, once the
                 // sheet is on the screen.
@@ -73,6 +79,20 @@ struct RunInspector: View {
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(focus, anchor: .top) }
             }
             }
+        }
+    }
+
+    private func readCodingWork(_ capture: EventRecord?) {
+        guard let capture else {
+            codingWork = nil
+            return
+        }
+        do {
+            let data: Data = try JSONEncoder().encode(capture.data)
+            codingWork = try JSONDecoder().decode(CodingWorkSnapshot.self, from: data)
+        } catch {
+            codingWork = nil
+            logger.warning("Could not read the coding work: \(error.localizedDescription, privacy: .public)")
         }
     }
 

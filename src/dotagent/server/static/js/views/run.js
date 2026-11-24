@@ -454,6 +454,33 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     head: undoLine.element,
   });
   const refreshChanges = debounce(() => attempt(changes.refresh), CHANGES_SETTLE_MS);
+  const codingWorkBody = el("div", { class: "panel-records" });
+  const codingWork = panelSection({ id: "coding-work", title: "Coding worktree", actions: null, body: codingWorkBody });
+  codingWork.element.hidden = true;
+  async function refreshCodingWork() {
+    const work = await sharedGet(`/runs/${encodeURIComponent(runId)}/coding-work`, signal);
+    if (signal.aborted || work === null) {
+      return;
+    }
+    const state = work.pr_state === "unverified" ? "Status unverified" : work.pr_state;
+    codingWorkBody.replaceChildren(
+      el("p", { class: "small" }, work.branch, " · ", work.head.slice(0, 12)),
+      el("p", { class: "small muted" }, work.worktree),
+      work.pr_url === null
+        ? null
+        : el("p", { class: "small" },
+            el("a", { href: work.pr_url, target: "_blank", rel: "noopener noreferrer" }, "Pull request"), " · ", state,
+            " · ", el("a", { href: `${work.pr_url}/files`, target: "_blank", rel: "noopener noreferrer" }, "Files changed")),
+      el(
+        "details",
+        null,
+        el("summary", { class: "small" }, "Committed changes from ", work.base.slice(0, 12)),
+        el("pre", { class: "coding-work-stat" }, work.diff_stat || "No committed changes"),
+      ),
+      el("p", { class: "small muted" }, "Captured ", new Date(work.captured_at * 1000).toLocaleString()),
+    );
+    codingWork.element.hidden = false;
+  }
 
   // ------------------------------------------------------------------------------------------------ cost
   // What the run cost and where (see cost.js): read on arrival, every COST_REFRESH_MS while it works, once at its end.
@@ -1883,7 +1910,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       // What came of the task first (its answer's files, how it ended), then the recap and the sources, the technical
       // last (the owner's ask of 2026-11-13: the files made stood under the recap and the skills, with their lines).
       { id: "run", label: t("tabs.task"), icon: "info", sections: [...context.head, recap.element, lineageCompact.element, automations.element, ...context.rest, more.element, lessonsSlot] },
-      { id: "changes", label: t("tabs.changes"), icon: "fileDiff", sections: [changes.element] },
+      { id: "changes", label: t("tabs.changes"), icon: "fileDiff", sections: [codingWork.element, changes.element] },
       { id: "plan", label: t("tabs.plan"), icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: t("tabs.agents"), icon: "users", sections: [lineageFull.element, withSection.element] },
       { id: "screen", label: t("tabs.screen"), icon: "monitor", sections: [screenQuiet, computer.element, macScreen.element] },
@@ -2165,6 +2192,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   paintLessons(detail.lessons, detail.disliked ?? null);
   reactions.start();
   attempt(changes.refresh);
+  attempt(refreshCodingWork);
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
@@ -2201,6 +2229,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   // The run as it stands, its lessons and its questions among it, once the lifecycle stream is back after a break, and
   // whether the chat went on meanwhile (item 451).
   const stopBack = onStreamBack(() => {
+    attempt(refreshCodingWork);
     reconcile();
     catchUp();
     reactions.refresh();
@@ -2217,6 +2246,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     timeline.push(message.data);
     workStatus.push(message.data);
     recap.onEvent(message.data);
+    if (!replaying && message.data.kind === "coding_work_captured" && message.data.run_id === runId) {
+      attempt(refreshCodingWork);
+    }
     if (!replaying && message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
       refreshChanges();
     }

@@ -644,6 +644,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Office          | `agents_now`, `read_agent_chat` (what the other agents do now and one's chat, item 890), `chats`, `read_chat` (the chats of this Mac, found and read, item 953), `send_to_chat` (a note to the run at work in one, item 957) |
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Appearance      | `theme_read`, `theme_apply`, `theme_undo` |
+| Worktrees       | `track_coding_work` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
@@ -965,6 +966,15 @@ a 5xx, or that does not reach it, is made again after the wait it asks for (half
 all; any other refusal is the call's error, with the provider's own words. The tools are in the `accounts` group.
 Their tests run against a stand-in of both providers after a real sign-in into a keychain of their own
 (`tests/smoke/test_mail_calendar.py`).
+
+## Coding worktrees and pull requests
+
+Ask Dot to record a coding worktree or refresh its snapshot. The worktree group offers `track_coding_work`,
+which attaches an existing linked worktree to the run with its branch, current commit, committed change
+summary from the supplied base commit, and optional GitHub pull request. A PR with a different head is marked
+unverified. A failed GitHub lookup reports the error and stops the capture. The desktop and web Changes tab
+shows the latest snapshot for the run. The iPhone Run inspector shows the latest capture in the conversation
+and updates when a new one arrives. Both show the capture time.
 
 ## Delegation
 
