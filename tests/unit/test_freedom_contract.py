@@ -943,13 +943,29 @@ def test_every_row_has_a_name_of_its_own_and_every_kind_of_tool_is_in_the_table(
 # --------------------------------------------------------------------------------------- the places that ask the owner
 
 
+_BROKER_METHODS: frozenset[str] = frozenset({"request", "keep", "leave"})
+# The modules that import the approval broker's class: the gate, the meeting desk and the runtime that makes it.
+BROKER_IMPORTERS: frozenset[str] = frozenset({"agent/gate.py", "meetings/desk.py", "runtime.py"})
+
+
+def _names_the_broker(receiver: str) -> bool:
+    lowered: str = receiver.lower()
+    return "approvals" in lowered or "broker" in lowered
+
+
 class _Asks(ast.NodeVisitor):
-    """The calls of the approval broker's ``request``, ``keep`` and ``leave`` in a file, by the function they are in."""
+    """The places of a file that reach the approval broker's ``request``, ``keep`` and ``leave``, by the function they
+    are in: the call, the method taken as a value (``ask = approvals.request``) and ``getattr(approvals, "request")``,
+    on a receiver that names the broker."""
 
     def __init__(self, file: str) -> None:
         self.file: str = file
         self.stack: list[str] = []
         self.found: dict[tuple[str, str], int] = {}
+
+    def _reached(self) -> None:
+        key: tuple[str, str] = (self.file, ".".join(self.stack))
+        self.found[key] = self.found.get(key, 0) + 1
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self.stack.append(node.name)
@@ -958,32 +974,75 @@ class _Asks(ast.NodeVisitor):
 
     visit_AsyncFunctionDef = visit_FunctionDef  # type: ignore[assignment]
 
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if node.attr in _BROKER_METHODS and _names_the_broker(ast.unparse(node.value)):
+            self._reached()
+        self.generic_visit(node)
+
     def visit_Call(self, node: ast.Call) -> None:
         function: ast.expr = node.func
-        if isinstance(function, ast.Attribute) and function.attr in {"request", "keep", "leave"}:
-            owner: str = ast.unparse(function.value).lower()
-            if "approvals" in owner or "broker" in owner:
-                key: tuple[str, str] = (self.file, ".".join(self.stack))
-                self.found[key] = self.found.get(key, 0) + 1
+        if isinstance(function, ast.Name) and function.id == "getattr" and len(node.args) >= 2:
+            receiver, name = node.args[0], node.args[1]
+            if (
+                isinstance(name, ast.Constant)
+                and name.value in _BROKER_METHODS
+                and _names_the_broker(ast.unparse(receiver))
+            ):
+                self._reached()
         self.generic_visit(node)
 
 
+def _asks_in(text: str, file: str = "tools/x.py") -> dict[tuple[str, str], int]:
+    visitor: _Asks = _Asks(file)
+    visitor.visit(ast.parse(text))
+    return visitor.found
+
+
 def _asking_sites() -> dict[tuple[str, str], int]:
-    """Every call of the approval broker's ``request``, ``keep`` and ``leave`` in the source, by file (from
-    ``src/dotagent``) and function, with how many there are: each puts a question to the owner."""
+    """Every place of the source (by file from ``src/dotagent`` and function, with how many there are) that reaches the
+    approval broker's ``request``, ``keep`` or ``leave``: each puts a question to the owner."""
     source: Path = ROOT / "src" / "dotagent"
     found: dict[tuple[str, str], int] = {}
     for path in sorted(source.rglob("*.py")):
-        visitor: _Asks = _Asks(path.relative_to(source).as_posix())
-        visitor.visit(ast.parse(path.read_text(encoding="utf-8")))
-        found.update(visitor.found)
+        found.update(_asks_in(path.read_text(encoding="utf-8"), path.relative_to(source).as_posix()))
     return found
+
+
+def _broker_importers() -> set[str]:
+    """The files of the source that import the approval broker's class, whatever name they give it."""
+    source: Path = ROOT / "src" / "dotagent"
+    found: set[str] = set()
+    for path in sorted(source.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom) and any(alias.name == "ApprovalBroker" for alias in node.names):
+                found.add(path.relative_to(source).as_posix())
+    return found
+
+
+def test_the_walk_sees_a_call_a_method_taken_as_a_value_and_a_getattr_of_the_broker() -> None:
+    assert _asks_in("async def f(ctx):\n    await ctx.runtime.approvals.request(1)\n") == {("tools/x.py", "f"): 1}
+    assert _asks_in("def g(ctx):\n    ask = ctx.runtime.approvals.request\n    return ask\n") == {
+        ("tools/x.py", "g"): 1
+    }
+    assert _asks_in("def h(ctx):\n    return getattr(ctx.runtime.approvals, 'keep')\n") == {("tools/x.py", "h"): 1}
+    assert _asks_in("class A:\n    async def i(self):\n        await self._broker.leave(1)\n") == {
+        ("tools/x.py", "i"): 1
+    }
+    # What is no question to the owner is left alone: the free mode's flag, a decision made, a request to a web server.
+    assert _asks_in("def j(ctx):\n    return ctx.runtime.approvals.free\n") == {}
+    assert _asks_in("def k(client):\n    return client.request('GET', 'https://example.invalid')\n") == {}
+
+
+def test_no_module_but_the_gate_the_meeting_desk_and_the_runtime_takes_the_approval_broker() -> None:
+    assert _broker_importers() == BROKER_IMPORTERS
 
 
 def test_the_owner_is_asked_in_the_places_the_contract_names_and_no_others() -> None:
     """A tool that asks the owner by itself (a call of the approval broker) is no decision of the gate, so yolo and free
     mode do not waive it: a new one is a new ask in both. The gate's own places and the known asks below are the whole
-    list; a new place is added here only with the owner's yes, and to docs/freedom.md."""
+    list; a new place is added here only with the owner's yes, and to docs/freedom.md. The walk reads the spellings that
+    name the broker (the call, its method taken as a value, ``getattr``) and who imports its class; a call made through
+    a name it cannot tie to the broker is for the review to find (REVIEW.md)."""
     found: set[tuple[str, str]] = set(_asking_sites())
     allowed: set[tuple[str, str]] = set(GATE_SITES) | set(KNOWN_ASKS)
     assert found - allowed == set(), "a new place asks the owner, which a yolo or free run must not: " + ", ".join(
