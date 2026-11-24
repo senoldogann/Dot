@@ -46,6 +46,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 - `Shared/DotFleetAttributes.swift`: the activity's attributes, compiled into both targets.
 - `Next/`: DotNext, the rewrite of this app for iPhone and iPad (items 1665 and 1666), built beside it with its own
   bundle id; `Next/README.md` says what it holds and how it is checked.
+- `DotEngine/`: DotNext's engine (item 1688), a Swift package for iOS and macOS: the sync store, the connection
+  supervisor, the outbox, the cache and pairing; `swift test` in it runs its tests.
 - `project.yml`: the XcodeGen spec. `Dot.xcodeproj` is generated from it and is not committed.
 
 ## What the native app does, and what it leaves to the web UI
