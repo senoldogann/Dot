@@ -132,7 +132,14 @@ back, the count or the line of output, or what the page showed. A mark without i
 evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
 happened. A step moves as the work does: a done step may be opened again (pending or in progress), a failed or
 skipped one tried again or marked done with its evidence, but a done step is not marked failed or skipped; the plan is
-rewritten for that. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check. A
+rewritten for that. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check.
+Dot also judges a step marked done by the run's own record, not by its words (item 1745): by the tool results of the
+time the step was open (from the first plan of its newest open stretch; from the run's start for a step written done at
+once). It is **shown** when one of them shows anything (the step keeps the ids of the newest three calls, `shown_by`),
+**unverified** when the newest browser or desktop act of that time left a step that was not seen to hold and no read,
+look or command came after it, and **none** when no tool result of that time shows anything. The mark is kept either
+way; one that is not shown reads `[done, not verified]` in the plan, its result says why and what to look at, and the
+run's account lists it. A step a helper's report closed is not judged. A
 step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan is refused),
 the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says which steps are
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together

@@ -98,6 +98,7 @@ async def test_a_change_of_the_plan_leaves_the_system_message_and_the_history_be
     lasts: list[str] = [messages[-1].content for messages in requests]
     # Written, the plan is handed; marked, it is handed again; unchanged, it is not; closed, it is said to be.
     assert lasts[1].startswith(PLAN_NOTE) and "[in_progress] Read the notes" in lasts[1]
-    assert lasts[2].startswith(PLAN_NOTE) and "[done] Read the notes" in lasts[2]
+    # Marked done before any call ran, nothing of the run shows it (item 1745).
+    assert lasts[2].startswith(PLAN_NOTE) and "[done, not verified] Read the notes" in lasts[2]
     assert not lasts[3].startswith(PLAN_NOTE) and all(PLAN_NOTE not in message.content for message in requests[3][-2:])
     assert lasts[4] == PLAN_CLOSED_NOTE
