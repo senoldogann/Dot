@@ -424,12 +424,30 @@ answer keeps its words, Ollama's too.
   limit ends the run failed. When the plan's window is used up, the run ends failed and says which window and when it
   resets: nothing moves the run to another model on its own. A program that writes nothing for
   `[providers.claude_code] silence_s` (600 s) while none of Dot's tools works for it is ended, and the run fails saying
-  so. A program that ends before its result with nobody ending it (killed from outside, crashed, exited by itself)
-  fails the run saying how (item 1580): the error's context and the log line `claude_code_program_cut` carry its exit
-  code, the signal's name (Claude Code ends `128 + n` on SIGTERM, 143, which is read as the signal too), the last 2 KB of
-  its stderr, the steps it took and the seconds since its last line, and `claude_code_programs_ended_together` is
-  logged once, with the run ids and signals, when two or more programs of the daemon are cut inside the same second
-  (the programs Dot ends itself, a Stop's included, are never counted). A run here ends as Dot's own do (item 1076): the model calls `finish` with its answer (a chat-mode run, which has no `finish`, ends with its last reply), whether it succeeded and
+  so. A program that ends before its result with nobody ending it (killed from outside, crashed, exited by itself) is
+  a cut, and the run is not lost (items 1580 and 1581). Dot says how the program ended, in the log line
+  `claude_code_program_cut` and the error's context: its exit code, the signal's name (Claude Code ends `128 + n` on
+  SIGTERM, 143, which is read as the signal too), the last 2 KB of its stderr, the steps it took and the seconds since
+  its last line; and `claude_code_programs_ended_together` is logged once, with the run ids and signals, when two or
+  more programs of the daemon are cut inside the same second (the programs Dot ends itself, a Stop's included, are never
+  counted). Then, when nothing of Dot's own caused the cut (not your Stop, the emergency stop or the daemon's stop, not
+  the plan's limit or the run's limits, not the silence watch, not a program Dot refused at its first line), the
+  program had said what the model has, the model was not at its `finish` and no call of an action Dot keeps for you
+  even in yolo (a message or mail sent for you, a payment, a public post) began since the model's last step, Dot
+  starts the program again with `--resume` of its session in the same run (its id, its events, the wait of the run
+  that delegated it and a helper's entry in the background stay), after 2 s and again after 10 s, at most
+  `[providers.claude_code] continue_cut` (2) times; `0` turns it off. The program is told when it was cut, that the
+  result of its last call may be lost, to look at the real state (git status, the files, the tabs) before it repeats
+  anything and to go on from where its plan says, and is sent first what you wrote that it had not taken in; the
+  run's page and `dotx run` say it in one line each time (the event `claude_code_continued`). Measured on Claude Code
+  2.1.331: a program killed in the middle of a call of a tool and resumed with `--resume` finds the call closed by
+  Claude Code itself (a result that says the session ended before the call's result was recorded and its outcome is
+  unknown) and goes on with no API error. A resume that fails with an error that says the session cannot be taken up
+  again is met with a new session that gets the run's goal, what the chat said, and what the cut one had done, from
+  Dot's record of the run. A cut after the model's `finish` ends the run as the finish says. A cut that is not
+  continued ends the run failed, with the exit of each cut and why it was not continued in the error's context
+  (`cuts`, `not_continued`); a cut during a call that may have sent something for you is one, since a second try could
+  send it twice. A run here ends as Dot's own do (item 1076): the model calls `finish` with its answer (a chat-mode run, which has no `finish`, ends with its last reply), whether it succeeded and
   what it needs from you, so a run that could not do its work ends failed and one that waits on you says so (before,
   every run ended done with nothing it needed), and a call it makes after its `finish`, or your message, drops what
   that `finish` said, while a reply it writes after it without a call shows no text: it says the answer again (item

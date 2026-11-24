@@ -1574,6 +1574,16 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       note(scope, record.ts, "clock", t("timeline.limitReached", { spent: limitSpent(record.data) }), "warn");
     },
 
+    // The run's Claude Code program was cut off from outside (killed, crashed) and Dot started it again in the same run (item
+    // 1581): one line, which opened says how it ended (`signal`, `returncode`, `steps`, `silent_s`). A new session is said so.
+    claude_code_continued(scope, record) {
+      const data = record.data;
+      const how = data.signal ? `${data.signal} (${data.returncode})` : `code ${data.returncode}`;
+      const details = t("timeline.programCut", { how, steps: data.steps, silent: data.silent_s });
+      const words = data.fresh_session ? "timeline.programContinuedFresh" : "timeline.programContinued";
+      note(scope, record.ts, "bolt", t(words, { at: data.cut_at }), "warn", details);
+    },
+
     // The final answer named paths that do not exist and that the run never touched ([agent] verify_answer_paths): the
     // run was sent back once to create them or to correct the answer.
     answer_paths(scope, record) {

@@ -197,10 +197,13 @@ class ClaudeCodeConfig(FrozenModel):
     """Claude Code on the owner's own plan (item 1013): a run on ``claude_code:<model>`` goes whole to the ``claude``
     program the owner installed and signed in to. ``command`` is that program: a path, or a name looked up on the login
     shell's PATH and in the usual places. A program that writes no line for ``silence_s`` while none of Dot's tools is
-    at work for it is ended, and its run fails."""
+    at work for it is ended, and its run fails. A program that ends before its result with nobody ending it (killed from
+    outside, crashed) is started again in the same session and the same run, after 2 s and after 10 s, at most
+    ``continue_cut`` times in a run (item 1581); 0 turns it off, and the run fails as it did."""
 
     command: str = Field(min_length=1)
     silence_s: float = Field(gt=0, allow_inf_nan=False)
+    continue_cut: int = Field(ge=0)
 
 
 class AntigravityConfig(FrozenModel):
