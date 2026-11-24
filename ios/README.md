@@ -44,6 +44,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
 - `DotShare/`: the share extension (`dev.dotagent.phone.share`, item 1009): what another app shares goes to Dot as a
   new chat. It reads the host from the app group's defaults and the key from the shared Keychain access group.
 - `Shared/DotFleetAttributes.swift`: the activity's attributes, compiled into both targets.
+- `Next/`: DotNext, the rewrite of this app for iPhone and iPad (items 1665 and 1666), built beside it with its own
+  bundle id; `Next/README.md` says what it holds and how it is checked.
 - `project.yml`: the XcodeGen spec. `Dot.xcodeproj` is generated from it and is not committed.
 
 ## What the native app does, and what it leaves to the web UI
