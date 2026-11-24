@@ -148,6 +148,7 @@ final class NativeStore {
         Task { await refreshList() }
         Task { await loadModels() }
         Task { await awareness.refreshNeedsYou() }
+        Task { await awareness.refreshAway() }
     }
 
     func stop() {
@@ -215,7 +216,8 @@ final class NativeStore {
     func refreshEverything() async {
         async let listed: Void = refreshList()
         async let waiting: Void = awareness.refreshNeedsYou()
-        _ = await (listed, waiting)
+        async let away: Void = awareness.refreshAway()
+        _ = await (listed, waiting, away)
     }
 
     private func readList() async {
@@ -449,8 +451,9 @@ final class NativeStore {
         Task { await feed?.kick() }
         for session in open.values { Task { await session.kick() } }
         if Date().timeIntervalSince(lastListAt) > 5 { refreshListSoon() }
-        // What waits on the owner may have changed on the Mac while the phone was away.
+        // What waits on the owner may have changed on the Mac while the phone was away, and Dot may have done things on its own.
         Task { await awareness.refreshNeedsYou() }
+        Task { await awareness.refreshAway() }
         outbox.start()
     }
 
@@ -537,6 +540,7 @@ final class NativeStore {
             startLifecycle()
             refreshListSoon()
             Task { await awareness.refreshNeedsYou() }
+            Task { await awareness.refreshAway() }
             for session in open.values { Task { await session.kick() } }
             outbox.start()
         } else {

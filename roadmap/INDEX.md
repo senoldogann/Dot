@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1443](1443.md) | done | 2026-11-24 | "While you were away": what Dot did on its own, as a card at the top of the chat list |
 | [1442](1442.md) | done | 2026-11-24 | The iPhone app's inbox of what waits on the owner, with its badge |
 | [1441](1441.md) | done | 2026-11-24 | The iPhone app's Notifications switches: which pushes Dot tells this phone |
 | [1440](1440.md) | done | 2026-11-24 | The iPhone app says it is in front of the owner: the activity lease |

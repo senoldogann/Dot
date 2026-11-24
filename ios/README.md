@@ -14,7 +14,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
     `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
     `PushSettings` (item 1441) the three push switches and what a flip does; `NeedsYou` (item 1442) the inbox's list, its rows
-    and what may be answered from them.
+    and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -120,6 +120,12 @@ did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app'
   which it does without a mark), a question its choices as buttons with the recommended one marked or a field for words,
   both through the outbox like the chat's card; a secret has no way to answer (its row says "Dot needs a secret: enter it
   on your Mac"); a hand-off is answered in the chat. A row opens its chat.
+- **"While you were away"** (item 1443): when Dot did something on its own since the owner last looked (what a schedule, an
+  agent's standing chat or a background run did), one flat card at the top of the chat list (`AwayCardView`, the pure rules
+  in `Core/Away`) says how many things and how they ended, lists the three newest (each opens its chat) and how many more,
+  and how many approvals Dot answered for the owner. It is read against the mark Dot keeps for every device
+  (`GET /api/away/read`; the first visit marks the moment and shows nothing) and put away with `POST /api/away/read` (the
+  card goes at once; a mark that does not get through is kept in `awareness.json` and sent first by the next read).
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 

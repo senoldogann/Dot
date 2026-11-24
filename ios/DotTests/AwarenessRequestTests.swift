@@ -104,4 +104,31 @@ final class AwarenessRequestTests: XCTestCase {
         XCTAssertEqual(list.count, 1)
         XCTAssertEqual(list.items.first?.kind, .approval)
     }
+
+    // MARK: Item 1443, what Dot did while the owner was away
+
+    func testWhatDotDidIsAskedSinceTheMark() async throws {
+        BodyStub.reply = #"{"since":1764000000.0,"until":1764003600.0,"done":1,"runs":[]}"#
+        let view: AwayView = try await api().away(since: 1_764_000_000)
+        XCTAssertEqual(BodyStub.seen.last?.method, "GET")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/away")
+        XCTAssertEqual(BodyStub.seen.last?.query, "since=1764000000.0")
+        XCTAssertEqual(BodyStub.seen.last?.authorization, "Bearer phone.a.b")
+        XCTAssertEqual(view.done, 1)
+    }
+
+    func testTheMarkIsReadAndSetOnItsOwnRoute() async throws {
+        BodyStub.reply = #"{"read_at": 1764003000.0}"#
+        let mark: AwayMark = try await api().awayMark()
+        XCTAssertEqual(BodyStub.seen.last?.method, "GET")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/away/read")
+        XCTAssertEqual(mark.readAt, 1_764_003_000)
+        let set: AwayMark = try await api().markAway(until: 1_764_003_600)
+        XCTAssertEqual(BodyStub.seen.last?.method, "POST")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/away/read")
+        let body: [String: Any] = try lastBody()
+        XCTAssertEqual(Set(body.keys), ["until"], "the daemon refuses any other key")
+        XCTAssertEqual(body["until"] as? Double, 1_764_003_600)
+        XCTAssertEqual(set.readAt, 1_764_003_000, "the answer says where the mark stands")
+    }
 }

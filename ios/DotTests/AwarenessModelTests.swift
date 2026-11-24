@@ -224,4 +224,120 @@ final class AwarenessModelTests: XCTestCase {
         _ = await (first, second)
         XCTAssertEqual(BodyStub.seen.filter { $0.path == "/api/needs-you" }.count, 1, "a pull to refresh and a push arriving read it once")
     }
+
+    // MARK: What Dot did while the owner was away
+
+    private static let awayExample: String = """
+        {"since":1000.0,"until":2000.0,"done":2,"failed":0,"cancelled":0,"working":0,"campaign_sessions":0,
+         "runs":[{"run_id":"run_1","title":"Morning brief","source":"schedule","status":"done","steps":3,"created_at":1100.0,
+                  "finished_at":1200.0,"answer":"Two mails need you."}],
+         "decisions":{"reviewer_approved":0,"reviewer_denied":0,"yolo_approved":0,"yolo_denied":0},"decision_runs":[],"drafts":0}
+        """
+
+    /// A daemon that answers the three away routes: `mark` is where the shared mark stands (`nil`: no device has set it).
+    private func awayDaemon(mark: Double?, view: String = AwarenessModelTests.awayExample) {
+        BodyStub.respond = { seen in
+            switch (seen.method, seen.path) {
+            case ("GET", "/api/away/read"): return (200, mark.map { #"{"read_at":\#($0)}"# } ?? #"{"read_at":null}"#)
+            case ("GET", "/api/away"): return (200, view)
+            case ("POST", "/api/away/read"): return (200, #"{"read_at":2000.0}"#)
+            default: return (200, "{}")
+            }
+        }
+    }
+
+    private func requests(_ method: String, _ path: String) -> [BodyStub.Seen] { BodyStub.seen.filter { $0.method == method && $0.path == path } }
+
+    func testTheFirstVisitFromAnyDeviceMarksTheMomentAndShowsNothing() async throws {
+        begin()
+        awayDaemon(mark: nil)
+        let model: AwarenessModel = make()
+        await model.refreshAway()
+        XCTAssertNil(model.away, "the card never pours out history")
+        XCTAssertEqual(requests("GET", "/api/away").count, 0, "nothing is asked of a past that was never marked")
+        let marks: [BodyStub.Seen] = requests("POST", "/api/away/read")
+        XCTAssertEqual(marks.count, 1)
+        let until: Double = try XCTUnwrap((try JSONSerialization.jsonObject(with: try XCTUnwrap(marks[0].body)) as? [String: Double])?["until"])
+        XCTAssertEqual(until, Date().timeIntervalSince1970, accuracy: 30, "now")
+    }
+
+    func testWhatDotDidSinceTheMarkIsTheCardAndIsKeptOnDisk() async throws {
+        begin()
+        awayDaemon(mark: 1000)
+        let model: AwarenessModel = make()
+        await model.refreshAway()
+        let asked: BodyStub.Seen = try XCTUnwrap(requests("GET", "/api/away").first)
+        XCTAssertEqual(asked.query, "since=1000.0", "read against the mark Dot keeps")
+        XCTAssertEqual(model.away?.until, 2000)
+        XCTAssertEqual(model.away?.runs.map(\.title), ["Morning brief"])
+        try await until { ChatCache.readAwareness(in: self.folder)?.away != nil }
+        XCTAssertEqual(ChatCache.readAwareness(in: folder)?.away?.until, 2000)
+    }
+
+    func testNothingDoneSinceTheMarkIsNoCard() async throws {
+        begin()
+        awayDaemon(mark: 1000, view: #"{"since":1000.0,"until":2000.0,"done":0,"failed":0,"cancelled":0,"working":0,"campaign_sessions":0,"runs":[]}"#)
+        let model: AwarenessModel = make()
+        await model.refreshAway()
+        XCTAssertNil(model.away)
+    }
+
+    func testPuttingTheCardAwayMarksItsMomentReadOnDotAndHidesItAtOnce() async throws {
+        begin()
+        awayDaemon(mark: 1000)
+        let model: AwarenessModel = make()
+        await model.refreshAway()
+        XCTAssertNotNil(model.away)
+        model.dismissAway()
+        XCTAssertNil(model.away, "it goes before Dot has answered")
+        try await until { !self.requests("POST", "/api/away/read").isEmpty }
+        let body: [String: Double] = try XCTUnwrap(
+            try JSONSerialization.jsonObject(with: try XCTUnwrap(requests("POST", "/api/away/read").last?.body)) as? [String: Double])
+        XCTAssertEqual(body, ["until": 2000], "the until of the card that was shown")
+        try await until { ChatCache.readAwareness(in: self.folder)?.awayMarkPending == nil && ChatCache.readAwareness(in: self.folder) != nil }
+        XCTAssertNil(ChatCache.readAwareness(in: folder)?.away)
+        XCTAssertNil(ChatCache.readAwareness(in: folder)?.awayMarkPending, "told, so nothing waits")
+    }
+
+    func testACardPutAwayWithNoAnswerFromDotStaysAwayAndIsToldWhenTheNextReadGoes() async throws {
+        begin()
+        awayDaemon(mark: 1000)
+        let model: AwarenessModel = make()
+        await model.refreshAway()
+        // Dot does not take the mark: the card is away on the phone all the same, and the mark is kept to send.
+        BodyStub.respond = { seen in seen.method == "POST" ? (503, #"{"message":"down"}"#) : (200, "{}") }
+        model.dismissAway()
+        try await until { self.requests("POST", "/api/away/read").count >= 1 }
+        try await Task.sleep(for: .milliseconds(60))
+        XCTAssertNil(model.away)
+        try await until { ChatCache.readAwareness(in: self.folder)?.awayMarkPending == 2000 }
+        XCTAssertEqual(ChatCache.readAwareness(in: folder)?.awayMarkPending, 2000, "kept on disk until Dot has heard it")
+
+        // The next launch: the card is not drawn from disk, and the read begins by telling Dot what was put away.
+        awayDaemon(mark: 2000, view: #"{"since":2000.0,"until":3000.0,"done":0,"failed":0,"cancelled":0,"working":0,"campaign_sessions":0,"runs":[]}"#)
+        let next: AwarenessModel = make()
+        XCTAssertNil(next.away)
+        BodyStub.seen = []
+        await next.refreshAway()
+        XCTAssertEqual(BodyStub.seen.first.map { "\($0.method) \($0.path)" }, "POST /api/away/read", "the mark the owner set goes first")
+        XCTAssertEqual(requests("GET", "/api/away").first?.query, "since=2000.0")
+        try await until { ChatCache.readAwareness(in: self.folder)?.awayMarkPending == nil }
+        XCTAssertNil(ChatCache.readAwareness(in: folder)?.awayMarkPending)
+    }
+
+    func testAReadThatFailsLeavesTheCardThePhoneHeld() async throws {
+        begin()
+        awayDaemon(mark: 1000)
+        let first: AwarenessModel = make()
+        await first.refreshAway()
+        try await until { ChatCache.readAwareness(in: self.folder)?.away != nil }
+
+        BodyStub.respond = nil
+        BodyStub.status = 503
+        BodyStub.reply = #"{"message":"down"}"#
+        let second: AwarenessModel = make()
+        XCTAssertEqual(second.away?.runs.map(\.title), ["Morning brief"], "drawn before any network answer")
+        await second.refreshAway()
+        XCTAssertEqual(second.away?.runs.map(\.title), ["Morning brief"], "and kept when Dot does not answer")
+    }
 }

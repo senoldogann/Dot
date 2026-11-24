@@ -27,6 +27,12 @@ struct ChatListView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                 }
+                if let card: AwayCard = awayCard {
+                    AwayCardView(card: card, onOpen: { model.pendingRunId = $0 }, onDismiss: { store.awareness.dismissAway() })
+                        .listRowInsets(EdgeInsets(top: Space.s, leading: Space.l, bottom: Space.s, trailing: Space.l))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                }
                 if let words: String = openFailed {
                     Button { openFailed = nil } label: {
                         Label(words, systemImage: "exclamationmark.circle").font(Theme.small).foregroundStyle(Theme.warn)
@@ -130,6 +136,9 @@ struct ChatListView: View {
             composing = .agent(agent)
         }
     }
+
+    /// What Dot did on its own since the owner last looked, as the card says it (none: no card).
+    private var awayCard: AwayCard? { store.awareness.away.flatMap(AwayRules.card(from:)) }
 
     /// What the newest thing that waits on the owner asks, for the entry's second line.
     private var inboxPreview: String? {

@@ -27,6 +27,10 @@ struct AwarenessSnapshot: Codable, Sendable, Equatable {
     var pushSettings: PushSettings?
     /// What waited on the owner at the last read, so that the inbox and its badge are drawn at once.
     var needsYou: NeedsYouList?
+    /// The card of what Dot did on its own, as last read (none when it did nothing, or the owner dismissed it), and a dismissal
+    /// the daemon has not heard yet (the `until` to post), so that a card put away offline stays away.
+    var away: AwayView?
+    var awayMarkPending: Double?
     var savedAt: Double
     var schema: Int? = ChatCache.schema
 }

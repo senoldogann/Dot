@@ -786,6 +786,16 @@ is a 422); the daemon takes it within the last seven days and never after now. R
 key, or a 422) and answers 200 with the same shape, where the mark stands now: it never moves back and never past now. The
 first visit from any device marks it and shows nothing, so the card never pours out history.
 
+**The iPhone app's card** (item 1443). The app reads the mark when it starts, comes to the front or the link is back, and
+when the chat list is pulled down. No device has set it yet: the app marks the moment (`POST` with the phone's now) and
+shows nothing, so the card never pours out history. Otherwise it reads `GET /api/away?since=` against the mark and, when
+Dot did anything in that time, shows one flat card at the top of the chat list: how many things Dot did on its own and how
+they ended, the three newest (each a row that opens its chat) and how many more there are, and, when it did, how many
+approvals Dot answered for you. Putting the card away marks the `until` of the card that was shown (`POST
+/api/away/read`), so that the Mac and every phone agree on what is news; the card goes at once, and a mark that does not
+get through (no link, no answer) is kept in `awareness.json` and sent first by the next read, so a card put away stays away.
+The card is drawn from the last read, kept in the same file, before the network answers.
+
 ### What the daemon pushes to the app
 
 Pushes go through APNs to every phone that registered a device (`POST /api/phone/apns`), signed with the key of `[apns]`,

@@ -42,4 +42,27 @@ extension APIClient {
     /// Everything that waits on the owner, newest first, with how many things that is (`GET /api/needs-you`): the approvals a
     /// run asks, its questions, its requests for a secret and its hand-offs. Any token reads it, a phone's key too.
     func needsYou() async throws -> NeedsYouList { try await get("/api/needs-you") }
+
+    // MARK: What Dot did while the owner was away (item 1443)
+
+    /// What Dot did on its own since `since` (seconds since the epoch; the daemon takes it within the last seven days and never
+    /// after now), `GET /api/away?since=`.
+    func away(since: Double) async throws -> AwayView {
+        try await get("/api/away", query: [URLQueryItem(name: "since", value: String(since))])
+    }
+
+    /// The moment the owner last looked, which Dot keeps for every device: `nil` before any device marked it.
+    func awayMark() async throws -> AwayMark { try await get("/api/away/read") }
+
+    /// Marks the moment the owner looked (`POST /api/away/read`): the `until` of the card that was shown, or now at the first
+    /// visit. The daemon never moves it back and never past now, and answers with where the mark stands.
+    @discardableResult
+    func markAway(until: Double) async throws -> AwayMark {
+        try await send("POST", "/api/away/read", body: AwayUntil(until: until))
+    }
+}
+
+/// The body of `POST /api/away/read`.
+private struct AwayUntil: Encodable, Sendable {
+    let until: Double
 }

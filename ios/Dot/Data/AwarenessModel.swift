@@ -15,12 +15,16 @@ final class AwarenessModel {
     /// reached Dot: until one does, what is shown is what the phone last held (item 1442).
     private(set) var needsYou: NeedsYouList
     private(set) var needsYouIsLive: Bool = false
+    /// What Dot did on its own since the owner last looked, for the card at the top of the chat list: `nil` when it did
+    /// nothing, when the owner put the card away, or at the first visit (item 1443).
+    private(set) var away: AwayView?
 
     @ObservationIgnored private let api: APIClient
     @ObservationIgnored private let cache: ChatCache
     @ObservationIgnored private let link: LinkMonitor?
     @ObservationIgnored private var held: AwarenessSnapshot
     @ObservationIgnored private var needsYouRead: Task<Void, Never>?
+    @ObservationIgnored private var awayReading: Task<Void, Never>?
     /// Puts a number on the app's icon: after each read of what waits on the owner it is that count.
     @ObservationIgnored private let setBadge: @Sendable (Int) async -> Void
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone", category: "awareness")
@@ -37,6 +41,7 @@ final class AwarenessModel {
         self.held = kept ?? AwarenessSnapshot(savedAt: 0)
         self.push = PushSwitches(known: kept?.pushSettings)
         self.needsYou = kept?.needsYou ?? .empty
+        self.away = kept?.away
     }
 
     /// The count on the app's icon. The daemon sets it on every alert it sends (`aps.badge`); an answer given on the Mac sends
@@ -141,6 +146,75 @@ final class AwarenessModel {
             if Task.isCancelled { return }
             needsYouIsLive = false
             logger.info("what waits on the owner could not be read: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    // MARK: What Dot did while the owner was away (item 1443)
+
+    /// The card of what Dot did on its own since the owner last looked (on start and on foreground, on a pull to refresh): the
+    /// mark of the last look is Dot's, shared by the Mac and every phone, so the card is read against it. The first visit from
+    /// any device marks the moment and shows nothing. A read that does not get through leaves the card the phone held.
+    func refreshAway() async {
+        if let running: Task<Void, Never> = awayReading {
+            await running.value
+            return
+        }
+        let task: Task<Void, Never> = Task { await readAway() }
+        awayReading = task
+        await task.value
+        awayReading = nil
+    }
+
+    private func readAway() async {
+        if let link, !link.state.online { return }
+        do {
+            // A card put away with no link is told to Dot first, so that this read is against the mark the owner set.
+            if let pending: Double = held.awayMarkPending {
+                try await api.markAway(until: pending)
+                held.awayMarkPending = nil
+                keep()
+            }
+            let mark: AwayMark = try await api.awayMark()
+            guard let readAt: Double = mark.readAt else {
+                // The first visit from any device: mark the moment, show nothing.
+                try await api.markAway(until: Date().timeIntervalSince1970)
+                setAway(nil)
+                return
+            }
+            let view: AwayView = try await api.away(since: readAt)
+            setAway(AwayRules.card(from: view) == nil ? nil : view)
+        } catch {
+            if Task.isCancelled { return }
+            logger.info("what Dot did while the owner was away could not be read: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func setAway(_ view: AwayView?) {
+        if view != away { away = view }
+        held.away = view
+        keep()
+    }
+
+    /// The owner put the card away: it goes at once, and the moment it covered is marked read on Dot, so that the Mac and every
+    /// phone agree. A mark that does not get through is kept and sent by the next read.
+    func dismissAway() {
+        guard let view: AwayView = away else { return }
+        away = nil
+        held.away = nil
+        held.awayMarkPending = max(view.until, held.awayMarkPending ?? 0)
+        keep()
+        Task { await sendPendingMark() }
+    }
+
+    private func sendPendingMark() async {
+        guard let pending: Double = held.awayMarkPending else { return }
+        do {
+            try await api.markAway(until: pending)
+            // A dismissal made while this one was on its way stays.
+            if held.awayMarkPending == pending { held.awayMarkPending = nil }
+            keep()
+        } catch {
+            logger.info("the dismissal of the away card was not told to Dot yet: \(String(describing: error), privacy: .public)")
         }
     }
 }
