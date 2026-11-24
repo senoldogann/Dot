@@ -109,7 +109,13 @@ struct ChatState: Sendable, Equatable {
         let live: [Helper] = liveHelpers
         // The chat's own run is over, but a run that ends done leaves the helpers it started at work (item 1351): the chat is not
         // at rest while any is live, and says so (item 1466; before, the line was idle and nothing said that five helpers worked).
-        guard isWorking else { return live.isEmpty ? .idle : .helpersInBackground(count: live.count) }
+        guard isWorking else {
+            if live.isEmpty { return .idle }
+            // A live helper that asks the owner something is the chat waiting on the owner, as it is while the run works.
+            let liveIds: Set<String> = Set(live.map(\.id))
+            let asking: Int = pendingApprovals.filter { liveIds.contains($0.runId) }.count
+            return asking > 0 ? .waitingOnYou(count: asking) : .helpersInBackground(count: live.count)
+        }
         let asking: Int = pendingApprovals.count
         if asking > 0 { return .waitingOnYou(count: asking) }
         let waitedFor: [Helper] = live.filter { !released.contains($0.id) }
