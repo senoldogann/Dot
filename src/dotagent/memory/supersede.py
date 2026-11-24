@@ -159,10 +159,11 @@ async def save_replacing(
     """Save a note as a run saves it (:func:`save_memory`, a note of Dot's) and put aside the notes it replaces: those
     of its ``subject`` when it has one, and the near notes whose words say the fact changed
     (:func:`wording_replaces`). A note saved again, with the text a note has already, replaces nothing."""
+    # Before anything is written: a subject that holds no word is refused with no note saved.
+    key: str | None = None if subject is None else normalize_subject(subject)
     saved: SavedMemory = await save_memory(index, content, tags, run_id, None, expires_at, tainted)
     if not saved.created:
         return Replacing(saved=saved, replaced=(), kept=())
-    key: str | None = None if subject is None else normalize_subject(subject)
     newer: MemoryRecord = saved.record
     if key is not None:
         newer = await index.store.set_memory_subject(newer.id, key)
