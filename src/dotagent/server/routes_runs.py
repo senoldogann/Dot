@@ -29,6 +29,7 @@ from dotagent.agent.rewind import (
     take_back,
 )
 from dotagent.browser.remote_input import InputBatch, InputResult
+from dotagent.coding_work import CODING_WORK_EVENT, CodingWork
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import workspace_dir
@@ -196,6 +197,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.get("/runs")
     async def list_runs(query: Annotated[RunsQuery, Query()]) -> list[RunRecord]:
         return [ctx.manager.as_shown(run) for run in await store.list_runs(query.limit, query.thread_id, query.before)]
+
+    @router.get("/runs/{run_id}/coding-work")
+    async def coding_work(run_id: str) -> CodingWork | None:
+        await store.get_run(run_id)
+        records = await store.events_of_kind(run_id, CODING_WORK_EVENT, 1)
+        return None if not records else CodingWork.model_validate(records[0].data)
 
     @router.post("/runs", status_code=201)
     async def start_run(request: StartRunRequest) -> RunRecord:

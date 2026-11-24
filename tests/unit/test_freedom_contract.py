@@ -579,6 +579,7 @@ ROWS: tuple[Row, ...] = (
     _row("appearance: read the shared theme", "theme_read", {}),
     _row("appearance: use the device theme", "theme_apply", {"revision": 0, "theme": None}),
     _row("appearance: undo a theme change", "theme_undo", {"revision": 0}),
+    _row("worktree: record coding work", "track_coding_work", {"worktree": ".", "base": "a" * 40}),
     _row("meta: a skill", "skill", {"name": "mail"}),
     _row("meta: find help", "find_help", {"need": "send a mail"}),
     _row("meta: save a skill", "skill_save", {"kind": "mail", "description": "How I write", "steps": ["Write short"]}),

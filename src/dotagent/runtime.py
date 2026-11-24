@@ -103,6 +103,7 @@ from dotagent.tools.base import RegisteredTool
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.campaign import build_campaign_tools
 from dotagent.tools.codes import build_code_tools
+from dotagent.tools.coding_work import build_coding_work_tool
 from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.contacts import build_contacts_tools
 from dotagent.tools.delegate import build_delegate_tools
@@ -305,6 +306,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_meta_tools(),
         build_page_tools(),
         build_appearance_tools(),
+        (build_coding_work_tool(),),
         (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),
         build_contacts_tools(),
         build_meeting_tools(),

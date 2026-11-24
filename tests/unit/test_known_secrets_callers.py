@@ -71,6 +71,7 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # The words of a work order and of an objective, masked before they are stored (items 907, 908).
     "tools/work_orders.py:_assign_tool.run": (True,),
     "tools/work_orders.py:_review_tool.run": (True,),
+    "tools/coding_work.py:_track": (True,),
     "tools/objectives.py:_add_tool.run": (True,),
     "tools/objectives.py:_update_tool.run": (True,),
     # The part a help offer says a free agent could take, masked before the office shows it (item 896).

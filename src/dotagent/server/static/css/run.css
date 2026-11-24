@@ -4279,3 +4279,9 @@ dialog.computer-full::backdrop {
 .outbox-note {
   margin-top: var(--space-1);
 }
+
+.coding-work-stat {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre;
+}
