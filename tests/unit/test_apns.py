@@ -49,8 +49,10 @@ from dotagent.notify.apns_watch import (
 from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import LiveNow, tool_now
 from dotagent.notify.owner import OWNER_TOLD_EVENT
+from dotagent.notify.settings import PushSettings, keep_push_settings
 from dotagent.runtime import _guarded_files
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_RUN_ENDED_EVENT, SCHEDULE_STOPPED_EVENT
+from dotagent.scheduler.notices import tells
 from dotagent.store.db import Store
 from dotagent.store.models import DraftRecord, EventRecord, RunRecord
 
@@ -568,5 +570,89 @@ async def test_a_watch_that_was_given_no_leases_sends_every_alert(tmp_path: Path
         run: RunRecord = await _run(store, "chat", None)
         await watch.on_event(_event(run.id, "run_finished", {"status": "done", "result": "x"}), _NOW)
         assert len(_alerts_to(apple, _DEVICE)) == 1
+    finally:
+        await store.close()
+
+
+async def test_a_phone_is_told_only_the_kinds_of_push_it_switched_on_each_phone_for_itself(tmp_path: Path) -> None:
+    """Item 1421: an approval, a question, a secret and a hand-off, and the failures of Dot's own work, are
+    ``needs_you``; a draft and what Dot tells the owner are ``ready``; the end of a run, of a schedule's run or of a
+    campaign is ``done``. A kind a phone switched off is not sent to it, and the others are; the phone's lock-screen
+    approval is ``needs_you`` too; the Live Activity is not a kind and follows the run as before."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        third: str = "34" * 32
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p3", third, None, "sandbox", _NOW)
+        await store.set_live_activity(FLEET_ID, "p1", _ACTIVITY, _NOW)
+        # p1 wants to be asked and nothing more; p2 never said, so it hears all; p3 wants all but being asked.
+        await keep_push_settings(store, "p1", PushSettings(needs_you=True, ready=False, done=False))
+        await keep_push_settings(store, "p3", PushSettings(needs_you=False, ready=True, done=True))
+        run: RunRecord = await _run(store, "chat", None)
+        step: JsonObject = {"approval_id": "apr_1", "severity": "low", "summary": "x", "args": {}}
+        sent: JsonObject = {"schedule_id": "s", "run_id": run.id, "status": "failed", "result": "x"}
+        missed: JsonObject = {"schedule_id": "s", "name": "Brief", "status": "missed"}
+        events: list[EventRecord] = [
+            _event(run.id, "approval_requested", step),
+            _event(run.id, "approval_requested", {**step, "severity": "question"}),
+            _draft_written(run),
+            _system(OWNER_TOLD_EVENT, {"title": "Brief", "text": "x", "url": "#/"}),
+            _event(run.id, "run_finished", {"status": "done", "result": "x"}),
+            _system(SCHEDULE_RUN_ENDED_EVENT, sent),
+            _system(SCHEDULE_MISSED_EVENT, missed),
+        ]
+        for event in events:
+            await watch.on_event(event, _NOW + 1)
+        heard: dict[str, int] = {
+            "p1": len(_alerts_to(apple, _DEVICE)),
+            "p2": len(_alerts_to(apple, _OTHER_DEVICE)),
+            "p3": len(_alerts_to(apple, third)),
+        }
+        assert heard == {"p1": 3, "p2": 7, "p3": 4}
+        # The lock screen's approval is a ``needs_you``: p3 has it off and is sent none, p1 and p2 are.
+        assert [body.get("approval_id") for body in _alerts_to(apple, third)] == [None] * 4
+        assert next(iter(_alerts_to(apple, _DEVICE))).get("approval_id") == "apr_1"
+        # The Live Activity is told the row of the run that ended, to the phone that switched ``done`` off too.
+        told: list[tuple[str, dict[str, str], JsonObject]] = [
+            post for post in apple.posted if post[0].endswith(_ACTIVITY)
+        ]
+        assert told and _rows(told[-1]) == [(run.id, "done")]
+    finally:
+        await store.close()
+
+
+async def test_a_schedules_notice_level_still_decides_whether_its_end_is_told_and_the_done_switch_comes_after(
+    tmp_path: Path,
+) -> None:
+    """Item 1421: the level of a schedule (``never``, ``problems``, ``always``) decides whether the end of its run is an
+    event at all, as it did; a phone that switched ``done`` off is not sent the ends that the level told."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        apple = _Apple({})
+        watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
+        await store.set_apns_device("p1", _DEVICE, None, "sandbox", _NOW)
+        await store.set_apns_device("p2", _OTHER_DEVICE, None, "sandbox", _NOW)
+        await keep_push_settings(store, "p2", PushSettings(needs_you=True, ready=True, done=False))
+        run: RunRecord = await _run(store, "schedule", None)
+        # (level, how the run ended, what it needs, failures in a row): whether the scheduler emits the event.
+        endings: list[tuple[str, str, str, int, bool]] = [
+            ("never", "failed", "", 1, False),
+            ("problems", "done", "", 1, False),
+            ("problems", "failed", "", 1, True),
+            ("problems", "failed", "", 2, False),
+            ("always", "done", "", 1, True),
+        ]
+        emitted: int = 0
+        for level, status, needs, in_row, told in endings:
+            assert tells(level, status, needs, in_row) is told, (level, status)  # type: ignore[arg-type]  # the level's literal
+            if told:
+                emitted += 1
+                data: JsonObject = {"schedule_id": "s", "run_id": run.id, "status": status, "result": "x"}
+                await watch.on_event(_system(SCHEDULE_RUN_ENDED_EVENT, data), _NOW + emitted)
+        assert emitted == 2
+        assert len(_alerts_to(apple, _DEVICE)) == 2 and _alerts_to(apple, _OTHER_DEVICE) == []
     finally:
         await store.close()

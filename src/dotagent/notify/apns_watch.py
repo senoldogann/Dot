@@ -41,7 +41,16 @@ from dotagent.notify.apns import (
 from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.live_now import PROGRESS_KINDS, THINKING, WAITING, WORKING, LiveNow, live_now
 from dotagent.notify.owner import OWNER_TOLD_EVENT
-from dotagent.notify.push import PUSH_KINDS, PushMessage, notice_message, push_message, quiet_while_shown
+from dotagent.notify.push import (
+    PUSH_KINDS,
+    PushGroup,
+    PushMessage,
+    notice_message,
+    push_group,
+    push_message,
+    quiet_while_shown,
+)
+from dotagent.notify.settings import push_settings_of
 from dotagent.proactive import UNWATCHED_SOURCES
 from dotagent.store.db import Store
 from dotagent.store.models import WORKING_STATUSES, ApnsDevice, EventRecord, LiveActivity, RunRecord
@@ -163,17 +172,23 @@ class ApnsWatch:
             await self._store.delete_apns_device(device.phone_id)
             log.info("apns_device_gone", phone=device.phone_id, status=reply.status, reason=reply.reason)
 
-    async def alert(self, message: PushMessage, now: float, quiet: bool = False) -> None:
-        await self._alert(alert_payload(message.title, message.route), now, quiet)
+    async def alert(self, message: PushMessage, now: float, kind: str) -> None:
+        await self._alert(alert_payload(message.title, message.route), now, kind)
 
     def _shown(self, phone_id: str, now: float) -> bool:
         """Whether the app of ``phone_id`` said it is in the foreground and its lease still holds at ``now``."""
         return self._leases is not None and self._leases.live(phone_id, now) is not None
 
-    async def _alert(self, payload: JsonObject, now: float, quiet: bool = False) -> None:
-        """Send ``payload`` as an alert to every phone. A ``quiet`` one (the end of a run, which the app shows itself)
-        is not sent to a phone whose app shows Dot (item 1420); any other is sent to all."""
+    async def _alert(self, payload: JsonObject, now: float, kind: str) -> None:
+        """Send ``payload``, the alert of an event of ``kind``, to every phone that is told pushes of its kind (item
+        1421: each phone switches the three kinds of :data:`dotagent.notify.push.PUSH_GROUPS` for itself) and, for the
+        end of a run, which the app shows itself, is not showing Dot now (item 1420)."""
+        group: PushGroup | None = push_group(kind)
+        quiet: bool = quiet_while_shown(kind)
         for device in await self._store.list_apns_devices():
+            if group is not None and not (await push_settings_of(self._store, device.phone_id)).wants(group):
+                log.info("apns_alert_switched_off", phone=device.phone_id, group=group)
+                continue
             if quiet and self._shown(device.phone_id, now):
                 log.info("apns_alert_kept_quiet", phone=device.phone_id)
                 continue
@@ -250,7 +265,7 @@ class ApnsWatch:
         if event.run_id == SYSTEM_RUN_ID:
             notice: PushMessage | None = notice_message(event)
             if notice is not None:
-                await self.alert(apns_message(event, notice), now, quiet_while_shown(event.kind))
+                await self.alert(apns_message(event, notice), now, event.kind)
             return
         if event.kind in PROGRESS_KINDS:
             await self.progress(event, now)
@@ -259,9 +274,9 @@ class ApnsWatch:
         message: PushMessage | None = push_message(event, run) if event.kind in PUSH_KINDS else None
         answerable: str | None = approval_answerable(event)
         if message is not None and answerable is not None:
-            await self._alert(approval_payload(message.title, message.route, answerable), now)
+            await self._alert(approval_payload(message.title, message.route, answerable), now, event.kind)
         elif message is not None:
-            await self.alert(message, now, quiet_while_shown(event.kind))
+            await self.alert(message, now, event.kind)
         if not follows_live(run):
             # Known as no row's while it works, so that its steps are passed over without a read.
             if event.kind == "run_finished":
