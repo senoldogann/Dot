@@ -11,6 +11,7 @@ code can call only what the daemon lets through, and each call is judged by the 
 is; nothing here decides anything.
 """
 
+import datetime
 import json
 import os
 import threading
@@ -34,6 +35,9 @@ _lock: threading.Lock = threading.Lock()
 _requests: TextIO | None = None
 _replies: TextIO | None = None
 _sent: int = 0
+# The most a line of the bridge may be, a little under what the daemon reads (32 MiB), so that a call too large to send
+# is the code's own error and not the end of the code.
+_MOST_BYTES: int = 32 * 1024 * 1024 - 4096
 
 
 def attach(request_fd: int, reply_fd: int) -> None:
@@ -49,8 +53,38 @@ def _parsed(text: str) -> object:
     if stripped[:1] in ("{", "["):
         try:
             return json.loads(stripped)
-        except ValueError:
+        except (ValueError, RecursionError):
             return text
+    return text
+
+
+def _plain(value: object) -> object:
+    """What a value the code gives a tool that is not JSON is sent as: a path as its text, a date as its ISO form, a
+    set as a sorted list. Anything else cannot be sent, and the call says so."""
+    if isinstance(value, os.PathLike):
+        return os.fspath(value)
+    if isinstance(value, datetime.date):
+        return value.isoformat()
+    if isinstance(value, set | frozenset):
+        return sorted(value, key=repr)
+    raise TypeError(f"{type(value).__name__} cannot be sent to a tool")
+
+
+def _frame(number: int, tool: str, arguments: dict[str, Any]) -> str:
+    """The line of call ``number``, or a :class:`ToolError` that says why the arguments cannot be sent: the call was not
+    made, and the numbering of the calls is as it was."""
+    try:
+        text: str = json.dumps(
+            {"id": number, "tool": tool, "args": arguments},
+            ensure_ascii=True,
+            separators=(",", ":"),
+            allow_nan=False,
+            default=_plain,
+        )
+    except (TypeError, ValueError, RecursionError) as error:
+        raise ToolError(f"the arguments of {tool} cannot be sent: {error}") from None
+    if len(text) > _MOST_BYTES:
+        raise ToolError(f"the arguments of {tool} are {len(text)} bytes: the most one call can carry is {_MOST_BYTES}")
     return text
 
 
@@ -60,11 +94,10 @@ def call(tool: str, arguments: dict[str, Any]) -> object:
     if _requests is None or _replies is None:
         raise BridgeError("the bridge is not attached")
     with _lock:
+        # Numbered only once the line exists: a call that is not made does not take a number the daemon waits for.
+        frame: str = _frame(_sent + 1, tool, arguments)
         _sent += 1
         number: int = _sent
-        frame: str = json.dumps(
-            {"id": number, "tool": tool, "args": arguments}, ensure_ascii=True, separators=(",", ":"), allow_nan=False
-        )
         try:
             _requests.write(frame + "\n")
             _requests.flush()
