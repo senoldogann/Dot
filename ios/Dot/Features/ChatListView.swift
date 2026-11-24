@@ -213,7 +213,7 @@ struct ThreadRow: View {
     private var stacked: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(spacing: Space.m) {
-                Avatar(id: thread.actorId ?? "dot", name: thread.title, size: 36, state: thread.state)
+                AgentAvatar(id: thread.actorId, size: 36, state: thread.state)
                 Text(shortAge(thread.updatedAt)).font(Theme.meta).foregroundStyle(Theme.faint)
                 Spacer(minLength: 0)
                 if thread.unread { Circle().fill(Theme.accent).frame(width: 10, height: 10).accessibilityLabel("Unread") }
@@ -228,7 +228,7 @@ struct ThreadRow: View {
 
     private var regular: some View {
         HStack(alignment: .top, spacing: Space.m + 2) {
-            Avatar(id: thread.actorId ?? "dot", name: thread.title, size: 40, state: thread.state)
+            AgentAvatar(id: thread.actorId, size: 40, state: thread.state)
                 .padding(.top, Space.xs)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: Space.s) {
@@ -264,15 +264,15 @@ struct AgentStrip: View {
             DotGlassGroup(spacing: Space.s) {
                 HStack(spacing: Space.s) {
                     ForEach(store.agents) { agent in
-                        let current: ThreadState = state(of: agent)
+                        let current: ThreadState = agent.state
                         Button {
                             onOpen(agent)
                         } label: {
                             HStack(spacing: Space.s) {
-                                Avatar(id: agent.id, name: agent.record.name, size: 28, state: current)
+                                AgentAvatar(id: agent.id, size: 28, state: current)
                                 VStack(alignment: .leading, spacing: 0) {
                                     Text(agent.record.name).font(.subheadline.weight(.medium)).foregroundStyle(Theme.text).lineLimit(1)
-                                    if current != .idle || agent.record.pausedAt != nil {
+                                    if current != .idle || agent.isPaused {
                                         Text(current == .waiting ? "Needs you" : current == .working ? "Working" : "Paused")
                                             .font(Theme.tiny.weight(.semibold))
                                             .foregroundStyle(current == .waiting ? Theme.warn : current == .working ? Theme.accent : Theme.faint)
@@ -283,18 +283,13 @@ struct AgentStrip: View {
                             .dotGlass(in: Capsule(), tint: current == .waiting ? Theme.warn.opacity(0.18) : nil, interactive: true)
                         }
                         .buttonStyle(.plain)
-                        .opacity(agent.record.pausedAt == nil ? 1 : 0.6)
-                        .accessibilityLabel("\(agent.record.name)\(current == .idle ? "" : ", \(current == .waiting ? "waiting on you" : "working")")")
+                        .opacity(agent.isPaused ? 0.6 : 1)
+                        .accessibilityLabel(agent.spokenWords)
                     }
                 }
             }
             .padding(.horizontal, Space.l).padding(.vertical, Space.s)
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-    }
-
-    private func state(of agent: AgentSummary) -> ThreadState {
-        guard let status: String = agent.latest?.status else { return .idle }
-        return status == "blocked" ? .waiting : status.isActiveRunStatus ? .working : .idle
     }
 }

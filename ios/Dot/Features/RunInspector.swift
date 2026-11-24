@@ -202,14 +202,15 @@ struct RunInspector: View {
     }
 }
 
-/// A helper in the inspector: a branch mark under the run, its goal, and how it stands; a live one says what it does.
+/// A helper in the inspector: a helper is a bot Dot handed a part of the work to, so it wears the bot (its ring turns while it
+/// works), then its goal and how it stands; a live one says what it does.
 private struct HelperRow: View {
     let helper: Helper
 
     var body: some View {
         HStack(alignment: .top, spacing: Space.s) {
-            DotIcon(.cornerDownRight, size: 14, relativeTo: .caption).foregroundStyle(Theme.faint)
-                .frame(width: 20).padding(.top, 3)
+            AgentAvatar(face: .bot, size: 26, state: helper.isLive ? .working : .idle)
+                .frame(width: 30).padding(.top, 1)
             VStack(alignment: .leading, spacing: 3) {
                 Text(shortened(helper.goal, 80)).font(Theme.small).foregroundStyle(Theme.text).lineLimit(2)
                 if helper.isLive, let words: String = helper.words {

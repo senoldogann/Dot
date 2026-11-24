@@ -52,9 +52,10 @@ struct DesignGallery: View {
     private var components: some View {
         VStack(alignment: .leading, spacing: Space.xl) {
             HStack(spacing: Space.l) {
-                Avatar(id: "dot", name: "Dot", size: 44, state: .working)
-                Avatar(id: "agt1", name: "Invoices", size: 44, state: .waiting)
-                Avatar(id: "agt2", name: "Research", size: 44)
+                AgentAvatar(id: "dot", size: 44, state: .working)
+                AgentAvatar(id: "agt1", size: 44, state: .waiting)
+                AgentAvatar(id: "agt2", size: 44, state: .working)
+                AgentAvatar(id: "agt3", size: 44)
                 DotGlyph(size: 44)
             }
             .padding(.vertical, Space.s)
