@@ -7498,6 +7498,19 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-xs);
 }
 
+/* What the run's record says it checked, sent and left open (item 1746), under the line of what it ran. */
+.run-changes-account {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.run-changes-account p {
+  margin: 0;
+}
+
 /* What a task at work has used so far (item 1403), above the details of the Cost card: its own quiet block. */
 .cost-so-far {
   display: grid;
