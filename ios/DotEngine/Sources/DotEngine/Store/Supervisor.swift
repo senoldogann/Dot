@@ -1,0 +1,398 @@
+import Foundation
+import os
+
+/// The one owner of every stream of a daemon and of the outbox's pace (plan §5, R-f §4 #3). Views never start a
+/// reconnect of their own.
+///
+/// - Each stream (the list's, each open chat's) is opened with the view read beside it, from the cursors held.
+/// - A broken stream is opened again after a jittered wait from 0.5 s up to 15 s; the count starts again only after a
+///   connection stayed up 30 s, so a link that passes one keepalive and dies does not hammer the Mac.
+/// - A stream silent for 12 s (the new streams write a keepalive every 5 s) is taken for dead and replaced.
+/// - Back in front: after 10 s or more away every stream is opened again from its cursors; sooner, a stream whose last
+///   byte is younger than 6 s is kept and an older one replaced (a probe by heartbeat age).
+/// - The link: lost, the streams are let go (the picture stays, as not live); back, every wait is cut short; a change
+///   of interface (Wi-Fi to cellular) opens every stream again.
+public actor Supervisor {
+    enum Key: Hashable, Sendable {
+        case list
+        case chat(String)
+    }
+
+    private enum Ending: Sendable {
+        /// The connection ended; it had been up this long.
+        case ended(upFor: Double)
+        /// The chat is gone: its stream is not opened again.
+        case gone
+        /// Nothing more can be done until the owner acts (key refused, daemon too old).
+        case halted
+    }
+
+    public static let tail: Int = 20
+
+    private let api: DaemonAPI
+    private let store: SyncStore
+    private let outbox: Outbox
+    private let link: LinkWatcher
+    private let clock: any EngineClock
+    private let jitter: @Sendable () -> Double
+    private let waker: Waker = Waker()
+    private var loops: [Key: Task<Void, Never>] = [:]
+    private var readers: [Key: Task<Void, Never>] = [:]
+    private var beats: [Key: Heartbeat] = [:]
+    private var immediate: Set<Key> = []
+    private var viewFailures: [String: Int] = [:]
+    private var backgroundAt: Double?
+    private var lastLink: LinkState
+    private var halted: Bool = false
+    private var watchers: [Task<Void, Never>] = []
+    private let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "supervisor")
+
+    public init(api: DaemonAPI, store: SyncStore, outbox: Outbox, link: LinkWatcher, clock: any EngineClock, jitter: @escaping @Sendable () -> Double) {
+        self.api = api
+        self.store = store
+        self.outbox = outbox
+        self.link = link
+        self.clock = clock
+        self.jitter = jitter
+        self.lastLink = link.state
+    }
+
+    // MARK: Life
+
+    /// Starts the list's stream, the outbox and the watch on the link.
+    public func start() async {
+        guard loops[.list] == nil else { return }
+        let outbox: Outbox = outbox
+        let store: SyncStore = store
+        watchers.append(Task { for await items in await outbox.changes() { await store.outbox(items) } })
+        watchers.append(Task { for await outcome in await outbox.outcomes() { await store.outcome(outcome) } })
+        watchers.append(Task { [weak self, link] in
+            for await state in link.updates() { await self?.linkChanged(state) }
+        })
+        await store.set(online: link.state.online)
+        run(.list)
+        await outbox.start()
+    }
+
+    /// Ends every stream and the outbox's sending (the key was forgotten, the app is torn down).
+    public func stop() async {
+        for task in loops.values { task.cancel() }
+        for task in readers.values { task.cancel() }
+        for task in watchers { task.cancel() }
+        loops = [:]
+        readers = [:]
+        watchers = []
+        await outbox.suspend()
+    }
+
+    /// Opens a chat: its picture from the cache, its stream and its view.
+    public func openChat(_ thread: String) async {
+        await store.chatOpened(thread)
+        guard loops[.chat(thread)] == nil else { return }
+        run(.chat(thread))
+    }
+
+    /// Leaves a chat: its stream ends, its picture is saved.
+    public func closeChat(_ thread: String) async {
+        end(.chat(thread))
+        await store.chatClosed(thread)
+    }
+
+    public func enterBackground() async {
+        backgroundAt = clock.now()
+        await store.persistAll()
+        await outbox.suspend()
+    }
+
+    public func enterForeground() async {
+        let away: Double = backgroundAt.map { clock.now() - $0 } ?? 0
+        backgroundAt = nil
+        await outbox.start()
+        if away >= StreamRules.resubscribeAfter {
+            replaceAll()
+        } else {
+            probe()
+        }
+        await waker.wake()
+    }
+
+    /// Replaces the streams whose last byte is older than the probe age (the app came back after a short while).
+    func probe() {
+        let now: Double = clock.now()
+        for (key, beat) in beats where now - beat.last > StreamRules.probeAge { replace(key) }
+    }
+
+    private func replaceAll() {
+        for key in loops.keys { replace(key) }
+    }
+
+    /// Ends the connection of `key` and opens it again at once, from its cursors.
+    private func replace(_ key: Key) {
+        immediate.insert(key)
+        readers[key]?.cancel()
+    }
+
+    private func end(_ key: Key) {
+        loops.removeValue(forKey: key)?.cancel()
+        readers.removeValue(forKey: key)?.cancel()
+        beats[key] = nil
+    }
+
+    private func linkChanged(_ state: LinkState) async {
+        let was: LinkState = lastLink
+        lastLink = state
+        await store.set(online: state.online)
+        if !state.online {
+            await store.set(transport: .offline)
+            for reader in readers.values { reader.cancel() }
+            return
+        }
+        if !was.online {
+            for key in loops.keys { immediate.insert(key) }
+            await waker.wake()
+            await outbox.nudge()
+        } else if state.interface != was.interface {
+            replaceAll()
+        }
+    }
+
+    // MARK: Connections
+
+    private func run(_ key: Key) {
+        loops[key] = Task { [weak self] in await self?.loop(key) }
+    }
+
+    private func loop(_ key: Key) async {
+        var attempt: Int = 0
+        while !Task.isCancelled, !halted {
+            if !link.state.online {
+                await store.set(transport: .offline)
+                let seen: Int = await waker.current
+                await waker.wait(seconds: 30, clock: clock, seen: seen)
+                continue
+            }
+            if key == .list { await store.set(transport: attempt == 0 ? .connecting : .reconnecting(attempt: attempt)) }
+            let seen: Int = await waker.current
+            let ending: Ending = await connect(key)
+            switch ending {
+            case .gone, .halted:
+                loops[key] = nil
+                return
+            case .ended(let upFor):
+                if upFor >= StreamRules.stableAfter { attempt = 0 }
+            }
+            if Task.isCancelled { return }
+            if immediate.remove(key) != nil {
+                attempt = 0
+                continue
+            }
+            attempt += 1
+            if key == .list, link.state.online { await store.set(transport: .reconnecting(attempt: attempt)) }
+            await waker.wait(seconds: reconnectWait(attempt: attempt, jitter: jitter()), clock: clock, seen: seen)
+        }
+    }
+
+    /// One connection of a stream, from opening to its end.
+    private func connect(_ key: Key) async -> Ending {
+        let connection: Int
+        let path: String
+        var query: [URLQueryItem] = []
+        switch key {
+        case .list:
+            do {
+                let status: DaemonStatus = try await api.status()
+                await store.daemon(version: status.version)
+            } catch {
+                if let ending: Ending = await halt(on: error) { return ending }
+                return .ended(upFor: 0)
+            }
+            let (opened, effects): (Int, [ListEffect]) = await store.listOpening()
+            connection = opened
+            path = "/api/threads/stream"
+            perform(effects)
+        case .chat(let thread):
+            let (opened, cursors, effects): (Int, String, [SyncEffect]) = await store.chatOpening(thread)
+            connection = opened
+            path = "/api/threads/\(thread)/stream"
+            if !cursors.isEmpty { query = [URLQueryItem(name: "cursors", value: cursors)] }
+            perform(effects)
+        }
+        let bytes: URLSession.AsyncBytes
+        do {
+            bytes = try await api.openStream(path: path, query: query)
+        } catch {
+            logger.warning("stream open failed path=\(path, privacy: .public) error=\(error.description, privacy: .public)")
+            await broke(key, connection: connection)
+            if let ending: Ending = await halt(on: error) { return ending }
+            if error.statusCode == 404, case .chat(let thread) = key {
+                // A chat deleted, or a cursor of a run it no longer has (a rewind): the view says which.
+                return await viewAfterMissingStream(thread)
+            }
+            return .ended(upFor: 0)
+        }
+        let began: Double = clock.now()
+        let beat: Heartbeat = Heartbeat(last: began)
+        beats[key] = beat
+        switch key {
+        case .list:
+            await store.listOpened(connection)
+            await store.set(transport: .up)
+            await outbox.nudge()
+        case .chat(let thread):
+            await store.chatOpened(thread, connection: connection)
+        }
+        let reader: Task<Void, Never> = Task { [weak self, clock] in
+            await Self.read(bytes, beat: beat, clock: clock) { [weak self] frame in await self?.apply(frame, key: key, connection: connection) }
+        }
+        readers[key] = reader
+        let watchdog: Task<Void, Never> = Task { [clock] in
+            await Self.watch(beat: beat, clock: clock, reader: reader)
+        }
+        await reader.value
+        watchdog.cancel()
+        if readers[key] == reader { readers[key] = nil }
+        if beats[key] === beat { beats[key] = nil }
+        await broke(key, connection: connection)
+        if case .chat(let thread) = key, await store.chat(thread)?.freshness == .deleted { return .gone }
+        return .ended(upFor: clock.now() - began)
+    }
+
+    private func broke(_ key: Key, connection: Int) async {
+        switch key {
+        case .list: await store.listBroke(connection)
+        case .chat(let thread): await store.chatBroke(thread, connection: connection)
+        }
+    }
+
+    /// A refused key or an old daemon stop everything until the owner acts; `nil` for any other failure.
+    private func halt(on error: DaemonRequestError) async -> Ending? {
+        guard let code: Int = error.statusCode else { return nil }
+        if code == 401 || code == 403 {
+            halted = true
+            await store.set(transport: .keyRefused)
+            return .halted
+        }
+        if code == 404, case .status(let path, _, _) = error, path == "/api/threads/stream" || path == "/api/status" {
+            halted = true
+            await store.set(transport: .daemonTooOld)
+            return .halted
+        }
+        return nil
+    }
+
+    private func viewAfterMissingStream(_ thread: String) async -> Ending {
+        await readView(thread)
+        return await store.chat(thread)?.freshness == .deleted ? .gone : .ended(upFor: 0)
+    }
+
+    /// Reads a stream's bytes line by line; every line (a keepalive too) is a heartbeat.
+    private static func read(
+        _ bytes: URLSession.AsyncBytes, beat: Heartbeat, clock: any EngineClock, frame: @Sendable (StreamFrame) async -> Void
+    ) async {
+        var parser: SSEParser = SSEParser()
+        var line: [UInt8] = []
+        do {
+            for try await byte in bytes {
+                line.append(byte)
+                guard byte == 0x0A else { continue }
+                beat.touch(clock.now())
+                for message in parser.feed(line) { await frame(readFrame(message)) }
+                line.removeAll(keepingCapacity: true)
+            }
+        } catch {
+            // The stream broke (or was cancelled): the loop opens it again.
+        }
+    }
+
+    /// Ends the reader once the stream was silent for the silence limit.
+    private static func watch(beat: Heartbeat, clock: any EngineClock, reader: Task<Void, Never>) async {
+        while !Task.isCancelled {
+            let due: Double = beat.last + StreamRules.silenceLimit - clock.now()
+            if due <= 0 {
+                reader.cancel()
+                return
+            }
+            do {
+                try await clock.sleep(seconds: due)
+            } catch {
+                return
+            }
+        }
+    }
+
+    // MARK: Frames and effects
+
+    private func apply(_ frame: StreamFrame, key: Key, connection: Int) async {
+        switch key {
+        case .list: perform(await store.listFrame(frame, connection: connection))
+        case .chat(let thread): perform(await store.chatFrame(thread, frame, connection: connection))
+        }
+    }
+
+    private func perform(_ effects: [ListEffect]) {
+        for effect in effects {
+            switch effect {
+            case .readList: Task { await self.readList() }
+            }
+        }
+    }
+
+    private func perform(_ effects: [SyncEffect]) {
+        for effect in effects {
+            switch effect {
+            case .readView(let thread): Task { await self.readView(thread) }
+            case .closeStream(let thread): end(.chat(thread))
+            }
+        }
+    }
+
+    private func readList() async {
+        let connection: Int = await store.listAsked()
+        do {
+            perform(await store.listLoaded(try await api.threadsView(), connection: connection))
+        } catch {
+            logger.warning("list read failed error=\(error.description, privacy: .public)")
+            await store.listFailed()
+            if error.statusCode == 404 {
+                halted = true
+                await store.set(transport: .daemonTooOld)
+                end(.list)
+            }
+        }
+    }
+
+    /// Reads a chat's view; a read that fails while the chat is open is tried again with the streams' backoff.
+    private func readView(_ thread: String) async {
+        guard let connection: Int = await store.chatViewAsked(thread) else { return }
+        do {
+            let view: ThreadView = try await api.threadView(thread, tail: Self.tail)
+            viewFailures[thread] = nil
+            perform(await store.chatViewLoaded(thread, view: view, connection: connection))
+        } catch {
+            logger.warning("view read failed thread=\(thread, privacy: .public) error=\(error.description, privacy: .public)")
+            let missing: Bool = error.statusCode == 404
+            perform(await store.chatViewFailed(thread, missing: missing))
+            if missing || error.statusCode == 401 || error.statusCode == 403 { return }
+            let failures: Int = (viewFailures[thread] ?? 0) + 1
+            viewFailures[thread] = failures
+            let seen: Int = await waker.current
+            await waker.wait(seconds: reconnectWait(attempt: failures, jitter: jitter()), clock: clock, seen: seen)
+            guard loops[.chat(thread)] != nil, beats[.chat(thread)] != nil else { return }
+            await readView(thread)
+        }
+    }
+}
+
+/// When a stream last said anything, shared by its reader and its watchdog.
+final class Heartbeat: @unchecked Sendable {
+    private let lock: NSLock = NSLock()
+    private var at: Double
+
+    init(last: Double) {
+        at = last
+    }
+
+    var last: Double { lock.withLock { at } }
+
+    func touch(_ now: Double) { lock.withLock { at = max(at, now) } }
+}
