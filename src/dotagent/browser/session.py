@@ -938,14 +938,21 @@ _CONTENT: str = "its content changed"
 _REQUESTED: str = "it sent a request"
 
 
-def changed_by_itself(quiet_ms: float | None, read_at: float, looked_at: float) -> bool:
+def changed_by_itself(quiet_ms: float | None, read_at: float, looked_at: float, asked: bool) -> bool:
     """Whether a page changed after Dot last looked at it (``looked_at``) and before the look before a step, read at
-    ``read_at`` (both ``time.monotonic()``) and ``quiet_ms`` after its last change: what the model acts on had changed
-    by itself (a clock, a feed, a poll). Not known for a page Dot has not looked at, or that has not changed since it
-    was first watched. :data:`_LOOK_SLACK_S` takes up the time a look takes."""
-    if quiet_ms is None or looked_at <= 0.0:
+    ``read_at`` (both ``time.monotonic()``) and ``quiet_ms`` after its last change, or started a request in between
+    (``asked``): what the model acts on had changed by itself (a clock, a feed, a poll). Not known for a page Dot has
+    not looked at. :data:`_LOOK_SLACK_S` takes up the time a look takes."""
+    if looked_at <= 0.0:
         return False
-    return read_at - quiet_ms / 1000.0 > looked_at + _LOOK_SLACK_S
+    return asked or (quiet_ms is not None and read_at - quiet_ms / 1000.0 > looked_at + _LOOK_SLACK_S)
+
+
+def _looked(tab: Tab) -> None:
+    """Dot has just looked at ``tab``'s page (a view, or the end of a step it ran, item 1744): what changes after this
+    and before the next step changed by itself."""
+    tab.looked_at = time.monotonic()
+    tab.looked_requests = tab.requests
 
 
 def _reaction(moved: str, busy: bool) -> OutcomeCheck:
@@ -2320,7 +2327,7 @@ class BrowserSession:
                 watching.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await watching
-        tab.looked_at = time.monotonic()
+        _looked(tab)
         kept: tuple[SnapshotLine, ...] = viewport_filter(
             lines, viewport.width, viewport.height, config.viewport_margin_px
         )
@@ -3686,6 +3693,8 @@ class BrowserSession:
                 made: _StepMade = await self._run_one(thread, tab, index, step, secret_field, sends, left, written)
             finally:
                 sends.stop()
+                # Every step Dot ran ends with its look (item 1744): what it set off is not the page changing by itself.
+                _looked(tab)
             reports.append(made.report)
             stopped, left = made.stopped, made.left
             if stopped is None and made.unjudged and index < len(steps):
@@ -3710,7 +3719,9 @@ class BrowserSession:
         before: _Watch = self._watch(thread, tab)
         pulse: Pulse | None = await page_pulse(tab.page) if _moves_the_page(step) else None
         # Whether the page changed by itself since Dot last looked (item 1744): then its changes tell nothing.
-        busy: bool = pulse is not None and changed_by_itself(pulse.quiet_ms, time.monotonic(), tab.looked_at)
+        busy: bool = pulse is not None and changed_by_itself(
+            pulse.quiet_ms, time.monotonic(), tab.looked_at, tab.requests != tab.looked_requests
+        )
         requests: int = tab.requests
         try:
             named: _Sights = await self._sights_of(tab, step, written)
@@ -3814,6 +3825,9 @@ class BrowserSession:
         # What the step's page sent is waited for, so that the steps after it do not run on a page whose server has
         # not answered, and its answer stands in the step's line (item 1158).
         sent, left = await self._answers(tab, sends, left)
+        # What the step's own page sent to its own site, not a read, is the step's even on a busy page (item 1158).
+        if sent and reaction is not None and reaction.status != "verified":
+            reaction = page_reacted(_REQUESTED)
         surprise: str | None = describe_surprise(before, self._watch(thread, tab))
         if effect.startswith(PAGE_UNCHANGED) and (sent or looked != requests):
             # A request left just after the page had been watched: it did change, and a click that sent something
@@ -4037,7 +4051,6 @@ class BrowserSession:
                 break
             await asyncio.sleep(_EFFECT_POLL_S)
             waited += _EFFECT_POLL_S
-        tab.looked_at = time.monotonic()
         if moved is None and ref is not None and await holds_field_focus(tab.page, ref):
             return _Effect(words="", check=page_reacted("the field clicked has the keyboard"))
         if moved is None:

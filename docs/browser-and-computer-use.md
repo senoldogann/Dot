@@ -276,8 +276,8 @@ Both modes share what follows.
   changed (its address, a tab, a dialog or a download, a request it sent, its content, the field that has the
   keyboard), or **uncertain** when nothing did within half a second. That says that the page did something, not that it
   did what the step was for: a wrong button that opens a menu reacts too. A page that changed by itself after Dot's
-  last look and before the step (a clock, a feed, a carousel, a poll) tells nothing by its content changing or a
-  request it makes: such a change is uncertain, and only a new address, tab or dialog, the keyboard in a field, or a
+  last look (a view, or the end of a step Dot ran) and before the step, or started a request then (a clock, a feed, a
+  carousel, a poll), tells nothing by its content changing or a request it makes: such a change is uncertain, and only a new address, tab or dialog, the keyboard in a field, or a
   request the step's page sent to its own site that is not a read counts there. Dot's watch of a page's changes starts
   with each view it reads, beside the read. A step that named what it expects is judged
   by that alone. The counts of each call (`tally` of its `tool_result` event) feed the run's account
