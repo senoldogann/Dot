@@ -62,6 +62,13 @@ replaces it. The setting has a table of its own because `[mcp]` cannot hold a ke
 TOML reads as one array of tables. Settings › Connectors has the same switch and writes it here, `dotx mcp list`
 marks the server `built-in`, and an eval run leaves it out. See [MCP servers](extending.md#mcp-servers).
 
+**Code mode** (items 1500 to 1507, [Code mode](code-mode.md)). `[code]` holds `enabled` (`true`: `code_run` is offered; read
+when the daemon starts), `max_seconds` (120, 1 to 900: the code's own time, a `time.sleep` included, not the time a tool call
+takes or the time you take to answer), `max_mb` (512, 64 to 8192: resident memory, which the daemon watches and the kernel does
+not limit), `output_chars` (8,000: what of its output reaches the model), `max_calls` (200: the tool calls of one
+`code_run`) and `result_chars` (5,000,000: the longest result handed to the code). A value outside its bounds is an error, as
+any other.
+
 Deleting a chat deletes the screenshot files that only it named, and the daemon thins its copies of the database
 (below). Its runs go with their words, but each leaves one row of numbers in the run ledger (item 1323): where it came
 from, its model and effort, how it ended, its steps, tokens and times, its schedule, agent and campaign, the version of

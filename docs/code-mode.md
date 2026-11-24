@@ -192,3 +192,34 @@ and `scratch/`. They are in the workspace, where your run's commands may write t
 rights, so it never follows a link there: each folder is opened from the one above it without following links, a file is
 written beside its target and moved over it, and a link a command left where a folder or a file is to be makes the write
 fail instead of leading it elsewhere.
+
+## The threat model (item 1503)
+
+Code mode must not widen what a run can do. The code is text a model wrote, which a page it read may have shaped, so it is
+treated as hostile text that has to be useful. What it can reach, and what stops it, attack by attack. Each row has a test
+that makes the attack with no sandbox first (so that it is shown to be an attack) and then in the sandbox, and a twin: the
+harmless thing next to it, which works.
+
+| The code tries to | What stops it | Where it is tested |
+| ----------------- | ------------- | ------------------ |
+| open a file outside its scratch folder; write one; reach Dot's home, `~/Library`, the keychain, `/Users` | the profile: `(deny default)`, read of its interpreter and its `tools`, read and write of its `scratch` | `test_code_attacks.py` (read, write, tools read-only, Dot's home) |
+| use the network: a socket, `urllib`, DNS, a bind, a UDP send | the profile: no `network*` | `test_code_attacks.py` (network) |
+| start a program: `subprocess`, `os.system`, `fork`, `exec`, `posix_spawn`, `ctypes` | the profile (no `process-fork`, no `exec` but the interpreter) and one process (`RLIMIT_NPROC`) | `test_code_attacks.py` (programs, ctypes, fork bomb) |
+| read the daemon's secrets from its environment | a clean environment: its two folders, the language and the zone, and nothing a command's environment is held back for | `test_code_attacks.py` (environment) |
+| run for ever, or sleep for ever | the watch of the code's own time, and a CPU limit in the kernel | `test_code_attacks.py` (infinite loop) |
+| hold the memory | the watch of its resident memory (a watch, not a wall: measured overshoot below) | `test_code_attacks.py` (memory bomb) |
+| print without end; fill the scratch folder; write a huge file | a head and a tail kept and the code stopped at 64 MiB; a quota on the folder; a file size limit in the kernel | `test_code_attacks.py` (print, scratch, file size) |
+| send the daemon something that is not a call: not JSON, another key, a call out of its turn, a line of 32 MiB; never read its replies | the bridge reads exactly one shape and ends the code on any other; no request is read until the last reply is read | `test_code_bridge.py` |
+| make more than `max_calls` calls | the 201st ends the code | `test_code_attacks.py`, `test_code_run_gate.py` (the gate saw exactly 200) |
+| call a tool that ends the run, asks you, starts a run, or is `code_run` itself | the deny list, answered without the gate being asked; and a call made in code has no way to make calls | `test_code_run_gate.py` (each name; code from code with the list switched off) |
+| make a call the run's own policy would refuse (a write in a research run, a step you said no to, a secret sent out) | the same gate: each call is judged one by one, and a refusal is `ToolRefused` in the code | `test_code_run_gate.py`, `smoke/test_code_mode.py` (a real gate and your approvals) |
+| use what a page told it to, after reading the page | the run is tainted as the call that read it ends, so the next call of the same code is judged under it | `test_code_run_gate.py` (taint) |
+| keep what a tool answered out of the masking | every result is masked of the secrets Dot holds before the code reads it, and what it prints is masked again | `test_code_run_gate.py` (secret) |
+| have the daemon write through a link it planted in the run's folders | every write of the daemon there goes through a descriptor of the folder above, without following a link | `test_code_sandbox.py` (links) |
+| run where the sandbox does not start, or does not hold | the probe, and no other way to start the code: nothing runs and the model is told why | `test_code_attacks.py`, `test_code_run_gate.py`, `test_doctor_rows.py` |
+| outlive the run: the run's Stop, a cancelled step, a daemon that went away | the process group is killed whatever ends the call; the code leaves when its parent is gone | `test_code_attacks.py` (Stop), `test_code_bridge.py` (a fault) |
+
+What the code does reach: what it prints, which the model reads (with the model's own caution towards what tools answered, as
+before), what the tools it may call answer (each judged by the gate), and its scratch folder. What was not shown: that no
+hole exists in `sandbox-exec` itself; the profile on another macOS than 26.6.2; a Mac that is not Apple silicon. The memory
+limit is a watch of 25 ms: a single allocation of 3 GB against a limit of 300 MB was seen and killed at 463 MB held.
