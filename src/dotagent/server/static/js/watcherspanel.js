@@ -12,6 +12,7 @@ import { icon } from "./icons.js";
 import { field, inlineError, loadingPanel, markOpener, segmented } from "./panels.js";
 import { onLifecycle } from "./state.js";
 import { attempt, confirmDialog, formDialog, settingFold, toast } from "./ui.js";
+import { countsLine, rowsOf, sumCounts } from "./tellwords.js";
 
 const KINDS = [
   { id: "mail", label: "New mail", hint: "A new mail in a Google or Microsoft account you signed in", mark: "mail", what: "new mail" },
@@ -70,8 +71,17 @@ function whenLine(view) {
   return el("div", { class: "row-meta when-line" }, ...joined(parts));
 }
 
+/** What you did with this watcher's tells in the last 30 days (item 1743), or null before the first one goes out. */
+function reactionLine(view, tells) {
+  const counts = sumCounts(rowsOf(tells, "watcher", view.id));
+  if (counts.sent === 0) {
+    return null;
+  }
+  return el("div", { class: "row-meta tell-line", title: "What you did with its tells in the last 30 days: opened or acted on within half an hour, dismissed, or let be" }, countsLine(counts));
+}
+
 /** A row of the list. `looking` says that its Check now is at work: the button shows it and takes no second press. */
-function watcherRow(view, handlers, looking) {
+function watcherRow(view, handlers, looking, tells) {
   const kind = kindOf(view.kind);
   const toggle = el("button", {
     class: "switch",
@@ -105,6 +115,7 @@ function watcherRow(view, handlers, looking) {
       ),
       view.words === "" ? null : el("div", { class: "row-text muted", title: view.words }, clip(view.words, WORDS_PREVIEW_CHARS)),
       whenLine(view),
+      reactionLine(view, tells),
       failure,
     ),
     el(
@@ -293,6 +304,8 @@ export function mountWatchers() {
   let ticket = 0;
   let views = null;
   let options = null;
+  // What you did with the tells of the last 30 days, `rows` of `GET /api/tells`; none until it is read (item 1743).
+  let tells = [];
   // The ids of the watchers whose Check now is at work. A look takes up to three minutes, and a second press would queue
   // another whole look behind it, so the row shows the first one and its button takes no more (item 612).
   const looking = new Set();
@@ -327,18 +340,19 @@ export function mountWatchers() {
       onEdit: (view) => openForm(view),
       onDelete: (view) => attempt(() => remove(view)),
     };
-    holder.replaceChildren(el("div", { class: "watcher-list" }, views.map((view) => watcherRow(view, handlers, looking.has(view.id)))));
+    holder.replaceChildren(el("div", { class: "watcher-list" }, views.map((view) => watcherRow(view, handlers, looking.has(view.id), tells))));
   }
 
   async function reload() {
     const mine = ++ticket;
     try {
-      const [fresh, offered] = await Promise.all([api.get("/watchers"), api.get("/watchers/options")]);
+      const [fresh, offered, told] = await Promise.all([api.get("/watchers"), api.get("/watchers/options"), api.get("/tells")]);
       if (disposed || mine !== ticket) {
         return;
       }
       views = fresh;
       options = offered;
+      tells = told.rows;
       lead.replaceChildren(
         ...(offered.looking
           ? ["Dot tells you when a mail, an event or a GitHub notification you care about comes: on your phone, and in the chat Watchers."]

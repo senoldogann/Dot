@@ -50,7 +50,7 @@ class MoneyTeller:
         before: float | None = self._told.get(ref.provider)
         self._told[ref.provider] = now
         try:
-            await tell_owner(self._bus, MONEY_TITLE, money_text(ref, pause, words), MODELS_ROUTE)
+            await tell_owner(self._bus, MONEY_TITLE, money_text(ref, pause, words), MODELS_ROUTE, "system", "")
         except BaseException:
             if before is None:
                 self._told.pop(ref.provider, None)

@@ -278,6 +278,25 @@ async function openAt(route) {
   return front.navigate(target);
 }
 
+// What the worker tells a window of Dot of a notification the owner closed without a tap: the route it was for (main.js
+// counts it, item 1743). A closed notification of a phone with no window of Dot open is not seen, and is counted as one
+// that was let be.
+const TELL_DISMISSED = "dot:tell-dismissed";
+
+worker.addEventListener("notificationclose", (event) => {
+  const route = event.notification.data?.route;
+  if (typeof route !== "string" || !route.startsWith("#/")) {
+    return;
+  }
+  event.waitUntil(
+    worker.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        client.postMessage({ type: TELL_DISMISSED, route });
+      }
+    }),
+  );
+});
+
 worker.addEventListener("notificationclick", (event) => {
   event.notification.close();
   // A tap opens one of the page's own routes (`#/…`, as the daemon sends them); anything else opens the home.
