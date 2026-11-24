@@ -4,13 +4,15 @@ import UIKit
 /// One row of the conversation. Dot's words are plain text on the ground (no bubble); the owner's words are a raised
 /// rounded box; a tool step is a quiet line; a step that needs the owner is a card that asks.
 struct ChatRow: View {
-    let item: ChatItem
-    let onDecide: (ApprovalCard, Bool, String) -> Void
-    var onTool: (ToolRow) -> Void = { _ in }
+    @Environment(\.shownPageHost) private var host
     @Environment(\.sharedAppearancePalette) private var palette
 
     private var ink: Color { palette?.color(\.text, fallback: Theme.text) ?? Theme.text }
     private var bubble: Color { palette?.color(\.raised, fallback: Theme.raised) ?? Theme.raised }
+
+    let item: ChatItem
+    let onDecide: (ApprovalCard, Bool, String) -> Void
+    var onTool: (ToolRow) -> Void = { _ in }
 
     var body: some View {
         switch item.kind {
@@ -44,6 +46,10 @@ struct ChatRow: View {
                 .accessibilityHint("Shows the step's arguments and result")
         case .approval(let card):
             ApprovalCardView(card: card, onDecide: onDecide)
+        case .shownPage(let id, let title):
+            if let host {
+                ShownPageRow(title: title, url: host.url(path: "/pages/\(id)"))
+            }
         case .note(let text, let tone):
             Text(text)
                 .font(Theme.meta)

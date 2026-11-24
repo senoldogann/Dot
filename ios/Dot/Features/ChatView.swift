@@ -60,6 +60,7 @@ struct ChatView: View {
             .frame(maxWidth: Theme.readingWidth)
             .frame(maxWidth: .infinity)
         }
+        .environment(\.shownPageHost, store.host)
         .environment(\.sharedAppearancePalette, store.sharedAppearance?.selection.palette(in: colorScheme))
         .background { SharedAppearanceBackground(appearance: store.sharedAppearance) }
         .navigationTitle(model.title)
