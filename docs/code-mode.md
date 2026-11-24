@@ -88,7 +88,7 @@ What a code cannot call: `code_run` (no code starts code, and a call made from c
 `finish`, `ask_user`, `ask_secret`, `browser_captcha`, `use_tools`, the plan and the reaction (`update_plan`,
 `mark_plan_step`, `react`), the tools that start or steer another run, agent or chat (`delegate`, `consult`,
 `message_agent`, `assign_work`, `work_orders`, `review_work`, `create_agent`, `create_team`, `send_to_chat`,
-`pass_reply`), a campaign's own (`campaign_*`), `wait_until` (poll with `time.sleep`), and the families `terminal_*`,
+`pass_reply`, `schedule_create`), a campaign's own (`campaign_*`), `wait_until` (poll with `time.sleep`), and the families `terminal_*`,
 `meeting_*` and `phone_*`. The code is told which, and why, and the gate is not asked. Everything else the run's mode and
 its tool list allow is callable.
 

@@ -301,6 +301,7 @@ def test_each_tool_a_code_cannot_call_is_named_has_a_reason_and_is_a_tool_of_dot
         "create_agent",
         "create_team",
         "browser_captcha",
+        "schedule_create",
     }
     assert named <= set(NOT_CALLABLE)
     assert set(NOT_CALLABLE_PREFIXES) == {"terminal_", "meeting_", "phone_"}
@@ -614,3 +615,31 @@ async def test_a_wait_in_a_loop_a_poll_and_a_filter_work_as_the_note_describes(c
         "100 of 10000 rows kept; first: [{'id': 0, 'tag': 'keep'}, {'id': 100, 'tag': 'keep'}]",
     ]
     assert cast(str, outcome.result.text.splitlines()[-1]).startswith("[4 tool calls, ")
+
+
+async def test_a_picture_the_code_made_impossible_to_save_is_an_error_to_the_call_not_a_crash(code_box: Box) -> None:
+    """The scratch folder is the code's: it may leave a link where the pictures go. The picture is not written through
+    it, and the call is told (the review of item 1501: the error was not caught and unwound out of ``code_run``)."""
+    png: bytes = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    )
+
+    async def shot(_arguments: JsonObject) -> ToolResult:
+        return ToolResult(
+            text="a screenshot",
+            images=(ImageData(media_type="image/png", data_b64=base64.b64encode(png).decode()),),
+            is_error=False,
+        )
+
+    scene: Run = run(code_box, [tool("browser_screenshot", shot)])
+    victim: Path = code_box.workspace.parent / "victim"
+    await asyncio.to_thread(victim.mkdir)
+    outcome: ToolOutcome = await scene.code(
+        "import dot_tools, os\n"
+        f"os.symlink({str(victim)!r}, 'images')\n"
+        "try:\n    dot_tools.call('browser_screenshot')\n"
+        "except dot_tools.ToolError as error:\n    print('told:', error)\n"
+    )
+    assert not outcome.result.is_error, outcome.result.text
+    assert outcome.result.text.startswith("told: the picture could not be saved in the scratch folder")
+    assert await asyncio.to_thread(os.listdir, victim) == []

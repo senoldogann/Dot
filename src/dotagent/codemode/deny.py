@@ -38,6 +38,7 @@ NOT_CALLABLE: dict[str, str] = {
     "create_team": _STARTS_RUNS,
     "send_to_chat": _STARTS_RUNS,
     "pass_reply": _STARTS_RUNS,
+    "schedule_create": "it makes a run that starts later: do it yourself, outside the code",
     "wait_until": "it holds the call for as long as it waits: poll in the code with time.sleep",
     "campaign_achieved": _CAMPAIGN,
     "campaign_note": _CAMPAIGN,
