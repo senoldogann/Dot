@@ -73,14 +73,16 @@ struct ChatListView: View {
                 }
             }
             .sheet(item: $composing) { target in
-                NewChatView(store: store, agent: target.agent, onStarted: { path = [$0] })
+                NewChatView(store: store, agent: target.agent, debugPicker: model.debugNewChat == 2, onStarted: { path = [$0] })
                     .dotSheet()
             }
             .sheet(isPresented: $showsInbox) {
                 NeedsYouView(store: store, onOpen: { runId in model.pendingRunId = runId }).dotSheet()
             }
             .navigationDestination(for: ThreadSummary.self) { thread in
-                ChatView(store: store, thread: thread, inspectorOpen: model.debugInspector)
+                ChatView(
+                    store: store, thread: thread, inspectorOpen: model.debugInspector,
+                    debug: DebugOpen(inspectorMedium: model.debugInspectorMedium, queue: model.debugQueue, step: model.debugStep))
             }
             .task(id: store.threads.map(\.id)) {
                 // Debug builds: the list is read again after the first draw, so the chat is opened again if its id changed.
@@ -92,10 +94,14 @@ struct ChatListView: View {
                 }
             }
             .task {
-                // Debug builds: `-DotShowInbox 1` opens the inbox once the list is on the screen.
+                // Debug builds: `-DotShowInbox 1` opens the inbox once the list is on the screen, `-DotShowNewChat 1|2` the new-chat sheet.
                 if model.debugInbox {
                     try? await Task.sleep(for: .milliseconds(900))
                     showsInbox = true
+                }
+                if model.debugNewChat > 0 {
+                    try? await Task.sleep(for: .milliseconds(900))
+                    composing = .home
                 }
             }
             .task(id: model.pendingRunId) {

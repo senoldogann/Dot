@@ -21,12 +21,16 @@ struct ChatView: View {
     @State private var editing: ChatItem?
     @Environment(\.dismiss) private var dismiss: DismissAction
 
-    init(store: NativeStore, thread: ThreadSummary, inspectorOpen: Bool = false) {
+    /// Debug builds' launch arguments that open a sheet of the chat (the look's screenshots); all false in a normal launch.
+    private let debug: DebugOpen
+
+    init(store: NativeStore, thread: ThreadSummary, inspectorOpen: Bool = false, debug: DebugOpen = DebugOpen()) {
         self.store = store
         self.thread = thread
+        self.debug = debug
         _model = State(initialValue: ChatModel(thread: thread, store: store))
         _showsInspector = State(initialValue: inspectorOpen)
-        _detent = State(initialValue: inspectorOpen ? .large : .medium)
+        _detent = State(initialValue: inspectorOpen && !debug.inspectorMedium ? .large : .medium)
     }
 
     var body: some View {
@@ -104,7 +108,22 @@ struct ChatView: View {
             Text("The messages after this one are taken out of the chat. The files they changed stay as they are.")
         }
         .onChange(of: model.leaves) { if model.leaves { dismiss() } }
-        .task { model.start() }
+        .task {
+            model.start()
+            #if DEBUG
+            if debug.queue {
+                try? await Task.sleep(for: .milliseconds(1800))
+                showsQueue = true
+            }
+            if debug.step {
+                try? await Task.sleep(for: .milliseconds(1800))
+                toolRow = model.state.items.lazy.compactMap { item -> ToolRow? in
+                    if case .tool(let row) = item.kind { return row }
+                    return nil
+                }.first
+            }
+            #endif
+        }
         .onDisappear { model.stop() }
     }
 
@@ -158,6 +177,13 @@ struct ChatView: View {
         case .helpersInBackground(let count): HelperWords.header(count: count, runWorking: model.isWorking)
         }
     }
+}
+
+/// What a debug build's launch arguments ask a chat to open (`-DotShowInspector 2`, `-DotShowQueue 1`, `-DotShowStep 1`).
+struct DebugOpen {
+    var inspectorMedium: Bool = false
+    var queue: Bool = false
+    var step: Bool = false
 }
 
 /// How far the reader is from the end of the transcript, and how tall it is.

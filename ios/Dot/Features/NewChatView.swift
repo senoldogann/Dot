@@ -141,10 +141,13 @@ struct NewChatView: View {
     @State private var showsPicker: Bool = false
     @FocusState private var focused: Bool
     @Environment(\.dismiss) private var dismiss: DismissAction
+    /// Debug builds' `-DotShowNewChat 2`: the model picker opens over the sheet (the look's screenshots).
+    private let debugPicker: Bool
 
-    init(store: NativeStore, agent: AgentSummary?, onStarted: @escaping (ThreadSummary) -> Void) {
+    init(store: NativeStore, agent: AgentSummary?, debugPicker: Bool = false, onStarted: @escaping (ThreadSummary) -> Void) {
         self.store = store
         self.agent = agent
+        self.debugPicker = debugPicker
         self.onStarted = onStarted
         _model = State(initialValue: NewChatModel(store: store, agent: agent))
     }
@@ -200,6 +203,12 @@ struct NewChatView: View {
                 .task {
                     await store.loadProviders()
                     focused = true
+                    #if DEBUG
+                    if debugPicker {
+                        try? await Task.sleep(for: .milliseconds(1200))
+                        showsPicker = true
+                    }
+                    #endif
                 }
                 .onDisappear { model.dictation.stop(); store.drafts.flush() }
         }

@@ -27,6 +27,13 @@ final class AppModel {
     /// `-DotShowSettings 1` the settings; for looking at a screen in the simulator, which has no way to tap from here.
     var debugOpenChat: String?
     var debugInspector: Bool = false
+    /// Debug builds only, for the look's screenshots: `-DotShowInspector 2` opens the run's sheet at its medium height,
+    /// `-DotShowQueue 1` the queue's sheet, `-DotShowStep 1` the first step's sheet, `-DotShowNewChat 1|2` the new-chat sheet
+    /// (2: with the model picker over it).
+    var debugInspectorMedium: Bool = false
+    var debugQueue: Bool = false
+    var debugStep: Bool = false
+    var debugNewChat: Int = 0
     var debugSchedules: Bool = false
     /// A page of Settings to open at launch (`models`, `schedules`, `licences`): debug builds only.
     var debugSettingsPage: String?
@@ -61,6 +68,10 @@ final class AppModel {
         self.debugInbox = args.bool(forKey: "DotShowInbox")
         self.debugOpenChat = args.string(forKey: "DotOpenChat")
         self.debugInspector = args.bool(forKey: "DotShowInspector")
+        self.debugInspectorMedium = args.integer(forKey: "DotShowInspector") == 2
+        self.debugQueue = args.bool(forKey: "DotShowQueue")
+        self.debugStep = args.bool(forKey: "DotShowStep")
+        self.debugNewChat = args.integer(forKey: "DotShowNewChat")
         self.showsSettings = args.bool(forKey: "DotShowSettings")
         self.debugOpenURL = args.string(forKey: "DotOpenURL").flatMap(URL.init(string:))
         #endif
