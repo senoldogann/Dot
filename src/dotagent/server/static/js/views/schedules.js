@@ -115,6 +115,16 @@ function failedInRow(record) {
   return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
 }
 
+/** The row's note of firings skipped one after the other (item 1401), from two on, or null: one skip is the last status's
+ * to say, beside it. A skipped firing starts no task, and the count ends with the first that does. */
+function skippedInRow(record) {
+  const count = record.skipped_in_row ?? 0;
+  if (count < 2) {
+    return null;
+  }
+  return el("span", { class: "badge b-warn", title: "Its last firings were skipped one after the other, so no task started: the last reason is beside it" }, `Skipped ${count} in a row`);
+}
+
 function historyLabel(count) {
   return count === 0 ? "None" : count === 1 ? "The last task" : `The last ${count} tasks`;
 }
@@ -319,6 +329,7 @@ function scheduleRow(view, handlers) {
         last,
         lastStatusBadge(record.last_status),
         failedInRow(record),
+        skippedInRow(record),
         pausedBadge(agent),
         view.zone === localZone() ? null : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
       ]),

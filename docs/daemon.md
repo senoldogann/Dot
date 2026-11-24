@@ -828,7 +828,8 @@ a subagent, and its Previous agents row opens the Agents tab. The Task tab also 
 while it is on, its title over how it repeats or when it runs and how it stands ("Every 6 hours · paused", "Once,
 Thursday at 19:31", "Loops every day at 09:00 · next Mon 09:00") and, under that, how its last run ended and when (item 1355: "Last run done · 09:00",
 "Last run failed · 21 Nov 09:00" (in red while the schedule is on), "Last 3 runs failed · latest 09:00" when several in a row did, "Last firing skipped"
-with no time, as a skip writes none of its own; none for a schedule that never ran or works now), a pencil that opens its editor page in Settings
+with no time, as a skip writes none of its own, and "Skipped 5 in a row" when several firings were skipped one after the other (item 1401); none for a
+schedule that never ran or works now), a pencil that opens its editor page in Settings
 (`#/settings/schedules/<id>`, item 1337), a play that runs it now (a run as at its time; its next time and its switch stay) and a switch that
 pauses it or puts it on again, which the scheduler reads at its next firing; the head's button opens all the schedules
 (`#/settings/schedules`). A chat with none shows no section. Under the Lineage the Agents tab says who

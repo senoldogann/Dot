@@ -1114,7 +1114,8 @@ class Scheduler:
                 # failure: the firing is skipped, as one under the emergency stop is, and nobody is told of a fault
                 # (item 723). A one-time schedule's is kept as a failure, whose wait spaces its next try.
                 log.info("schedule_skipped_chat_busy", schedule_id=record.id, error=exc.message)
-                await store.set_schedule_status(record.id, f"skipped: {exc.message}")
+                # Counted with the firings skipped in a row (item 1401), so that where the owner looks it says how many.
+                await store.count_schedule_skip(record.id, f"skipped: {exc.message}")
                 return
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
@@ -1139,6 +1140,8 @@ class Scheduler:
             await self._tell_missed(record, missed_status(missed, occurrence, late, zone))
         try:
             await store.mark_schedule_running(record.id, run.id)
+            # The firings skipped in a row are over (item 1401), whether or not the run is still at work.
+            await store.clear_schedule_skips(record.id)
             await record_firing_started(store, record.id)
             # The firing's run does the task: a try of an earlier one waiting for the schedule is dropped (item 1206).
             await supersede_stored(store, record.id)

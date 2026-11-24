@@ -665,6 +665,7 @@ export const TR = {
   "automations.lastFailed": "Son çalışma başarısız · {when}",
   "automations.lastFailedRow": "Son {count} çalışma başarısız · en yenisi {when}",
   "automations.lastSkipped": "Son çalışma atlandı",
+  "automations.lastSkippedRow": "Üst üste {count} çalışma atlandı",
   "automations.started": "Başladı: {name}",
   "automations.unread": "Bu sohbetin zamanlamaları okunamadı: {problem}",
   "loops.region": "Bu sohbetin tekrarları",

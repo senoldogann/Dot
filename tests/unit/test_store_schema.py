@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.core.errors import StoreError
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.store import db
 from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 
@@ -21,7 +22,7 @@ from dotagent.store.db import BEFORE_UPGRADE_DIR, SCHEMA_VERSION, Store
 _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
     2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
-    3: "55d5f864bf810ebc4143a0362e800ead6ed5fbaf4b54d9f32ddd4f3ebaf00067",
+    3: "90f6c3c14079268b1fdb4ea20ec63fa57c7b92ec0b6267350bc40ec04ac9578f",
 }
 
 
@@ -314,6 +315,31 @@ async def test_a_subscription_kept_before_the_phone_column_belongs_to_no_phone_a
         await store.add_push_subscription("https://web.push.apple.com/new", "p", "a", "aaaaaaaaaaaa")
         assert await store.delete_phone_push_subscriptions("aaaaaaaaaaaa") == 1
         assert [s.endpoint for s in await store.list_push_subscriptions()] == ["https://web.push.apple.com/kept"]
+    finally:
+        await store.close()
+    assert _tables_digest(database) == _PINNED[SCHEMA_VERSION]
+
+
+async def test_a_schedule_kept_before_the_skipped_column_has_skipped_none_and_counts_from_there(tmp_path: Path) -> None:
+    """Item 1401: ``schedules.skipped_in_row`` is added at open like any column; a schedule stored before it has skipped
+    none, and the count goes on from 0."""
+    database: Path = tmp_path / "dot.sqlite3"
+    first: Store = await Store.open(database, tmp_path / "images")
+    kept = await first.add_schedule(
+        "report", "*/5 * * * *", None, "Write it.", "task", 100.0, UNSET_OPTIONS, None, True
+    )
+    await first.close()
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        old.execute("ALTER TABLE schedules DROP COLUMN skipped_in_row")
+        old.commit()
+        assert "skipped_in_row" not in [column[1] for column in old.execute("PRAGMA table_info(schedules)")]
+    finally:
+        old.close()
+    store: Store = await Store.open(database, tmp_path / "images")
+    try:
+        assert (await store.get_schedule(kept.id)).skipped_in_row == 0
+        assert await store.count_schedule_skip(kept.id, "skipped: a run is already active on this thread") == 1
     finally:
         await store.close()
     assert _tables_digest(database) == _PINNED[SCHEMA_VERSION]
