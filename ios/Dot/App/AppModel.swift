@@ -183,13 +183,3 @@ final class AppModel {
         }
     }
 }
-
-/// The run id of a route like `#/runs/run_abc` or `/runs/run_abc`, or `nil` for any other route.
-func runId(inRoute route: String) -> String? {
-    let trimmed: String = route.trimmingCharacters(in: CharacterSet(charactersIn: "#/"))
-    let parts: [Substring] = trimmed.split(separator: "/")
-    guard parts.count == 2, parts[0] == "runs", parts[1].allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) else {
-        return nil
-    }
-    return String(parts[1])
-}

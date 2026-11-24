@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1446](1446.md) | done | 2026-11-24 | Foreground quiet: the app draws no banner for the chat the owner is reading |
 | [1445](1445.md) | done | 2026-11-24 | The Live Activity starts by push: the app gives Dot its push-to-start token |
 | [1444](1444.md) | done | 2026-11-24 | The hand-off card: "Dot is waiting for you in the browser on <host>" |
 | [1443](1443.md) | done | 2026-11-24 | "While you were away": what Dot did on its own, as a card at the top of the chat list |

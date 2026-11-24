@@ -192,7 +192,10 @@ code** takes its place. The same by hand:
    (in [the app's calls](#the-iphone-apps-calls) below), a lease that it renews every 25 seconds, and for as long as it
    holds the end of a run, of a schedule's run and of a campaign are not sent to that phone as alerts, while what asks
    something of you (an approval, a question, a secret, a hand-off), a draft, what Dot tells you and its own warnings
-   are sent whatever it says, and so is every Live Activity update. The app sends the lease (item 1440). The app's pushes come in three kinds that each phone switches for itself (item 1421,
+   are sent whatever it says, and so is every Live Activity update. The app sends the lease (item 1440), and agrees with it
+   (item 1446): while it is active and shows a chat, an alert about that chat (a run of it or of its helpers, by the run
+   its route names) is not drawn, whatever kind it is, since an approval or a question of that chat is its own card; an
+   alert about another chat is a banner with its sound, and so is every alert while the app is inactive or shows the list. The app's pushes come in three kinds that each phone switches for itself (item 1421,
    `GET` and `PUT /api/phone/push-settings`): *needs you* (an approval, a question, a secret, a hand-off, and Dot's own
    failures you are to look at: a schedule that did not run or was switched off, learning that stopped, a restart after
    an unexpected stop), *ready* (a draft written for you to send, what Dot tells you on its own) and *done* (a run, a
@@ -555,6 +558,14 @@ to the background, once. A report is one try with an 8-second wait and does not 
 a time with only the newest behind it, so a poor link never piles requests up and `background` is never overtaken by an
 older `foreground`. A report that does not get through is only logged, never shown: the lease ends by itself within 45
 seconds, which is the safe side (the alerts go). An app that is not paired says nothing.
+
+The same moment decides what the app draws (item 1446): while the app is active and shows a chat, an alert about that chat,
+the run its `route` names being one of that chat's runs or its helpers', is handed to iOS with no banner and no sound and
+is not added to the list of alerts (`willPresent` answers none); an alert about another chat is a banner with its sound
+and its place in the list as before, an alert that names no run (a campaign, a schedule, Dot's own message) is drawn too,
+and so is every alert while the app is inactive (a system sheet, the app switcher) or shows the list or Settings. What the
+daemon holds back (the `done` kind's three events) and what the app does not draw (an alert about the chat in front of
+the owner) are one quiet.
 
 Errors: 403 for the Mac's token; 422 for a `state` that is neither `foreground` nor `background`, a `chat` that is empty
 or over 64 characters, a `ttl_s` that is not a number above 0, or any other key (the lease is as it was); 404 for a phone

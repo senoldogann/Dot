@@ -15,7 +15,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
     `PushSettings` (item 1441) the three push switches and what a flip does; `NeedsYou` (item 1442) the inbox's list, its rows
     and what may be answered from them; `Away` (item 1443) what Dot did on its own and the card that says it; `Handoff` (item 1444) the card of a step only the owner can do; `LiveStartToken` (item 1445) when the token that starts the Live
-    Activity is sent.
+    Activity is sent; `ForegroundQuiet` (item 1446) which alerts are not drawn while the owner reads the chat they are about.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -138,6 +138,11 @@ did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app'
   hex of 64 to 512 characters), so that Dot can start the phone's Live Activity by push when a run begins on the Mac or by a
   schedule. `DELETE` goes when the phone's key is forgotten (`AppModel.forgetKey`, before the key is deleted) and when Live
   Activities are switched off for Dot; the activity's own token goes as it did. `DotFleetAttributes` is unchanged.
+- **Foreground quiet** (item 1446): while the app is active and shows a chat, an alert about that chat is not drawn
+  (`willPresent` answers `[]`): `ForegroundQuiet` says so when the run the alert's route names is one of the runs of the chat on
+  the screen or its helpers' (`NativeStore.runIdsOnScreen`); an alert about another chat is a banner with its sound as
+  before, and so is every alert while the app is inactive, shows the list or Settings, or names no run. The same moment
+  is what the lease tells the daemon, so the two agree.
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 

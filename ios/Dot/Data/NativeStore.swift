@@ -352,6 +352,19 @@ final class NativeStore {
     /// The chat on the screen (its thread id), `nil` when the list or Settings is.
     var chatOnScreen: String? { openOrder.last.flatMap { open[$0]?.threadId } }
 
+    /// The runs of the chat on the screen, its own and its helpers' (and the newest one the list names): an alert about one of
+    /// them is about the chat the owner is reading (item 1446). `nil` when no chat is on the screen.
+    func runIdsOnScreen() -> Set<String>? {
+        guard let id: String = chatOnScreen else { return nil }
+        var ids: Set<String> = []
+        if let state: ChatState = warm[id] {
+            ids.formUnion(state.rootRunIds)
+            ids.formUnion(state.helpers.map(\.id))
+        }
+        if let latest: String = threads.first(where: { $0.id == id })?.latestRunId, !latest.isEmpty { ids.insert(latest) }
+        return ids
+    }
+
     /// The scene's phase changed: the lease says so to the daemon at once (item 1440).
     func sceneChanged(_ phase: LeaseScene) { lease.scene(phase) }
 
