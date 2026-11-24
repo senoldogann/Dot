@@ -652,7 +652,8 @@ Reply, 200:
   (`dotagent://run/<run id>`; an alert's own route is `#/runs/<run id>`, as before).
 - `kind`: `approval` (a step a run asks leave for), `question` (`ask_user`), `secret` (`ask_secret`) or `handoff` (a
   step only you can do, which the run waits for or kept for you: see Hand-offs below).
-- `title`: what is asked, on one line of at most 120 characters, with secrets masked; for a `secret` a fixed line, never
+- `title`: what is asked, on one line of at most 120 characters (code points: the cut is made on those, with no mark that it was
+  made), with secrets masked; for a `secret` a fixed line, never
   the card's words, and the list carries **no secret's value** (a request for one has none: it is told by its id and who
   asks); for a `handoff` a fixed line with the host of the page alone (below).
 - `choices` (a `question` that offers options only): the options' labels, in the order the run gave them. `recommended`:
@@ -694,9 +695,10 @@ anything waits, the chat list has one card at its top (the count on a badge, and
 inbox, newest first. Each row says who asks and in which chat, and what: an approval says what Dot wants to do (the line
 taken apart as the chat's card takes it) with **Allow once** and **Deny**; a question shows its options as buttons, the
 recommended one marked, or a field for words when it offers none; both answer through the outbox and the decision route
-above, as the chat's card does. **Allow once is not offered for an approval whose line is 120 characters long**: the
-daemon cuts a title there and says nothing of it, so that line may be the start of a longer one, and the row says to read
-all of it in the chat (Deny stays). **A secret is never answered on the phone**: its row says "Dot needs a secret: enter it
+above, as the chat's card does. **Allow once is not offered for an approval whose line is 120 code points long**: the
+daemon cuts a title there (it counts code points, so a line of combining marks or an emoji sequence is cut at 120 of them
+and reads as fewer characters) and says nothing of it, so that line may be the start of a longer one, and the row says to
+read all of it in the chat (Deny stays). **A secret is never answered on the phone**: its row says "Dot needs a secret: enter it
 on your Mac" and has no field or button that takes a value. A hand-off and a kind the app does not know are answered in
 the chat, which each row opens (`dotagent://run/<run id>`).
 

@@ -2,7 +2,7 @@ import Foundation
 
 /// One thing that waits on the owner (`GET /api/needs-you`, items 1422 and 1423): an approval a run waits for, a question
 /// (`ask_user`), a request for a secret (`ask_secret`) or a hand-off (a step only the owner can do). `id` is the approval's,
-/// which the decision routes take; `title` is the line of what is asked, at most 120 characters (the daemon cuts it there, with
+/// which the decision routes take; `title` is the line of what is asked, at most 120 code points (the daemon cuts it there, with
 /// no mark that it did) and, for a secret and a hand-off, a fixed line that carries nothing of what the step is.
 struct NeedsYouItem: Codable, Equatable, Hashable, Sendable, Identifiable {
     enum Kind: String, Codable, Sendable {
@@ -76,7 +76,7 @@ struct NeedsYouRow: Equatable, Sendable, Identifiable {
     struct Choice: Equatable, Sendable, Identifiable {
         let label: String
         let recommended: Bool
-        /// The place in the list: the run chooses the words, and two options may say the same, so each is its own button.
+        /// The place the run gave the option in its list: the run chooses the words, and two may say the same, so each is its own button.
         let position: Int
         var id: Int { position }
     }
@@ -146,10 +146,11 @@ enum NeedsYouRules {
                 title: tool.isEmpty ? "Dot wants to do this" : presentation.title, command: presentation.command, why: presentation.why,
                 mayAllow: !item.title.isEmpty && item.title.unicodeScalars.count < titleLimit)
         case .question:
-            let labels: [String] = (item.choices ?? []).filter { !$0.isEmpty }
-            return .question(
-                text: item.title,
-                choices: labels.enumerated().map { NeedsYouRow.Choice(label: $1, recommended: $1 == item.recommended, position: $0) })
+            // The place is the one the run gave the option: an empty label is left out and does not move the others.
+            let choices: [NeedsYouRow.Choice] = (item.choices ?? []).enumerated().compactMap { place, label in
+                label.isEmpty ? nil : NeedsYouRow.Choice(label: label, recommended: label == item.recommended, position: place)
+            }
+            return .question(text: item.title, choices: choices)
         case .secret:
             return .secret
         case .handoff:

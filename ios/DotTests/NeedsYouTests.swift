@@ -153,6 +153,15 @@ final class NeedsYouTests: XCTestCase {
         XCTAssertEqual(choices.map(\.recommended), [false, false, true])
     }
 
+    /// The place is the one the run gave the option: an empty label is left out and does not move the others.
+    func testAnEmptyLabelIsLeftOutAndDoesNotMoveThePlaceOfTheOthers() {
+        guard case .question(_, let choices) = row(.question, title: "Which?", choices: ["Yes", "", "No"]).ask else {
+            return XCTFail("a question")
+        }
+        XCTAssertEqual(choices.map(\.label), ["Yes", "No"])
+        XCTAssertEqual(choices.map(\.position), [0, 2], "No keeps the third place the run gave it")
+    }
+
     func testAChoiceIsTheAnswerAsItsLabelAndSkipIsADenial() {
         let question: NeedsYouRow = row(.question, title: "Which?", choices: ["Friday", "Monday"])
         XCTAssertEqual(
