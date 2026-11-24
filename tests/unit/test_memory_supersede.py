@@ -76,7 +76,6 @@ async def _awake(index: MemoryIndex, query: str) -> list[str]:
         ("The daily standup is at 09:00.", "The daily standup is at 10:30."),
         ("Dot's daemon listens on port 8765.", "Dot's daemon listens on port 9120."),
         ("The staging server has 4 CPU cores.", "The staging server has 8 CPU cores."),
-        ("The invoice template is invoice-v1.docx.", "The invoice template is invoice-v2.docx."),
         ("Nordic Pines pays within 14 days.", "Nordic Pines pays within 30 days."),
         ("The team call is on Mondays.", "The team call is now on Wednesdays."),
         ("The user drinks coffee in the morning.", "The user no longer drinks coffee in the morning."),
@@ -97,6 +96,14 @@ def test_the_same_sentence_with_a_value_swapped_or_a_word_of_change_says_the_fac
         ("The staging server has 4 CPU cores.", "The staging server has 16 GB RAM."),
         ("The user has 2 monitors.", "The user has 3 bikes."),
         ("Meeting 1 is at 9.", "Meeting 2 is at 10."),
+        # A number that names a thing, with the rest of the sentence the same: two things of one kind are both true.
+        ("Invoice 1042 is paid.", "Invoice 1043 is paid."),
+        ("Server 1 has 16 GB RAM.", "Server 2 has 16 GB RAM."),
+        ("PR 12 is merged.", "PR 13 is merged."),
+        ("The user's invoice 1042 is paid.", "The user's invoice 1043 is paid."),
+        ("Ticket 12 is assigned to Maria.", "Ticket 13 is assigned to Maria."),
+        # A version after a word that names a thing is left to a subject or the night, not guessed.
+        ("The invoice template is invoice-v1.docx.", "The invoice template is invoice-v2.docx."),
         # Both can be true: a name is no number, and no word says it changed.
         ("The user likes pizza.", "The user likes sushi."),
         ("The user speaks Turkish.", "The user speaks Finnish."),
@@ -263,6 +270,7 @@ async def test_a_note_put_aside_and_forgotten_comes_back_from_the_trash_with_its
 
 def test_a_subject_is_kept_as_lowercase_words_joined_by_hyphens_and_one_without_a_word_is_refused() -> None:
     assert normalize_subject("  User City! ") == "user-city"
+    assert normalize_subject("user_city") == normalize_subject("user-city") == "user-city"
     assert normalize_subject("Kullanıcı Şehri") == "kullanıcı-şehri"
     assert len(normalize_subject("x" * 200)) == 48
     with pytest.raises(InvalidValueError, match="no letter or digit"):

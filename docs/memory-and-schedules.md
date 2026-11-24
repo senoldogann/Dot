@@ -273,8 +273,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   tag off wakes it, and after `forget_after_days` it is only ever proposed to be forgotten. A search and the notes a run starts with
   pass over it, so the run reads the fact as it stands; the answer to the save lists what it replaced. With no subject,
   a save replaces a note close to it (`similar_threshold`, so only with embeddings on) only when its words say the
-  fact changed and nothing else: the same sentence with a number, a time or a version swapped (`at 09:00` and `at
-  10:30`, `port 8765` and `port 9120`) or with a word of change added (`now`, `no longer`, `moved`, `switched`), with at
+  fact changed and nothing else: the same sentence with a number, a time or a version swapped after a word a value follows (`at 09:00` and
+  `at 10:30`, `port 8765` and `port 9120`; not `invoice 1042` and `invoice 1043`, which are two things) or with a word of change added (`now`, `no longer`, `moved`, `switched`), with at
   least three words shared. A cosine alone cannot tell the two apart (measured with `bge-m3`: facts that changed lie at
   0.68 to 0.97, two facts that are both true at 0.68 to 0.84), and no model is asked in the save: a note reworded into
   another sentence, or two values that are names, wait for a subject or for the night, when the reflection asks the
@@ -283,8 +283,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   outside content never replaces one that was not (the answer to the save names the notes it left, and `memory_update`
   proposes the change to you, item 1711). Measured with `dotx eval memory` (42 cases, 34 of facts that changed, the
   three best notes of each search, 2026-11-24): before, the newest fact came first in 2 cases and the outdated note was
-  shown beside it in all 34; now the newest comes first in 26 and the outdated note is shown in 9 (0 of the 18 with a
-  subject; the 9 are notes reworded or whose changed value is a name), and none of the 8 facts that stayed true was put
+  shown beside it in all 34; now the newest comes first in 25 and the outdated note is shown in 10 (0 of the 18 with a
+  subject; the 10 are notes reworded, whose changed value is a name, or a version after a word that names a thing), and none of the 8 facts that stayed true was put
   aside. A store of two or three notes ties the two versions in the search and the older wins the tie, so the first
   count before is a floor, not a rate for a large store; the shown count is not affected.
 - Saving a note close to an existing one (`similar_threshold`) tells the model the notes that remain, which decides
