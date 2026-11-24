@@ -4,12 +4,6 @@ import XCTest
 @testable import Dot
 
 final class LinkStyleTests: XCTestCase {
-    private func components(_ color: Color) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
-        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(color).getRed(&r, green: &g, blue: &b, alpha: &a)
-        return (r, g, b)
-    }
-
     func testABareAddressBecomesAPlainLink() throws {
         let styled: AttributedString = LinkStyle.styled("See https://example.com/report for it")
         let link: AttributedString.Runs.Run = try XCTUnwrap(styled.runs.first { $0.link != nil })
@@ -35,10 +29,12 @@ final class LinkStyleTests: XCTestCase {
         XCTAssertTrue(others.allSatisfy { $0.foregroundColor == nil && $0.backgroundColor == nil && $0.underlineStyle == nil })
     }
 
-    func testTheLinkIsAShadeBrighterThanTheTextAndTiltedToTheAccent() {
-        let link: (r: CGFloat, g: CGFloat, b: CGFloat) = components(Theme.link)
-        XCTAssertGreaterThan(max(link.r, link.g, link.b), CGFloat(Theme.textLevel), "its brightest channel is above the text's")
-        XCTAssertGreaterThan(link.b, link.r, "it leans to the blue of the accent")
+    func testTheLinkIsAShadeBrighterThanTheTextAndTiltedToTheAccentInTheDark() {
+        // The theme's colours follow the appearance: read the link as the dark look draws it.
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(Theme.link).resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark)).getRed(&r, green: &g, blue: &b, alpha: &a)
+        XCTAssertGreaterThan(max(r, g, b), CGFloat(Theme.textLevel), "its brightest channel is above the text's")
+        XCTAssertGreaterThan(b, r, "it leans to the blue of the accent")
         XCTAssertNotEqual(Theme.link, Theme.text)
     }
 

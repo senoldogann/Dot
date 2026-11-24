@@ -8,19 +8,19 @@ struct PendingStatusLine: View {
     let onDiscard: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.m) {
             if send.sending {
                 ProgressView().controlSize(.mini)
-                Text("Sending…").font(.system(size: 12)).foregroundStyle(.secondary)
+                Text("Sending…").font(Theme.meta).foregroundStyle(Theme.faint)
             } else if send.waiting {
-                Image(systemName: "clock").font(.system(size: 11)).foregroundStyle(.secondary)
-                Text("Waiting to send").font(.system(size: 12)).foregroundStyle(.secondary)
-                Button("Retry now", action: onRetry).font(.system(size: 12))
-                Button("Edit", action: onDiscard).font(.system(size: 12))
+                Image(systemName: "clock").font(Theme.meta).foregroundStyle(Theme.faint)
+                Text("Waiting to send").font(Theme.meta).foregroundStyle(Theme.faint)
+                Button("Retry now", action: onRetry).font(Theme.meta.weight(.semibold))
+                Button("Edit", action: onDiscard).font(Theme.meta.weight(.semibold))
             } else {
-                Text(send.note ?? "Not sent").font(.system(size: 12)).foregroundStyle(Color.red).lineLimit(2)
-                Button("Retry", action: onRetry).font(.system(size: 12))
-                Button("Edit", action: onDiscard).font(.system(size: 12))
+                Text(send.note ?? "Not sent").font(Theme.meta).foregroundStyle(Theme.bad).lineLimit(2)
+                Button("Retry", action: onRetry).font(Theme.meta.weight(.semibold))
+                Button("Edit", action: onDiscard).font(Theme.meta.weight(.semibold))
             }
         }
         .accessibilityIdentifier("pending-status")

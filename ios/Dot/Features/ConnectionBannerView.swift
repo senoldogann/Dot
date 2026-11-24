@@ -27,16 +27,17 @@ struct ConnectionBannerView: View {
     }
 
     private func bar(_ banner: ConnectionBanner) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon(banner.kind)).font(.system(size: 11, weight: .medium))
-            Text(banner.text).font(.system(size: 12)).lineLimit(1).minimumScaleFactor(0.85)
-            Spacer(minLength: 0)
+        let refused: Bool = banner.kind == .unauthorized
+        return HStack(spacing: Space.s) {
+            Image(systemName: icon(banner.kind)).font(.system(size: 12, weight: .semibold))
+                .symbolEffect(.pulse, options: .repeating, isActive: banner.kind == .reconnecting)
+            Text(banner.text).font(Theme.meta.weight(.medium)).lineLimit(1).minimumScaleFactor(0.85)
         }
-        .foregroundStyle(banner.kind == .unauthorized ? Color.orange : Color.secondary)
-        .padding(.horizontal, 16)
-        .frame(height: 26)
+        .foregroundStyle(refused ? Theme.warn : Theme.text)
+        .padding(.horizontal, Space.m).frame(minHeight: 30)
+        .dotGlass(in: Capsule(), tint: refused ? Theme.warn.opacity(0.22) : nil)
+        .padding(.top, Space.xs)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.06))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("connection-banner")
     }

@@ -6,6 +6,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1382](1382.md) | done | 2026-11-23 | Dot for iPhone: an app icon, a launch screen and a Live Activity on the app's own tokens |
+| [1381](1381.md) | done | 2026-11-23 | Dot for iPhone: every screen redrawn on the design system, row by row |
+| [1380](1380.md) | done | 2026-11-23 | Dot for iPhone: a design system (tokens, glass, type, motion, haptics) and the audit that asked for it |
 | [1371](1371.md) | done as a simulator-tested slice | 2026-11-23 | Dot for iPhone works on the worst network: it draws what it holds first, reads together and tries again, keeps what the owner did with no link and sends it once, and says when it is offline |
 | [1370](1370.md) | done | 2026-11-23 | `GET /api/runs/{id}/events` takes `tail`, so a client that was away through a long run reads the end of it |
 | [1367](1367.md) | done | 2026-11-23 | The Claude plan's models are those Claude Code lists, not a list written into Dot |

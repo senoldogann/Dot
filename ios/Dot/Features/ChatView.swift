@@ -1,8 +1,9 @@
 import PhotosUI
 import SwiftUI
 
-/// A chat: the transcript in one scroller (it keeps to the bottom only while the reader is at the bottom), and under
-/// it, outside the scroller, the queue, the one line of the run's status and the composer.
+/// A chat: the transcript in one scroller (it keeps to the bottom only while the reader is at the bottom), and over its
+/// foot, floating on glass, the queue, the one line of the run's status and the composer. The transcript runs under
+/// them, softened at its edge, so that nothing is cut off by a bar.
 struct ChatView: View {
     let store: NativeStore
     let thread: ThreadSummary
@@ -25,77 +26,89 @@ struct ChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Transcript(
-                model: model, atBottom: $atBottom, onTool: { toolRow = $0 }, onSelect: { selecting = $0 },
-                onEdit: { editing = $0 })
-            VStack(spacing: 0) {
-                    if let notice: String = model.notice {
-                        Button { model.clearNotice() } label: {
-                            Text(notice).font(Theme.meta).foregroundStyle(Theme.warn).padding(.vertical, 6).frame(maxWidth: .infinity)
-                        }
+        Transcript(
+            model: model, atBottom: $atBottom, onTool: { toolRow = $0 }, onSelect: { selecting = $0 },
+            onEdit: { editing = $0 }
+        )
+        .dotScrollEdges()
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: Space.s) {
+                if let notice: String = model.notice {
+                    Button { model.clearNotice() } label: {
+                        Label(notice, systemImage: "info.circle")
+                            .font(Theme.meta).foregroundStyle(Theme.warn)
+                            .padding(.horizontal, Space.m).frame(minHeight: 32)
                     }
-                    QueuePanel(model: model)
-                    StatusLine(model: model, onDetails: { showsInspector = true })
-                    Composer(model: model)
+                    .buttonStyle(.plain)
+                    .dotGlass(in: Capsule(), tint: Theme.warn.opacity(0.2))
+                }
+                QueuePanel(model: model).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                StatusLine(model: model, onDetails: { showsInspector = true }).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                Composer(model: model).dynamicTypeSize(...DynamicTypeSize.accessibility2)
             }
-            .background(Theme.background)
-            .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+            .padding(.horizontal, Space.s + 2)
+            .padding(.bottom, Space.xs)
+            .padding(.top, Space.xs)
+            .dotAnimation(Motion.snappy, value: model.queue.messages.count)
         }
-            .background(Theme.background)
-            .navigationTitle(model.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showsInspector = true } label: { Image(systemName: "sidebar.right") }
-                        .accessibilityLabel("Run details")
-                }
+        .dotScreenBackground()
+        .navigationTitle(model.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .dotSubtitle(subtitle)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showsInspector = true } label: { Image(systemName: "info.circle") }
+                    .accessibilityLabel("Run details")
             }
-            .sheet(isPresented: $showsInspector) {
-                RunInspector(
-                    model: model, onModels: { showsInspector = false; showsModels = true }, onExpand: { detent = .large })
-                    .tint(Theme.accent)
-                    .preferredColorScheme(.dark)
-                    .presentationDetents([.medium, .large], selection: $detent)
-                    .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $showsInspector) {
+            RunInspector(
+                model: model, onModels: { showsInspector = false; showsModels = true }, onExpand: { detent = .large }
+            )
+            .dotSheet()
+            .presentationDetents([.medium, .large], selection: $detent)
+        }
+        .sheet(isPresented: $showsModels) {
+            NavigationStack { ModelsView(store: store) }
+                .dotSheet()
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $toolRow) { row in
+            ToolDetailSheet(model: model, row: row)
+                .dotSheet()
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: Binding(get: { selecting != nil }, set: { if !$0 { selecting = nil } })) {
+            SelectTextSheet(text: selecting ?? "")
+                .dotSheet()
+                .presentationDetents([.medium, .large])
+        }
+        .confirmationDialog(
+            "Edit from here?", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Edit from here", role: .destructive) {
+                if let item: ChatItem = editing { model.editFromHere(item) }
+                editing = nil
             }
-            .sheet(isPresented: $showsModels) {
-                NavigationStack { ModelsView(store: store) }
-                    .tint(Theme.accent)
-                    .preferredColorScheme(.dark)
-                    .presentationDetents([.medium, .large])
-                    .presentationBackground(Theme.background)
-            }
-            .sheet(item: $toolRow) { row in
-                ToolDetailSheet(model: model, row: row)
-                    .tint(Theme.accent)
-                    .preferredColorScheme(.dark)
-                    .presentationDetents([.medium, .large])
-                    .presentationBackground(Theme.background)
-            }
-            .sheet(isPresented: Binding(get: { selecting != nil }, set: { if !$0 { selecting = nil } })) {
-                SelectTextSheet(text: selecting ?? "")
-                    .tint(Theme.accent)
-                    .preferredColorScheme(.dark)
-                    .presentationDetents([.medium, .large])
-                    .presentationBackground(Theme.background)
-            }
-            .confirmationDialog(
-                "Edit from here?", isPresented: Binding(get: { editing != nil }, set: { if !$0 { editing = nil } }),
-                titleVisibility: .visible
-            ) {
-                Button("Edit from here", role: .destructive) {
-                    if let item: ChatItem = editing { model.editFromHere(item) }
-                    editing = nil
-                }
-                Button("Cancel", role: .cancel) { editing = nil }
-            } message: {
-                Text("The messages after this one are taken out of the chat. The files they changed stay as they are.")
-            }
-            .onChange(of: model.leaves) { if model.leaves { dismiss() } }
-            .task { model.start() }
-            .onDisappear { model.stop() }
+            Button("Cancel", role: .cancel) { editing = nil }
+        } message: {
+            Text("The messages after this one are taken out of the chat. The files they changed stay as they are.")
+        }
+        .onChange(of: model.leaves) { if model.leaves { dismiss() } }
+        .task { model.start() }
+        .onDisappear { model.stop() }
+    }
+
+    /// The line under the title (iOS 26): how the run stands.
+    private var subtitle: String {
+        switch model.state.line {
+        case .idle: ""
+        case .working: "Working"
+        case .waitingOnYou: "Waiting on you"
+        case .waitingOnSubagents(let count, _): "Waiting on \(count) subagent\(count == 1 ? "" : "s")"
+        case .helpersInBackground(let count): "\(count) subagent\(count == 1 ? "" : "s") in the background"
+        }
     }
 }
 
@@ -125,35 +138,41 @@ private struct Transcript: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    if model.state.items.isEmpty && model.pending.isEmpty {
-                        Text(model.loaded ? "No messages yet." : "")
-                            .font(Theme.small).foregroundStyle(Theme.faint).frame(maxWidth: .infinity).padding(.top, 40)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if model.state.items.isEmpty && model.pending.isEmpty && model.loaded {
+                        DotEmptyState(
+                            symbol: "text.bubble", title: "No messages yet",
+                            message: "Say what you want done. Dot works on it and asks you only when it must.")
+                            .padding(.top, Space.xxl)
                     }
                     if model.hasOlder {
                         OlderRow(model: model).onAppear { if readerScrolled { model.loadOlder() } }
                     }
-                    ForEach(model.state.items) { item in
+                    ForEach(Array(model.state.items.enumerated()), id: \.element.id) { index, item in
                         MessageRow(
                             model: model, item: item, onTool: onTool, onSelect: onSelect, onEdit: onEdit,
-                            onDecide: { card, approve, note in model.decide(card, approve: approve, note: note) })
-                            .id(item.id)
+                            onDecide: { card, approve, note in model.decide(card, approve: approve, note: note) }
+                        )
+                        .padding(.top, index == 0 ? 0 : Self.gap(after: model.state.items[index - 1], before: item))
+                        .id(item.id)
                     }
                     ForEach(model.pending) { send in
                         PendingRow(send: send, onRetry: { model.retry(send) }, onDiscard: { model.discard(send) })
+                            .padding(.top, 20)
                             .id(send.id)
                     }
                     Color.clear.frame(height: 1).id(bottomId)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.horizontal, Space.l)
+                .padding(.vertical, Space.m)
                 // A short chat sits at the bottom, by the composer, as a long one ends there.
                 .frame(minHeight: viewport, alignment: .bottom)
             }
             .scrollDismissesKeyboard(.interactively)
             .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
                 // The distance left to scroll down: what the content has beyond the visible container, less what is
-                // already scrolled (the offset is measured from the top inset).
+                // already scrolled (the offset is measured from the top inset), and the inset at the foot (the
+                // composer floats over it) is not a distance the reader has to scroll.
                 ScrollMetrics(
                     fromBottom: (geometry.contentSize.height - geometry.containerSize.height
                         - (geometry.contentOffset.y + geometry.contentInsets.top)).rounded(),
@@ -185,22 +204,30 @@ private struct Transcript: View {
             }
             .onAppear { settle(proxy) }
             .overlay(alignment: .bottomTrailing) {
-                if !atBottom {
-                    Button {
-                        atBottom = true
-                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(bottomId, anchor: .bottom) }
-                    } label: {
-                        Image(systemName: "arrow.down")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.text)
-                            .frame(width: 32, height: 32)
-                            .background(Theme.raised, in: Circle())
-                            .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
+                ZStack {
+                    if !atBottom {
+                        GlassCircleButton(symbol: "arrow.down", label: "Jump to the newest message") {
+                            atBottom = true
+                            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(bottomId, anchor: .bottom) }
+                        }
+                        .padding(Space.m)
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
                     }
-                    .padding(12)
-                    .accessibilityLabel("Jump to the newest message")
                 }
+                .dotAnimation(Motion.bouncy, value: atBottom)
             }
+        }
+    }
+
+    /// The space above a row: steps sit close together, the owner's message stands apart, everything else is one
+    /// paragraph's distance from the row above.
+    private static func gap(after previous: ChatItem, before item: ChatItem) -> CGFloat {
+        func isTool(_ item: ChatItem) -> Bool { if case .tool = item.kind { return true } else { return false } }
+        switch item.kind {
+        case .user: return 24
+        case .tool: return isTool(previous) ? 0 : 10
+        case .note: return 10
+        default: return isTool(previous) ? 12 : 16
         }
     }
 
@@ -232,96 +259,125 @@ private struct Transcript: View {
     }
 }
 
+/// A message that was sent and is not yet in the chat: the owner's box, dimmed, and what to do when it did not go.
 private struct PendingRow: View {
     let send: PendingSend
     let onRetry: () -> Void
     let onDiscard: () -> Void
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 4) {
+        VStack(alignment: .trailing, spacing: Space.xs) {
             HStack(spacing: 0) {
-                Spacer(minLength: 56)
+                Spacer(minLength: 48)
                 Text(send.shown)
-                    .font(Theme.body).foregroundStyle(Theme.text.opacity(0.6))
-                    .padding(.horizontal, 12).padding(.vertical, 9)
-                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
+                    .font(Theme.body).foregroundStyle(Theme.text.opacity(0.62))
+                    .padding(.horizontal, Space.l).padding(.vertical, Space.m - 1)
+                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Radius.l + 2))
             }
             PendingStatusLine(send: send, onRetry: onRetry, onDiscard: onDiscard)
         }
     }
 }
 
-/// The one line over the composer: how long the run has worked, that it waits for the owner, or that it waits for its
-/// subagents (with what the first does now). It stands outside the transcript, so it never scrolls with it.
+/// The one line over the composer, on glass: how long the run has worked, that it waits for the owner, or that it waits
+/// for its subagents (with what the first does now). It stands outside the transcript, so it never scrolls with it.
 struct StatusLine: View {
     let model: ChatModel
     let onDetails: () -> Void
 
     var body: some View {
-        switch model.state.line {
-        case .idle:
-            if case .reconnecting(_, let unauthorized) = model.connection {
-                line(
-                    icon: unauthorized ? "key" : "arrow.triangle.2.circlepath",
-                    text: unauthorized ? "This phone's key was refused. Pair again in Settings." : "Reconnecting…",
-                    tone: unauthorized ? Theme.warn : Theme.faint)
-            }
-        case .working(let since):
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.mini).tint(Theme.accent)
-                if let since {
-                    TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Text("Working · \(elapsed(since, now: context.date))").font(Theme.meta).foregroundStyle(Theme.muted)
+        Group {
+            switch model.state.line {
+            case .idle:
+                if case .reconnecting(_, let unauthorized) = model.connection {
+                    pill(
+                        symbol: unauthorized ? "key" : "arrow.triangle.2.circlepath",
+                        text: unauthorized ? "This phone's key was refused. Pair again in Settings." : "Reconnecting…",
+                        tone: unauthorized ? Theme.warn : Theme.muted, tint: unauthorized ? Theme.warn.opacity(0.2) : nil)
+                }
+            case .working(let since):
+                workingPill(since: since)
+            case .waitingOnYou(let count):
+                pill(
+                    symbol: "bell.fill", text: count == 1 ? "Waiting on you" : "Waiting on you · \(count)", tone: Theme.warn,
+                    tint: Theme.warn.opacity(0.22), bounce: true)
+            case .helpersInBackground(let count):
+                HStack(spacing: Space.s) {
+                    Image(systemName: "circle.dashed").font(.system(size: 12)).foregroundStyle(Theme.muted)
+                    Text(count == 1 ? "1 subagent keeps working in the background" : "\(count) subagents keep working in the background")
+                        .font(Theme.meta).foregroundStyle(Theme.muted).lineLimit(2)
+                    Spacer(minLength: Space.xs)
+                    Button("Details", action: onDetails).font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.accent)
+                }
+                .padding(.horizontal, Space.m).frame(minHeight: 36)
+                .dotGlass(in: RoundedRectangle(cornerRadius: Radius.l))
+            case .waitingOnSubagents(let count, let now):
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Space.s) {
+                        Image(systemName: "circle.dashed").font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent)
+                            .symbolEffect(.pulse, options: .repeating)
+                        Text(count == 1 ? "Waiting on 1 subagent" : "Waiting on \(count) subagents")
+                            .font(Theme.small.weight(.semibold)).foregroundStyle(Theme.text)
+                        Spacer(minLength: Space.xs)
+                        Button("Details", action: onDetails).font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.accent)
+                            .frame(minHeight: 32)
+                        Button("Stop") { model.stopRun() }.font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.muted)
+                            .frame(minHeight: 32)
                     }
-                } else {
-                    Text("Working").font(Theme.meta).foregroundStyle(Theme.muted)
+                    if let now {
+                        Text(now).font(Theme.meta).foregroundStyle(Theme.muted).lineLimit(1).padding(.leading, 21)
+                    }
                 }
-                Spacer()
-                reconnecting
+                .padding(.horizontal, Space.m).padding(.vertical, Space.s)
+                .dotGlass(in: RoundedRectangle(cornerRadius: Radius.l))
             }
-            .padding(.horizontal, 16).frame(height: 28)
-        case .waitingOnYou(let count):
-            line(icon: "bell", text: count == 1 ? "Waiting on you" : "Waiting on you · \(count)", tone: Theme.warn)
-        case .helpersInBackground(let count):
-            HStack(spacing: 8) {
-                Image(systemName: "circle.dashed").font(.system(size: 11)).foregroundStyle(Theme.faint)
-                Text(count == 1 ? "1 subagent keeps working in the background" : "\(count) subagents keep working in the background")
-                    .font(Theme.meta).foregroundStyle(Theme.muted)
-                Spacer()
-                Button("Details", action: onDetails).font(Theme.meta).foregroundStyle(Theme.muted)
-            }
-            .padding(.horizontal, 16).frame(height: 28)
-        case .waitingOnSubagents(let count, let now):
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 8) {
-                    Image(systemName: "circle.dashed").font(.system(size: 11)).foregroundStyle(Theme.accent)
-                    Text(count == 1 ? "Waiting on 1 subagent" : "Waiting on \(count) subagents")
-                        .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.text)
-                    Spacer()
-                    Button("Details", action: onDetails).font(Theme.meta).foregroundStyle(Theme.muted)
-                    Button("Stop") { model.stopRun() }.font(Theme.meta).foregroundStyle(Theme.muted)
-                }
-                if let now {
-                    Text(now).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(1).padding(.leading, 19)
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dotAnimation(Motion.snappy, value: lineKey)
+    }
+
+    private var lineKey: String {
+        switch model.state.line {
+        case .idle: "idle"
+        case .working: "working"
+        case .waitingOnYou(let count): "waiting\(count)"
+        case .waitingOnSubagents(let count, _): "subagents\(count)"
+        case .helpersInBackground(let count): "background\(count)"
         }
     }
 
-    @ViewBuilder private var reconnecting: some View {
-        if case .reconnecting = model.connection {
-            Text("Reconnecting…").font(Theme.meta).foregroundStyle(Theme.faint)
+    private func workingPill(since: Double?) -> some View {
+        HStack(spacing: Space.s) {
+            Image(systemName: "waveform")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.accent)
+                .symbolEffect(.variableColor.iterative.reversing, options: .repeating)
+            if let since {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text("Working · \(elapsed(since, now: context.date))")
+                        .font(Theme.meta.weight(.medium).monospacedDigit()).foregroundStyle(Theme.text)
+                }
+            } else {
+                Text("Working").font(Theme.meta.weight(.medium)).foregroundStyle(Theme.text)
+            }
+            if case .reconnecting = model.connection {
+                Text("· Reconnecting…").font(Theme.meta).foregroundStyle(Theme.muted)
+            }
         }
+        .padding(.horizontal, Space.m).frame(minHeight: 32)
+        .dotGlass(in: Capsule())
+        .accessibilityElement(children: .combine)
     }
 
-    private func line(icon: String, text: String, tone: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon).font(.system(size: 11)).foregroundStyle(tone)
-            Text(text).font(Theme.meta).foregroundStyle(tone)
-            Spacer()
+    private func pill(symbol: String, text: String, tone: Color, tint: Color? = nil, bounce: Bool = false) -> some View {
+        HStack(spacing: Space.s) {
+            Image(systemName: symbol).font(.system(size: 12, weight: .semibold)).foregroundStyle(tone)
+                .symbolEffect(.bounce, options: .repeat(2), isActive: bounce)
+            Text(text).font(Theme.meta.weight(.medium)).foregroundStyle(tone == Theme.muted ? Theme.text : tone)
         }
-        .padding(.horizontal, 16).frame(height: 28)
+        .padding(.horizontal, Space.m).frame(minHeight: 32)
+        .dotGlass(in: Capsule(), tint: tint)
+        .accessibilityElement(children: .combine)
     }
 
     private func elapsed(_ since: Double, now: Date) -> String {
@@ -330,8 +386,8 @@ struct StatusLine: View {
     }
 }
 
-/// The queue: each message waiting to run, with an up and a down arrow to move it and a button to remove it. There is
-/// no drag.
+/// The queue, on glass: each message waiting to run, numbered, with an up and a down arrow to move it and a button to
+/// remove it. There is no drag.
 struct QueuePanel: View {
     let model: ChatModel
 
@@ -339,103 +395,126 @@ struct QueuePanel: View {
         let messages: [QueuedMessage] = model.queue.messages
         if !messages.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
-                Text(model.queue.held ? "Queued · paused" : "Queued · \(messages.count)")
-                    .font(Theme.tiny).foregroundStyle(Theme.faint)
-                    .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 2)
+                Label(model.queue.held ? "Queued · paused" : "Queued · \(messages.count)", systemImage: model.queue.held ? "pause.circle" : "list.number")
+                    .font(Theme.meta.weight(.semibold)).foregroundStyle(Theme.muted)
+                    .padding(.horizontal, Space.m).padding(.top, Space.s + 2).padding(.bottom, 2)
                 ForEach(Array(messages.enumerated()), id: \.element.id) { index, message in
-                    HStack(spacing: 4) {
-                        Text(message.text).font(Theme.small).foregroundStyle(Theme.muted).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 2) {
+                        Text("\(index + 1)").font(Theme.meta.monospacedDigit()).foregroundStyle(Theme.faint).frame(width: 18)
+                        Text(message.text).font(Theme.small).foregroundStyle(Theme.text).lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         arrow("chevron.up", label: "Move up", enabled: index > 0) { model.moveQueued(message.id, by: -1) }
                         arrow("chevron.down", label: "Move down", enabled: index < messages.count - 1) { model.moveQueued(message.id, by: 1) }
                         arrow("xmark", label: "Remove", enabled: true) { model.removeQueued(message.id) }
                     }
-                    .padding(.leading, 16).padding(.trailing, 6)
+                    .padding(.leading, Space.m).padding(.trailing, 2)
                 }
             }
-            .padding(.bottom, 4)
+            .padding(.bottom, Space.xs)
+            .dotGlass(in: RoundedRectangle(cornerRadius: Radius.xl - 2))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .sensoryFeedback(.selection, trigger: messages.map(\.id))
         }
     }
 
     private func arrow(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(enabled ? Theme.muted : Theme.faint.opacity(0.4))
-                .frame(width: 36, height: 34)
+                .foregroundStyle(enabled ? Theme.muted : Theme.faint.opacity(0.45))
+                .frame(width: 40, height: 40)
                 .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(!enabled)
         .accessibilityLabel(label)
     }
 }
 
-/// The composer: + (a photo), the text, the microphone (dictation on the phone), and Send. While a run works, Send queues the message,
-/// and with the box empty the button is Stop.
+/// The composer, one floating bar of glass: + (a photo), the text, the microphone (dictation on the phone), and a
+/// button that is Send, or Queue while a run works, or Stop with an empty box. The button changes by morphing its symbol.
 struct Composer: View {
     @Bindable var model: ChatModel
     @State private var picks: [PhotosPickerItem] = []
+    @State private var sent: Int = 0
+    @State private var stopped: Int = 0
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Space.s) {
             DictationLine(dictation: model.dictation)
             if !model.images.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.s) {
                         ForEach(model.images) { image in
                             Image(uiImage: image.preview).resizable().scaledToFill().frame(width: 52, height: 52)
-                                .clipShape(RoundedRectangle(cornerRadius: Theme.radius))
+                                .clipShape(RoundedRectangle(cornerRadius: Radius.m - 2))
                         }
-                    }.padding(.horizontal, 16)
+                    }
+                    .padding(.horizontal, Space.m)
                 }
             }
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 2) {
                 PhotosPicker(selection: $picks, maxSelectionCount: 4, matching: .images) {
-                    Image(systemName: "plus").font(.system(size: 16, weight: .medium)).foregroundStyle(Theme.muted)
-                        .frame(width: 36, height: 36)
+                    Image(systemName: "plus").font(.system(size: 17, weight: .medium)).foregroundStyle(Theme.muted)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Attach a photo")
                 TextField(model.isWorking ? "Queue a message" : "Message Dot", text: $model.draft, axis: .vertical)
                     .font(Theme.body)
                     .lineLimit(1...6)
                     .focused($focused)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.radius))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
+                    .padding(.vertical, Space.m - 1)
+                    .frame(minHeight: 44)
                     .accessibilityIdentifier("composer-field")
                 MicButton(dictation: model.dictation) { model.toggleDictation() }
-                sendButton
+                actionButton
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, Space.xs)
         }
-        .padding(.vertical, 8)
+        .padding(.top, model.images.isEmpty && !model.dictation.state.isActive ? 0 : Space.s)
+        .dotGlass(in: RoundedRectangle(cornerRadius: Radius.xl + 2), interactive: false)
         .onChange(of: model.draft) { model.draftChanged() }
         .onChange(of: picks) {
             let chosen: [PhotosPickerItem] = picks
             picks = []
             Task { await model.pick(chosen) }
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: sent)
+        .sensoryFeedback(.impact(weight: .medium), trigger: stopped)
     }
 
-    @ViewBuilder private var sendButton: some View {
-        if model.isWorking && !model.canSend {
-            Button { model.stopRun() } label: {
-                Image(systemName: "stop.fill").font(.system(size: 13)).foregroundStyle(Theme.text)
-                    .frame(width: 36, height: 36)
-                    .background(Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
-                    .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
+    private var showsStop: Bool { model.isWorking && !model.canSend }
+
+    /// One round button for all three: the arrow, the queue mark, the stop square. Its symbol is replaced in place.
+    private var actionButton: some View {
+        Button {
+            if showsStop {
+                stopped += 1
+                model.stopRun()
+            } else if model.canSend {
+                sent += 1
+                model.send()
             }
-            .accessibilityLabel("Stop")
-        } else {
-            Button { model.send() } label: {
-                Image(systemName: model.isWorking ? "text.append" : "arrow.up").font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(model.canSend ? Color.black.opacity(0.9) : Theme.faint)
-                    .frame(width: 36, height: 36)
-                    .background(model.canSend ? Theme.accent : Theme.raised, in: RoundedRectangle(cornerRadius: Theme.radius))
-            }
-            .disabled(!model.canSend)
-            .accessibilityIdentifier("send")
-            .accessibilityLabel(model.isWorking ? "Queue" : "Send")
+        } label: {
+            Image(systemName: showsStop ? "stop.fill" : (model.isWorking ? "text.append" : "arrow.up"))
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(showsStop ? Theme.background : (model.canSend ? Theme.onAccent : Theme.faint))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 36, height: 36)
+                .background {
+                    Circle().fill(
+                        showsStop ? AnyShapeStyle(Theme.text) : (model.canSend ? AnyShapeStyle(Theme.accentGradient) : AnyShapeStyle(Theme.faint.opacity(0.16))))
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
+        .buttonStyle(.plain)
+        .disabled(!showsStop && !model.canSend)
+        .accessibilityIdentifier(showsStop ? "stop" : "send")
+        .accessibilityLabel(showsStop ? "Stop" : (model.isWorking ? "Queue" : "Send"))
+        .dotAnimation(Motion.snappy, value: showsStop)
+        .dotAnimation(Motion.snappy, value: model.canSend)
     }
 }
 
@@ -451,14 +530,20 @@ private struct OlderRow: View {
                 ProgressView().controlSize(.small).tint(Theme.muted)
             } else {
                 Button { model.loadOlder() } label: {
-                    Text(model.olderFailed ? "Could not read older messages. Tap to try again." : "Load older messages")
+                    Label(
+                        model.olderFailed ? "Could not read older messages. Tap to try again." : "Load older messages",
+                        systemImage: model.olderFailed ? "exclamationmark.circle" : "arrow.up.to.line")
                         .font(Theme.meta).foregroundStyle(model.olderFailed ? Theme.warn : Theme.muted)
+                        .padding(.horizontal, Space.m).frame(minHeight: 32)
+                        .background(Theme.surface, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("load-older")
             }
             Spacer()
         }
-        .frame(height: 30)
+        .frame(minHeight: 44)
     }
 }
 
@@ -474,14 +559,15 @@ private struct MessageRow: View {
 
     var body: some View {
         let standing: [String] = MessageActions.standing(on: item, among: model.reactions)
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Space.xs) {
             ChatRow(item: item, onDecide: onDecide, onTool: onTool)
             if !standing.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(standing, id: \.self) { name in
-                        Text(Reaction.symbol(of: name)).font(.system(size: 12))
-                            .padding(.horizontal, 6).frame(height: 22)
-                            .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.hairline, lineWidth: 1))
+                        Text(Reaction.symbol(of: name)).font(.footnote)
+                            .padding(.horizontal, Space.s).frame(minHeight: 26)
+                            .background(Theme.raised, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
                     }
                 }
                 .accessibilityIdentifier("reactions")
@@ -534,10 +620,10 @@ private struct SelectTextSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                Text(text).font(Theme.body).foregroundStyle(Theme.text).textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                Text(text).font(Theme.body).foregroundStyle(Theme.text).textSelection(.enabled).lineSpacing(4)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(Space.l)
             }
-            .background(Theme.background)
+            .dotScreenBackground(inSheet: true)
             .navigationTitle("Select text")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -556,18 +642,25 @@ private struct ToolDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 8) {
-                        Image(systemName: icon).font(.system(size: 11, weight: .bold)).foregroundStyle(tone)
-                        Text(row.tool.replacingOccurrences(of: "_", with: " ").capitalizedFirst)
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text)
+                VStack(alignment: .leading, spacing: Space.l) {
+                    HStack(spacing: Space.m) {
+                        Image(systemName: ToolGlyph.symbol(for: row.tool))
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(tone)
+                            .frame(width: 36, height: 36)
+                            .background(tone.opacity(0.14), in: Circle())
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(row.tool.replacingOccurrences(of: "_", with: " ").capitalizedFirst)
+                                .font(.headline).foregroundStyle(Theme.text)
+                            Text(stateWords).font(Theme.meta).foregroundStyle(row.state == .failed ? Theme.bad : Theme.faint)
+                        }
                         Spacer()
                         if let seconds: Double = detail?.seconds {
-                            Text(seconds < 10 ? String(format: "%.1f s", seconds) : "\(Int(seconds)) s").font(Theme.meta).foregroundStyle(Theme.faint)
+                            Text(seconds < 10 ? String(format: "%.1f s", seconds) : "\(Int(seconds)) s")
+                                .font(Theme.meta.monospacedDigit()).foregroundStyle(Theme.faint)
                         }
                     }
                     if let target: String = detail?.target {
-                        Text(target).font(Theme.meta).foregroundStyle(Theme.faint).lineLimit(2)
+                        Text(target).font(Theme.mono).foregroundStyle(Theme.muted).lineLimit(3)
                     }
                     if let detail {
                         block("Arguments", clip: detail.arguments, empty: "No arguments.")
@@ -578,16 +671,18 @@ private struct ToolDetailSheet: View {
                                 .font(Theme.small).foregroundStyle(Theme.faint)
                         }
                     } else if failed {
-                        Text("Dot could not be reached.").font(Theme.small).foregroundStyle(Theme.warn)
-                        Button("Try again") { Task { await load() } }.buttonStyle(QuietButtonStyle())
+                        DotEmptyState(
+                            symbol: "wifi.exclamationmark", title: "Dot could not be reached",
+                            message: "The step's detail is read from your Mac.", tone: Theme.warn, actionTitle: "Try again",
+                            action: { Task { await load() } })
                     } else {
                         ProgressView().controlSize(.small).tint(Theme.muted)
                     }
                 }
-                .padding(16)
+                .padding(Space.l)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .background(Theme.background)
+            .dotScreenBackground(inSheet: true)
             .navigationTitle("Step")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -605,14 +700,14 @@ private struct ToolDetailSheet: View {
     }
 
     private func block(_ title: String, clip: Clipped, empty: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(Theme.tiny).foregroundStyle(Theme.faint)
+        VStack(alignment: .leading, spacing: Space.s - 2) {
+            SectionLabel(title: title)
             Text(clip.text.isEmpty ? empty : clip.text)
                 .font(Theme.mono).foregroundStyle(clip.text.isEmpty ? Theme.faint : Theme.text)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
-                .card(fill: Theme.surface)
+                .padding(Space.m)
+                .card(fill: Theme.codeFill)
             if clip.isCut {
                 Text("\(clip.omitted) more characters are not shown. The web UI shows the whole step.")
                     .font(Theme.meta).foregroundStyle(Theme.faint)
@@ -620,13 +715,13 @@ private struct ToolDetailSheet: View {
         }
     }
 
-    private var icon: String {
+    private var stateWords: String {
         switch row.state {
-        case .running: "ellipsis"
-        case .ok: "checkmark"
-        case .failed: "xmark"
+        case .running: "Running"
+        case .ok: "Done"
+        case .failed: "Failed"
         }
     }
 
-    private var tone: Color { row.state == .failed ? Theme.bad : Theme.muted }
+    private var tone: Color { row.state == .failed ? Theme.bad : (row.state == .running ? Theme.accent : Theme.muted) }
 }
