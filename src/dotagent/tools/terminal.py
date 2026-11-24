@@ -23,7 +23,7 @@ from typing import Annotated, NoReturn
 
 from pydantic import Field, JsonValue
 
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import ToolInputError, ToolSteer
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolSpec
@@ -180,7 +180,7 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         if args.background:
             run: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
             if tells_no_chat(run):
-                raise ToolInputError(
+                raise ToolSteer(
                     "A command in the background is told to its chat when it ends, and a delegated run or a "
                     "campaign's session has none: run it with shell, or in a terminal session you read.",
                     {"run_id": run.id, "parent_run_id": run.parent_run_id, "campaign_id": run.campaign_id},

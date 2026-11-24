@@ -43,7 +43,9 @@ class ToolResult(FrozenModel):
     application shows on the screen): the run counts it as untrusted input from then on.
 
     ``images`` are what a model is shown. ``shown_images``, when set, are what is kept for the owner instead: a
-    browser screenshot whose model picture carries ref marks and whose kept picture does not."""
+    browser screenshot whose model picture carries ref marks and whose kept picture does not. ``steered`` marks an
+    error result that is Dot's rule turning the call another way (:class:`dotagent.core.errors.ToolSteer`, item 1722),
+    not a failure."""
 
     text: str
     images: tuple[ImageData, ...]
@@ -52,6 +54,7 @@ class ToolResult(FrozenModel):
     shown_images: tuple[ImageData, ...] = ()
     # What the steps of an act call came to, counted (item 1744): ``None`` for every other call.
     tally: StepTally | None = None
+    steered: bool = False
 
 
 def ok(text: str) -> ToolResult:

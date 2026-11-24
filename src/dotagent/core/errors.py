@@ -130,6 +130,13 @@ class ToolInputError(DotError):
     """The model supplied arguments that do not satisfy the tool schema."""
 
 
+class ToolSteer(ToolInputError):
+    """A call Dot's own rule turns to another way, not a failure (item 1722): a background command in a run that has no
+    chat to tell when it ends, a delegation or a new agent while the team may have an agent for it. The model reads it
+    as an error, since the call did nothing, and is told what to do instead; its result is recorded as ``steered`` and
+    not as failed, so that the tools' error rates count failures alone."""
+
+
 class NulCharacterError(ToolInputError, ValueError):
     """A path or a line with a NUL character, which names no file and no command (item 727): refused for what the step
     gave, and a ``ValueError`` as well, as ``os`` raises for one, so that what caught that still catches it."""
