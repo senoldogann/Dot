@@ -652,7 +652,10 @@ times out is killed with the commands it started (it runs as the leader of a pro
 is killed, and a process that does not exit when killed is logged, never raised in place of the timeout's own error,
 item 1299), after `[desktop] osascript_timeout_s` or the `timeout_s` the run gives a script that starts an
 application or works on a large document (at most 110 s, item 1180); the application may go on with what it was asked,
-which the timeout says. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
+which the timeout says. A tool's own limit (the `timeout_s` its `tool_call` event carries) holds the time the tool
+spends, not the time its call spends at the gate or in a hold of the run: a `tool_result` carries `seconds` (the whole
+call), `waited_s` (at the gate, and in a hold) and `ran_s` (in the tool, item 1406), and a tool that is still running
+more than five seconds past its limit, cut or not, is logged as `tool_overran`. `web_search` climbs a ladder of engines until one answers. Settings › Web search orders them (items
 655 and 657, `[web] search_order`): each engine in the owner's order, one whose key is not set passed over and said
 to be, the browser rung only with Dot's own browser and the web-research rung only while that server runs; its Try asks
 one engine one search. The search APIs that take a key of their own are Brave's Search API (`BRAVE_SEARCH_API_KEY`),

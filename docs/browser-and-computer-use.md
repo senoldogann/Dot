@@ -563,6 +563,11 @@ Both modes share what follows.
   browser is in use by a run of another Dot process*, to be tried again once that run no longer uses it. A Chrome
   window no Dot process started (Sign in…, or one you opened on the profile) is never closed: the start fails at once
   and asks for that window to be closed.
+- A call that waits for Dot's own Chrome to start and is cut (its own limit ran out, or its run was stopped) ends only
+  once the launch is over and the Chrome it started is closed, so that no Chrome is left holding the profile (item 144).
+  A call cut at its limit then takes the rest of the launch, which Playwright ends after 30 seconds at most, past its
+  own clock: its `tool_result` says how long its tool ran (`ran_s`) and the log says `tool_overran` when that is five
+  seconds past the limit (item 1406: a `browser_requests` call had run 102 s on a limit of 45).
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`, and the
   addresses a call of the web-research server's tools holds (`web_scrape`, `web_extract`, `web_map` and
   `web_crawl_start`, item 583: checked as `web_fetch`'s is, and a long one is flagged as it is, see
