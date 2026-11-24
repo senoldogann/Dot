@@ -77,6 +77,7 @@ from dotagent.store.models import (
     HarnessStepState,
     HarnessTask,
     HarnessVersion,
+    LessonSave,
     LiveActivity,
     MeetingLineKind,
     MeetingLineRecord,
@@ -1365,6 +1366,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("proposed_tainted", "INTEGER"),
     ("proposed_at", "REAL"),
 )
+# The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
+_LESSON_SAVES_KEY: str = "lessons.saved"
+_LESSON_SAVES: TypeAdapter[list[LessonSave]] = TypeAdapter(list[LessonSave])
 # The notes the owner wrote or approved, as a condition on ``memories`` with the owner's correction mark as its one
 # parameter: their own, one they pinned, one whose words they corrected on the Memory page.
 _OWNER_APPROVED: str = "(source_run IS NULL OR pinned_at IS NOT NULL OR edited_by = ?)"
@@ -6226,15 +6230,26 @@ class Store:
         row = await self._one("SELECT COUNT(*) AS n FROM memories", ())
         return 0 if row is None else int(row["n"])
 
-    async def count_auto_lessons_since(self, since: float) -> int:
-        """How many lessons ``auto`` saved as new notes at ``since`` or later (item 1247): its ``lesson_saved`` events,
-        not the owner's Save anyway nor a lesson that was a note already."""
-        row = await self._one(
-            "SELECT COUNT(*) AS n FROM events WHERE kind = 'lesson_saved' AND ts >= ?"
-            " AND json_extract(data, '$.by') = 'auto' AND json_extract(data, '$.created') = 1",
-            (since,),
+    @_writing
+    async def record_lesson_save(self, save: LessonSave, keep_since: float) -> None:
+        """Record that ``auto`` saved a lesson as a new note (item 1713), in the ``kv`` table apart from the run's
+        events, which go with its chat: the day's room for lessons is counted from these. Records older than
+        ``keep_since`` go in the same write, so the list holds about two days of saves."""
+        row: aiosqlite.Row | None = await self._one("SELECT value FROM kv WHERE key = ?", (_LESSON_SAVES_KEY,))
+        kept: list[LessonSave] = [] if row is None else _LESSON_SAVES.validate_json(str(row["value"]))
+        saves: list[LessonSave] = [*(one for one in kept if one.at >= keep_since), save]
+        await self._db.execute(
+            "INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (_LESSON_SAVES_KEY, _LESSON_SAVES.dump_json(saves).decode()),
         )
-        return 0 if row is None else int(row["n"])
+        await self._db.commit()
+
+    async def lesson_saves_since(self, since: float) -> list[LessonSave]:
+        """The lessons ``auto`` saved as new notes at ``since`` or later (item 1713), whatever became of their chats
+        and notes since; not the owner's Save anyway nor a lesson that was a note already."""
+        value: str | None = await self.kv_get(_LESSON_SAVES_KEY)
+        saves: list[LessonSave] = [] if value is None else _LESSON_SAVES.validate_json(value)
+        return [one for one in saves if one.at >= since]
 
     async def awake_memories_with_tag(self, tag: str, rest_tag: str) -> list[MemoryRecord]:
         """Every memory carrying ``tag`` and not ``rest_tag``, the oldest change first (item 1247: the night's

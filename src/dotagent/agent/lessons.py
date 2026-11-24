@@ -69,7 +69,7 @@ from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, MemoryRecord, ReactionName, RunMode, RunRecord, RunStatus
+from dotagent.store.models import EventRecord, LessonSave, MemoryRecord, ReactionName, RunMode, RunRecord, RunStatus
 
 log = get_logger(__name__)
 
@@ -494,13 +494,30 @@ async def vet_lessons(runtime: Runtime, case: LessonCase, lessons: tuple[str, ..
     return vetted(lessons, checked, vetting)
 
 
-def day_full(saved: int, cap: int) -> str | None:
-    """Why ``auto`` leaves a lesson out when it saved ``saved`` lessons in the last 24 hours and ``cap`` is the most
-    it saves (``[agent] lessons_per_day``, item 1247), ``None`` while there is room."""
-    if saved < cap:
-        return None
-    lessons: str = "1 lesson was" if saved == 1 else f"{saved} lessons were"
-    return f"{lessons} saved in the last 24 hours, the most a day keeps is {cap}"
+def day_full(saves: Sequence[LessonSave], source: str, tainted: bool, cap: int) -> str | None:
+    """Why ``auto`` leaves out a lesson of a run of ``source`` (``tainted`` when that run had read content third parties
+    can author), when ``saves`` are the lessons it saved in the last 24 hours and ``cap`` the most it saves (``[agent]
+    lessons_per_day``, item 1247); ``None`` while there is room. The room is shared fairly (item 1713): one source
+    takes at most half of it, so that a schedule that loops or the night's reflection of many runs of one kind leaves
+    room for the others, and the last quarter is kept for the lessons of runs that read nothing from outside, the ones
+    every later run can start with (on the owner's Mac 72% of those were handed to a later run against 31% of the
+    others, which reach only Dot's own loop at a site or after a failure)."""
+    if len(saves) >= cap:
+        lessons: str = "1 lesson was" if len(saves) == 1 else f"{len(saves)} lessons were"
+        return f"{lessons} saved in the last 24 hours, the most a day keeps is {cap}"
+    share: int = math.ceil(cap / 2)
+    alike: int = sum(1 for save in saves if save.source == source)
+    if alike >= share:
+        return (
+            f"{alike} lessons of {source} tasks were saved in the last 24 hours, the most one kind of task takes is "
+            f"{share} of the day's {cap}"
+        )
+    if tainted and len(saves) >= cap - cap // 4:
+        return (
+            f"{len(saves)} of the day's {cap} lessons were saved; the rest is kept for lessons of tasks that read no "
+            "outside content"
+        )
+    return None
 
 
 async def _decide_all(
@@ -514,16 +531,20 @@ async def _decide_all(
         left_out: tuple[str | None, ...] = await vet_lessons(runtime, case, lessons)
     except DotError as error:
         return await _failed(runtime, case.run_id, error, "The lessons of this run could not be checked")
-    agent_id: str | None = await _agent_of(runtime.store, case.run_id)
+    run: RunRecord = await runtime.store.get_run(case.run_id)
+    agent_id: str | None = run.agent_id
+    source: str = run.source
     for index, (lesson, vetted_out) in enumerate(zip(lessons, left_out, strict=True)):
         async with deciding:
             if (await _lesson_of(runtime.store, case.run_id, index)).state != "proposed":
                 continue
             why: str | None = vetted_out
             if why is None:
-                since: float = time.time() - _DAY_S
                 why = day_full(
-                    await runtime.store.count_auto_lessons_since(since), runtime.config.agent.lessons_per_day
+                    await runtime.store.lesson_saves_since(time.time() - _DAY_S),
+                    source,
+                    case.tainted,
+                    runtime.config.agent.lessons_per_day,
                 )
             if why is not None:
                 log.info("lesson_left_out", run_id=case.run_id, index=index, reason=why)
@@ -542,6 +563,11 @@ async def _decide_all(
                 )
             except DotError as error:
                 return await _failed(runtime, case.run_id, error, "A lesson could not be saved")
+            if saved.created:
+                now: float = time.time()
+                await runtime.store.record_lesson_save(
+                    LessonSave(at=now, source=source, tainted=case.tainted), now - _DAY_S
+                )
             await _emit_saved(runtime, case.run_id, index, saved, "auto")
     return None
 
