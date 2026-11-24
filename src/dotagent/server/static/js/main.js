@@ -5,6 +5,7 @@ import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp, unreachable } from "./api.js";
 import { lineOf } from "./linewords.js";
 import { noteRefused, phoneScreen } from "./linkfacts.js";
+import { followSharedAppearance } from "./sharedappearance.js";
 import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
@@ -480,6 +481,7 @@ function endSession() {
 
 function beginSession() {
   const controller = new AbortController();
+  followSharedAppearance(controller.signal);
   const shell = buildShell({ homeRoute: DEFAULT_ROUTE });
   let disposeView = () => undefined;
   // The curtain stays over the page until the page shows what it was opened for.

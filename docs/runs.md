@@ -999,3 +999,14 @@ agent is bound to, as its parent's are, and its prompt holds the agent's instruc
 question for your yes, that nobody answers in time is kept where its parent keeps them, with `[policy] unanswered =
 "park"` (item 485, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)): your answer goes to the
 parent, or to a run that goes on from it.
+
+## Changing Dot's appearance from a chat
+
+Describe the look you want, then ask Dot to refine or undo it. The `appearance` tool group composes light and dark
+palettes from named sRGB roles, validates contrast, and can use a raster image from the chat workspace as artwork.
+Quiet Forest is one bundled example. Both palettes travel with the theme so every connected device keeps its own
+light or dark preference. Web and desktop use the same roles as the native iPhone conversation.
+
+The daemon stores the current theme and its predecessor together. An out-of-date revision is refused so two changes
+cannot silently overwrite each other. Visible clients refresh the look while keeping the conversation open. The user
+can undo the last change or return to the device's preferences from the chat or from Appearance on web and desktop.

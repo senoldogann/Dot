@@ -3,20 +3,67 @@ or deleting one. The page sends a theme as the file it is kept as, and the daemo
 reads (``dotagent.themes``)."""
 
 import asyncio
+from typing import Literal
 
 from fastapi import APIRouter
 
+from dotagent.active_theme import (
+    AppearanceSnapshot,
+    StoredAppearance,
+    ThemeRevision,
+    ThemeSelection,
+    quiet_forest,
+    read_selection,
+    replace_selection,
+    snapshot,
+)
+from dotagent.core.errors import NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import themes_dir
+from dotagent.core.paths import dot_home, themes_dir
+from dotagent.core.types import FrozenModel
 from dotagent.themes import StoredTheme, ThemeFile, ThemeFolder, delete_theme, read_theme_folder, save_theme
 
 log = get_logger(__name__)
+
+
+class ThemeSelectionChange(FrozenModel):
+    revision: ThemeRevision
+    choice: Literal["forest", "undo", "local"]
 
 
 def themes_router() -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     # One change of the folder at a time: each weighs the files there against the caps before it writes.
     writing: asyncio.Lock = asyncio.Lock()
+
+    @router.get("/active-theme")
+    async def active_theme() -> AppearanceSnapshot:
+        return snapshot(await asyncio.to_thread(read_selection, dot_home()))
+
+    @router.put("/active-theme")
+    async def set_active_theme(change: ThemeSelectionChange) -> AppearanceSnapshot:
+        home = dot_home()
+        current: ThemeSelection = await asyncio.to_thread(read_selection, home)
+        active: StoredAppearance | None
+        match change.choice:
+            case "forest":
+                active = quiet_forest()
+            case "undo":
+                active = current.previous
+            case "local":
+                active = None
+        return snapshot(await asyncio.to_thread(replace_selection, home, change.revision, active))
+
+    @router.get("/active-theme/artwork")
+    async def active_artwork(revision: int) -> dict[str, str]:
+        current: ThemeSelection = await asyncio.to_thread(read_selection, dot_home())
+        if current.revision != revision:
+            raise RunConflict(
+                "The appearance changed before its artwork was loaded.", {"current_revision": current.revision}
+            )
+        if current.active is None or current.active.jpeg is None:
+            raise NotFoundError("This appearance has no custom artwork.", {"revision": revision})
+        return {"jpeg": current.active.jpeg}
 
     # A theme goes out as its file holds it: the keys it has, none written as null.
     @router.get("/themes", response_model_exclude_none=True)

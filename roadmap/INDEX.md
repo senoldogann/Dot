@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1656](1656.md) | done | 2026-11-24 | Describe an appearance in chat and apply it across Dot clients |
 | [1644](1644.md) | done | 2026-11-24 | Dot for iPhone: the new look seen on every screen, before and after |
 | [1643](1643.md) | done | 2026-11-24 | Dot for iPhone: every sheet and screen in the new look, the queue with swipe, undo and a drag |
 | [1642](1642.md) | done | 2026-11-24 | Dot for iPhone: one recipe for the card, the row, the sheet, the buttons and the state mark |

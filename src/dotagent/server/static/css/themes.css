@@ -294,3 +294,34 @@
   --button-fill-hover: color-mix(in srgb, var(--text) 10%, transparent);
   --fine: var(--text-2);
 }
+
+/* The shared appearance takes precedence over the local selection, except during an editor preview. */
+:root[data-shared-appearance]:not([data-theme="draft"]) {
+  --bg: var(--shared-canvas) !important;
+  --sidebar: var(--shared-surface) !important;
+  --surface: var(--shared-surface) !important;
+  --surface-2: var(--shared-raised) !important;
+  --surface-3: var(--shared-raised) !important;
+  --control: var(--shared-raised) !important;
+  --text: var(--shared-text) !important;
+  --text-2: var(--shared-text) !important;
+  --muted: var(--shared-muted) !important;
+  --faint: var(--shared-muted) !important;
+  --accent: var(--shared-accent) !important;
+  --accent-strong: var(--shared-accent) !important;
+  --accent-weak: var(--shared-raised) !important;
+  --on-accent: var(--shared-canvas) !important;
+  --bubble: var(--shared-raised) !important;
+  --on-bubble: var(--shared-text) !important;
+}
+
+:root[data-shared-appearance]:not([data-theme="draft"]) .run-main {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--bg) 95%, transparent), color-mix(in srgb, var(--bg) 84%, transparent)),
+    var(--shared-artwork, none) right center / cover no-repeat,
+    var(--bg);
+}
+
+.shared-appearance-actions {
+  flex-wrap: wrap;
+}

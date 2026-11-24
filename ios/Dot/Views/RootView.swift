@@ -4,6 +4,7 @@ import SwiftUI
 /// web UI stays one tap away ("Open web UI") as a full-screen fallback.
 struct RootView: View {
     @Bindable var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Debug builds: `-DotGallery 1|2|3` shows the design gallery instead of the app.
     private static var galleryPage: Int? {
@@ -30,6 +31,10 @@ struct RootView: View {
                         ChatListView(model: model, store: store)
                             .id(host.name)
                     }
+                    .task(id: scenePhase) {
+                        if scenePhase == .active { await store.followSharedAppearance() }
+                    }
+                    .id(ObjectIdentifier(store))
                 } else {
                     PairView(model: model, host: host)
                 }
