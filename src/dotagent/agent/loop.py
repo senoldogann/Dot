@@ -483,11 +483,11 @@ _SUMMARY_CUT_PROMPT: str = (
     "Your summary ran past {tokens} tokens and was cut off. Write it again, whole, under {max_words} words: shorten "
     "finished work to one line per step and keep every identifier. "
 )
-_NO_TOOL_NOTE: str = (
+NO_TOOL_NOTE: str = (
     "[system note] You replied without calling a tool. If the goal is achieved or impossible, call finish with your "
     "complete final answer. Otherwise continue by calling the tools you need."
 )
-_EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the task using tools, or call finish."
+EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the task using tools, or call finish."
 # How a reply ends that the model service stopped before it was complete: at its output limit, or for an abnormal
 # reason it gave (a refusal, a reason the codecs do not know).
 _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
@@ -640,7 +640,7 @@ PLAN_AGAIN_STEPS: int = 20
 async def _plan_now(agent: AgentRun) -> str | None:
     """The note of the run's plan while it has open steps (item 87); ``None`` when there is no plan or every step is
     closed."""
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     if not plan.steps or not open_steps(plan.steps):
         return None
     return f"{PLAN_NOTE}\n{plan_lines(plan)}"
@@ -655,7 +655,7 @@ def plan_due(plan: str | None, told: str | None, told_at: int, step: int) -> boo
     return plan is not None and (plan != told or step - told_at >= PLAN_AGAIN_STEPS)
 
 
-async def _current_plan(agent: AgentRun) -> PlanPayload:
+async def current_plan(agent: AgentRun) -> PlanPayload:
     latest: EventRecord | None = await agent.runtime.store.last_event(agent.run.id, PLAN_EVENT)
     return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
@@ -795,7 +795,7 @@ async def _compact(
         message.model_copy(update={"content": summary_part(message.content)}) for message in head
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     now: float = time.time()
     paused: Unavailable | None = (
         None if fast.label == own.label else paused_model(agent.runtime.router, fast.label, now)
@@ -1297,7 +1297,7 @@ def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
     )
 
 
-def _plan_note(unclosed: Sequence[int]) -> str:
+def plan_note(unclosed: Sequence[int]) -> str:
     return _PLAN_NOTE.format(steps=", ".join(str(number) for number in unclosed))
 
 
@@ -1347,7 +1347,7 @@ async def close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome]
     closings: list[tuple[int, ToolOutcome]] = _delegated_closings(outcomes)
     if not closings:
         return None
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     steps: tuple[PlanItem, ...] = plan.steps
     problems: list[str] = []
     for number, outcome in closings:
@@ -1385,7 +1385,7 @@ def _cut_short_end(reply: ModelReply) -> RunOutcome:
 
 def _with_restated(restating: Sequence[tuple[int, str]], outcome: RunOutcome) -> RunOutcome:
     """``outcome`` with the steps of the text replies its answer restates (item 620). A task run that answers in a plain
-    reply is told to finish (``_NO_TOOL_NOTE``, item 460), as such a reply may be a step announced; when its next step
+    reply is told to finish (``NO_TOOL_NOTE``, item 460), as such a reply may be a step announced; when its next step
     is the finish and nothing else, the reply was the answer, and the finish writes it again, often reworded, which the
     page's comparison of words cannot tell (the owner's chat showed a screenshot's description twice, 2026-10-24). A
     reply the answer does not restate (:func:`restates`: one it only points at, or one with a line, a number or a "not"
@@ -1778,7 +1778,7 @@ async def _ask_checker(
     """
     run: RunRecord = agent.run
     patience: int = agent.runtime.config.agent.goal_patience
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
         plan=render_plan(plan.steps),
@@ -1898,7 +1898,7 @@ async def _follow_ups(agent: AgentRun) -> str:
     return "\n".join(lines)
 
 
-async def _check_goal(
+async def check_goal(
     agent: AgentRun,
     checker: GoalChecker,
     history: Sequence[Message],
@@ -2044,7 +2044,7 @@ async def _checkpoint(
     request: CheckpointRequest = CheckpointRequest(
         goal=agent.run.goal,
         owner_words=agent.gate.instructions,
-        plan=plan_lines(await _current_plan(agent)) or _NO_PLAN,
+        plan=plan_lines(await current_plan(agent)) or _NO_PLAN,
         digest=goal_digest(render_recent_steps(_since_goal(history, goal), _CHECKPOINT_DIGEST_CHARS)),
     )
     try:
@@ -2072,7 +2072,7 @@ async def _answer_alert(
 ) -> StallAnswer | RunOutcome:
     """What the rung an alert reached asks for: a note (with the tools of the next step limited for a re-plan or a
     question), the advice of the review model, or the end of the run with what was tried."""
-    plan: str = plan_lines(await _current_plan(agent))
+    plan: str = plan_lines(await current_plan(agent))
     match alert.rung:
         case "consult":
             return await _consult(agent, consultant, alert, history, goal, ledger, plan)
@@ -2089,9 +2089,7 @@ async def _answer_alert(
     return StallAnswer(note=note, allowed=restriction_for(alert.rung, can_ask))
 
 
-def _run_end(
-    agent: AgentRun, history: Sequence[Message], goal: Message, outcome: RunOutcome, facts: RunFacts
-) -> RunEnd:
+def run_end(agent: AgentRun, history: Sequence[Message], goal: Message, outcome: RunOutcome, facts: RunFacts) -> RunEnd:
     """The end of a run, with what its lessons are drawn from when it may hold some."""
     run: RunRecord = agent.run
     setting = agent.runtime.config.agent.lessons
@@ -2124,7 +2122,7 @@ async def _limit_seen(agent: AgentRun, limits: RunLimits, started: float) -> Lim
 async def _limit_end(agent: AgentRun, reached: LimitReached, ledger: RunLedger, reply: str) -> RunOutcome:
     """The end of a run that did not finish in the step after it was told that its limit is reached; ``reply`` is the
     text that step's reply had."""
-    plan: str = plan_lines(await _current_plan(agent))
+    plan: str = plan_lines(await current_plan(agent))
     return RunOutcome(status="failed", result=limit_result(reached, ledger, plan, reply), needs="")
 
 
@@ -2930,7 +2928,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
     ratio: float = 1.0
-    # The text replies the loop told to finish (``_NO_TOOL_NOTE``) since the run last acted: their steps and texts. A
+    # The text replies the loop told to finish (``NO_TOOL_NOTE``) since the run last acted: their steps and texts. A
     # finish that follows them with no other call may restate them (item 620).
     noted_replies: list[tuple[int, str]] = []
     used_tools: bool = False
@@ -3466,7 +3464,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 restating = tuple(noted_replies)
                 noted_replies = []
             elif past_limit is not None:
-                return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+                return run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
             else:
                 alert: Alert | None
                 watch, alert = advance(watch, _calls_seen(outcomes), limits, ladder)
@@ -3494,9 +3492,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     )
                     if alert.rung == "stop":
                         stopped: str = stop_result(
-                            f"{alert.detail} {drift.diagnosis}", ledger, plan_lines(await _current_plan(agent))
+                            f"{alert.detail} {drift.diagnosis}", ledger, plan_lines(await current_plan(agent))
                         )
-                        return _run_end(
+                        return run_end(
                             agent, history, goal, RunOutcome(status="failed", result=stopped, needs=""), facts
                         )
                     # A re-plan's or a question's rung keeps the next step's tools to planning or asking, as for a
@@ -3516,12 +3514,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                         agent, consultant, alert, can_ask, history, goal, ledger
                     )
                     if isinstance(answer, RunOutcome):
-                        return _run_end(agent, history, goal, answer, facts)
+                        return run_end(agent, history, goal, answer, facts)
                     history.append(await _stored_note(agent, answer.note))
                     allowed = answer.allowed
                 elif reminder_due(scaffold, run.mode, steps, reminded_at):
                     reminded_at = steps
-                    plan: PlanPayload = await _current_plan(agent)
+                    plan: PlanPayload = await current_plan(agent)
                     history.append(await _stored_note(agent, reminder_note(ledger, plan)))
                     await runtime.bus.emit(
                         run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan.steps))}, True
@@ -3545,9 +3543,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else:
             answered: bool = bool(reply.text.strip())
             if past_limit is not None:
-                return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+                return run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
             elif reply.finish in _CUT_SHORT and nudges >= config.finish_nudges:
-                return _run_end(agent, history, goal, _cut_short_end(reply), facts)
+                return run_end(agent, history, goal, _cut_short_end(reply), facts)
             elif reply.finish in _CUT_SHORT:
                 nudges += 1
                 history.append(await _stored_note(agent, _CUT_SHORT_NOTE.format(reason=_ended_with(reply))))
@@ -3556,14 +3554,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
                 # Empty again and again: the run ends, on no other model (item 1225).
-                return _run_end(
+                return run_end(
                     agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
                 )
             else:
                 nudges += 1
                 if answered:
                     noted_replies.append((steps, reply.text))
-                history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
+                history.append(await _stored_note(agent, NO_TOOL_NOTE if answered else EMPTY_NOTE))
                 continue
         # The run wants to end here. Past its limit it ends with this finish: nothing sends it back, goal mode's verdict
         # on it is final, and what the user sent during the step comes too late for it (the manager keeps an answer in
@@ -3574,7 +3572,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 if checker is None
                 else await _check_goal_at_limit(agent, checker, history, goal, ended, sent_back, facts)
             )
-            return _run_end(agent, history, goal, _with_restated(restating, at_limit), facts)
+            return run_end(agent, history, goal, _with_restated(restating, at_limit), facts)
         # Otherwise a finish that came in the reply of a call that did not work is sent back once, to read what
         # happened (item 552). Outside a chat, a plan with open steps does not end the run: each finish is sent back
         # until the steps are closed or abandoned (done, failed or skipped), and at most stall_limit times, after
@@ -3590,23 +3588,23 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             )
             continue
         if run.mode != "chat":
-            unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
+            unclosed: tuple[int, ...] = open_steps((await current_plan(agent)).steps)
             if unclosed and plan_reminders < config.stall_limit:
                 plan_reminders += 1
                 nudges = 0
-                history.append(await _stored_note(agent, _plan_note(unclosed)))
+                history.append(await _stored_note(agent, plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
             if unclosed and checker is not None and not plan_handed:
                 # The reminder bound is spent. Goal mode's checker takes the finish; an open plan still blocks a
                 # finish the checker does not accept, and one more finish with steps open reaches the progress stop.
                 plan_handed = True
-                plan_verdict: RunOutcome | SendBack = await _check_goal(
+                plan_verdict: RunOutcome | SendBack = await check_goal(
                     agent, checker, history, goal, ended, sent_back, facts
                 )
                 if isinstance(plan_verdict, RunOutcome):
                     if not agent.inbox.asks():
-                        return _run_end(agent, history, goal, _with_restated(restating, plan_verdict), facts)
+                        return run_end(agent, history, goal, _with_restated(restating, plan_verdict), facts)
                     continue
                 sent_back += 1
                 nudges = 0
@@ -3621,9 +3619,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     + ", ".join(str(number) for number in unclosed)
                     + " were still open",
                     ledger,
-                    plan_lines(await _current_plan(agent)),
+                    plan_lines(await current_plan(agent)),
                 )
-                return _run_end(agent, history, goal, RunOutcome(status="failed", result=stopped_plan, needs=""), facts)
+                return run_end(agent, history, goal, RunOutcome(status="failed", result=stopped_plan, needs=""), facts)
         if (
             run.campaign_id is not None
             and not targets_reminded
@@ -3644,11 +3642,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 await runtime.bus.emit(run.id, "answer_paths", {"missing": list(missing)}, True)
                 continue
         settled: RunOutcome | SendBack = (
-            ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
+            ended if checker is None else await check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
             if not agent.inbox.asks():
-                return _run_end(agent, history, goal, _with_restated(restating, settled), facts)
+                return run_end(agent, history, goal, _with_restated(restating, settled), facts)
             # The user sent something during this step, such as the answer to a question the run left: the run reads it
             # before it ends. Nothing awaits between this check and the moment the manager shuts the inbox.
             continue

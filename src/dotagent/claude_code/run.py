@@ -30,10 +30,11 @@ answered it (a message taken after the turn's last step began waits for a turn o
 failed when the session fails, when the plan's window is used up (with when it resets: nothing moves the run to another
 model), when the program says nothing for ``[providers.claude_code] silence_s`` while none of Dot's tools works for it,
 when its last reply was cut short, and when it goes on past the run's limits (``run_max_minutes``, ``run_max_tokens``),
-which it is told of once. A run here is handed the notes recalled at the start under its message, as Dot's own loop
-hands them (item 1055), but none of the rest of what Dot's own runs bring: the checks of a finish, the lessons drawn at
-its end, the playbooks offered, the skills listed by goal, Dot's masking and compaction (the research of 2026-11-18,
-item 1217)."""
+which it is told of once. A run here is told Dot's own system prompt (item 1691) and handed the notes recalled at the
+start and the skills that fit its goal under its message, as Dot's own loop hands them (item 1055), keeps Dot's plan
+(item 1693), and ends as Dot's own runs end (item 1694: the nudge to finish, the plan's reminders, the goal check, the
+lessons, from Dot's record of its calls); not the playbooks offered or Dot's masking and compaction (the research of
+2026-11-18, item 1217)."""
 
 import asyncio
 import base64
@@ -61,6 +62,7 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.continuity import new_ledger
 from dotagent.agent.executor import ToolOutcome
+from dotagent.agent.goal_chain import goal_checker_with_standby
 from dotagent.agent.handover import (
     ChatSession,
     agent_tools,
@@ -83,18 +85,25 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.loop import (
+    EMPTY_NOTE,
+    NO_TOOL_NOTE,
     AgentRun,
     HandedNotes,
     PromptFacts,
     RunEnd,
     RunOutcome,
+    SendBack,
+    check_goal,
     close_delegated_steps,
     count_start_notes,
+    current_plan,
     free_mode_line,
     gather_prompt_facts,
     goal_query,
     notes_to_hand,
     opening_text,
+    plan_note,
+    run_end,
     run_harness_text,
     run_helpers,
     run_prompt_inputs,
@@ -103,12 +112,15 @@ from dotagent.agent.loop import (
     turn_skills,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
-from dotagent.agent.plan import PLAN_EVENT, plan_event_data
+from dotagent.agent.plan import PLAN_EVENT, PlanPayload, open_steps, plan_event_data, plan_lines
+from dotagent.agent.progress import stop_result
 from dotagent.agent.prompt import PromptInputs, build_system_prompt, started_note, turn_note
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.resume import RESUMED_EVENT, resumed_event_data
+from dotagent.agent.review import GoalChecker
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.streammask import StreamMask, delta_event, said_in_harness
+from dotagent.agent.verify import RunFacts, new_facts, with_outcomes
 from dotagent.claude_code.cut import (
     CONTINUED_EVENT,
     ProgramExit,
@@ -148,6 +160,7 @@ from dotagent.claude_code.stream import (
     tool_prefix,
     user_line,
 )
+from dotagent.config import AgentConfig
 from dotagent.core.errors import (
     ClaudeCodeBroke,
     ClaudeCodeCut,
@@ -177,6 +190,7 @@ from dotagent.llm.types import (
     ToolCall,
     ToolSpec,
     assistant_message,
+    tool_message,
     user_message,
 )
 from dotagent.memory.service import Remembered, memory_budget
@@ -601,7 +615,34 @@ class _Quiet:
 type _OutcomeRunner = Callable[[ToolCall], Awaitable[ToolOutcome]]
 
 
-async def _watched_call(quiet: _Quiet, agent: AgentRun, run: _OutcomeRunner, call: ToolCall) -> ToolResult:
+@dataclass
+class _Record:
+    """What Dot's own loop keeps of a run that a run on the plan keeps too (item 1694): the conversation as its goal
+    check and its lessons read it (the goal, the model's words, each call of Dot's tool with its result, the owner's
+    messages and Dot's notes), the facts the calls showed (:class:`RunFacts`), and how the end of its work went: the
+    replies it was told to finish after (``nudges``), the plan reminders, the times the goal check sent it back and the
+    end the check settled, ``None`` while none did."""
+
+    goal: Message
+    history: list[Message]
+    facts: RunFacts
+    used_tools: bool = False
+    nudges: int = 0
+    plan_reminders: int = 0
+    plan_handed: bool = False
+    sent_back: int = 0
+    settled: RunOutcome | None = None
+
+    def called(self, outcome: ToolOutcome, result: ToolResult) -> None:
+        """A call of Dot's tool ended with ``result`` (its ``outcome``'s, with what Dot added to it)."""
+        self.used_tools = True
+        self.history.extend((assistant_message("", None, (outcome.call,)), tool_message(outcome.call, result.text, ())))
+        self.facts = with_outcomes(self.facts, (outcome,))
+
+
+async def _watched_call(
+    quiet: _Quiet, record: "_Record", agent: AgentRun, run: _OutcomeRunner, call: ToolCall
+) -> ToolResult:
     """Run a call of Dot's tool for the program. It runs in the bridge's task, not the run's (item 1076): the owner's
     emergency stop that it meets (the pointer in a corner of the screen) ends the run as one, as in Dot's own loop, not
     as an error the model reads and goes past. (A Stop cuts it already: the program ended, its request is cancelled.)"""
@@ -613,6 +654,7 @@ async def _watched_call(quiet: _Quiet, agent: AgentRun, run: _OutcomeRunner, cal
     try:
         outcome: ToolOutcome = await run(call)
         result: ToolResult = await _after_call(agent, outcome)
+        record.called(outcome, result)
         # The model's finish, as Dot's own loop reads its own (item 1076): the run ends as it says, not "done" whatever
         # it said; a finish the gate refused or that did not parse says nothing.
         if call.name == FINISH_TOOL and not result.is_error:
@@ -732,6 +774,11 @@ class _Follow:
     added: int = 0
     # The tools of Dot's the run cannot work without (:func:`tools_needed`), which the init line must list.
     needed: tuple[str, ...] = ()
+    # What the goal check and the lessons read (item 1694), the goal mode's checker (``None`` outside goal mode), and
+    # the text of the model's last step.
+    record: _Record | None = None
+    checker: GoalChecker | None = None
+    last_text: str = ""
     stream: StreamMask = field(init=False)
 
     def __post_init__(self) -> None:
@@ -790,10 +837,78 @@ class _Follow:
                     # write next, or their ✋ taken back, as Dot's own loop does (item 1076).
                     # A run past its limit ends all the same.
                     if event is not None and await self.seen(event):
-                        if self.quiet.held_since is None or self.over is not None:
+                        if self.over is not None or (self.quiet.held_since is None and await self.settle()):
                             return self.answer
+                        if self.quiet.held_since is None:
+                            # Sent back to work (item 1694): the note starts a turn of its own.
+                            continue
                         # Held, the turn ended: the hold's time counts from now.
                         self.quiet.resting_since = time.monotonic()
+
+    async def note(self, text: str) -> None:
+        """A note of Dot's to the model that sends it back to work, as Dot's own loop stores one in its history."""
+        if self.record is not None:
+            self.record.history.append(user_message(text, ()))
+        # Sent again to a program that goes on after a cut (item 1581), as the limit's note is; never the owner's words.
+        await self.send(text, (), True, False)
+
+    async def settle(self) -> bool:
+        """Whether the run ends now that the program's turn ended, decided as Dot's own loop decides at a reply that
+        ends its work (item 1694): a run whose mode ends with ``finish`` and that did not call it after working is told
+        to (``[agent] finish_nudges`` times), a finish with steps of the plan still open is reminded of them (``[agent]
+        stall_limit`` times), and in goal mode the end goes to the goal check, which settles it or sends the run back
+        to work with its reason, ``[agent] goal_patience`` times; a run whose plan stays open with no check ends failed.
+        A run past its limit, a chat (no finish) and a run whose record is not kept end as they are."""
+        record: _Record | None = self.record
+        if record is None or FINISH_TOOL not in self.needed:
+            return True
+        config: AgentConfig = self.runtime.config.agent
+        finished: FinishArgs | None = self.quiet.finished
+        if finished is None and record.used_tools and record.nudges < config.finish_nudges:
+            record.nudges += 1
+            await self.note(NO_TOOL_NOTE if self.last_text else EMPTY_NOTE)
+            return False
+        ended: RunOutcome = (
+            RunOutcome(status="done", result=self.answer, needs="")
+            if finished is None
+            else RunOutcome(
+                status="done" if finished.success else "failed",
+                result=finished.answer,
+                needs=finished.needs_from_user or "",
+            )
+        )
+        plan: PlanPayload = await current_plan(self.agent)
+        unclosed: tuple[int, ...] = open_steps(plan.steps)
+        if unclosed and record.plan_reminders < config.stall_limit:
+            record.plan_reminders += 1
+            await self.emit("plan_reminder", {"open_steps": list(unclosed)}, True)
+            await self.note(plan_note(unclosed))
+            return False
+        if unclosed and (self.checker is None or record.plan_handed):
+            steps: str = ", ".join(str(number) for number in unclosed)
+            stopped: str = stop_result(
+                f"finish was called while plan step(s) {steps} were still open",
+                new_ledger(self.agent.run.goal),
+                plan_lines(plan),
+            )
+            record.settled = RunOutcome(status="failed", result=stopped, needs="")
+            return True
+        if self.checker is None:
+            record.settled = ended
+            return True
+        record.plan_handed = record.plan_handed or bool(unclosed)
+        settled: RunOutcome | SendBack = await check_goal(
+            self.agent, self.checker, record.history, record.goal, ended, record.sent_back, record.facts
+        )
+        if isinstance(settled, RunOutcome):
+            record.settled = settled
+            return True
+        record.sent_back += 1
+        record.nudges = 0
+        # What the finish said is what the check did not accept: the run's end is the next one's.
+        self.quiet.finished = None
+        await self.note(settled.note)
+        return False
 
     async def seen(self, event: ClaudeEvent) -> bool:
         """Show ``event``; whether the run is over after it."""
@@ -877,8 +992,11 @@ class _Follow:
         # other words: the finish's answer is the run's, and the chat showed both (the owner's screenshot of
         # 2026-11-11). A step that calls a tool after it is work, which clears the finish (``_watched_call``).
         shown: str = "" if self.quiet.finished is not None and not step.tools else text
+        self.last_text = text.strip()
         if text.strip():
             self.answer = text.strip()
+            if self.record is not None:
+                self.record.history.append(assistant_message(text.strip(), None, ()))
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         await self.emit(
             "assistant",
@@ -1028,6 +1146,8 @@ class _Follow:
         # As Dot's own loop takes it (item 902): one place for what a message does to the run's trust.
         self.agent.gate.take(sent)
         await runtime.store.append_messages(self.agent.run.thread_id, [note])
+        if self.record is not None:
+            self.record.history.append(note)
         self.added += 1
         await self.emit("steer", steer_event(sent, self.agent.gate.tainted), True)
         own: bool = sent.owners_own()
@@ -1126,6 +1246,23 @@ async def _private_folder() -> AsyncIterator[Path]:
         yield folder
     finally:
         await asyncio.to_thread(shutil.rmtree, folder, True)
+
+
+def _checker_of(agent: AgentRun) -> GoalChecker | None:
+    """The goal check of a goal-mode run (item 1694), as Dot's own loop makes it: the review model, then the standby
+    one; ``None`` outside goal mode."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    if not run.goal_mode:
+        return None
+    return goal_checker_with_standby(
+        runtime.router,
+        runtime.roles.review(),
+        runtime.roles.standby(),
+        runtime.config.agent.model_call_timeout_s,
+        f"{run.thread_id}:goal",
+        run.id,
+    )
 
 
 async def _provider_of(runtime: Runtime, ref: ModelRef) -> ClaudeCodeProvider:
@@ -1237,10 +1374,16 @@ def _outcome(follow: _Follow, answer: str, goal: str, finished: FinishArgs | Non
     if follow.finish in _CUT_SHORT:
         cut: str = f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with '{follow.finish}')."
         return RunOutcome(status="failed", result=cut, needs="")
+    settled: RunOutcome | None = None if follow.record is None else follow.record.settled
     closing: str = finished.answer if finished is not None else answer
-    said: str = closing or "Claude Code finished without a closing message."
+    said: str = (
+        settled.result if settled is not None else closing
+    ) or "Claude Code finished without a closing message."
     if follow.fast_off:
         said = f"{said}\n\n{fast_off_words(follow.fast_off)}"
+    if settled is not None:
+        # As the goal check, the plan's reminders or the nudges to finish settled it (item 1694).
+        return RunOutcome(status=settled.status, result=said, needs=settled.needs)
     if finished is not None:
         return RunOutcome(
             status="done" if finished.success else "failed", result=said, needs=finished.needs_from_user or ""
@@ -1637,22 +1780,6 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     )
     queue: asyncio.Queue[_Item] = asyncio.Queue()
     quiet: _Quiet = _Quiet(heard=time.monotonic(), queue=queue)
-    door: Door = new_door(
-        CLAUDE_DOOR,
-        door_specs(_offered_specs(run, tools)),
-        loaded_tools(tools.tools),
-        partial(
-            _watched_call,
-            quiet,
-            agent,
-            partial(
-                bridged_outcome,
-                _noting_outward(quiet, tools),
-                await tool_context(agent, ref, info, frozenset(tools.tools), quiet.owner),
-                agent.gate,
-            ),
-        ),
-    )
     chat: ChatSession | None = await asyncio.to_thread(read_chat, chat_path(run.thread_id))
     # The notes the session the run goes on in heard, read from the messages it took in whole, as Dot's own loop reads
     # what its context carries (``handed_note_ids``); what the chat said on other models since comes cut short
@@ -1661,6 +1788,25 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     carried: str = "\n".join(message.content for message in heard if message.role == "user")
     goal: Message = await message_with_attachments(
         runtime, run.thread_id, run.id, await _opening_of(agent, ref, info), agent.opening.files, info.vision
+    )
+    # What the goal check and the lessons read of the run, as Dot's own loop keeps it (item 1694).
+    record: _Record = _Record(goal=goal, history=[goal], facts=new_facts())
+    door: Door = new_door(
+        CLAUDE_DOOR,
+        door_specs(_offered_specs(run, tools)),
+        loaded_tools(tools.tools),
+        partial(
+            _watched_call,
+            quiet,
+            record,
+            agent,
+            partial(
+                bridged_outcome,
+                _noting_outward(quiet, tools),
+                await tool_context(agent, ref, info, frozenset(tools.tools), quiet.owner),
+                agent.gate,
+            ),
+        ),
     )
     # The notes go after the owner's words as a message of their own, as Dot's own loop stores them, so that no one
     # reads them as the owner's (a group chat's members read the lead's chat); the program gets both in one message.
@@ -1707,6 +1853,8 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 limits=limits_of(runtime.config.agent, run.mode),
                 quiet=quiet,
                 needed=needed,
+                record=record,
+                checker=_checker_of(agent),
             )
             pumps: tuple[asyncio.Task[None], ...] = (
                 asyncio.create_task(_pump_inbox(agent.inbox, queue), name="claude-code-inbox"),
@@ -1786,7 +1934,8 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         if chat is not None and not kept:
             await asyncio.to_thread(forget_chat, run.thread_id)
     log.info("claude_code_run_ended", run_id=run.id, session=follow.session_id, steps=follow.steps, clean=clean)
-    return RunEnd(outcome=_outcome(follow, answer, run.goal, quiet.finished), lessons=None)
+    # Its lessons are drawn as a run of Dot's own loop's are (item 1694), from the record of its calls.
+    return run_end(agent, record.history, record.goal, _outcome(follow, answer, run.goal, quiet.finished), record.facts)
 
 
 async def _stderr_now(tail: asyncio.Task[str], process: asyncio.subprocess.Process) -> str:

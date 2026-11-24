@@ -500,11 +500,13 @@ answer keeps its words, Ollama's too.
   tool of it meets ends it as the emergency stop, not as an error the model reads; a message sent as it ends is kept or
   marked unread as Dot's own loop does, not dropped; a resumed run says which it goes on from and is told that the steps
   of that run are not in its session; and Claude Code's own limit on a call of Dot's tool is a day, so a question or an
-  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. A run here that ended
-  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called, which the store keeps as
-  for any run (item 1714: they waited for the night's reflection before, which reads only some). What Dot's own runs
-  bring besides (the checks of a finish and playbooks) a run here does not
-  have, and these models cannot be the fast, vision or standby model chosen on the
+  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. Its end is
+  decided as on Dot's own runs (item 1694): a turn that ends after the model worked without `finish` is nudged towards
+  it (`finish_nudges`), a `finish` with plan steps open is reminded of them (`stall_limit`), and in goal mode a
+  `finish` goes to the goal check, read from Dot's record of the run's calls and words, which settles it or sends it
+  back to work with its reason (`goal_patience`); the lessons of its end are drawn from the same record (a run on
+  OpenCode's are drawn from the results of Dot's tools the store keeps, item 1714). What Dot's own
+  runs bring besides (the playbooks offered, Dot's own compaction) a run here does not have, and these models cannot be the fast, vision or standby model chosen on the
   Models page, whose calls include conversations and pictures; they can be the review model (item 1032) and the own
   work model, whose look has its tools there (item 1063). They can be the models of the improvement loop's roles
   (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which

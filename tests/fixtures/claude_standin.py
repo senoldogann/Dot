@@ -73,9 +73,40 @@ SESSION: str = "ses-standin-1"
 RECORD: Path = Path(".")
 
 
+# The answer of the last result the stand-in said, which a note of Dot's telling it to finish is answered with.
+LAST_ANSWER: str = ""
+
+
 def _say(item: dict[str, object]) -> None:
+    global LAST_ANSWER
+    if item.get("type") == "result" and isinstance(item.get("result"), str) and item["result"]:
+        LAST_ANSWER = str(item["result"])
     sys.stdout.write(json.dumps(item) + "\n")
     sys.stdout.flush()
+
+
+async def _finish_as_told(server: dict[str, object], door: str, answer: str) -> None:
+    """Call Dot's finish with ``answer``, as a model told to finish does (item 1694)."""
+    headers: dict[str, str] = server["headers"]  # type: ignore[assignment]  # the config Dot wrote
+    async with (
+        httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(10.0, read=60.0)) as http,
+        Client(streamable_http_client(str(server["url"]), http_client=http), mode="auto") as client,
+    ):
+        _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+        await client.call_tool("finish", {"answer": answer, "success": True})
+
+
+def _answer_notes(server: dict[str, object] | None, door: str) -> None:
+    """Take in what Dot sends after the stand-in's work, as the real program does, until Dot closes its input: a note
+    that tells it to finish (item 1694: a run that worked and did not call finish is told to, as in Dot's own loop) is
+    answered with a finish of its last answer, anything else with that answer again."""
+    for line in sys.stdin:
+        message: dict[str, object] = json.loads(line)["message"]
+        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
+        if server is not None and "call finish" in json.dumps(message["content"]):
+            asyncio.run(_finish_as_told(server, door, LAST_ANSWER))
+        _step([("text", "")], "end_turn")
+        _say({"type": "result", "subtype": "success", "is_error": False, "result": "", "session_id": SESSION})
 
 
 def _event(event: dict[str, object]) -> None:
@@ -461,13 +492,14 @@ def main() -> None:
     with (record / "starts.log").open("a", encoding="utf-8") as starts:
         starts.write(json.dumps({"resume": resumed, "session": SESSION}) + "\n")
     (record / "first.json").write_text(json.dumps(message["content"]), encoding="utf-8")
+    server: dict[str, object] | None = None
     if "extra tools" in said:
         _init(door, ["Bash", f"mcp__{door}__notify"])
     else:
-        server: dict[str, object] = json.loads(config_file.read_text(encoding="utf-8"))["mcpServers"][door]
+        server = json.loads(config_file.read_text(encoding="utf-8"))["mcpServers"][door]
         asyncio.run(_work(server, door, said, plan, resumed))
     # Dot closes the input once each message has its result, or ends the program.
-    sys.stdin.read()
+    _answer_notes(server, door)
 
 
 if __name__ == "__main__":
