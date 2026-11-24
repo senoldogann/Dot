@@ -22,6 +22,7 @@ from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ActOutcome, PageView, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.outcomes import PAGE_REACTED, StepReport
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -104,15 +105,38 @@ def _ref(view: PageView, name: str, role: str = "button") -> str:
     return found.group(1)
 
 
-async def _click(browser: BrowserSession, thread: str, name: str, role: str = "button") -> str:
-    """The detail of the report of a click on the element ``name`` (a button) of the thread's page."""
+async def _click_report(browser: BrowserSession, thread: str, name: str, role: str) -> StepReport:
+    """The report of a click on the element ``name`` of the thread's page."""
     view: PageView = await browser.snapshot(thread, True)
     outcome: ActOutcome = await browser.act(
         thread, [Step(action="click", ref=_ref(view, name, role))], False, refuse_secret_field, True
     )
     (report,) = outcome.steps
     assert report.outcome == "done", report
-    return report.detail
+    return report
+
+
+async def _click(browser: BrowserSession, thread: str, name: str, role: str = "button") -> str:
+    """The detail of the report of a click on the element ``name`` (a button) of the thread's page."""
+    return (await _click_report(browser, thread, name, role)).detail
+
+
+async def test_a_click_is_checked_by_whether_the_page_reacted_from_the_same_looks(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 1744: a click that has no check of its own is checked by the page's reaction, which the look of item 739
+    made already: verified with what changed, or uncertain when nothing did; never contradicted."""
+    await browser.open_url("reacted", f"{site}/", True)
+
+    async def checks(name: str, role: str) -> list[tuple[str, str, str]]:
+        report: StepReport = await _click_report(browser, "reacted", name, role)
+        return [(check.condition, check.status, check.evidence) for check in report.checks]
+
+    nothing: list[tuple[str, str, str]] = await checks("Nothing", "button")
+    assert [(condition, status) for condition, status, _ in nothing] == [(PAGE_REACTED, "uncertain")]
+    assert await checks("Change", "button") == [(PAGE_REACTED, "verified", "its content changed")]
+    assert await checks("Ping", "button") == [(PAGE_REACTED, "verified", "it sent a request")]
+    assert [status for _, status, _ in await checks("Note", "textbox")] == ["verified"]
 
 
 async def test_a_click_that_changed_nothing_is_told_and_one_that_changed_the_page_is_not(
