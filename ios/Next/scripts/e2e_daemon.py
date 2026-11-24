@@ -1,0 +1,182 @@
+"""A throwaway Dot daemon for DotNext's end-to-end check from the simulator (wave N1-client).
+
+It serves the real app (routes, stores, streams, the revision watch) on 127.0.0.1 in a home of its own, with a model
+that replies by a script instead of a service, so no model is called and nothing leaves this Mac. The owner's words
+choose the script:
+
+- "helper: ...": the run starts a helper (``delegate``, wait false) that waits 20 s, then ends;
+- "wait: ...": the run waits 25 s in ``wait_until`` (a steer meanwhile shows "read after this step");
+- "slow: ...": the reply takes 8 s (a run at work, for the queue);
+- anything else: an answer at once, after a few words streamed.
+
+Usage (the three folders are throwaway, ``mktemp -d``)::
+
+    DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome uv run python ios/Next/scripts/e2e_daemon.py 8765
+
+It prints ``READY <port> <token>`` once it serves; a pairing code is made with
+``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
+"""
+
+import asyncio
+import os
+import sys
+import time
+from pathlib import Path
+
+from dotagent.agent.manager import RunManager
+from dotagent.config import load_config
+from dotagent.core.paths import ensure_layout
+from dotagent.llm.types import (
+    ChatRequest,
+    DeltaSink,
+    ModelInfo,
+    ModelReply,
+    StreamDelta,
+    ToolCall,
+    Usage,
+)
+from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.thread_sync import watch_revisions
+
+TOKEN: str = "dotnext-e2e-token"
+MODEL: str = "ollama:scripted"
+
+
+class ScriptProvider:
+    """Replies by the owner's last words (module docstring); a tool's result is answered with a closing text."""
+
+    def __init__(self) -> None:
+        self._calls: int = 0
+
+    @property
+    def name(self) -> str:
+        return "ollama"
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self._calls += 1
+        # The newest owner's words: the run adds its own notes as user messages that start with "[system note]".
+        owners: list[int] = [
+            i for i, m in enumerate(request.messages) if m.role == "user" and not m.content.startswith("[")
+        ]
+        at: int = owners[-1] if owners else -1
+        latest: str = request.messages[at].content.strip() if at >= 0 else ""
+        owner: str = latest
+        # A tool already answered since the owner's words: the step is over, the run ends with a text.
+        answered: bool = any(m.role == "tool" for m in request.messages[at + 1 :])
+        calls: tuple[ToolCall, ...] = ()
+        text: str = ""
+        if any(tool.name == "goal_verdict" for tool in request.tools):
+            # The goal check asks the same model: the work is taken as done.
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="goal_verdict",
+                    arguments={"decision": "achieved", "reason": "The scripted step is done.", "unproven_steps": []},
+                ),
+            )
+        elif answered:
+            text = f"Done: {owner[:60]}"
+        elif latest.startswith("helper:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="delegate",
+                    arguments={"goal": "wait for the test, then say done", "wait": False},
+                ),
+            )
+        elif latest.startswith("wait for the test"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="wait_until",
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 0.34},
+                ),
+            )
+        elif latest.startswith("wait:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="wait_until",
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 0.42},
+                ),
+            )
+        elif latest.startswith("slow:"):
+            await asyncio.sleep(8)
+            text = f"Slowly: {owner[:60]}"
+        else:
+            text = f"Echo: {owner[:80]}"
+        for word in text.split(" "):
+            await sink(StreamDelta(kind="text", text=word + " "))
+        return ModelReply(
+            model=request.model,
+            text=text,
+            thinking="",
+            tool_calls=calls,
+            usage=Usage(input_tokens=100, output_tokens=10, cached_tokens=0),
+            finish="tool_calls" if calls else "stop",
+            raw_finish="tool_calls" if calls else "stop",
+            raw=(),
+        )
+
+    async def model_info(self, model: str) -> ModelInfo:
+        return ModelInfo(
+            id=model,
+            vision=False,
+            tools=True,
+            thinking=False,
+            context_length=128_000,
+            own_context_length=None,
+            window_source="assumed",
+            efforts=(),
+            free=False,
+        )
+
+    async def list_models(self) -> tuple[ModelInfo, ...]:
+        return (await self.model_info("scripted"),)
+
+    async def aclose(self) -> None:
+        return None
+
+
+async def serve(port: int) -> None:
+    home: Path = Path(os.environ["DOT_HOME"])
+    for name in ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR"):
+        if name not in os.environ:
+            raise SystemExit(f"{name} must name a throwaway folder")
+    ensure_layout()
+    (home / "config.toml").write_text(f'[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n', encoding="utf-8")
+    runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
+    await runtime.router.register("ollama", ScriptProvider())
+    manager: RunManager = RunManager(runtime)
+    stopping: asyncio.Event = asyncio.Event()
+    listener = bind_listener("127.0.0.1", port)
+    context: ServerContext = ServerContext(
+        runtime=runtime,
+        manager=manager,
+        scheduler=None,
+        token=TOKEN,
+        host="127.0.0.1",
+        port=port,
+        started_at=time.time(),
+        stopping=stopping,
+    )
+    server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+    serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
+    watching: asyncio.Task[None] = asyncio.create_task(watch_revisions(runtime.store, runtime.bus))
+    # As the smoke tests wait for it: the server says it started by a flag, not an event.
+    while not server.started:  # noqa: ASYNC110
+        await asyncio.sleep(0.05)
+    print(f"READY {port} {TOKEN}", flush=True)
+    try:
+        await serving
+    finally:
+        watching.cancel()
+        await manager.shutdown()
+        await close_runtime(runtime)
+
+
+if __name__ == "__main__":
+    asyncio.run(serve(int(sys.argv[1])))

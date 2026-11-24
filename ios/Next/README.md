@@ -5,8 +5,19 @@ The native app that replaces `ios/Dot` wave by wave (the plan lives in the owner
 `group.dev.dotagent.phone.next`, its own Keychain access group, URL scheme `dotnext://`, display name "Dot Next". iOS 26
 and later, iPhone and iPad. No push and no Live Activity until the swap (owner's decision): the old app keeps them.
 
-Wave N0 (this tree today) is the design system, the components, the gallery and the app shell with placeholder
-content; it reads no daemon. The engine comes in N1-client.
+Wave N0 gave the design system, the components and the gallery; wave N1-client the engine (`ios/DotEngine`, below)
+and the screens wired to it: pairing, the chat list, a chat, the helpers and background sheets, settings. The full
+chat (work log groups, ask dock, composer modes, inspector) is wave N2.
+
+## The engine: `ios/DotEngine`
+
+A Swift package (iOS 26 and macOS 26; Foundation, Network, Security only: no UIKit, so the Mac app can use it):
+`Contract/` (the daemon's sync contract, `docs/phone.md` "A chat kept in sync"), `Wire/` (HTTP, SSE parser, host,
+retry policy), `Sync/` (the pure reducers of a chat and the list, frames, delivery states, the transcript filter, the
+clock, the link), `Store/` (`SyncStore`, `Supervisor`, `Engine`), `Outbox/` (moved from the old app), `Cache/`
+(`v2/` of the app group), `Pairing/` (typed code, Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
+the DotNext scheme runs them on the simulator too. The tests never sleep: `ManualClock` is moved by hand, and
+`FakeDaemon` (a `URLProtocol`) speaks the contract and misbehaves as a test says.
 
 ## Layout
 
@@ -50,7 +61,22 @@ cd ios && xcodegen generate
 xcodebuild test -project Dot.xcodeproj -scheme DotNext -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -configuration Debug CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/dotnext-dd
 Next/scripts/check_strings.sh /tmp/dotnext-dd
+(cd DotEngine && swift test)
 ```
+
+## End to end against a throwaway daemon
+
+```bash
+t=$(mktemp -d)
+DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome uv run python ios/Next/scripts/e2e_daemon.py 18765
+curl -X POST -H "Authorization: Bearer dotnext-e2e-token" http://127.0.0.1:18765/api/phone/pairing   # the code
+```
+
+Build DotNext for the simulator signed locally (`CODE_SIGN_IDENTITY=-`, so it has its app group), pair with
+`http://127.0.0.1:18765` (debug builds only take a loopback address) and the code. The script's model replies by the
+message: `helper: …` starts a helper, `wait: …` waits in `wait_until`, `slow: …` takes 8 s. A debug launch with
+`-DotNextScene live-chat -DotNextProbe 20` sends 20 messages in the first chat and writes send → first event on screen
+to `Library/Caches/dotnext-latency.txt`.
 
 ## Screenshots
 

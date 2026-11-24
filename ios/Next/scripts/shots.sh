@@ -12,7 +12,8 @@ out=${2:?out dir}
 languages=${3:?languages}
 shift 3
 bundle=dev.dotagent.phone.next
-scenes="tokens rows controls feedback transcript helpers chrome symbols chats chat chat-agents chat-background agents activity settings"
+# DOTNEXT_SCENES picks some of them (e.g. the live screens against a paired throwaway daemon: "chats live-chat settings").
+scenes=${DOTNEXT_SCENES:-"tokens rows controls feedback transcript helpers chrome symbols chats chat chat-agents chat-background agents activity settings live-chat"}
 mkdir -p "$out"
 for udid in "$@"; do
     name=$(xcrun simctl list devices | grep "$udid" | sed -E 's/^ *(.*) \(.*\) \(.*$/\1/' | tr ' ' '_')

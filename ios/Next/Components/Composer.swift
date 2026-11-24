@@ -17,6 +17,8 @@ enum ComposerLayout: Equatable, Sendable {
 struct SendButton: View {
     let isEnabled: Bool
     let send: () -> Void
+    /// The other way to send (D10: long-press on Send): into the running task while one works; `nil` for none.
+    var alternate: (() -> Void)? = nil
 
     var body: some View {
         Button(action: send) {
@@ -30,7 +32,17 @@ struct SendButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+        .contextMenu {
+            if let alternate {
+                Button(String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue"), systemImage: "arrow.turn.down.right", action: alternate)
+            }
+        }
         .accessibilityLabel(String(localized: "Send", comment: "VoiceOver: the composer's send button"))
+        .accessibilityActions {
+            if let alternate {
+                Button(String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue"), action: alternate)
+            }
+        }
     }
 }
 
@@ -60,48 +72,52 @@ struct ComposerShell: View {
     let placeholder: String
     let modelTitle: String
     let send: () -> Void
+    /// Long-press on Send: the other way to send (steer while a run works); `nil` for none.
+    var steer: (() -> Void)? = nil
     @FocusState private var isFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
     var body: some View {
         let layout: ComposerLayout = ComposerLayout.of(text: text, isFocused: isFocused)
-        Group {
-            switch layout {
-            case .compact:
-                HStack(alignment: .bottom, spacing: 0) {
+        // One field in one place whatever the layout: a field made anew when the composer grows on focus would take the
+        // focus away again, and the keyboard would never stay (found in the N1 end-to-end check).
+        let compact: Bool = layout == .compact
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .bottom, spacing: 0) {
+                if compact {
                     ComposerIconButton(systemImage: "plus", label: String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"), action: {})
-                    field(lines: 1...4).padding(.vertical, Space.s)
-                    ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button"), action: {})
-                    SendButton(isEnabled: canSend, send: send)
                 }
-                .padding(.horizontal, Space.xxs)
-            case .expanded:
-                VStack(alignment: .leading, spacing: 0) {
-                    field(lines: 1...6)
-                        .padding(.horizontal, Space.m)
-                        .padding(.top, Space.m)
-                    HStack(spacing: 0) {
-                        ComposerIconButton(systemImage: "plus", label: String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"), action: {})
-                        Menu {
-                            Button(String(localized: "Default model", comment: "Composer model menu: use the daemon's default model"), action: {})
-                        } label: {
-                            HStack(spacing: Space.xxs) {
-                                Text(modelTitle).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
-                                Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
-                            }
-                            .padding(.horizontal, Space.xs)
-                            .frame(minHeight: Metric.hit)
-                            .contentShape(Rectangle())
+                field(lines: compact ? 1...4 : 1...6)
+                    .padding(.vertical, compact ? Space.s : 0)
+                    .padding(.horizontal, compact ? 0 : Space.m - Space.xxs)
+                    .padding(.top, compact ? 0 : Space.m)
+                if compact {
+                    ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button"), action: {})
+                    SendButton(isEnabled: canSend, send: send, alternate: steer)
+                }
+            }
+            if !compact {
+                HStack(spacing: 0) {
+                    ComposerIconButton(systemImage: "plus", label: String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"), action: {})
+                    Menu {
+                        Button(String(localized: "Default model", comment: "Composer model menu: use the daemon's default model"), action: {})
+                    } label: {
+                        HStack(spacing: Space.xxs) {
+                            Text(modelTitle).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
+                            Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
                         }
-                        .accessibilityLabel(String(localized: "Model, \(modelTitle)", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
-                        Spacer(minLength: 0)
-                        ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button"), action: {})
-                        SendButton(isEnabled: canSend, send: send)
+                        .padding(.horizontal, Space.xs)
+                        .frame(minHeight: Metric.hit)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, Space.xxs)
+                    .accessibilityLabel(String(localized: "Model, \(modelTitle)", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+                    Spacer(minLength: 0)
+                    ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button"), action: {})
+                    SendButton(isEnabled: canSend, send: send, alternate: steer)
                 }
             }
         }
+        .padding(.horizontal, Space.xxs)
         .interactiveGlass(in: rounded(Radius.composer))
         .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
     }

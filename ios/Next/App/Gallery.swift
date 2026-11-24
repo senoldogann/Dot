@@ -1,3 +1,4 @@
+#if DEBUG
 import SwiftUI
 
 /// The gallery's pages; `-DotNextGallery <page>` opens one at launch (debug builds) for screenshots without taps.
@@ -286,3 +287,109 @@ private struct HelpersGallery: View {
         }
     }
 }
+
+/// The sample chat of wave N0, kept as the gallery's fixture (the shipped chat is `ChatScreen`, on the store).
+struct SampleChatScreen: View {
+    let chat: SampleChat
+    @State private var draft: String = ""
+    @State private var panel: ChatPanel?
+
+    init(chat: SampleChat, initialPanel: ChatPanel?) {
+        self.chat = chat
+        _panel = State(initialValue: initialPanel)
+    }
+
+    @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.m) {
+                UserBubble(text: String(localized: "Book me the dentist for next week, afternoons if you can.", comment: "Sample owner message in the placeholder screen of wave N0"))
+                SpeakerLine(agent: "Dot")
+                ToolGroup(summary: String(localized: "Worked for 2m 14s · 4 steps", comment: "Work-log group summary (sample)"), calls: Samples.computerUse, startsOpen: true)
+                HelperGroup(helpers: Samples.helpers, open: { _ in })
+                AnswerText(text: Samples.booking())
+                Notice(tone: .warn, message: String(localized: "Dot waits for you: pay the 20 € deposit?", comment: "Sample notice: Dot waits for a payment approval"), dismiss: nil)
+            }
+            .frame(maxWidth: proseWidth)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Space.gutter)
+            .padding(.vertical, Space.m)
+        }
+        .defaultScrollAnchor(.bottom)
+        .scrollDismissesKeyboard(.interactively)
+        .background(Tone.ground)
+        .navigationTitle(chat.title)
+        .navigationSubtitle(subtitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button(
+                    String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"),
+                    systemImage: "folder"
+                ) { panel = .files }
+                Button(String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers"), systemImage: "person.2") {
+                    panel = .agents
+                }
+                Button(
+                    String(localized: "The Mac's screen", comment: "Chat header quick panel: the Mac's live screen"),
+                    systemImage: "desktopcomputer"
+                ) { panel = .screen }
+            }
+        }
+        .sheet(item: $panel) { panel in
+            switch panel {
+            case .agents: AgentsSheet(runs: Samples.helperRuns(now: .now), close: { self.panel = nil })
+            case .background: BackgroundWorkSheet(items: Samples.backgroundWork, close: { self.panel = nil })
+            case .files:
+                EmptyState(
+                    title: String(localized: "No changes yet", comment: "Changes panel empty state"), systemImage: "folder",
+                    detail: String(localized: "Files the run changes show here.", comment: "Changes panel empty state detail"),
+                    actionTitle: nil, action: {}
+                )
+                .inspectorSheet(
+                    title: String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"),
+                    close: { self.panel = nil })
+            case .screen:
+                EmptyState(
+                    title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen"),
+                    systemImage: "desktopcomputer",
+                    detail: String(localized: "The live screen comes in a later version.", comment: "Mac screen panel placeholder"),
+                    actionTitle: nil, action: {}
+                )
+                .inspectorSheet(
+                    title: String(localized: "The Mac's screen", comment: "Chat header quick panel: the Mac's live screen"),
+                    close: { self.panel = nil })
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(alignment: .trailing, spacing: Space.xs) {
+                FloatingWorkingControl(
+                    summary: WorkingSummary(status: .waitingOnYou, elapsed: Self.elapsed, queued: 2, helpers: 2),
+                    showsScrollToBottom: true, openStatus: { panel = .background }, openQueue: {}, openHelpers: { panel = .agents },
+                    scrollToBottom: {})
+                    .frame(maxWidth: .infinity, alignment: .center)
+                ComposerShell(text: $draft, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), modelTitle: String(localized: "Default · medium", comment: "Composer model chip: the model and the reasoning effort"), send: {})
+            }
+            .frame(maxWidth: proseWidth)
+            .padding(.horizontal, Space.s)
+            .padding(.bottom, Space.xs)
+        }
+    }
+
+    /// Who and where (plan §18): the agent and the Mac.
+    private var subtitle: String { [chat.agent, Samples.macName].joined(separator: " · ") }
+
+    /// A sample clock, formatted by the system so it reads "3 min" in English and "3 dk" in Turkish.
+    private static let elapsed: String = Duration.seconds(180).formatted(.units(allowed: [.minutes], width: .abbreviated))
+
+    /// The reading column: about 68 characters of the body font on a wide screen, the full width on a phone.
+    private var proseWidth: CGFloat? {
+        guard sizeClass == .regular else { return nil }
+        return ProseColumn.width(charactersPerLine: ProseColumn.target, font: ProseColumn.bodyFont(dynamicTypeSize))
+    }
+}
+
+#endif

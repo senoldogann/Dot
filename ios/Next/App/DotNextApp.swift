@@ -1,8 +1,12 @@
+import DotEngine
 import SwiftUI
 import UIKit
 
 @main
 struct DotNextApp: App {
+    @State private var model: AppModel = AppModel()
+    @Environment(\.scenePhase) private var scenePhase: ScenePhase
+
     init() {
         // The Chats badge counts what waits on the owner: amber, never the system's red (red means failure only).
         let appearance: UITabBarAppearance = UITabBarAppearance()
@@ -18,7 +22,10 @@ struct DotNextApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(launch: LaunchOptions.read(UserDefaults.standard))
+                .environment(model)
+                .onAppear { model.load() }
         }
+        .onChange(of: scenePhase) { _, phase in model.scene(phase) }
     }
 }
 
@@ -34,24 +41,37 @@ enum AppTab: String, CaseIterable, Hashable, Sendable {
 /// A scene the screenshot harness can open at launch with `-DotNextScene <name>` (debug builds only; see
 /// `scripts/shots.sh`): a gallery page, a tab, or the sample chat.
 enum LaunchScene: Equatable, Sendable {
-    case gallery(GalleryPage)
+    #if DEBUG
+        case gallery(GalleryPage)
+        /// The sample chat of the gallery's fixtures.
+        case sampleChat(ChatPanel?)
+    #endif
     case tab(AppTab)
-    case chat(ChatPanel?)
+    /// The live chat list with its first chat open.
+    case liveChat
 
     /// Every scene name the harness knows.
-    static let names: [String] =
-        GalleryPage.allCases.map(\.rawValue) + AppTab.allCases.map(\.rawValue) + ["chat", "chat-agents", "chat-background"]
+    static var names: [String] {
+        #if DEBUG
+            GalleryPage.allCases.map(\.rawValue) + AppTab.allCases.map(\.rawValue) + ["chat", "chat-agents", "chat-background", "live-chat"]
+        #else
+            AppTab.allCases.map(\.rawValue) + ["live-chat"]
+        #endif
+    }
 
     /// The scene of a name; an unknown name is no scene (the app opens normally).
     static func named(_ name: String) -> LaunchScene? {
-        if let page = GalleryPage(rawValue: name) { return .gallery(page) }
+        #if DEBUG
+            if let page = GalleryPage(rawValue: name) { return .gallery(page) }
+            switch name {
+            case "chat": return .sampleChat(nil)
+            case "chat-agents": return .sampleChat(.agents)
+            case "chat-background": return .sampleChat(.background)
+            default: break
+            }
+        #endif
         if let tab = AppTab(rawValue: name) { return .tab(tab) }
-        switch name {
-        case "chat": return .chat(nil)
-        case "chat-agents": return .chat(.agents)
-        case "chat-background": return .chat(.background)
-        default: return nil
-        }
+        return name == "live-chat" ? .liveChat : nil
     }
 }
 
@@ -72,14 +92,18 @@ struct LaunchOptions: Equatable, Sendable {
 
 struct RootView: View {
     let launch: LaunchOptions
+    @Environment(AppModel.self) private var model: AppModel
 
     var body: some View {
         Group {
             switch launch.scene {
-            case .gallery(let page): NavigationStack { GalleryPageView(page: page) }
-            case .tab(let tab): AppShell(initialTab: tab, opensSampleChat: false, initialPanel: nil)
-            case .chat(let panel): AppShell(initialTab: .chats, opensSampleChat: true, initialPanel: panel)
-            case nil: AppShell(initialTab: .chats, opensSampleChat: false, initialPanel: nil)
+            #if DEBUG
+                case .gallery(let page): NavigationStack { GalleryPageView(page: page) }
+                case .sampleChat(let panel): NavigationStack { SampleChatScreen(chat: Samples.chats[0], initialPanel: panel) }
+            #endif
+            case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false))
+            case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true))
+            case nil: paired(AppShell(initialTab: .chats, opensFirstChat: false))
             }
         }
         .tint(Tone.text)
@@ -115,26 +139,40 @@ struct RootView: View {
     }
 #endif
 
+extension RootView {
+    /// The shell once a key is held; pairing before; a plain word while the key is read.
+    @ViewBuilder func paired(_ shell: AppShell) -> some View {
+        switch model.phase {
+        case .loading: LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way")).background(Tone.ground)
+        case .unpaired: PairingView()
+        case .ready: shell
+        case .noStorage:
+            EmptyState(
+                title: String(localized: "This build cannot keep anything", comment: "Shown when the app group of the app is missing"), systemImage: "exclamationmark.triangle",
+                detail: String(localized: "It was signed without its app group. Install a build signed for Dot Next.", comment: "Detail when the app group of the app is missing"),
+                actionTitle: nil, action: {}
+            ).background(Tone.ground)
+        }
+    }
+}
+
 /// The shell: the system's floating tab bar (never minimised), tinted with the ink.
 struct AppShell: View {
     @State private var tab: AppTab
-    let opensSampleChat: Bool
-    let initialPanel: ChatPanel?
-    /// One source for the list and the Chats badge (review S1): a settled chat leaves both at once.
-    @State private var chats: [SampleChat] = Samples.chats
+    let opensFirstChat: Bool
+    @Environment(AppModel.self) private var model: AppModel
 
-    init(initialTab: AppTab, opensSampleChat: Bool, initialPanel: ChatPanel?) {
+    init(initialTab: AppTab, opensFirstChat: Bool) {
         _tab = State(initialValue: initialTab)
-        self.opensSampleChat = opensSampleChat
-        self.initialPanel = initialPanel
+        self.opensFirstChat = opensFirstChat
     }
 
     var body: some View {
         TabView(selection: $tab) {
             Tab(String(localized: "Chats", comment: "Tab bar: the chats tab"), systemImage: "bubble.left.and.bubble.right", value: AppTab.chats) {
-                ChatsTab(chats: $chats, opensSampleChat: opensSampleChat, initialPanel: initialPanel)
+                ChatsTab(opensFirstChat: opensFirstChat)
             }
-            .badge(chats.filter { $0.status == .waitingOnYou || $0.status == .question }.count)
+            .badge(model.snapshot.list.needsYou)
             Tab(String(localized: "Agents", comment: "Tab bar: the agents and teams tab"), systemImage: "person.2", value: AppTab.agents) { AgentsTab() }
             Tab(String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"), systemImage: "clock.arrow.circlepath", value: AppTab.activity) { ActivityTab() }
             Tab(String(localized: "Settings", comment: "Tab bar: the settings tab"), systemImage: "gearshape", value: AppTab.settings) { SettingsTab() }
