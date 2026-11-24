@@ -114,9 +114,9 @@ test("a read that failed after one that worked keeps its count, in the warning's
   assert.deepEqual([one.label, one.tone, one.name], ["every 10 min", "warn", "Loop, every 10 min. Could not read"]);
   const many = dockSegments(state({ loops: { count: 3, rhythm: null, problem: true } }))[0];
   assert.deepEqual([many.label, many.tone, many.name], ["3 loops", "warn", "3 loops. Could not read"]);
-  // The queue says it as well: a count with a problem is in the warning's tone.
+  // The queue says it as well: a count with a problem is in the warning's tone, and named so.
   const queue = dockSegments(state({ queue: { count: 2, held: false, problem: true, sending: false } }))[0];
-  assert.deepEqual([queue.label, queue.tone], ["2 queued", "warn"]);
+  assert.deepEqual([queue.label, queue.tone, queue.name], ["2 queued", "warn", "2 queued. Could not read"]);
 });
 
 test("the segments come in one order, and the chat's own stand when no run works", () => {

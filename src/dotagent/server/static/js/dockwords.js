@@ -119,7 +119,8 @@ export function dockSegments(state) {
       segments.push({ id: "queue", label, short: queue.sending ? "…" : "!", name: label, tone: queue.sending ? "quiet" : "warn", sheet: true });
     } else {
       const label = queue.held ? t("dock.queuedHeld", { count: queue.count }) : t("capsule.queued", { count: queue.count });
-      segments.push({ id: "queue", label, short: String(queue.count), name: label, tone: queue.held || queue.problem ? "warn" : "quiet", sheet: true });
+      const name = queue.problem ? `${label}. ${t("dock.unread")}` : label;
+      segments.push({ id: "queue", label, short: String(queue.count), name, tone: queue.held || queue.problem ? "warn" : "quiet", sheet: true });
     }
   }
   const { running } = state;
