@@ -12,6 +12,10 @@ the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/Work
 `DotEngine/Sync/Transcript.swift`) and the fold of a finished run, markdown answers, the ask dock in the composer's place
 (approvals, questions, hand-offs, secrets typed in a secure field), the composer (+ menu, model · effort chip, on-device
 dictation, Send / Queue / Steer / Stop), the queue sheet and the edit of a queued message, the run inspector, reactions.
+While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
+and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
+every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;
+what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 ## The engine: `ios/DotEngine`
 

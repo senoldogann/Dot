@@ -3421,6 +3421,17 @@
         }
       }
     },
+    "Shows the whole thinking": {
+      "comment": "VoiceOver hint of a thinking row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşüncenin tamamını gösterir"
+          }
+        }
+      }
+    },
     "Side answer": {
       "comment": "Title of the alert with a /btw answer",
       "localizations": {
@@ -4147,6 +4158,17 @@
         }
       }
     },
+    "Thinking": {
+      "comment": "Capsule: the run's model is thinking",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşünüyor"
+          }
+        }
+      }
+    },
     "This Mac": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row: the paired Mac",
       "localizations": {
@@ -4198,6 +4220,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonun anahtarı reddedildi"
+          }
+        }
+      }
+    },
+    "Thought": {
+      "comment": "Work log: a step's thinking, folded",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşündü"
           }
         }
       }
@@ -4605,6 +4638,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışıyor"
+          }
+        }
+      }
+    },
+    "Writing": {
+      "comment": "Capsule: the run's model is writing its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıyor"
           }
         }
       }

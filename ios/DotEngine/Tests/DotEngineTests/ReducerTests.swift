@@ -80,6 +80,26 @@ final class ReducerTests: XCTestCase {
         XCTAssertTrue(broken.writing.isEmpty, "a break drops the live words: the stored event brings them back")
     }
 
+    func testThinkingGoesOnlyOnTheOpenStepAndAResetDropsIt() {
+        var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [record("run_a", status: "running", at: 1)])
+        let delta: (String, String, Int) -> StreamFrame = { kind, text, step in
+            .delta(EventRecord(id: 0, runId: "run_a", ts: 0, kind: "delta", data: ["kind": .string(kind), "text": .string(text), "step": .int(step)]))
+        }
+        chat = ChatReducer.frame(chat, delta("thinking", "Which ", 1), connection: connection).0
+        chat = ChatReducer.frame(chat, delta("thinking", "day?", 1), connection: connection).0
+        XCTAssertEqual(chat.thinking["run_a"], LiveThought(step: 1, text: "Which day?"))
+        chat = ChatReducer.frame(chat, delta("reset", "", 1), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"], "a step asked again starts its thinking again")
+        chat = ChatReducer.frame(chat, delta("thinking", "Monday", 1), connection: connection).0
+        chat = ChatReducer.frame(chat, .event(event(20, "run_a", "assistant", ["text": .string(""), "step": .int(1)])), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"], "the stored reply ends the live thinking")
+        chat = ChatReducer.frame(chat, delta("thinking", "late", 1), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"], "thinking of a stored step is not drawn again")
+        chat = ChatReducer.frame(chat, delta("thinking", "next", 2), connection: connection).0
+        XCTAssertEqual(chat.thinking["run_a"]?.step, 2)
+        XCTAssertTrue(ChatReducer.broke(chat, connection: connection).thinking.isEmpty, "a break drops the live thinking")
+    }
+
     func testAnUnknownKindMovesTheCursorAndDrawsNothing() {
         var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [record("run_a", status: "running", at: 1)])
         let message: SSEMessage = SSEMessage(
@@ -301,7 +321,7 @@ final class ReducerTests: XCTestCase {
         let answers: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none).filter {
             if case .answer = $0 { true } else { false }
         }
-        XCTAssertEqual(answers, [.answer(id: "r:run_a", text: "Booked", writing: false)])
+        XCTAssertEqual(answers, [.answer(id: "r:run_a", text: "Booked", writing: false, endedAt: 12)])
     }
 
     func testAHelpersEndOnTheStreamEndsItInTheViewSoTheCapsuleStopsCountingIt() {

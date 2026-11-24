@@ -27,7 +27,7 @@ final class ChatWordsTests: XCTestCase {
         let tool: (String) -> TranscriptItem = { id in
             .tool(ToolEntry(id: id, tool: "shell", kind: .command, target: "ls", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1))
         }
-        let blocks: [TranscriptBlock] = TranscriptBlock.of([tool("t:1"), tool("t:2"), .answer(id: "a:3", text: "x", writing: false), tool("t:4")])
+        let blocks: [TranscriptBlock] = TranscriptBlock.of([tool("t:1"), tool("t:2"), .answer(id: "a:3", text: "x", writing: false, endedAt: nil), tool("t:4")])
         XCTAssertEqual(blocks.map(\.id), ["tools:t:1", "a:3", "tools:t:4"])
     }
 }

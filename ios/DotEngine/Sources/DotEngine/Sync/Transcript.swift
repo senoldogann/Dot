@@ -9,15 +9,17 @@ import Foundation
 /// | the same, still running                | row      | row             | hidden   | hidden |
 /// | a failed tool                          | row      | row             | row      | hidden |
 /// | helper group (each helper's step)      | card     | card            | card     | hidden |
-/// | reasoning                              | not drawn: the daemon stores none (live `thinking` deltas are not words for the owner) ||||
+/// | thinking (live as written, then the step's stored thinking) | row | row       | row      | hidden |
 /// | plan                                   | card     | card            | card     | hidden |
 /// | interim prose (not the run's last answer) | shown | shown           | shown    | hidden |
 /// | the run's answer                       | shown    | shown           | shown    | shown  |
 /// | run error, usage limit                 | shown    | shown           | shown    | shown  |
 /// | asks and their decisions               | shown    | shown           | shown    | shown  |
+/// | an ask nobody had to answer (`approval_auto` the policy allowed) | not drawn: the run's inspector keeps it ||||
 /// | the owner's words, Dot's notes         | shown    | shown           | shown    | shown  |
 ///
-/// "Response streaming" off: the words being written are not drawn; an answer appears once it is whole.
+/// "Response streaming" off: the words and the thinking being written are not drawn; an answer appears once it is whole.
+/// The answer's footer (copy, reaction, time) is on the run's final answer alone, once the run ended (`endedAt`).
 public enum ToolCallMode: String, CaseIterable, Codable, Sendable {
     case showAll
     case hideSuccessful
@@ -180,8 +182,11 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
     case owner(id: String, text: String, delivery: Delivery?)
     /// A note of Dot's from another run (a helper's report among them), drawn as Dot's row.
     case note(id: String, text: String)
-    /// Dot's words; `writing` while they are still being written (the stream's live words).
-    case answer(id: String, text: String, writing: Bool)
+    /// Dot's words; `writing` while they are still being written (the stream's live words). `endedAt` (epoch seconds)
+    /// only on the run's final answer once the run ended: the row then has its footer (copy, reaction, the time).
+    case answer(id: String, text: String, writing: Bool, endedAt: Double?)
+    /// The model's thinking of a step: `live` while it is being written.
+    case thought(id: String, text: String, live: Bool)
     case tool(ToolEntry)
     /// The helpers a run started, each with its current step (plan §18).
     case helpers(id: String, runId: String, helpers: [HelperView])
@@ -196,7 +201,7 @@ public indirect enum TranscriptItem: Sendable, Equatable, Identifiable {
 
     public var id: String {
         switch self {
-        case .owner(let id, _, _), .note(let id, _), .answer(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
+        case .owner(let id, _, _), .note(let id, _), .answer(let id, _, _, _), .thought(let id, _, _), .helpers(let id, _, _), .plan(let id, _), .ended(let id, _, _),
             .limit(let id, _):
             id
         case .tool(let entry): entry.id
@@ -236,7 +241,7 @@ public func transcript(
     let helpers: [HelperView] = chat.view?.helpers ?? []
     for run in runs {
         let built: [Built] = runItems(
-            run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil,
+            run, timeline: chat.runs[run.id], writing: streaming ? chat.writing[run.id] : nil, thinking: streaming ? chat.thinking[run.id] : nil,
             helpers: helpers.filter { $0.parentRunId == run.id }, context: context)
         items.append(contentsOf: shaped(built, finished: !run.isActive || hasEnded(chat.runs[run.id]), mode: mode))
     }
@@ -269,6 +274,7 @@ enum Category: Equatable {
     case plan
     case answer(final: Bool)
     case writing
+    case thought
     case decision
     case runEnd
 }
@@ -285,7 +291,8 @@ private func hasEnded(_ timeline: RunTimeline?) -> Bool {
     timeline?.events.contains { $0.kind == "run_finished" } ?? false
 }
 
-private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?, helpers: [HelperView], context: TranscriptContext) -> [Built] {
+private func runItems(
+    _ run: RunRecord, timeline: RunTimeline?, writing: String?, thinking: LiveThought?, helpers: [HelperView], context: TranscriptContext) -> [Built] {
     // A run a helper's report started (item 1351) begins with Dot's note, not the owner's words.
     let opening: TranscriptItem =
         run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil)
@@ -300,9 +307,14 @@ private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?
     for event in events {
         switch event.kind {
         case "assistant":
+            let thought: String = event.data["thinking"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !thought.isEmpty {
+                let step: Int = event.data["step"]?.int ?? event.id
+                items.append(Built(item: .thought(id: "th:\(run.id):\(step)", text: thought, live: false), category: .thought, start: event.ts, end: event.ts))
+            }
             let text: String = event.data["text"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !text.isEmpty else { continue }
-            items.append(Built(item: .answer(id: "a:\(event.id)", text: text, writing: false), category: .answer(final: false), start: event.ts, end: event.ts))
+            items.append(Built(item: .answer(id: "a:\(event.id)", text: text, writing: false, endedAt: nil), category: .answer(final: false), start: event.ts, end: event.ts))
         case "tool_call":
             guard let step: HelperStep = helperStep(of: event) else { continue }
             // An ask and a plan stand as their own rows (the anchor, the checklist): their tool calls are not drawn twice.
@@ -337,6 +349,9 @@ private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?
         case "approval_requested", "question_left", "approval_auto":
             guard let approval: String = event.data["approval_id"]?.string else { continue }
             let auto: Bool = event.kind == "approval_auto"
+            // What the policy allowed with nobody asked (yolo, free, a rule, the auto review) is the run's record, not the
+            // chat's: the inspector keeps it. A refusal changed what the run did, and stays.
+            if auto, (event.data["status"]?.string ?? "approved") == "approved" { continue }
             let status: String = auto ? (event.data["status"]?.string ?? "approved") : (event.kind == "question_left" ? "left" : "pending")
             let decider: AskDecider? = auto ? .automatic(event.data["decided_by"]?.string ?? "") : nil
             let anchor: AskAnchor = AskAnchor(
@@ -375,7 +390,7 @@ private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?
                 (event.data["restated"]?.array ?? []).compactMap { $0.string?.trimmingCharacters(in: .whitespacesAndNewlines) }
             ).union(result.isEmpty ? [] : [result])
             items = items.filter { built in
-                if case .answer(_, let text, _) = built.item { return !restated.contains(text) }
+                if case .answer(_, let text, _, _) = built.item { return !restated.contains(text) }
                 return true
             }
             appendHelpers(&items, run: run, helpers: helpers, at: event.ts)
@@ -388,7 +403,7 @@ private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?
                 // A failed run's result is its error's words: they stand once, in the card that says it failed.
                 let resultIsTheError: Bool = status != "done" && (message.isEmpty || result == message.trimmingCharacters(in: .whitespacesAndNewlines))
                 if !result.isEmpty, !resultIsTheError {
-                    items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false), category: .answer(final: true), start: event.ts, end: event.ts))
+                    items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false, endedAt: nil), category: .answer(final: true), start: event.ts, end: event.ts))
                 }
                 if status != "done" {
                     let cause: String = firstLine(message.isEmpty ? (status == "failed" ? result : "") : message)
@@ -403,7 +418,7 @@ private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?
         appendHelpers(&items, run: run, helpers: helpers, at: run.finishedAt ?? run.createdAt)
         let result: String = run.result.trimmingCharacters(in: .whitespacesAndNewlines)
         if !result.isEmpty {
-            items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false), category: .answer(final: true), start: run.createdAt, end: run.createdAt))
+            items.append(Built(item: .answer(id: "r:\(run.id)", text: result, writing: false, endedAt: nil), category: .answer(final: true), start: run.createdAt, end: run.createdAt))
         }
         if run.status != "done" {
             items.append(Built(item: .ended(id: "e:\(run.id)", status: run.status, detail: ""), category: .runEnd, start: run.createdAt, end: run.createdAt))
@@ -412,15 +427,28 @@ private func runItems(_ run: RunRecord, timeline: RunTimeline?, writing: String?
     if !hasEnded(timeline), run.isActive || !events.isEmpty {
         appendHelpers(&items, run: run, helpers: helpers, at: events.last?.ts ?? run.createdAt)
     }
+    if let thinking, !thinking.text.isEmpty, run.isActive, !hasEnded(timeline) {
+        let at: Double = events.last?.ts ?? run.createdAt
+        items.append(Built(item: .thought(id: "th:\(run.id):\(thinking.step)", text: thinking.text, live: true), category: .thought, start: at, end: at))
+    }
     if let writing, !writing.isEmpty, run.isActive {
         let at: Double = events.last?.ts ?? run.createdAt
-        items.append(Built(item: .answer(id: "w:\(run.id)", text: writing, writing: true), category: .writing, start: at, end: at))
+        items.append(Built(item: .answer(id: "w:\(run.id)", text: writing, writing: true, endedAt: nil), category: .writing, start: at, end: at))
     }
     // While the run works, its newest reply is not yet known to be its last; once it ended, the last reply is the answer.
     if hasEnded(timeline) || !run.isActive, !items.contains(where: { $0.category == .answer(final: true) }),
         let last: Int = items.lastIndex(where: { $0.category == .answer(final: false) })
     {
         items[last].category = .answer(final: true)
+    }
+    // The final answer's footer comes once the run ended, with the time it ended.
+    if hasEnded(timeline) || !run.isActive {
+        let ended: Double = events.last(where: { $0.kind == "run_finished" })?.ts ?? run.finishedAt ?? run.createdAt
+        for at in items.indices where items[at].category == .answer(final: true) {
+            if case .answer(let id, let text, _, _) = items[at].item {
+                items[at].item = .answer(id: id, text: text, writing: false, endedAt: ended)
+            }
+        }
     }
     return items
 }
@@ -466,6 +494,8 @@ func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
     case (.showAll, _): true
     case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
+    case (.zen, .thought): false
+    case (_, .thought): true
     case (.hideSuccessful, .tool(let state)): state != .done
     case (.hideAll, .tool(let state)): state == .failed
     case (.zen, _): false
@@ -477,7 +507,7 @@ func shows(_ category: Category, mode: ToolCallMode) -> Bool {
 /// words, Dot's notes, the asks, the helpers or how it ended.
 private func foldable(_ category: Category) -> Bool {
     switch category {
-    case .tool, .plan, .answer(final: false): true
+    case .tool, .plan, .answer(final: false), .thought: true
     default: false
     }
 }
@@ -509,4 +539,31 @@ func shaped(_ built: [Built], finished: Bool, mode: ToolCallMode) -> [Transcript
     }
     flush()
     return out
+}
+
+// MARK: What a run is doing now
+
+/// What a run at work is doing this moment, for the capsule's word (a sign of life in every tool mode, Zen too): writing
+/// its words, thinking, or running a tool; `nil` between steps (the model is being asked).
+public enum RunActivity: Sendable, Equatable {
+    case writing
+    case thinking
+    case tool(HelperStep)
+}
+
+/// What `run` of `chat` is doing now, from its live words and thinking and its stored events. Pure.
+public func activity(of chat: ChatProjection, run: String) -> RunActivity? {
+    if let words: String = chat.writing[run], !words.isEmpty { return .writing }
+    if let thought: LiveThought = chat.thinking[run], !thought.text.isEmpty { return .thinking }
+    let events: [EventRecord] = chat.runs[run]?.events ?? []
+    guard !events.contains(where: { $0.kind == "run_finished" }) else { return nil }
+    // The calls of the newest step that have no result yet: the first of them is what runs.
+    let since: ArraySlice<EventRecord> = events[((events.lastIndex { $0.kind == "assistant" }) ?? -1) + 1..<events.count]
+    let done: Set<String> = Set(since.filter { $0.kind == "tool_result" }.compactMap { $0.data["call_id"]?.string })
+    for event in since where event.kind == "tool_call" {
+        guard let step: HelperStep = helperStep(of: event), !silentTools.contains(step.tool) else { continue }
+        if let call: String = event.data["call_id"]?.string, done.contains(call) { continue }
+        return .tool(step)
+    }
+    return nil
 }

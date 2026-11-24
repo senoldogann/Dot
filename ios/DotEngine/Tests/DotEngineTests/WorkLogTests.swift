@@ -44,7 +44,7 @@ final class WorkLogTests: XCTestCase {
             [run("run_a", status: "running")],
             [
                 call(10, "ok", "read_file"), result(11, "ok", ok: true),
-                event(12, "assistant", ["text": .string("Looking"), "step": .int(1)]),
+                event(12, "assistant", ["text": .string("Looking"), "thinking": .string("Which file first?"), "step": .int(1)]),
                 call(13, "bad", "shell"), result(14, "bad", ok: false),
                 call(15, "open", "wait_until"),
                 event(16, "plan", ["steps": .array([.object(["text": .string("Read"), "status": .string("done")])])]),
@@ -54,10 +54,10 @@ final class WorkLogTests: XCTestCase {
 
     func testEveryCellOfTheModeTable() {
         let ids: (ToolCallMode) -> [String] = { transcript(of: self.working, pending: [], mode: $0, streaming: true, context: .none).map(\.id) }
-        XCTAssertEqual(ids(.showAll), ["u:run_a", "t:ok", "a:12", "t:bad", "t:open", "plan:run_a", "ask:apr_1"])
-        XCTAssertEqual(ids(.hideSuccessful), ["u:run_a", "a:12", "t:bad", "t:open", "plan:run_a", "ask:apr_1"], "running and failed stay")
-        XCTAssertEqual(ids(.hideAll), ["u:run_a", "a:12", "t:bad", "plan:run_a", "ask:apr_1"], "a failed tool still shows")
-        XCTAssertEqual(ids(.zen), ["u:run_a", "ask:apr_1"], "Zen: the owner's words and the asks; the reply may not be the last")
+        XCTAssertEqual(ids(.showAll), ["u:run_a", "t:ok", "th:run_a:1", "a:12", "t:bad", "t:open", "plan:run_a", "ask:apr_1"])
+        XCTAssertEqual(ids(.hideSuccessful), ["u:run_a", "th:run_a:1", "a:12", "t:bad", "t:open", "plan:run_a", "ask:apr_1"], "running and failed stay")
+        XCTAssertEqual(ids(.hideAll), ["u:run_a", "th:run_a:1", "a:12", "t:bad", "plan:run_a", "ask:apr_1"], "a failed tool still shows")
+        XCTAssertEqual(ids(.zen), ["u:run_a", "ask:apr_1"], "Zen: the owner's words and the asks; the reply may not be the last, no thinking")
     }
 
     func testAFinishedRunFoldsItsStepsAndTalliesThemWithItsDuration() {
@@ -115,19 +115,43 @@ final class WorkLogTests: XCTestCase {
             event(13, "approval_decided", ["approval_id": .string("apr_2"), "status": .string("expired"), "note": .string("")]),
             event(14, "approval_auto", ["approval_id": .string("apr_3"), "severity": .string("low"), "summary": .string("Read a file"),
                 "status": .string("approved"), "decided_by": .string("review")]),
+            event(15, "approval_auto", ["approval_id": .string("apr_4"), "severity": .string("high"), "summary": .string("Delete the backups"),
+                "status": .string("denied"), "decided_by": .string("review")]),
         ]
         let items: [TranscriptItem] = transcript(
             of: chat([run("run_a", status: "running")], asked), pending: [], mode: .zen, streaming: true,
             context: TranscriptContext(answeredHere: ["apr_1"]))
         let anchors: [AskAnchor] = items.compactMap { if case .decision(let anchor) = $0 { anchor } else { nil } }
-        XCTAssertEqual(anchors.map(\.status), ["approved", "expired", "approved"])
+        XCTAssertEqual(anchors.map(\.status), ["approved", "expired", "denied"], "what the policy allowed with nobody asked is not drawn")
         XCTAssertEqual(anchors.map(\.decider), [.thisPhone, .nobody, .automatic("review")])
+        for mode in ToolCallMode.allCases {
+            let ids: [String] = transcript(of: chat([run("run_a", status: "running")], asked), pending: [], mode: mode, streaming: true, context: .none).map(\.id)
+            XCTAssertFalse(ids.contains("ask:apr_3"), "an allowed ask nobody answered is in no mode (\(mode))")
+            XCTAssertTrue(ids.contains("ask:apr_4"), "a refusal stays in every mode (\(mode))")
+        }
         XCTAssertEqual(anchors[1].summary, "Which day?", "a question's own words")
         let asking: [TranscriptItem] = transcript(
             of: chat([run("run_a", status: "running")], [call(9, "q1", "ask_user")] + asked), pending: [], mode: .showAll, streaming: true, context: .none)
         XCTAssertFalse(asking.contains { $0.id == "t:q1" }, "the ask's own tool call is not drawn beside its anchor")
         let elsewhere: [TranscriptItem] = transcript(of: chat([run("run_a", status: "running")], asked), pending: [], mode: .showAll, streaming: true, context: .none)
         XCTAssertTrue(elsewhere.contains { if case .decision(let anchor) = $0 { anchor.decider == .elsewhere } else { false } })
+    }
+
+    /// The footer (copy, reaction, time) is on the final answer alone, once the run ended: none on the passing words
+    /// while it works, none on the last words before it ended.
+    func testOnlyTheFinalAnswerOfAnEndedRunHasItsFooter() {
+        let steps: [EventRecord] = [
+            event(10, "assistant", ["text": .string("Checking the disk"), "step": .int(1)]), call(11, "c1", "shell"), result(12, "c1", ok: true),
+            event(13, "assistant", ["text": .string("All clear"), "step": .int(2)]),
+        ]
+        let ended: (TranscriptItem) -> Double?? = { if case .answer(_, _, _, let at) = $0 { at } else { nil } }
+        let working: [TranscriptItem] = transcript(of: chat([run("run_a", status: "running")], steps), pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(working.compactMap(ended), [nil, nil], "no footer while the run works")
+        let done: [TranscriptItem] = transcript(
+            of: chat([run("run_a", status: "done")], steps + [event(14, "run_finished", ["status": .string("done"), "result": .string("")])]),
+            pending: [], mode: .showAll, streaming: true, context: .none)
+        XCTAssertEqual(done.last.flatMap(ended), .some(14), "the final answer has the footer with the time the run ended")
+        XCTAssertEqual(done.filter { if case .answer(_, _, _, .some) = $0 { true } else { false } }.count, 1)
     }
 
     func testAUsageLimitIsItsOwnCardAndAFailureSaysItsCauseInOneLine() {

@@ -207,6 +207,11 @@ final class FakeDaemon: @unchecked Sendable {
         push(EventRecord(id: 0, runId: run, ts: 0, kind: "delta", data: ["kind": .string("text"), "text": .string(text), "step": .int(step)]))
     }
 
+    /// Thinking being written (id 0).
+    func thinking(_ run: String, _ text: String, step: Int) {
+        push(EventRecord(id: 0, runId: run, ts: 0, kind: "delta", data: ["kind": .string("thinking"), "text": .string(text), "step": .int(step)]))
+    }
+
     /// Moves a chat's revision; `tell` false is a change whose `thread_changed` was lost.
     func bump(_ thread: String, tell: Bool) {
         let revision: Int? = lock.withLock {

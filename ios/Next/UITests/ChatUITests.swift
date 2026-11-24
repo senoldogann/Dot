@@ -9,6 +9,21 @@ final class ChatUITests: XCTestCase {
         return app
     }
 
+    /// The owner's report of 2026-11-25: the capsule's clock froze between events. The fixture's run gets no event at
+    /// all, yet the clock goes on every second; and the capsule says what the run does (here: writing its words).
+    func testTheCapsuleClockTicksWithNoEventsAndSaysWhatTheRunDoes() {
+        let app: XCUIApplication = launch("n2-chat")
+        let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        let first: String = status.label
+        XCTAssertTrue(first.hasPrefix("Writing, "), "the capsule says what the run does: \(first)")
+        let moved: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", first), object: status)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 2.5), .completed, "the clock moved on its own: \(first) -> \(status.label)")
+        let second: String = status.label
+        let again: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", second), object: status)
+        XCTAssertEqual(XCTWaiter.wait(for: [again], timeout: 2.5), .completed, "and again a second later: \(second) -> \(status.label)")
+    }
+
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
         XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))

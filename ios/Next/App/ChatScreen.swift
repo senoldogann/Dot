@@ -49,7 +49,8 @@ struct ChatScreen: View {
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
 
-    private var items: [TranscriptItem] {
+    /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
+    private var builtItems: [TranscriptItem] {
         guard let chat else { return [] }
         return transcript(
             of: chat, pending: model.snapshot.pending(in: thread), mode: mode, streaming: streaming,
@@ -76,7 +77,8 @@ struct ChatScreen: View {
     }
 
     var body: some View {
-        content
+        let items: [TranscriptItem] = builtItems
+        return content(items)
             .background(Tone.ground)
             .navigationTitle(view?.thread.title ?? model.snapshot.list.rows.first { $0.summary.id == thread }?.summary.title ?? "")
             .navigationSubtitle(subtitle)
@@ -122,7 +124,7 @@ struct ChatScreen: View {
 
     // MARK: The transcript
 
-    @ViewBuilder private var content: some View {
+    @ViewBuilder private func content(_ items: [TranscriptItem]) -> some View {
         if chat?.freshness == .deleted, items.isEmpty {
             EmptyState(
                 title: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), systemImage: "trash",
@@ -138,11 +140,11 @@ struct ChatScreen: View {
                     : String(localized: "Nothing of this chat is saved on this phone yet. It loads once the phone reaches your Mac.", comment: "Empty chat when offline with nothing saved"),
                 actionTitle: nil, action: {})
         } else {
-            transcriptView
+            transcriptView(items)
         }
     }
 
-    private var transcriptView: some View {
+    private func transcriptView(_ items: [TranscriptItem]) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.m) {
@@ -236,11 +238,13 @@ struct ChatScreen: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
         case .note(_, let text):
             DotNoteRow(text: text)
-        case .answer(let id, let text, let writing):
+        case .answer(let id, let text, let writing, let endedAt):
             VStack(alignment: .leading, spacing: Space.xxs) {
                 AnswerView(markdown: text, writing: writing)
-                if !writing, let target = chat.flatMap({ reactionTarget(of: id, in: $0) }) {
+                // The footer is the final answer's alone, once the run ended (plan §24): none under passing words.
+                if let endedAt, let target = chat.flatMap({ reactionTarget(of: id, in: $0) }) {
                     ReactionsBar(
+                        at: Date(timeIntervalSince1970: endedAt),
                         on: Set((view?.reactions ?? []).filter { $0.runId == target.run && $0.message == target.message }.map(\.reaction)),
                         toggle: { reaction in react(reaction, target: target) },
                         copy: {
@@ -252,6 +256,8 @@ struct ChatScreen: View {
             .contextMenu {
                 Button(String(localized: "Copy", comment: "Code block header button that copies the code"), systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
             }
+        case .thought(_, let text, let live):
+            ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
         case .helpers(_, _, let list):
@@ -295,7 +301,8 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: capsuleStatus, elapsed: elapsed, queued: view?.queue.messages.count ?? 0,
+                    status: capsuleStatus, activity: activityWords,
+                    since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
                     helpers: helpers.filter { helperState($0.status).isLive }.count),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
                 scrollToBottom: { withAnimation { proxy.scrollTo("end", anchor: .bottom) } }
@@ -517,7 +524,8 @@ struct ChatScreen: View {
         if stopping, activeRun != nil { return String(localized: "Stopping…", comment: "Helper state: the owner pressed Stop and it has not ended yet") }
         switch phase {
         case .waitingOnYou: return ChatStatus.waitingOnYou.word
-        case .working: return [ChatStatus.working.word, elapsed].compactMap { $0 }.joined(separator: " · ")
+        // The clock is the capsule's, which ticks on its own; a title drawn with the screen would freeze between events.
+        case .working: return ChatStatus.working.word
         case .starting: return ChatStatus.starting.word
         case .failed: return ChatStatus.failed.word
         default:
@@ -526,9 +534,18 @@ struct ChatScreen: View {
         }
     }
 
-    private var elapsed: String? {
-        guard let run = activeRun else { return nil }
-        return elapsedWords(from: Date(timeIntervalSince1970: run.createdAt), to: .now)
+    /// What the run at work does now, for the capsule (thinking, writing, the tool that runs); `nil` between steps.
+    private var activityWords: String? {
+        guard capsuleStatus == .working, let run = activeRun, let chat, let now = activity(of: chat, run: run.id) else { return nil }
+        switch now {
+        case .thinking: return String(localized: "Thinking", comment: "Capsule: the run's model is thinking")
+        case .writing: return String(localized: "Writing", comment: "Capsule: the run's model is writing its words")
+        case .tool(let step):
+            return toolLine(
+                ToolEntry(
+                    id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [],
+                    startedAt: step.at, endedAt: nil))
+        }
     }
 
     @ViewBuilder private func sheet(_ panel: ChatPanel) -> some View {

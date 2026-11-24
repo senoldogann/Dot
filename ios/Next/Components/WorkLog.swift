@@ -420,19 +420,19 @@ struct HelperGroupCard: View {
     }
 }
 
-/// The reactions on an answer and the menu that adds one, each with what it does (docs/runs.md).
+/// The footer of a run's final answer (plan §24): copy, the reactions on it and the menu that adds one (docs/runs.md), and
+/// the time the answer came. Quiet ink glyphs of one weight, close together; drawn under the final answer alone.
 struct ReactionsBar: View {
+    let at: Date
     let on: Set<String>
     let toggle: (ReactionKind) -> Void
     let copy: () -> Void
 
     var body: some View {
-        HStack(spacing: Space.xxs) {
-            Button(action: copy) {
-                Symbol(name: "doc.on.doc", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.hit, height: Metric.toolRow)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Copy the answer", comment: "VoiceOver: copies Dot's answer"))
+        HStack(spacing: Space.xs) {
+            Button(action: copy) { glyph("square.on.square") }
+                .buttonStyle(.plain)
+                .accessibilityLabel(String(localized: "Copy the answer", comment: "VoiceOver: copies Dot's answer"))
             ForEach(ReactionKind.allCases.filter { on.contains($0.rawValue) }) { reaction in
                 Button { toggle(reaction) } label: {
                     Text(reaction.emoji).font(.footnote).padding(.horizontal, Space.xs).frame(minHeight: Metric.toolRow)
@@ -446,10 +446,58 @@ struct ReactionsBar: View {
                     Button { toggle(reaction) } label: { Text(verbatim: "\(reaction.emoji)  \(reaction.meaning)") }
                 }
             } label: {
-                Symbol(name: "face.smiling", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.hit, height: Metric.toolRow)
+                glyph("face.smiling")
             }
             .accessibilityLabel(String(localized: "React", comment: "VoiceOver: the menu of reactions under an answer"))
+            Text(at.formatted(date: .omitted, time: .shortened)).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
             Spacer(minLength: 0)
+        }
+    }
+
+    private func glyph(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(.footnote, weight: .regular))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(Tone.tertiary)
+            .frame(width: 28, height: Metric.toolRow)
+            .contentShape(Rectangle())
+    }
+}
+
+/// The model's thinking of a step (Show all, Hide successful, Hide all; never in Zen): "Thinking" with its last lines
+/// while it is written, "Thought" folded once the step is stored; a tap opens the whole of it.
+struct ThoughtRow: View {
+    let text: String
+    let live: Bool
+    @State private var open: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            Button { open.toggle() } label: {
+                HStack(spacing: Space.xs) {
+                    Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary)
+                    if live {
+                        Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.label).modifier(Shimmer())
+                    } else {
+                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.label).foregroundStyle(Tone.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Symbol(name: open ? "chevron.up" : "chevron.down", context: .chevron).foregroundStyle(Tone.tertiary)
+                }
+                .frame(minHeight: Metric.toolRow)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
+            if open || live {
+                Text(text)
+                    .textRole(.label)
+                    .foregroundStyle(Tone.tertiary)
+                    .lineLimit(open ? nil : 3)
+                    .truncationMode(.head)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
         }
     }
 }

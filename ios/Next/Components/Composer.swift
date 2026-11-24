@@ -417,7 +417,11 @@ struct DocumentScanner: UIViewControllerRepresentable {
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
     let status: ChatStatus?
-    let elapsed: String?
+    /// What the run does this moment ("Thinking", "Running du -sh ~"), said in the status's place while it works: a sign
+    /// of life in every tool mode, Zen too.
+    let activity: String?
+    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not.
+    let since: Date?
     let queued: Int
     let helpers: Int
 
@@ -461,13 +465,23 @@ struct FloatingWorkingControl: View {
             : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let status = summary.status {
-                segment(action: openStatus, label: [status.word, summary.elapsed].compactMap { $0 }.joined(separator: ", ")) {
-                    HStack(spacing: Space.xxs + 1) {
-                        StatusWord(status: status)
-                        if let elapsed = summary.elapsed {
-                            Text(elapsed).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
+                // The status and its clock are drawn every second, whether events come or not: a clock drawn with
+                // the screen froze between events and jumped when they came (the owner's report of 2026-11-25).
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
+                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
+                        HStack(spacing: Space.xxs + 1) {
+                            if let activity = summary.activity {
+                                ActivityWord(text: activity)
+                            } else {
+                                StatusWord(status: status)
+                            }
+                            if let clock {
+                                Text(clock).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
+                            }
                         }
                     }
+                    .accessibilityIdentifier("capsule.status")
                 }
             }
             if summary.queued > 0 {
@@ -509,5 +523,20 @@ struct FloatingWorkingControl: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// What a run does now, as the capsule's status word: the working spinner and one short line.
+struct ActivityWord: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: Space.xxs + 1) {
+            ProgressView().controlSize(.mini).tint(Tone.secondary)
+            Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).truncationMode(.tail).frame(maxWidth: 200, alignment: .leading)
+        }
+        .foregroundStyle(ChatStatus.working.tone.color)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }
