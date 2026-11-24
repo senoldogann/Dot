@@ -20,6 +20,15 @@ struct ExtrasSnapshot: Codable, Sendable, Equatable {
     var schema: Int? = ChatCache.schema
 }
 
+/// What the phone's awareness keeps between launches (items 1441 to 1443): the push switches as the daemon last held them,
+/// what waits on the owner and the card of what Dot did while they were away, so that each is drawn at once and the
+/// network only brings it up to date. A field a build does not know yet reads as none.
+struct AwarenessSnapshot: Codable, Sendable, Equatable {
+    var pushSettings: PushSettings?
+    var savedAt: Double
+    var schema: Int? = ChatCache.schema
+}
+
 /// What one chat keeps on disk: its newest runs and the tail of their stored events, so that the chat draws before
 /// the network answers and then catches up by the events after the last one it holds.
 struct StoredChat: Codable, Sendable, Equatable {
@@ -173,6 +182,22 @@ actor ChatCache {
         var current: ExtrasSnapshot = extras
         current.schema = Self.schema
         write(current, to: directory.appending(path: "extras.json"))
+    }
+
+    nonisolated static func readAwareness(in directory: URL) -> AwarenessSnapshot? {
+        let url: URL = directory.appending(path: "awareness.json")
+        guard let held: AwarenessSnapshot = read(AwarenessSnapshot.self, at: url) else { return nil }
+        guard isReadable(schema: held.schema) else {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+        return held
+    }
+
+    func saveAwareness(_ snapshot: AwarenessSnapshot) {
+        var current: AwarenessSnapshot = snapshot
+        current.schema = Self.schema
+        write(current, to: directory.appending(path: "awareness.json"))
     }
 
     /// Drops the chats that are not among `ids` (deleted on the Mac), the oldest beyond the most kept, and, when the

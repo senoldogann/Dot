@@ -68,4 +68,28 @@ final class AwarenessRequestTests: XCTestCase {
         XCTAssertLessThan(made.configuration.timeoutIntervalForResource, ActivityLeaseRules.renewEvery)
         XCTAssertTrue(made.configuration.protocolClasses?.contains { $0 == BodyStub.self } ?? false, "made like the session it came from")
     }
+
+    // MARK: Item 1441, the push switches
+
+    func testTheSwitchesAreReadFromTheirRouteWithThePhonesKey() async throws {
+        BodyStub.reply = #"{"needs_you":true,"ready":false,"done":true}"#
+        let read: PushSettings = try await api().pushSettings()
+        XCTAssertEqual(BodyStub.seen.last?.method, "GET")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/phone/push-settings")
+        XCTAssertEqual(BodyStub.seen.last?.authorization, "Bearer phone.a.b")
+        XCTAssertEqual(read, PushSettings(needsYou: true, ready: false, done: true))
+    }
+
+    func testTheSwitchesAreWrittenAllThreeTogetherAndTheAnswerIsWhatWasKept() async throws {
+        BodyStub.reply = #"{"needs_you":false,"ready":false,"done":true}"#
+        let kept: PushSettings = try await api().setPushSettings(PushSettings(needsYou: false, ready: false, done: true))
+        XCTAssertEqual(BodyStub.seen.last?.method, "PUT")
+        XCTAssertEqual(BodyStub.seen.last?.path, "/api/phone/push-settings")
+        let body: [String: Any] = try lastBody()
+        XCTAssertEqual(Set(body.keys), ["needs_you", "ready", "done"], "the daemon refuses a missing switch and any other key")
+        XCTAssertEqual(body["needs_you"] as? Bool, false)
+        XCTAssertEqual(body["ready"] as? Bool, false)
+        XCTAssertEqual(body["done"] as? Bool, true)
+        XCTAssertEqual(kept, PushSettings(needsYou: false, ready: false, done: true))
+    }
 }

@@ -25,4 +25,15 @@ extension APIClient {
         built.timeoutInterval = 8
         _ = try await data(built, path: path)
     }
+
+    // MARK: Push switches (item 1441)
+
+    /// Which of the three kinds of push Dot tells this phone (`GET /api/phone/push-settings`).
+    func pushSettings() async throws -> PushSettings { try await get("/api/phone/push-settings") }
+
+    /// Keeps all three switches (`PUT /api/phone/push-settings`: the daemon takes the three together) and answers with what it
+    /// kept. A write is sent once; the screen that flipped the switch says it when it does not get through.
+    func setPushSettings(_ settings: PushSettings) async throws -> PushSettings {
+        try await send("PUT", "/api/phone/push-settings", body: settings)
+    }
 }

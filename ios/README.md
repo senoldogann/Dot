@@ -12,7 +12,8 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     rows; `QueueOrder`; `MessageBlocks`.
     Resilience rules live here too (item 1371): `RetryPolicy` (tries, waits, jitter, what is worth repeating),
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
-    `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner.
+    `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner;
+    `PushSettings` (item 1441) the three push switches and what a flip does.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -101,6 +102,14 @@ did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app'
   does not get through is only logged (the lease ends by itself in 45 s: the safe side). `NativeStore` owns the lease (a
   store exists for a paired phone only, so an unpaired app says nothing), knows the chat on the screen from the sessions
   it holds (`chatOnScreen`) and is told the scene's phase by `AppModel.sceneChanged`.
+- **Push switches** (item 1441): Settings has a **Notifications** group of three switches (`Core/PushSettings`: Needs you,
+  Ready, Done, each with its one line), read with `GET /api/phone/push-settings` when Settings opens and when the link is
+  back, written as all three with `PUT` on a flip. `PushSwitches` is the rule: a flip shows at once, one write is on its
+  way at a time (a second flip goes after it with the latest of all three), a write that is not kept puts the switches
+  back to what the daemon held with a plain line (`words(forStatus:)`), and without the daemon's answer the last switches
+  the phone knew are shown dimmed and do not move. `AwarenessModel` (one per store) draws them from `awareness.json` in the
+  cache folder before the network answers. The old row that opens the iPhone's own page of this app's settings is now
+  "iPhone notification settings".
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 

@@ -593,6 +593,15 @@ Errors: 403 for the Mac's token; 422 for a `PUT` that is not the three booleans 
 phone removed while its `PUT` was on its way. Web push to a browser has its own switch (Settings › General ›
 Notifications) and is not changed by these.
 
+The iPhone app has these switches in Settings, under **Notifications** (item 1441), each with one line of what it means
+("Needs you": Dot waits on your answer, or something it does on its own needs a look; "Ready": a draft is ready to send, or
+Dot has news for you; "Done": a task, a schedule or a campaign has finished, or failed). It reads them with a `GET` when
+Settings opens and again when the phone's link comes back, and writes all three with a `PUT` when one is flipped: the
+switch moves at once, a second flip while a write is on its way waits and goes after it with the latest of all three, and
+a write the daemon does not keep (a refusal, or no answer) puts the switches back to what the daemon held and says so in a
+plain line. With no answer to the read the phone shows the switches as it last knew them (kept in `awareness.json` of the
+cache folder), dimmed, and they do not move: a switch that cannot be kept is no switch.
+
 ### GET /api/needs-you
 
 Everything that waits on you, in one list, for the app's list and badge (item 1422): the approvals a run waits for, its

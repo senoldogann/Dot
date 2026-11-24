@@ -38,6 +38,9 @@ final class NativeStore {
     private(set) var lastUpdated: Date?
     /// What was typed and not sent, per chat, kept between launches.
     let drafts: DraftStore
+    /// What the phone knows of Dot's awareness of the owner: the push switches (item 1441), later what waits on them and what
+    /// Dot did while they were away.
+    let awareness: AwarenessModel
     /// Tells the daemon whether the app is in front of the owner and which chat it shows (item 1440), so that its alerts
     /// stay quiet while the owner looks and go the moment they do not.
     @ObservationIgnored let lease: ActivityLease
@@ -100,8 +103,10 @@ final class NativeStore {
             })
         let folder: URL = directory ?? ChatCache.directory(for: host)
         self.folder = folder
-        self.cache = ChatCache(directory: folder)
+        let chatCache: ChatCache = ChatCache(directory: folder)
+        self.cache = chatCache
         self.drafts = DraftStore(directory: folder)
+        self.awareness = AwarenessModel(api: client, cache: chatCache, directory: folder, link: link)
         let box: Outbox = Outbox(directory: folder, api: client, link: link, uploadSession: uploadSession)
         self.outbox = OutboxModel(box: box, initial: Outbox.read(folder.appending(path: "outbox.json")))
         #if DEBUG
