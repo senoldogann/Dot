@@ -100,7 +100,8 @@ is told so. A run that did what the policy would have asked about can always be 
 - **A scripted run through the real loop**, with a browser that presses nothing, ends done in free mode with no approval
   event and no `ask_user`, and records why it would have asked; the same run in yolo alone asks only about the post and the
   payment.
-- **The gate adds no wait**: no approval and no sleep is awaited in a run that asks nothing.
+- **The gate adds no wait**: no approval and no sleep is awaited in a run that asks nothing, with no pace set for the site
+  (a pace is the owner's own wait, above).
 - The exceptions are compared with the engine's own flags, and each refusal above but the desktop's has a test.
 
 [REVIEW.md](../REVIEW.md) makes the review of every push read for it.
