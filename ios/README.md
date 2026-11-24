@@ -12,6 +12,7 @@ Settings › Open web UI (and to pair in the page), but it is no longer the app'
     rows; `QueueOrder`; `MessageBlocks`.
     Resilience rules live here too (item 1371): `RetryPolicy` (tries, waits, jitter, what is worth repeating),
     `OutboxItem` (what waits for the Mac), `ConnectionBanner` (what the one line says) and `PrefetchRules`.
+    `ActivityLease` (item 1440) is the rule of the activity lease: when the app tells Dot it is in front of the owner.
   - `Data/`: `APIClient` (URLSession over `DaemonHost`, the phone key from `PhoneKeyStore`; a read is tried again by
     `Retrier` as its `RetryPolicy` says), `SSEParser` and `EventFeed` (resume from the last event id, backoff, wait for the
     link, reconnect on foreground and on a change of the network), `ChatCache` (JSON files per host: versioned, whole or
@@ -87,6 +88,19 @@ the models (the default and the review model) in Settings, notifications and the
   `DotDeepLink`, a run id that is not plainly an id opens nothing); a notification's tap and its **Open** action (new next
   to Approve and Deny; it comes to the front) open the chat of the alert's run, reading the run's own page and drawing
   the chat from it when the list does not hold it yet (a cold launch from the tap).
+
+Awareness (items 1440 to 1446: the app knows when Dot needs the owner, stays quiet while they look at it, and says what Dot
+did while they were away; the daemon's side is `docs/phone.md`, "The iPhone app's calls"):
+
+- **The activity lease** (item 1440): the app tells Dot it is in front of the owner (`POST /api/phone/activity`:
+  `foreground` and the chat on the screen) as its scene becomes active, every 25 s while it stays so and at once when the
+  chat on the screen changes, and `background` at once when the scene goes inactive or to the background, so that Dot's
+  alerts of a task's end stay quiet while the owner looks and go the moment they do not. The rules are `Core/ActivityLease`
+  (`ActivityLeaseRules`: no clock, no network; `ActivityLease`: the clock, the timer and the sender that a test replaces);
+  a report is one try that does not wait for a link, one on its way at a time with the newest behind it, and one that
+  does not get through is only logged (the lease ends by itself in 45 s: the safe side). `NativeStore` owns the lease (a
+  store exists for a paired phone only, so an unpaired app says nothing), knows the chat on the screen from the sessions
+  it holds (`chatOnScreen`) and is told the scene's phase by `AppModel.sceneChanged`.
 
 In the web UI: everything else (agents and teams, memory, rules, settings, the vault, the cards of a secret); the plan is in `roadmap/1353.md` and `roadmap/1361.md`.
 

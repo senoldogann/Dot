@@ -546,8 +546,15 @@ and of a campaign are not sent to that phone as alerts, for the chat on screen a
 itself. Everything else is sent whatever the lease says: an approval, a question (also one a run left), a secret and a
 hand-off, a draft written for you, what Dot tells you on its own and its own warnings (a schedule that did not run or was
 switched off, learning that stopped, a restart). The Live Activity is not touched by the lease, nor are the other phones,
-nor the web push of a browser. A phone that is removed loses its lease. The app of this checkout does not call this
-route yet (`ios/` was left as it was), so until it does the lease is never made and every alert goes.
+nor the web push of a browser. A phone that is removed loses its lease.
+
+The iPhone app makes the lease (item 1440): it says `foreground` as its scene becomes active and again every 25 seconds while
+the scene stays so, `foreground` with the new `chat` (the thread id) at once when the chat on its screen changes (`null`
+on the list and in Settings), and `background` at once when the scene goes inactive (a system sheet, the app switcher) or
+to the background, once. A report is one try with an 8-second wait and does not wait for a link, and one is on its way at
+a time with only the newest behind it, so a poor link never piles requests up and `background` is never overtaken by an
+older `foreground`. A report that does not get through is only logged, never shown: the lease ends by itself within 45
+seconds, which is the safe side (the alerts go). An app that is not paired says nothing.
 
 Errors: 403 for the Mac's token; 422 for a `state` that is neither `foreground` nor `background`, a `chat` that is empty
 or over 64 characters, a `ttl_s` that is not a number above 0, or any other key (the lease is as it was); 404 for a phone

@@ -20,6 +20,9 @@ final class AppModel {
     private(set) var native: NativeStore?
     /// A run a notification asked to open: the native list opens its chat.
     var pendingRunId: String?
+    /// The scene's phase as the activity lease reads it (item 1440), kept so that a store made later (pairing done while the
+    /// app is in front) says it at once.
+    @ObservationIgnored private(set) var scene: LeaseScene = .background
     /// Debug builds only: `-DotOpenChat <title prefix>` opens that chat at launch, `-DotShowInspector 1` its inspector,
     /// `-DotShowSettings 1` the settings; for looking at a screen in the simulator, which has no way to tap from here.
     var debugOpenChat: String?
@@ -70,6 +73,13 @@ final class AppModel {
         let store: NativeStore = NativeStore(host: host, key: key)
         native = store
         store.start()
+        store.sceneChanged(scene)
+    }
+
+    /// The scene became active, inactive or went to the background: the daemon is told at once whether the owner is looking.
+    func sceneChanged(_ phase: LeaseScene) {
+        scene = phase
+        native?.sceneChanged(phase)
     }
 
     private func currentKey() -> String? {

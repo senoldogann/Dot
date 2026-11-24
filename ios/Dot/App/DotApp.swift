@@ -22,11 +22,15 @@ struct DotApp: App {
                     native.enterForeground()
                     native.reconnect()
                 }
+                // The daemon is told the owner is looking: its alerts of a task's end stay quiet while they do.
+                appDelegate.model.sceneChanged(.active)
             case .background:
+                appDelegate.model.sceneChanged(.background)
                 appDelegate.model.native?.enterBackground()
                 BackgroundRefresh.schedule()
             case .inactive:
-                break
+                // A system sheet or the app switcher is over the app: the owner may not be looking, so the lease ends.
+                appDelegate.model.sceneChanged(.inactive)
             @unknown default:
                 break
             }
