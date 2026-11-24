@@ -377,6 +377,10 @@ def main() -> None:
     record: Path = Path(sys.argv[1])
     RECORD = record
     args: list[str] = sys.argv[2:]
+    if args == ["--version"]:
+        # The version Dot was measured on (item 1673).
+        print("2.1.331 (Claude Code)")
+        return
     if "--mcp-config" not in args:
         _list_models(record)
         return

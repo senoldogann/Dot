@@ -15,14 +15,25 @@ from pathlib import Path
 
 from dotagent.claude_code.ask import ask_claude
 from dotagent.claude_code.models import PlanModel, find_model, plan_models
+from dotagent.claude_code.versions import (
+    CLAUDE_VERSIONS,
+    VersionVerdict,
+    claude_version,
+    parse_version,
+    refusal,
+    verdict_of,
+)
 from dotagent.config import ClaudeCodeConfig
-from dotagent.core.errors import ClaudeCodeMissing
+from dotagent.core.errors import ClaudeCodeBrokenVersion, ClaudeCodeMissing
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import claude_code_command
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
 from dotagent.opencode.bridge import ToolBridge
 from dotagent.opencode.server import find_program
 from dotagent.repair.claude import ClaudeAccount, claude_state, read_account
+
+log = get_logger(__name__)
 
 CLAUDE_CODE_PROVIDER: str = "claude_code"
 # How hard a run thinks, as Claude Code's `--effort` takes it (item 1014), lowest first.
@@ -63,6 +74,9 @@ class ClaudeCodeProvider:
         self._bridge: ToolBridge = bridge
         # One listing at a time: runs that start together after the kept list aged wait for the one listing.
         self._listing: asyncio.Lock = asyncio.Lock()
+        # How Dot fares on the program's version (item 1673), by its path and the time it was last changed: asked once
+        # for each program file a self-update leaves.
+        self._versions: dict[tuple[str, float], VersionVerdict] = {}
 
     @property
     def name(self) -> str:
@@ -89,7 +103,28 @@ class ClaudeCodeProvider:
             raise ClaudeCodeMissing(NOT_INSTALLED, {"command": claude_code_command(self._config.command)})
         if await self.account() is None:
             raise ClaudeCodeMissing(NOT_SIGNED_IN, {"state": str(claude_state(self._login_env))})
+        verdict: VersionVerdict = await self.version_of(found)
+        if verdict.support == "broken":
+            raise ClaudeCodeBrokenVersion(
+                refusal(verdict), {"program": str(found), "version": verdict.shown, "why": verdict.why}
+            )
         return found
+
+    async def version_of(self, program: Path) -> VersionVerdict:
+        """How Dot fares on ``program``'s version (:data:`~dotagent.claude_code.versions.CLAUDE_VERSIONS`), asked once
+        for each program file; a version Dot was not measured on is logged once (item 1673)."""
+        stamp: tuple[str, float] = (str(program), (await asyncio.to_thread(program.stat)).st_mtime)
+        known: VersionVerdict | None = self._versions.get(stamp)
+        if known is not None:
+            return known
+        said: str = await claude_version(program, self._login_env)
+        verdict: VersionVerdict = verdict_of(parse_version(said), CLAUDE_VERSIONS)
+        self._versions[stamp] = verdict
+        if verdict.support != "supported":
+            log.warning(
+                "claude_code_version_not_measured", version=verdict.shown, support=verdict.support, why=verdict.why
+            )
+        return verdict
 
     async def account(self) -> ClaudeAccount | None:
         """The account ``claude`` is signed in with, read from its state file (no secret), or ``None``."""

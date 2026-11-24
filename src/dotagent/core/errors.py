@@ -323,6 +323,11 @@ class ClaudeCodeCut(ClaudeCodeBroke):
     ``stderr``, ``inited``, ``steps``, ``silent_s``), and the run goes on in place when that is safe (item 1581)."""
 
 
+class ClaudeCodeBrokenVersion(ClaudeCodeError):
+    """The installed ``claude`` program is a version Dot is known not to work with (item 1673): a run on it is refused,
+    saying which version and what to install."""
+
+
 class ClaudePlanLimitError(ClaudeCodeError):
     """The owner's Claude plan's usage limit stopped a run (item 1206). ``resets_at`` is when the plan's window resets,
     in epoch seconds, ``None`` when the plan did not say; it is in the context too, which the run's end keeps."""

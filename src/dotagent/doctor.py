@@ -24,6 +24,7 @@ from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid, started_by_dot
 from dotagent.browser.profiles import profile_dir
+from dotagent.claude_code.versions import CLAUDE_VERSIONS, VersionVerdict, claude_version, parse_version, verdict_of
 from dotagent.codemode.sandbox import Probe, code_mode_ready
 from dotagent.config import (
     AntigravityConfig,
@@ -38,6 +39,7 @@ from dotagent.config import (
 from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
     chrome_data_dir,
+    claude_code_command,
     config_path,
     db_path,
     dot_home,
@@ -64,6 +66,7 @@ from dotagent.mcp.builtin import builtin_servers, switch_of, web_research_instal
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.types import LeftOutTool
 from dotagent.memory.embedder import OpenAIEmbedder, build_openai_embedder
+from dotagent.opencode.server import find_program
 from dotagent.plugins.catalog import load_plugins
 from dotagent.plugins.types import PluginCatalog, PluginProblem
 from dotagent.secrets import require_secret, resolve_secret
@@ -354,6 +357,18 @@ def _openai_api_row(served: Served, required: bool, name: str = "openai api") ->
     if served.problem:
         return _result(name, False, required, served.problem)
     return _result(name, True, required, f"{len(served.names)} chat models are available to this key")
+
+
+async def _claude_code_row(config: AppConfig, required: bool) -> CheckResult:
+    """The ``claude`` program of the owner's Claude plan and how Dot fares on its version (item 1673): measured, older
+    than measured, unknown, or known not to work (a run on it is refused)."""
+    command: str = claude_code_command(config.providers.claude_code.command)
+    program: Path | None = await asyncio.to_thread(find_program, command, os.environ.get("PATH", ""))
+    if program is None:
+        return _result("claude code", not required, required, f"'{command}' is not installed")
+    verdict: VersionVerdict = verdict_of(parse_version(await claude_version(program, os.environ)), CLAUDE_VERSIONS)
+    detail: str = f"{program}: {verdict.shown}, {verdict.support} ({verdict.why})"
+    return _result("claude code", verdict.support != "broken", required, detail)
 
 
 def _antigravity_login_row(config: AntigravityConfig, required: bool) -> CheckResult:
@@ -997,6 +1012,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         if google_present:
             results.append(_openai_api_row(served["google"], "google" in used, "google api"))
         results.append(_antigravity_login_row(config.providers.antigravity, "antigravity" in used))
+        results.append(await _claude_code_row(config, "claude_code" in used))
         results.append(await _check_memory(router, config, down))
         for role, reference in configured:
             results.append(await _check_model(router, role, reference, served, down))
