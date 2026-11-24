@@ -67,7 +67,7 @@ class Tab:
     rendered_url: str = ""
     # Whether the last view was of a part of the page (item 743): the next one is not compared with it.
     rendered_partial: bool = False
-    # When Dot last looked at the page (``time.monotonic()``; item 1744): a view read, or the end of a step's watch. A
+    # When Dot last looked at the page (``time.monotonic()``; item 1744): a view read, or the end of any step it ran. A
     # page that changed after it and before the next step changes by itself. Zero: not looked at yet.
     looked_at: float = 0.0
     # How many requests the page had started then (``requests``): a page that asked for more before the next step polls
