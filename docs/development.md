@@ -550,7 +550,7 @@ failed (item 1722): a background `terminal_open` in a delegated run or a campaig
 `create_agent` with a team but no `agents_considered`. The model reads it as an error, since nothing was done, and its
 `tool_result` event is `"ok": false` (the call did not do its job, as the timeline and the record of acts show it) with
 `"steered": true`, which this table, the run ledger, the self-improvement loop's tool outcomes, the nightly reflection
-and the repair night's problems leave out of the failed calls (`store/failed.py`); an audit of the store does the same
+the repair night's problems and an eval run's scorecard leave out of the failed calls (`store/failed.py`); an audit of the store does the same
 by counting `"ok": false` and not `"steered": true`. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 

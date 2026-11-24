@@ -640,7 +640,7 @@ def test_the_answer_of_a_page_the_time_cut_says_so() -> None:
 
 def test_the_web_addresses_of_a_pages_media_are_found_and_the_rest_are_not() -> None:
     """Item 1721: pictures, sound and video by a web address stand empty in a shown page; a file beside the page, a
-    data: address, a link and a library's sheet or font do not."""
+    data: address, a link and what a style names (a sheet, a font, a background) are not refused."""
     html: str = (
         '<img src="https://a.example/1.png" srcset="https://a.example/2.png 2x, local.png 1x">'
         '<video poster="//b.example/p.jpg"><source src="http://127.0.0.1:9/v.mp4"></video>'
@@ -656,8 +656,5 @@ def test_the_web_addresses_of_a_pages_media_are_found_and_the_rest_are_not() -> 
         "//b.example/p.jpg",
         "http://127.0.0.1:9/v.mp4",
         "https://a.example/favicon.ico",
-        "https://c.example/bg.png",
-        "https://e.example/s.css",
-        "https://d.example/g.png",
     )
     assert page_files.remote_media("<p>No media</p>") == ()

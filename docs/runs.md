@@ -832,10 +832,9 @@ picture named fewer times, or by a tag with a `srcset`, is written where it is n
 encoded once however often the page names it. Writing the files in has ten seconds (a page that names files by the
 thousands is looked at for that long): after it the rest of the page is shown as written, and the answer says so. A
 page that names a picture, a sound or a video by a web address (`http:`, `https:`, `//host`: in a tag, a `srcset` or
-its icon), or a style sheet or a font on a host other than the libraries' (a linked sheet, an `@import`, a style's
-`url()`), is refused and not kept, with those addresses and how to write them in, since its policy loads pictures, sound
-and video only from `data:` and `blob:` and sheets and fonts only from the libraries' hosts, and the owner would see a
-broken picture or an empty player (item 1721). A page longer than 500,000 characters is refused with its length and how to make it shorter (fewer
+its icon) is refused and not kept, with those addresses and how to write them in, since its policy loads them only from
+`data:` and `blob:` and the owner would see a broken picture or an empty player (item 1721); what its styles name (a
+sheet or a font of another host than the libraries', a background) is not refused, as the page is drawn without it. A page longer than 500,000 characters is refused with its length and how to make it shorter (fewer
 pixels, JPEG or WebP, a video as a few frames, a chart from its data, or pages of their own): a file named by its path is
 written in as base64 too, so it takes as much room. The pages of one step are shown one after the other in the order of
 the calls, so they stand in the conversation in that order (item 1721). The
