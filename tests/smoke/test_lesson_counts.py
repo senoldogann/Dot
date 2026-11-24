@@ -18,7 +18,7 @@ async def test_the_day_counts_only_autos_new_lessons_and_the_night_reads_every_a
         await store.record_lesson_save(LessonSave(at=start - 3 * DAY_S, source="ui", tainted=False), 0.0)
         await store.record_lesson_save(LessonSave(at=start, source="schedule", tainted=True), start - 2 * DAY_S)
         # Item 1713: the day counts its saves apart from the run's events, which go with its chat; a record older than
-        # the two days kept goes as the next is written.
+        # what the writer says it keeps goes as the next is written.
         await store._db.execute("DELETE FROM events")
         await store._db.commit()
         assert await store.lesson_saves_since(start - DAY_S) == [LessonSave(at=start, source="schedule", tainted=True)]

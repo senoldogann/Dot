@@ -6125,6 +6125,27 @@ class Store:
         await self._db.commit()
         return record.proposed
 
+    @_writing
+    async def take_proposed_change(
+        self, memory_id: str, content: str, tags: Sequence[str], vector: Sequence[float] | None, at: float
+    ) -> MemoryRecord:
+        """The owner takes the run's proposal of note ``memory_id`` made at ``at``: its words ``content`` and ``tags``
+        (checked, and ``vector`` their embedding) become the note's as the owner's own correction
+        (:meth:`update_memory_vouched`), and the proposal goes, in one write: a proposal that is not the one shown is a
+        conflict, and a write that fails keeps the proposal."""
+        record: MemoryRecord = await self.get_memory(memory_id)
+        if record.proposed is None or record.proposed.at != at:
+            raise RunConflict(
+                "the change proposed for this note is not the one shown; read the note again",
+                {"memory_id": memory_id, "at": at},
+            )
+        await self._db.execute(
+            "UPDATE memories SET proposed_content = NULL, proposed_tags = NULL, proposed_by = NULL,"
+            " proposed_tainted = NULL, proposed_at = NULL WHERE id = ?",
+            (memory_id,),
+        )
+        return await self._rewrite_memory(memory_id, content, tags, vector, record.source_run, "?", 0, OWNER_EDIT, None)
+
     async def memories_with_proposals(self, limit: int) -> list[MemoryRecord]:
         """The notes a run proposed a change of that waits for the owner, the newest proposal first."""
         rows = await self._all(
@@ -6236,7 +6257,7 @@ class Store:
     async def record_lesson_save(self, save: LessonSave, keep_since: float) -> None:
         """Record that ``auto`` saved a lesson as a new note (item 1713), in the ``kv`` table apart from the run's
         events, which go with its chat: the day's room for lessons is counted from these. Records older than
-        ``keep_since`` go in the same write, so the list holds about two days of saves."""
+        ``keep_since`` go in the same write, so the list holds the saves of the day the count reads."""
         row: aiosqlite.Row | None = await self._one("SELECT value FROM kv WHERE key = ?", (_LESSON_SAVES_KEY,))
         kept: list[LessonSave] = [] if row is None else _LESSON_SAVES.validate_json(str(row["value"]))
         saves: list[LessonSave] = [*(one for one in kept if one.at >= keep_since), save]

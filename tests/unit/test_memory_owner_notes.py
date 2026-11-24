@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.config import AppConfig, load_config
-from dotagent.core.errors import RunConflict
+from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.memory.lifecycle import pin_memory
 from dotagent.memory.service import (
     MemoryIndex,
@@ -177,3 +177,27 @@ async def test_the_owner_drops_a_proposed_change_and_the_note_stays(
     assert [note.proposed.content for note in listed if note.proposed is not None] == [REWRITE]
     assert (dropped.content, dropped.proposed, dropped.tainted) == (OWNERS, None, False)
     assert left == []
+
+
+async def test_a_proposal_the_store_refuses_to_take_stays_proposed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pre-push review's finding: the proposal was cleared before its words were written, so a write that failed
+    (here a ``[memory] max_chars`` lowered while the proposal waited) lost it."""
+    index, store = await _index(tmp_path, monkeypatch)
+    try:
+        saved: MemoryRecord = (await save_memory(index, OWNERS, ["core"], None, None, None, False)).record
+        proposed: MemoryRecord = (
+            await rewrite_memory_note(index, saved.id, REWRITE, ["core"], RUN, False, None)
+        ).record
+        assert proposed.proposed is not None
+        narrow: MemoryIndex = MemoryIndex(
+            store=store, embedder=None, config=index.config.model_copy(update={"max_chars": 10})
+        )
+        with pytest.raises(InvalidValueError):
+            await take_proposed_change(narrow, saved.id, proposed.proposed.at)
+        kept: MemoryRecord = await store.get_memory(saved.id)
+    finally:
+        await store.close()
+    assert kept.content == OWNERS
+    assert kept.proposed is not None and kept.proposed.content == REWRITE

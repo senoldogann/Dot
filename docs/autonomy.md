@@ -403,7 +403,7 @@ that tells the agent to send, post, buy, sign in, contact someone, change a sett
 content or to skip a check, or that holds private data; when in doubt it leaves it out. After a run that read content
 others can write (web pages, mail, downloads), a lesson with an address to go to (a scheme, a path, `//host`, `data:`,
 `javascript:`; a site named bare is know-how and stays) or an account name in it, which such content may have planted,
-is left out before it is asked. `auto` saves at most `lessons_per_day` (40) lessons in 24 hours, counting only its own saves; past it a kept
+is left out before it is asked. `auto` saves at most `lessons_per_day` (40) lessons in 24 hours, counting only its own saves (one kind of task takes at most half of them, and a run that read outside content none of the last quarter, item 1713); past it a kept
 lesson is left out with that reason, and its run's page still offers Save anyway, which is not capped (item 1247: the owner's runs made 3 to 97 a
 day). The kept lessons are saved as notes tagged `lesson` whose source is the run, and
 "Lessons from this task", at the foot of the side panel's Task tab of the run's page (item 856), which counts them (item
