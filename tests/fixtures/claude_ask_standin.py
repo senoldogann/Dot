@@ -15,6 +15,10 @@ from pathlib import Path
 
 record: Path = Path(sys.argv[1])
 argv: list[str] = sys.argv[2:]
+if argv == ["--version"]:
+    # The version Dot was measured on (item 1673).
+    sys.stdout.write("2.1.331 (Claude Code)\n")
+    sys.exit(0)
 if "--system-prompt-file" not in argv:
     sys.stdin.readline()
     sys.stdout.write((Path(__file__).parent / "claude_models_response.json").read_text(encoding="utf-8"))

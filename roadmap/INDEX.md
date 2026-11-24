@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1673](1673.md) | done | 2026-11-24 | Dot knows which versions of the `claude` program it works with, refuses a broken one and says when one is unmeasured |
 | [1672](1672.md) | done | 2026-11-24 | A pause of Dot's event loop is caught with where it was, logged and listed under Diagnostics |
 | [1671](1671.md) | done | 2026-11-24 | The Mac does not idle-sleep while Dot works |
 | [1670](1670.md) | done | 2026-11-24 | The process groups a crashed Dot left at work are ended when it starts again, and named to the run that goes on |

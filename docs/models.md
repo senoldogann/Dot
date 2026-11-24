@@ -365,7 +365,12 @@ answer keeps its words, Ollama's too.
   program's environment, so the plan is billed and nothing else. The menu lists the models once the program is found
   (`[providers.claude_code] command`, `claude` on your login PATH) and an account is signed in, which Dot reads from
   `~/.claude.json` (the address and the organisation, no secret: Dot never reads Claude Code's credentials nor its
-  Keychain item). A run on one goes whole to Claude Code, started without a terminal (`claude -p`, its input and output
+  Keychain item). Dot also asks the program its version (`claude --version`, once for each program file, so again after
+  it updates itself) and reads it against a table of its own (item 1673, `claude_code/versions.py`): 2.1.330 to 2.1.x is
+  what Dot was measured on; an older 2.x, or a version in no range, is logged once
+  (`claude_code_version_not_measured`) and runs; a version listed as broken refuses the run, saying which version and to
+  install another (none is listed yet). `dotx doctor` shows it in its **claude code** row. A run on one goes whole to
+  Claude Code, started without a terminal (`claude -p`, its input and output
   lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
   the name you call Dot by, what Dot's nightly reflection keeps of you, and, under your message, the notes of Dot's
   memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
