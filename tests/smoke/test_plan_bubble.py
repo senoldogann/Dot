@@ -1,9 +1,10 @@
 """The plan over the composer (item 644): while a run works and has a plan, the line over the composer has a part that
 says how far the plan has come ("Plan 1/3"); a tap opens the plan as a bubble over the dock, with its targets and its
-steps as the Plan tab draws them and the way to that tab; it follows the plan while it is open, fits the window of a
-phone, and closes on Escape. First over a static page with the page's own ``capsule.js`` and ``planbubble.js``, at a
-phone's width and a desktop's; then on a real run, whose scripted model writes a plan with ``update_plan`` and goes on
-working until it is stopped, which takes the part and its bubble away."""
+steps as the Plan tab draws them and the way to that tab; it follows the plan while it is open, fits the window, and
+closes on Escape. First over a static page with the page's own ``capsule.js`` and ``planbubble.js``, at a desktop's
+width; on a phone (item 1383) the capsule's plan segment opens the same plan in a sheet (``dockbar.js``,
+``docksheet.js``), over a static page too; then on a real run, whose scripted model writes a plan with ``update_plan``
+and goes on working until it is stopped, which takes the part and its bubble away."""
 
 import asyncio
 import functools
@@ -120,7 +121,7 @@ async def _box(locator: Locator) -> dict[str, float]:
     return box
 
 
-@pytest.mark.parametrize("width", [390, 1280])
+@pytest.mark.parametrize("width", [1280])
 async def test_the_plans_part_opens_the_plan_as_a_bubble_that_follows_it_and_fits_the_window(
     static_page: str, width: int, tmp_path: Path
 ) -> None:
@@ -167,6 +168,126 @@ async def test_the_plans_part_opens_the_plan_as_a_bubble_that_follows_it_and_fit
             # A run that no longer works has no plan's part over its composer.
             await page.evaluate("paint(3, false)")
             await expect(page.locator(".capsule-plan")).to_be_hidden()
+        finally:
+            await browser.close()
+
+
+# ------------------------------------------------------------------------------------- a phone: the plan in a sheet
+
+_PHONE_PAGE: str = """<!doctype html><html lang="en" class="chat-shell"><head>
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="dot-pages" content="">
+<link rel="stylesheet" href="/css/app.css"><link rel="stylesheet" href="/css/shell.css">
+<link rel="stylesheet" href="/css/run.css"><link rel="stylesheet" href="/css/themes.css"></head>
+<body style="margin:0;padding-top:420px">
+<div class="dock" id="dock" style="position:relative;padding:0 12px"><div class="composer">Queue a message</div></div>
+<script type="module">
+import { createDockBar } from "/js/dockbar.js";
+import { createDockSheets } from "/js/docksheet.js";
+import { planContent } from "/js/planbubble.js";
+import { t } from "/js/i18n.js";
+const steps = %s;
+const targets = %s;
+let now = [];
+const sheets = createDockSheets();
+const bar = createDockBar({ onWork() {}, onStop() {}, onEnd() {}, sheets });
+document.getElementById("dock").prepend(bar.element);
+sheets.add("plan", {
+  anchor: bar.segment("plan"),
+  title: () => t("capsule.plan", { done: now.filter((step) => step.status === "done").length, total: now.length }),
+  build: () => planContent({
+    steps: now, targets, head: false, openTab: () => { sheets.close("plan"); window.opened = "plan"; },
+  }),
+});
+const statusAt = (index, done) => (index < done ? "done" : index === done ? "in_progress" : "pending");
+window.paint = (done, working) => {
+  now = steps.map((step, index) => ({ ...step, status: statusAt(index, done) }));
+  bar.paint({
+    status: working ? "running" : null, took: 97, stopping: false, reconnecting: false,
+    plan: { done, total: now.length }, helpers: { live: 0, waitedFor: 0, letGo: 0 },
+    loops: { count: 0, rhythm: null, problem: false }, queue: { count: 0, held: false, problem: false, sending: false },
+    running: { count: 0, problem: false },
+  });
+  sheets.repaint("plan");
+};
+window.paint(1, true);
+window.ready = true;
+</script></body></html>"""
+
+
+class _QuietPhone(_Quiet):
+    """The page's own files, and the phone's page that draws the capsule and the plan's sheet."""
+
+    def do_GET(self) -> None:
+        if self.path.split("?")[0] != "/":
+            SimpleHTTPRequestHandler.do_GET(self)
+            return
+        body: bytes = (_PHONE_PAGE % (json.dumps(_STEPS), json.dumps(_TARGETS))).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+@pytest.fixture(scope="module")
+def phone_page() -> Iterator[str]:
+    server: ThreadingHTTPServer = ThreadingHTTPServer(
+        ("127.0.0.1", 0), functools.partial(_QuietPhone, directory=str(STATIC_DIR))
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_address[1]}/"
+    server.shutdown()
+    server.server_close()
+
+
+async def test_on_a_phone_the_plans_segment_opens_the_plan_in_a_sheet_that_follows_it(
+    phone_page: str, tmp_path: Path
+) -> None:
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            context = await browser.new_context(
+                viewport={"width": 390, "height": 844}, reduced_motion="reduce", has_touch=True, is_mobile=True
+            )
+            page: Page = await context.new_page()
+            await page.goto(phone_page)
+            await page.wait_for_function("window.ready === true")
+            segment: Locator = page.locator('[data-segment="plan"]')
+            await expect(segment).to_have_attribute("aria-label", "Plan, 1 of 3 steps done")
+            await expect(segment).to_contain_text("1/3")
+            await segment.tap()
+            sheet: Locator = page.locator(".dock-sheet-panel")
+            await expect(page.get_by_role("dialog", name="Plan 1/3")).to_be_visible()
+            await expect(segment).to_have_attribute("aria-expanded", "true")
+            await expect(sheet.locator(".plan-targets")).to_have_text(_TARGETS)
+            await expect(sheet.locator(".plan-step")).to_have_count(3)
+            await expect(sheet.locator(".plan-step.done")).to_have_text(_STEPS[0]["text"])
+            await expect(sheet.locator(".plan-step.in_progress")).to_have_text(_STEPS[1]["text"])
+            # It stands at the foot of the window, inside it, and says its way to the Plan tab a finger tall.
+            shown: dict[str, float] = await _box(sheet)
+            assert shown["x"] >= 0 and shown["x"] + shown["width"] <= 390, shown
+            assert round(shown["y"] + shown["height"]) == 844, shown
+            way: dict[str, float] = await _box(sheet.get_by_role("button", name="Open in the side panel"))
+            assert way["height"] >= 43.99, way
+            await page.screenshot(path=str(tmp_path / "plan-sheet.png"), animations="disabled")
+            # It follows the plan while it is open, its title with it.
+            await page.evaluate("paint(2, true)")
+            await expect(page.get_by_role("dialog", name="Plan 2/3")).to_be_visible()
+            await expect(sheet.locator(".plan-step.done")).to_have_count(2)
+            # Escape closes it, the way to the Plan tab closes it too.
+            await page.keyboard.press("Escape")
+            await expect(sheet).to_be_hidden()
+            await expect(segment).to_have_attribute("aria-expanded", "false")
+            await segment.tap()
+            await sheet.get_by_role("button", name="Open in the side panel").tap()
+            await expect(sheet).to_be_hidden()
+            assert await page.evaluate("window.opened") == "plan"
+            # A run that no longer works has no plan's segment, and its sheet is not left open over nothing.
+            await segment.tap()
+            await expect(sheet).to_be_visible()
+            await page.evaluate("paint(3, false)")
+            await expect(segment).to_be_hidden()
+            await expect(sheet).to_be_hidden()
         finally:
             await browser.close()
 

@@ -23,6 +23,7 @@ from typing import Any, Literal
 import httpx
 import pytest
 import pytest_asyncio
+from dock_scenario import is_phone, open_sheet
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import BACKGROUND_SOURCE, QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT, RunManager
@@ -569,6 +570,12 @@ async def test_the_chats_page_shows_its_commands_at_work_and_the_note_of_one_tha
                 page: Page = await _page(browser, address, working.id, width, scheme)
                 line: Locator = page.locator(".background-work")
                 row: Locator = line.locator(".background-row")
+                # A phone draws no pane over the composer (item 1383): the capsule says "1 running", and its segment
+                # opens the commands in a sheet.
+                phone: bool = is_phone(page)
+                if phone:
+                    await expect(page.locator('[data-segment="running"]')).to_have_attribute("aria-label", "1 running")
+                    await open_sheet(page, "running")
                 await expect(row).to_have_count(1)
                 # Its end wakes Dot: the dot pulses, and a screen reader hears it.
                 await expect(row).to_have_attribute("data-wakes", "true")
@@ -576,12 +583,15 @@ async def test_the_chats_page_shows_its_commands_at_work_and_the_note_of_one_tha
                     f"Running: {_LONG}. Dot is told when it ends"
                 )
                 await expect(row.locator(".background-time")).to_have_text(re.compile(r"^\d+(\.\d)? s$"))
-                # Right above the composer, which is drawn over its lower edge.
+                # Right above the composer, which is drawn over its lower edge; on a phone the line stands in the sheet.
                 composer: Locator = page.locator(".composer")
                 above = await line.bounding_box()
                 frame = await composer.bounding_box()
                 assert above is not None and frame is not None
-                assert above["y"] < frame["y"] < above["y"] + above["height"], (above, frame)
+                if phone:
+                    assert await line.evaluate("(line) => line.closest('.dock-sheet') !== null")
+                else:
+                    assert above["y"] < frame["y"] < above["y"] + above["height"], (above, frame)
                 await page.screenshot(path=str(tmp_path / f"commands-{width}-{scheme}.png"), animations="disabled")
                 if index == len(_SHOTS) - 1:
                     # Stop asks first, then ends the command; the line goes.

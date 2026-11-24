@@ -29,6 +29,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from dock_scenario import is_phone, open_sheet
 from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent import manager as manager_module
@@ -659,7 +660,10 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     # over (item 454).
                     box: Locator = page.locator(".dock textarea:not([inert] *)")
                     send: Locator = page.locator(".dock .btn.send")
-                    queue: Locator = page.locator(".dock .queue")
+                    # Over the composer on a computer's window; on a phone (item 1383) the capsule says "3 queued"
+                    # and the queue stands in the sheet its segment opens, which covers the composer while it is open.
+                    queue: Locator = page.locator(".dock .queue, .dock-sheet .queue")
+                    phone: bool = is_phone(page)
                     rows: Locator = queue.locator(".queue-row")
                     texts: Locator = queue.locator(".queue-text")
                     ups: Locator = queue.locator(".queue-up")
@@ -680,6 +684,9 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
 
                     # Each row has an up and a down arrow (item 1348), disabled at the ends of the queue, named for a
                     # screen reader, and 32 px square with a pointer and 44 px on a phone. There is no drag.
+                    if phone:
+                        await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "3 queued")
+                        await open_sheet(page, "queue")
                     await expect(ups).to_have_count(3)
                     await expect(downs).to_have_count(3)
                     await expect(ups.first).to_have_attribute("aria-label", "Move queued message up")
@@ -708,6 +715,7 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await expect(ups.nth(0)).to_be_disabled()
                     await expect(downs.nth(0)).to_be_focused()
                     await downs.nth(0).click()
+                    await expect(texts).to_have_text([SUMMARY, CLOSE, MAIL])
                     await downs.nth(1).click()
                     await expect(texts).to_have_text([SUMMARY, MAIL, CLOSE])
                     await ups.nth(2).click()
@@ -722,6 +730,9 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     # The pencil edits a message in the composer, whose draft comes back when the edit ends.
                     await box.fill("Half a thought")
                     await rows.nth(1).get_by_role("button", name="Edit queued message").click()
+                    if phone:
+                        # The edit is made in the composer, which the sheet covers: it gives way.
+                        await expect(page.locator(".dock-sheet:not([hidden])")).to_have_count(0)
                     await expect(box).to_have_value(SUMMARY)
                     await expect(box).to_be_focused()
                     await expect(send).to_have_attribute("aria-label", "Save")
@@ -733,6 +744,8 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await expect(box).to_have_value("Half a thought")
                     await expect(send).to_have_attribute("aria-label", "After this task")
                     await expect(rows.nth(1)).not_to_have_attribute("aria-current", "true")
+                    if phone:
+                        await open_sheet(page, "queue")
                     await rows.nth(1).get_by_role("button", name="Edit queued message").click()
                     await box.fill(SHORT_SUMMARY)
                     await box.press("Enter")
@@ -743,16 +756,19 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await expect(send).to_have_attribute("aria-label", "Stop")
                     await _shot(page, tmp_path / f"queue-{width}-{scheme}.png")
 
-                    # The head folds the list away and back.
-                    head: Locator = queue.locator(".queue-head")
-                    await head.click()
-                    await expect(head).to_have_attribute("aria-expanded", "false")
-                    await expect(queue.locator(".queue-list")).to_be_hidden()
-                    await _shot(page, tmp_path / f"queue-folded-{width}-{scheme}.png")
-                    await head.click()
-                    await expect(queue.locator(".queue-list")).to_be_visible()
+                    # The head folds the list away and back (a phone's sheet has no head: its title is the sheet's).
+                    if not phone:
+                        head: Locator = queue.locator(".queue-head")
+                        await head.click()
+                        await expect(head).to_have_attribute("aria-expanded", "false")
+                        await expect(queue.locator(".queue-list")).to_be_hidden()
+                        await _shot(page, tmp_path / f"queue-folded-{width}-{scheme}.png")
+                        await head.click()
+                        await expect(queue.locator(".queue-list")).to_be_visible()
 
                     # Steer sends a message to the run now; with the box empty, the key steers the next one.
+                    if phone:
+                        await open_sheet(page, "queue")
                     await rows.nth(0).get_by_role("button", name="Steer").click()
                     await expect(texts).to_have_text([SHORT_SUMMARY, CLOSE])
                     # The run reads each at once: the step at work is cut short and asked again with it (item 509).
@@ -774,6 +790,10 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     )
                     await expect(page).to_have_url(f"{address}/#/runs/{second.id}")
                     await expect(queue).to_be_hidden()
+                    if phone:
+                        # With the last message gone the segment goes, and the sheet with it.
+                        await expect(page.locator('[data-segment="queue"]')).to_be_hidden()
+                        await expect(page.locator(".dock-sheet:not([hidden])")).to_have_count(0)
                     steers: list[EventRecord] = await runtime.store.events_of_kind(first.id, "steer", 10)
                     assert [event.data["text"] for event in steers] == [MAIL, SHORT_SUMMARY]
 
@@ -788,6 +808,10 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     await expect(texts).to_have_text([FILE])
                     await send.click()
                     assert (await _ended(manager, second.id)).status == "cancelled"
+                    if phone:
+                        # A held queue says so in the capsule, and the sheet has the Resume.
+                        await expect(page.locator('[data-segment="queue"]')).to_have_attribute("aria-label", "1 paused")
+                        await open_sheet(page, "queue")
                     await expect(queue.locator(".queue-paused")).to_be_visible()
                     await expect(send).to_have_attribute("aria-label", "Follow up")
                     await expect(rows.nth(0).get_by_role("button", name="Steer")).to_be_disabled()

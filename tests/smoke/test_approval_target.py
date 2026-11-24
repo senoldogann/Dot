@@ -263,6 +263,10 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         await expect(loops).not_to_have_attribute("hidden", "")
                         await expect(loops.locator(".chat-loops-count")).to_have_text("1")
                         await expect(loops).to_be_hidden()
+                        # On a phone the loop stands in the capsule (item 1383), which does not give way to the panel.
+                        shown: Locator = page.locator('[data-segment="loops"]') if width <= 720 else loops
+                        if width <= 720:
+                            await expect(shown).to_be_visible()
                         composer: Locator = page.locator(".dock .composer")
                         await expect(composer).to_be_visible()
                         await expect(composer.get_by_role("button", name="Stop")).to_be_visible()
@@ -280,7 +284,7 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         # Answered, the panel goes and the composer and the loops are back.
                         await expect(asked).to_be_hidden()
                         await expect(composer).to_be_visible()
-                        await expect(loops).to_be_visible()
+                        await expect(shown).to_be_visible()
                         await page.screenshot(path=str(tmp_path / f"decided-{width}-{approved}.png"))
                         # The chat opened again reads the same.
                         await page.reload()

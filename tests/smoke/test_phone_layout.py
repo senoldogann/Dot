@@ -13,6 +13,7 @@ The model is a scripted one; the run's page is a local one in Dot's own headless
 """
 
 import asyncio
+import re
 import threading
 import time
 from collections.abc import AsyncIterator, Iterator
@@ -213,16 +214,21 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     screen_button: Locator = bar.get_by_role("button", name="Show Dot's computer")
                     await expect(screen_button).to_be_visible()
                     await expect(bar.get_by_role("button", name="Task details")).to_be_visible()
-                    # The line over the composer: the run's time, its helpers and what is queued (item 352).
-                    capsule: Locator = page.locator(".capsule")
-                    await expect(capsule).to_contain_text("Working")
-                    await expect(capsule).to_contain_text(f"{len(_HELPERS)} working")
+                    # The one capsule over the composer (item 1383): the run's time, its helpers and what is queued.
+                    capsule: Locator = page.locator(".dockbar-capsule")
+                    await expect(capsule.locator('[data-segment="status"]')).to_contain_text("Working")
+                    helpers_segment: Locator = capsule.locator('[data-segment="helpers"]')
+                    await expect(helpers_segment).to_have_attribute(
+                        "aria-label", re.compile(rf"^{len(_HELPERS)} helpers?\.")
+                    )
                     await expect(page.locator(".queue")).to_contain_text(_QUEUED)
                     await expect(capsule.get_by_role("button", name="1 queued")).to_be_visible()
                     await page.screenshot(path=str(tmp_path / f"run-{scheme}.png"))
 
-                    # The helpers' part opens the details as a sheet from the foot, on the Agents tab.
-                    await capsule.get_by_role("button", name=f"{len(_HELPERS)} working").click()
+                    # The helpers' segment opens a sheet of them, whose Details open the panel as a sheet from the foot,
+                    # on the Agents tab.
+                    await helpers_segment.click()
+                    await page.locator(".dock-sheet:not([hidden])").get_by_role("button", name="Details").click()
                     sheet: Locator = page.locator(".inspector[data-mode='drawer']")
                     await expect(sheet).to_have_attribute("data-open", "true")
                     await expect(sheet.get_by_role("tab", name="Agents")).to_have_attribute("aria-selected", "true")
