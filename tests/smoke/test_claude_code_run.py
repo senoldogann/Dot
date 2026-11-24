@@ -702,11 +702,13 @@ async def test_a_program_that_ends_before_its_result_says_how_it_ended(
     assert re.fullmatch(r"ses-cut-[0-9a-f]{8}", str(context["claude_session"])), context["claude_session"]
     assert context["continued"] == 0 and "continue_cut = 0" in str(context["not_continued"])
     assert isinstance(context["stderr"], str) and stderr_says in context["stderr"]
+    # The key the program printed in its crash is masked, as everything Dot stores or logs is.
+    assert "sk-ant" not in context["stderr"] and ("***" in context["stderr"]) is (returncode == 1)
     assert isinstance(context["silent_s"], float) and 0 <= context["silent_s"] < 30
     assert isinstance(context["cut_at"], str) and len(context["cut_at"]) == len("10:44:04")
     cuts: list[dict[str, object]] = [line for line in logs if line["event"] == "claude_code_program_cut"]
     assert len(cuts) == 1 and cuts[0]["run_id"] == ended.id and cuts[0]["returncode"] == returncode
-    assert cuts[0]["signal"] == named and cuts[0]["steps"] == 1
+    assert cuts[0]["signal"] == named and cuts[0]["steps"] == 1 and "sk-ant" not in str(cuts[0]["stderr"])
     # The run's own line says the same: its context is in the log (item 1580), where the cause was missing before.
     failed: list[dict[str, object]] = [line for line in logs if line["event"] == "run failed"]
     assert failed and failed[0]["context"]["returncode"] == returncode  # type: ignore[index]  # a dict by the lines above
