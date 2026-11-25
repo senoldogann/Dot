@@ -502,6 +502,12 @@ public struct ProviderModels: Codable, Sendable, Hashable {
     public let provider: String
     public let models: [ModelOption]
     public let error: String?
+
+    public init(provider: String, models: [ModelOption], error: String?) {
+        self.provider = provider
+        self.models = models
+        self.error = error
+    }
 }
 
 /// `GET`/`POST /api/failsafe`.

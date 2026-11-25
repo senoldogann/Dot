@@ -27,8 +27,10 @@ Support/Dot`` or ``~/Library/Logs/Dot`` fails, as :func:`_owners_dot_stays_their
 :func:`_a_test_stays_out_of_the_owners_dot` say. A run that holds ``live``, ``hosted``, ``internet`` or ``desktop``
 tests is the owner's own run on their Mac and keeps what it was given."""
 
+import http.server
 import os
 import pwd
+import socketserver
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -142,6 +144,24 @@ def _offline_test(request: pytest.FixtureRequest, _offline_run: bool) -> Iterato
         yield
         return
     with _without_the_owners_keys():
+        yield
+
+
+def _bind_without_a_name_lookup(self: http.server.HTTPServer) -> None:
+    """``HTTPServer.server_bind`` as the standard library has it, without ``socket.getfqdn`` of the address: a stand-in
+    page is served on 127.0.0.1 and its name is never asked for, and on GitHub's macOS runners that reverse lookup took
+    35 seconds, once in each process that served one (a stand-in's setup in nine smoke and browser files)."""
+    socketserver.TCPServer.server_bind(self)
+    host, port = self.server_address[:2]
+    self.server_name = str(host)
+    self.server_port = int(port)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _stand_in_servers_ask_no_name() -> Iterator[None]:
+    """The stand-in pages the tests serve (``http.server``) bind without looking their address's name up."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(http.server.HTTPServer, "server_bind", _bind_without_a_name_lookup)
         yield
 
 

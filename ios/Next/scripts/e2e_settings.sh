@@ -34,13 +34,17 @@ key=$(curl -fsS -X POST -H "Content-Type: application/json" -d "{\"code\":\"$cod
 phone="Authorization: Bearer $key"
 curl -fsS -X POST -H "$main" -H "Content-Type: application/json" \
     -d '{"name":"E2E brief","goal":"Say good morning.","cron":"0 8 * * *","mode":"task"}' "$base/api/schedules" >/dev/null
+curl -fsS -X PUT -H "$main" -H "Content-Type: application/json" -d '{"free":true}' "$base/api/policy/free" >/dev/null
+curl -fsS -X POST -H "$main" -H "Content-Type: application/json" \
+    -d '{"name":"E2E Scout","role":"Finds leads","instructions":"","model":"","effort":null,"approvals":null}' "$base/api/agents" >/dev/null
 
 # The UI test's own assertions (what each page shows) count as much as the daemon's side below: its status is kept.
 fail=0
 if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
     -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
-    -only-testing:DotNextUITests/SettingsLiveUITests -only-testing:DotNextUITests/SettingsMaintenanceLiveUITests >"$t/xcodebuild.log" 2>&1; then
-    echo "FAIL  SettingsLiveUITests or SettingsMaintenanceLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
+    -only-testing:DotNextUITests/SettingsLiveUITests -only-testing:DotNextUITests/SettingsMaintenanceLiveUITests \
+    -only-testing:DotNextUITests/ConnectAppsLiveUITests >"$t/xcodebuild.log" 2>&1; then
+    echo "FAIL  SettingsLiveUITests, SettingsMaintenanceLiveUITests or ConnectAppsLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
     fail=1
 fi
 grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | sort -u
@@ -53,6 +57,10 @@ curl -fsS -H "$main" "$base/api/assistant" | check "General: Dot's name is Nokta
 curl -fsS -H "$main" "$base/api/reactions/settings" | check "Chat: reactions start no follow-up" 'd["follow_ups"] is False'
 curl -fsS -H "$main" "$base/api/schedules" | check "Scheduled tasks: paused and renamed, its rhythm kept" \
     'd[0]["record"]["enabled"] is False and d[0]["record"]["name"] == "E2E brief edited" and d[0]["record"]["cron"] == "0 8 * * *"'
+curl -fsS -H "$main" "$base/api/code-review" | check "Models: the code review's reasoning set from the phone" 'd["effort"] == "high"'
+curl -fsS -H "$main" "$base/api/policy/free" | check "Rules: free mode switched off from the phone" 'd["free"] is False'
+curl -fsS -H "$main" "$base/api/agents" | check "Agents: the agent's first chat opened from the phone" 'any(a["record"]["name"] == "E2E Scout" and a["home"] is not None for a in d)'
+curl -fsS -H "$main" "$base/api/memories?limit=50" | check "Memory: the note edited from the phone" 'any("Edited." in m["content"] for m in d["items"])'
 curl -fsS -H "$main" "$base/api/memories/proposed" | check "Memory: no proposal waits" 'd == []'
 curl -fsS -H "$main" "$base/api/memories?limit=10" | check "Memory: the proposed words were used" \
     'any("commands written out in full" in (m.get("content") or m.get("record", {}).get("content", "")) for m in (d if isinstance(d, list) else d.get("items", [])))'

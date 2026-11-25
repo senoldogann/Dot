@@ -56,14 +56,20 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert any("ruff format" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
     assert any("npm run check" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
     # And both halves of the smoke tests (item 944), each on its own runner, with nothing that skips them there but a
-    # pull request that changes prose alone: the `prose` job tells the heavy jobs to skip, and a required check that a
-    # path filter skips would never be reported at all.
+    # pull request that changes prose alone (the `prose` job tells the heavy jobs to skip, and a required check that a
+    # path filter skips would never be reported at all) or one whose files nothing of them reads (`changes`, its
+    # python answer, scripts/python_ci.py); a decision that failed runs them. Every other run, a release among them,
+    # runs them.
     prose_skip = (
         "${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}"
     )
-    assert gate_jobs["smoke"]["if"] == prose_skip
+    python_skip = (
+        "${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true' && "
+        "(needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}"
+    )
+    assert gate_jobs["smoke"]["if"] == python_skip
     assert gate_jobs["checks"]["if"] == prose_skip
-    assert gate_jobs["gate"]["if"] == prose_skip
+    assert gate_jobs["gate"]["if"] == python_skip
     assert gate_jobs["prose"]["if"] == "github.event_name == 'pull_request'"
     assert gate_jobs["prose"]["outputs"]["prose_only"] == "${{ steps.decide.outputs.prose_only }}"
     assert not _workflow("gate.yml")[True]["pull_request"]

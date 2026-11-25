@@ -12,6 +12,7 @@ struct SettingsTab: View {
     @State private var stopAsked: Bool = false
     @State private var stopProblem: SettingsFailure?
     @State private var releasing: Bool = false
+    @State private var connectApps: ConnectAppsOpening
 
     let start: SettingsStart
 
@@ -19,6 +20,7 @@ struct SettingsTab: View {
         self.start = start
         _path = State(initialValue: start.path)
         _query = State(initialValue: start.query)
+        _connectApps = State(initialValue: start.connectApps)
     }
 
     var body: some View {
@@ -30,6 +32,9 @@ struct SettingsTab: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: String(localized: "Search settings", comment: "Settings: the search field's placeholder"))
         }
         .task { failsafe = await model.read { api throws(DaemonRequestError) in try await api.failsafe() } }
+        .sheet(isPresented: Binding(get: { connectApps != .closed }, set: { if !$0 { connectApps = .closed } })) {
+            ConnectAppsSheet(opensDetail: connectApps.detail)
+        }
     }
 
     // MARK: The root list
@@ -53,7 +58,9 @@ struct SettingsTab: View {
                 PageRow(page: .schedules, systemImage: "clock", title: String(localized: "Scheduled tasks", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .rules, systemImage: "lock.shield", title: String(localized: "Rules", comment: "Settings row: what Dot may do without asking"), description: nil, detail: nil)
                 PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
             }
+            GroupedSection(header: nil, footer: nil) { connectAppsRow }
             GroupedSection(header: String(localized: "System", comment: "Settings section: health, version"), footer: nil) {
                 PageRow(page: .system, systemImage: "heart.text.square", title: String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), description: nil, detail: nil)
                 PageRow(page: .usage, systemImage: "chart.bar", title: String(localized: "Usage", comment: "Settings row: the tokens of the last days"), description: nil, detail: nil)
@@ -114,6 +121,15 @@ struct SettingsTab: View {
         }
     }
 
+    /// The row that opens Connect apps (item 1862, PLAN §27, which overrides §26's cut of Connectors), until the settings
+    /// sheet of PLAN §27 carries it.
+    private var connectAppsRow: some View {
+        Button { connectApps = .list } label: {
+            ListRow(systemImage: "powerplug", title: String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), description: nil, accessory: .chevron)
+        }
+        .buttonStyle(RowPressStyle())
+    }
+
     // MARK: Search
 
     private var results: some View {
@@ -126,7 +142,12 @@ struct SettingsTab: View {
                 SettingsScroll(title: String(localized: "Settings", comment: "Title of the settings tab")) {
                     GroupedSection(header: nil, footer: nil) {
                         ForEach(found) { entry in
-                            if let page = index.first(where: { $0.0.id == entry.id })?.1 {
+                            if index.first(where: { $0.0.id == entry.id })?.1 == .connectApps {
+                                Button { connectApps = .list } label: {
+                                    ListRow(systemImage: nil, title: entry.title, description: entry.path.isEmpty ? nil : entry.path, accessory: .chevron)
+                                }
+                                .buttonStyle(RowPressStyle())
+                            } else if let page = index.first(where: { $0.0.id == entry.id })?.1 {
                                 NavigationLink(value: page) {
                                     ListRow(systemImage: nil, title: entry.title, description: entry.path.isEmpty ? nil : entry.path, accessory: .chevron)
                                 }
@@ -151,12 +172,14 @@ struct SettingsTab: View {
         case .voice: VoicePage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
-        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule)
+        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
         case .rules: RulesPage()
         case .memory: MemoryPage()
+        case .agents: AgentsHome()
         case .system: SystemPage()
         case .usage: UsagePage()
         case .maintenance: MaintenancePage()
+        case .connectApps: EmptyView()
         }
     }
 }
@@ -167,6 +190,19 @@ struct SettingsStart: Equatable, Sendable {
     let query: String
     let editsFirstSchedule: Bool
     let triesRaise: Bool
+    let connectApps: ConnectAppsOpening
+}
+
+/// Whether Settings opens with Connect apps shown, and on which service's detail.
+enum ConnectAppsOpening: Equatable, Sendable {
+    case closed
+    case list
+    case detail(String)
+
+    var detail: String? {
+        if case .detail(let id) = self { return id }
+        return nil
+    }
 }
 
 /// How the link to the Mac stands, in one word.
@@ -225,6 +261,9 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals",
             String(localized: "notes remember lessons proposals", comment: "Settings search synonyms of Memory (space separated)"), .memory),
         entry(
+            "agents", String(localized: "Agents", comment: "Title of the agents list"), agents, "agent agents helpers chat",
+            String(localized: "agent agents helpers chat", comment: "Settings search synonyms of Agents (space separated)"), .agents),
+        entry(
             "system", String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), system,
             "daemon health emergency stop version uptime failsafe", String(localized: "health emergency stop version", comment: "Settings search synonyms of System (space separated)"), .system),
         entry(
@@ -234,6 +273,9 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "maintenance", String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), system,
             "updates versions resume restart continue claude opencode cli",
             String(localized: "updates versions resume restart continue", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
+        entry(
+            "connect-apps", String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), "", "connectors connect apps services mcp accounts google github slack notion plugins",
+            String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),
     ]
     return all
 }

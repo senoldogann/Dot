@@ -92,11 +92,11 @@ A change that takes days is many pushes, each waiting on the review and the gate
   pull requests and pushed branches all hold numbers), and the pull request is made from the entries (`gh pr create
   --title "$(uv run python scripts/pr_body.py N M --title)" --body "$(uv run python scripts/pr_body.py N M)"`).
 - **`main` does not require a branch up to date (item 944).** `scripts/merge_pr.py` merges once the checks passed,
-  and brings the branch up to `main` first only when `main` changed one of its files since they ran (exit 2: merge
-  again once they pass). After a merge, look at `main`'s run of the gate for it before the next merge, and never
-  cancel it: it is what shows two pull requests that pass alone and break `main` together. A run of `main` shown as
-  cancelled before it began was replaced by a newer waiting one (item 1011), whose run checks that merge too. A red
-  `main` is fixed before anything else is merged.
+  and brings the branch up to `main` first only when `main` changed one of its files since they ran, Markdown no
+  test names aside (item 1863; exit 2: merge again once they pass). After a merge, look at `main`'s run of the gate
+  for it before the next merge, and never cancel it: it is what shows two pull requests that pass alone and break
+  `main` together. A run of `main` shown as cancelled before it began was replaced by a newer waiting one (item 1011),
+  whose run checks that merge too. A red `main` is fixed before anything else is merged.
 - **Merging main** into a branch whose own change is unchanged costs no review (the hook sees it); do it when the
   branch is ready, never while a test run of the same worktree is going.
 - **A failure that is not the change's** (a known flaky test, `main` red): rerun the job (`gh run rerun <id> --failed`)

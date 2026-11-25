@@ -132,9 +132,9 @@ struct RootView: View {
                     paired(AppShell(initialTab: .settings, opensFirstChat: false, settings: fixture.start))
                         .onAppear { model.showSettingsFixture(fixture) }
             #endif
-            case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
-            case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
-            case nil: paired(AppShell(initialTab: .chats, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
+            case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed)))
+            case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed)))
+            case nil: paired(AppShell(initialTab: .chats, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed)))
             }
         }
         .tint(Tone.text)
