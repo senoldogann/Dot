@@ -37,10 +37,15 @@ final class ChatWordsTests: XCTestCase {
         let entry: (String, String) -> ToolEntry = { tool, target in
             ToolEntry(id: "t", tool: tool, kind: ToolKind.of(tool), target: target, args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)
         }
-        XCTAssertEqual(toolLine(entry("finish", "")), "Finish")
-        XCTAssertEqual(toolLine(entry("use_tools", "")), "Turn on more actions")
-        XCTAssertEqual(toolLine(entry("schedule_list", "schedules")), "List schedules · schedules")
-        XCTAssertEqual(toolLine(entry("memory_search", "deploy")), "Search notes · deploy", "a note search is Dot's, not a file search")
+        // In the simulator's language: the phrases are the web's, English or Turkish.
+        XCTAssertEqual(toolLine(entry("finish", "")), dotToolWords("finish"))
+        XCTAssertEqual(toolLine(entry("use_tools", "")), dotToolWords("use_tools"))
+        XCTAssertEqual(toolLine(entry("schedule_list", "schedules")), (dotToolWords("schedule_list") ?? "") + " · schedules")
+        XCTAssertEqual(toolLine(entry("memory_search", "deploy")), (dotToolWords("memory_search") ?? "") + " · deploy", "a note search is Dot's, not a file search")
+        for tool in ["finish", "use_tools", "work_orders", "schedule_list", "react", "draft_reply", "mcp__x__y"] {
+            let line: String = toolLine(entry(tool, ""))
+            XCTAssertEqual(line.first.map { String($0).uppercased() }, line.first.map(String.init), "\(tool) starts with a capital: \(line)")
+        }
         XCTAssertEqual(toolLine(entry("draft_reply", "")), "Draft reply", "a name with no phrase reads as a sentence")
         XCTAssertEqual(toolLine(entry("mcp__microsoft-learn__search", "")), "Microsoft Learn · Search")
         XCTAssertTrue(isDotTool(entry("work_orders", "")))

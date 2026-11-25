@@ -255,4 +255,19 @@ final class WorkLogTests: XCTestCase {
         live.writing["run_a"] = "The test"
         XCTAssertEqual(workNow(of: live, run: "run_a", stopping: false), .writing, "words in sight: the line steps aside")
     }
+
+    func testHideAllFoldsAllOfAnEndedRunsStepsSoTheyStayReachable() {
+        let finished: ChatProjection = chat(
+            [run("run_a", status: "done")],
+            [
+                event(9, "assistant", ["text": .string(""), "thinking": .string("Read the hosts file first."), "step": .int(1)]),
+                call(10, "r1", "read_file"), result(20, "r1", ok: true),
+                event(150, "run_finished", ["status": .string("done"), "result": .string("All done")]),
+            ])
+        let items: [TranscriptItem] = transcript(of: finished, pending: [], mode: .hideAll, streaming: true, context: .none)
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "f:th:run_a:1", "r:run_a"], "the fold, then the answer")
+        guard case .work(let fold) = items[1] else { return XCTFail("the steps fold") }
+        XCTAssertEqual(fold.items.map(\.id), ["th:run_a:1", "t:r1"], "the thought and the successful read are in it")
+        XCTAssertEqual(transcript(of: finished, pending: [], mode: .zen, streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"], "Zen: the answer alone")
+    }
 }

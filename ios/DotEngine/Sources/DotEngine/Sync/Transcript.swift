@@ -20,7 +20,8 @@ import Foundation
 ///
 /// "Response streaming" off: the words and the thinking being written are not drawn; an answer appears once it is whole.
 /// Hide all and Zen draw one live line under the last message instead of the steps (`workNow`, item 1769): what the run
-/// does now ("Thinking", "Running swift test"); a tap on it shows the steps of the chat.
+/// does now ("Thinking", "Running swift test"); a tap on it shows the steps of the chat. Once a run ended, Hide all folds
+/// all of its steps into its "Worked for" line; Zen shows none.
 /// The answer's footer (copy, reaction, time) is on the run's final answer alone, once the run ended (`endedAt`).
 public enum ToolCallMode: String, CaseIterable, Codable, Sendable {
     case showAll
@@ -517,9 +518,10 @@ private func foldable(_ category: Category) -> Bool {
 /// The tools whose calls the transcript shows as their own rows instead (an ask's anchor, the plan's card).
 let silentTools: Set<String> = ["ask_user", "ask_secret", "update_plan", "mark_plan_step"]
 
-/// The rows of one run, filtered by `mode`, and folded when the run has ended.
+/// The rows of one run, filtered by `mode`, and folded when the run has ended. In Hide all an ended run's fold holds all
+/// of its steps (item 1769): the live line said the work while it ran, and the fold is the way to it afterwards.
 func shaped(_ built: [Built], finished: Bool, mode: ToolCallMode) -> [TranscriptItem] {
-    let kept: [Built] = built.filter { shows($0.category, mode: mode) }
+    let kept: [Built] = built.filter { shows($0.category, mode: finished && mode == .hideAll ? .showAll : mode) }
     guard finished else { return kept.map(\.item) }
     var out: [TranscriptItem] = []
     var stretch: [Built] = []
