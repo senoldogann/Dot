@@ -99,9 +99,7 @@ def render_saved(result: Replacing) -> str:
     """What the model reads after saving: the note, or that it existed, the notes it replaced (kept, resting), the notes
     of the same fact it could not replace, and the notes it may still have outdated."""
     saved: SavedMemory = result.saved
-    if not saved.created:
-        return f"Already saved: {render_note(saved.record)}"
-    lines: list[str] = [f"Saved: {render_note(saved.record)}"]
+    lines: list[str] = [f"{'Saved' if saved.created else 'Already saved'}: {render_note(saved.record)}"]
     if result.replaced:
         lines.append(
             "It replaced these older notes, which rest now (kept: the owner can wake them) and are no longer recalled:"
@@ -285,7 +283,7 @@ def _forget_tool() -> RegisteredTool:
         description=(
             "Forget a saved note by its id, for example because it is outdated or wrong. It is no longer recalled or "
             "found: it goes to the owner's trash, where it waits some days and the owner can restore it (you cannot). "
-            "When a fact has changed, forget the old note and save the corrected one."
+            "For a fact that changed, save the new one under the old note's subject."
         ),
         args_model=ForgetArgs,
         modes=ACTING_MODES,

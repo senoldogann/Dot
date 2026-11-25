@@ -37,6 +37,7 @@ from dotagent.memory.service import (
     stands,
 )
 from dotagent.memory.words import lowercase
+from dotagent.secrets import mask_filled
 from dotagent.store.models import OWNER_EDIT, MemoryRecord
 
 log = get_logger("dotagent.memory")
@@ -64,8 +65,10 @@ _CHANGE_WORDS: frozenset[str] = frozenset({"now", "longer", "anymore", "instead"
 
 def normalize_subject(raw: str) -> str:
     """The subject as the notes keep it: lowercase words joined by hyphens, at most :data:`_MOST_SUBJECT_CHARS`
-    characters (``User city`` is ``user-city``). One without a letter or a digit is an error."""
-    slug: str = _SUBJECT_NOISE.sub("-", lowercase(raw.strip())).strip("-")[:_MOST_SUBJECT_CHARS].strip("-")
+    characters (``User city`` is ``user-city``). One without a letter or a digit is an error. A value filled into a page
+    is masked first, as in the note's text (item 621): the subject is stored and shown in every run's notes."""
+    masked: str = mask_filled(raw)
+    slug: str = _SUBJECT_NOISE.sub("-", lowercase(masked.strip())).strip("-")[:_MOST_SUBJECT_CHARS].strip("-")
     if not slug:
         raise InvalidValueError(
             "the subject holds no letter or digit; give a short name for what the note is about, as 'user-city', "
@@ -120,15 +123,15 @@ def wording_replaces(older: str, newer: str) -> bool:
     return cue and shared >= _LEAST_SHARED_PART * min(len(before), len(after))
 
 
-def holds(older: MemoryRecord, newer: MemoryRecord, now: float) -> bool:
-    """Whether ``older`` is a note a newer note could replace: awake (not resting, merged away or run out), written
-    before it, and for the same agent."""
+def holds(older: MemoryRecord, agent_id: str | None, said_at: float, now: float) -> bool:
+    """Whether ``older`` is a note a note of ``agent_id`` said at ``said_at`` could replace: awake (not resting, merged
+    away or run out), written before it, and for the same agent."""
     return (
         REST_TAG not in older.tags
         and older.merged_into is None
         and not expired(older, now)
-        and older.created_at < newer.created_at
-        and older.agent_id == newer.agent_id
+        and older.created_at < said_at
+        and older.agent_id == agent_id
         and JOURNAL_TAG not in older.tags
     )
 
@@ -168,16 +171,17 @@ async def save_replacing(
 ) -> Replacing:
     """Save a note as a run saves it (:func:`save_memory`, a note of Dot's) and put aside the notes it replaces: those
     of its ``subject`` when it has one, and the near notes whose words say the fact changed
-    (:func:`wording_replaces`). A note saved again, with the text a note has already, replaces nothing."""
+    (:func:`wording_replaces`). A note saved again, with the text a note has already, is said now: it takes the subject
+    and puts aside the other notes of it (the city that was Oulu, then Helsinki, saved as Oulu again is Oulu), and no
+    near note by its wording."""
     # Before anything is written: a subject that holds no word is refused with no note saved.
     key: str | None = None if subject is None else normalize_subject(subject)
     saved: SavedMemory = await save_memory(index, content, tags, run_id, None, expires_at, tainted)
-    if not saved.created:
-        return Replacing(saved=saved, replaced=(), kept=())
     newer: MemoryRecord = saved.record
-    if key is not None:
+    if key is not None and newer.subject != key:
         newer = await index.store.set_memory_subject(newer.id, key)
     now: float = time.time()
+    said_at: float = newer.created_at if saved.created else now
     found: dict[str, tuple[MemoryRecord, str]] = {}
     if key is not None:
         for older in await index.store.memories_with_subject(key, None):
@@ -188,7 +192,7 @@ async def save_replacing(
             found.setdefault(hit.record.id, (hit.record, "wording"))
     found.pop(newer.id, None)
     matching: list[tuple[MemoryRecord, str]] = [
-        (older, why) for older, why in found.values() if holds(older, newer, now)
+        (older, why) for older, why in found.values() if holds(older, newer.agent_id, said_at, now)
     ]
     owner_saved: set[str] = await index.store.owner_saved_memory_ids() if matching else set()
     replaced: list[MemoryRecord] = []
@@ -202,7 +206,8 @@ async def save_replacing(
         )
         log.info("note_superseded", memory_id=older.id, replaced_by=newer.id, why=why, subject=key)
         replaced.append(resting)
-    gone: set[str] = {record.id for record in replaced}
+    # A note named as replaced or kept is not offered again among the near notes to forget.
+    gone: set[str] = {record.id for record in (*replaced, *kept)}
     shown: SavedMemory = saved.model_copy(
         update={"record": newer, "similar": tuple(hit for hit in saved.similar if hit.record.id not in gone)}
     )

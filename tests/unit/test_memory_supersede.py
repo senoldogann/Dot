@@ -168,16 +168,24 @@ async def test_a_note_of_another_subject_or_none_stays(tmp_path: Path, monkeypat
         assert len(awake) == 3
 
 
-async def test_the_same_text_saved_again_replaces_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_the_same_text_saved_again_is_the_fact_as_it_stands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The city was Oulu, then Helsinki, and is said to be Oulu again: Oulu wakes and Helsinki rests, so that one note
+    of the subject is awake (the pre-push review of item 1729)."""
     async with _index(tmp_path, monkeypatch, None) as index:
         await _save(index, OULU, CITY)
         await _save(index, HELSINKI, CITY)
         again: Replacing = await _save(index, OULU, CITY)
-        assert (again.saved.created, again.replaced) == (False, ())
-        helsinki: list[MemoryRecord] = [
-            note for note in await index.store.list_memories(10, 0) if note.content == HELSINKI
+        assert again.saved.created is False
+        assert [note.content for note in again.replaced] == [HELSINKI]
+        awake: list[str] = [
+            note.content for note in await index.store.list_memories(10, 0) if REST_TAG not in note.tags
         ]
-        assert [REST_TAG in note.tags for note in helsinki] == [False]
+        assert awake == [OULU]
+        assert again.saved.record.subject == "user-city"
+        twice: Replacing = await _save(index, OULU, CITY)
+        assert (twice.saved.created, twice.replaced) == (False, ())
 
 
 async def test_the_owners_notes_a_pinned_note_and_a_corrected_one_stay_and_are_named(
