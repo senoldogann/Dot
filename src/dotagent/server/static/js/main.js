@@ -97,7 +97,7 @@ const ROUTES = [
     pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/,
     load: () => import("./views/agents.js"),
     // An agent's page is its conversation (item 1233), so its way back is the list of chats, as a chat's is: the sidebar
-    // opens it on a phone, and a Back to the office between them left the chats behind. Opened by a link of the agents'
+    // opens it on a phone, and a Back to the Agents page between them left the chats behind. Opened by a link of the agents'
     // page, it still goes back there.
     parent: () => null,
   },

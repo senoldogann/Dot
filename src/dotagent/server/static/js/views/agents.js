@@ -2,8 +2,8 @@
 // instructions that open the prompt of its runs, and bounds for them (a model, a reasoning level, approvals, tools).
 // The list (#/agents) is in parts, one shown at a time (item 1136): Dot and the agents as a grid of compact cards, each
 // with its newest chat, and under them the ready teams (item 504) and the templates (item 315) agents start from in one
-// click; the owner's teams (item 610), each a card with its agents' faces; the work orders; and the office. An agent's
-// page (#/agents/<id>) greets with its face and role, takes a message for it, and lists its schedules and what it
+// click; the owner's teams (item 610), each a card with its agents' faces; and the work orders. An
+// agent's page (#/agents/<id>) greets with its face and role, takes a message for it, and lists its schedules and what it
 // learned (item 1266: the counts of its chats, actions, orders and messages left the page); the editor makes or changes
 // an agent. An agent goes out as a file from its page and comes back, in this home or another, from Import an
 // agent under the list's "…". A team's own page is views/teams.js.
@@ -19,7 +19,6 @@ import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
 import { openMenu } from "../menu.js";
-import { mountOffice } from "../office/office.js";
 import { readFolds, readPref, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
 import { aboutToggle, chatLoading, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
@@ -1030,34 +1029,14 @@ function mountList(root, ctx) {
       ],
     });
   });
-  // The office (the owner's ask of 2026-10-31): the agents in a 3D room, living their day by what they do. It is a
-  // part of its own (item 1136), drawn only while it is open: its room and its labels are a view to look at, not the
-  // list to work from, and WebGL costs nothing while another part is shown.
-  const officeHolder = el("div", { class: "office-holder" });
-  let office = null;
-  function showOffice(on) {
-    if (on && office === null) {
-      office = mountOffice(officeHolder, {
-        composerFor: (record, onStarted, follow, onSteered) => officeComposer(record, ctx, onStarted, follow, onSteered),
-        openAgent: (id) => ctx.navigate(`/agents/${id}`),
-      });
-    } else if (!on && office !== null) {
-      office.dispose();
-      office = null;
-      // Its canvas goes with it, and with the canvas the browser's WebGL context.
-      officeHolder.replaceChildren();
-    }
-  }
-  const officePart = el("section", { class: "agents-part office-part", "aria-label": "The office" }, officeHolder);
   // What Dot handed out to the agents and the objectives it keeps (items 907, 908), read only.
   const work = workOrdersPart();
   // The page in parts (item 1136): the agents the owner has and the ready-made ones first, then the teams, the work
-  // orders and the office, one part at a time; the part shown is kept in this browser.
+  // orders, one part at a time; the part shown is kept in this browser.
   const parts = [
     { id: "agents", label: "Agents", sections: [yours, templates] },
     { id: "teams", label: "Teams", sections: [yourTeams] },
     { id: "orders", label: "Orders", sections: [work.element] },
-    { id: "office", label: "Office", sections: [officePart] },
   ];
   const kept = readPref(PART_KEY);
   const tabs = segmented(
@@ -1075,7 +1054,6 @@ function mountList(root, ctx) {
         section.hidden = part.id !== id;
       }
     }
-    showOffice(id === "office");
   }
   root.append(
     pageHead(
@@ -1088,7 +1066,6 @@ function mountList(root, ctx) {
     templates,
     yourTeams,
     work.element,
-    officePart,
   );
   showPart(tabs.value());
   const stopLifecycle = onLifecycle((event) => {
@@ -1119,30 +1096,12 @@ function mountList(root, ctx) {
     stopLifecycle();
     stopBack();
     closeEditor();
-    office?.dispose();
     work.dispose();
   };
 }
 
-// The part of the Agents page shown (item 1136), kept in this browser: "agents", "teams", "orders" or "office".
+// The part of the Agents page shown (item 1136), kept in this browser: "agents", "teams" or "orders".
 const PART_KEY = "dot.agents.part";
-
-/**
- * The box of the office's panel that messages `record` (Dot, or an agent): the composer of the agent's page, whose
- * run starts without leaving the office; `onStarted(run)` is told of it, so its figure goes to work at once.
- */
-function officeComposer(record, ctx, onStarted, follow, onSteered) {
-  const stay = {
-    ...ctx,
-    // The run the message started, with its chat, so that the next message goes on in it at once (the review).
-    started: (run) => onStarted(run),
-    navigate: () => {},
-    steered: (runId, text) => onSteered(runId, text, false),
-    queued: (runId, text) => onSteered(runId, text, true),
-  };
-  const owner = record.id === DOT_ID ? {} : { agent_id: record.id };
-  return startComposer({ name: record.name, bounds: record, owner, ctx: stay, follow });
-}
 
 // ------------------------------------------------------------------------------------------------- the page
 
@@ -1201,14 +1160,14 @@ function agentComposer(record, ctx, follow) {
  * `ctx` the page's context, which opens the run the message started. Returns `element`, `focus()` and `dispose()`.
  */
 /**
- * What the box that starts an agent's run is given of its page: where a started run is opened, and, in the office,
- * what is told of a run started, a message steered to the run at work, or one queued for it.
- * @typedef {{ navigate: (path: string) => void, started?: (run: any) => void, steered?: (runId: string, text: string) => void,
+ * What the box that starts an agent's run is given of its page: where a started run is opened, and what is told of a
+ * message steered to the run at work, or one queued for it.
+ * @typedef {{ navigate: (path: string) => void, steered?: (runId: string, text: string) => void,
  *   queued?: (runId: string, text: string) => void, [key: string]: any }} ComposerContext
  */
 
 /**
- * The box that starts an agent's run. `follow`, when given, says where the next message goes (the office, item 898):
+ * The box that starts an agent's run. `follow`, when given, says where the next message goes (item 1233):
  * the run at work it is sent to (`working`), or the chat it goes on in (`threadId`), else a new chat.
  * @param {{ name: string, bounds: object, owner: object, ctx: ComposerContext, follow?: () => { threadId: string | null, working: string | null } }} options
  */
@@ -1295,7 +1254,6 @@ export function startComposer({ name, bounds, owner, ctx, follow }) {
         frame.picks.sent();
         frame.clear();
         unsent = null;
-        ctx.started?.(created);
         ctx.navigate(`/runs/${created.id}`);
       });
     } finally {
@@ -1484,7 +1442,7 @@ function mountPage(root, ctx, agentId) {
   const top = el("div", { class: "home-start agent-top" });
   const sections = el("section", { class: "home-today agent-sections", "aria-label": "The agent's work" });
   // While the agent is read its page stands as a chat that opens: Dot's three dots in the middle, not a card's spinner
-  // at the top that read as the office loading.
+  // at the top that read as something else loading.
   const page = el("div", { class: "home agent-home" }, chatLoading());
   // Its face, name and box stand in the middle of the room under the bar, as the home's do (item 124): the row above
   // them takes half of what their height leaves (app.css), so the page keeps that height as it changes.
