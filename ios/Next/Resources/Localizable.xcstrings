@@ -2032,6 +2032,17 @@
         }
       }
     },
+    "Delegated task “%@” failed": {
+      "comment": "Tool row: a task handed to a helper that failed; the argument is its goal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” görevi devredildi, başarısız oldu"
+          }
+        }
+      }
+    },
     "Delegated task “%@” finished": {
       "comment": "Tool row: a task handed to a helper, ended; the argument is its goal",
       "localizations": {

@@ -19,6 +19,8 @@ import Foundation
 /// | an ask nobody had to answer (`approval_auto` the policy allowed) | not drawn: the run's inspector keeps it ||||
 /// | the owner's words, Dot's notes         | shown    | shown           | shown    | shown  |
 ///
+/// The app draws two or more consecutive commands that ended well as one "Ran N commands" line that opens to them (item
+/// 1769); a command at work or one that failed stands alone. This filter keeps each of them a row.
 /// "Response streaming" off: the words and the thinking being written are not drawn; an answer appears once it is whole.
 /// Hide all and Zen draw one live line under the last message instead of the steps (`workNow`, item 1769): what the run
 /// does now ("Thinking", "Running swift test"); a tap on it shows the steps of the chat. Once a run ended, Hide all folds

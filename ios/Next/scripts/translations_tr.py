@@ -836,6 +836,7 @@ TR: dict[str, str] = {
     'Ran %lld commands': '%lld komut çalıştırdı',
     'Delegating “%@”': '“%@” devrediliyor',
     'Delegated task “%@” finished': '“%@” görevi devredildi ve bitti',
+    'Delegated task “%@” failed': '“%@” görevi devredildi, başarısız oldu',
     # G2: Connect apps (items 1861-1862)
     'Connect apps': 'Uygulamaları bağla',
     '%lld connected': '%lld bağlı',
