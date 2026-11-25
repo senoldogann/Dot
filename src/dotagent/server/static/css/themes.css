@@ -154,23 +154,6 @@
   /* Dot's computer (run.css): the warm backdrop behind the live view, from Dot's own yellow (--brand, the same in every
      look: the bubbles are the accent's tint since item 1324 and no longer carry it). */
   --computer-backdrop: linear-gradient(160deg, color-mix(in srgb, var(--brand) 55%, #ffffff), var(--brand) 70%, color-mix(in srgb, var(--brand) 80%, #000000));
-  /* The office of the Agents page (item 885): the room stands on a dark stage in every scheme, as a lit diorama does,
-     and the tags over the agents are dark glass with light words; a dot says what each one does. */
-  --office-stage: radial-gradient(120% 90% at 60% 35%, #2b2a31 0%, #17161b 70%);
-  --office-glass: rgb(28 27 32 / 72%);
-  --office-glass-strong: rgb(28 27 32 / 90%);
-  /* A free agent's name on a phone (item 894): quieter glass, so that the room shows through the names. */
-  --office-glass-quiet: rgb(28 27 32 / 48%);
-  --office-ink: #f6f2ea;
-  --office-ink-soft: rgb(246 242 234 / 66%);
-  --office-free: #8a8790;
-  --office-working: #3ecf8e;
-  --office-waiting: #f08a24;
-  --office-panel-shadow: 0 18px 48px rgb(0 0 0 / 35%);
-  /* What a working agent does now, in a speech bubble over its tag (item 889). */
-  --office-bubble: #fffdf8;
-  --office-bubble-ink: #2a2830;
-  --office-bubble-shadow: 0 6px 18px rgb(0 0 0 / 28%);
 }
 
 /* ---------- paper: warm paper, a serif voice for answers and one terracotta accent ---------- */

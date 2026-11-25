@@ -10,6 +10,7 @@ import { api } from "../api.js";
 import { mountBrief } from "../briefcard.js";
 import { mountCheckin } from "../checkincard.js";
 import { mountInitiative } from "../initiativecard.js";
+import { mountTells } from "../tellspanel.js";
 import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
@@ -742,7 +743,9 @@ function mountList(root, ctx) {
   const watchers = mountWatchers();
   // Dot's own initiative (item 715), under the watchers: what Dot does for you on its own while the Mac is idle.
   const initiative = mountInitiative();
-  const others = thread === "" ? [brief.element, checkin.element, watchers.element, initiative.element] : [];
+  // What you do with the tells (item 1743), under the initiative: it only counts.
+  const tells = mountTells();
+  const others = thread === "" ? [brief.element, checkin.element, watchers.element, initiative.element, tells.element] : [];
 
   function listOf(shown, handlers) {
     return setCard(...shown.map((view) => scheduleRow(view, handlers)));
@@ -902,6 +905,7 @@ function mountList(root, ctx) {
     checkin.dispose();
     watchers.dispose();
     initiative.dispose();
+    tells.dispose();
     stopLifecycle();
     stopBack();
   };

@@ -545,3 +545,34 @@ def with_its_files(
         )
     found.html = whole
     return found
+
+
+def _remote(url: str) -> bool:
+    """Whether ``url`` is a web address (``http:``, ``https:`` or one without a scheme that names a host)."""
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:
+        return False
+    return parts.scheme.lower() in ("http", "https") or (not parts.scheme and bool(parts.netloc))
+
+
+def remote_media(html: str) -> tuple[str, ...]:
+    """The web addresses of the pictures, sounds and videos ``html`` names in its tags, its ``srcset`` and its icon,
+    each once, in the order named. A shown page loads none of them (its policy loads them only from ``data:`` and
+    ``blob:``), so each would stand empty (item 1721). Its styles are not read: a sheet or a font that does not load
+    leaves the page drawn in the fonts it falls back to, and a picture of a style is a page's ground, not what it
+    shows."""
+    tags: _Tags = _Tags(html)
+    tags.feed(html)
+    tags.close()
+    found: list[str] = []
+    for _start, _end, tag, attrs, _closed in tags.tags:
+        named: dict[str, str | None] = dict(attrs)
+        shown: tuple[str, ...] = _SHOWN.get(tag, ())
+        if tag == "link" and _is_icon(named.get("rel")):
+            shown = ("href",)
+        found.extend(value for name in shown if (value := named.get(name)))
+        srcset: str | None = named.get("srcset")
+        if srcset:
+            found.extend(srcset[start:end] for start, end in _srcset_urls(srcset))
+    return tuple(dict.fromkeys(url.strip() for url in found if _remote(url)))

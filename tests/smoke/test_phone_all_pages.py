@@ -202,7 +202,7 @@ async def _fill(runtime: Runtime, port: int) -> str:
     await _vault(runtime)
     thread: ThreadRecord = await runtime.store.create_thread(_CAMPAIGN_TITLE, "test")
     await runtime.store.create_campaign(
-        _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own"
+        _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own", ()
     )
     async with httpx.AsyncClient(
         base_url=f"http://127.0.0.1:{port}",

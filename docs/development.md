@@ -234,6 +234,19 @@ job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned b
 pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .`
 first, on your Mac).
 
+`.github/workflows/ios.yml` builds and tests the iPhone app DotNext and its engine on `macos-26` with Xcode 26.6
+(item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), the unit
+and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e` (Settings
+against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes only when
+all of them did. A pull request that changes `ios/` runs `engine`, `build` and `tests (chat)`, about 20 minutes; the
+whole run, about an hour, runs on a push to `main` that changes `ios/`, every night, when asked (`gh workflow run
+ios.yml --ref <branch>`) and on a pull request with the label `ios-full`. A run holds two macOS runners at most
+(`engine` beside `build`, the test parts two at a time, then `e2e` alone), so three of the five stay free for the
+gate's macOS jobs. A test that fails runs once more, as a fresh runner's simulator sometimes fails to launch the app;
+one that passed only on its retry is named in the job's summary ("passed on retry: <test>"). The `ios` check is not one
+`main`'s protection can require: a pull request outside `ios/` never runs the workflow, so it never reports it.
+ios/Next/README.md "CI" says how to read a run and download its results and screenshots.
+
 A Dependabot pull request that raises versions by a patch or a minor step merges by itself
 (`.github/workflows/dependabot-merge.yml`, item 1190): a job marks it with the label `dependabot-merge`, and every
 twenty minutes another merges at most one marked pull request whose `ci` passed, the oldest, and only when main's gate
@@ -545,7 +558,13 @@ median call, and the finished runs that acted there with the share of them that 
 follows: per day, the finished runs that acted on a site and the share done, which shows whether the browser and the
 desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them, and
 `--by tool` prints only the tool health table: every tool by failure rate, calls, failed calls, fail % and median call,
-so one tool at 40 % is not hidden by the 5 % of all calls. Acts and steps recorded before
+so one tool at 40 % is not hidden by the 5 % of all calls. A call Dot's own rule turned another way is not counted as
+failed (item 1722): a background `terminal_open` in a delegated run or a campaign's session, and a `delegate` or
+`create_agent` with a team but no `agents_considered`. The model reads it as an error, since nothing was done, and its
+`tool_result` event is `"ok": false` (the call did not do its job, as the timeline and the record of acts show it) with
+`"steered": true`, which this table, the run ledger, the self-improvement loop's tool outcomes, the nightly reflection,
+the repair night's problems and an eval run's scorecard leave out of the failed calls (`store/failed.py`); an audit of the store does the same
+by counting `"ok": false` and not `"steered": true`. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of
@@ -557,10 +576,27 @@ check; blocked: HTTP 401 or 403; in transit; other); the calls of any tool **ref
 the run waited for them; and the step line adds the median input tokens a step sent per band, the growth of the
 context. **`dotx stats --run ID`** prints the same for one run: its minutes of wall time (to now while it works), its
 tool calls' seconds and the part spent at the gate, the version of [the harness](harness.md) it took (or Dot's own
-text), then the lines above and its tools. The daemon serves the same as `GET /api/runs/{id}/stats`. A **Harness**
+text), then the lines above, **the prompt cache** (item 1742, below) and its tools. The daemon serves the same as
+`GET /api/runs/{id}/stats`. A **Harness**
 table follows the learning lines (item 588): the finished runs of the window by the version of the harness they took,
 the busiest first, with the share that ended done and the runs on Dot's own text beside them, which is how a
 version's effect on its runs is read.
+
+**The prompt cache of a run** (item 1742): `dotx stats --run ID` and the run's Cost card (**Cache misses**, `cache` in
+`GET /api/runs/{id}/stats`) say how much of the run's input the provider read from its cache and what it wrote to it
+(`cache_write_tokens`, which Anthropic reports and bills above the price of input), and why a step was cold. The first
+step is *warm*, or cold because the chat had no earlier call (*new chat*), because the instructions or the tools differ
+from the chat's previous run (*prefix changed*, with the sections, `system:<heading>`, and groups, `tools:<group>`, that
+differ, told by the fingerprints `context_parts` carries since item 1742, by their sizes for a run recorded before),
+because the chat was last called longer ago than five minutes with the same prompt (*after a pause*), or for no cause
+the run recorded (*unexplained*). A later step that sent more than 20,000 tokens at full price is told with what
+happened just before it: a tool group turned on (the tools stand before the conversation, so the step reads nothing),
+a compaction, or no mark. Measured on the owner's 10,236 answered calls of 2026-11-10 to 11-24 (14 days): 94.3 % of
+the 1.04 billion step input tokens were read from the cache (OpenCode Go's DeepSeek 94.3 %, Anthropic 86.9 %,
+Antigravity 89.8 %); of the 59.2 million that were not, 21 % were first steps (69 of 72 first steps after a pause of an
+hour or more were cold, 3 of 17 within five minutes), 7 % were steps after a tool group turned on, and the rest steps
+that grew by a large tool result or met no mark. The side calls (a progress check, a goal check, lessons, a recap, a
+compaction) are asked once and read 0 to 12 % from the cache by design.
 
 **What a run's first step carries** (item 735): the first step of every run records, as a `context_parts` event, what
 its request holds in characters, the system prompt by the heading of each section, the tools' schemas by group (`core`,
@@ -605,6 +641,7 @@ it.
 | `dotx eval from-run RUN [--out PATH]`                    | Writes a draft task from a saved run: its goal, ending, steps and the tool names that failed. It leaves tool arguments out, so the draft can be read before it is shared, and it does not play anything; turn it into a task in `src/dotagent/evals/catalog.py`. The default is `<home>/evals/drafts/<run>.md`. |
 | `dotx eval run [--model REF] [--task ID]... [--repeat N] [--effort LEVEL] [--no-mcp-purposes]` | Plays the tasks against a model (the configured main model if none is given) and prints the score. It spends the tokens of that model: an attempt is cut after 300 s or 600000 tokens (180 s or 250000 for a choice task), and the notice before it starts states the ceiling. A model on your Claude plan (`claude_code:...`) or on OpenCode is counted from each step it records, as Dot's own loop is from its model calls (item 1220), and on your Claude plan an attempt is also cut, and the eval stops without counting it, once the plan's window it runs in is 70 % used or refuses calls, also when it refused the run before its first step: the rest is kept for your own work. A harness probe stops the same way. `--repeat` plays every task several times, which shows the tasks a model passes only now and then. `--no-mcp-purposes` plays them with `[agent] mcp_purposes` false (below). |
 | `dotx eval speed [--model REF] [--repeat N] [--effort LEVEL] [--report FILE]...` | Plays the speed set (items 1037 and 1040): five browser tasks on a local site, with no network and no account (a sign-up over three pages, a search and the result it opens, a stock list of 120 rows, a daily check over three pages, a job application in a dialog of three steps), `--repeat` times each (3 by default), and prints per task and over them all the share passed, the wall seconds, the model calls, the share of `browser_act`/`desktop_act` calls that carried one step, the mean time to the first token of the steps' calls and the largest context a call was sent. `--effort` plays every attempt at that level of thinking, the report keeping it (item 1041). `--report` prints a saved report's table instead, and two of them side by side, a baseline and a later run, with how much the seconds and the calls changed. It stops at your Claude plan's window as `dotx eval run` does. A change to how fast Dot uses the browser is measured with it, the same model and set before and after: `uv run dotx eval speed --repeat 3`. |
+| `dotx eval memory [--embeddings scripted\|configured]` | Measures whether a search finds the newest fact when a fact changed (item 1728): 42 cases, each in a store of its own, of owner facts a run saves over time (a city, a rate, a port, a client's state; some in Turkish), most of them replaced later (twice for four), with a question whose right answer is the newest fact, and eight facts that are both true and must both stay found. A fact is saved as `memory_save` saves a note, with the subject a run may give or without one, and some old notes are handed to a run in between (which lifts them in a search); the question is then searched as `memory_search` does, the three best notes. It prints per group how often the newest fact came first, was among the three, and an outdated one was among them too. No model is asked: `scripted` (the default) embeds from the cosines `bge-m3` measured on these texts, offline, as `tests/unit/test_eval_memory.py` runs it; `configured` embeds with the model of `[memory]` (`tests/smoke/test_eval_memory_live.py`, marked `live`, measures the scripted numbers again). It reads and writes a scratch folder, never your notes. A store of two or three notes ties the two versions of a fact in the fusion and the older wins the tie, so "first" is a floor there, not a rate for a large store; "outdated shown" is not affected. The cases are in `evals/memory_cases.py`. |
 | `dotx eval tools [--model REF] [--case ID]... [--repeat N]` | Asks a model the moments of tool use Dot's runs got wrong (item 736), one call each: each case's goal is started as a run of the scripted model, whose first request (the system prompt and the tools' schemas, as Dot makes them) is asked of the model with the steps before the moment, and the first call that does work is judged (the tool, its arguments, the calls it must not make). The request is captured in `yolo`, so that no case waits on an approval. It spends the tokens of that model, about 20,000 a call; its key comes from the environment and the home's `.env` alone, and the Keychain is not asked while the cases play: a key in neither is missing, and the command says so before the first case. The cases are in `evals/tool_cases.py`, each saying which failure it comes from. |
 | `dotx eval report [FILE...]`                             | The score of saved runs, with a comparison table when there are several and, for exactly two files, a line with the second against the first (passed, steps, tokens and seconds per pass, the one-step act and cache shares in percentage points, tool errors, stalls, false claims, unproven steps, the share of the easy ways taken); without a file, every run saved under `<home>/evals/`. |
 

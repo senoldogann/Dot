@@ -10,7 +10,8 @@ its policy kind, from its tool's ``prepare``, which classifies a call and runs n
 may run again, any other may have changed something.
 
 By hand, any run that :func:`can_resume` allows can be resumed. With ``[agent] resume = "safe"`` the daemon also resumes
-on its own, when it starts, the runs that :func:`resumes_on_start` allows. Every function here is pure except
+on its own, when it starts, the runs that :func:`resumes_on_start` allows: a cut call that may have paid, sent or posted
+holds a run back, any other is told in the note (item 1854). Every function here is pure except
 :func:`interrupted_calls`, which reads the store and classifies the calls.
 """
 
@@ -41,7 +42,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
 from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.endings import classify_ending
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import EventRecord, ProofCheck, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool
 from dotagent.tools.context import ToolContext
 from dotagent.tools.help import FIND_HELP_TOOL
@@ -71,7 +72,9 @@ _ADDING_TOOLS: frozenset[str] = frozenset({SHOW_PAGE_TOOL})
 
 # Tools whose classification looks at the screen as it is now, which can bring an application to the front: their calls
 # are not classified again. None of their kinds only reads.
-_SCREEN_CLASSIFIED: frozenset[str] = frozenset({DESKTOP_ACT_TOOL})
+# ``browser_act`` classifies a click by the element of the tab's last snapshot, which a daemon that has just started
+# does not hold: classified again, a click on "Pay now" would read as a click that raises nothing (item 1854).
+_SCREEN_CLASSIFIED: frozenset[str] = frozenset({DESKTOP_ACT_TOOL, "browser_act"})
 _STEP_EVENT: str = "assistant"
 _GROUP_NAMES: dict[GroupKind, str] = {
     "shell": "a shell command",
@@ -142,6 +145,8 @@ class Resumption(FrozenModel):
     # The work the run had going on its own (a shell command, a terminal session, a Claude Code program, a code-mode
     # script) that the daemon's start ended, as it outlived the daemon that started it (item 1670): one line each.
     stopped: tuple[str, ...] = ()
+    # The proof checks of the run it goes on from (item 1853), which hold this run as they held that one.
+    proof: tuple[ProofCheck, ...] = ()
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:
@@ -188,6 +193,21 @@ RESTART_CUTS: frozenset[CutOff] = frozenset({"daemon_restarted", "daemon_shutdow
 # what even yolo keeps for the owner (``dotagent.policy.engine.owners_guard``; a test holds the two equal). A call of
 # one that was cut while it ran may have been done, and a resumed run could do it a second time.
 OUTWARD_FLAGS: frozenset[Flag] = frozenset({"financial", "message_send", "public_post"})
+# What an action that reaches beyond the Mac raises: a message or mail, a post, an upload or data sent out, a payment, a
+# project's change put live. A call of one that was cut while it ran keeps its run from going on by itself after a
+# restart (item 1854), as a schedule's task with such a step is never tried again (``scheduler.recovery``).
+SENT_OUT_FLAGS: frozenset[Flag] = frozenset(
+    {
+        "external_send",
+        "message_send",
+        "public_post",
+        "social",
+        "upload",
+        "exfiltration",
+        "financial",
+        "release",
+    }
+)
 
 
 def cut_by_restart(run: RunRecord) -> bool:
@@ -247,16 +267,26 @@ def repeatable(call: InterruptedCall) -> bool:
     return call.kind is not None and call.kind in REPEATABLE_KINDS
 
 
+def held_back(call: InterruptedCall) -> bool:
+    """Whether ``call``, cut while it ran, keeps its run from going on by itself after a restart (item 1854): it
+    reaches beyond the Mac (a payment, a message or mail, a post, an upload, a release: :data:`SENT_OUT_FLAGS`), so it
+    may have been done and a second try could do it twice, or its kind cannot be told, so it may be one of those (a
+    click classified by the screen or a browser snapshot the new daemon does not hold). Any other cut call is told in
+    the note, which says to check what it may have changed."""
+    return call.end == "cut_off" and (call.kind is None or bool(SENT_OUT_FLAGS & set(call.flags)))
+
+
 def resumes_on_start(run: RunRecord, newest_run_id: str | None, calls: Sequence[InterruptedCall]) -> bool:
-    """Whether the daemon resumes ``run`` on its own when it starts: a run of the web UI that may be resumed and whose
-    calls that were cut off while they ran only read. A call that finished is reported with its result and one that had
-    not started did nothing, so neither counts. A run that the command line, a schedule or an evaluation started waits
-    for the owner, and so does a resumed run: a run that brings the daemon down is not resumed again and again."""
+    """Whether the daemon resumes ``run`` on its own when it starts: a run of the web UI that may be resumed and that
+    no cut call holds back (:func:`held_back`, item 1854). A call that finished is reported with its result and one
+    that had not started did nothing, so neither counts. A run that the command line, a schedule or an evaluation
+    started waits for the owner, and so does a resumed run: a run that brings the daemon down is not resumed again and
+    again."""
     return (
         run.source == UI_SOURCE
         and cut_off_by(run) is not None
         and can_resume(run, newest_run_id)
-        and all(repeatable(call) for call in calls if call.end == "cut_off")
+        and not any(held_back(call) for call in calls)
     )
 
 
@@ -282,8 +312,16 @@ def resume_note(goal: str, resumption: Resumption) -> str:
     """The first message of a resumed run: how the run it resumes stopped, its goal, the calls of the step it was in
     and its plan, the ledger ids a compaction kept, and to go on from where it stopped. A cut-off uses the words it
     always has. The note is the opening message, not part of the system prompt."""
-    if resumption.cut_off in _CUT_OFF_TEXT:
+    if resumption.automatic and resumption.cut_off in _CUT_OFF_TEXT:
+        # OpenClaw's words for the same moment (``session-restart-resume-prompt.ts``), as its runs follow (item 1854).
         lead: str = (
+            "[system note] Dot restarted while you were working on this goal, and goes on with it now: "
+            f"{_CUT_OFF_TEXT[resumption.cut_off]}. The conversation above holds every step it "
+            "took. Before you repeat anything, check the current state of what was in progress (files, processes, "
+            f"helpers, outside actions), then continue. Its goal:\n{goal}"
+        )
+    elif resumption.cut_off in _CUT_OFF_TEXT:
+        lead = (
             f"[system note] The run that worked on this goal was cut off: {_CUT_OFF_TEXT[resumption.cut_off]}. You go "
             f"on with it; the conversation above holds every step it took. Its goal:\n{goal}"
         )

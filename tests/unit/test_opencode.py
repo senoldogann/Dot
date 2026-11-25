@@ -36,6 +36,7 @@ from dotagent.opencode.run import (
     _Call,
     agent_failed,
     bridged_tools,
+    harness_prompt,
     local_target,
     meanwhile,
     permission_action,
@@ -52,6 +53,7 @@ from dotagent.opencode.server import (
 )
 from dotagent.policy.sandbox import confined_server
 from dotagent.policy.types import ActionInfo
+from dotagent.store.models import RunRecord
 from dotagent.tools.base import ToolResult
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.delegate import build_delegate_tools
@@ -294,7 +296,7 @@ def _registry() -> ToolRegistry:
             (build_shell_tool(),),
             build_web_tools(),
             build_browser_tools(),
-            build_memory_tools(),
+            build_memory_tools(600),
             build_schedule_tools(),
             build_delegate_tools(),
             build_meta_tools(),
@@ -303,19 +305,64 @@ def _registry() -> ToolRegistry:
     )
 
 
+_TASK_RUN: RunRecord = RunRecord(
+    id="run_zen",
+    thread_id="thread_zen",
+    goal="Look into it",
+    mode="task",
+    model="opencode:big-pickle",
+    status="running",
+    created_at=1.0,
+    finished_at=None,
+    result="",
+    steps=0,
+    input_tokens=0,
+    output_tokens=0,
+    parent_run_id=None,
+    source="ui",
+    effort=None,
+    speed="standard",
+    once=None,
+    approvals="yolo",
+    goal_mode=False,
+    campaign_id=None,
+    agent_id=None,
+    rewindable=True,
+)
+
+
 def test_the_agent_gets_dots_tools_for_what_opencode_has_none_of() -> None:
-    names: set[str] = set(bridged_tools(_registry(), "task", None).tools)
+    names: set[str] = set(bridged_tools(_registry(), _TASK_RUN, None).tools)
     assert {"browser_open", "browser_act", "memory_save", "memory_search", "memory_forget", "schedule_create"} <= names
-    assert {"ask_user", "notify"} <= names
-    # OpenCode's agent has its own for files, commands and the web; the plan, finish, tool groups and helpers are Dot's
-    # loop's.
-    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search", "terminal_send", "finish"}
-    assert not names & (left_out | {"update_plan", "use_tools", "delegate"})
+    assert {"ask_user", "notify", "delegate", "terminal_send"} <= names
+    # Item 1695: the run ends with Dot's finish and keeps Dot's plan, as its prompt says.
+    assert {"finish", "update_plan", "mark_plan_step"} <= names
+    # OpenCode's agent has its own for files, commands and the web; the tool groups are Dot's loop's.
+    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search"}
+    assert not names & (left_out | {"use_tools"})
+
+
+def test_a_delegated_run_gets_none_of_what_a_delegated_run_may_not_use() -> None:
+    delegated: RunRecord = _TASK_RUN.model_copy(update={"parent_run_id": "run_parent"})
+    names: set[str] = set(bridged_tools(_registry(), delegated, None).tools)
+    assert "browser_open" in names and not names & {"ask_user", "delegate"}
 
 
 def test_an_agent_bounded_to_some_tools_gives_only_those() -> None:
     bounded: frozenset[str] = frozenset({"browser_open", "finish", "ask_user", "read_file"})
-    assert set(bridged_tools(_registry(), "task", bounded).tools) == {"browser_open", "ask_user"}
+    assert set(bridged_tools(_registry(), _TASK_RUN, bounded).tools) == {"browser_open", "finish", "ask_user"}
+
+
+def test_the_agent_is_told_dots_own_prompt_then_what_opencode_changes() -> None:
+    """Item 1695: a run on Zen's free models was told nothing of Dot's (no character, rules, owner or finish); Zen
+    answered with Dot's whole prompt in a prompt's system (measured 2026-11-24), which now carries it, then which of
+    OpenCode's tools stand for the ones it names."""
+    task: str = harness_prompt("DOT PROMPT", "dot_1a2b3c4d", ["browser_open", "finish"], Path("/w"))
+    assert task.startswith("DOT PROMPT\n\n# This run's harness\n")
+    assert "bash for shell" in task and "dot_1a2b3c4d_<tool>): browser_open, finish" in task
+    assert "call finish" in task and "Dot's workspace, /w" in task
+    chat: str = harness_prompt("DOT PROMPT", "dot_1a2b3c4d", ["browser_open"], Path("/w"))
+    assert "call finish" not in chat and "your last reply" in chat
 
 
 def _decided(tool: str, rules: list[JsonValue]) -> str:

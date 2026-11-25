@@ -18,7 +18,9 @@ log="$t/daemon.log"
 DOT_HOME="$t/home" DOT_LOG_DIR="$t/logs" DOT_CHROME_DIR="$t/chrome" \
     uv run --project "$daemon" python "$here/e2e_daemon.py" "$port" --seed >"$log" 2>&1 &
 pid=$!
-trap 'kill $pid 2>/dev/null || true' EXIT
+# `uv run` may outlive a kill of its own pid by a moment: the daemon is stopped by its command line too, so that a
+# second run of this script finds the port free.
+trap 'kill $pid 2>/dev/null || true; pkill -f "e2e_daemon.py $port" 2>/dev/null || true' EXIT
 tries=0
 until grep -q READY "$log"; do
     tries=$((tries + 1))
@@ -36,11 +38,16 @@ curl -fsS -X PUT -H "$main" -H "Content-Type: application/json" -d '{"free":true
 curl -fsS -X POST -H "$main" -H "Content-Type: application/json" \
     -d '{"name":"E2E Scout","role":"Finds leads","instructions":"","model":"","effort":null,"approvals":null}' "$base/api/agents" >/dev/null
 
-TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
-    -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
-    -only-testing:DotNextUITests/SettingsLiveUITests 2>&1 | grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" | sort -u
-
+# The UI test's own assertions (what each page shows) count as much as the daemon's side below: its status is kept.
 fail=0
+if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
+    -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
+    -only-testing:DotNextUITests/SettingsLiveUITests -only-testing:DotNextUITests/SettingsMaintenanceLiveUITests >"$t/xcodebuild.log" 2>&1; then
+    echo "FAIL  SettingsLiveUITests or SettingsMaintenanceLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
+    fail=1
+fi
+grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | sort -u
+
 check() {
     if python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($2) else 1)"; then echo "ok    $1"; else echo "FAIL  $1" >&2; fail=1; fi
 }
@@ -62,5 +69,6 @@ if curl -fsS -H "$main" "$base/api/budget" >"$t/budget.json" 2>/dev/null; then
 else
     echo "skip  Caps: this daemon has no /api/budget (item 1731 not merged): the page said Update Dot"
 fi
+curl -fsS -H "$main" "$base/api/status" | check "Maintenance: interrupted tasks are not resumed" 'd["resume"]["resume"] == "off"'
 grep -c "PhoneRefused\|a phone cannot" "$log" | sed 's/^/      refusals to the phone in the daemon log: /'
 exit $fail

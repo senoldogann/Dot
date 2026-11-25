@@ -155,7 +155,7 @@ async def test_the_digest_counts_what_schedules_and_campaigns_did_and_what_was_d
     await store.finish_run(broken.id, "failed", "The disk was full.")
     goal_chat: ThreadRecord = await store.create_thread("Ship 2.0", "ui")
     campaign: CampaignRecord = await store.create_campaign(
-        "Ship 2.0", "Ship it.", goal_chat.id, OPUS, "high", "standard", None, "yolo", [], "own"
+        "Ship 2.0", "Ship it.", goal_chat.id, OPUS, "high", "standard", None, "yolo", [], "own", ()
     )
     session: RunRecord = await _run(store, goal_chat.id, "Ship it.", "schedule", None, campaign.id)
     await store.finish_run(session.id, "done", "Shipped the notes.")

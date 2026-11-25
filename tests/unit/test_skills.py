@@ -34,7 +34,7 @@ from dotagent.skills.catalog import (
 from dotagent.skills.discover import find_skill_files
 from dotagent.skills.icons import ICON_NAMES, skill_icon
 from dotagent.skills.office import CLOUD_STORAGE, OFFICE_APPS, ONEDRIVE_APP, app_version, onedrive_folders
-from dotagent.skills.parse import cut_description, parse_skill
+from dotagent.skills.parse import cut_description, parse_others_skill, parse_skill
 from dotagent.skills.types import PYTHON_MARK, Skill
 from dotagent.tools.skill import fence_skill, with_python
 
@@ -141,15 +141,45 @@ def test_a_skill_that_cannot_be_read_is_told_once_while_its_file_stays_and_again
 ) -> None:
     root: Path = tmp_path / "skills"
     _skill_dir(root, "good", _simple("good"))
-    broken: Path = _skill_dir(root, "bad", "# no frontmatter\n") / "SKILL.md"
+    broken: Path = _skill_dir(root, "bad", "---\nname: bad\n") / "SKILL.md"
     catalog = load_catalog([SkillRoot(path=root, source="home")])
     assert [skill.name for skill in catalog.skills] == ["good"], "the skills that load are offered as before"
     assert len(unreported(catalog.problems)) == 1
     assert unreported(load_catalog([SkillRoot(path=root, source="home")]).problems) == ()
     assert len(load_catalog([SkillRoot(path=root, source="home")]).problems) == 1, "the problem stays in the catalog"
-    broken.write_text("# still no frontmatter\n", encoding="utf-8")
+    broken.write_text("---\nname: bad\nstill open\n", encoding="utf-8")
     os.utime(broken, ns=(1_000_000_000, 2_000_000_000))
     assert len(unreported(load_catalog([SkillRoot(path=root, source="home")]).problems)) == 1
+
+
+def test_a_skill_without_a_frontmatter_is_read_as_claude_code_reads_it_but_none_of_dots_own(tmp_path: Path) -> None:
+    """Item 1723: a skill the owner or a plugin brought that opens with a title (Twilio's ``twilio-agent-connect``) is
+    named for its folder and described by its first line of words, as Claude Code reads it; one of Dot's own playbooks
+    still needs its frontmatter, and a folder whose name is no skill name is refused with what to do."""
+    text: str = "# Twilio Agent Connect\n\n## Overview\n\nTAC is a Python SDK for agents.\n\nSteps.\n"
+    skill: Skill = parse_others_skill(tmp_path / "twilio-agent-connect" / "SKILL.md", text, "plugin twilio")
+    assert (skill.name, skill.description) == ("twilio-agent-connect", "TAC is a Python SDK for agents.")
+    assert skill.body == text.strip()
+    titled: Skill = parse_others_skill(tmp_path / "only-title" / "SKILL.md", "# Only a title\n", "home")
+    assert titled.description == "Only a title"
+    tabled: str = "# Kit\n\n| Name | Value |\n|---|---|\n\n```bash\nkit run\n```\n\n- a list\n\nRuns the kit.\n"
+    assert parse_others_skill(tmp_path / "kit" / "SKILL.md", tabled, "home").description == "Runs the kit."
+    coded: str = "```bash\nkit run\n```\n\n- a list\n"
+    assert parse_others_skill(tmp_path / "code-only" / "SKILL.md", coded, "home").description == "code-only"
+    listed: str = "- a list\n| a | row |\n"
+    assert parse_others_skill(tmp_path / "list-only" / "SKILL.md", listed, "home").description == "list-only"
+    late: str = "- a list\n\n## The kit\n\n- more\n"
+    assert parse_others_skill(tmp_path / "late-title" / "SKILL.md", late, "home").description == "The kit"
+    assert parse_others_skill(tmp_path / "bare-hash" / "SKILL.md", "#\n", "home").description == "bare-hash"
+    assert parse_others_skill(tmp_path / "tidy" / "SKILL.md", _simple("tidy"), "home") == parse_skill(
+        tmp_path / "tidy" / "SKILL.md", _simple("tidy"), "home"
+    )
+    with pytest.raises(SkillError, match="does not start with the --- line"):
+        parse_skill(tmp_path / "learned-x" / "SKILL.md", text, "playbook")
+    with pytest.raises(SkillError, match="no skill name"):
+        parse_others_skill(tmp_path / "Bad Name" / "SKILL.md", text, "home")
+    with pytest.raises(SkillError, match="is empty"):
+        parse_others_skill(tmp_path / "blank" / "SKILL.md", " \n", "home")
 
 
 @pytest.mark.parametrize(
@@ -203,7 +233,7 @@ def test_the_catalog_keeps_each_name_once_and_reports_what_it_left_out(tmp_path:
     first: Path = tmp_path / "first"
     second: Path = tmp_path / "second"
     _skill_dir(first, "alpha", _simple("alpha"))
-    _skill_dir(first, "broken", "no frontmatter\n")
+    _skill_dir(first, "broken", "---\nname: broken\n")
     _skill_dir(second, "alpha", _simple("alpha").replace("Do alpha.", "Do alpha another way."))
     _skill_dir(second, "beta", _simple("beta"))
     # A copy of a skill, as a sync of the same skills leaves in another folder, counts once and is no problem.
@@ -222,7 +252,7 @@ def test_the_catalog_keeps_each_name_once_and_reports_what_it_left_out(tmp_path:
         str(problem.path.relative_to(tmp_path)): (problem.reason, problem.shadowed) for problem in catalog.problems
     }
     assert reasons == {
-        "first/broken/SKILL.md": ("SKILL.md does not start with the --- line that opens the frontmatter", False),
+        "first/broken/SKILL.md": ("the frontmatter of SKILL.md is not closed by a --- line", False),
         "second/alpha/SKILL.md": (f"another skill is already called alpha: {first / 'alpha'}", True),
         "missing": ("the skills directory does not exist", False),
     }

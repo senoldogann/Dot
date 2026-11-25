@@ -578,7 +578,7 @@ async def test_the_cast_and_the_input_of_a_campaign_come_from_its_own_browser(
     monkeypatch.setattr("dotagent.agent.manager.read_debug_endpoint", chrome_is_open)
     MODEL.script = ScriptedProvider(_PROVIDER, [_call("shell", {"command": "sleep 5"}), _FINISH, _FINISH])
     campaign: RunRecord = await manager.start_campaign(
-        "Wait", "task", SCRIPTED_MODEL, None, "test", None, "standard", None, "yolo", None, (), "attach"
+        "Wait", "task", SCRIPTED_MODEL, None, "test", None, "standard", None, "yolo", None, (), "attach", ()
     )
     try:
         taken: httpx.Response = await client.post(f"/api/runs/{campaign.id}/takeover/screen")

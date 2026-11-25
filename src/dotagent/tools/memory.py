@@ -23,8 +23,8 @@ from dotagent.memory.service import (
     normalize_tags,
     recall_for,
     rewrite_memory_note,
-    save_memory,
 )
+from dotagent.memory.supersede import Replacing, save_replacing
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import known_secrets
@@ -46,6 +46,8 @@ from dotagent.tools.context import ToolContext
 
 _TIMEOUT_S: float = 60.0
 _SUMMARY_CHARS: int = 200
+# The longest subject a run gives a note (the store keeps it as :func:`normalize_subject` cuts it).
+_MOST_SUBJECT_CHARS: int = 60
 # The longest a note may be saved for a while: past a few years a fact is one that holds until it changes.
 _MOST_VALID_DAYS: int = 3650
 # What a run's rewrite of a note the owner wrote or approved says: it waits for them (audit 2026-11-24, D1).
@@ -93,15 +95,27 @@ async def _secret_refusal(content: str) -> ToolResult | None:
     )
 
 
-def render_saved(saved: SavedMemory) -> str:
-    """What the model reads after saving: the note, or that it existed, plus the notes it may now have outdated."""
-    if not saved.created:
-        return f"Already saved: {render_note(saved.record)}"
-    lines: list[str] = [f"Saved: {render_note(saved.record)}"]
+def render_saved(result: Replacing) -> str:
+    """What the model reads after saving: the note, or that it existed, the notes it replaced (kept, resting), the notes
+    of the same fact it could not replace, and the notes it may still have outdated."""
+    saved: SavedMemory = result.saved
+    lines: list[str] = [f"{'Saved' if saved.created else 'Already saved'}: {render_note(saved.record)}"]
+    if result.replaced:
+        lines.append(
+            "It replaced these older notes, which rest now (kept: the owner can wake them) and are no longer recalled:"
+        )
+        lines.extend(f"- {render_note(record)}" for record in result.replaced)
+    if result.kept:
+        lines.append(
+            "These notes of the same fact stay as they are, since the owner wrote or approved them or this run read "
+            "outside content; to change one, use memory_update (the owner decides) or tell the owner:"
+        )
+        lines.extend(f"- {render_note(record)}" for record in result.kept)
     if saved.similar:
         lines.append(
             "These saved notes say nearly the same. If one is outdated or contradicts the new note, "
-            "remove it with memory_forget:"
+            "remove it with memory_forget (next time give both notes the same subject, and the newer replaces the "
+            "older):"
         )
         lines.extend(f"- {render_note(hit.record)}" for hit in saved.similar)
     return "\n".join(lines)
@@ -155,6 +169,14 @@ class SaveArgs(ToolArgs):
         le=_MOST_VALID_DAYS,
         description=("Days a short-lived fact stays true (a trip, a deadline, an offer); none for a lasting one."),
     )
+    subject: str | None = Field(
+        default=None,
+        max_length=_MOST_SUBJECT_CHARS,
+        description=(
+            "A short name for the fact's slot when it has one current value, like 'user-city'; a newer note with the "
+            "same subject replaces the older. Omit for facts that add up."
+        ),
+    )
 
 
 def expiry_of(valid_days: int | None, now: float) -> float | None:
@@ -163,7 +185,13 @@ def expiry_of(valid_days: int | None, now: float) -> float | None:
     return None if valid_days is None else now + valid_days * 86400.0
 
 
-def _save_tool() -> RegisteredTool:
+def _length_rule(max_chars: int) -> str:
+    """What a note may hold, said in the tools that write one: a run on the owner's plan sent 6 of 21 notes over the
+    limit, which no word of its tools named (the audit of 2026-11-24)."""
+    return f" A note holds at most {max_chars} characters; a longer one is refused, so split it into single facts."
+
+
+def _save_tool(max_chars: int) -> RegisteredTool:
     def classify(args: SaveArgs, ctx: ToolContext) -> ActionInfo:
         flags: tuple[Flag, ...] = ("persistence", "exfiltration") if looks_like_key(args.content) else ("persistence",)
         return _write_action("memory_save", f"Remember: {args.content}", flags)
@@ -177,8 +205,14 @@ def _save_tool() -> RegisteredTool:
         expires_at: float | None = expiry_of(args.valid_days, time.time())
         # Read at any time in the run, not as it stands: the owner's "go on" clears the run's taint, not the page's
         # words it may quote (the review of 2026-11-01, as skill_save does).
-        saved: SavedMemory = await save_memory(
-            ctx.runtime.memory, args.content, _own_tags(args.tags), ctx.run_id, None, expires_at, ctx.ever_tainted()
+        saved: Replacing = await save_replacing(
+            ctx.runtime.memory,
+            args.content,
+            _own_tags(args.tags),
+            ctx.run_id,
+            expires_at,
+            ctx.ever_tainted(),
+            args.subject,
         )
         return ok(render_saved(saved))
 
@@ -188,6 +222,7 @@ def _save_tool() -> RegisteredTool:
             "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, "
             "a convention that will apply again. One fact per call. Do not save secrets (one that holds a key is "
             "refused: record where the key lives), progress on the current task, or what is easy to look up again."
+            + _length_rule(max_chars)
         ),
         args_model=SaveArgs,
         modes=ALL_MODES,
@@ -255,7 +290,7 @@ def _forget_tool() -> RegisteredTool:
         description=(
             "Forget a saved note by its id, for example because it is outdated or wrong. It is no longer recalled or "
             "found: it goes to the owner's trash, where it waits some days and the owner can restore it (you cannot). "
-            "When a fact has changed, forget the old note and save the corrected one."
+            "For a fact that changed, save the new one under the old note's subject (forget it if it has none)."
         ),
         args_model=ForgetArgs,
         modes=ACTING_MODES,
@@ -286,7 +321,7 @@ class UpdateArgs(ToolArgs):
     )
 
 
-def _update_tool() -> RegisteredTool:
+def _update_tool(max_chars: int) -> RegisteredTool:
     async def classify(args: UpdateArgs, ctx: ToolContext) -> ActionInfo:
         record: MemoryRecord = await ctx.runtime.memory.store.get_memory(args.memory_id)
         flags: tuple[Flag, ...] = ("persistence", "exfiltration") if looks_like_key(args.content) else ("persistence",)
@@ -313,7 +348,7 @@ def _update_tool() -> RegisteredTool:
         name="memory_update",
         description=(
             "Rewrite a saved note whose fact has changed or was wrong, keeping its id. Prefer it over forgetting and "
-            "saving again."
+            "saving again." + _length_rule(max_chars)
         ),
         args_model=UpdateArgs,
         modes=ACTING_MODES,
@@ -324,5 +359,7 @@ def _update_tool() -> RegisteredTool:
     )
 
 
-def build_memory_tools() -> tuple[RegisteredTool, ...]:
-    return (_save_tool(), _search_tool(), _update_tool(), _forget_tool())
+def build_memory_tools(max_chars: int) -> tuple[RegisteredTool, ...]:
+    """The tools of Dot's memory; ``max_chars`` is the longest note (``[memory] max_chars``), which the tools that write
+    one name."""
+    return (_save_tool(max_chars), _search_tool(), _update_tool(max_chars), _forget_tool())

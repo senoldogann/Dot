@@ -158,18 +158,6 @@ final class SettingsLiveUITests: XCTestCase {
         }
         back(app)
 
-        // A web row opens the Mac's own page in the app.
-        open(app, "Vault")
-        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15))
-        // Signed in with the phone's key: the page of the vault, never the web's sign-in screen.
-        XCTAssertTrue(app.webViews.staticTexts["Vault"].waitForExistence(timeout: 20) || app.webViews.staticTexts["Kasa"].exists, "the web page is signed in")
-        XCTAssertFalse(app.webViews.buttons["Sign in"].exists, "the web's sign-in screen")
-        let web: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
-        web.name = "e2e-web-vault"
-        web.lifetime = .keepAlways
-        add(web)
-        back(app)
-
         // The emergency stop, then its release.
         app.swipeDown()
         app.buttons["Emergency stop"].tap()

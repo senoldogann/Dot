@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
+from dotagent.agent.account import RunAccount, result_fact, run_account
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.budget import loosens, run_budget
@@ -18,7 +19,9 @@ from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secr
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import save_playbook
+from dotagent.agent.proof import added, checks_of
 from dotagent.agent.recap import RecapView, recap_view, write_recap
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
@@ -54,12 +57,10 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import local_hosts, refuse_from_a_phone
 from dotagent.server.sending import send_once
 from dotagent.server.stream import (
-    MOST_FOLLOWED_RUNS,
     UNREAD_BY_PAGES,
     event_stream,
     follow_lifecycle,
     follow_run,
-    follow_runs,
     follow_screencast,
     resume_after,
 )
@@ -84,7 +85,6 @@ from dotagent.server.views import (
     RunActions,
     RunDetail,
     RunsQuery,
-    RunsStreamQuery,
     SavedSkill,
     SecretRequest,
     StartRunRequest,
@@ -103,6 +103,7 @@ from dotagent.store.models import (
     CampaignRecord,
     ChatChoices,
     EventRecord,
+    ProofCheck,
     RewindCut,
     RunMode,
     RunPicks,
@@ -158,6 +159,19 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
     )
 
 
+# The most tool results of a run its account reads (item 1746), the newest.
+_ACCOUNT_RESULTS: int = 5000
+
+
+async def _account_of(store: Store, run_id: str) -> RunAccount:
+    """What the run did by its record (item 1746): its tool results, without their text, and its newest plan."""
+    results: list[EventRecord] = await store.tool_results_without_text(run_id, 0, _ACCOUNT_RESULTS)
+    latest: EventRecord | None = await store.last_event(run_id, PLAN_EVENT)
+    return run_account(
+        [result_fact(event) for event in results], EMPTY_PLAN if latest is None else plan_from_event(latest)
+    )
+
+
 async def _campaign_of(store: Store, run: RunRecord) -> CampaignChip | None:
     if run.campaign_id is None:
         return None
@@ -190,6 +204,7 @@ async def run_detail(ctx: ServerContext, run_id: str) -> RunDetail:
         disliked=await disliked_of(store, run_id),
         questions=await store.list_left_questions(run_id),
         campaign=await _campaign_of(store, run),
+        account=await _account_of(store, run_id),
         held=ctx.manager.held(run_id),
         holding=ctx.manager.holding(run_id),
         agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
@@ -235,6 +250,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             "task" if request.standing and request.mode == "auto" else resolved_mode(request.mode, request.goal)
         )
 
+        # The owner's proof checks (item 1853), each command once.
+        proof: tuple[ProofCheck, ...] = added((), checks_of(request.proof, "owner"))
+
         async def start() -> str:
             if request.loop is not None:
                 # The loop's schedule is asked of the scheduler before the run starts: what it would refuse (a rhythm a
@@ -256,6 +274,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     request.browser,
+                    proof,
                 )
             elif request.team_id is not None:
                 team: TeamRecord = await store.get_team(request.team_id)
@@ -305,6 +324,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     picks,
+                    proof=proof,
                 )
             if request.mode == "auto":
                 await keep_auto(run)
@@ -327,19 +347,6 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """Save what the run did as a skill, at the owner's word (item 318, :func:`save_playbook`)."""
         name, updated = await save_playbook(ctx.runtime, await store.get_run(run_id))
         return SavedSkill(name=name, updated=updated)
-
-    @router.get("/runs/streams")
-    async def runs_stream(
-        query: Annotated[RunsStreamQuery, Query()], last_event_id: Annotated[str | None, Header()] = None
-    ) -> StreamingResponse:
-        """Several runs' events on one stream (item 889): a browser keeps six connections to a server, and a stream for
-        each working agent of the office filled them. Each run must be one; at most ``MOST_FOLLOWED_RUNS``."""
-        run_ids: frozenset[str] = frozenset(part.strip() for part in query.ids.split(",") if part.strip())
-        if not run_ids or len(run_ids) > MOST_FOLLOWED_RUNS:
-            raise InvalidValueError(f"name between 1 and {MOST_FOLLOWED_RUNS} runs", {"runs": str(len(run_ids))})
-        for run_id in run_ids:
-            await store.get_run(run_id)
-        return event_stream(follow_runs(ctx, run_ids, resume_after(query.after, last_event_id)))
 
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
@@ -402,6 +409,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             edits=file_edits(plan.steps),
             ended=not active_run_ids(runs) and run_id not in ctx.manager.active_run_ids(),
             outside=outside_steps(await store.ran_steps(run_id)),
+            account=await _account_of(store, run_id),
         )
 
     @router.get("/runs/{run_id}/actions")
@@ -583,7 +591,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         minutes: int = max(1, round(request.quiet_s / 60))
         goal: str = " ".join(run.goal.split())[:120]
         await tell_owner(
-            ctx.runtime.bus, "A task makes no progress", f"{minutes} min with no step: {goal}", f"#/runs/{run.id}"
+            ctx.runtime.bus,
+            "A task makes no progress",
+            f"{minutes} min with no step: {goal}",
+            f"#/runs/{run.id}",
+            "system",
+            "",
         )
         log.warning("run_stuck_told", run_id=run.id, quiet_s=request.quiet_s)
         return StuckView(told=True)

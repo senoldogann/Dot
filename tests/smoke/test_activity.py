@@ -187,7 +187,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("Leads campaign", "test")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Find leads", "Find ten leads", thread.id, SCRIPTED_MODEL, "medium", "standard", None, "yolo", (), "own"
+        "Find leads", "Find ten leads", thread.id, SCRIPTED_MODEL, "medium", "standard", None, "yolo", (), "own", ()
     )
     gate: Path = tmp_path / "work-gate"
     waiting: str = f"while [ ! -f '{gate}' ]; do sleep 0.2; done"

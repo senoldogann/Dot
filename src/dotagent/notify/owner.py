@@ -10,6 +10,7 @@ change to the callers."""
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
 from dotagent.events import SYSTEM_RUN_ID, EventBus
+from dotagent.notify.tellkinds import TellKind
 
 # The live event of Dot itself that carries one tell.
 OWNER_TOLD_EVENT: str = "owner_told"
@@ -23,11 +24,14 @@ _ROUTE_CHARS: int = 200
 
 class OwnerTold(FrozenModel):
     """What ``owner_told`` carries: the title and the text of the tell, and the route (``#/runs/<id>``) that opens what
-    it is about."""
+    it is about, with what kind of tell it is and what it is about (item 1743: a watcher's id; empty for a kind that has
+    one subject), by which the owner's answers to it are counted."""
 
     title: str
     text: str
     url: str
+    kind: TellKind
+    subject: str
 
 
 def _clipped(text: str, limit: int) -> str:
@@ -36,18 +40,21 @@ def _clipped(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
-def told(title: str, text: str, url: str) -> OwnerTold:
+def told(title: str, text: str, url: str, kind: TellKind, subject: str) -> OwnerTold:
     """The tell for ``title``, ``text`` and ``url``, as it is sent. ``url`` is a route inside Dot's own pages: a tell
     that opened any other address would let whoever wrote the words of one send the owner somewhere else."""
     if not url.startswith(ROUTE_PREFIX) or len(url) > _ROUTE_CHARS or any(char.isspace() for char in url):
         raise InvalidValueError(
             "a tell opens a route of Dot's own pages (#/runs/<id>)", {"url": _clipped(url, _ROUTE_CHARS)}
         )
-    return OwnerTold(title=_clipped(title, TITLE_CHARS), text=_clipped(text, TEXT_CHARS), url=url)
+    return OwnerTold(
+        title=_clipped(title, TITLE_CHARS), text=_clipped(text, TEXT_CHARS), url=url, kind=kind, subject=subject
+    )
 
 
-async def tell_owner(bus: EventBus, title: str, text: str, url: str) -> None:
+async def tell_owner(bus: EventBus, title: str, text: str, url: str, kind: TellKind, subject: str) -> None:
     """Tell the owner: ``title`` and ``text`` where they are told (their phone, their desktop), and ``url``, the route
-    of what it is about, opened by a tap. Raises :class:`InvalidValueError` for a route that is not one of Dot's
+    of what it is about, opened by a tap; ``kind`` and ``subject`` say which tell it is, for the count of what the owner
+    did with it (:mod:`dotagent.notify.tells`). Raises :class:`InvalidValueError` for a route that is not one of Dot's
     pages."""
-    await bus.emit(SYSTEM_RUN_ID, OWNER_TOLD_EVENT, told(title, text, url).model_dump(), False)
+    await bus.emit(SYSTEM_RUN_ID, OWNER_TOLD_EVENT, told(title, text, url, kind, subject).model_dump(), False)

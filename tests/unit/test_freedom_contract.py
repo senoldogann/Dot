@@ -560,6 +560,8 @@ ROWS: tuple[Row, ...] = (
     _row("campaign: note", "campaign_note", {"kind": "note", "text": "a note"}),
     _row("campaign: schedule", "campaign_schedule", {"cron": "0 9 * * *"}),
     _row("campaign: achieved", "campaign_achieved", {"evidence": "ten replies"}),
+    # --- proof checks (item 1853): adding one runs nothing; the check runs later as a shell call, through the gate
+    _row("proof: add a check", "add_proof", {"command": "uv run pytest tests -q", "timeout_s": 300}),
     # --- terminal and waits
     _row("terminal: open", "terminal_open", {"command": "python3"}),
     _row("terminal: send", "terminal_send", {"session": "term_1", "text": "print(1)"}),

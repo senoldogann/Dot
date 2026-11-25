@@ -625,7 +625,7 @@ class Scheduler:
             log.info("scout_fired", summary=state.last_summary)
             tell: tuple[str, str] | None = scout_service.blind_tell(state)
             if tell is not None:
-                await tell_owner(self._runtime.bus, tell[0], tell[1], scout_service.PLUGINS_ROUTE)
+                await tell_owner(self._runtime.bus, tell[0], tell[1], scout_service.PLUGINS_ROUTE, "system", "")
 
     async def _step(self, now: float) -> None:
         """Task body of the night of the harness, and the one place its errors end: its outcome is logged and kept in
@@ -933,7 +933,12 @@ class Scheduler:
         if not record.last_status.startswith("switched off:"):
             await self._runtime.store.set_schedule_status(record.id, status)
         await tell_owner(
-            self._runtime.bus, "A schedule's task was not tried again", f"{record.name}: {status}", f"#/runs/{run_id}"
+            self._runtime.bus,
+            "A schedule's task was not tried again",
+            f"{record.name}: {status}",
+            f"#/runs/{run_id}",
+            "schedule_end",
+            record.id,
         )
 
     async def _retry_due(self, now: float) -> None:

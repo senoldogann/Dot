@@ -16,6 +16,12 @@ def test_a_provider_is_told_again_only_after_a_day() -> None:
 
 def test_the_tell_names_the_model_the_reason_and_the_providers_words_within_a_tells_limits() -> None:
     words: str = "provider answered HTTP 402: Insufficient balance. Top up at https://opencode.ai/console/billing"
-    tell = told(MONEY_TITLE, money_text(REF, Pause(reason="not in the plan", until=0.0), words), "#/settings/models")
+    tell = told(
+        MONEY_TITLE,
+        money_text(REF, Pause(reason="not in the plan", until=0.0), words),
+        "#/settings/models",
+        "system",
+        "",
+    )
     assert tell.title == "A model cannot answer: payment needed"
     assert tell.text == f"opencode_go:deepseek-v4.1-flash (not in the plan): {words}"

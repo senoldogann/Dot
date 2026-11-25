@@ -17,6 +17,7 @@ from dotagent.llm.http import SseEvent
 from dotagent.llm.provider_errors import StatusClassifier, WireError, error_from_stream, wire_error_from_object
 from dotagent.llm.traits import ModelTraits, choose_effort, label_rank
 from dotagent.llm.types import (
+    CacheTtl,
     ChatRequest,
     FinishReason,
     ImageData,
@@ -56,13 +57,16 @@ class MessagesOptions(FrozenModel):
     unchanged. Anthropic looks for a cached prefix at most 20 blocks before a mark, and a step that shortens an older
     tool result changes the prompt further back than that from its end: the mark keeps the run before it in the cache.
     ``default_max_tokens``: the output limit of a request that names none (``None``: the model's own); never more than
-    the model's own.
+    the model's own. ``long_ttl`` (Anthropic, item 1742): a request that asks for it (``ChatRequest.cache_ttl``) has
+    its marks written for an hour instead of five minutes; a server not known to take the ``ttl`` field is never sent
+    it.
     """
 
     adaptive_thinking: bool
     prompt_cache: bool
     settled_mark: bool
     default_max_tokens: int | None
+    long_ttl: bool
 
 
 # --------------------------------------------------------------------------------------------- request
@@ -118,23 +122,28 @@ def _tool_results_first(blocks: Sequence[JsonObject]) -> list[JsonObject]:
     return sorted(blocks, key=lambda block: 0 if get_str(block, "type") == "tool_result" else 1)
 
 
-def _with_cache_mark(blocks: Sequence[JsonObject]) -> list[JsonObject]:
-    """``blocks`` with a cache mark on the last one that can carry it: a thinking block cannot."""
+def cache_mark(ttl: CacheTtl) -> JsonObject:
+    """The ``cache_control`` object of a mark: the provider's own five minutes, or an hour (item 1742)."""
+    return {"type": "ephemeral"} if ttl == "5m" else {"type": "ephemeral", "ttl": ttl}
+
+
+def _with_cache_mark(blocks: Sequence[JsonObject], mark: JsonObject) -> list[JsonObject]:
+    """``blocks`` with the cache ``mark`` on the last one that can carry it: a thinking block cannot."""
     for index in range(len(blocks) - 1, -1, -1):
         if get_str(blocks[index], "type") not in _THINKING_BLOCKS:
-            marked: JsonObject = {**blocks[index], "cache_control": {"type": "ephemeral"}}
+            marked: JsonObject = {**blocks[index], "cache_control": mark}
             return [*blocks[:index], marked, *blocks[index + 1 :]]
     return list(blocks)
 
 
-def encode_messages(messages: Sequence[Message], origin: str, marked: int | None) -> list[JsonObject]:
+def encode_messages(messages: Sequence[Message], origin: str, marked: int | None, mark: JsonObject) -> list[JsonObject]:
     """Neutral messages as alternating user/assistant turns; neighbours with the same role are merged. The message at
-    index ``marked`` ends with a cache mark."""
+    index ``marked`` ends with the cache ``mark``."""
     turns: list[tuple[str, list[JsonObject]]] = []
     for index, message in enumerate(messages):
         role, blocks = _turn_of(message, origin)
         if index == marked:
-            blocks = _with_cache_mark(blocks)
+            blocks = _with_cache_mark(blocks, mark)
         if turns and turns[-1][0] == role:
             turns[-1] = (role, [*turns[-1][1], *blocks])
         else:
@@ -190,11 +199,12 @@ def build_messages_body(request: ChatRequest, traits: ModelTraits, origin: str, 
     thinking_off: bool = label is not None and label_rank(label) == 0
     replayed: list[Message] = [_without_thinking(message) for message in conversation] if thinking_off else conversation
     body: JsonObject = {"model": request.model, "max_tokens": _max_tokens(request, traits, options)}
+    mark: JsonObject = cache_mark(request.cache_ttl if options.long_ttl else "5m")
     if options.prompt_cache and request.prompt_reuse == "conversation":
-        body["cache_control"] = {"type": "ephemeral"}
+        body["cache_control"] = mark
     if instructions:
         body["system"] = instructions
-    body["messages"] = list(encode_messages(replayed, origin, _settled_index(request, conversation, options)))
+    body["messages"] = list(encode_messages(replayed, origin, _settled_index(request, conversation, options), mark))
     if request.tools:
         body["tools"] = list(encode_tools(request.tools))
     if traits.thinking_toggle:
@@ -241,11 +251,13 @@ def initial_messages_state(model: str) -> MessagesState:
 def _merge_usage(previous: Usage, usage: JsonObject) -> Usage:
     """Later usage objects are cumulative; a field they leave out keeps its earlier value."""
     cache_read: int = get_int(usage, "cache_read_input_tokens")
-    total_input: int = get_int(usage, "input_tokens") + cache_read + get_int(usage, "cache_creation_input_tokens")
+    cache_written: int = get_int(usage, "cache_creation_input_tokens")
+    total_input: int = get_int(usage, "input_tokens") + cache_read + cache_written
     return Usage(
         input_tokens=total_input or previous.input_tokens,
         output_tokens=get_int(usage, "output_tokens") or previous.output_tokens,
         cached_tokens=cache_read or previous.cached_tokens,
+        cache_write_tokens=cache_written or previous.cache_write_tokens,
     )
 
 

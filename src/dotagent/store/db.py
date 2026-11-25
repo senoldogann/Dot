@@ -35,9 +35,18 @@ from dotagent.core.text import fold_search, plain_line
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, Effort, ImageData, Message, OneMessage, Speed
+from dotagent.notify.tells import (
+    TELL_RESPONSE_EVENT,
+    TELL_SENT_EVENT,
+    TELLS_RUN_ID,
+    OwnerAct,
+    TellResponse,
+    TellSent,
+)
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
+from dotagent.store.failed import failed_result_sql
 from dotagent.store.models import (
     NO_PICKS,
     OBJECTIVE_MOVES,
@@ -97,6 +106,7 @@ from dotagent.store.models import (
     ObjectiveRecord,
     ObjectiveStatus,
     ObjectiveWorkflow,
+    ProofCheck,
     ProposedChange,
     PushSubscription,
     QueuedMessage,
@@ -312,7 +322,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, goal TEXT NOT NULL, targets TEXT NOT NULL, verification TEXT NOT NULL,
     status TEXT NOT NULL, thread_id TEXT NOT NULL, model TEXT NOT NULL, effort TEXT NOT NULL, approvals TEXT NOT NULL,
     files TEXT NOT NULL, cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
-    evidence TEXT NOT NULL, browser TEXT
+    evidence TEXT NOT NULL, browser TEXT, proofs TEXT NOT NULL DEFAULT '[]'
 );
 CREATE TABLE IF NOT EXISTS agents (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, instructions TEXT NOT NULL, model TEXT NOT NULL,
@@ -405,6 +415,8 @@ _PAGE_ID_BYTES: int = 18
 # A chat's last line in the sidebar (item 277): how many characters it keeps, and how many of the latest run's message
 # and answer are read for it (a fence or a heading at the start of an answer takes some of them).
 _LAST_MESSAGE_CHARS: int = 160
+# How many ids one ``IN (...)`` of a query takes (SQLite's own limit is far above).
+_IN_CHUNK: int = 500
 _LAST_MESSAGE_READ_CHARS: int = 1000
 # A run and the later runs still in its chat, oldest first: what a rewind to before the run takes out (item 282). Its
 # two parameters are the run's id.
@@ -904,6 +916,7 @@ def _campaign(row: aiosqlite.Row) -> CampaignRecord:
             "updated_at": row["updated_at"],
             "evidence": row["evidence"],
             "browser": row["browser"],
+            "proofs": parse_json_value(row["proofs"], "campaign proofs"),
         }
     )
 
@@ -1190,6 +1203,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         rested_at=row["rested_at"],
         edited_by=row["edited_by"],
         proposed=_proposed_change(row),
+        subject=row["subject"],
     )
 
 
@@ -1377,6 +1391,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("proposed_by", "TEXT"),
     ("proposed_tainted", "INTEGER"),
     ("proposed_at", "REAL"),
+    # The subject a run gave a note when it saved it (item 1729): a newer note of the same subject replaces it. NULL for
+    # a note saved with none, and for every note stored before the column.
+    ("subject", "TEXT"),
 )
 # The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
 _LESSON_SAVES_KEY: str = "lessons.saved"
@@ -1416,6 +1433,8 @@ _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("browser", "TEXT"),
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
+    # The proof checks of its claim (item 1853), a JSON list of ``ProofCheck``: an older campaign had none.
+    ("proofs", "TEXT NOT NULL DEFAULT '[]'"),
 )
 # Columns of ``queued_messages`` added later: an older message was sent at the standard speed, without a choice for one
 # message and without picks (item 318; a ``RunPicks`` as JSON, NULL for none).
@@ -2979,7 +2998,7 @@ class Store:
             " r.harness_version,"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_call'),"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_result'"
-            "  AND json_extract(e.data, '$.ok') = 0),"
+            f"  AND {failed_result_sql('e.data')}),"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'tool_call'"
             "  AND instr(e.data, ?) > 0),"
             " (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id AND e.kind = 'stall'),"
@@ -4217,7 +4236,7 @@ class Store:
             return {}
         rows = await self._all(
             "SELECT run_id, COUNT(*) AS errors FROM events WHERE kind = 'tool_result'"
-            f" AND run_id IN ({','.join('?' * len(run_ids))}) AND json_extract(data, '$.ok') = 0 GROUP BY run_id",
+            f" AND run_id IN ({','.join('?' * len(run_ids))}) AND {failed_result_sql('data')} GROUP BY run_id",
             tuple(run_ids),
         )
         return {row["run_id"]: row["errors"] for row in rows}
@@ -4441,6 +4460,60 @@ class Store:
         )
         return None if row is None else _event(row)
 
+    async def thread_last_call_at(self, thread_id: str, run_id: str) -> float | None:
+        """When a model last answered in a run of the chat ``thread_id`` other than ``run_id`` (item 1742), or ``None``
+        when the chat has had no call: how long ago the provider's cache of the chat was last written or read."""
+        row = await self._one(
+            "SELECT MAX(e.ts) AS last FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            " WHERE r.thread_id = ? AND r.id != ? AND e.kind = ?",
+            (thread_id, run_id, CALL_EVENT),
+        )
+        return None if row is None or row["last"] is None else float(row["last"])
+
+    async def add_tell_event(self, kind: str, data: JsonObject) -> None:
+        """Keep a tell or the owner's answer to one (item 1743) as an event under :data:`TELLS_RUN_ID`: the events
+        table is where tells are kept, so that the store gains no table."""
+        await self.add_event(TELLS_RUN_ID, kind, data)
+
+    async def tells_since(self, since: float) -> list[TellSent]:
+        """The tells that went out since ``since``, the oldest first."""
+        rows = await self._all(
+            "SELECT ts, data FROM events WHERE run_id = ? AND kind = ? AND ts >= ? ORDER BY id",
+            (TELLS_RUN_ID, TELL_SENT_EVENT, since),
+        )
+        return [TellSent.model_validate({**parse_json_object(row["data"], "tell"), "ts": row["ts"]}) for row in rows]
+
+    async def tell_responses_since(self, since: float) -> list[TellResponse]:
+        """The owner's answers to tells made since ``since``, the oldest first."""
+        rows = await self._all(
+            "SELECT ts, data FROM events WHERE run_id = ? AND kind = ? AND ts >= ? ORDER BY id",
+            (TELLS_RUN_ID, TELL_RESPONSE_EVENT, since),
+        )
+        return [
+            TellResponse.model_validate({**parse_json_object(row["data"], "tell"), "ts": row["ts"]}) for row in rows
+        ]
+
+    async def owner_acts_since(self, since: float, sources: Sequence[str]) -> list[OwnerAct]:
+        """What the owner did in a chat since ``since``: the runs their own messages started (``sources``) and the
+        reactions they put on messages of Dot's, each with its chat."""
+        marks: str = ",".join("?" for _ in sources)
+        runs = await self._all(
+            f"SELECT thread_id, created_at AS ts FROM runs WHERE created_at >= ? AND source IN ({marks})",
+            (since, *sources),
+        )
+        reactions = await self._all("SELECT thread_id, created_at AS ts FROM reactions WHERE created_at >= ?", (since,))
+        return [OwnerAct(thread_id=str(row["thread_id"]), ts=float(row["ts"])) for row in (*runs, *reactions)]
+
+    async def threads_of_runs(self, run_ids: Sequence[str]) -> dict[str, str]:
+        """The chat of each of ``run_ids`` that is still there."""
+        found: dict[str, str] = {}
+        for start in range(0, len(run_ids), _IN_CHUNK):
+            chunk: Sequence[str] = run_ids[start : start + _IN_CHUNK]
+            marks: str = ",".join("?" for _ in chunk)
+            for row in await self._all(f"SELECT id, thread_id FROM runs WHERE id IN ({marks})", tuple(chunk)):
+                found[str(row["id"])] = str(row["thread_id"])
+        return found
+
     async def goal_spend(self, since: float, limit: int) -> list[ChatSpend]:
         """The ``limit`` goals that spent the most tokens in the runs created since ``since``, the chats of one title
         together (items 881 and 883), as ``dotx stats`` reads them."""
@@ -4515,6 +4588,16 @@ class Store:
             (run_id, tool),
         )
         return 0 if row is None else int(row["n"])
+
+    async def tool_results_without_text(self, run_id: str, after_id: int, limit: int) -> list[EventRecord]:
+        """The newest ``limit`` ``tool_result`` events of a run with an id after ``after_id``, oldest first, each
+        without its text (item 1745): what a run's account reads of its calls, not what they returned."""
+        rows = await self._all(
+            "SELECT * FROM (SELECT id, run_id, ts, kind, json_remove(data, '$.text') AS data FROM events"
+            " WHERE run_id = ? AND kind = 'tool_result' AND id > ? ORDER BY id DESC LIMIT ?) ORDER BY id",
+            (run_id, after_id, limit),
+        )
+        return [_event(row) for row in rows]
 
     async def events_of_kinds(self, run_id: str, kinds: Sequence[str], limit: int) -> list[EventRecord]:
         """The newest ``limit`` events of a run that are of any of ``kinds``, oldest first."""
@@ -6556,6 +6639,22 @@ class Store:
         return await self.get_memory(memory_id)
 
     @_writing
+    async def set_memory_subject(self, memory_id: str, subject: str) -> MemoryRecord:
+        """Give a note the ``subject`` its run named (item 1729); its text, tags, vector and ``updated_at`` stay."""
+        await self._db.execute("UPDATE memories SET subject = ? WHERE id = ?", (subject, memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    async def memories_with_subject(self, subject: str, agent_id: str | None) -> list[MemoryRecord]:
+        """The notes of ``subject`` that a run of ``agent_id`` (``None`` for Dot) is handed, the oldest first:
+        the notes a newer note of the subject replaces (item 1729)."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE subject = ? AND (agent_id IS ? OR agent_id IS NULL) ORDER BY created_at",
+            (subject, agent_id),
+        )
+        return [_memory(row) for row in rows]
+
+    @_writing
     async def delete_memory(self, memory_id: str) -> bool:
         cursor = await self._db.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
@@ -6922,7 +7021,7 @@ class Store:
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
                 " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
-                " edited_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?)",
+                " edited_by, subject) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?)",
                 (
                     record.id,
                     record.content,
@@ -6938,6 +7037,7 @@ class Store:
                     _MERGED_SOURCES.dump_json(record.merged_from).decode() if record.merged_from else None,
                     record.pinned_at,
                     record.edited_by,
+                    record.subject,
                 ),
             )
             await self._db.execute(
@@ -7147,8 +7247,9 @@ class Store:
         marks: str = ", ".join("?" for _ in sources_out)
         rows = await self._all(
             "SELECT e.run_id, r.thread_id, COALESCE(r.source, '') AS source, e.ts,"
-            " COALESCE(json_extract(e.data, '$.tool'), '') AS tool, COALESCE(json_extract(e.data, '$.ok'), 0) AS ok,"
-            " CASE WHEN COALESCE(json_extract(e.data, '$.ok'), 0) = 0"
+            " COALESCE(json_extract(e.data, '$.tool'), '') AS tool,"
+            f" NOT COALESCE({failed_result_sql('e.data')}, 1) AS ok,"
+            f" CASE WHEN COALESCE({failed_result_sql('e.data')}, 1)"
             " THEN substr(COALESCE(json_extract(e.data, '$.text'), ''), 1, ?) ELSE '' END AS error,"
             " COALESCE(json_extract(e.data, '$.site'), '') AS site,"
             " COALESCE(json_type(e.data, '$.tainted') = 'true', 0) AS tainted"
@@ -7574,9 +7675,10 @@ class Store:
         approvals: ApprovalMode,
         files: Sequence[str],
         browser: BrowserMode | None,
+        proofs: Sequence[ProofCheck],
     ) -> CampaignRecord:
         """Store a new campaign: active, without targets, with no session planned yet, on the Chrome ``browser``
-        names (``None``: the daemon's browser mode)."""
+        names (``None``: the daemon's browser mode), its claim held to the checks ``proofs`` (item 1853)."""
         now: float = time.time()
         record: CampaignRecord = CampaignRecord(
             id=new_id("cmp"),
@@ -7598,11 +7700,12 @@ class Store:
             updated_at=now,
             evidence="",
             browser=browser,
+            proofs=tuple(proofs),
         )
         await self._db.execute(
             "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, speed,"
-            " once, approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " once, approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser, proofs)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.title,
@@ -7623,6 +7726,7 @@ class Store:
                 record.updated_at,
                 record.evidence,
                 record.browser,
+                dumps_compact([proof.model_dump(mode="json") for proof in record.proofs]),
             ),
         )
         await self._db.commit()
@@ -7650,6 +7754,14 @@ class Store:
 
     async def set_campaign_targets(self, campaign_id: str, targets: str, verification: str) -> None:
         await self._update_campaign(campaign_id, "targets = ?, verification = ?", (targets, verification))
+
+    async def add_campaign_proof(self, campaign_id: str, proof: ProofCheck) -> None:
+        """Add ``proof`` at the end of the campaign's proof checks (item 1853), which are only ever added to."""
+        await self._update_campaign(
+            campaign_id,
+            "proofs = json_insert(proofs, '$[#]', json(?))",
+            (dumps_compact(proof.model_dump(mode="json")),),
+        )
 
     async def _update_campaign_in(
         self, campaign_id: str, assignments: str, params: Sequence[object], statuses: Sequence[CampaignStatus]

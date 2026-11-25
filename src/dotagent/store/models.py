@@ -1,8 +1,8 @@
 """Row types returned by the store."""
 
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import Effort, OneMessage, Speed
@@ -764,7 +764,7 @@ class MemoryRecord(FrozenModel):
     merged note was made of, ``merged_into`` the merged note a resting one was merged into, ``pinned_at`` is when the
     owner pinned the note (it never rests) and ``rested_at`` when it began to rest. ``edited_by`` is
     :data:`OWNER_EDIT` when the owner later corrected a note a run wrote. ``proposed`` is a run's rewrite of a note the
-    owner wrote or approved, which waits for them."""
+    owner wrote or approved, which waits for them. ``subject`` is the slot the saving run named (item 1729)."""
 
     id: str
     content: str
@@ -789,6 +789,9 @@ class MemoryRecord(FrozenModel):
     # A run's rewrite that waits for the owner, when the note is the owner's (written, pinned or corrected by them);
     # ``None`` otherwise, and on every note stored before the columns.
     proposed: ProposedChange | None = None
+    # What the run that saved the note said it is about (item 1729): a newer note of the same subject replaces it.
+    # ``None`` for a note saved with no subject, and on every note stored before the column.
+    subject: str | None = None
 
 
 class MemoryRewrite(FrozenModel):
@@ -1035,6 +1038,24 @@ class AutoDecisionCount(FrozenModel):
     count: int
 
 
+type ProofBy = Literal["owner", "run"]
+ProofCommand = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+# The longest a proof check may run, in seconds; the limit of one the owner gives none for (an external contract of
+# ``dotx run --proof`` and the API); and how many a run or a campaign may carry, as each runs at every finish.
+MAX_PROOF_TIMEOUT_S: int = 3600
+DEFAULT_PROOF_TIMEOUT_S: int = 300
+MAX_PROOF_CHECKS: int = 5
+
+
+class ProofCheck(FrozenModel):
+    """A proof check a run or a campaign carries (item 1853): a command line that has to exit 0 within ``timeout_s``
+    seconds before it is done, and who set it (``dotagent.agent.proof``)."""
+
+    command: ProofCommand
+    timeout_s: int = Field(ge=1, le=MAX_PROOF_TIMEOUT_S)
+    by: ProofBy
+
+
 class CampaignRecord(FrozenModel):
     """A goal that Dot works on in sessions, through restarts and days, until its outcome is verified or the owner
     stops it. ``thread_id`` is the owner's conversation it was started in. ``targets`` and ``verification`` are what
@@ -1065,6 +1086,8 @@ class CampaignRecord(FrozenModel):
     updated_at: float
     evidence: str
     browser: BrowserMode | None
+    # The proof checks its claim is held to (item 1853), only added to; none for a campaign from before.
+    proofs: tuple[ProofCheck, ...] = ()
 
 
 type ApnsEnvironment = Literal["sandbox", "production"]

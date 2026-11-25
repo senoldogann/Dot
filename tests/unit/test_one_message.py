@@ -101,6 +101,7 @@ async def test_the_store_keeps_the_choice_with_a_run_a_queued_message_and_a_camp
             "ask",
             [],
             "own",
+            (),
         )
         assert (await store.get_run(run.id)).once == "ultracode"
         assert [(message.id, message.once, message.effort) for message in await store.list_queued(thread.id)] == [

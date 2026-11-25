@@ -6,6 +6,15 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
+| [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
+| [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
+| [1851](1851.md) | done | 2026-11-25 | The orphan-groups test keeps a Dot home of its own, which no other pytest worker writes into |
+| [1850](1850.md) | done | 2026-11-25 | The iPhone app is tested on GitHub's macOS runners |
+| [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
+| [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
+| [1791](1791.md) | done | 2026-11-25 | DotNext's Settings open no web page: the Mac's setup pages have no row, and the list ends with "More settings are on your Mac." |
+| [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
 | [1771](1771.md) | done | 2026-11-25 | DotNext's Models, Scheduled tasks, Rules, Memory and Agents are native, as much of them as a phone is for |
 | [1770](1770.md) | done | 2026-11-25 | The code review's models and their reasoning are changed from the phone too |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
@@ -20,17 +29,35 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1752](1752.md) | done | 2026-11-25 | On a phone a note's tags stand at the height of the badge beside them again |
 | [1751](1751.md) | done | 2026-11-25 | An offline test does not read the owner's Antigravity login |
 | [1750](1750.md) | done | 2026-11-25 | The code review's model is named "Code review model", apart from the review model of the roles |
+| [1746](1746.md) | done | 2026-11-24 | The run's account: what it did by its record, on the run page and in its detail |
+| [1745](1745.md) | done | 2026-11-24 | A plan step marked done is judged by the run's record |
+| [1744](1744.md) | done | 2026-11-24 | A click that names nothing it expects is checked by whether the page reacted |
+| [1743](1743.md) | done | 2026-11-24 | What the owner does with Dot's tells is recorded and shown per watcher and per kind |
+| [1742](1742.md) | done | 2026-11-24 | The prompt cache says why it missed, and a chat that comes back within the hour keeps its Claude cache for an hour |
 | [1741](1741.md) | done | 2026-11-24 | A hop count across agents: a runaway chain of hand-offs is stopped for a run that asks, and reported in yolo and free mode |
 | [1740](1740.md) | done | 2026-11-24 | `search_chats`: a run finds what was said in any chat, by its words |
 | [1731](1731.md) | done | 2026-11-24 | What a task will cost is shown, and caps the owner sets pause a task and ask the owner, in every mode |
+| [1729](1729.md) | done | 2026-11-24 | A fact that changed replaces its older note: `memory_save` takes a subject, and the older note rests, kept |
+| [1728](1728.md) | done | 2026-11-24 | A memory benchmark: does a search find the newest fact when a fact changed (`dotx eval memory`) |
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
 | [1726](1726.md) | done | 2026-11-24 | DotNext's chat, whole: the work log, the ask dock in the composer's place, the composer, the queue and its edit, the inspector |
 | [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |
+| [1724](1724.md) | decided | 2026-11-24 | MCP servers are not started lazily: measured, and kept as they are |
+| [1723](1723.md) | done | 2026-11-24 | A skill without a frontmatter loads as Claude Code loads it, and a skill left out is logged with what to do |
+| [1722](1722.md) | done | 2026-11-24 | A call Dot's own rule turns another way is recorded as steered, not failed |
+| [1721](1721.md) | done | 2026-11-24 | A shown page that names media by a web address is refused with why, a page too long says how to shrink, and the pages of one step keep the call order |
+| [1720](1720.md) | done | 2026-11-24 | OpenCode's agent gets every tool of Dot's a run on the Claude plan gets, and a test holds the three harnesses' tools together |
 | [1715](1715.md) | done | 2026-11-24 | A run records why recall chose its notes and which of them it echoed |
 | [1714](1714.md) | done | 2026-11-24 | A run on the Claude plan or OpenCode is asked for its lessons as it ends |
 | [1713](1713.md) | done | 2026-11-24 | The day's room for lessons is counted by time and shared fairly between kinds of tasks |
 | [1712](1712.md) | done | 2026-11-24 | A code review starts with the notes about code alone |
 | [1711](1711.md) | done | 2026-11-24 | A run's rewrite of the owner's note waits for the owner, and the owner's words keep reaching every run |
+| [1695](1695.md) | done | 2026-11-24 | A run on Zen's free models is told Dot's own prompt and ends with Dot's finish |
+| [1694](1694.md) | done | 2026-11-24 | A run on the owner's Claude plan ends as Dot's own runs end: nudged to finish, checked, with lessons |
+| [1693](1693.md) | done | 2026-11-24 | A run on the owner's Claude plan keeps Dot's plan |
+| [1692](1692.md) | done | 2026-11-24 | A run on the owner's Claude plan has the core tools' definitions from the start |
+| [1691](1691.md) | done | 2026-11-24 | A run on the owner's Claude plan is told Dot's own system prompt |
+| [1690](1690.md) | done | 2026-11-24 | memory_save and memory_update name the longest note they take |
 | [1689](1689.md) | done | 2026-11-24 | DotNext on the store: the chat list, a chat, the helpers, pairing, checked end to end on a throwaway daemon |
 | [1688](1688.md) | done | 2026-11-24 | DotNext's engine: a store per daemon, one connection supervisor, the outbox moved, the cache, pairing |
 | [1687](1687.md) | done | 2026-11-24 | Smoke tests of the phone's sync contract on a served daemon |

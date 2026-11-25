@@ -1,6 +1,6 @@
 """A skill Dot could not offer to a task is on the page of skills (item 1405), in a scratch home on the scripted
-model, served by a real server and seen in a real headless Chrome. The owner's folder holds a skill with no frontmatter
-and the plugin of the audit's case holds one whose SKILL.md does not start with the --- line: ``GET
+model, served by a real server and seen in a real headless Chrome. The owner's folder and the plugin of the audit's
+case each hold a skill whose frontmatter is not closed: ``GET
 /api/skills/left-out`` lists each with its file, the catalog's reason and where Dot looked for it, and Settings ›
 Skills says so at the foot of the tab each belongs on (Personal, System), a closed fold with the reason and the file
 in it, readable on a phone 390 px wide and on a wide page."""
@@ -22,7 +22,7 @@ from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-_REASON: str = "SKILL.md does not start with the --- line that opens the frontmatter"
+_REASON: str = "the frontmatter of SKILL.md is not closed by a --- line"
 _GOOD: str = "---\nname: good-skill\ndescription: A skill that loads.\n---\nFollow the steps.\n"
 _PLUGIN: str = "twilio-developer-kit"
 _PHONE: dict[str, int] = {"width": 390, "height": 844}
@@ -45,16 +45,14 @@ def _write(folder: Path, name: str, text: str) -> None:
 
 
 def _home_skills(home: Path) -> None:
-    """A skill that loads and one with no frontmatter in the owner's folder; a plugin whose skill's frontmatter is
-    opened by a title (the audit's twilio-agent-connect) and one that loads."""
+    """A skill that loads and one whose frontmatter is not closed in the owner's folder; a plugin with one such skill
+    (the audit's twilio-agent-connect opened with a title, which loads since item 1723) and one that loads."""
     _write(home / "skills", "good-skill", _GOOD)
-    _write(home / "skills", "no-frontmatter", "Steps without a frontmatter.\n")
+    _write(home / "skills", "open-frontmatter", "---\nname: open-frontmatter\nSteps.\n")
     plugin: Path = home / "plugins" / _PLUGIN
     (plugin / ".claude-plugin").mkdir(parents=True)
     (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": _PLUGIN}), encoding="utf-8")
-    _write(
-        plugin / "skills", "twilio-agent-connect", "# Twilio\n---\nname: twilio-agent-connect\ndescription: x\n---\n"
-    )
+    _write(plugin / "skills", "twilio-agent-connect", "---\nname: twilio-agent-connect\ndescription: x\n")
     _write(plugin / "skills", "twilio-call", _GOOD.replace("good-skill", "twilio-call"))
 
 
@@ -74,7 +72,7 @@ async def test_the_route_lists_each_skill_left_out_with_its_file_its_reason_and_
         str(Path(str(item["path"])).parent.name): (item["reason"], item["source"], item["shadowed"]) for item in items
     }
     assert listed == {
-        "no-frontmatter": (_REASON, "home", False),
+        "open-frontmatter": (_REASON, "home", False),
         "twilio-agent-connect": (_REASON, f"plugin {_PLUGIN}", False),
     }, items
     assert all(str(item["path"]).endswith("/SKILL.md") for item in items)
@@ -127,10 +125,10 @@ async def test_the_page_says_what_was_left_out_on_the_tab_it_belongs_to_at_1280_
                     fold: Locator = await _fold(page, "personal")
                     rows: Locator = fold.locator(".list-row")
                     await expect(rows).to_have_count(1)
-                    await expect(rows.first.locator(".row-title")).to_have_text("no-frontmatter")
+                    await expect(rows.first.locator(".row-title")).to_have_text("open-frontmatter")
                     await expect(rows.first.locator(".row-text")).to_have_text(_REASON)
                     await expect(rows.first.locator(".row-meta")).to_contain_text(
-                        str(home / "skills" / "no-frontmatter" / "SKILL.md")
+                        str(home / "skills" / "open-frontmatter" / "SKILL.md")
                     )
                     await expect(page.get_by_text("twilio-agent-connect")).to_have_count(0)
                     await _fits(page, rows)
@@ -141,7 +139,7 @@ async def test_the_page_says_what_was_left_out_on_the_tab_it_belongs_to_at_1280_
                     await expect(plugin_rows).to_have_count(1)
                     await expect(plugin_rows.first.locator(".row-title")).to_have_text("twilio-agent-connect")
                     await expect(plugin_rows.first.locator(".row-text")).to_have_text(_REASON)
-                    await expect(page.get_by_text("no-frontmatter")).to_have_count(0)
+                    await expect(page.get_by_text("open-frontmatter")).to_have_count(0)
                     await _fits(page, plugin_rows)
                     await page.close()
             finally:

@@ -27,7 +27,7 @@
         case offline = "settings-offline"
         case keyRefused = "settings-key-refused"
         case oldDaemon = "settings-old-daemon"
-        case web = "settings-web"
+        case maintenance = "settings-maintenance"
         case pairing = "pairing"
         case pairingLink = "pairing-link"
 
@@ -61,7 +61,7 @@
             case .memory: .memory
             case .agents: .agents
             case .system: .system
-            case .web: .web(WebSettingsPage.Target(tab: "vault", title: String(localized: "Vault", comment: "Settings row: logins, cards and contacts Dot can use")))
+            case .maintenance: .maintenance
             case .pairing, .pairingLink: nil
             }
         }
@@ -171,6 +171,12 @@
             case ("GET", "/api/memories/search"): return (200, "[]")
             case ("GET", "/api/reactions/settings"):
                 return (200, #"{"follow_ups":true,"follow_ups_per_hour":20,"hold_minutes":30,"good":"feedback","love":"feedback","wrong":"follow_up","again":"follow_up","explain":"follow_up","hold":"follow_up"}"#)
+            case ("GET", "/api/diagnostics/programs"):
+                return (
+                    200,
+                    #"{"programs":[{"name":"Claude Code","command":"claude","path":"/opt/homebrew/bin/claude","version":"2.1.331","support":"supported","why":"measured with Dot (items 1580 to 1582)"},{"name":"OpenCode","command":"opencode","path":"/opt/homebrew/bin/opencode","version":"1.19.5","support":"unknown","why":"Dot keeps no list of the OpenCode versions it was measured on"}]}"#
+                )
+            case ("PUT", "/api/agent/resume"): return (200, #"{"resume":"off","resume_within_s":3600}"#)
             default: return (404, #"{"detail":"Not Found"}"#)
             }
         }

@@ -17,7 +17,7 @@ from pydantic import Field, model_validator
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import DesktopError, NotFoundError, ToolInputError
-from dotagent.core.outcomes import DESKTOP_EXPECTATIONS, echoes_written, expectation_on_last_step
+from dotagent.core.outcomes import DESKTOP_EXPECTATIONS, echoes_written, expectation_on_last_step, tally_of
 from dotagent.core.text import truncate_tail
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
@@ -492,7 +492,10 @@ def _act_tool() -> RegisteredTool:
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
         note: str = batch_cut_note(len(args.steps), limit)
         rendered: str = render_act_outcome(outcome, source, _nonce())
-        return _screen_result(f"{note}\n{rendered}" if note else rendered)
+        # What the steps came to, counted, goes with the result for the run's account (item 1744).
+        return _screen_result(f"{note}\n{rendered}" if note else rendered).model_copy(
+            update={"tally": tally_of(outcome.steps)}
+        )
 
     return make_reviewed_tool(
         name=DESKTOP_ACT_TOOL,

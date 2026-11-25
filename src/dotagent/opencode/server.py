@@ -654,15 +654,18 @@ class OpenCodeServer:
         variant: str | None,
         text: str,
         files: tuple[PromptFile, ...],
+        system: str,
     ) -> None:
-        """Hand ``text`` and ``files`` to the agent of the session on ``model``; it works on while the call returns. A
-        prompt sent while the agent works is read once its step ends."""
+        """Hand ``text`` and ``files`` to the agent of the session on ``model``, with ``system`` after OpenCode's own
+        system prompt for this turn (item 1695: Zen's free tier answered with Dot's whole prompt there, measured on
+        2026-11-24 with OpenCode 1.19.5); it works on while the call returns. A prompt sent while the agent works is
+        read once its step ends."""
         parts: list[JsonValue] = [{"type": "text", "text": text}]
         parts.extend(
             {"type": "file", "mime": file.media_type, "filename": file.name, "url": file.path.as_uri()}
             for file in files
         )
-        body: JsonObject = {"model": {"providerID": ZEN_PROVIDER, "modelID": model}, "parts": parts}
+        body: JsonObject = {"model": {"providerID": ZEN_PROVIDER, "modelID": model}, "parts": parts, "system": system}
         if variant is not None:
             body["variant"] = variant
         await self._send("POST", f"/session/{session_id}/prompt_async", directory, body)

@@ -279,3 +279,19 @@ def test_the_report_of_a_step_that_named_what_it_expects_does_not_say_to_reach_t
     # What came later than the half second the page was watched for is no page that stayed as it was.
     assert effect_of_expected(unchanged, (seen,)) == ""
     assert effect_of_expected("the page says: Saved", (seen,)) == "the page says: Saved"
+
+
+def test_a_batch_is_tallied_by_how_its_checks_ended_and_its_steps_with_none() -> None:
+    """Item 1744: what an act call's steps came to, counted for the run's account."""
+    from dotagent.core.outcomes import StepReport, StepTally, page_did_not_react, page_reacted, tally_of
+
+    reports = (
+        StepReport(index=1, description="click e1", outcome="done", detail="", dispatched="sent",
+                   checks=(page_reacted("its content changed"),)),
+        StepReport(index=2, description="click e2", outcome="done", detail="", dispatched="sent",
+                   checks=(page_did_not_react(0.5),)),
+        StepReport(index=3, description="hover e3", outcome="done", detail="", dispatched="sent"),
+        StepReport(index=4, description="click e4", outcome="failed", detail="gone", dispatched="unknown"),
+    )  # fmt: skip
+    assert tally_of(reports) == StepTally(verified=1, contradicted=0, uncertain=1, not_checked=1, failed=1)
+    assert page_did_not_react(0.5).status == "uncertain"

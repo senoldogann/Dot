@@ -28,9 +28,10 @@ model with its reasoning, changed from the phone too: item 1770, a §24 picker s
 windows, today's tokens, the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last
 run, paused, failed; a switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks
 in it; free mode, switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every
-note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and version, Usage; every other page of the web app's settings is
-a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`: the key never in the address, a
-script on the Mac's origin alone writes it where the page keeps it; only the Mac's origin loads). A search with synonyms finds any page in English or
+note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and
+version, Usage, Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the
+computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
+with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
@@ -90,6 +91,41 @@ xcodebuild test -project Dot.xcodeproj -scheme DotNext -destination 'platform=iO
 Next/scripts/check_strings.sh /tmp/dotnext-dd
 (cd DotEngine && swift test)
 ```
+
+## CI
+
+`.github/workflows/ios.yml` runs the above on GitHub's macOS runners, so the Mac does not have to: `engine`
+(`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), `tests (chat)`,
+`tests (controls)` and `tests (rows)` (the unit and UI tests from that build; each test of `SettingsControlsUITests`
+takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
+throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
+
+- A pull request that changes `ios/**` runs `engine`, `build` and `tests (chat)` (about 20 minutes).
+- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs on a push to `main`, every night,
+  when asked (`gh workflow run ios.yml --ref <branch>`), and on a pull request with the label `ios-full`
+  (`gh pr edit <pr> --add-label ios-full`; adding it starts the run).
+- A run holds two macOS runners at most, so that three of the account's five stay free for the gate.
+- A test that fails, unit or UI, runs once more (`-retry-tests-on-failure`; `e2e` runs its whole script once more): a
+  fresh runner's simulator sometimes fails to launch the app or start the test runner. A test that fails twice fails
+  the part; one that passed only on its retry is named in the job's summary as "passed on retry: <test>" and as a
+  warning, so the retry hides no flaky test.
+
+Run a test on the Mac only to reproduce a failure CI showed, and the screenshots for the owner.
+
+```bash
+gh pr checks <pr>                                   # the ios jobs among the others
+gh run list --workflow ios.yml --branch <branch>    # the runs, newest first
+gh run view <run id> --log-failed                   # the lines of the step that failed
+gh run download <run id> -n ios-tests-chat -D /tmp/ios-chat   # also ios-tests-controls, ios-tests-rows, ios-e2e
+open /tmp/ios-chat/tests.xcresult                   # the whole result in Xcode; shots/ holds every screenshot as PNG
+```
+
+The artifacts are kept 7 days: `tests.xcresult` (or `e2e.xcresult`, with `e2e-logs/`: the daemon's and xcodebuild's
+logs of each try, and the first try's result when it was retried) and `shots/`, its attachments exported with
+`xcrun xcresulttool export attachments` (`shots/manifest.json` names the test of each file): the screenshot and
+description XCTest keeps of a failure, and whatever a test attaches with `XCTAttachment` and `lifetime = .keepAlways`.
+A passing test keeps no screenshot of its own; the owner's screenshots of every scene stay `scripts/shots.sh` on the
+Mac.
 
 ## End to end against a throwaway daemon
 

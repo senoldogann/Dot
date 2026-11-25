@@ -67,7 +67,7 @@ def _context_cleared(index: MemoryIndex) -> SimpleNamespace:
 
 
 def _tool(name: str) -> RegisteredTool:
-    return next(tool for tool in build_memory_tools() if tool.spec.name == name)
+    return next(tool for tool in build_memory_tools(600) if tool.spec.name == name)
 
 
 async def _call(name: str, ctx: SimpleNamespace, arguments: JsonObject) -> ToolResult:

@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 
-from dotagent.agent.resume import InterruptedCall, interrupted_calls
+from dotagent.agent.resume import SENT_OUT_FLAGS, InterruptedCall, interrupted_calls
 from dotagent.core.errors import FailureKind, StoreError
 from dotagent.core.types import FrozenModel
 from dotagent.policy.types import Flag
@@ -39,21 +39,9 @@ RETRY_AFTER_S: float = 15.0
 AFTER_RESET_S: float = 60.0
 # The latest reset a task waits for: one further away is not waited for, and the owner is told.
 RESET_WAIT_MOST_S: float = 43_200.0
-# What an action that reaches beyond the Mac raises: a message or mail, a post, an upload or data sent out, a payment, a
-# project's change put live. A task with a step that raised one is never tried again, whether or not the
-# policy let it through.
-OUTWARD_FLAGS: frozenset[Flag] = frozenset(
-    {
-        "external_send",
-        "message_send",
-        "public_post",
-        "social",
-        "upload",
-        "exfiltration",
-        "financial",
-        "release",
-    }
-)
+# What an action that reaches beyond the Mac raises (``SENT_OUT_FLAGS``, the set a restart's resume holds back by too,
+# item 1854). A task with a step that raised one is never tried again, whether or not the policy let it through.
+OUTWARD_FLAGS: frozenset[Flag] = SENT_OUT_FLAGS
 _HANDING_KIND: str = "delegate"
 
 # Why a task is tried again: Dot's stop cut it, a passing error of the model service ended it, the progress watchdog

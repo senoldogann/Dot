@@ -3,7 +3,8 @@
 ## Memory
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
-`memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
+`memory_search` and `memory_forget` are tools of the agent (`memory_save` and `memory_update` name the longest note,
+`[memory] max_chars`, 600, in their description: item 1690); you manage the same notes with `dotx memory` and in the web
 UI, where Settings › Memory (items 373 and 566) is the box that adds a note at its head (its tags beside it, one fact
 per note, **Remember** or ⌘Enter; on a phone the tags have a line of their own and **Remember** stands at the right of
 the line under them, and a touch screen is not offered the key, item 576), then **Notes** with how many there are, a
@@ -263,8 +264,38 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - `dotx setup` writes `[memory] embed_enabled = false` when it sets up the models of a provider other than Ollama and
   the Ollama of this Mac does not serve the embedding model (item 558): `dotx doctor` then passes, and no run waits
   out an embedder that is not there. It says how to switch the embeddings on again.
-- Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
-  outdated.
+- A fact that changed replaces its older note (item 1729). `memory_save` takes a `subject`, a short name for what the
+  note is about when the fact has one current value (`user-city`, `standup-time`, `nordic-pines-status`; the store keeps
+  it as lowercase words joined by hyphens, 48 characters at most), and a note recalled with one shows it ("about
+  user-city"), so a run saving the fact again gives the same one. A newer note of the same subject puts the older notes
+  of the subject aside: each rests, names the note that replaced it (`replaced_by`, "Replaced by another note" on the
+  Memory page) and keeps its words and the day it began to rest (`rested_at`, "Resting since"), which is the day it
+  stopped being true. Nothing is deleted: the page lists it among the notes that rest, pinning it or taking its `rest`
+  tag off wakes it, and after `forget_after_days` it is only ever proposed to be forgotten. A search and the notes a run starts with
+  pass over it, so the run reads the fact as it stands; the answer to the save lists what it replaced. A note saved
+  again with the words of one that rests is said now: it wakes, takes the subject when it has none (a note keeps the
+  subject it was given), and the other notes of its subject rest (the city that was Oulu, then Helsinki, said to be
+  Oulu again is Oulu); a run that read outside content gives a clean note no subject and puts no clean note aside,
+  whatever the mark of the note it saved again. A value filled into a page is masked in
+  the subject as in the note's words. With no subject,
+  a save replaces a note close to it (`similar_threshold`, so only with embeddings on) only when its words say the
+  fact changed and nothing else: the same sentence with a number, a time or a version swapped after a word a value follows (`at 09:00` and
+  `at 10:30`, `port 8765` and `port 9120`; not `invoice 1042` and `invoice 1043`, which are two things, nor `for 1077`
+  and `for 1080`, nor a time that keeps its hour) or with a word of change added (`now`, `no longer`, `moved`, `switched`), with at
+  least three words shared. A cosine alone cannot tell the two apart (measured with `bge-m3`: facts that changed lie at
+  0.68 to 0.97, two facts that are both true at 0.68 to 0.84), and no model is asked in the save: a note reworded into
+  another sentence, or two values that are names, wait for a subject or for the night, when the reflection asks the
+  review model about the notes that remain close. What a run changes is never what you wrote: a note you wrote, pinned
+  or corrected, a lesson you saved and a standing note stay as they are, and a note saved while its run had read
+  outside content never replaces one that was not (the answer to the save names the notes it left, and `memory_update`
+  proposes the change to you, item 1711). Measured with `dotx eval memory` (42 cases, 34 of facts that changed, the
+  three best notes of each search, 2026-11-24): before, the newest fact came first in 2 cases and the outdated note was
+  shown beside it in all 34; now the newest comes first in 25 and the outdated note is shown in 10 (0 of the 18 with a
+  subject; the 10 are notes reworded, whose changed value is a name, or a version after a word that names a thing), and none of the 8 facts that stayed true was put
+  aside. A store of two or three notes ties the two versions in the search and the older wins the tie, so the first
+  count before is a floor, not a rate for a large store; the shown count is not affected.
+- Saving a note close to an existing one (`similar_threshold`) tells the model the notes that remain, which decides
+  whether the old note is outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:
   the run is tainted, so its next save asks unless the approval mode answers that question itself, and the note it

@@ -20,7 +20,12 @@ from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import ensure_layout, log_dir
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort
 from dotagent.policy.types import ApprovalMode
-from dotagent.store.models import BrowserMode, MemoryOrder
+from dotagent.store.models import (
+    DEFAULT_PROOF_TIMEOUT_S,
+    MAX_PROOF_CHECKS,
+    BrowserMode,
+    MemoryOrder,
+)
 
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
@@ -120,6 +125,7 @@ _FAMILIES: dict[str, str] = {
     "eval-run": "dotagent.cli_eval",
     "eval-report": "dotagent.cli_eval",
     "eval-tools": "dotagent.cli_eval",
+    "eval-memory": "dotagent.cli_eval",
     "eval-speed": "dotagent.cli_eval",
     "stats": "dotagent.cli_stats",
     "daemon": "dotagent.cli_daemon",
@@ -172,6 +178,25 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")
+    run.add_argument(
+        "--proof",
+        action="append",
+        default=[],
+        metavar="COMMAND",
+        help=(
+            "a command that must exit 0 before the run (with --standing, the campaign) is done, such as a test run; "
+            f"Dot runs it at the finish and sends the run back with its output while it fails (repeat, at most "
+            f"{MAX_PROOF_CHECKS})"
+        ),
+    )
+    run.add_argument(
+        "--proof-timeout",
+        dest="proof_timeout_s",
+        type=int,
+        default=DEFAULT_PROOF_TIMEOUT_S,
+        metavar="SECONDS",
+        help=f"seconds each --proof command may run, at most [shell] max_timeout_s (default {DEFAULT_PROOF_TIMEOUT_S})",
+    )
     run.add_argument(
         "--review",
         action="store_true",
@@ -605,6 +630,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--case", dest="cases", action="append", default=[], help="ask only this case; give it again for more"
     )
     eval_tools.add_argument("--repeat", type=int, default=1, help="ask every case this many times")
+    eval_memory = eval_commands.add_parser(
+        "memory",
+        help="measure whether a search finds the newest fact when a fact changed: 42 owner facts saved over time, "
+        "some replaced, and a question each (no model is asked; it embeds with the model of [memory] when asked to)",
+    )
+    eval_memory.add_argument(
+        "--embeddings",
+        choices=["scripted", "configured"],
+        default="scripted",
+        help="scripted: offline, with embeddings made from measured cosines; configured: the embedding model of "
+        "[memory] (default: scripted)",
+    )
     eval_speed = eval_commands.add_parser(
         "speed",
         help="play the speed set (five browser tasks on a local site) and print what each took: passes, wall seconds, "

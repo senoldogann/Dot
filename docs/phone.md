@@ -54,7 +54,11 @@ once a pairing code is. **Sign-in code** keeps a row of dots in the code's place
 code** takes its place. Beside a shown code stands a QR code for the iPhone app Dot Next, of
 `dotnext://pair?host=https://<Dot's name>&code=<the code>` (`GET /api/phone/pair-qr`: only the code that is good now,
 never words of the caller's, and only for the Mac's own key, as a phone makes no code): the iPhone's camera opens Dot
-Next with the address and the code filled, and one tap pairs it. The same by hand:
+Next with the address and the code filled, and one tap pairs it. Dot Next's Settings hold what you need away from the
+Mac to direct, watch, answer or stop Dot; setting up the Mac stays on the Mac, which the list's last line says ("More
+settings are on your Mac"), and no row of it opens the web app (item 1791). Its **Maintenance** shows Dot's version and
+the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
@@ -963,7 +967,9 @@ a run and fails for one that neither has the triggers nor says why it is not a c
 **`GET /api/threads/{id}/view`** answers the chat's small state (`ThreadView`): `revision` (read first, so a change made
 while the rest is read moves the chat past it and is told), `thread`, `summary` (the list's row, `null` for a helper's
 chat), `runs` (its newest `tail` runs, 20 by default and 50 at most, oldest first; `older` says more are left, read with
-`before=<run id>`), `newest` (the newest run's page, as `GET /api/runs/{id}`; `null` with no events for a page read with `before`) and
+`before=<run id>`), `newest` (the newest run's page, as `GET /api/runs/{id}`, its `account` among it, item 1746: a step moves no revision,
+so a view kept by revision holds the account of its last move until the run ends; `null` with no events for a page read
+with `before`) and
 `newest_events` (the tail of its
 events, 200 at most, `newest_events_cut` when older ones were left out), `queue` (as `GET /api/threads/{id}/queue`),
 `asks` (the approvals and questions waiting, its helpers' among them), `helpers` (the runs its runs started in chats of

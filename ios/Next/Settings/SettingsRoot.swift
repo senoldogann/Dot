@@ -2,8 +2,8 @@ import DotEngine
 import SwiftUI
 
 /// The Settings tab (PLAN §4.4, the reference's structure with Dot's pages; UI-STANDARD 14:25): the emergency stop at
-/// the top, then Connections, the phone's own preferences, Agents, System, and every other web settings page as a row
-/// with the "Web" mark, so nothing of the web app is out of reach. A search with synonyms finds any page.
+/// the top, then Connections, the phone's own preferences, Agents, System, and one quiet footnote: what is set up at the
+/// computer is the Mac's (PLAN §26), so no row opens the web app. A search with synonyms finds any page.
 struct SettingsTab: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var path: [SettingsPage]
@@ -53,19 +53,15 @@ struct SettingsTab: View {
                 PageRow(page: .rules, systemImage: "lock.shield", title: String(localized: "Rules", comment: "Settings row: what Dot may do without asking"), description: nil, detail: nil)
                 PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
-                ForEach(WebSettingsPage.Target.agentPages, id: \.tab) { target in WebRow(target: target, systemImage: target.symbol, description: nil) }
             }
-            GroupedSection(header: String(localized: "Apps and services", comment: "Settings section: connectors, plugins, skills, keys, channels, vault"), footer: nil) {
-                ForEach(WebSettingsPage.Target.servicePages, id: \.tab) { target in WebRow(target: target, systemImage: target.symbol, description: nil) }
-            }
-            GroupedSection(
-                header: String(localized: "System", comment: "Settings section: health, version"),
-                footer: String(localized: "Rows marked Web open your Mac's own settings page here; each becomes a page of the app in a later version.", comment: "Settings: footer that explains the Web mark")
-            ) {
+            GroupedSection(header: String(localized: "System", comment: "Settings section: health, version"), footer: nil) {
                 PageRow(page: .system, systemImage: "heart.text.square", title: String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), description: nil, detail: nil)
                 PageRow(page: .usage, systemImage: "chart.bar", title: String(localized: "Usage", comment: "Settings row: the tokens of the last days"), description: nil, detail: nil)
-                ForEach(WebSettingsPage.Target.systemPages, id: \.tab) { target in WebRow(target: target, systemImage: target.symbol, description: nil) }
+                PageRow(page: .maintenance, systemImage: "arrow.triangle.2.circlepath", title: String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), description: nil, detail: nil)
             }
+            Text(String(localized: "More settings are on your Mac.", comment: "Settings: the quiet footnote at the end; what is set up at the computer is done on the Mac"))
+                .textRole(.footnote).foregroundStyle(Tone.tertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
             #if DEBUG
                 GroupedSection(header: String(localized: "Design", comment: "Settings section of debug builds"), footer: String(localized: "Debug builds only.", comment: "Footer of the debug-only design section")) {
                     NavigationRow(systemImage: "square.grid.2x2", title: String(localized: "Gallery", comment: "Settings row of debug builds: the component gallery"), description: nil, detail: nil) {
@@ -160,7 +156,7 @@ struct SettingsTab: View {
         case .agents: AgentsHome()
         case .system: SystemPage()
         case .usage: UsagePage()
-        case .web(let target): WebSettingsPage(target: target)
+        case .maintenance: MaintenancePage()
         }
     }
 }
@@ -185,8 +181,8 @@ func transportWord(_ transport: Transport) -> String {
     }
 }
 
-/// Every place the search finds, with the page it opens: the native pages and their main rows, and the web pages, each
-/// with synonyms in English (whatever the app's language, as the web's words) and in the app's language.
+/// Every place the search finds, with the page it opens: the native pages, each with synonyms in English (whatever the
+/// app's language, as the web's words) and in the app's language.
 func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
     let agents: String = String(localized: "Agents", comment: "Settings section: models, schedules, rules, memory")
     let connections: String = String(localized: "Connections", comment: "Settings section: the Mac, notifications, this phone")
@@ -194,7 +190,7 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
     func entry(_ id: String, _ title: String, _ path: String, _ english: String, _ local: String, _ page: SettingsPage) -> (SettingsEntry, SettingsPage) {
         (SettingsEntry(id: id, title: title, path: path, synonyms: [english, local]), page)
     }
-    var all: [(SettingsEntry, SettingsPage)] = [
+    let all: [(SettingsEntry, SettingsPage)] = [
         entry(
             "mac", String(localized: "This Mac", comment: "Settings row: the paired Mac"), connections, "connection tailscale address key pair diagnose network status proof",
             String(localized: "connection tailscale address key pair diagnose network", comment: "Settings search synonyms of This Mac (space separated)"), .mac),
@@ -234,9 +230,10 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
         entry(
             "usage", String(localized: "Usage", comment: "Settings row: the tokens of the last days"), system, "usage tokens days stats",
             String(localized: "usage tokens days", comment: "Settings search synonyms of Usage (space separated)"), .usage),
+        entry(
+            "maintenance", String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), system,
+            "updates versions resume restart continue claude opencode cli",
+            String(localized: "updates versions resume restart continue", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
     ]
-    for target in WebSettingsPage.Target.allPages {
-        all.append((SettingsEntry(id: "web.\(target.tab)", title: target.title, path: String(localized: "Web", comment: "Settings: the mark of a row that opens the web page in the app"), synonyms: [target.words]), .web(target)))
-    }
     return all
 }

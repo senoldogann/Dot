@@ -4,7 +4,7 @@ beside one that has the role."""
 
 import pytest
 
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import ToolSteer
 from dotagent.store.models import AgentRecord
 from dotagent.tools.delegate import checked_considered, team_listing
 
@@ -25,7 +25,8 @@ def test_with_no_team_nothing_is_asked() -> None:
 
 def test_with_a_team_the_line_is_asked_for_with_the_team_listed() -> None:
     for missing in ("", "   "):
-        with pytest.raises(ToolInputError) as refused:
+        # A steer, not a failure (item 1722): the tools' error rates do not count it.
+        with pytest.raises(ToolSteer) as refused:
             checked_considered(missing, _TEAM, "send the part to the agent whose role fits it")
         said: str = refused.value.message
         assert "send the part to the agent whose role fits it" in said and "agents_considered" in said

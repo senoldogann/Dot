@@ -619,4 +619,6 @@ async def prepare(runtime: Runtime, record: ScheduleRecord, now: float, zone: Zo
 async def tell_brief(bus: EventBus, run: RunRecord) -> None:
     """Tell the owner that the brief is written: its first line, which opens the run in its chat."""
     first: str = next((line for line in run.result.splitlines() if line.strip()), "")
-    await tell_owner(bus, TELL_TITLE, one_line(first, TELL_CHARS) or "Your brief is ready.", f"#/runs/{run.id}")
+    await tell_owner(
+        bus, TELL_TITLE, one_line(first, TELL_CHARS) or "Your brief is ready.", f"#/runs/{run.id}", "brief", ""
+    )
