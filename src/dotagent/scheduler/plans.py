@@ -9,6 +9,7 @@ from dotagent.core.errors import InvalidValueError, StoreError, ToolExecutionErr
 from dotagent.core.types import FrozenModel
 from dotagent.llm.router import parse_model_ref
 from dotagent.scheduler import DAEMON_NOTE
+from dotagent.scheduler.precheck import ready_check
 from dotagent.scheduler.timing import (
     Timing,
     format_local,
@@ -71,6 +72,20 @@ def _check_options(options: ScheduleOptions) -> None:
         raise ToolInputError("a time zone cannot be blank; leave it out to use the configured one", {})
 
 
+async def _check_precheck(request: ScheduleRequest) -> None:
+    """Refuse a check (item 1855) that could not run: a name that is not a plain file name, a file that is not an
+    executable one in Dot's checks folder, or a check on a one-time schedule, whose single firing has nothing to wait
+    for."""
+    name: str | None = request.options.precheck
+    if name is None:
+        return
+    if request.cron is None:
+        raise InvalidValueError(
+            "a check belongs to a repeating schedule: give it cron, or leave the check out", {"check": name}
+        )
+    await asyncio.to_thread(ready_check, name)
+
+
 async def _check_agent(store: Store, options: ScheduleOptions) -> None:
     """Refuse an agent that is not one of the owner's (item 462): Dot is named by no agent (``None``), and an agent
     that does not exist is not found."""
@@ -125,6 +140,7 @@ async def plan_schedule(
     400)."""
     _check_options(request.options)
     await _check_agent(store, request.options)
+    await _check_precheck(request)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
     await _ensure_room(store, config)
@@ -164,6 +180,7 @@ async def create_schedule_off(
     checks that (:func:`enable_schedule`)."""
     _check_options(request.options)
     await _check_agent(store, request.options)
+    await _check_precheck(request)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
     return await store.add_schedule(
@@ -215,6 +232,7 @@ async def edit_schedule(
     record: ScheduleRecord = await store.get_schedule(schedule_id)
     _check_options(request.options)
     await _check_agent(store, request.options)
+    await _check_precheck(request)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: _EditedTiming = _edited_timing(record, request, zone, config, now)
     if enabled and timing.upcoming is None:

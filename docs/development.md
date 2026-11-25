@@ -614,6 +614,14 @@ scheduled run of the owner's sent 50,000 to 61,000 tokens before any work on 202
 `tests/smoke/test_context_budget.py` holds a fresh home's task run under a budget (21,300 in all, the system prompt
 7,000, the tools 14,400), and a change that needs more raises it there, saying why.
 
+**The prompt surface is checked in** (item 1858): `tests/fixtures/prompt_surface/` holds the system prompt of five kinds
+of run (a task asking approvals, a yolo task, a lean task, a chat, a research run) and the schema of every built-in
+tool, rendered by `dotagent.evals.prompt_surface` with the machine's facts fixed (user `owner`, its home, macOS 26.0,
+the date 2026-11-25), and `summary.txt` with each part's characters and estimated tokens. `tests/unit/test_prompt_surface.py`
+fails when what Dot would send differs from the files and shows the start of the diff; `uv run python
+scripts/prompt_surface.py` writes them again, and the pull request commits them with the change, so that a sentence a
+prompt gains or a tool description that grows shows in the review as a diff, with its tokens in `summary.txt`.
+
 **Where the tokens went** (item 881): after the medians, `dotx stats` names the five goals of its window that spent the
 most tokens, the chats of one title together (a goal started again in a new chat keeps its title; only chats you
 opened whose title is three words or more, so two chats titled "selam", or the chats of a schedule, a watcher or Dot's
