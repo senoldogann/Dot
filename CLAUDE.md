@@ -27,7 +27,13 @@ Point `DOT_HOME`, `DOT_LOG_DIR` and `DOT_CHROME_DIR` at throwaway folders first,
 `plugins_dir()` is the owner's own; a run that holds `live`, `hosted`, `internet` or `desktop` tests keeps its variables.
 While working, run the tests of what changed (`uv run pytest tests/unit/test_x.py tests/smoke/test_y.py -q`), not the
 whole gate. Run the whole gate once, when the change is done; `.github/workflows/gate.yml` runs it again on the pull
-request. `-n auto` spreads the tests over the Mac's cores.
+request. On GitHub a pull request runs only the parts its files can affect (`scripts/python_ci.py`,
+`scripts/browser_ci.py`, ios.yml's paths; a decision that fails runs everything); a push to main runs only the Python
+gate its files can affect and no browser part (item 1886, the owner's "only when really needed"): a break that two
+pull requests make together through files neither shares shows in the night's `browser.yml`, not before `main` moves,
+so a red night is fixed as a red `main` is. The whole browser and iPhone suites run
+each night and when asked (`gh workflow run browser.yml` or `ios.yml --ref <branch>`). `-n auto` spreads the
+tests over the Mac's cores.
 
 ```bash
 uv run ruff format --check src tests
