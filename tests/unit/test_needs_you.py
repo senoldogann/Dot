@@ -207,7 +207,10 @@ async def test_a_handoff_is_told_by_the_host_of_its_page_and_a_fixed_line_with_n
         assert set(by_id) == {newer.id, broken.id} and listed.count == 2
         assert by_id[newer.id].title == "Dot needs you on bank.example"
         assert by_id[broken.id].title == HANDOFF_TITLE_NO_HOST
-        dumped: str = json.dumps(listed.model_dump(exclude_none=True))
+        # Ids are left out: the base36 time in a random id can spell "pw" or "frag" by chance.
+        dumped: str = json.dumps(
+            listed.model_dump(exclude_none=True, exclude={"items": {"__all__": {"id", "run_id", "thread_id", "route"}}})
+        )
         for leaked in ("hunter2", "token=abc", "pw", "login", "step-two", "8443", "frag", "password", "credential"):
             assert leaked not in dumped, leaked
         assert on_desktop.id not in by_id
