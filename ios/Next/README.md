@@ -41,10 +41,33 @@ version, Usage, Maintenance (Dot's and the provider programs' versions, Continue
 computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app; the
 phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says so at the top with
 Release the stop. A search with synonyms finds any page in English or
+computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
+with synonyms finds any page in English or
+(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
+only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
+on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
+runs' proposed rewrites with Use and Drop), Health and version, Usage, Maintenance (Dot's and the provider programs'
+versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
+line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
 or enter the code; a pair link opened from elsewhere waits for the same tap; a failure says which hop failed.
+
+Connect apps (`Settings/ConnectAppsSheet.swift`, items 1861 and 1862, PLAN §27) is a sheet over the Mac's Connectors
+catalogue (`GET /api/plugins`, `/connections`, `/mcp/servers`, `/vault`, `/accounts`, read together): an "N connected"
+pill that lists the connected services alone, the catalogue's sections as chips, Featured (the web's Popular, at most
+eight), then each section; a row per service with its logo (the web's own files, `Resources/PluginLogos.xcassets`, made
+by `scripts/sync_plugin_logos.py`, drawn in the theme's ink; else its glyph or its initial), its line and a Connect or
+Connected pill; a floating search over the services and the skills. A row opens the service's detail: what each way
+does and how it connects, who it is connected as, Disconnect with a confirmation for what Dot can take back (a
+connected app added on the Mac or from another agent, 1Password's token, an official sign-in). Connect takes the
+daemon's step: a Mac application's, a synced folder's and Dot's browser's sign-in (`POST /api/connections/{id}`) are
+started from the phone and finished on the Mac, where macOS asks or the page opens; adding a connected app, an official
+sign-in and 1Password's token are refused to a phone's key (item 678, `on_this_mac`), so their Connect says "Finish on
+your Mac" on the row and names the Mac's page in the detail. A Disconnect of a sign-in the provider did not end shows
+the daemon's notice of where to end it. While the daemon says a service waits, the sheet reads again every five seconds.
+No "For you" section: the daemon gives no suggestion for services.
 
 ## The engine: `ios/DotEngine`
 
@@ -168,12 +191,12 @@ Debug builds draw Settings on a daemon served from memory through a `URLProtocol
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-models`, `settings-caps`, `settings-caps-refused`,
 `settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
-`settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`, `pairing`,
-`pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
+`settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
+`settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.
 `scripts/e2e_settings.sh <simulator udid> <derived data> [daemon checkout]` starts a throwaway daemon with a seeded
 proposal, pairs a phone, makes a schedule, runs `SettingsLiveUITests` (every page that writes) and reads on the
-daemon's side what each tap wrote.
+daemon's side what each tap wrote; `ConnectAppsLiveUITests` reads Connect apps (a chip, the search, a detail).
 
 ## Screenshots
 

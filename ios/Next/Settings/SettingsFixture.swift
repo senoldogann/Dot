@@ -28,6 +28,9 @@
         case keyRefused = "settings-key-refused"
         case oldDaemon = "settings-old-daemon"
         case maintenance = "settings-maintenance"
+        case connectApps = "settings-connect-apps"
+        case connectAppsDetail = "settings-connect-apps-detail"
+        case connectAppsOffline = "settings-connect-apps-offline"
         case pairing = "pairing"
         case pairingLink = "pairing-link"
 
@@ -36,7 +39,7 @@
         /// What the fixture daemon does with every request.
         var behaviour: FixtureBehaviour {
             switch self {
-            case .offline: .unreachable
+            case .offline, .connectAppsOffline: .unreachable
             case .keyRefused: .keyRefused
             case .oldDaemon: .old
             case .stopped: .stopped
@@ -62,12 +65,21 @@
             case .agents: .agents
             case .system: .system
             case .maintenance: .maintenance
-            case .pairing, .pairingLink: nil
+            case .pairing, .pairingLink, .connectApps, .connectAppsDetail, .connectAppsOffline: nil
+            }
+        }
+
+        /// Whether the scene opens Connect apps (item 1862), and on which service.
+        var connectAppsOpening: ConnectAppsOpening {
+            switch self {
+            case .connectApps, .connectAppsOffline: .list
+            case .connectAppsDetail: .detail("notion")
+            default: .closed
             }
         }
 
         var start: SettingsStart {
-            SettingsStart(path: page.map { [$0] } ?? [], query: self == .search ? "approvals" : "", editsFirstSchedule: self == .scheduleEdit, triesRaise: self == .capsRefused)
+            SettingsStart(path: page.map { [$0] } ?? [], query: self == .search ? "approvals" : "", editsFirstSchedule: self == .scheduleEdit, triesRaise: self == .capsRefused, connectApps: connectAppsOpening)
         }
 
         func api() -> DaemonAPI {
@@ -80,7 +92,7 @@
 
         var transport: Transport {
             switch self {
-            case .offline: .offline
+            case .offline, .connectAppsOffline: .offline
             case .keyRefused: .keyRefused
             default: .up
             }
@@ -168,6 +180,16 @@
             case ("GET", "/api/rules"): return (200, rules)
             case ("GET", "/api/memories/proposed"): return (200, proposed(now: now))
             case ("GET", "/api/memories/search"): return (200, "[]")
+            case ("GET", "/api/plugins"): return (200, connectPlugins)
+            case ("GET", "/api/connections"): return (200, connectConnections)
+            case ("GET", "/api/mcp/servers"): return (200, connectServers)
+            case ("GET", "/api/vault"):
+                return (200, #"{"cli":"/opt/homebrew/bin/op","app":true,"connected":true,"vaults":[{"id":"v1","name":"Shared with Dot","logins":12}],"error":null}"#)
+            case ("GET", "/api/accounts"):
+                return (200, #"[{"id":"google","name":"Google","configured":true,"client_names":["Dot"],"accounts":[{"address":"senol@example.com","connected_at":\#(now - 86400)}]},{"id":"microsoft","name":"Microsoft","configured":false,"client_names":[],"accounts":[]}]"#)
+            case ("POST", let route) where route.hasPrefix("/api/connections/"):
+                return (200, #"{"id":"\#(route.split(separator: "/").last ?? "")","kind":"mac","name":"Mail","does":"x","state":"not_asked","step":"ask","waiting":true}"#)
+            case ("DELETE", let route) where route.hasPrefix("/api/mcp/servers/"): return (200, connectServers)
             case ("GET", "/api/reactions/settings"):
                 return (200, #"{"follow_ups":true,"follow_ups_per_hour":20,"hold_minutes":30,"good":"feedback","love":"feedback","wrong":"follow_up","again":"follow_up","explain":"follow_up","hold":"follow_up"}"#)
             case ("GET", "/api/diagnostics/programs"):
@@ -178,6 +200,66 @@
             case ("PUT", "/api/agent/resume"): return (200, #"{"resume":"off","resume_within_s":3600}"#)
             default: return (404, #"{"detail":"Not Found"}"#)
             }
+        }
+
+        /// A part of the daemon's real catalogue (`connections/directory.py`): its sections in its order, Featured full.
+        private var connectPlugins: String {
+            let rows: [(String, String, String, String?, String?, [String], String)] = [
+                ("google", "Google", "popular", "google-icon.svg", nil, ["web:google"], "Gmail, Google Calendar and Drive, in Dot's browser."),
+                ("notion", "Notion", "popular", "notion-icon.svg", nil, ["mcp:notion", "web:notion"], "Search, read and write your Notion pages and databases."),
+                ("github", "GitHub", "popular", "github-icon.svg", nil, ["mcp:github", "web:github"], "Read and work on your repositories, issues, pull requests and actions."),
+                ("slack", "Slack", "popular", "slack-icon.svg", nil, ["web:slack"], "Your workspaces' channels and messages, in Dot's browser."),
+                ("linear", "Linear", "popular", "linear-icon.svg", nil, ["mcp:linear"], "Find, create and update issues, projects and comments in Linear."),
+                ("microsoft-365", "Microsoft 365", "popular", "microsoft-icon.svg", nil, ["web:microsoft"], "Outlook, OneDrive and Office on the web, in Dot's browser."),
+                ("mail", "Mail", "popular", nil, "mail", ["mac:mail"], "Reads, sorts and writes your email."),
+                ("calendar", "Calendar", "popular", nil, "calendar", ["mac:calendar"], "Reads your events and adds new ones."),
+                ("1password", "1Password", "passwords", "1password.svg", nil, ["vault:1password"], "Fills your logins into pages on their own sites."),
+                ("sentry", "Sentry", "code", "sentry-icon.svg", nil, ["mcp:sentry"], "Look into errors, issues and releases in Sentry."),
+                ("cloudflare", "Cloudflare", "code", "cloudflare-icon.svg", nil, ["mcp:cloudflare"], "Work with your Cloudflare account: Workers, DNS, logs and the rest."),
+                ("vercel", "Vercel", "code", "vercel-icon.svg", nil, ["mcp:vercel"], "Look into your Vercel projects, their deployments and logs."),
+                ("figma", "Figma", "design", "figma.svg", nil, ["mcp:figma"], "Read your Figma files and their frames, components and comments."),
+                ("linkedin", "LinkedIn", "communication", "linkedin-icon.svg", nil, ["web:linkedin"], "Your profile, messages and posts, in Dot's browser."),
+                ("todoist", "Todoist", "productivity", "todoist-icon.svg", nil, ["mcp:todoist"], "Read and manage your tasks and projects in Todoist."),
+                ("granola", "Granola", "productivity", nil, nil, ["mcp:granola"], "Read your Granola meeting notes and transcripts."),
+                ("notes", "Notes", "mac", nil, "pencil", ["mac:notes"], "Finds, writes and files your notes."),
+                ("reminders", "Reminders", "mac", nil, "list", ["mac:reminders"], "Keeps your to-dos and lists."),
+            ]
+            let listings: [String] = rows.map { id, name, section, logo, glyph, ways, does in
+                let shown: [String] = ways.map { way in
+                    let parts: [Substring] = way.split(separator: ":")
+                    return #"{"kind":"\#(parts[0])","ref":"\#(parts[1])","how":"\#(wayHow(String(parts[0])))","data":"Stays between your Mac and \#(name).","does":"\#(does)"}"#
+                }
+                return #"{"id":"\#(id)","name":"\#(name)","section":"\#(section)","does":"\#(does)","logo":\#(logo.map { "\"\($0)\"" } ?? "null"),"glyph":\#(glyph.map { "\"\($0)\"" } ?? "null"),"ways":[\#(shown.joined(separator: ","))]}"#
+            }
+            return #"{"plugins":[\#(listings.joined(separator: ","))]}"#
+        }
+
+        private func wayHow(_ kind: String) -> String {
+            switch kind {
+            case "mcp": "A connected app: Dot signs in to the service's own server."
+            case "mac": "Dot drives the app on your Mac, once macOS allows it."
+            case "web": "Dot's browser, where you sign in once."
+            case "vault": "1Password's command line, with a service account that only reads."
+            default: "A folder kept in sync on your Mac."
+            }
+        }
+
+        private var connectConnections: String {
+            let app: (String, String, String, String?) -> String = { id, kind, state, step in
+                #"{"id":"\#(id)","kind":"\#(kind)","name":"\#(id)","does":"x","state":"\#(state)","step":\#(step.map { "\"\($0)\"" } ?? "null"),"waiting":false}"#
+            }
+            let apps: [String] = [
+                app("mail", "mac", "allowed", nil), app("calendar", "mac", "not_asked", "ask"), app("notes", "mac", "allowed", nil), app("reminders", "mac", "refused", "settings"),
+                app("google", "web", "signed_out", "sign_in"), app("notion", "web", "signed_out", "sign_in"), app("github", "web", "signed_in", nil),
+                app("slack", "web", "signed_out", "sign_in"), app("microsoft", "web", "signed_out", "sign_in"), app("linkedin", "web", "signed_out", "sign_in"),
+            ]
+            return #"{"apps":[\#(apps.joined(separator: ","))],"browser_mode":"own","headless":false,"runner":"Dot"}"#
+        }
+
+        private var connectServers: String {
+            #"{"servers":[{"name":"notion","origin":"connected","address":"https://mcp.notion.com/mcp","service":"notion","state":"ready","tools":["search","fetch"],"error":null,"link":null,"signs_in":true,"mark":null,"picks_tools":true,"plugin":null},"#
+                + #"{"name":"sentry","origin":"connected","address":"https://mcp.sentry.dev/mcp","service":"sentry","state":"signing_in","tools":[],"error":null,"link":null,"signs_in":true,"mark":null,"picks_tools":false,"plugin":null}],"#
+                + #""services":[{"id":"notion","added":false},{"id":"linear","added":false},{"id":"sentry","added":false}]}"#
         }
 
         private var modelsConfig: String {
