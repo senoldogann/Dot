@@ -27,12 +27,14 @@ from dotagent.evals.memory_cases import CASES, Fact, MemoryCase
 from dotagent.memory.embedder import Embedder, build_embedder
 from dotagent.memory.ranking import Vector
 from dotagent.memory.service import MemoryHit, MemoryIndex, normalize_text, recall_for
-from dotagent.memory.supersede import save_replacing
+from dotagent.memory.supersede import handed_echo, save_replacing
 from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord
 
 # The run that saves every note of the benchmark: a note a run saved, which a run may replace.
 RUN_ID: str = "run_memory_bench"
+# The second run of an E case (item 1866): handed the old fact as it was saved, it saves it again at the end.
+ECHO_RUN_ID: str = "run_memory_bench_echo"
 # How many notes a search is asked for: the few a run reads.
 SHOWN: int = 3
 # Below this a pivot of the factorisation is not a number the vectors can be made from.
@@ -106,6 +108,7 @@ class CaseResult(FrozenModel):
     kind: str
     keyed: bool
     used: bool
+    echoed: bool
     shown: tuple[int, ...]
     answer: int
     outdated: tuple[int, ...]
@@ -123,9 +126,11 @@ class CaseResult(FrozenModel):
         return any(place in self.shown for place in self.outdated)
 
 
-async def _save_fact(index: MemoryIndex, fact: Fact) -> MemoryRecord:
-    """The fact saved as ``memory_save`` saves a note, with the subject the run gave it."""
-    return (await save_replacing(index, fact.text, [], RUN_ID, None, False, fact.subject)).saved.record
+async def _save_fact(index: MemoryIndex, fact: Fact, run_id: str) -> None:
+    """The fact saved by the run ``run_id`` as ``memory_save`` saves a note, with the subject the run gave it: not when
+    it is the words of a note recall handed the run (item 1866)."""
+    if await handed_echo(index, run_id, fact.text) is None:
+        await save_replacing(index, fact.text, [], run_id, None, False, fact.subject)
 
 
 async def play_case(case: MemoryCase, embedder: Embedder, config: MemoryConfig, folder: Path) -> CaseResult:
@@ -134,11 +139,17 @@ async def play_case(case: MemoryCase, embedder: Embedder, config: MemoryConfig, 
     store: Store = await Store.open(folder / f"{case.id}.db", folder / f"{case.id}-images")
     try:
         index: MemoryIndex = MemoryIndex(store=store, embedder=embedder, config=config)
-        saved: list[MemoryRecord] = []
         for place, fact in enumerate(case.facts):
-            saved.append(await _save_fact(index, fact))
+            await _save_fact(index, fact, RUN_ID)
+            note: MemoryRecord | None = await store.find_memory_by_content(normalize_text(fact.text), None)
+            if note is None:
+                raise InvalidValueError("a fact the case saved is not in its store", {"case": case.id, "fact": place})
             if place in case.used:
-                await store.mark_memories_used(RUN_ID, [saved[place].id], time.time(), "start")
+                await store.mark_memories_used(RUN_ID, [note.id], time.time(), "start")
+            if place in case.echoed:
+                await store.mark_memories_used(ECHO_RUN_ID, [note.id], time.time(), "start")
+        for place in case.echoed:
+            await _save_fact(index, case.facts[place], ECHO_RUN_ID)
         places: dict[str, int] = {normalize_text(fact.text): place for place, fact in enumerate(case.facts)}
         hits: list[MemoryHit] = await recall_for(index, case.question, SHOWN, None)
     finally:
@@ -148,6 +159,7 @@ async def play_case(case: MemoryCase, embedder: Embedder, config: MemoryConfig, 
         kind=case.kind,
         keyed=case.facts[case.answer].subject is not None,
         used=bool(case.used),
+        echoed=bool(case.echoed),
         shown=tuple(places[hit.record.content] for hit in hits),
         answer=case.answer,
         outdated=case.outdated,
@@ -212,14 +224,16 @@ def tally(name: str, results: Sequence[CaseResult]) -> Tally:
 
 def tallies(results: Sequence[CaseResult]) -> list[Tally]:
     """The groups the report shows: every fact that changed, those saved with a subject and those without, those whose
-    old note a run was handed (a search lifts it), and the facts that did not change."""
-    updates: list[CaseResult] = [result for result in results if result.kind == "update"]
+    old note a run was handed (a search lifts it), and the facts that did not change; and apart, the E cases, whose old
+    note a run handed it saved again (item 1866)."""
+    updates: list[CaseResult] = [result for result in results if result.kind == "update" and not result.echoed]
     return [
         tally("facts that changed", updates),
         tally("  saved with a subject", [result for result in updates if result.keyed]),
         tally("  saved without one", [result for result in updates if not result.keyed]),
         tally("  old note handed to a run", [result for result in updates if result.used]),
         tally("facts that did not change", [result for result in results if result.kind == "addition"]),
+        tally("old note saved again by a run", [result for result in results if result.echoed]),
     ]
 
 
@@ -232,12 +246,12 @@ def render_results(label: str, results: Sequence[CaseResult]) -> list[str]:
     first, how often it was among the three notes, and how often an outdated note was among them too."""
     lines: list[str] = [
         f"Memory benchmark, {len(results)} cases, {label} embeddings, the {SHOWN} best notes of each search:",
-        f"  {'':28}{'cases':>6}{'first':>8}{'in top ' + str(SHOWN):>10}{'outdated shown':>16}",
+        f"  {'':30}{'cases':>6}{'first':>8}{'in top ' + str(SHOWN):>10}{'outdated shown':>16}",
     ]
     for group in tallies(results):
         shown_stale: str = _share(group.stale, group.cases) if group.name != "facts that did not change" else "-"
         lines.append(
-            f"  {group.name:28}{group.cases:>6}{_share(group.first, group.cases):>8}"
+            f"  {group.name:30}{group.cases:>6}{_share(group.first, group.cases):>8}"
             f"{_share(group.found, group.cases):>10}{shown_stale:>16}"
         )
     missed: list[str] = [result.case_id for result in results if not result.first]

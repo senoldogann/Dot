@@ -225,3 +225,22 @@ async def test_a_scheduled_task_s_lessons_stay_proposed_under_auto_and_wait_on_t
         assert (await client.get("/api/memories/waiting")).json() == []
         notes: list[MemoryRecord] = await home.runtime.store.list_memories(10, 0, "changed")
         assert [(note.content, note.origin) for note in notes] == [(LESSON, "schedule")]
+
+
+async def _echo_turns(runtime: Runtime) -> Sequence[ScriptedTurn]:
+    """A note saved earlier, and the turns of a run that searches for it and saves its words again (item 1866)."""
+    await runtime.store.add_memory(FACT, ("mail",), "run_gone", None, None, False)
+    search: ScriptedCall = ScriptedCall(tool="memory_search", arguments={"query": "landlord weekdays"})
+    return [_turn(search), _save(f"Remember: {FACT}", None), FINISH]
+
+
+async def test_a_run_that_saves_again_the_words_recall_handed_it_saves_nothing_and_is_told_why(
+    login_env: dict[str, str],
+) -> None:
+    async with _home_made(login_env, _echo_turns) as home:
+        run: RunRecord = await _run(home, EVAL_SOURCE)
+        notes: list[MemoryRecord] = await home.runtime.store.list_memories(10, 0, "changed")
+        assert [note.content for note in notes] == [FACT]
+        results = await home.runtime.store.events_of_kind(run.id, "tool_result", 10)
+        said: list[str] = [str(event.data.get("output", event.data)) for event in results]
+        assert any("Not saved: these are the words of a note you were handed" in text for text in said), said

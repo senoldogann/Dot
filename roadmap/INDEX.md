@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1866](1866.md) | done | 2026-11-25 | What recall handed a task is never saved back as a new note; the memory benchmark measures it |
 | [1865](1865.md) | done | 2026-11-25 | A scheduled task, a watcher's task and a helper propose what they would remember; the owner decides |
 | [1864](1864.md) | done | 2026-11-25 | Every note says where it came from: an `origin` the store sets from the run that saved it |
 | [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
