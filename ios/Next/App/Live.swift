@@ -122,13 +122,21 @@ struct ChatsTab: View {
     var body: some View {
         AdaptiveSplit(selection: $selection) {
             list
-        } detail: { thread in
-            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
+        } detail: { id in
+            if model.startingChats[id] != nil {
+                StartingChat(key: id)
+            } else {
+                ChatScreen(thread: id, initialPanel: nil, editsFirstQueued: false)
+            }
         } placeholder: {
             EmptyState(
                 title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",
                 detail: String(localized: "Pick a chat on the left, or start a new one.", comment: "iPad detail column when no chat is selected"), actionTitle: nil, action: {})
                 .background(Tone.ground)
+        }
+        // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it (item 1849).
+        .onChange(of: selection.flatMap { model.accepted[$0]?.thread }) { _, thread in
+            if let thread { selection = thread }
         }
         .onChange(of: model.list.rows.count) { _, count in
             if opensFirstChat, selection == nil, count > 0 { selection = model.list.ordered.first?.summary.id }
@@ -152,7 +160,14 @@ struct ChatsTab: View {
                 deleting = nil
             }
         }
-        .sheet(isPresented: $composing) { NewChatSheet(close: { composing = false }) }
+        .sheet(isPresented: $composing) {
+            NewChatSheet(
+                close: { composing = false },
+                opened: { key in
+                    composing = false
+                    selection = key
+                })
+        }
     }
 
     /// Deletes at once when the owner turned the confirmation off (Settings › General › Confirmations).
@@ -311,12 +326,15 @@ struct ChatRow: View {
     }
 }
 
-/// A new chat: the composer on an empty sheet (plan §4.2); it shows in the list at once from the outbox.
+/// A new chat: the composer on an empty sheet (plan §4.2); once sent, the chat opens at once under the outbox's key
+/// (item 1849) and shows in the list from the outbox.
 struct NewChatSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
     let close: () -> Void
+    /// The chat was kept in the outbox under this key: the sheet closes and the chat opens.
+    let opened: (String) -> Void
 
     var body: some View {
         VStack {
@@ -332,14 +350,45 @@ struct NewChatSheet: View {
                     guard !words.isEmpty else { return }
                     let photos: [Data] = attachments.map(\.jpeg)
                     Task {
-                        await model.startChat(words, photos: photos)
-                        close()
+                        if let key = await model.startChat(words, photos: photos) { opened(key) } else { close() }
                     }
                 }, model: nil, models: [:], chooseModel: nil, suggestions: .none)
             .padding(Space.s)
         }
         .padding(Space.gutter)
         .inspectorSheet(title: String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), close: close)
+    }
+}
+
+/// A new chat between its first send and the daemon's answer (item 1849): the owner's message where the chat shows it,
+/// with where it stands, under the chat's title; the list swaps it for the real chat, in place, once the daemon names it.
+struct StartingChat: View {
+    let key: String
+    @Environment(AppModel.self) private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
+
+    var body: some View {
+        let text: String = model.startingChats[key] ?? ""
+        let delivery: Delivery = model.pendingChats.first { $0.key == key }?.delivery ?? .delivered
+        ScrollView {
+            VStack(alignment: .trailing, spacing: Space.xxs) {
+                OwnerMessage(text: text)
+                Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, Space.gutter)
+            .padding(.vertical, Space.m)
+        }
+        .background(Tone.ground)
+        .navigationTitle(text)
+        .navigationSubtitle(ChatStatus.starting.word)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
+    }
+
+    private func refused(_ delivery: Delivery) -> Bool {
+        if case .rejected = delivery { return true }
+        return false
     }
 }
 
