@@ -234,18 +234,18 @@ job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned b
 pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .`
 first, on your Mac).
 
-When something under `ios/` changes (a pull request or a push to `main`, and when asked: `gh workflow run ios.yml
---ref <branch>`), `.github/workflows/ios.yml` builds and tests the iPhone app DotNext and its engine on `macos-26` with
-Xcode 26.6 (item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check),
-the unit and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e`
-(Settings against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes
-only when all of them did; a test that fails (unit or UI) runs once more, as a fresh runner's simulator sometimes fails to
-launch the app. A run takes about 30 minutes, its longest part `tests (controls)`. It holds four of the five
-macOS runners at once (`build`, `engine` and `e2e`, then the three test parts beside `e2e`; five while `engine` still
-runs then), so a pull request
-that changes `ios/` and the daemon waits longer for the gate's macOS jobs; one that changes neither runs none of it. The
-`ios` check is not one `main`'s protection can require, for the same reason: a pull request outside `ios/` never
-reports it. ios/Next/README.md "CI" says how to read a run and download its results and screenshots.
+`.github/workflows/ios.yml` builds and tests the iPhone app DotNext and its engine on `macos-26` with Xcode 26.6
+(item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), the unit
+and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e` (Settings
+against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes only when
+all of them did. A pull request that changes `ios/` runs `engine`, `build` and `tests (chat)`, about 20 minutes; the
+whole run, about an hour, runs on a push to `main` that changes `ios/`, every night, when asked (`gh workflow run
+ios.yml --ref <branch>`) and on a pull request with the label `ios-full`. A run holds two macOS runners at most
+(`engine` beside `build`, the test parts two at a time, then `e2e` alone), so three of the five stay free for the
+gate's macOS jobs. A test that fails runs once more, as a fresh runner's simulator sometimes fails to launch the app;
+one that passed only on its retry is named in the job's summary ("passed on retry: <test>"). The `ios` check is not one
+`main`'s protection can require: a pull request outside `ios/` never runs the workflow, so it never reports it.
+ios/Next/README.md "CI" says how to read a run and download its results and screenshots.
 
 A Dependabot pull request that raises versions by a patch or a minor step merges by itself
 (`.github/workflows/dependabot-merge.yml`, item 1190): a job marks it with the label `dependabot-merge`, and every

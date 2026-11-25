@@ -4,18 +4,26 @@
 #
 # The jobs: `engine` runs `swift test` of the engine; `build` makes the project with XcodeGen, builds DotNext and its
 # tests once (build-for-testing) and runs the String Catalog check on that build; `tests` runs the unit and UI tests
-# from that build in three parts side by side; `e2e` runs Settings end to end against a throwaway daemon of this
-# checkout (scripts/e2e_settings.sh); `ios` is the one check that says all of them passed. Each test job keeps its
-# .xcresult and the screenshots in it for 7 days. Four of the account's five macOS runners at once (`build`, `engine` and `e2e`,
-# then the three `tests` parts beside `e2e`), five while `engine` still runs then: docs/development.md.
+# from that build; `e2e` runs Settings end to end against a throwaway daemon of this checkout
+# (scripts/e2e_settings.sh); `ios` is the one check that says all of them passed. Each test job keeps its .xcresult and
+# the screenshots in it for 7 days.
+#
+# The account runs five macOS runners at once and the gate's own jobs need them, so a run holds two at most: `engine`
+# beside `build`, then the `tests` parts two at a time (`max-parallel`), then `e2e` alone. A pull request runs `engine`,
+# `build` and the `chat` part only; the long parts (`controls`, `rows`) and `e2e` run on a push to main, every night,
+# when asked, and on a pull request that carries the label `ios-full` (docs/development.md).
 name: ios
 
 on:
   pull_request:
+    # `labeled`: adding `ios-full` to a pull request starts the whole run.
+    types: [opened, synchronize, reopened, labeled]
     paths: ["ios/**", ".github/workflows/ios.yml"]
   push:
     branches: [main]
     paths: ["ios/**", ".github/workflows/ios.yml"]
+  schedule:
+    - cron: "17 2 * * *"
   workflow_dispatch:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
@@ -33,6 +41,8 @@ concurrency:
 env:
   XCODE: "26.6"
   SIMULATOR: "iPhone 17 Pro"
+  # Whether this run is the whole one: everything but a pull request without the label `ios-full`.
+  FULL: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full') }}
 
 # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
 jobs:
@@ -83,22 +93,26 @@ jobs:
           retention-days: 1
 
   tests:
-    needs: build
+    # After `engine` too, so that `engine` never runs beside two parts: two macOS runners at most.
+    needs: [build, engine]
     runs-on: macos-26
     timeout-minutes: 65
-    # The parts by the time they took on the runner: the unit tests with the chat's and Settings' UI tests 4 minutes,
-    # each test of SettingsControlsUITests (it taps every row, and every control of every native page) about 20.
+    # The parts by the time they took on the runner: the unit tests with the chat's and Settings' UI tests 12-15
+    # minutes, each test of SettingsControlsUITests (it taps every row, and every control of every native page) 16-27.
+    # The longest starts first; the third waits for one of the two to end.
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
-        part:
-          - name: chat
+        part: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full')) && '["controls", "chat", "rows"]' || '["chat"]') }}
+        include:
+          - part: chat
             only: -only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/SettingsUITests
-          - name: controls
+          - part: controls
             only: -only-testing:DotNextUITests/SettingsControlsUITests/testEveryControlOfTheNativePagesDoesSomething
-          - name: rows
+          - part: rows
             only: -only-testing:DotNextUITests/SettingsControlsUITests/testEveryRowOfSettingsOpensItsPage
-    name: tests (${{ matrix.part.name }})
+    name: tests (${{ matrix.part }})
     steps:
       # StringCatalogTests reads Resources/Localizable.xcstrings at its source path.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -144,7 +158,7 @@ jobs:
       - name: Test
         timeout-minutes: 55
         env:
-          ONLY: ${{ matrix.part.only }}
+          ONLY: ${{ matrix.only }}
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
           run=$(ls "$RUNNER_TEMP"/dd/Build/Products/*.xctestrun | head -1)
@@ -153,15 +167,21 @@ jobs:
             -retry-tests-on-failure -test-iterations 2 \
             -resultBundlePath "$RUNNER_TEMP/tests.xcresult" | grep --line-buffered -E "error:|Test Case|Executed|TEST "
           test "${PIPESTATUS[0]}" -eq 0
-      - name: Screenshots out of the result
+      # A test that passed only on its retry is flaky: the job's summary names it, so the retry hides nothing.
+      - name: Screenshots and retries out of the result
         if: always()
         run: |
           [ -f "$RUNNER_TEMP/tests.xcresult/Info.plist" ] || exit 0
           xcrun xcresulttool export attachments --path "$RUNNER_TEMP/tests.xcresult" --output-path "$RUNNER_TEMP/shots"
+          retried=$(python3 ios/Next/scripts/passed_on_retry.py "$RUNNER_TEMP/tests.xcresult")
+          if [ -n "$retried" ]; then
+            echo "$retried" | sed 's/^/::warning title=flaky::/'
+            echo "$retried" | sed 's/^/- /' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: ios-tests-${{ matrix.part.name }}
+          name: ios-tests-${{ matrix.part }}
           path: |
             ${{ runner.temp }}/tests.xcresult
             ${{ runner.temp }}/shots
@@ -169,6 +189,8 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
+    needs: tests
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full')
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -196,24 +218,34 @@ jobs:
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid"
-      # The script makes its three folders with mktemp; DOT_HOME and the others point at the runner's temp too, so
+      # The script makes its folders with mktemp, under a TMPDIR of each try's own, so that the logs of a try (the
+      # daemon's, xcodebuild's) are kept for the artifact; DOT_HOME and the others point at the runner's temp too, so
       # nothing it starts can reach a default home. It runs once more when the first try failed: on the runner the UI
       # test runner sometimes fails to start ("Timed out waiting for AX loaded notification", run 45569714390) before
-      # any test ran. The second try starts a new daemon in new folders; a failure of both fails the job.
+      # any test ran. The second try starts a new daemon in new folders; a failure of both fails the job, and a pass on
+      # the second is named in the job's summary.
       - name: Settings end to end
         timeout-minutes: 45
         env:
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
           export DOT_HOME="$RUNNER_TEMP/home" DOT_LOG_DIR="$RUNNER_TEMP/logs" DOT_CHROME_DIR="$RUNNER_TEMP/chrome"
-          if ! ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"; then
+          mkdir -p "$RUNNER_TEMP/try1" "$RUNNER_TEMP/try2"
+          if ! TMPDIR="$RUNNER_TEMP/try1" ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"; then
             echo "::warning title=e2e::the first try failed; trying once more"
-            rm -rf "$RUNNER_TEMP/dd/Logs/Test"
-            ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"
+            mv "$RUNNER_TEMP/dd/Logs/Test" "$RUNNER_TEMP/try1/xcresults" 2>/dev/null || true
+            TMPDIR="$RUNNER_TEMP/try2" ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"
+            echo "- passed on retry: SettingsLiveUITests (e2e; the first try's logs are in the artifact ios-e2e, try1/)" >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Screenshots out of the result
+      - name: Screenshots and logs
         if: always()
         run: |
+          mkdir -p "$RUNNER_TEMP/e2e-logs"
+          find "$RUNNER_TEMP/try1" "$RUNNER_TEMP/try2" -maxdepth 2 -name '*.log' 2>/dev/null | while read -r log; do
+            dest="$RUNNER_TEMP/e2e-logs/$(basename "$(dirname "$(dirname "$log")")")"
+            mkdir -p "$dest" && cp "$log" "$dest/"
+          done
+          [ -d "$RUNNER_TEMP/try1/xcresults" ] && cp -R "$RUNNER_TEMP/try1/xcresults" "$RUNNER_TEMP/e2e-logs/try1/"
           result=$(find "$RUNNER_TEMP/dd/Logs/Test" -name '*.xcresult' -maxdepth 1 2>/dev/null | head -1)
           [ -n "$result" ] || exit 0
           cp -R "$result" "$RUNNER_TEMP/e2e.xcresult"
@@ -225,11 +257,13 @@ jobs:
           path: |
             ${{ runner.temp }}/e2e.xcresult
             ${{ runner.temp }}/shots
+            ${{ runner.temp }}/e2e-logs
           retention-days: 7
           if-no-files-found: ignore
 
-  # The one check to read: it passes only when every job above passed. Not one for main's protection to require: a
-  # pull request that changes nothing under ios/ runs none of this workflow, so the check would never arrive.
+  # The one check to read: it passes only when every job above passed, `e2e` skipped only in a run that is not the whole
+  # one. Not one for main's protection to require: a pull request that changes nothing under ios/ runs none of this
+  # workflow, so the check would never arrive.
   ios:
     if: always()
     needs: [engine, build, tests, e2e]
@@ -238,7 +272,11 @@ jobs:
     steps:
       - name: Every job passed
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          ENGINE: ${{ needs.engine.result }}
+          BUILD: ${{ needs.build.result }}
+          TESTS: ${{ needs.tests.result }}
+          E2E: ${{ needs.e2e.result }}
         run: |
-          echo "$RESULTS"
-          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
+          echo "engine=$ENGINE build=$BUILD tests=$TESTS e2e=$E2E full=$FULL"
+          [ "$ENGINE" = success ] && [ "$BUILD" = success ] && [ "$TESTS" = success ] || exit 1
+          [ "$E2E" = success ] || { [ "$FULL" = false ] && [ "$E2E" = skipped ]; } || exit 1
