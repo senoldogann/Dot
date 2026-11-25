@@ -88,7 +88,11 @@ final class ScreenFeed {
     private(set) var quality: WatchQuality = .hd
     /// The owner's choice (Settings of the viewer); Auto lets the link decide.
     var choice: WatchQualityChoice = .auto {
-        didSet { if choice != oldValue, api != nil { restart() } }
+        didSet {
+            guard choice != oldValue else { return }
+            fellBehind = false
+            if api != nil { restart() }
+        }
     }
     @ObservationIgnored let picture: VideoPicture = VideoPicture()
     @ObservationIgnored private var api: DaemonAPI?
@@ -116,6 +120,8 @@ final class ScreenFeed {
     /// Starts reading (or again, after a stop or a refusal).
     func start(api: DaemonAPI) {
         self.api = api
+        // Each opening tries HD again under Auto: the link that fell behind last time may be a better one now.
+        fellBehind = false
         restart()
     }
 
@@ -205,7 +211,7 @@ final class ScreenFeed {
         api: DaemonAPI, quality: WatchQuality, feeder: H264Feeder, opened: Double, report: @escaping @Sendable (FeedReport) -> Void
     ) async throws {
         var rest: Data = Data()
-        var meter: FrameMeter = FrameMeter(opened: opened)
+        var meter: LiveFrameMeter = LiveFrameMeter(opened: opened)
         var lag: LagMeter = LagMeter()
         var told: Double = 0
         var toldBehind: Bool = false
@@ -213,6 +219,8 @@ final class ScreenFeed {
             let split = try splitLiveFrames(rest.isEmpty ? chunk : rest + chunk)
             rest = split.rest
             for frame in split.frames {
+                // A reader that was replaced (a quality change) draws nothing more: the new one owns the layer.
+                try Task.checkCancellation()
                 if let size: CGSize = try feeder.feed(frame) { report(.size(size)) }
                 let now: Double = ProcessInfo.processInfo.systemUptime
                 meter = meter.seeing(at: now)
@@ -331,7 +339,7 @@ final class CastFeed {
     /// as it is now.
     private nonisolated static func pump(api: DaemonAPI, run: String, opened: Double, show: @escaping @Sendable (Shown) -> Void) async throws {
         var parser: SSEParser = SSEParser()
-        var meter: FrameMeter = FrameMeter(opened: opened)
+        var meter: LiveFrameMeter = LiveFrameMeter(opened: opened)
         var noted: Double = 0
         for try await chunk in api.screencast(run: run) {
             guard let frame: CastFrame = parser.feed(chunk).compactMap(castFrame(of:)).last else { continue }

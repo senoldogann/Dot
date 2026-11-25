@@ -147,7 +147,7 @@ private func oneLine(_ text: String) -> String { middleCut(text.split(whereSepar
 // MARK: Smoothness
 
 /// How the picture comes: when the first frame came after the view opened, and the frames of the last two seconds.
-public struct FrameMeter: Sendable, Equatable {
+public struct LiveFrameMeter: Sendable, Equatable {
     public private(set) var opened: Double
     public private(set) var firstFrame: Double?
     public private(set) var recent: [Double]
@@ -163,8 +163,8 @@ public struct FrameMeter: Sendable, Equatable {
     }
 
     /// The meter with a frame seen at `now` (seconds).
-    public func seeing(at now: Double) -> FrameMeter {
-        var next: FrameMeter = self
+    public func seeing(at now: Double) -> LiveFrameMeter {
+        var next: LiveFrameMeter = self
         if next.firstFrame == nil { next.firstFrame = now }
         next.frames += 1
         next.recent = next.recent.filter { now - $0 < Self.window } + [now]

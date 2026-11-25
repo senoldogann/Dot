@@ -31,7 +31,8 @@ class WatchQuery(FrozenModel):
 # to 1.5 Mbit/s, and the average below is the most the encoder aims at when much moves; a key frame every 4 s.
 # light (item 1837): measured on the owner's MacBook, an hd key frame is 90 to 230 KB, three seconds of a 600 kbit/s
 # link, behind which a slow viewer drops every frame until the next key frame. 1280 pixels at 30 frames a second with a
-# fifth of the bit rate halves the key frame and a key every 2 s heals a drop twice as soon.
+# fifth of the bit rate aims at smaller key frames (less than half the pixels; not measured yet), and a key every 2 s
+# heals a drop twice as soon.
 _QUALITIES: dict[WatchQuality, tuple[int, int, int, int]] = {
     "hd": (1920, 60, 8_000_000, 4),
     "light": (1280, 30, 1_500_000, 2),

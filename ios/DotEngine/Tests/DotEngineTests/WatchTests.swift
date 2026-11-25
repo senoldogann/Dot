@@ -122,7 +122,7 @@ final class WatchRulesTests: XCTestCase {
     }
 
     func testTheMeterCountsTheLastTwoSeconds() {
-        var meter: FrameMeter = FrameMeter(opened: 10)
+        var meter: LiveFrameMeter = LiveFrameMeter(opened: 10)
         XCTAssertNil(meter.firstFrameMs)
         for frame in 0..<90 { meter = meter.seeing(at: 10.4 + Double(frame) / 30) }
         XCTAssertEqual(meter.firstFrameMs, 400)
