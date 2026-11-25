@@ -32,29 +32,19 @@ Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's 
 daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
 iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
 Forget this phone's key), Notifications (the three kinds of `/api/phone/push-settings`), General (Dot's and the owner's
-names, the language, the clock, Queue or Steer, the confirmation of deleting a chat, dictation's language), Appearance (light, dark or
-system, the text size with a live preview, the tool calls in chat, response streaming, the reading width), Chat
-(haptics, reactions' follow-ups), Models (the main and fast models from the daemon's list, and the code review's
-model with its reasoning, changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's
-windows, today's tokens, the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last
-run, paused, failed; a switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks
-in it; free mode, switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every
-note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and
-version, Usage, Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the
-computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app; the
-phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says so at the top with
-Release the stop. A search with synonyms finds any page in English or
-computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
-with synonyms finds any page in English or
-system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their own and word
-break, the tool calls in chat, response streaming, the reading width), Chat
-(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
-only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
-on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
-runs' proposed rewrites with Use and Drop), Health and version, Usage, Maintenance (Dot's and the provider programs'
-versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
-line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
-line says, and no Settings row opens the web app. A search with synonyms finds any page in English or
+names, the language, the clock, Queue or Steer, the confirmation of deleting a chat, dictation's language), Appearance
+(light, dark or system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their
+own and word break, the tool calls in chat, response streaming, the reading width), Chat (haptics, reactions'
+follow-ups), Models (the main and fast models from the daemon's list, and the code review's model with its reasoning,
+changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's windows, today's tokens,
+the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
+switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks in it; free mode,
+switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every note to read, edit or
+forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and version, Usage,
+Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
+the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
+the web app; the phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says
+so at the top with Release the stop. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
