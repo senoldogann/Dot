@@ -1,9 +1,9 @@
 """The unit tests that drive macOS itself (AppKit, Quartz, the accessibility API, ScreenCaptureKit, VideoToolbox) are
 left out where those frameworks are not, as on the Linux a cloud agent works on (item 1270); every other unit test runs
 there. A module is listed here only when what it tests is the desktop's own: one that reaches the frameworks through
-code that only names a type or a constant is fixed in that code instead. The gate runs the list on macOS as every other
-test, and a listed file that is gone stops the collection, so the list cannot leave a test out by a name it no longer
-has.
+code that only names a type or a constant is fixed in that code instead. The gate's Linux job runs every other unit
+test, and its macOS job runs these alone (``--macos-only``, item 1872), so each runs once; a listed file that is gone
+stops the collection, so the list cannot leave a test out by a name it no longer has.
 """
 
 import importlib.util
@@ -89,9 +89,32 @@ def _frameworks_here() -> bool:
 collect_ignore: list[str] = [] if _frameworks_here() else list(MACOS_ONLY)
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--macos-only",
+        action="store_true",
+        default=False,
+        help="run only the unit tests Linux leaves out: the files listed here and the tests marked macos (the gate's "
+        "macOS job, as its Linux job runs every other one)",
+    )
+
+
+def _needs_macos(item: pytest.Item) -> bool:
+    """Whether Linux leaves the test out: its file is listed above, or it is marked ``macos``."""
+    return item.path.name in MACOS_ONLY or item.get_closest_marker("macos") is not None
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """A test marked ``macos`` (one of a module whose other tests run anywhere) is skipped where the frameworks are
-    not."""
+    not. With ``--macos-only`` (the gate's macOS job), only the tests Linux leaves out are kept: the gate's Linux job
+    runs every other one, so the two together run each unit test once."""
+    if config.getoption("--macos-only"):
+        if not _frameworks_here():
+            raise pytest.UsageError("--macos-only runs the tests that need macOS, and this is not macOS")
+        dropped: list[pytest.Item] = [item for item in items if not _needs_macos(item)]
+        config.hook.pytest_deselected(items=dropped)
+        items[:] = [item for item in items if _needs_macos(item)]
+        return
     if _frameworks_here():
         return
     skip: pytest.MarkDecorator = pytest.mark.skip(reason="needs macOS (its kernel's paths, AppKit or Quartz)")
