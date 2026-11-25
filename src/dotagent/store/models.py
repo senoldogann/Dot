@@ -753,6 +753,12 @@ class ProposedChange(FrozenModel):
     at: float
 
 
+# Where a note came from (item 1864): the owner, a run of a chat, a schedule, a watcher, a helper another run started,
+# Dot's own initiative, or the nightly reflection. Set by the store from the saving run, never by a model
+# (:mod:`dotagent.store.provenance`).
+MemoryOrigin = Literal["owner", "chat", "schedule", "watcher", "helper", "initiative", "reflection"]
+
+
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
@@ -792,6 +798,9 @@ class MemoryRecord(FrozenModel):
     # What the run that saved the note said it is about (item 1729): a newer note of the same subject replaces it.
     # ``None`` for a note saved with no subject, and on every note stored before the column.
     subject: str | None = None
+    # Where the note came from (item 1864), set by the store from the run that saved it. ``None`` when that is not
+    # known: a note stored before the column whose run is gone, or one saved under an id no run has.
+    origin: MemoryOrigin | None = None
 
 
 class MemoryRewrite(FrozenModel):
