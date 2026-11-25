@@ -284,3 +284,23 @@ func points(of text: String) -> [String] {
     }
     .filter { !$0.isEmpty }
 }
+
+/// What one agent did of `view`: its runs and the rows its face wears (an agent's profile shows only its own work).
+func scoped(_ view: ActivityView, to agent: String) -> ActivityView {
+    func own(_ rows: [ActivityRow]) -> [ActivityRow] { rows.filter { $0.actorId == agent } }
+    return ActivityView(
+        waiting: own(view.waiting), working: own(view.working), endedDelegated: own(view.endedDelegated), recent: own(view.recent),
+        learnedToday: own(view.learnedToday), due: own(view.due), generatedAt: view.generatedAt)
+}
+
+/// "While you were away" of one agent: its runs among the newest the daemon listed, counted again; the decisions and
+/// the drafts, which the daemon counts for all of Dot, are left out.
+func scoped(_ view: AwayView, to agent: String) -> AwayView {
+    let runs: [AwayRun] = view.runs.filter { $0.agentId == agent }
+    let outcomes: [RunOutcome] = runs.map { RunOutcome(status: $0.status) }
+    return AwayView(
+        since: view.since, until: view.until, done: outcomes.filter { $0 == .done }.count, failed: outcomes.filter { $0 == .failed }.count,
+        cancelled: outcomes.filter { $0 == .stopped }.count, working: outcomes.filter { $0 == .working }.count,
+        campaignSessions: runs.filter(\.campaign).count, runs: runs,
+        decisions: AwayDecisions(reviewerApproved: 0, reviewerDenied: 0, yoloApproved: 0, yoloDenied: 0), decisionRuns: [], drafts: 0)
+}
