@@ -14,7 +14,13 @@ the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/Work
 dictation, Send / Queue / Steer / Stop), the queue sheet and the edit of a queued message, the run inspector, reactions.
 While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
 and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
-every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;
+every second whether events come or not. A new chat opens as soon as its first message is sent, under the outbox's
+key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
+while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
+once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
+(the app's model publishes the store's snapshot by part, at most 30 times a second), and the live thinking's last
+three lines are clipped from the top rather than cut at the head, so a new word never moves the words before it
+(item 1848). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
@@ -139,7 +145,11 @@ Build DotNext for the simulator signed locally (`CODE_SIGN_IDENTITY=-`, so it ha
 `http://127.0.0.1:18765` (debug builds only take a loopback address) and the code. The script's model replies by the
 message: `helper: …` starts a helper, `wait: …` waits in `wait_until`, `slow: …` takes 8 s. A debug launch with
 `-DotNextScene live-chat -DotNextProbe 20` sends 20 messages in the first chat and writes send → first event on screen
-to `Library/Caches/dotnext-latency.txt`.
+to `Library/Caches/dotnext-latency.txt`. `ios/Next/scripts/e2e_streaming.sh <udid> <derived data> [test] [video]`
+runs `StreamingLiveUITests` on such a daemon: a new chat stays open when its first message is sent, and the
+`stream:` script (four steps that think aloud and read a file, then a long answer, about 40 words a second) is measured
+by the debug frame meter (`-DotNextFrameMeter 1`: frames, hitches, frames over 16.7 ms, hitch time per second, one line
+per run in `Library/Caches/dotnext-frames.txt`).
 
 ## The chat's fixtures
 
@@ -147,7 +157,7 @@ Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtu
 JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`, `n2-editing`, `n2-failed`,
 `n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`. The UI tests (`UITests/ChatUITests.swift`, target
 `DotNextUITests`) run on them. The e2e daemon's script words for the chat: `approve:`, `question:`, `secret:`, `tools:`,
-`fail:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
+`fail:`, `stream:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
 
 ## Settings' fixtures and end to end
 

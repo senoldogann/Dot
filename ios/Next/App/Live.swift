@@ -122,16 +122,24 @@ struct ChatsTab: View {
     var body: some View {
         AdaptiveSplit(selection: $selection) {
             list
-        } detail: { thread in
-            ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
+        } detail: { id in
+            if model.startingChats[id] != nil {
+                StartingChat(key: id)
+            } else {
+                ChatScreen(thread: id, initialPanel: nil, editsFirstQueued: false)
+            }
         } placeholder: {
             EmptyState(
                 title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",
                 detail: String(localized: "Pick a chat on the left, or start a new one.", comment: "iPad detail column when no chat is selected"), actionTitle: nil, action: {})
                 .background(Tone.ground)
         }
-        .onChange(of: model.snapshot.list.rows.count) { _, count in
-            if opensFirstChat, selection == nil, count > 0 { selection = model.snapshot.list.ordered.first?.summary.id }
+        // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it (item 1849).
+        .onChange(of: selection.flatMap { model.startedChats[$0] }) { _, thread in
+            if let thread { selection = thread }
+        }
+        .onChange(of: model.list.rows.count) { _, count in
+            if opensFirstChat, selection == nil, count > 0 { selection = model.list.ordered.first?.summary.id }
         }
         .alert(String(localized: "Rename", comment: "Context menu of a chat"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField(String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), text: $newTitle)
@@ -152,7 +160,14 @@ struct ChatsTab: View {
                 deleting = nil
             }
         }
-        .sheet(isPresented: $composing) { NewChatSheet(close: { composing = false }) }
+        .sheet(isPresented: $composing) {
+            NewChatSheet(
+                close: { composing = false },
+                opened: { key in
+                    composing = false
+                    selection = key
+                })
+        }
     }
 
     /// Deletes at once when the owner turned the confirmation off (Settings › General › Confirmations).
@@ -162,7 +177,7 @@ struct ChatsTab: View {
 
     private var rows: [ThreadRow] {
         let words: String = query.trimmingCharacters(in: .whitespaces)
-        let all: [ThreadRow] = model.snapshot.list.ordered
+        let all: [ThreadRow] = model.list.ordered
         guard !words.isEmpty else { return all }
         return all.filter { $0.summary.title.localizedStandardContains(words) || $0.summary.lastMessage.localizedStandardContains(words) }
     }
@@ -172,7 +187,7 @@ struct ChatsTab: View {
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
             }
-            ForEach(model.snapshot.pendingChats) { pending in
+            ForEach(model.pendingChats) { pending in
                 VStack(alignment: .leading, spacing: Space.xxs) {
                     Text(pending.text).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(2)
                     Text(deliveryWords(pending.delivery)).textRole(.footnote).foregroundStyle(Tone.secondary)
@@ -189,11 +204,11 @@ struct ChatsTab: View {
         .overlay {
             if rows.isEmpty && !query.isEmpty {
                 ContentUnavailableView.search(text: query)
-            } else if rows.isEmpty, model.snapshot.list.freshness == .live {
+            } else if rows.isEmpty, model.list.freshness == .live {
                 EmptyState(
                     title: String(localized: "No chats yet", comment: "Chat list empty state title"), systemImage: "bubble.left.and.bubble.right",
                     detail: String(localized: "Start one with the pencil above.", comment: "Chat list empty state detail"), actionTitle: nil, action: {})
-            } else if rows.isEmpty, model.snapshot.list.freshness == .empty, model.snapshot.transport == .connecting {
+            } else if rows.isEmpty, model.list.freshness == .empty, model.transport == .connecting {
                 LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way"))
             }
         }
@@ -210,7 +225,7 @@ struct ChatsTab: View {
     /// The list's own line when it is not live (transport apart from freshness).
     private var listLine: String? {
         freshnessLine(
-            freshness: model.snapshot.list.freshness, transport: model.snapshot.transport, savedAt: model.snapshot.savedAt["list"], workingAt: nil, now: .now)
+            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
     }
 
     @ViewBuilder private func section(_ title: String, _ rows: [ThreadRow]) -> some View {
@@ -311,12 +326,15 @@ struct ChatRow: View {
     }
 }
 
-/// A new chat: the composer on an empty sheet (plan §4.2); it shows in the list at once from the outbox.
+/// A new chat: the composer on an empty sheet (plan §4.2); once sent, the chat opens at once under the outbox's key
+/// (item 1849) and shows in the list from the outbox.
 struct NewChatSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
     let close: () -> Void
+    /// The chat was kept in the outbox under this key: the sheet closes and the chat opens.
+    let opened: (String) -> Void
 
     var body: some View {
         VStack {
@@ -332,14 +350,45 @@ struct NewChatSheet: View {
                     guard !words.isEmpty else { return }
                     let photos: [Data] = attachments.map(\.jpeg)
                     Task {
-                        await model.startChat(words, photos: photos)
-                        close()
+                        if let key = await model.startChat(words, photos: photos) { opened(key) } else { close() }
                     }
                 }, model: nil, models: [:], chooseModel: nil, suggestions: .none)
             .padding(Space.s)
         }
         .padding(Space.gutter)
         .inspectorSheet(title: String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), close: close)
+    }
+}
+
+/// A new chat between its first send and the daemon's answer (item 1849): the owner's message where the chat shows it,
+/// with where it stands, under the chat's title; the list swaps it for the real chat, in place, once the daemon names it.
+struct StartingChat: View {
+    let key: String
+    @Environment(AppModel.self) private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
+
+    var body: some View {
+        let text: String = model.startingChats[key] ?? ""
+        let delivery: Delivery = model.pendingChats.first { $0.key == key }?.delivery ?? .delivered
+        ScrollView {
+            VStack(alignment: .trailing, spacing: Space.xxs) {
+                OwnerMessage(text: text)
+                Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, Space.gutter)
+            .padding(.vertical, Space.m)
+        }
+        .background(Tone.ground)
+        .navigationTitle(text)
+        .navigationSubtitle(ChatStatus.starting.word)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
+    }
+
+    private func refused(_ delivery: Delivery) -> Bool {
+        if case .rejected = delivery { return true }
+        return false
     }
 }
 
@@ -352,7 +401,7 @@ struct LiveAgentsSheet: View {
     @State private var stopping: Set<String> = []
 
     var body: some View {
-        let helpers: [HelperView] = model.snapshot.chats[thread]?.view?.helpers ?? []
+        let helpers: [HelperView] = model.chats[thread]?.view?.helpers ?? []
         Group {
             if helpers.isEmpty {
                 EmptyState(
@@ -396,8 +445,8 @@ enum LatencyProbe {
             let count: Int = UserDefaults.standard.integer(forKey: "DotNextProbe")
             guard count > 0 else { return }
             for number in 1...count {
-                while !(model.snapshot.chats[thread]?.freshness == .live
-                    && model.snapshot.chats[thread]?.view?.runs.contains(where: \.isActive) == false)
+                while !(model.chats[thread]?.freshness == .live
+                    && model.chats[thread]?.view?.runs.contains(where: \.isActive) == false)
                 {
                     try? await Task.sleep(for: .milliseconds(100))
                     if Task.isCancelled { return }

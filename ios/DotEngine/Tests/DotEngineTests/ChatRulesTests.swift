@@ -126,8 +126,9 @@ final class ChatRulesTests: XCTestCase {
         }
         XCTAssertEqual(chatPhase(of: view(false)), .working(since: 7))
         XCTAssertEqual(chatPhase(of: view(true)), .waitingOnYou, "an ask is never Working")
-        XCTAssertTrue(followsNewWords(distanceFromEnd: 40, viewport: 800))
-        XCTAssertFalse(followsNewWords(distanceFromEnd: 900, viewport: 800))
+        XCTAssertTrue(isAtEnd(distanceFromEnd: 0))
+        XCTAssertTrue(isAtEnd(distanceFromEnd: -150))
+        XCTAssertFalse(isAtEnd(distanceFromEnd: 120))
     }
 
     func testMarkdownBlocks() {

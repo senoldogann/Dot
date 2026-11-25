@@ -352,9 +352,10 @@ public func chatPhase(of view: ThreadView?) -> ChatPhase {
 
 // MARK: Scrolling
 
-/// Whether the transcript follows new words: only while the owner reads near its end (plan §13 S5).
-public func followsNewWords(distanceFromEnd: Double, viewport: Double) -> Bool {
-    distanceFromEnd <= max(80, viewport * 0.25)
+/// Whether the owner is at the transcript's end, where it follows new words (plan §13 S5, item 1848): a few points of
+/// slack, never a screenful, so a short scroll up to read is not pulled back down by the next word. Pure.
+public func isAtEnd(distanceFromEnd: Double) -> Bool {
+    distanceFromEnd <= 24
 }
 
 // MARK: Titles

@@ -14,7 +14,7 @@ struct QueueSheet: View {
     @State private var toast: ToastMessage?
     @State private var removal: [UUID: String] = [:]
 
-    private var queue: QueueView? { model.snapshot.chats[thread]?.view?.queue }
+    private var queue: QueueView? { model.chats[thread]?.view?.queue }
     private var messages: [QueuedMessageView] { (queue?.messages ?? []).filter { !removing.contains($0.id) } }
 
     var body: some View {
@@ -129,7 +129,7 @@ struct RunInspector: View {
     @State private var changes: RunChanges?
     @State private var preview: URL?
 
-    private var view: ThreadView? { model.snapshot.chats[thread]?.view }
+    private var view: ThreadView? { model.chats[thread]?.view }
     private var run: RunRecord? { view?.runs.last { $0.parentRunId == nil } }
 
     var body: some View {
@@ -203,7 +203,7 @@ struct RunInspector: View {
     }
 
     private var planSteps: [PlanStep]? {
-        guard let run, let events = model.snapshot.chats[thread]?.runs[run.id]?.events else { return nil }
+        guard let run, let events = model.chats[thread]?.runs[run.id]?.events else { return nil }
         guard let plan = events.last(where: { $0.kind == "plan" }) else { return nil }
         return (plan.data["steps"]?.array ?? []).compactMap { step in
             step["text"]?.string.map { PlanStep(text: $0, status: step["status"]?.string ?? "pending") }
@@ -212,7 +212,7 @@ struct RunInspector: View {
 
     /// The share of the model's context the newest step read.
     private var contextMeter: Double? {
-        guard let run, let events = model.snapshot.chats[thread]?.runs[run.id]?.events else { return nil }
+        guard let run, let events = model.chats[thread]?.runs[run.id]?.events else { return nil }
         guard let used = events.last(where: { $0.data["input_tokens"]?.int != nil })?.data["input_tokens"]?.int else { return nil }
         guard let window = model.models.flatMap(\.models).first(where: { $0.ref == run.model })?.contextLength, window > 0 else { return nil }
         return min(1, Double(used) / Double(window))
