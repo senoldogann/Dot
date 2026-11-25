@@ -963,7 +963,9 @@ a run and fails for one that neither has the triggers nor says why it is not a c
 **`GET /api/threads/{id}/view`** answers the chat's small state (`ThreadView`): `revision` (read first, so a change made
 while the rest is read moves the chat past it and is told), `thread`, `summary` (the list's row, `null` for a helper's
 chat), `runs` (its newest `tail` runs, 20 by default and 50 at most, oldest first; `older` says more are left, read with
-`before=<run id>`), `newest` (the newest run's page, as `GET /api/runs/{id}`; `null` with no events for a page read with `before`) and
+`before=<run id>`), `newest` (the newest run's page, as `GET /api/runs/{id}`, its `account` among it, item 1746: a step moves no revision,
+so a view kept by revision holds the account of its last move until the run ends; `null` with no events for a page read
+with `before`) and
 `newest_events` (the tail of its
 events, 200 at most, `newest_events_cut` when older ones were left out), `queue` (as `GET /api/threads/{id}/queue`),
 `asks` (the approvals and questions waiting, its helpers' among them), `helpers` (the runs its runs started in chats of
