@@ -1,5 +1,5 @@
 """The number the next roadmap item takes (items 540, 541 and 1891): one more than the highest that is held anywhere a
-session on this Mac or on GitHub may have put one, and it is reserved at once.
+session in this clone or on GitHub may have put one, and it is reserved at once.
 
 Where numbers are held:
 
@@ -10,8 +10,8 @@ Where numbers are held:
   (`item-<n>-...`), the subjects of their commits not on main and the entries those commits add;
 - every worktree of this repository: its checked-out commit (detached ones too) and the `roadmap/` and `changes/`
   files in its folder, committed or not;
-- the reservations file, `item-reservations.json` in the repository's common git directory, which every worktree on this
-  Mac shares: each number this script gave (with the branch it was given on and when) for three days.
+- the reservations file, `item-reservations.json` in the repository's common git directory, which every worktree of this
+  clone shares: each number this script gave (with the branch it was given on and when) for three days.
 
 Reading the reservations, taking the next numbers and writing them back happen under a lock
 (`item-reservations.lock`), so two sessions asking at the same moment never get the same number. A batch takes its
@@ -36,6 +36,7 @@ _TITLE: re.Pattern[str] = re.compile(r"\bItems? ([1-9]\d*(?:(?:, | and )[1-9]\d*
 _BRANCH: re.Pattern[str] = re.compile(r"\bitem-([1-9]\d*)\b")
 RESERVATION_DAYS: timedelta = timedelta(days=3)
 _CLOSED_PULLS: int = 100
+_OPEN_PULLS: int = 500
 
 
 def numbers_in(text: str) -> set[int]:
@@ -91,7 +92,14 @@ class SourceError(RuntimeError):
 def _read(path: Path) -> list[Reservation]:
     if not path.exists():
         return []
-    return [Reservation(**row) for row in json.loads(path.read_text(encoding="utf-8"))]
+    rows: list[dict[str, int | str]] = json.loads(path.read_text(encoding="utf-8"))
+    held: list[Reservation] = []
+    for row in rows:
+        number, branch, time = row["number"], row["branch"], row["time"]
+        if not (isinstance(number, int) and isinstance(branch, str) and isinstance(time, str)):
+            raise SourceError(f"{path} holds a reservation of the wrong shape: {row!r}; fix or delete that row")
+        held.append(Reservation(number, branch, time))
+    return held
 
 
 def reserve(directory: Path, found: dict[int, str], count: int, branch: str, now: datetime) -> list[Reservation]:
@@ -119,7 +127,11 @@ def _lines(*command: str) -> list[str]:
 def _pulls() -> list[str]:
     texts: list[str] = []
     fields: str = "title,body,headRefName"
-    for pull in json.loads("\n".join(_lines("gh", "pr", "list", "--state", "open", "--json", f"{fields},files"))):
+    for pull in json.loads(
+        "\n".join(
+            _lines("gh", "pr", "list", "--state", "open", "--limit", str(_OPEN_PULLS), "--json", f"{fields},files")
+        )
+    ):
         texts.extend([pull["title"], pull["body"], pull["headRefName"], *(file["path"] for file in pull["files"])])
     closed: list[str] = _lines("gh", "pr", "list", "--state", "closed", "--limit", str(_CLOSED_PULLS), "--json", fields)
     for pull in json.loads("\n".join(closed)):
@@ -173,10 +185,10 @@ def main(arguments: list[str]) -> int:
     try:
         directory, branch = _here()
         found: dict[int, str] = taken(*_sources())
-    except (SourceError, OSError, KeyError, ValueError) as error:
+        given: list[Reservation] = reserve(directory, found, count, branch, datetime.now(UTC))
+    except (SourceError, OSError, KeyError, ValueError, TypeError) as error:
         print(f"next_item: {error}; no number is given, as it could collide with one it did not see", file=sys.stderr)
         return 1
-    given: list[Reservation] = reserve(directory, found, count, branch, datetime.now(UTC))
     print(" ".join(str(held.number) for held in given))
     if found:
         highest: int = max(found)

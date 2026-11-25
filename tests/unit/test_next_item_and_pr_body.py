@@ -183,6 +183,18 @@ def test_the_script_refuses_a_count_that_is_no_number_and_gives_none_when_a_sour
     assert not (places.common / "item-reservations.json").exists()
 
 
+def test_a_broken_reservations_file_gives_no_number(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    places: _Places = _places(tmp_path)
+    broken: str = '[{"number": "1890", "branch": "x", "time": "2026-11-25T00:00:00+00:00"}]'
+    (places.common / "item-reservations.json").write_text(broken, encoding="utf-8")
+    _fake_sources(monkeypatch, places)
+    assert next_item.main([]) == 1
+    printed = capsys.readouterr()
+    assert printed.out == "" and "wrong shape" in printed.err and "no number is given" in printed.err
+
+
 def test_concurrent_callers_never_get_the_same_number(tmp_path: Path) -> None:
     now: datetime = datetime(2026, 11, 25, tzinfo=UTC)
 
