@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
+from dotagent.agent.account import RunAccount, result_fact, run_account
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.budget import loosens, run_budget
@@ -18,6 +19,7 @@ from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secr
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import save_playbook
 from dotagent.agent.recap import RecapView, recap_view, write_recap
 from dotagent.agent.resume import cut_off_by
@@ -155,6 +157,19 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
     )
 
 
+# The most tool results of a run its account reads (item 1746), the newest.
+_ACCOUNT_RESULTS: int = 5000
+
+
+async def _account_of(store: Store, run_id: str) -> RunAccount:
+    """What the run did by its record (item 1746): its tool results, without their text, and its newest plan."""
+    results: list[EventRecord] = await store.tool_results_without_text(run_id, 0, _ACCOUNT_RESULTS)
+    latest: EventRecord | None = await store.last_event(run_id, PLAN_EVENT)
+    return run_account(
+        [result_fact(event) for event in results], EMPTY_PLAN if latest is None else plan_from_event(latest)
+    )
+
+
 async def _campaign_of(store: Store, run: RunRecord) -> CampaignChip | None:
     if run.campaign_id is None:
         return None
@@ -187,6 +202,7 @@ async def run_detail(ctx: ServerContext, run_id: str) -> RunDetail:
         disliked=await disliked_of(store, run_id),
         questions=await store.list_left_questions(run_id),
         campaign=await _campaign_of(store, run),
+        account=await _account_of(store, run_id),
         held=ctx.manager.held(run_id),
         holding=ctx.manager.holding(run_id),
         agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
@@ -386,6 +402,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             edits=file_edits(plan.steps),
             ended=not active_run_ids(runs) and run_id not in ctx.manager.active_run_ids(),
             outside=outside_steps(await store.ran_steps(run_id)),
+            account=await _account_of(store, run_id),
         )
 
     @router.get("/runs/{run_id}/actions")
@@ -567,7 +584,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         minutes: int = max(1, round(request.quiet_s / 60))
         goal: str = " ".join(run.goal.split())[:120]
         await tell_owner(
-            ctx.runtime.bus, "A task makes no progress", f"{minutes} min with no step: {goal}", f"#/runs/{run.id}"
+            ctx.runtime.bus,
+            "A task makes no progress",
+            f"{minutes} min with no step: {goal}",
+            f"#/runs/{run.id}",
+            "system",
+            "",
         )
         log.warning("run_stuck_told", run_id=run.id, quiet_s=request.quiet_s)
         return StuckView(told=True)

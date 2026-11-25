@@ -63,6 +63,8 @@ async def tell_if_due(runtime: Runtime, now: float, started_at: float = PROCESS_
         NOTICE_TITLE,
         f"A restart of Dot has waited for {int((now - flag.since) // 60)} minutes. {text}",
         route,
+        "system",
+        "",
     )
     await runtime.store.kv_set(TOLD_KEY, repr(flag.since))
     log.info("restart_waiting_told", since=flag.since, waiting_for=flag.waiting_for)

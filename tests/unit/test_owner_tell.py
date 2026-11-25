@@ -17,11 +17,11 @@ from dotagent.store.models import EventRecord
 
 def test_a_tell_is_one_line_of_limited_size_and_keeps_its_route() -> None:
     long: str = "word " * 200
-    tell: OwnerTold = told("  Bank\nmail ", f"From the bank:\n\n{long}", "#/runs/run_1")
+    tell: OwnerTold = told("  Bank\nmail ", f"From the bank:\n\n{long}", "#/runs/run_1", "watcher", "w1")
     assert tell.title == "Bank mail"
     assert "\n" not in tell.text and len(tell.text) == TEXT_CHARS and tell.text.endswith("…")
     assert tell.url == "#/runs/run_1"
-    assert len(told("t" * 500, "x", "#/runs/run_1").title) == TITLE_CHARS
+    assert len(told("t" * 500, "x", "#/runs/run_1", "system", "").title) == TITLE_CHARS
 
 
 @pytest.mark.parametrize(
@@ -40,7 +40,7 @@ def test_a_tell_is_one_line_of_limited_size_and_keeps_its_route() -> None:
 )
 def test_a_tell_opens_only_a_route_of_dots_own_pages(url: str) -> None:
     with pytest.raises(InvalidValueError, match="route of Dot's own pages"):
-        told("Title", "Text", url)
+        told("Title", "Text", url, "system", "")
 
 
 def test_the_phone_and_the_pages_both_take_the_tell() -> None:
@@ -50,7 +50,7 @@ def test_the_phone_and_the_pages_both_take_the_tell() -> None:
         run_id=SYSTEM_RUN_ID,
         ts=1.0,
         kind=OWNER_TOLD_EVENT,
-        data=told("Landlord", "Re: rent " + "x" * 400, "#/runs/run_2").model_dump(),
+        data=told("Landlord", "Re: rent " + "x" * 400, "#/runs/run_2", "watcher", "w2").model_dump(),
     )
     message: PushMessage | None = notice_message(event)
     assert message is not None
@@ -63,11 +63,17 @@ async def test_a_tell_is_an_event_of_dot_itself_that_is_not_stored(tmp_path: Pat
     try:
         bus: EventBus = EventBus(store)
         async with bus.subscribe(SYSTEM_RUN_ID) as feed:
-            await tell_owner(bus, "Your morning brief", "Nothing needs you.", "#/runs/run_3")
+            await tell_owner(bus, "Your morning brief", "Nothing needs you.", "#/runs/run_3", "brief", "")
             event: EventRecord = feed.queue.get_nowait()
         assert (event.run_id, event.kind, event.id) == (SYSTEM_RUN_ID, OWNER_TOLD_EVENT, 0)
-        assert event.data == {"title": "Your morning brief", "text": "Nothing needs you.", "url": "#/runs/run_3"}
+        assert event.data == {
+            "title": "Your morning brief",
+            "text": "Nothing needs you.",
+            "url": "#/runs/run_3",
+            "kind": "brief",
+            "subject": "",
+        }
         with pytest.raises(InvalidValueError):
-            await tell_owner(bus, "Title", "Text", "https://example.com/")
+            await tell_owner(bus, "Title", "Text", "https://example.com/", "system", "")
     finally:
         await store.close()

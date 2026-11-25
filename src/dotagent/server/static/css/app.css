@@ -5339,6 +5339,16 @@ dialog.modal.versions-dialog {
   white-space: nowrap;
 }
 
+/* A done step no tool result of the run shows (item 1745): a word, in the muted ink, never a colour alone. */
+.plan-step .unshown {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
 /* What the run observed that closed the step; the goal check reads the same text. */
 .plan-step .evidence {
   font-size: var(--text-sm);
@@ -7496,6 +7506,19 @@ summary:has(> .chev)::-webkit-details-marker {
   min-width: 0;
   color: var(--muted);
   font-size: var(--text-xs);
+}
+
+/* What the run's record says it checked, sent and left open (item 1746), under the line of what it ran. */
+.run-changes-account {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.run-changes-account p {
+  margin: 0;
 }
 
 /* What a task at work has used so far (item 1403), above the details of the Cost card: its own quiet block. */

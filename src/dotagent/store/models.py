@@ -764,7 +764,7 @@ class MemoryRecord(FrozenModel):
     merged note was made of, ``merged_into`` the merged note a resting one was merged into, ``pinned_at`` is when the
     owner pinned the note (it never rests) and ``rested_at`` when it began to rest. ``edited_by`` is
     :data:`OWNER_EDIT` when the owner later corrected a note a run wrote. ``proposed`` is a run's rewrite of a note the
-    owner wrote or approved, which waits for them."""
+    owner wrote or approved, which waits for them. ``subject`` is the slot the saving run named (item 1729)."""
 
     id: str
     content: str
@@ -789,6 +789,9 @@ class MemoryRecord(FrozenModel):
     # A run's rewrite that waits for the owner, when the note is the owner's (written, pinned or corrected by them);
     # ``None`` otherwise, and on every note stored before the columns.
     proposed: ProposedChange | None = None
+    # What the run that saved the note said it is about (item 1729): a newer note of the same subject replaces it.
+    # ``None`` for a note saved with no subject, and on every note stored before the column.
+    subject: str | None = None
 
 
 class MemoryRewrite(FrozenModel):

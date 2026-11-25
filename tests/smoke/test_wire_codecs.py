@@ -65,11 +65,11 @@ LIVE_MODEL: str = "gpt-oss:20b-cloud"
 VISION_MODEL: str = "gemma4:cloud"
 # What OpenCode Go's messages route sends: a plain thinking switch, no cache marks, and its own output limit.
 GO_MESSAGES: MessagesOptions = MessagesOptions(
-    adaptive_thinking=False, prompt_cache=False, settled_mark=False, default_max_tokens=32768
+    adaptive_thinking=False, prompt_cache=False, settled_mark=False, default_max_tokens=32768, long_ttl=False
 )
 # What the Anthropic connector sends: adaptive thinking at the reasoning level, the prompt cache, the model's own limit.
 CLAUDE_MESSAGES: MessagesOptions = MessagesOptions(
-    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
+    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None, long_ttl=True
 )
 # What OpenCode Go's chat route sends: ``max_tokens``, the thinking of a turn carried back as ``reasoning_content``.
 GO_CHAT: ChatOptions = ChatOptions(

@@ -782,16 +782,19 @@ async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int
 _PULSE_SCRIPT: str = """() => {
   const w = window;
   if (!w.__dotPulse) {
-    w.__dotPulse = { changes: 0 };
+    // `last` is when the page last changed (item 1744): a page that changes by itself tells nothing by a change.
+    w.__dotPulse = { changes: 0, last: null };
     try {
-      new MutationObserver((list) => { w.__dotPulse.changes += list.length; })
+      const changed = (count) => { w.__dotPulse.changes += count; w.__dotPulse.last = performance.now(); };
+      new MutationObserver((list) => changed(list.length))
         .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
       // What changes a page with no mutation: a box ticked, a field typed in, a <details> opened.
       for (const kind of ["input", "change", "toggle"]) {
-        document.addEventListener(kind, () => { w.__dotPulse.changes += 1; }, true);
+        document.addEventListener(kind, () => changed(1), true);
       }
     } catch (error) { w.__dotPulse.changes = -1; }
   }
+  const quiet = w.__dotPulse.last === null ? null : performance.now() - w.__dotPulse.last;
   const shown = (el) => { const box = el.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
   const words = (el) => (el.innerText || el.textContent || "").trim().replace(/\\s+/g, " ").slice(0, 160);
   const alerts = [...document.querySelectorAll("[role=alert], [aria-live=assertive], [aria-live=polite]")]
@@ -833,7 +836,7 @@ _PULSE_SCRIPT: str = """() => {
     }
     return `${path.join(".")}:${caret}`;
   };
-  return { changes: w.__dotPulse.changes, alerts, invalid, focus: focusOf() };
+  return { changes: w.__dotPulse.changes, alerts, invalid, focus: focusOf(), quiet };
 }"""
 _PULSE_FRAMES: int = 10
 _PULSE_TIMEOUT_S: float = 1.0
@@ -843,12 +846,16 @@ _PULSE_TIMEOUT_S: float = 1.0
 class Pulse:
     """The page as :data:`_PULSE_SCRIPT` reads it: the changes its documents had (``None`` when one could not be
     read, which then counts as a change), what it shows of alerts and invalid fields, and where the keyboard is in
-    each frame when that is a field (``focus``, empty for a frame whose keyboard is not in one; item 1142)."""
+    each frame when that is a field (``focus``, empty for a frame whose keyboard is not in one; item 1142), and how
+    long ago it last changed (``quiet_ms``)."""
 
     changes: int | None
     alerts: tuple[str, ...]
     invalid: tuple[str, ...]
     focus: tuple[str, ...] = ()
+    # How long ago, in milliseconds, any frame read last changed (item 1744): ``None`` when none changed since Dot first
+    # asked, which says nothing of what came before.
+    quiet_ms: float | None = None
 
 
 def focus_landed(before: tuple[str, ...], after: tuple[str, ...]) -> bool:
@@ -881,6 +888,7 @@ async def page_pulse(page: Page) -> Pulse:
     alerts: list[str] = []
     invalid: list[str] = []
     focus: list[str] = []
+    quiet: list[float] = []
     for answer in answers:
         # One slot per frame, in order, so a frame that cannot be read does not shift the field of the next.
         if not isinstance(answer, dict) or not isinstance(answer.get("changes"), int) or answer["changes"] < 0:
@@ -893,11 +901,15 @@ async def page_pulse(page: Page) -> Pulse:
         invalid.extend(str(one) for one in answer.get("invalid") or [] if isinstance(one, str))
         where: object = answer.get("focus")
         focus.append(where if isinstance(where, str) else "")
+        since: object = answer.get("quiet")
+        if isinstance(since, int | float):
+            quiet.append(float(since))
     return Pulse(
         changes=changes,
         alerts=tuple(dict.fromkeys(alerts)),
         invalid=tuple(dict.fromkeys(invalid)),
         focus=tuple(focus),
+        quiet_ms=min(quiet) if quiet else None,
     )
 
 

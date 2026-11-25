@@ -6,7 +6,8 @@
 // back, and nothing for a run that changed no file. A command's own writes are in no journal and so not here
 // (docs/autonomy.md); the run's own notes are left out. A run that also acted with a tool the journal does not hold (a
 // command, the browser, the screen, a message) says how many such steps it ran and that Undo cannot take them back, with
-// no claim of what they did (item 1404); that line stands alone for a run that changed no file.
+// no claim of what they did (item 1404); that line stands alone for a run that changed no file. Under it, what the run's
+// record says it checked, sent and left open (item 1746), never what the model said of it.
 
 import { api } from "./api.js";
 import { el, plural, requestFile } from "./dom.js";
@@ -67,6 +68,37 @@ export function outsideWords(outside) {
   return `Dot also ran ${list}. Undo takes back files only, so it cannot take ${total === 1 ? "this" : "these"} back.`;
 }
 
+/**
+ * What the run did by its record, not by its model (item 1746), from `account` of `GET /runs/{id}/actions`: how many
+ * browser and desktop steps were seen to hold and how many were not, how many things it sent, and the plan steps it
+ * marked done that no tool result shows and those it left open. A list of sentences, empty when there is nothing to
+ * say.
+ */
+export function accountWords(account) {
+  const words = [];
+  const acts = account.acts;
+  const unseen = acts.contradicted + acts.uncertain + acts.not_checked;
+  if (acts.verified + unseen + acts.failed > 0) {
+    const parts = [
+      acts.not_checked === 0 ? "" : `${acts.not_checked} not checked`,
+      acts.uncertain === 0 ? "" : `${acts.uncertain} uncertain`,
+      acts.contradicted === 0 ? "" : `${acts.contradicted} contradicted`,
+    ].filter((part) => part !== "");
+    const failed = acts.failed === 0 ? "" : ` ${plural(acts.failed, "step", "steps")} failed.`;
+    words.push(`Checked on the page or the screen: ${acts.verified} seen to hold${unseen === 0 ? "" : `, ${unseen} not (${parts.join(", ")})`}.${failed}`);
+  }
+  if (account.sent_count > 0) {
+    words.push(`Sent ${plural(account.sent_count, "thing", "things")}: ${account.sent.join("; ")}.`);
+  }
+  if (account.unshown.length > 0) {
+    words.push(`Marked done with no tool result that shows it: ${account.unshown.join("; ")}.`);
+  }
+  if (account.open_steps.length > 0) {
+    words.push(`Left open: ${account.open_steps.join("; ")}.`);
+  }
+  return words;
+}
+
 /** What Undo asks before it takes `ready` back, of `shown`: what goes back, what is deleted, what stays. */
 export function undoQuestion(ready, shown) {
   const deleted = ready.filter((edit) => edit.action === "delete").length;
@@ -112,10 +144,14 @@ export function runChangesCard({ runId, onReview, onUndone }) {
     // A daemon older than item 1404 sends no `outside`: no such line then.
     const outside = outsideWords(actions.outside ?? []);
     const outsideLine = outside === "" ? null : el("div", { class: "run-changes-outside", dataset: { outside: "" } }, outside);
+    // A daemon older than item 1746 sends no `account`: no such lines then.
+    const account = actions.account === undefined ? [] : accountWords(actions.account);
+    const accountLine =
+      account.length === 0 ? null : el("div", { class: "run-changes-account", dataset: { account: "" } }, ...account.map((line) => el("p", null, line)));
     if (shown.length === 0) {
       const taken = undone ? [icon("undo"), el("span", { class: "run-changes-words" }, "Its file changes were taken back.")] : [];
-      element.replaceChildren(...taken, ...(outsideLine === null ? [] : [outsideLine]));
-      element.hidden = !undone && outsideLine === null;
+      element.replaceChildren(...taken, ...[outsideLine, accountLine].filter((part) => part !== null));
+      element.hidden = !undone && outsideLine === null && accountLine === null;
       return;
     }
     const named = shown.slice(0, NAMED).map((edit) =>
@@ -150,6 +186,7 @@ export function runChangesCard({ runId, onReview, onUndone }) {
           undo,
         ),
         outsideLine,
+        accountLine,
       ].filter((part) => part !== null),
     );
     element.hidden = false;

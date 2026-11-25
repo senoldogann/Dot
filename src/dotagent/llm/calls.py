@@ -83,6 +83,8 @@ class ModelCall(FrozenModel):
     output_tokens: int
     cached_tokens: int
     error: str | None
+    # What the provider wrote to its cache (item 1742): 0 for a provider that reports none; counted inside the input.
+    cache_write_tokens: int = 0
 
 
 CallRecorder = Callable[[ModelCall], Awaitable[None]]
@@ -98,6 +100,7 @@ def call_event_data(call: ModelCall) -> JsonObject:
         "input_tokens": call.input_tokens,
         "output_tokens": call.output_tokens,
         "cached_tokens": call.cached_tokens,
+        "cache_write_tokens": call.cache_write_tokens,
         "error": call.error,
     }
 

@@ -28,6 +28,7 @@ from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ActOutcome, PageView, SecretField, SecretFieldCheck, Step, StepReport
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
+from dotagent.core.outcomes import PAGE_REACTED
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -546,7 +547,11 @@ async def test_a_step_says_what_its_page_sent_and_what_the_server_answered(
         "sent", [Step(action="click", ref=_ref(view, "Send", "button"))], False, refuse_secret_field, True
     )
     (click,) = outcome.steps
-    assert (click.outcome, click.checks) == ("done", ())
+    # The 200 is no check of what the click was for; that the page reacted is (item 1744), and says no more.
+    assert (click.outcome, [(check.condition, check.status, check.evidence) for check in click.checks]) == (
+        "done",
+        [(PAGE_REACTED, "verified", "it sent a request")],
+    )
     assert click.detail == f"its page sent POST {_address(site)}/submit → 200"
     assert outcome.stopped is None and len(site.orders) == 1
     # A beacon is not what a step was for: the page never reads its answer, so the step neither names nor awaits it.

@@ -384,6 +384,14 @@ class EvalToolsCommand(FrozenModel):
     repeat: int = Field(ge=1)
 
 
+class EvalMemoryCommand(FrozenModel):
+    """`dotx eval memory` (item 1728): the memory benchmark with ``scripted`` embeddings or the ``configured`` model of
+    ``[memory]``; no model is asked to write or to judge."""
+
+    name: Literal["eval-memory"]
+    embeddings: Literal["scripted", "configured"]
+
+
 class EvalSpeedCommand(FrozenModel):
     """`dotx eval speed` (item 1037): the speed set played on ``model``, ``repeat`` times each, and its table; or, with
     ``reports``, the table of saved reports (two: a baseline and a later run, side by side), playing nothing."""
@@ -599,6 +607,7 @@ type Command = Annotated[
     | EvalFromRunCommand
     | EvalRunCommand
     | EvalToolsCommand
+    | EvalMemoryCommand
     | EvalSpeedCommand
     | EvalReportCommand
     | StatsCommand

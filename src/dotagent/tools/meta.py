@@ -7,6 +7,7 @@ from typing import Annotated, Literal, Self, get_args
 
 from pydantic import AfterValidator, Field, StringConstraints, model_validator
 
+from dotagent.agent.account import ResultFact, StepProof, opened_after, proof_words, result_fact, step_proof, with_proof
 from dotagent.agent.approvals import ApprovalOutcome
 from dotagent.agent.held_secrets import SECRET_SEVERITY, checked_name, held_secrets
 from dotagent.agent.plan import (
@@ -28,7 +29,7 @@ from dotagent.agent.plan import (
 from dotagent.agent.questions import Option, QuestionOption, answered
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
-from dotagent.core.types import JsonObject
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.policy.types import ActionInfo
 from dotagent.server import UI_SOURCE
 from dotagent.store.models import EventRecord, RunMode
@@ -422,11 +423,67 @@ async def _latest_plan(ctx: ToolContext) -> PlanPayload:
     return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
 
-async def _record_plan(ctx: ToolContext, plan: PlanPayload) -> ToolResult:
+# How many of the run's plans and tool results the judgement of a step done reads at most (item 1745).
+_PLANS_READ: int = 200
+_RESULTS_READ: int = 2000
+
+
+def _same_step(text: str) -> str:
+    return text.strip().casefold()
+
+
+class _Judged(FrozenModel):
+    """The steps once judged, and what the result says of those newly judged that no tool result shows."""
+
+    steps: tuple[PlanItem, ...]
+    note: str
+
+
+async def _judged(
+    ctx: ToolContext, steps: tuple[PlanItem, ...], previous: tuple[PlanItem, ...], candidates: frozenset[int]
+) -> _Judged:
+    """``steps`` with each step done and not judged yet among ``candidates`` (0-based) judged against the run's record
+    (item 1745): by the tool results of the time it was open (``agent.account``). A step the previous plan held done
+    with the same text keeps how it stood there; a step a helper's report closed is no candidate."""
+    held: dict[str, PlanItem] = {_same_step(step.text): step for step in previous if step.status == "done"}
+    kept: tuple[PlanItem, ...] = tuple(
+        step.model_copy(
+            update={"proof": held[_same_step(step.text)].proof, "shown_by": held[_same_step(step.text)].shown_by}
+        )
+        if step.status == "done" and not step.proof and _same_step(step.text) in held
+        else step
+        for step in steps
+    )
+    wanted: list[int] = [
+        index
+        for index, step in enumerate(kept)
+        if index in candidates and step.status == "done" and not step.proof and _same_step(step.text) not in held
+    ]
+    if not wanted:
+        return _Judged(steps=kept, note="")
+    events: list[EventRecord] = await ctx.runtime.store.events_of_kind(ctx.run_id, PLAN_EVENT, _PLANS_READ)
+    plans: list[tuple[int, PlanPayload]] = [(event.id, plan_from_event(event)) for event in events]
+    starts: dict[int, int] = {index: opened_after(plans, kept[index].text) for index in wanted}
+    facts: list[ResultFact] = [
+        result_fact(event)
+        for event in await ctx.runtime.store.tool_results_without_text(ctx.run_id, min(starts.values()), _RESULTS_READ)
+    ]
+    proofs: dict[int, StepProof] = {
+        index: step_proof([fact for fact in facts if fact.event_id > start]) for index, start in starts.items()
+    }
+    return _Judged(
+        steps=tuple(with_proof(step, proofs[index]) if index in proofs else step for index, step in enumerate(kept)),
+        note="\n".join(words for index, proof in proofs.items() if (words := proof_words(index + 1, proof))),
+    )
+
+
+async def _record_plan(ctx: ToolContext, plan: PlanPayload, note: str) -> ToolResult:
+    """Record ``plan`` and say it back, with ``note`` (what the judgement of the steps just marked done found, item
+    1745; empty when there is nothing to say) after it."""
     await ctx.runtime.bus.emit(ctx.run_id, PLAN_EVENT, plan_event_data(plan), True)
     readiness: str = readiness_lines(plan.steps)
     text: str = f"Plan recorded ({count_done(plan.steps)}/{len(plan.steps)} done):\n{plan_lines(plan)}"
-    return ok(f"{text}\n{readiness}" if readiness else text)
+    return ok("\n".join(part for part in (text, readiness, note) if part))
 
 
 def _update_plan_tool() -> RegisteredTool:
@@ -440,7 +497,13 @@ def _update_plan_tool() -> RegisteredTool:
             PlanItem(text=step.text, status=step.status, evidence=step.evidence, depends_on=tuple(step.depends_on))
             for step in args.steps
         )
-        steps: tuple[PlanItem, ...] = checked_dependencies(rewritten_steps(previous.steps, given))
+        judged: _Judged = await _judged(
+            ctx,
+            checked_dependencies(rewritten_steps(previous.steps, given)),
+            previous.steps,
+            frozenset(range(len(given))),
+        )
+        steps: tuple[PlanItem, ...] = judged.steps
         plan: PlanPayload = PlanPayload(steps=steps, targets=targets)
         # The independent steps with a brief go to helpers at once (item 927), by the plan rather than the model.
         briefs: dict[int, str] = {
@@ -449,14 +512,14 @@ def _update_plan_tool() -> RegisteredTool:
         most: int = ctx.runtime.config.agent.fan_out
         ready: list[int] = ready_steps(steps, briefs)[:most]
         if len(ready) < 2 or not await _hands_on(ctx):
-            return await _record_plan(ctx, plan)
+            return await _record_plan(ctx, plan, judged.note)
         working: tuple[PlanItem, ...] = tuple(
             step.model_copy(update={"status": "in_progress"}) if index in ready else step
             for index, step in enumerate(steps)
         )
-        await _record_plan(ctx, plan.model_copy(update={"steps": working}))
+        await _record_plan(ctx, plan.model_copy(update={"steps": working}), "")
         done: FannedOut = await fan_out(ctx, plan, ready, briefs)
-        recorded: ToolResult = await _record_plan(ctx, done.plan)
+        recorded: ToolResult = await _record_plan(ctx, done.plan, judged.note)
         reports: str = "\n\n".join(f"Step {number}, by its helper:\n{result.text}" for number, result in done.results)
         text: str = f"Steps {', '.join(str(index + 1) for index in ready)} ran at once as helpers.\n{recorded.text}"
         result: ToolResult = ok(f"{text}\n\n{reports}" if reports else text)
@@ -498,7 +561,8 @@ def _mark_plan_step_tool() -> RegisteredTool:
         steps: tuple[PlanItem, ...] = with_step_status(
             current.steps, args.step, args.status, args.evidence, reopen=True
         )
-        return await _record_plan(ctx, current.model_copy(update={"steps": steps}))
+        judged: _Judged = await _judged(ctx, steps, (), frozenset({args.step - 1}))
+        return await _record_plan(ctx, current.model_copy(update={"steps": judged.steps}), judged.note)
 
     return make_tool(
         name=MARK_PLAN_STEP_TOOL,

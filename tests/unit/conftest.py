@@ -25,6 +25,7 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_notes_file.py",
     "test_open_plan_finish.py",
     "test_page_by_path.py",
+    "test_plan_proof.py",
     "test_read_pdf.py",
     "test_service_install_from_a_terminal.py",
     "test_shell_guard_awk.py",

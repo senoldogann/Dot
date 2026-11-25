@@ -20,6 +20,7 @@ from dotagent.agent.attachments import (
     message_with_attachments,
     steer_event,
 )
+from dotagent.agent.cache_report import cache_ttl_for
 from dotagent.agent.campaign import session_number
 from dotagent.agent.compact import (
     drop_old_images,
@@ -233,6 +234,7 @@ from dotagent.llm.reach import OFFLINE, host_of, out_of_reach
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref, unavailable_reason
 from dotagent.llm.traits import effective_effort
 from dotagent.llm.types import (
+    CacheTtl,
     ChatRequest,
     DeltaSink,
     Effort,
@@ -2549,6 +2551,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     peers_said: str = ""
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
     query: str = await goal_query(runtime, run)
+    # How long the run's cache is written for (item 1742): an hour for a chat that comes back at the pace of a schedule
+    # or a watcher, which the provider's five minutes lose.
+    last_called: float | None = await runtime.store.thread_last_call_at(run.thread_id, run.id)
+    cache_ttl: CacheTtl = cache_ttl_for(None if last_called is None else time.time() - last_called)
     recalled: Remembered = await start_notes(runtime, run, query, notes_budget)
     # The secrets Dot holds, which the texts a prompt takes from what Dot learned are asked for again, as when they
     # were written (item 587). A gate refuses by a value, so the values filled into a page are not among them (item
@@ -3047,6 +3053,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             prompt_reuse="conversation",
             # The window the run planned with as it started (item 520): a context size chosen since does not change it.
             window=scaffold.window if routed is None else routed.scaffold.window,
+            cache_ttl=cache_ttl,
         )
         if not parts_told:
             parts_told = True

@@ -35,6 +35,14 @@ from dotagent.core.text import fold_search, plain_line
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, Effort, ImageData, Message, OneMessage, Speed
+from dotagent.notify.tells import (
+    TELL_RESPONSE_EVENT,
+    TELL_SENT_EVENT,
+    TELLS_RUN_ID,
+    OwnerAct,
+    TellResponse,
+    TellSent,
+)
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
@@ -405,6 +413,8 @@ _PAGE_ID_BYTES: int = 18
 # A chat's last line in the sidebar (item 277): how many characters it keeps, and how many of the latest run's message
 # and answer are read for it (a fence or a heading at the start of an answer takes some of them).
 _LAST_MESSAGE_CHARS: int = 160
+# How many ids one ``IN (...)`` of a query takes (SQLite's own limit is far above).
+_IN_CHUNK: int = 500
 _LAST_MESSAGE_READ_CHARS: int = 1000
 # A run and the later runs still in its chat, oldest first: what a rewind to before the run takes out (item 282). Its
 # two parameters are the run's id.
@@ -1190,6 +1200,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         rested_at=row["rested_at"],
         edited_by=row["edited_by"],
         proposed=_proposed_change(row),
+        subject=row["subject"],
     )
 
 
@@ -1377,6 +1388,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("proposed_by", "TEXT"),
     ("proposed_tainted", "INTEGER"),
     ("proposed_at", "REAL"),
+    # The subject a run gave a note when it saved it (item 1729): a newer note of the same subject replaces it. NULL for
+    # a note saved with none, and for every note stored before the column.
+    ("subject", "TEXT"),
 )
 # The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
 _LESSON_SAVES_KEY: str = "lessons.saved"
@@ -4441,6 +4455,60 @@ class Store:
         )
         return None if row is None else _event(row)
 
+    async def thread_last_call_at(self, thread_id: str, run_id: str) -> float | None:
+        """When a model last answered in a run of the chat ``thread_id`` other than ``run_id`` (item 1742), or ``None``
+        when the chat has had no call: how long ago the provider's cache of the chat was last written or read."""
+        row = await self._one(
+            "SELECT MAX(e.ts) AS last FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            " WHERE r.thread_id = ? AND r.id != ? AND e.kind = ?",
+            (thread_id, run_id, CALL_EVENT),
+        )
+        return None if row is None or row["last"] is None else float(row["last"])
+
+    async def add_tell_event(self, kind: str, data: JsonObject) -> None:
+        """Keep a tell or the owner's answer to one (item 1743) as an event under :data:`TELLS_RUN_ID`: the events
+        table is where tells are kept, so that the store gains no table."""
+        await self.add_event(TELLS_RUN_ID, kind, data)
+
+    async def tells_since(self, since: float) -> list[TellSent]:
+        """The tells that went out since ``since``, the oldest first."""
+        rows = await self._all(
+            "SELECT ts, data FROM events WHERE run_id = ? AND kind = ? AND ts >= ? ORDER BY id",
+            (TELLS_RUN_ID, TELL_SENT_EVENT, since),
+        )
+        return [TellSent.model_validate({**parse_json_object(row["data"], "tell"), "ts": row["ts"]}) for row in rows]
+
+    async def tell_responses_since(self, since: float) -> list[TellResponse]:
+        """The owner's answers to tells made since ``since``, the oldest first."""
+        rows = await self._all(
+            "SELECT ts, data FROM events WHERE run_id = ? AND kind = ? AND ts >= ? ORDER BY id",
+            (TELLS_RUN_ID, TELL_RESPONSE_EVENT, since),
+        )
+        return [
+            TellResponse.model_validate({**parse_json_object(row["data"], "tell"), "ts": row["ts"]}) for row in rows
+        ]
+
+    async def owner_acts_since(self, since: float, sources: Sequence[str]) -> list[OwnerAct]:
+        """What the owner did in a chat since ``since``: the runs their own messages started (``sources``) and the
+        reactions they put on messages of Dot's, each with its chat."""
+        marks: str = ",".join("?" for _ in sources)
+        runs = await self._all(
+            f"SELECT thread_id, created_at AS ts FROM runs WHERE created_at >= ? AND source IN ({marks})",
+            (since, *sources),
+        )
+        reactions = await self._all("SELECT thread_id, created_at AS ts FROM reactions WHERE created_at >= ?", (since,))
+        return [OwnerAct(thread_id=str(row["thread_id"]), ts=float(row["ts"])) for row in (*runs, *reactions)]
+
+    async def threads_of_runs(self, run_ids: Sequence[str]) -> dict[str, str]:
+        """The chat of each of ``run_ids`` that is still there."""
+        found: dict[str, str] = {}
+        for start in range(0, len(run_ids), _IN_CHUNK):
+            chunk: Sequence[str] = run_ids[start : start + _IN_CHUNK]
+            marks: str = ",".join("?" for _ in chunk)
+            for row in await self._all(f"SELECT id, thread_id FROM runs WHERE id IN ({marks})", tuple(chunk)):
+                found[str(row["id"])] = str(row["thread_id"])
+        return found
+
     async def goal_spend(self, since: float, limit: int) -> list[ChatSpend]:
         """The ``limit`` goals that spent the most tokens in the runs created since ``since``, the chats of one title
         together (items 881 and 883), as ``dotx stats`` reads them."""
@@ -4515,6 +4583,16 @@ class Store:
             (run_id, tool),
         )
         return 0 if row is None else int(row["n"])
+
+    async def tool_results_without_text(self, run_id: str, after_id: int, limit: int) -> list[EventRecord]:
+        """The newest ``limit`` ``tool_result`` events of a run with an id after ``after_id``, oldest first, each
+        without its text (item 1745): what a run's account reads of its calls, not what they returned."""
+        rows = await self._all(
+            "SELECT * FROM (SELECT id, run_id, ts, kind, json_remove(data, '$.text') AS data FROM events"
+            " WHERE run_id = ? AND kind = 'tool_result' AND id > ? ORDER BY id DESC LIMIT ?) ORDER BY id",
+            (run_id, after_id, limit),
+        )
+        return [_event(row) for row in rows]
 
     async def events_of_kinds(self, run_id: str, kinds: Sequence[str], limit: int) -> list[EventRecord]:
         """The newest ``limit`` events of a run that are of any of ``kinds``, oldest first."""
@@ -6556,6 +6634,22 @@ class Store:
         return await self.get_memory(memory_id)
 
     @_writing
+    async def set_memory_subject(self, memory_id: str, subject: str) -> MemoryRecord:
+        """Give a note the ``subject`` its run named (item 1729); its text, tags, vector and ``updated_at`` stay."""
+        await self._db.execute("UPDATE memories SET subject = ? WHERE id = ?", (subject, memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    async def memories_with_subject(self, subject: str, agent_id: str | None) -> list[MemoryRecord]:
+        """The notes of ``subject`` that a run of ``agent_id`` (``None`` for Dot) is handed, the oldest first:
+        the notes a newer note of the subject replaces (item 1729)."""
+        rows = await self._all(
+            "SELECT * FROM memories WHERE subject = ? AND (agent_id IS ? OR agent_id IS NULL) ORDER BY created_at",
+            (subject, agent_id),
+        )
+        return [_memory(row) for row in rows]
+
+    @_writing
     async def delete_memory(self, memory_id: str) -> bool:
         cursor = await self._db.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
@@ -6922,7 +7016,7 @@ class Store:
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
                 " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
-                " edited_by) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?)",
+                " edited_by, subject) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?)",
                 (
                     record.id,
                     record.content,
@@ -6938,6 +7032,7 @@ class Store:
                     _MERGED_SOURCES.dump_json(record.merged_from).decode() if record.merged_from else None,
                     record.pinned_at,
                     record.edited_by,
+                    record.subject,
                 ),
             )
             await self._db.execute(

@@ -198,7 +198,8 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         "run again.\n"
     ) in note
     assert (
-        "Its plan, which is your plan now:\n1. [done] Read data.csv\n   evidence: read_file data.csv: 3 rows\n"
+        "Its plan, which is your plan now:\n1. [done, not verified] Read data.csv\n"
+        "   evidence: read_file data.csv: 3 rows\n"
         "2. [in_progress] Write report.md\n"
         "Targets: report.md sums every row of data.csv\n"
     ) in note
