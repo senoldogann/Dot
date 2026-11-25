@@ -148,14 +148,12 @@ struct SchedulesPage: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint(String(localized: "Opens the edit", comment: "VoiceOver: a schedule's name opens its edit sheet"))
-            Toggle(
-                String(localized: "\(schedule.record.name) on", comment: "VoiceOver: a schedule's switch; the argument is its name"),
-                isOn: Binding(get: { schedule.record.enabled }, set: { on in Task { await setEnabled(schedule, on) } })
-            )
-            .labelsHidden()
-            .toggleStyle(InkSwitchStyle())
-            .fixedSize()
-            .disabled(switching.contains(schedule.id))
+            // The ink switch draws its label, so the label is empty and VoiceOver hears the name.
+            Toggle(isOn: Binding(get: { schedule.record.enabled }, set: { on in Task { await setEnabled(schedule, on) } })) { EmptyView() }
+                .toggleStyle(InkSwitchStyle())
+                .fixedSize()
+                .accessibilityLabel(String(localized: "\(schedule.record.name) on", comment: "VoiceOver: a schedule's switch; the argument is its name"))
+                .disabled(switching.contains(schedule.id))
             Menu {
                 Button(String(localized: "Edit", comment: "Schedule menu: edit"), systemImage: "pencil") { editing = schedule }
                 Button(String(localized: "Run now", comment: "Schedule menu: runs it at once"), systemImage: "play") { Task { await runNow(schedule) } }

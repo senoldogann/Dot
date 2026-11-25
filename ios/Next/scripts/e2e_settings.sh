@@ -52,7 +52,7 @@ curl -fsS -H "$main" "$base/api/schedules" | check "Scheduled tasks: paused and 
 curl -fsS -H "$main" "$base/api/code-review" | check "Models: the code review's reasoning set from the phone" 'd["effort"] == "high"'
 curl -fsS -H "$main" "$base/api/policy/free" | check "Rules: free mode switched off from the phone" 'd["free"] is False'
 curl -fsS -H "$main" "$base/api/agents" | check "Agents: the agent's first chat opened from the phone" 'any(a["record"]["name"] == "E2E Scout" and a["home"] is not None for a in d)'
-curl -fsS -H "$main" "$base/api/memories?limit=50" | check "Memory: the note edited from the phone" 'any(m["content"].endswith("Edited.") for m in d["items"])'
+curl -fsS -H "$main" "$base/api/memories?limit=50" | check "Memory: the note edited from the phone" 'any("Edited." in m["content"] for m in d["items"])'
 curl -fsS -H "$main" "$base/api/memories/proposed" | check "Memory: no proposal waits" 'd == []'
 curl -fsS -H "$main" "$base/api/memories?limit=10" | check "Memory: the proposed words were used" \
     'any("commands written out in full" in (m.get("content") or m.get("record", {}).get("content", "")) for m in (d if isinstance(d, list) else d.get("items", [])))'

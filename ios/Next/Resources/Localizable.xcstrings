@@ -187,18 +187,6 @@
         }
       }
     },
-    "%lld min": {
-      "comment": "A number of minutes",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld dk"
-          }
-        }
-      }
-    },
     "%lld notes": {
       "comment": "Memory: the number of notes\nMemory: the number of search hits",
       "localizations": {
@@ -481,18 +469,6 @@
         }
       }
     },
-    "A chat schedule is edited on the web page.": {
-      "comment": "Schedule edit: a chat-mode schedule cannot be edited here",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sohbet zamanlaması web sayfasında düzenlenir."
-          }
-        }
-      }
-    },
     "A chat schedule is edited on your Mac.": {
       "comment": "Schedule edit: a chat-mode schedule cannot be edited here",
       "localizations": {
@@ -544,18 +520,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni model her görevin bir sonraki başlangıcından geçerli olur; çalışan görevler kendi modelini korur."
-          }
-        }
-      }
-    },
-    "A phone reads these; change them on the Mac: Settings › Models › Code review.": {
-      "comment": "Models: the code review is read-only from a phone",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Telefon bunları okur; değiştirmek için Mac'te: Ayarlar › Modeller › Kod incelemesi."
           }
         }
       }
@@ -754,18 +718,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tüm eylemler"
-          }
-        }
-      }
-    },
-    "All notes, trash and lessons": {
-      "comment": "Memory: the web page row",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tüm notlar, çöp kutusu ve dersler"
           }
         }
       }
@@ -1034,18 +986,6 @@
         }
       }
     },
-    "Ask Dot in a chat to do something every morning, or make one with +.": {
-      "comment": "Schedules: how one is made",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir sohbette Dot'tan her sabah bir şey yapmasını iste ya da + ile bir tane oluştur."
-          }
-        }
-      }
-    },
     "Ask Dot in a chat to do something every morning.": {
       "comment": "Schedules: how one is made",
       "localizations": {
@@ -1119,18 +1059,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamera izni isteniyor…"
-          }
-        }
-      }
-    },
-    "Asks first": {
-      "comment": "Rule: Dot asks the owner first",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Önce sorar"
           }
         }
       }
@@ -1773,18 +1701,6 @@
         }
       }
     },
-    "Context, effort and providers": {
-      "comment": "Models: the web page's other parts",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bağlam, çaba ve sağlayıcılar"
-          }
-        }
-      }
-    },
     "Copied": {
       "comment": "Code block header after a copy",
       "localizations": {
@@ -2335,18 +2251,6 @@
         }
       }
     },
-    "Dot follows its approval mode alone.": {
-      "comment": "Rules: what holds without rules",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot yalnızca onay moduna göre davranır."
-          }
-        }
-      }
-    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -2831,18 +2735,6 @@
         }
       }
     },
-    "Fallback %lld": {
-      "comment": "Code review: a fallback model's place",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yedek %lld"
-          }
-        }
-      }
-    },
     "Fast model": {
       "comment": "Models: the role for quick small steps",
       "localizations": {
@@ -3140,18 +3032,6 @@
         }
       }
     },
-    "Hands to you": {
-      "comment": "Rule: the owner does it",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sana bırakır"
-          }
-        }
-      }
-    },
     "Haptics": {
       "comment": "Chat settings: touch feedback",
       "localizations": {
@@ -3335,18 +3215,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Milyon token olarak, Kullanım sayfasının saydığı gibi."
-          }
-        }
-      }
-    },
-    "In order, the first that matches decides": {
-      "comment": "Rules: header above the list",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sırayla; eşleşen ilk kural karar verir"
           }
         }
       }
@@ -3923,18 +3791,6 @@
         }
       }
     },
-    "New scheduled task": {
-      "comment": "Schedules: makes a new one (on the web page)",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yeni zamanlanmış görev"
-          }
-        }
-      }
-    },
     "Next ask": {
       "comment": "Ask dock: shows the ask after",
       "localizations": {
@@ -4067,18 +3923,6 @@
         }
       }
     },
-    "No rules of your own": {
-      "comment": "Rules: empty",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kendi kuralın yok"
-          }
-        }
-      }
-    },
     "No scheduled tasks": {
       "comment": "Schedules: empty",
       "localizations": {
@@ -4097,18 +3941,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kimse zamanında yanıtlamadı"
-          }
-        }
-      }
-    },
-    "None": {
-      "comment": "No value set",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yok"
           }
         }
       }
@@ -4762,18 +4594,6 @@
         }
       }
     },
-    "Pause": {
-      "comment": "Schedule menu: switch off",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Duraklat"
-          }
-        }
-      }
-    },
     "Paused": {
       "comment": "Schedule: switched off",
       "localizations": {
@@ -4935,18 +4755,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamerayı Mac'indeki Dot › Ayarlar › Telefon'daki koda tut."
-          }
-        }
-      }
-    },
-    "Pre-approved": {
-      "comment": "Rule: allowed ahead even in a tainted run",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Önceden onaylı"
           }
         }
       }
@@ -5358,18 +5166,6 @@
         }
       }
     },
-    "Resume": {
-      "comment": "Schedule menu: switch on",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sürdür"
-          }
-        }
-      }
-    },
     "Resume now": {
       "comment": "Usage limit card: starts the work again now",
       "localizations": {
@@ -5388,18 +5184,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sırayı sürdür"
-          }
-        }
-      }
-    },
-    "Review model": {
-      "comment": "Code review: the first model\nModels: the role that reviews in auto mode",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "İnceleme modeli"
           }
         }
       }
@@ -5455,18 +5239,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kurallar"
-          }
-        }
-      }
-    },
-    "Rules on the web page": {
-      "comment": "Rules: the web page row",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Web sayfasındaki kurallar"
           }
         }
       }
@@ -6219,30 +5991,6 @@
         }
       }
     },
-    "Small change": {
-      "comment": "Code review: the size of a small change",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Küçük değişiklik"
-          }
-        }
-      }
-    },
-    "Small change model": {
-      "comment": "Code review: the model of a small change",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Küçük değişiklik modeli"
-          }
-        }
-      }
-    },
     "Snapshots": {
       "comment": "Settings row: pictures of the screen for Dot",
       "localizations": {
@@ -6272,18 +6020,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Standart"
-          }
-        }
-      }
-    },
-    "Standby": {
-      "comment": "Models section: the models used when the main one fails",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yedekte"
           }
         }
       }
@@ -7333,18 +7069,6 @@
         }
       }
     },
-    "Time limit": {
-      "comment": "Code review: the time limit",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Süre sınırı"
-          }
-        }
-      }
-    },
     "Timestamps": {
       "comment": "General section: how clocks read",
       "localizations": {
@@ -7352,18 +7076,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Saat biçimi"
-          }
-        }
-      }
-    },
-    "To add a rule that allows, move or switch rules: open on the Mac Settings › Rules. A phone may add a rule that asks or hands to you on the web page.": {
-      "comment": "Rules: footer: what a phone may not do",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "İzin veren bir kural eklemek, kuralları taşımak ya da açıp kapatmak için Mac'te Ayarlar › Kurallar'ı aç. Telefon, soran ya da sana bırakan bir kuralı web sayfasında ekleyebilir."
           }
         }
       }
@@ -7676,18 +7388,6 @@
         }
       }
     },
-    "Used in this order when a model does not answer.": {
-      "comment": "Models: footer under the standby list",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir model yanıt vermediğinde bu sırayla kullanılır."
-          }
-        }
-      }
-    },
     "Vault": {
       "comment": "Settings row: logins, cards and contacts Dot can use",
       "localizations": {
@@ -7706,18 +7406,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sürüm"
-          }
-        }
-      }
-    },
-    "Vision model": {
-      "comment": "Models: the role that reads pictures",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Görme modeli"
           }
         }
       }
@@ -8719,18 +8407,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "yapılacak"
-          }
-        }
-      }
-    },
-    "up to %lld lines": {
-      "comment": "Code review: the small change's lines",
-      "extractionState": "stale",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "en çok %lld satır"
           }
         }
       }

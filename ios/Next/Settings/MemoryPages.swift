@@ -144,15 +144,27 @@ struct MemoryPage: View {
         if hits != nil { await search() }
     }
 
-    /// Reads the first `count` notes, the newest change first.
+    /// Reads the first `count` notes, the newest change first, in pages of at most 200 (the daemon's most).
     private func loadNotes(count: Int) async {
-        let limit: Int = min(count, 200)
-        let read: Loadable<MemoryList> = await model.read { api throws(DaemonRequestError) in try await api.memories(limit: limit, offset: 0, order: .changed) }
-        switch read {
-        case .loaded(let list): notes = .loaded(NotesState(items: list.items, total: list.total))
-        case .failed(let failure): notes = .failed(failure)
-        case .loading: notes = .loading
-        }
+        var items: [MemoryNote] = []
+        var total: Int = 0
+        repeat {
+            let offset: Int = items.count
+            let limit: Int = min(count - offset, 200)
+            let read: Loadable<MemoryList> = await model.read { api throws(DaemonRequestError) in try await api.memories(limit: limit, offset: offset, order: .changed) }
+            switch read {
+            case .loaded(let list):
+                items += list.items
+                total = list.total
+                if list.items.isEmpty { total = items.count }
+            case .failed(let failure):
+                notes = .failed(failure)
+                return
+            case .loading:
+                return
+            }
+        } while items.count < min(count, total)
+        notes = .loaded(NotesState(items: items, total: total))
     }
 
     private func search() async {

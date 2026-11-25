@@ -108,8 +108,9 @@ final class SettingsLiveUITests: XCTestCase {
         XCTAssertTrue(note.waitForExistence(timeout: 10))
         note.tap()
         app.buttons.matching(NSPredicate(format: "label == %@", "Edit")).firstMatch.tap()
-        let words: XCUIElement = app.textViews.firstMatch.exists ? app.textViews.firstMatch : app.textFields["Note"]
-        XCTAssertTrue(words.waitForExistence(timeout: 5))
+        // The note's field holds its words (its placeholder is not its identifier).
+        let words: XCUIElement = app.textFields.matching(NSPredicate(format: "value BEGINSWITH %@", "The owner prefers")).firstMatch
+        XCTAssertTrue(words.waitForExistence(timeout: 5), "the note's field")
         words.tap()
         words.typeText(" Edited.")
         app.buttons["Save"].tap()
