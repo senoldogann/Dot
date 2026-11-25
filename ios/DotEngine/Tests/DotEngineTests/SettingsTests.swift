@@ -43,6 +43,15 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(probe(.up, .answered(code: 200, millis: 30), .answered(code: 200, millis: 30), .mismatch).firstFailure?.1, .proofMismatch)
     }
 
+    func testAProofThatGotNoAnswerIsNotARefusalOfTheKey() {
+        let silent: Diagnosis = probe(.up, .answered(code: 200, millis: 30), .notRun, .unanswered)
+        XCTAssertEqual(silent.firstFailure?.1, .proofUnanswered)
+        XCTAssertEqual(silent.firstFailure?.1.refusesTheKey, false, "no Pair again for a check that got no answer")
+        XCTAssertEqual(probe(.up, .answered(code: 200, millis: 30), .transport(code: -1001, millis: 8000), .proven).firstFailure?.1.refusesTheKey, false)
+        XCTAssertEqual(probe(.up, .answered(code: 200, millis: 30), .answered(code: 401, millis: 30), .proven).firstFailure?.1.refusesTheKey, true)
+        XCTAssertEqual(probe(.up, .answered(code: 200, millis: 30), .notRun, .mismatch).firstFailure?.1.refusesTheKey, true)
+    }
+
     func testAllHopsPassWhenTheKeyIsTakenAndProven() {
         let whole: Diagnosis = probe(.up, .answered(code: 200, millis: 30), .answered(code: 200, millis: 40), .proven)
         XCTAssertNil(whole.firstFailure)

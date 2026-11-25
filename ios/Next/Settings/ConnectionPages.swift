@@ -62,6 +62,8 @@ func problemWords(_ problem: HopProblem) -> String {
     case .proofMismatch:
         String(localized: "This address did not prove it holds this phone's key, so the key was not sent. Pair again.", comment: "Diagnosis: the proof did not match")
     case .daemonTooOld: String(localized: "Update Dot on your Mac.", comment: "Diagnosis: the Mac's Dot is too old")
+    case .proofUnanswered:
+        String(localized: "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.", comment: "Diagnosis: the proof request got no answer")
     case .other(let code): String(localized: "Failed with code \(code).", comment: "Diagnosis: an unclassified failure; the argument is the code")
     }
 }
@@ -111,7 +113,7 @@ struct MacPage: View {
 
     var body: some View {
         SettingsScroll(title: String(localized: "This Mac", comment: "Settings row: the paired Mac")) {
-            if model.snapshot.transport == .keyRefused || run?.diagnosis.firstFailure?.0 == .key {
+            if model.snapshot.transport == .keyRefused || run?.diagnosis.firstFailure?.1.refusesTheKey == true {
                 FailureBanner(failure: .keyRefused, macPlace: "", retry: nil)
             }
             GroupedSection(header: nil, footer: nil) {
@@ -167,6 +169,7 @@ struct MacPage: View {
         case .proven: String(localized: "Your Mac proved it holds this phone's key.", comment: "This Mac: the proof matched")
         case .mismatch: String(localized: "This address did not prove it holds this phone's key; the key was not sent.", comment: "This Mac: the proof did not match")
         case .unsupported: String(localized: "This Dot cannot prove it holds the key; update Dot on your Mac.", comment: "This Mac: the daemon has no proof route")
+        case .unanswered: String(localized: "Your Mac did not answer the check of this phone's key.", comment: "This Mac: the proof request got no answer")
         case .notRun, nil: String(localized: "Not checked yet.", comment: "This Mac: the proof was not asked")
         }
     }

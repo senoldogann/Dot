@@ -140,7 +140,7 @@ extension DaemonAPI {
             let answer: ProofAnswer = try decode(try await data(built, path: "/api/proof"), path: "/api/proof")
             return answer.proof == expectedProof(key: key, nonce: nonce) ? .proven : .mismatch
         } catch {
-            return error.statusCode == 404 ? .unsupported : .notRun
+            return error.statusCode == 404 ? .unsupported : .unanswered
         }
     }
 }

@@ -42,8 +42,21 @@ public enum ProofOutcome: Sendable, Equatable {
     /// The daemon answered with a proof that does not match the key: not this phone's Mac, or a key it no longer holds.
     case mismatch
     case notRun
+    /// The proof was asked and no answer came (a timeout, a 5xx, a dropped connection, an answer that did not read).
+    case unanswered
     /// The daemon has no proof route (a Dot from before it).
     case unsupported
+}
+
+extension HopProblem {
+    /// Whether the daemon said no to this phone's key (a refusal or a proof for another key): only then is pairing
+    /// again the way out; a hop that got no answer says nothing of the key.
+    public var refusesTheKey: Bool {
+        switch self {
+        case .keyRefused, .proofMismatch: true
+        default: false
+        }
+    }
 }
 
 /// Why a hop failed, as the words of the page name it.
@@ -63,6 +76,8 @@ public enum HopProblem: Sendable, Equatable {
     case keyRefused(Int)
     /// The daemon's proof does not match the key.
     case proofMismatch
+    /// The check of the key got no answer: nothing is known of the key (never told as a refusal).
+    case proofUnanswered
     /// The daemon is too old for this app.
     case daemonTooOld
     /// Something the classification does not know; the code is in the report.
@@ -130,6 +145,8 @@ public func diagnose(_ probe: DiagnosisProbe) -> Diagnosis {
         guard (200..<300).contains(code) else { return failAt(.daemon, .daemonError(code)) }
         hops.append((.daemon, .passed))
     }
+    if probe.proof == .unanswered { return failAt(.key, .proofUnanswered) }
+    if probe.proof == .mismatch { return failAt(.key, .proofMismatch) }
     switch probe.status {
     case .answered(let code, _) where code == 401 || code == 403:
         return failAt(.key, .keyRefused(code))
@@ -142,7 +159,6 @@ public func diagnose(_ probe: DiagnosisProbe) -> Diagnosis {
     case .notRun:
         return failAt(.key, .other(0))
     }
-    if probe.proof == .mismatch { return failAt(.key, .proofMismatch) }
     hops.append((.key, .passed))
     return Diagnosis(hops: hops)
 }
