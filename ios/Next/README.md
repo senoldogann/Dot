@@ -61,7 +61,7 @@ daemon's step: a Mac application's, a synced folder's and Dot's browser's sign-i
 started from the phone and finished on the Mac, where macOS asks or the page opens; adding a connected app, an official
 sign-in and 1Password's token are refused to a phone's key (item 678, `on_this_mac`), so their Connect says "Finish on
 your Mac" on the row and names the Mac's page in the detail. A Disconnect of a sign-in the provider did not end shows
-the daemon's notice of where to end it. While a service waits on the Mac, the sheet reads again every five seconds.
+the daemon's notice of where to end it. While the daemon says a service waits, the sheet reads again every five seconds.
 No "For you" section: the daemon gives no suggestion for services.
 
 ## The engine: `ios/DotEngine`
