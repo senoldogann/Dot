@@ -291,7 +291,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_browser_tools(),
         build_web_tools(),
         build_notes_tools(),
-        build_memory_tools(),
+        build_memory_tools(config.memory.max_chars),
         build_todo_tools(),
         build_objective_tools(),
         build_pipeline_tools(),

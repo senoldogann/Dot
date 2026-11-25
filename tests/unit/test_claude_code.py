@@ -34,6 +34,7 @@ from dotagent.claude_code.run import (
     ended_clean,
     fast_off_words,
     goal_asks_notification,
+    loaded_tools,
     mcp_config,
     missing_tools,
     opened_bounds,
@@ -83,6 +84,7 @@ from dotagent.tools.shell import build_shell_tool
 
 DOOR: str = "dot_1a2b3c4d"
 CONFIG: Path = Path("/private/dot/claude_code/runs/run-x/mcp.json")
+PROMPT_FILE: Path = Path("/private/dot/claude_code/runs/run-x/prompt.md")
 
 
 async def _run(call: object) -> ToolResult:
@@ -102,13 +104,15 @@ def _value(argv: tuple[str, ...], flag: str) -> str:
 def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() -> None:
     door: Door = _door()
     argv: tuple[str, ...] = claude_argv(
-        "/usr/local/bin/claude", "opus", "medium", "standard", "You are Dot.", CONFIG, door.name, None
+        "/usr/local/bin/claude", "opus", "medium", "standard", PROMPT_FILE, CONFIG, door.name, None
     )
     assert argv[:2] == ("/usr/local/bin/claude", "-p")
     assert _value(argv, "--input-format") == "stream-json"
     assert _value(argv, "--output-format") == "stream-json"
     assert _value(argv, "--model") == "opus"
-    assert _value(argv, "--append-system-prompt") == "You are Dot."
+    # The prompt is in a 0600 file, never in the arguments, which ps shows (item 1691's pre-push review).
+    assert _value(argv, "--append-system-prompt-file") == str(PROMPT_FILE)
+    assert "--append-system-prompt" not in argv
     # No built-in tool at all, no settings file read, the door as the only MCP server and the only allowed tools.
     # Claude Code's search of the door's tools is its one tool of its own (item 1053).
     assert _value(argv, "--tools") == "ToolSearch"
@@ -131,7 +135,7 @@ def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() ->
 
 
 def test_a_chat_with_a_session_resumes_it() -> None:
-    argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", "p", CONFIG, DOOR, "ses-1")
+    argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", PROMPT_FILE, CONFIG, DOOR, "ses-1")
     assert _value(argv, "--resume") == "ses-1"
     # The allowed tools stay the last words, so that nothing after them is read as one.
     assert argv[-2:] == ("--allowedTools", f"mcp__{DOOR},ToolSearch")
@@ -178,20 +182,21 @@ def test_the_doors_config_is_a_file_only_the_owner_reads(tmp_path: Path) -> None
     }
 
 
-def test_the_prompt_says_who_the_model_is_its_tools_and_what_it_knows_of_the_owner() -> None:
-    prompt: str = system_prompt(
-        "Dot", DOOR, ["notify", "shell"], Path("/w"), "Friday", "# Team\n- Ada", ["(you said) My name is Ada."]
-    )
-    assert prompt.startswith("You are Dot,") and f"MCP server {DOOR}: notify, shell" in prompt
-    assert "Dot's workspace, /w" in prompt and prompt.endswith("- (you said) My name is Ada.")
-    assert "\n\n# Team\n- Ada\n\nWhat you know about the owner:" in prompt
+def test_the_prompt_is_dots_own_followed_by_what_the_harness_changes() -> None:
+    """Item 1691: a run on the plan was told 3.9 KB of its own instead of the prompt Dot's own loop builds (how to work,
+    trust and safety, the plan, skills, what Dot learned). It is now that prompt whole, then the door, the tools'
+    names and what this harness changes."""
+    prompt: str = system_prompt("DOT PROMPT", DOOR, ["notify", "shell"], Path("/w"))
+    assert prompt.startswith("DOT PROMPT\n\n# This run's harness\n")
+    assert f"MCP server {DOOR} (mcp__{DOOR}__<tool>): notify, shell" in prompt
+    assert "Dot's workspace, /w" in prompt and "Claude Code's own tools" in prompt
 
 
 def test_the_prompt_tells_the_model_to_look_a_tool_up_before_it_calls_it() -> None:
     """Item 1201: only the door's tools' names are in the prompt (item 1053), and runs on the plan called
     ``browser_find`` and ``search_files`` with a ``query`` they had guessed, which neither takes, at 15 times the rate
     of Dot's own loop. The prompt says that a tool's parameters come from its look-up, and how to look it up."""
-    prompt: str = system_prompt("Dot", DOOR, ["browser_find"], Path("/w"), "Friday", "", [])
+    prompt: str = system_prompt("", DOOR, ["browser_find"], Path("/w"))
     assert f"{SEARCH_TOOL} (select:mcp__{DOOR}__<tool>, several at once" in prompt
     assert "before your first call of it" in prompt and "never guess" in prompt
 
@@ -204,11 +209,19 @@ def test_the_tools_in_the_prompt_from_the_start_are_door_tools_the_shell_sends_t
     assert all(name in shell and door_tool(name, False) and door_tool(name, True) for name in LOADED_TOOLS)
 
 
+def test_the_core_tools_are_in_the_prompt_whole_and_the_others_are_looked_up() -> None:
+    """Item 1692: the model called core tools it had not looked up with guessed arguments (19 % of runs against 6 % in
+    Dot's own loop); their definitions are in the prompt from the start, as Dot's own loop gives the core group, and a
+    tool of another group is still looked up."""
+    names: list[str] = ["delegate", "notify", "memory_save", "finish", "browser_open", "terminal_open", "mcp__notes__x"]
+    assert loaded_tools(names) == {"delegate", "notify", "memory_save", "finish", "terminal_open"}
+
+
 def test_the_prompt_names_finish_only_to_a_run_that_has_it() -> None:
     """Item 1076's pre-push review: a chat-mode run has no finish, and a prompt that told it to call one lost its
     answer; it ends with its last reply."""
-    task: str = system_prompt("Dot", DOOR, ["finish", "shell"], Path("/w"), "Friday", "", [])
-    chat: str = system_prompt("Dot", DOOR, ["shell"], Path("/w"), "Friday", "", [])
+    task: str = system_prompt("", DOOR, ["finish", "shell"], Path("/w"))
+    chat: str = system_prompt("", DOOR, ["shell"], Path("/w"))
     assert "call finish" in task and "your last reply" not in task
     assert "finish" not in chat and "write your answer as your last reply" in chat
 
@@ -228,8 +241,11 @@ def test_the_model_gets_every_tool_of_dots_own_loop_but_the_loops_own() -> None:
         "mail_search",
     ):
         assert door_tool(name, False), name
-    for name in ("update_plan", "mark_plan_step", "use_tools", "react"):
+    for name in ("use_tools", "react"):
         assert not door_tool(name, False), name
+    # Item 1693: the plan is the model's, as in Dot's own loop.
+    for name in ("update_plan", "mark_plan_step"):
+        assert door_tool(name, False) and door_tool(name, True), name
     for name in ("delegate", "message_agent", "ask_user", "ask_secret"):
         assert not door_tool(name, True), name
     assert door_tool("read_file", True)
@@ -405,10 +421,10 @@ def test_only_the_measured_built_in_plugins_pass() -> None:
 def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     """Item 1014: the run's reasoning level goes as --effort when it is one of Claude Code's, and fast mode as the
     --settings the run reads; neither goes when the run has none."""
-    argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", "p", CONFIG, DOOR, None)
+    argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", PROMPT_FILE, CONFIG, DOOR, None)
     assert argv[argv.index("--effort") + 1] == "xhigh"
     assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
-    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", "p", CONFIG, DOOR, None)
+    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", PROMPT_FILE, CONFIG, DOOR, None)
     assert "--settings" not in plain
     # The configured default goes when the run chose none, rounded to the levels Claude Code lists for the model, as
     # the composer shows it (item 1367): Opus 4.6 has no xhigh, Haiku 4.5 no level, and then no --effort goes.
@@ -421,7 +437,7 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     assert opus_4_6 is not None and haiku_4_5 is not None
     assert run_effort(opus_4_6.efforts, None, "xhigh") in ("high", "max")
     assert run_effort(haiku_4_5.efforts, None, "xhigh") is None
-    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", "p", CONFIG, DOOR, None)
+    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", PROMPT_FILE, CONFIG, DOOR, None)
     # Fast mode goes to a model that has it alone, as Claude Code last listed them (item 1367).
     keep_models(PlanModels(fetched_at=0.0, models=_listed()))
     assert run_speed(ModelRef(provider="claude_code", model="sonnet"), "fast") == "standard"
@@ -456,7 +472,7 @@ def test_a_step_that_stops_for_a_tool_ends_as_dots_steps_do() -> None:
     tool_use", as Claude names a stop for a tool; the timeline reads Dot's names, and a cut reply still shows."""
     assert dot_finish("tool_use") == "tool_calls" and dot_finish("end_turn") == "stop"
     assert dot_finish("max_tokens") == "max_tokens"
-    said: str = system_prompt("Dot", DOOR, ("read_file",), Path("/w"), "2026-11-07", "", ())
+    said: str = system_prompt("", DOOR, ("read_file",), Path("/w"))
     assert "in the language the owner writes in" in said
 
 

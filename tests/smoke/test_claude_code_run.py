@@ -25,7 +25,7 @@ from structlog.testing import capture_logs
 
 from dotagent.agent.lessons import RunLessons, run_lessons
 from dotagent.agent.manager import RunManager
-from dotagent.agent.review import LESSONS_TOOL
+from dotagent.agent.review import LESSONS_TOOL, GoalRequest, GoalVerdict
 from dotagent.claude_code import cut as cut_module
 from dotagent.claude_code import run as run_module
 from dotagent.claude_code.cut import EndedTogether
@@ -137,13 +137,16 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
     assert not await asyncio.to_thread((workspace / ".claude" / "settings.json").exists)
     assert await asyncio.to_thread((workspace / "notes.txt").read_text, encoding="utf-8") == "from claude"
     results: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "tool_result", 10)
+    # Item 1694: the model worked and ended its turn without finish, so it was told to call it, as Dot's own loop
+    # tells its own; it finished with its answer.
     assert [(event.data["tool"], event.data["ok"]) for event in results] == [
         ("write_file", False),
         ("write_file", True),
+        ("finish", True),
     ]
     assert all(event.data["decision"] is not None or not event.data["ok"] for event in results)
     steps: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "assistant", 10)
-    assert [event.data["tool_calls"] for event in steps] == [["write_file"], []]
+    assert [event.data["tool_calls"] for event in steps] == [["write_file"], [], ["finish"], []]
     assert steps[0].data["input_tokens"] == 120 and steps[0].data["cached_tokens"] == 20
 
     # The plan's models were asked for first (item 1367): with the telemetry the list comes over, nothing else of the
@@ -261,9 +264,11 @@ async def test_the_owners_message_ends_a_wait_of_dots_once_and_the_program_takes
     assert "The condition had not held after" in first and "not there yet" in first
     assert "did not hold within 0.05 min" in second, second
     results: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "tool_result", 10)
+    # Item 1694: the turn ended without finish after the waits, so the run was told to call it, and did.
     assert [(event.data["tool"], event.data["ok"]) for event in results] == [
         ("wait_until", True),
         ("wait_until", False),
+        ("finish", True),
     ]
 
 
@@ -358,6 +363,52 @@ async def test_a_reply_after_a_finish_is_not_shown_as_a_second_answer(room: Room
     assert [step.data["text"] for step in steps] == ["", ""], [step.data for step in steps]
 
 
+async def test_a_finish_in_goal_mode_goes_to_the_goal_check_which_sends_the_run_back(
+    room: Room, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1694, the audit of 2026-11-24: Dot's own loop sent 11 % of its checked runs back to work, a run on the plan
+    none, as its finish was never checked. In goal mode the finish now goes to the goal check with the run's record (its
+    calls, its answer): a "continue" sends the model back with the check's reason, and its next finish is checked again;
+    the run ends as the check settles it, and its lessons are drawn from the same record."""
+    asked: list[GoalRequest] = []
+    verdicts: list[GoalVerdict] = [
+        GoalVerdict(decision="continue", reason="The answer does not say how you checked.", unproven_steps=()),
+        GoalVerdict(decision="achieved", reason="It says it now.", unproven_steps=()),
+    ]
+
+    async def check(request: GoalRequest) -> GoalVerdict:
+        asked.append(request)
+        return verdicts[len(asked) - 1]
+
+    monkeypatch.setattr(run_module, "_checker_of", lambda agent: check)
+    started: RunRecord = await room.manager.start(
+        "How are you: finish then restate.",
+        "task",
+        MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "yolo",
+        True,
+        (),
+    )
+    async with asyncio.timeout(30):
+        ended: RunRecord = await room.manager.wait(started.id)
+    assert ended.status == "done" and ended.result == "I'm well, thank you!", ended.result
+    assert [request.answer for request in asked] == ["I am well, thanks.", "I'm well, thank you!"]
+    assert "ASSISTANT CALLS finish" in asked[0].digest
+    checks: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "goal_check", 10)
+    assert [(event.data["decision"], event.data["final"]) for event in checks] == [
+        ("continue", False),
+        ("achieved", True),
+    ]
+    first: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert "The goal check does not accept this ending yet" not in first
+
+
 async def test_a_stop_ends_the_call_of_dots_tool_at_work_for_the_program(room: Room) -> None:
     """Item 1076: a call of Dot's tool runs in the bridge's task, not the run's; a Stop that ends the program cuts it
     all the same (its request is cancelled as the program goes), which this keeps: stopped while its command sleeps,
@@ -448,6 +499,44 @@ async def test_a_picked_skill_reaches_claude_code_in_the_first_message(room: Roo
     assert _SKILL_STEPS in first and "The owner picked the skills below for this message." in first
     chips: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "picks", 10)
     assert [event.data["skills"] for event in chips] == [[_SKILL]]
+
+
+async def test_a_run_on_the_plan_is_told_dots_own_system_prompt_and_the_skills_of_its_goal(room: Room) -> None:
+    """Item 1691, the audit of 2026-11-24: a run on the plan was told 3.9 KB of its own, without how to work, the plan,
+    trust and safety, the skills or what Dot learned, and no skill was ever used in 124 runs. It is now told the
+    prompt Dot's own loop builds, whole, with the skills listed, then what the harness changes; under its message how
+    it was started, as Dot's own loop hands it."""
+    await asyncio.to_thread(_write_skill, Path(os.environ["DOT_HOME"]))
+    ended: RunRecord = await _run(room, "Write a note in the workspace.")
+    assert ended.status == "done", ended.result
+    started: dict[str, object] = await asyncio.to_thread(_json, room.record / "started.json")
+    args: list[str] = started["args"]  # type: ignore[assignment]  # what the stand-in wrote
+    # In a 0600 file of the run's private folder, never in the arguments (the pre-push review of item 1691).
+    prompt: str = str(started["prompt"])
+    assert started["prompt_mode"] == stat.S_IRUSR | stat.S_IWUSR and "--append-system-prompt" not in args
+    for said in (
+        "# How to work",
+        "keep a short plan with update_plan",
+        "# Trust and safety",
+        "Bold in method, conservative in consequence.",
+        f"- {_SKILL}: Write the weekly report as the owner likes it.",
+        "# This run's harness",
+        "mcp__dot__<tool>",
+    ):
+        assert said in prompt, said
+    assert "use_tools" not in prompt
+    first: str = await asyncio.to_thread((room.record / "first.json").read_text, encoding="utf-8")
+    assert "How this run was started" in first
+
+
+async def test_a_run_on_the_plan_keeps_dots_plan_with_the_plans_tools(room: Room) -> None:
+    """Item 1693: the plan's tools were Dot's own loop's alone, and no run on the plan had a plan (0 of 124, against
+    22 % of the loop's runs). They are the door's: the plan the owner watches moves as the model writes and marks it."""
+    ended: RunRecord = await _run(room, "Please plan the work.")
+    assert ended.status == "done", ended.result
+    assert "Plan recorded (0/1 done)" in ended.result and "Plan recorded (1/1 done)" in ended.result
+    plans: list[EventRecord] = await room.runtime.store.events_of_kind(ended.id, "plan", 10)
+    assert [[step["status"] for step in event.data["steps"]] for event in plans] == [["in_progress"], ["done"]]  # type: ignore[union-attr]  # the plan event's steps
 
 
 async def test_plan_first_on_claude_code_is_refused_before_the_run(room: Room) -> None:
