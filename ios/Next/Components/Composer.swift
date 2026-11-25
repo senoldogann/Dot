@@ -23,7 +23,7 @@ struct ComposerAttachment: Identifiable, Equatable {
     let preview: UIImage
 }
 
-/// A model and effort the chip offers.
+/// What the model chip shows: the chat's model and level.
 struct ModelChoice: Hashable, Identifiable {
     let ref: String
     let label: String
@@ -104,6 +104,7 @@ struct ComposerSuggestions: Sendable {
 /// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
 /// button on one row; expanded with the field above and +, the model · effort chip, the microphone and the button
 /// beneath. Photos, the camera, files and a document scan go on the + menu; `/` offers commands and skills, `@` agents.
+/// The chip opens the chat's settings (PLAN §24).
 struct ComposerView: View {
     @Binding var text: String
     @Binding var attachments: [ComposerAttachment]
@@ -111,8 +112,8 @@ struct ComposerView: View {
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
     let model: ModelChoice?
-    let models: [String: [ModelChoice]]
-    let chooseModel: ((ModelChoice) -> Void)?
+    /// Opens the chat's settings sheet from the chip; `nil` shows no chip.
+    let openSettings: (() -> Void)?
     let suggestions: ComposerSuggestions
     @FocusState private var isFocused: Bool
     @State private var dictation: Dictation = Dictation()
@@ -232,35 +233,26 @@ struct ComposerView: View {
     }
 
     @ViewBuilder private var modelChip: some View {
-        if let model, let chooseModel {
-            Menu {
-                ForEach(models.keys.sorted(), id: \.self) { provider in
-                    Section(provider) {
-                        ForEach(models[provider] ?? []) { choice in
-                            Button {
-                                chooseModel(choice)
-                            } label: {
-                                if choice == model { Label(chipWords(choice), systemImage: "checkmark") } else { Text(chipWords(choice)) }
-                            }
-                        }
-                    }
-                }
-            } label: {
+        if let model, let openSettings {
+            Button(action: openSettings) {
                 HStack(spacing: Space.xxs) {
                     Text(model.label).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                    if let effort = model.effort { Text(effort.capitalized).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
+                    if let effort = model.effort { Text(effortTitle(effort)).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
                 }
                 .padding(.horizontal, Space.xs)
                 .frame(minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(String(localized: "Model, \(chipWords(model))", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+            .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
+            .accessibilityIdentifier("composer.model")
         }
     }
 
     private func chipWords(_ choice: ModelChoice) -> String {
-        [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · ")
+        [choice.label, choice.effort.map(effortTitle)].compactMap { $0 }.joined(separator: " · ")
     }
 
     private var micButton: some View {

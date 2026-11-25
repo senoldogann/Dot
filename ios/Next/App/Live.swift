@@ -121,7 +121,9 @@ struct ChatsTab: View {
             if model.startingChats[id] != nil {
                 StartingChat(key: id)
             } else {
-                ChatScreen(thread: id, initialPanel: nil, editsFirstQueued: false)
+                // A chat of its own each time: on a wide screen the split keeps the detail, and a chat's draft, plan
+                // first and panels would otherwise follow the owner into the next chat.
+                ChatScreen(thread: id, initialPanel: nil, editsFirstQueued: false).id(id)
             }
         } placeholder: {
             EmptyState(
@@ -522,37 +524,87 @@ struct ChatRow: View {
     }
 }
 
-/// A new chat: the composer on an empty sheet (plan §4.2); once sent, the chat opens at once under the outbox's key
-/// (item 1849) and shows in the list from the outbox.
+/// A new chat (PLAN §24): a clean canvas, the composer, the model chip in the bar and in the composer. The chat's
+/// settings are chosen before the first message (model, level, fast mode, approvals, plan first) and go with it
+/// (`POST /runs`); once sent, the chat opens at once under the outbox's key (item 1849) and shows in the list from the
+/// outbox.
 struct NewChatSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
+    @State private var settings: ChatSettingsDraft = ChatSettingsDraft(choices: .daemons, planFirst: false)
+    @State private var choosing: Bool = false
     let close: () -> Void
     /// The chat was kept in the outbox under this key: the sheet closes and the chat opens.
     let opened: (String) -> Void
 
+    private var chip: ModelChoice? {
+        guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort)
+    }
+
     var body: some View {
-        VStack {
-            Spacer()
-            Text(String(localized: "What should Dot work on?", comment: "New chat sheet: the prompt above the composer"))
-                .textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
-            Spacer()
-            ComposerView(
-                text: $text, attachments: $attachments, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"),
-                buttons: composerButtons(hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
-                perform: { _ in
-                    let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !words.isEmpty else { return }
-                    let photos: [Data] = attachments.map(\.jpeg)
-                    Task {
-                        if let key = await model.startChat(words, photos: photos) { opened(key) } else { close() }
+        NavigationStack {
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ComposerView(
+                    text: $text, attachments: $attachments, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"),
+                    buttons: composerButtons(
+                        // A new chat needs words (the daemon's goal is never empty): photos alone do not start one.
+                        hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
+                    perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+                .padding(.horizontal, Space.s)
+                .padding(.bottom, Space.xs)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Tone.ground)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
+                }
+                ToolbarItem(placement: .principal) {
+                    Button { choosing = true } label: {
+                        HStack(spacing: Space.xxs) {
+                            Text(chip?.label ?? String(localized: "New chat", comment: "Chat list toolbar: starts a new chat")).textRole(.body).fontWeight(.semibold)
+                                .foregroundStyle(Tone.text).lineLimit(1)
+                            Symbol(name: "chevron.down", context: .chevron).foregroundStyle(Tone.glyph)
+                        }
+                        .frame(minHeight: Metric.hit)
+                        .contentShape(Rectangle())
                     }
-                }, model: nil, models: [:], chooseModel: nil, suggestions: .none)
-            .padding(Space.s)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        chip.map { String(localized: "Model, \($0.label)", comment: "VoiceOver: the new chat's model button; the argument is the model") }
+                            ?? String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"))
+                    .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
+                    .accessibilityIdentifier("newChat.model")
+                }
+            }
         }
-        .padding(Space.gutter)
-        .inspectorSheet(title: String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), close: close)
+        .presentationDetents([.large])
+        .presentationBackground(Tone.ground)
+        .tint(Tone.text)
+        .task { await model.loadModels() }
+        .sheet(isPresented: $choosing) {
+            ChatSettingsSheet(
+                initial: settings, providers: model.models, defaults: model.chatDefaults, problem: model.modelsProblem,
+                retry: { Task { await model.loadModels() } },
+                confirm: { picked in
+                    settings = picked
+                    choosing = false
+                }, cancel: { choosing = false })
+        }
+    }
+
+    private func send() {
+        let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !words.isEmpty else { return }
+        let photos: [Data] = attachments.map(\.jpeg)
+        let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
+        Task {
+            if let key = await model.startChat(words, photos: photos, start: start) { opened(key) } else { close() }
+        }
     }
 }
 

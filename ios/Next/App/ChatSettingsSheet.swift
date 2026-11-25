@@ -94,7 +94,7 @@ struct ChatSettingsSheet: View {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     Text(String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level")).textRole(.body).foregroundStyle(Tone.text)
                     Picker(String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level"), selection: effortBinding(chosen)) {
-                        Text(String(localized: "Standard", comment: "Chat settings: the reasoning segment that leaves the level to the model's default")).tag(String?.none)
+                        Text(String(localized: "Default level", comment: "Chat settings: the reasoning segment that leaves the level to the model's default")).tag(String?.none)
                     ForEach(chosen.efforts, id: \.self) { effort in Text(effortTitle(effort)).tag(String?.some(effort)) }
                     }
                     .pickerStyle(.segmented)
@@ -143,7 +143,7 @@ struct ChatSettingsSheet: View {
         }
     }
 
-    /// The chosen model's level: the one picked, or `nil` for Standard (the configured level on it).
+    /// The chosen model's level: the one picked, or `nil` for Default level (the configured level on it).
     private func effortBinding(_ option: ModelOption) -> Binding<String?> {
         Binding(
             get: { draft.choices.effort },

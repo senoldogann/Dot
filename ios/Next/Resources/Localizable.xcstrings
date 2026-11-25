@@ -1771,6 +1771,17 @@
         }
       }
     },
+    "Default level": {
+      "comment": "Chat settings: the reasoning segment that leaves the level to the model's default",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan düzey"
+          }
+        }
+      }
+    },
     "Default · medium": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -4509,6 +4520,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'in canlı ekranını açar; sen açana kadar hiçbir şey oynamaz."
+          }
+        }
+      }
+    },
+    "Opens the chat's settings": {
+      "comment": "VoiceOver hint of the composer's model chip",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetin ayarlarını açar"
           }
         }
       }
@@ -7820,17 +7842,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Neye uygulanacak"
-          }
-        }
-      }
-    },
-    "What should Dot work on?": {
-      "comment": "New chat sheet: the prompt above the composer",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot ne üzerinde çalışsın?"
           }
         }
       }

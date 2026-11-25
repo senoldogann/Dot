@@ -285,13 +285,13 @@ final class AppModel {
         }
     }
 
-    /// Starts a new chat through the outbox: its key, which the chat list opens at once (item 1849) and swaps for the
-    /// chat's own id once the daemon names it; `nil` when the message could not be kept.
-    func startChat(_ text: String, photos: [Data]) async -> String? {
+    /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24): its key, which the chat
+    /// list opens at once (item 1849) and swaps for the chat's own id once the daemon names it; `nil` when the message
+    /// could not be kept.
+    func startChat(_ text: String, photos: [Data], start: ChatStart) async -> String? {
         guard let engine else { return nil }
         do {
-            // The daemon's choices: the chat's settings sheet picks them (item 1801's app part).
-            let key: String = try await engine.startChat(text, photos: photos, start: .daemons)
+            let key: String = try await engine.startChat(text, photos: photos, start: start)
             startingChats[key] = text
             return key
         } catch {

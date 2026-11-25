@@ -260,7 +260,6 @@ TR: dict[str, str] = {
     "Update Dot on your Mac: it is too old for this app.": "Mac'indeki Dot'u güncelle: bu uygulama için fazla eski.",
     "Waiting for the link": "Bağlantı bekleniyor",
     "Was working at %@ · syncing…": "%@ saatinde çalışıyordu · eşitleniyor…",
-    "What should Dot work on?": "Dot ne üzerinde çalışsın?",
     "Your Mac": "Mac'in",
     "Your Mac could not be reached. Check that it is on and on your tailnet.": "Mac'ine ulaşılamadı. Açık ve tailnet'inde olduğunu kontrol et.",
     "Your agents and teams, their chats and schedules will show here.": "Ajanların ve ekiplerin, sohbetleri ve zamanlamaları burada görünecek.",
@@ -779,6 +778,7 @@ TR: dict[str, str] = {
     "Updates": "Güncellemeler",
     "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
     # Helper L1 (items 1800-1802): the chat list's select mode, the chat's settings, voice typing, Settings › Voice.
+    'Default level': 'Varsayılan düzey',
     'The models could not be read: %@': 'Modeller okunamadı: %@',
     'Recently used': 'Son kullanılanlar',
     'Chats with a run at work or waiting on you are kept; stop or answer them first.': 'Çalışan ya da seni bekleyen sohbetler silinmez; önce durdur ya da yanıtla.',
@@ -816,6 +816,7 @@ TR: dict[str, str] = {
     'Minimal': 'En az',
     'No model matches.': 'Eşleşen model yok.',
     'Open': 'Açık',
+    "Opens the chat's settings": 'Sohbetin ayarlarını açar',
     'Options': 'Seçenekler',
     'Pinned': 'Sabitlenenler',
     'Plan first': 'Önce plan',

@@ -25,7 +25,11 @@ what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
 it) selects several chats (Select in the bar or on a row's menu) and pins or deletes them together, with a Pinned
-section on top.
+section on top. The composer's model chip, and a new chat before its first message, open the chat's settings
+(`App/ChatSettingsSheet.swift`, rules in `ChatSettingsRules.swift`) on the app's one model catalog
+(`Components/ModelCatalog.swift`): the recent models, the providers as folding groups with their marks, Default, ✓ and ☆
+favourites, a search with a filter, the reasoning level on the model's own levels, fast mode, the approval mode, plan
+first and hidden models; the picks go to the chat's choices or with a new chat's first message (`POST /api/runs`).
 
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
 daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
@@ -156,7 +160,7 @@ per run in `Library/Caches/dotnext-frames.txt`).
 
 Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtures.swift`, decoded from the contract's
 JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`, `n2-editing`, `n2-failed`,
-`n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`. The UI tests (`UITests/ChatUITests.swift`, target
+`n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`, `n2-model` (the chat's settings). The UI tests (`UITests/ChatUITests.swift`, target
 `DotNextUITests`) run on them. The e2e daemon's script words for the chat: `approve:`, `question:`, `secret:`, `tools:`,
 `fail:`, `stream:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
 
@@ -173,9 +177,11 @@ Settings and every control of each native page and fails on one after which noth
 proposal, pairs a phone, makes a schedule, runs `SettingsLiveUITests` (every page that writes) and reads on the
 daemon's side what each tap wrote.
 
-`scripts/e2e_chats.sh <simulator udid> <derived data>` starts a throwaway daemon on a free port, makes two "[test]"
-chats and runs `ChatListLiveUITests` (which checks the pins); it reads the deletion on the daemon, and fails on a UI
-test that fails.
+`scripts/e2e_chats.sh <simulator udid> <derived data> [model ref]` starts a throwaway daemon on a free port, makes two
+"[test]" chats and runs `ChatListLiveUITests` (a UI test that fails fails it): two chats pinned and deleted together
+(the deletion read on the daemon), and a new chat on the model, level
+and approvals picked in its settings (a real model, `claude_code:haiku` by default: the owner's Claude plan through the
+`claude` CLI), whose run record it reads.
 
 ## Screenshots
 
