@@ -398,11 +398,21 @@ started. After a shutdown, the chat's queue goes on once the new run ends done; 
 until you resume it. The daemon still resumes on its own only a run that was cut off, not one that failed or is blocked.
 
 By default (`resume = "safe"` in `[agent]`, item 248) the daemon also resumes runs on its own when it starts: runs of
-the web UI, cut off at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a
-question to you counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed
-another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
-changed something (a command, a write, a click, an agent it made, a notification or a page it showed (item 552), or a
-delegation, whose run may have done anything) wait for you. `resume
+the web UI and the phone, cut off at most `resume_within_s` seconds before (30 minutes) by a restart, a shutdown or a
+crash of the daemon. Since item 1854 a call that was cut while it ran and may have changed something (a command, a
+write, an agent it made, a delegation) no longer holds the run back: the note names it, and the run is told, in the
+words OpenClaw's runs follow, that Dot restarted while it worked and to check the current state of what was in progress
+(files, processes, helpers, outside actions) before it repeats any of it, then to go on. What still waits for you: a
+run cut in a call that reaches beyond the Mac (a payment, a message or mail, a post, an upload or data sent out, a
+release: the set a schedule's task is never tried again for; done or not, a second try could do it twice), or in a
+call whose kind Dot cannot tell (a click the screen classifies, a browser click, whose element only the tab's snapshot
+of the daemon that ended knew, an unknown tool); a run of `dotx run`, of a
+channel, of an eval or a code review; a schedule's run, which the scheduler starts once more instead (item 1206); and a
+run that itself resumed another, so a run that brings the daemon down is not resumed again and again. A run you
+stopped is never resumed, by Stop, Ctrl-C or the emergency stop. The resumed run keeps the approval mode, the taint,
+the plan, the ledger and the proof checks (below) of the run it goes on from, and asks what that mode asks. So a
+restart (`dotx service restart`, an update) no longer loses a run's work, and an update need not wait for the runs to
+end; `--when-idle` is still there for a restart that should not cut a step in the middle. `resume
 = "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Details writes the choice into
 the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt
 (item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else
