@@ -7,6 +7,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1850](1850.md) | done | 2026-11-25 | The iPhone app is tested on GitHub's macOS runners |
+| [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
+| [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
 | [1759](1759.md) | done | 2026-11-25 | DotNext's Settings, whole: every page of the web app reachable, the hop-by-hop diagnosis, and pairing as a first run |
@@ -42,6 +44,12 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1713](1713.md) | done | 2026-11-24 | The day's room for lessons is counted by time and shared fairly between kinds of tasks |
 | [1712](1712.md) | done | 2026-11-24 | A code review starts with the notes about code alone |
 | [1711](1711.md) | done | 2026-11-24 | A run's rewrite of the owner's note waits for the owner, and the owner's words keep reaching every run |
+| [1695](1695.md) | done | 2026-11-24 | A run on Zen's free models is told Dot's own prompt and ends with Dot's finish |
+| [1694](1694.md) | done | 2026-11-24 | A run on the owner's Claude plan ends as Dot's own runs end: nudged to finish, checked, with lessons |
+| [1693](1693.md) | done | 2026-11-24 | A run on the owner's Claude plan keeps Dot's plan |
+| [1692](1692.md) | done | 2026-11-24 | A run on the owner's Claude plan has the core tools' definitions from the start |
+| [1691](1691.md) | done | 2026-11-24 | A run on the owner's Claude plan is told Dot's own system prompt |
+| [1690](1690.md) | done | 2026-11-24 | memory_save and memory_update name the longest note they take |
 | [1689](1689.md) | done | 2026-11-24 | DotNext on the store: the chat list, a chat, the helpers, pairing, checked end to end on a throwaway daemon |
 | [1688](1688.md) | done | 2026-11-24 | DotNext's engine: a store per daemon, one connection supervisor, the outbox moved, the cache, pairing |
 | [1687](1687.md) | done | 2026-11-24 | Smoke tests of the phone's sync contract on a served daemon |

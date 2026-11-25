@@ -47,7 +47,8 @@ type CallPurpose = Literal[
     "busy",
     # The review of a plugin the scout found for the gallery (item 710).
     "scout",
-    # Which free agents could help an agent at work (item 896), asked while the office is open.
+    # Which free agents could help an agent at work (item 896); none is asked since item 1836, kept so that the
+    # calls recorded before read.
     "offer",
     # The notes of a meeting Dot is in (item 1138), written by a call with no tool but its answer's.
     "meeting",

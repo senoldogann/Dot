@@ -14,10 +14,9 @@ from dotagent.runtime import _tool_groups
 from dotagent.store.models import RunMode
 from dotagent.tools.registry import ToolRegistry, build_registry, tools_for_mode
 
-# The loop's own and a campaign's, which neither program's agent gets.
+# The loop's own and a campaign's, which neither program's agent gets; the plan's tools are both programs' since items
+# 1693 and 1695.
 _LOOP_ONLY: dict[str, str] = {
-    "update_plan": "the program plans in its own way",
-    "mark_plan_step": "the program plans in its own way",
     "use_tools": "the loop's tool groups; Claude Code looks tools up with its own search, OpenCode lists them all",
     "react": "a reaction is on a message of the owner's in Dot's own chat",
     "campaign_achieved": "a campaign is judged by the facts and plan only Dot's own loop keeps",
@@ -28,7 +27,7 @@ _LOOP_ONLY: dict[str, str] = {
     "pick_draft": "a campaign's post",
     "rank_posts": "a campaign's post",
 }
-# Besides those, what OpenCode's agent does with its own tools, and finish, since its run ends with its last answer.
+# Besides those, what OpenCode's agent does with its own tools; finish is its since item 1695.
 _OPENCODE_ALSO_WITHOUT: dict[str, str] = {
     "read_file": "OpenCode's read",
     "write_file": "OpenCode's write",
@@ -39,7 +38,6 @@ _OPENCODE_ALSO_WITHOUT: dict[str, str] = {
     "shell": "OpenCode's bash",
     "web_fetch": "OpenCode's webfetch",
     "web_search": "OpenCode's websearch",
-    "finish": "the run ends with the agent's last answer (item 283)",
 }
 
 

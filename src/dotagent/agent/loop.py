@@ -225,6 +225,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import agent_folder
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.harness.components import GivenText
 from dotagent.harness.seat import TRIAL_EVENT, text_for_run
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.help.meaning import HelpVectorsCold
@@ -482,11 +483,11 @@ _SUMMARY_CUT_PROMPT: str = (
     "Your summary ran past {tokens} tokens and was cut off. Write it again, whole, under {max_words} words: shorten "
     "finished work to one line per step and keep every identifier. "
 )
-_NO_TOOL_NOTE: str = (
+NO_TOOL_NOTE: str = (
     "[system note] You replied without calling a tool. If the goal is achieved or impossible, call finish with your "
     "complete final answer. Otherwise continue by calling the tools you need."
 )
-_EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the task using tools, or call finish."
+EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the task using tools, or call finish."
 # How a reply ends that the model service stopped before it was complete: at its output limit, or for an abnormal
 # reason it gave (a refusal, a reason the codecs do not know).
 _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
@@ -639,7 +640,7 @@ PLAN_AGAIN_STEPS: int = 20
 async def _plan_now(agent: AgentRun) -> str | None:
     """The note of the run's plan while it has open steps (item 87); ``None`` when there is no plan or every step is
     closed."""
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     if not plan.steps or not open_steps(plan.steps):
         return None
     return f"{PLAN_NOTE}\n{plan_lines(plan)}"
@@ -654,7 +655,7 @@ def plan_due(plan: str | None, told: str | None, told_at: int, step: int) -> boo
     return plan is not None and (plan != told or step - told_at >= PLAN_AGAIN_STEPS)
 
 
-async def _current_plan(agent: AgentRun) -> PlanPayload:
+async def current_plan(agent: AgentRun) -> PlanPayload:
     latest: EventRecord | None = await agent.runtime.store.last_event(agent.run.id, PLAN_EVENT)
     return EMPTY_PLAN if latest is None else plan_from_event(latest)
 
@@ -794,7 +795,7 @@ async def _compact(
         message.model_copy(update={"content": summary_part(message.content)}) for message in head
     ]
     transcript: str = truncate_middle(render_transcript(readable), _SUMMARY_TRANSCRIPT_CHARS)
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     now: float = time.time()
     paused: Unavailable | None = (
         None if fast.label == own.label else paused_model(agent.runtime.router, fast.label, now)
@@ -1296,7 +1297,7 @@ def _new_teammates_note(agents: Sequence[AgentRecord]) -> str:
     )
 
 
-def _plan_note(unclosed: Sequence[int]) -> str:
+def plan_note(unclosed: Sequence[int]) -> str:
     return _PLAN_NOTE.format(steps=", ".join(str(number) for number in unclosed))
 
 
@@ -1337,7 +1338,7 @@ def _delegated_closings(outcomes: Sequence[ToolOutcome]) -> list[tuple[int, Tool
     return closings
 
 
-async def _close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome]) -> str | None:
+async def close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome]) -> str | None:
     """Close the plan steps the delegate calls of this step named: done with the report as evidence when the delegated
     run ended done, failed otherwise. The loop does this, not the tool, because delegate calls run side by side and the
     plan is rewritten whole. Returns the note for the model when a step of a run that ended done could not be closed
@@ -1346,7 +1347,7 @@ async def _close_delegated_steps(agent: AgentRun, outcomes: Sequence[ToolOutcome
     closings: list[tuple[int, ToolOutcome]] = _delegated_closings(outcomes)
     if not closings:
         return None
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     steps: tuple[PlanItem, ...] = plan.steps
     problems: list[str] = []
     for number, outcome in closings:
@@ -1384,7 +1385,7 @@ def _cut_short_end(reply: ModelReply) -> RunOutcome:
 
 def _with_restated(restating: Sequence[tuple[int, str]], outcome: RunOutcome) -> RunOutcome:
     """``outcome`` with the steps of the text replies its answer restates (item 620). A task run that answers in a plain
-    reply is told to finish (``_NO_TOOL_NOTE``, item 460), as such a reply may be a step announced; when its next step
+    reply is told to finish (``NO_TOOL_NOTE``, item 460), as such a reply may be a step announced; when its next step
     is the finish and nothing else, the reply was the answer, and the finish writes it again, often reworded, which the
     page's comparison of words cannot tell (the owner's chat showed a screenshot's description twice, 2026-10-24). A
     reply the answer does not restate (:func:`restates`: one it only points at, or one with a line, a number or a "not"
@@ -1573,6 +1574,177 @@ async def _session_number(agent: AgentRun, campaign_id: str) -> int:
     return session_number(await agent.runtime.store.campaign_sessions(campaign_id), agent.run.id)
 
 
+def free_mode_line(runtime: Runtime) -> str:
+    """What a run's prompt ends with while the owner's free mode is on as it starts (item 922), else nothing."""
+    return _FREE_MODE_LINE if runtime.approvals.free else ""
+
+
+async def run_harness_text(runtime: Runtime, run: RunRecord, held: tuple[str, ...]) -> GivenText:
+    """The texts of the adopted version of the harness the run's prompt takes (item 389), with the secrets ``held``
+    masked; the run records which version it took. While a version is tried on real runs (item 988), half the runs
+    take it, by their id, and record their half."""
+    text, version, seat = await text_for_run(runtime.store, run.id, held, time.time())
+    if version is not None:
+        await runtime.store.set_run_harness(run.id, version)
+    if seat is not None:
+        await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
+    return text
+
+
+@dataclass(frozen=True)
+class PromptFacts:
+    """What a run's system prompt is built from besides its tools, gathered once as the run starts, by Dot's own loop
+    and by a run on the owner's Claude plan alike (item 1691): how its questions go, its chat and the team it leads,
+    the skills listed by the chat's title (``listing``) and those that fit its goal (``fitting``), its browser, what the
+    MCP servers' groups are for, its agent and the team, the accounts signed in, its helpers, the harness's texts and
+    the secrets Dot held as it started."""
+
+    can_ask: bool
+    questions: AskMode
+    thread: ThreadRecord
+    lead: TeamBrief | None
+    listing: SkillListing
+    fitting: SkillListing
+    browser: BrowserSession
+    purposes: dict[str, McpPurpose]
+    agent_record: AgentRecord | None
+    team: tuple[AgentRecord, ...]
+    signed_in: tuple[Account, ...]
+    helpers: tuple[str, ...]
+    harness: GivenText
+    held: tuple[str, ...]
+
+
+async def gather_prompt_facts(
+    agent: AgentRun,
+    query: str,
+    skills: SkillCatalog,
+    agent_record: AgentRecord | None,
+    team: Sequence[AgentRecord],
+    signed_in: Sequence[Account],
+    helpers: tuple[str, ...],
+    harness: GivenText,
+    held: tuple[str, ...],
+) -> PromptFacts:
+    """The :class:`PromptFacts` of ``agent``'s run, whose goal reads as ``query`` and which is offered ``skills``."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    config: AgentConfig = runtime.config.agent
+    plan_first: bool = agent.opening.picks.plan_first
+    # Free mode (item 922) asks no run's owner anything; a Plan first, the owner's own word for this message, stands
+    # (item 1563).
+    can_ask: bool = can_ask_user(
+        run.source, run.parent_run_id, run.approvals, runtime.approvals.free and not plan_first
+    )
+    asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
+    # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
+    # wait for the answer whatever it says (item 508).
+    questions: AskMode = "wait" if asks == "choose" and plan_first else asks
+    # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
+    # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
+    # the provider's cache of the instructions and the history holds from message to message (item 404). More skills
+    # than the instructions list are picked by meaning too (item 169), or by their words when the embeddings fail
+    # (item 256).
+    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
+    close_to_title, close = (
+        await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
+        if len(skills.skills) > runtime.config.skills.listed
+        else ([], [])
+    )
+    return PromptFacts(
+        can_ask=can_ask,
+        questions=questions,
+        thread=thread,
+        # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
+        lead=team_brief(await runtime.store.find_team(thread.team_id), tuple(team), run),
+        listing=listed_skills(skills.skills, thread.title, close_to_title, runtime.config.skills.listed),
+        fitting=listed_skills(skills.skills, query, close, runtime.config.skills.listed),
+        browser=await browser_of(runtime, run),
+        # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked
+        # of a server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
+        purposes=runtime.mcp.purposes(held) if config.mcp_purposes else {},
+        agent_record=agent_record,
+        team=tuple(team),
+        signed_in=tuple(signed_in),
+        helpers=helpers,
+        harness=harness,
+        held=held,
+    )
+
+
+def turn_skills(facts: PromptFacts) -> list[Skill]:
+    """The skills that fit the run's goal and that its instructions do not list, handed under its message (item 404),
+    at most :data:`_TURN_SKILLS_MOST`."""
+    listed: set[str] = {skill.name for skill in facts.listing.skills}
+    return [skill for skill in facts.fitting.skills if skill.name not in listed][:_TURN_SKILLS_MOST]
+
+
+async def run_prompt_inputs(agent: AgentRun, facts: PromptFacts, tools: Sequence[ToolSpec]) -> PromptInputs:
+    """What the system prompt of ``agent``'s run is built from, for ``tools``: asked again when a small window left
+    tools out, so that the prompt names only the tools the run has (item 1211)."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    record: AgentRecord | None = facts.agent_record
+    names: AssistantView = runtime.assistant.view()
+    tool_names: list[str] = [spec.name for spec in tools]
+    return _with_phone_state(
+        runtime,
+        tool_names,
+        collect_prompt_inputs(
+            run.mode,
+            run.source,
+            runtime.config.policy.preset,
+            run.approvals,
+            facts.questions,
+            run.goal_mode,
+            splits_work(run.once),
+            runtime.workspace,
+            (),
+            0,
+            tools_in_order(tools, facts.thread.title),
+            facts.listing.skills,
+            facts.listing.left,
+            None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
+            facts.helpers,
+            None
+            if record is None
+            else AgentBrief(
+                name=record.name,
+                role=record.role,
+                instructions=record.instructions,
+                made_by_dot=record.made_by is not None,
+                team=team_name(record.name),
+                refuses=record.refuses,
+                folder=str(await _agent_folder(runtime.workspace, record.id)),
+            ),
+            [
+                AgentBrief(
+                    name=member.name,
+                    role=member.role,
+                    instructions="",
+                    made_by_dot=member.made_by is not None,
+                    team=team_name(member.name),
+                )
+                for member in facts.team
+            ],
+            (
+                *owner_name_lines(names.owner, names.mac_name),
+                *(called_lines(names.name) if record is None else ()),
+                # The accounts are named only to a run that has one of the tools that take them (an agent's may have
+                # none, or only some).
+                *(account_lines(list(facts.signed_in)) if tools_in(tool_names, ACCOUNTS_GROUP) else ()),
+                *owner_prompt_lines(await owner_section(runtime.store), facts.held),
+            ),
+            devtools_address(facts.browser.config),
+            runtime.config.agent.prompt,
+            facts.harness,
+            facts.lead,
+            skills_left_names=facts.listing.left_names,
+            group_purposes=facts.purposes,
+        ),
+    )
+
+
 async def _missing_in_answer(agent: AgentRun, answer: str, facts: RunFacts) -> tuple[str, ...]:
     """The paths ``answer`` names that do not exist and that no successful call of the run named."""
     return await asyncio.to_thread(missing_paths, answer_paths(answer), facts.named, agent.runtime.workspace)
@@ -1606,7 +1778,7 @@ async def _ask_checker(
     """
     run: RunRecord = agent.run
     patience: int = agent.runtime.config.agent.goal_patience
-    plan: PlanPayload = await _current_plan(agent)
+    plan: PlanPayload = await current_plan(agent)
     request: GoalRequest = GoalRequest(
         goal=run.goal,
         plan=render_plan(plan.steps),
@@ -1726,7 +1898,7 @@ async def _follow_ups(agent: AgentRun) -> str:
     return "\n".join(lines)
 
 
-async def _check_goal(
+async def check_goal(
     agent: AgentRun,
     checker: GoalChecker,
     history: Sequence[Message],
@@ -1872,7 +2044,7 @@ async def _checkpoint(
     request: CheckpointRequest = CheckpointRequest(
         goal=agent.run.goal,
         owner_words=agent.gate.instructions,
-        plan=plan_lines(await _current_plan(agent)) or _NO_PLAN,
+        plan=plan_lines(await current_plan(agent)) or _NO_PLAN,
         digest=goal_digest(render_recent_steps(_since_goal(history, goal), _CHECKPOINT_DIGEST_CHARS)),
     )
     try:
@@ -1900,7 +2072,7 @@ async def _answer_alert(
 ) -> StallAnswer | RunOutcome:
     """What the rung an alert reached asks for: a note (with the tools of the next step limited for a re-plan or a
     question), the advice of the review model, or the end of the run with what was tried."""
-    plan: str = plan_lines(await _current_plan(agent))
+    plan: str = plan_lines(await current_plan(agent))
     match alert.rung:
         case "consult":
             return await _consult(agent, consultant, alert, history, goal, ledger, plan)
@@ -1917,9 +2089,7 @@ async def _answer_alert(
     return StallAnswer(note=note, allowed=restriction_for(alert.rung, can_ask))
 
 
-def _run_end(
-    agent: AgentRun, history: Sequence[Message], goal: Message, outcome: RunOutcome, facts: RunFacts
-) -> RunEnd:
+def run_end(agent: AgentRun, history: Sequence[Message], goal: Message, outcome: RunOutcome, facts: RunFacts) -> RunEnd:
     """The end of a run, with what its lessons are drawn from when it may hold some."""
     run: RunRecord = agent.run
     setting = agent.runtime.config.agent.lessons
@@ -1952,7 +2122,7 @@ async def _limit_seen(agent: AgentRun, limits: RunLimits, started: float) -> Lim
 async def _limit_end(agent: AgentRun, reached: LimitReached, ledger: RunLedger, reply: str) -> RunOutcome:
     """The end of a run that did not finish in the step after it was told that its limit is reached; ``reply`` is the
     text that step's reply had."""
-    plan: str = plan_lines(await _current_plan(agent))
+    plan: str = plan_lines(await current_plan(agent))
     return RunOutcome(status="failed", result=limit_result(reached, ledger, plan, reply), needs="")
 
 
@@ -2574,109 +2744,26 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # were written (item 587). A gate refuses by a value, so the values filled into a page are not among them (item
     # 621); a text that holds one reaches the prompt with it masked (``given_text``, ``owner_prompt_lines``).
     held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
-    # While a version is tried on real runs (item 988), half the runs take it, by their id, and record their half.
-    harness_text, harness_version, seat = await text_for_run(runtime.store, run.id, held_at_start, time.time())
-    if harness_version is not None:
-        await runtime.store.set_run_harness(run.id, harness_version)
-    if seat is not None:
-        await runtime.store.add_event(run.id, TRIAL_EVENT, {"version": seat.version, "arm": seat.arm})
+    harness_text: GivenText = await run_harness_text(runtime, run, held_at_start)
     remembered: tuple[MemoryRecord, ...] = recalled.records
     await count_start_notes(runtime, run, recalled, memory_seen_at)
-    # Free mode (item 922) asks no run's owner anything; a Plan first, the owner's own word for this message, stands
-    # (item 1563).
-    can_ask: bool = can_ask_user(
-        run.source, run.parent_run_id, run.approvals, runtime.approvals.free and not opening.picks.plan_first
+    prompt_facts: PromptFacts = await gather_prompt_facts(
+        agent, query, skills, agent_record, team, signed_in, helpers, harness_text, held_at_start
     )
-    asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
-    # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
-    # wait for the answer whatever it says (item 508).
-    questions: AskMode = "wait" if asks == "choose" and agent.opening.picks.plan_first else asks
-    # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
-    # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
-    # the provider's cache of the instructions and the history holds from message to message (item 404). More skills
-    # than the instructions list are picked by meaning too (item 169), or by their words when the embeddings fail
-    # (item 256).
-    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
-    # The team the chat is with (item 610): every run of its thread, a follow-up too, leads it as the team is now.
-    lead: TeamBrief | None = team_brief(await runtime.store.find_team(thread.team_id), team, run)
+    can_ask: bool = prompt_facts.can_ask
+    questions: AskMode = prompt_facts.questions
+    lead: TeamBrief | None = prompt_facts.lead
     # A run that leads a group chat sends every agent its part in one reply, and they work at once (item 831).
     group_parallelism: int = parallel_calls(config.parallel_tools, lead)
-    close_to_title, close = (
-        await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
-        if len(skills.skills) > runtime.config.skills.listed
-        else ([], [])
-    )
-    listing: SkillListing = listed_skills(skills.skills, thread.title, close_to_title, runtime.config.skills.listed)
-    fitting: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
-    browser: BrowserSession = await browser_of(runtime, run)
-    names: AssistantView = runtime.assistant.view()
-    # What each MCP server's group is for, from what the hub learned when it connected (item 659): nothing is asked of a
-    # server now. ``[agent] mcp_purposes = false`` leaves the lines as they were, the evals' other arm.
-    purposes: dict[str, McpPurpose] = runtime.mcp.purposes(held_at_start) if config.mcp_purposes else {}
+    browser: BrowserSession = prompt_facts.browser
 
     async def _inputs_for(tools: tuple[ToolSpec, ...]) -> PromptInputs:
         """What the prompt is built from, for ``tools``: it is asked again when a small window left tools out, so
         that the prompt names only the tools the run has (item 1211)."""
-        return _with_phone_state(
-            runtime,
-            [spec.name for spec in tools],
-            collect_prompt_inputs(
-                run.mode,
-                run.source,
-                runtime.config.policy.preset,
-                run.approvals,
-                questions,
-                run.goal_mode,
-                splits_work(run.once),
-                runtime.workspace,
-                (),
-                0,
-                tools_in_order(tools, thread.title),
-                listing.skills,
-                listing.left,
-                None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
-                helpers,
-                None
-                if agent_record is None
-                else AgentBrief(
-                    name=agent_record.name,
-                    role=agent_record.role,
-                    instructions=agent_record.instructions,
-                    made_by_dot=agent_record.made_by is not None,
-                    team=team_name(agent_record.name),
-                    refuses=agent_record.refuses,
-                    folder=str(await _agent_folder(runtime.workspace, agent_record.id)),
-                ),
-                [
-                    AgentBrief(
-                        name=member.name,
-                        role=member.role,
-                        instructions="",
-                        made_by_dot=member.made_by is not None,
-                        team=team_name(member.name),
-                    )
-                    for member in team
-                ],
-                (
-                    *owner_name_lines(names.owner, names.mac_name),
-                    *(called_lines(names.name) if agent_record is None else ()),
-                    # The accounts are named only to a run that has one of the tools that take them (an agent's may
-                    # have none, or only some).
-                    *(account_lines(signed_in) if tools_in([spec.name for spec in tools], ACCOUNTS_GROUP) else ()),
-                    *owner_prompt_lines(await owner_section(runtime.store), held_at_start),
-                ),
-                devtools_address(browser.config),
-                config.prompt,
-                harness_text,
-                lead,
-                skills_left_names=listing.left_names,
-                group_purposes=purposes,
-            ),
-        )
+        return await run_prompt_inputs(agent, prompt_facts, tools)
 
     # The owner's free mode (item 922), as it stands when the run starts: the gate reads it at every step.
-    free_line: str = _FREE_MODE_LINE if runtime.approvals.free else ""
+    free_line: str = free_mode_line(runtime)
     prompt_inputs: PromptInputs = await _inputs_for(specs)
     system: Message = system_message(build_system_prompt(prompt_inputs) + free_line)
 
@@ -2767,10 +2854,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     fresh_notes: list[str] = list(handed_notes.fresh)
     forgotten: list[str] = list(handed_notes.forgotten)
     stood_in: list[MemoryRecord] = list(handed_notes.stood_in)
-    listed_names: set[str] = {skill.name for skill in listing.skills}
-    extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
-        :_TURN_SKILLS_MOST
-    ]
+    extra_skills: list[Skill] = turn_skills(prompt_facts)
     recalled_ids: list[str] = [record.id for record in (*remembered, *stood_in)]
 
     async def recalled_now(present: str) -> str:
@@ -2844,7 +2928,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     parts_told: bool = False
     step_origin: CallOrigin = CallOrigin(run_id=run.id, purpose="step")
     ratio: float = 1.0
-    # The text replies the loop told to finish (``_NO_TOOL_NOTE``) since the run last acted: their steps and texts. A
+    # The text replies the loop told to finish (``NO_TOOL_NOTE``) since the run last acted: their steps and texts. A
     # finish that follows them with no other call may restate them (item 620).
     noted_replies: list[tuple[int, str]] = []
     used_tools: bool = False
@@ -3350,7 +3434,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     if outcome.shown
                 }
             )
-            delegated_note: str | None = await _close_delegated_steps(agent, outcomes)
+            delegated_note: str | None = await close_delegated_steps(agent, outcomes)
             if delegated_note is not None:
                 history.append(await _stored_note(agent, delegated_note))
             finished: ToolOutcome | None = next(
@@ -3369,7 +3453,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             sites_seen.update(site_tag(site) for site in arrived)
             if arrived and finished is None:
                 arrival: str | None = await _arrival_note(
-                    agent, arrived, skills.skills, frozenset(skill.name for skill in listing.skills)
+                    agent, arrived, skills.skills, frozenset(skill.name for skill in prompt_facts.listing.skills)
                 )
                 if arrival is not None:
                     history.append(await _stored_note(agent, arrival))
@@ -3380,7 +3464,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 restating = tuple(noted_replies)
                 noted_replies = []
             elif past_limit is not None:
-                return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+                return run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
             else:
                 alert: Alert | None
                 watch, alert = advance(watch, _calls_seen(outcomes), limits, ladder)
@@ -3408,9 +3492,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     )
                     if alert.rung == "stop":
                         stopped: str = stop_result(
-                            f"{alert.detail} {drift.diagnosis}", ledger, plan_lines(await _current_plan(agent))
+                            f"{alert.detail} {drift.diagnosis}", ledger, plan_lines(await current_plan(agent))
                         )
-                        return _run_end(
+                        return run_end(
                             agent, history, goal, RunOutcome(status="failed", result=stopped, needs=""), facts
                         )
                     # A re-plan's or a question's rung keeps the next step's tools to planning or asking, as for a
@@ -3430,12 +3514,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                         agent, consultant, alert, can_ask, history, goal, ledger
                     )
                     if isinstance(answer, RunOutcome):
-                        return _run_end(agent, history, goal, answer, facts)
+                        return run_end(agent, history, goal, answer, facts)
                     history.append(await _stored_note(agent, answer.note))
                     allowed = answer.allowed
                 elif reminder_due(scaffold, run.mode, steps, reminded_at):
                     reminded_at = steps
-                    plan: PlanPayload = await _current_plan(agent)
+                    plan: PlanPayload = await current_plan(agent)
                     history.append(await _stored_note(agent, reminder_note(ledger, plan)))
                     await runtime.bus.emit(
                         run.id, "reminder", {"step": steps, "open_steps": list(open_steps(plan.steps))}, True
@@ -3459,9 +3543,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else:
             answered: bool = bool(reply.text.strip())
             if past_limit is not None:
-                return _run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+                return run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
             elif reply.finish in _CUT_SHORT and nudges >= config.finish_nudges:
-                return _run_end(agent, history, goal, _cut_short_end(reply), facts)
+                return run_end(agent, history, goal, _cut_short_end(reply), facts)
             elif reply.finish in _CUT_SHORT:
                 nudges += 1
                 history.append(await _stored_note(agent, _CUT_SHORT_NOTE.format(reason=_ended_with(reply))))
@@ -3470,14 +3554,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 ended = RunOutcome(status="done", result=reply.text, needs="")
             elif nudges >= config.finish_nudges:
                 # Empty again and again: the run ends, on no other model (item 1225).
-                return _run_end(
+                return run_end(
                     agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
                 )
             else:
                 nudges += 1
                 if answered:
                     noted_replies.append((steps, reply.text))
-                history.append(await _stored_note(agent, _NO_TOOL_NOTE if answered else _EMPTY_NOTE))
+                history.append(await _stored_note(agent, NO_TOOL_NOTE if answered else EMPTY_NOTE))
                 continue
         # The run wants to end here. Past its limit it ends with this finish: nothing sends it back, goal mode's verdict
         # on it is final, and what the user sent during the step comes too late for it (the manager keeps an answer in
@@ -3488,7 +3572,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 if checker is None
                 else await _check_goal_at_limit(agent, checker, history, goal, ended, sent_back, facts)
             )
-            return _run_end(agent, history, goal, _with_restated(restating, at_limit), facts)
+            return run_end(agent, history, goal, _with_restated(restating, at_limit), facts)
         # Otherwise a finish that came in the reply of a call that did not work is sent back once, to read what
         # happened (item 552). Outside a chat, a plan with open steps does not end the run: each finish is sent back
         # until the steps are closed or abandoned (done, failed or skipped), and at most stall_limit times, after
@@ -3504,23 +3588,23 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             )
             continue
         if run.mode != "chat":
-            unclosed: tuple[int, ...] = open_steps((await _current_plan(agent)).steps)
+            unclosed: tuple[int, ...] = open_steps((await current_plan(agent)).steps)
             if unclosed and plan_reminders < config.stall_limit:
                 plan_reminders += 1
                 nudges = 0
-                history.append(await _stored_note(agent, _plan_note(unclosed)))
+                history.append(await _stored_note(agent, plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
             if unclosed and checker is not None and not plan_handed:
                 # The reminder bound is spent. Goal mode's checker takes the finish; an open plan still blocks a
                 # finish the checker does not accept, and one more finish with steps open reaches the progress stop.
                 plan_handed = True
-                plan_verdict: RunOutcome | SendBack = await _check_goal(
+                plan_verdict: RunOutcome | SendBack = await check_goal(
                     agent, checker, history, goal, ended, sent_back, facts
                 )
                 if isinstance(plan_verdict, RunOutcome):
                     if not agent.inbox.asks():
-                        return _run_end(agent, history, goal, _with_restated(restating, plan_verdict), facts)
+                        return run_end(agent, history, goal, _with_restated(restating, plan_verdict), facts)
                     continue
                 sent_back += 1
                 nudges = 0
@@ -3535,9 +3619,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     + ", ".join(str(number) for number in unclosed)
                     + " were still open",
                     ledger,
-                    plan_lines(await _current_plan(agent)),
+                    plan_lines(await current_plan(agent)),
                 )
-                return _run_end(agent, history, goal, RunOutcome(status="failed", result=stopped_plan, needs=""), facts)
+                return run_end(agent, history, goal, RunOutcome(status="failed", result=stopped_plan, needs=""), facts)
         if (
             run.campaign_id is not None
             and not targets_reminded
@@ -3558,11 +3642,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 await runtime.bus.emit(run.id, "answer_paths", {"missing": list(missing)}, True)
                 continue
         settled: RunOutcome | SendBack = (
-            ended if checker is None else await _check_goal(agent, checker, history, goal, ended, sent_back, facts)
+            ended if checker is None else await check_goal(agent, checker, history, goal, ended, sent_back, facts)
         )
         if isinstance(settled, RunOutcome):
             if not agent.inbox.asks():
-                return _run_end(agent, history, goal, _with_restated(restating, settled), facts)
+                return run_end(agent, history, goal, _with_restated(restating, settled), facts)
             # The user sent something during this step, such as the answer to a question the run left: the run reads it
             # before it ends. Nothing awaits between this check and the moment the manager shuts the inbox.
             continue

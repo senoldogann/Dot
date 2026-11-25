@@ -2,81 +2,9 @@
 
 ## Agents
 
-**The Agents page** is in four parts, one shown at a time and the last one kept in this browser (item 1136): **Agents**
-(Dot and your agents as cards, then the ready-made agents and teams), **Teams**, **Orders** (the work orders) and
-**Office**. **New agent** stands beside the tabs; **New team**, **Import an agent** and **Handoffs** are under the "…"
+**The Agents page** is in three parts, one shown at a time and the last one kept in this browser (item 1136): **Agents**
+(Dot and your agents as cards, then the ready-made agents and teams), **Teams** and **Orders** (the work orders). **New agent** stands beside the tabs; **New team**, **Import an agent** and **Handoffs** are under the "…"
 next to it.
-
-**The office** (item 885, the owner's ask of 2026-10-31) is the Office part of the Agents page: Dot and your agents in a
-room drawn in 3D, each living its day by what it does. An agent whose run works goes to its own desk (its name on a plate), sits and
-types, and its screen lights up; one whose run waits for you (a question, a step to approve) stands at its desk, turns
-to you and waves, its tag pulsing orange; a free one has a coffee at the bar, sits on the sofa, looks out of a window,
-thinks at the whiteboard, browses the shelf or sits at its desk, and in the small hours naps. The figures are Dot's own,
-drawn in code with no model file: the head is the agent's look (its shape made solid, in its colour), with eyes that
-blink, look about and change with what it does, and Dot has gold eyes; clothes and an accessory come from its id. The
-room has the Mac's time: a wall clock that tells it, a sky behind the windows that turns from day to evening to a night
-with stars, and lamps that glow at night. A tag over each says its name and what it does, and over a working agent a
-bubble says the step it takes this moment ("Web search · cafés in Oulu", "Edit file · drafts/cafes.md", "Writing", item
-889); a click on a figure or its tag opens a panel with its face, role and what it works on, its steps live as they come
-(each marked when it went through or failed) and the answer as it is written, "Open its chat", "Its page" and the box to
-message it, which starts the run without leaving the room, so you see the agent walk to its desk and start; click
-another and message it too, and both work at once. An agent that sends another a message (`message_agent`) walks to that
-one's desk and talks there a while ("Talking to Copy Editor"), then goes back to its work. The office follows the eight
-newest working runs, and the one whose panel is open, on one stream (`GET /api/runs/streams`): it reads each one's steps
-so far once, then the stream brings the new ones, so however many agents work it holds one connection to Dot, and a
-message you send waits behind none. A call it reads from before it opened moves nobody. Drag turns the room, the wheel
-or two fingers zoom, the button at the corner brings the whole room back. On a phone (item 894, the owner's look at it
-there) the room is square and seen more from above, so that its floor fills the frame; a free agent's tag is its name
-alone, small, and those that work or wait for you, and the one whose panel is open, keep the full tag; the panel takes
-the frame's foot, and the button that brings the room back steps aside while it is open.
-
-**Help offers** (item 896, your ask of 2026-11-01: the agents outside the work should offer to help the agents at work,
-when it makes sense). While the office is open, each run at work, Dot's or an agent's (six at most, the newest first),
-is matched once with the agents free now (not at work, not waiting for you, not paused): the fast model is shown its
-goal, in a fence since it may hold what a page or a mail wrote, and each free agent's name and role, and names at most
-two whose role fits a real part of that work, each with that part in a few words, or none. Such a helper walks over to
-the one at work, its tag saying "Offers to help …", and both panels list the offer with **Let it help**: the helper's
-run starts as a helper of the run at work, as `message_agent` starts one, so that it asks you what that run would ask
-(an initiative's message, post or release, in every mode but free mode, item 922) and starts as untrusted as it is (item 902; item 896 only told
-the run at work it could hand a part over, and a run near its end went on without): its goal, in fixed words, names the
-one it helps and its run at work, and has it read where that run stands with `read_agent_chat` (that run's chat, not the
-newest, fenced when it read outside content), do the part its role fits and end with what it found or made. The run at
-work is told so in a note of Dot's, and the helper's answer reaches it as another note when the helper ends, while it
-still works (fenced when the helper read outside content, and the run at work then counts as having read it, as with
-`message_agent`). Only a free agent helps (409 for one at work, waiting or paused). Stopping the run at work, or its
-end, stops its helper. The notes are not your messages: like a note about a reaction they clear no mark of content
-others can write and give the reviewer no instruction, and the part the model wrote is shown to you, never sent to a
-run. The room shows the helper at work at once, and the button says **Helping**. A run is asked about once; a model that
-cannot answer offers nothing. By meaning alone (bge-m3) a Turkish goal and the English roles of the templates scored
-0.44 to 0.57 for every role alike, which is why a model matches them. `GET /api/agents/offers` gives the offers
-(`helper_id`, `helper_name`, `helper_role`, `to_id`, `to_name`, `run_id`, `part`); `POST /api/agents/offers/help` with
-`helper_id` and `run_id` starts the helper's run and returns it (201; 404 for an agent or a run that is not, 409 for a
-run that is not at work). **Hide** folds it away, which this browser keeps; the teams and the agents' cards stay under
-it. It draws only while it is on the screen, the page is shown and Dot's window is the one in front, at 30 frames a
-second while nobody walks and the camera rests, with fewer pixels when the Mac or the phone cannot keep up (item 889:
-the still room is baked into one mesh per material and its sun shadows drawn once, a few hundred draw calls where it was
-1,420), one frame each time something changes when motion is reduced, and a browser without WebGL 2 is told so and shows
-the rest of the page. The room grows with the number of agents (two desks a pod, three pods across), and is 20 by 15
-metres at least (item 898). Its panel is a chat (item 898): the agent's conversation (item 1233: its home chat, as its page's) shows its last turns, your
-words at the right and its answers at the left, and what you write goes on in that chat rather than starting a new chat
-each time: while the agent works, or waits for you, it waits in that chat's queue, or reaches the run at once with
-**Steer** chosen under Settings › General › Messages, as a message in its chat does; the panel has no New chat (item
-1279): the agent has this one chat. A schedule's, a watcher's or Dot's own chat is not gone on in: with no chat of yours, the panel is an
-empty chat, ready for your first message. A free agent's panel is its chat alone; its steps and words show while it
-works or waits (item 901), at the foot of the chat, whoever started the run (a schedule, a watcher, Dot's own
-initiative, a helper's part, or a run that is no chat of yours). The chat is written as the chat page writes it (item
-905): your words in a bubble, the answers across the panel with their Markdown rendered (headings, bold, lists, code),
-never as marks, and whole; the words a run at work is writing show their newest whole blocks, 1,600 characters or so
-(as the chat page's reader finds them, so never inside a code block or a list; a code block still being written shows
-its opening line and its newest lines). Over the chat, what the agent does is a word (Working, Waits for you)
-when its run is the chat below, whose first message is the goal; for any other run, the word and the goal. The chat takes the height of the panel and is the one part of it that scrolls, and a new step or word is added
-to what is drawn rather than drawing the whole chat again, so it stays where you scrolled it, or follows the foot when
-you were there or when you send. Many help offers scroll in their own part, and the panel scrolls as a last resort, so
-the box is never out of reach. The button at the top corner shows the office full screen, over the whole window, and takes
-it back, as Escape does (item 901). The names over the heads glide when one must stand above another, and their sizes
-are read when their words change, not at every frame (item 898: they moved jerkily). three.js 0.187.0 (MIT,
-`static/vendor/three/`, its licence beside it) draws it, loaded only when the office opens and drawn only while its part is
-shown.
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the actions it may use (its tools); each left out takes the configured one, and **All actions**,
@@ -97,10 +25,10 @@ that agent alone — or, for an agent the owner chatted with before that binding
 it, whose latest run is the agent's (the daemon names it, `home`
 in `GET /api/agents` and `GET /api/agents/{id}`, not one a schedule, a watcher, Dot's initiative, a lead's work order
 or the agents' work among themselves started, nor a team's or a campaign's), its row in the
-agents' menu of the sidebar opens that chat, and its page's box goes on in it, as the office's panel does
+agents' menu of the sidebar opens that chat, and its page's box goes on in it
 (item 898): to the run at work while there is one, queued or steered as Settings › General › Messages says, and the
 chat opens. Under the box, **Open your chat with Scout** leads back into it. **New chat** in the page's "…" is the one
-way to leave the conversation (item 1279: an agent has one chat, so the office's panel and the home have no such button):
+way to leave the conversation (item 1279: an agent has one chat, so the home has no such button):
 it starts the next message afresh (the way back hides until then); that chat is then the newest, and the conversation
 from there on.
 Chats deleted in the sidebar may take the conversation with them: the menu's row and the open page then name the one left. With no chat yet, the row opens

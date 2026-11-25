@@ -185,7 +185,13 @@ def expiry_of(valid_days: int | None, now: float) -> float | None:
     return None if valid_days is None else now + valid_days * 86400.0
 
 
-def _save_tool() -> RegisteredTool:
+def _length_rule(max_chars: int) -> str:
+    """What a note may hold, said in the tools that write one: a run on the owner's plan sent 6 of 21 notes over the
+    limit, which no word of its tools named (the audit of 2026-11-24)."""
+    return f" A note holds at most {max_chars} characters; a longer one is refused, so split it into single facts."
+
+
+def _save_tool(max_chars: int) -> RegisteredTool:
     def classify(args: SaveArgs, ctx: ToolContext) -> ActionInfo:
         flags: tuple[Flag, ...] = ("persistence", "exfiltration") if looks_like_key(args.content) else ("persistence",)
         return _write_action("memory_save", f"Remember: {args.content}", flags)
@@ -216,6 +222,7 @@ def _save_tool() -> RegisteredTool:
             "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, "
             "a convention that will apply again. One fact per call. Do not save secrets (one that holds a key is "
             "refused: record where the key lives), progress on the current task, or what is easy to look up again."
+            + _length_rule(max_chars)
         ),
         args_model=SaveArgs,
         modes=ALL_MODES,
@@ -314,7 +321,7 @@ class UpdateArgs(ToolArgs):
     )
 
 
-def _update_tool() -> RegisteredTool:
+def _update_tool(max_chars: int) -> RegisteredTool:
     async def classify(args: UpdateArgs, ctx: ToolContext) -> ActionInfo:
         record: MemoryRecord = await ctx.runtime.memory.store.get_memory(args.memory_id)
         flags: tuple[Flag, ...] = ("persistence", "exfiltration") if looks_like_key(args.content) else ("persistence",)
@@ -341,7 +348,7 @@ def _update_tool() -> RegisteredTool:
         name="memory_update",
         description=(
             "Rewrite a saved note whose fact has changed or was wrong, keeping its id. Prefer it over forgetting and "
-            "saving again."
+            "saving again." + _length_rule(max_chars)
         ),
         args_model=UpdateArgs,
         modes=ACTING_MODES,
@@ -352,5 +359,7 @@ def _update_tool() -> RegisteredTool:
     )
 
 
-def build_memory_tools() -> tuple[RegisteredTool, ...]:
-    return (_save_tool(), _search_tool(), _update_tool(), _forget_tool())
+def build_memory_tools(max_chars: int) -> tuple[RegisteredTool, ...]:
+    """The tools of Dot's memory; ``max_chars`` is the longest note (``[memory] max_chars``), which the tools that write
+    one name."""
+    return (_save_tool(max_chars), _search_tool(), _update_tool(max_chars), _forget_tool())

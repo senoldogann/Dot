@@ -36,6 +36,7 @@ from dotagent.opencode.run import (
     _Call,
     agent_failed,
     bridged_tools,
+    harness_prompt,
     local_target,
     meanwhile,
     permission_action,
@@ -295,7 +296,7 @@ def _registry() -> ToolRegistry:
             (build_shell_tool(),),
             build_web_tools(),
             build_browser_tools(),
-            build_memory_tools(),
+            build_memory_tools(600),
             build_schedule_tools(),
             build_delegate_tools(),
             build_meta_tools(),
@@ -334,10 +335,11 @@ def test_the_agent_gets_dots_tools_for_what_opencode_has_none_of() -> None:
     names: set[str] = set(bridged_tools(_registry(), _TASK_RUN, None).tools)
     assert {"browser_open", "browser_act", "memory_save", "memory_search", "memory_forget", "schedule_create"} <= names
     assert {"ask_user", "notify", "delegate", "terminal_send"} <= names
-    # OpenCode's agent has its own for files, commands and the web; the run ends with its last answer, not finish; the
-    # plan and the tool groups are Dot's loop's.
-    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search", "finish"}
-    assert not names & (left_out | {"update_plan", "use_tools"})
+    # Item 1695: the run ends with Dot's finish and keeps Dot's plan, as its prompt says.
+    assert {"finish", "update_plan", "mark_plan_step"} <= names
+    # OpenCode's agent has its own for files, commands and the web; the tool groups are Dot's loop's.
+    left_out: set[str] = {"read_file", "write_file", "shell", "web_fetch", "web_search"}
+    assert not names & (left_out | {"use_tools"})
 
 
 def test_a_delegated_run_gets_none_of_what_a_delegated_run_may_not_use() -> None:
@@ -348,7 +350,19 @@ def test_a_delegated_run_gets_none_of_what_a_delegated_run_may_not_use() -> None
 
 def test_an_agent_bounded_to_some_tools_gives_only_those() -> None:
     bounded: frozenset[str] = frozenset({"browser_open", "finish", "ask_user", "read_file"})
-    assert set(bridged_tools(_registry(), _TASK_RUN, bounded).tools) == {"browser_open", "ask_user"}
+    assert set(bridged_tools(_registry(), _TASK_RUN, bounded).tools) == {"browser_open", "finish", "ask_user"}
+
+
+def test_the_agent_is_told_dots_own_prompt_then_what_opencode_changes() -> None:
+    """Item 1695: a run on Zen's free models was told nothing of Dot's (no character, rules, owner or finish); Zen
+    answered with Dot's whole prompt in a prompt's system (measured 2026-11-24), which now carries it, then which of
+    OpenCode's tools stand for the ones it names."""
+    task: str = harness_prompt("DOT PROMPT", "dot_1a2b3c4d", ["browser_open", "finish"], Path("/w"))
+    assert task.startswith("DOT PROMPT\n\n# This run's harness\n")
+    assert "bash for shell" in task and "dot_1a2b3c4d_<tool>): browser_open, finish" in task
+    assert "call finish" in task and "Dot's workspace, /w" in task
+    chat: str = harness_prompt("DOT PROMPT", "dot_1a2b3c4d", ["browser_open"], Path("/w"))
+    assert "call finish" not in chat and "your last reply" in chat
 
 
 def _decided(tool: str, rules: list[JsonValue]) -> str:

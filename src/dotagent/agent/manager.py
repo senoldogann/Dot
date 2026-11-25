@@ -1770,7 +1770,7 @@ class RunManager:
                 if work_chat is not None and not carried:
                     await _uncancelled(self._runtime.store.delete_threads([work_chat]))
                 raise
-        # Who started it hears the run's id at once (item 902: the owner's Let it help shows the helper at work).
+        # Who started it hears the run's id at once (item 902): a work order's attempt waits on it.
         if on_start is not None:
             on_start(handle.run_id)
         released: bool = False

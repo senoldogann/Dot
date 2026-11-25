@@ -352,7 +352,8 @@ answer keeps its words, Ollama's too.
   not cut short here: OpenCode does not say when it takes one in), skills and saving one, the team and helpers, your
   mail and calendars, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
   them and as Dot's own loop withholds them (no accounts, no skills, no helpers). It has none of Dot's for what its own
-  tools do (files, `shell`, `web_fetch` and `web_search`) and no `finish`: the run ends with its last answer. It does
+  tools do (files, `shell`, `web_fetch` and `web_search`); `finish` and the plan's tools are its since item 1695
+  (below). It does
   have Dot's terminal sessions (`terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`), `web_crawl` and
   `web_extract`: a command sent to a terminal session runs in Dot's own terminal, under Dot's gate and Dot's sandbox as
   Dot's own commands do, not in the OpenCode server above.
@@ -368,12 +369,21 @@ answer keeps its words, Ollama's too.
   (`run_max_minutes`, `run_max_tokens`) bind the agent as they bind Dot's own loop (item 552): the first step that ends
   past one while the agent goes on tells it to stop and answer, and an agent that goes on two steps after that is
   stopped and the run ends failed. A reply that stopped at the model's output limit ends the run failed too ("the
-  model's replies were cut short"), not done with half an answer. A run here that ended is asked for its lessons as
-  Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own runs bring
-  besides (the memory recalled at the start, the checks of a finish and playbooks) a run here does not have,
+  model's replies were cut short"), not done with half an answer. Since item 1695 the agent is told Dot's own system
+  prompt, the one Dot's own loop builds for the run (its character, how to work, trust and safety, the plan, what Dot
+  knows of you, the skills), in each prompt's `system`, after OpenCode's own, then which of OpenCode's tools stand for
+  the ones it names (Zen's free tier answered with it on Big Pickle and DeepSeek V4.1 Flash Free, measured 2026-11-24
+  on OpenCode 1.19.5; before, the agent heard nothing of Dot's but your words); under your message come how the run
+  was started, the notes of Dot's memory recalled for it and the skills that fit its goal; and it has Dot's `finish`,
+  `update_plan` and `mark_plan_step`, so it keeps Dot's plan and the run ends as its `finish` says (done only when it
+  succeeded, with what it needs from you; a later call of a tool, Dot's or OpenCode's, drops it). A run here that ended
+  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own
+  runs bring besides (the goal check of a finish and playbooks) a run here does not have,
   and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
   apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models
-  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models. The free tier is Zen's to give: it
+  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models: since item 1695 every run here
+  sends them Dot's prompt with what Dot knows of you (your names, the accounts you signed in, what the nightly
+  reflection keeps of you; the secrets Dot holds stay masked) and the notes recalled for your message. The free tier is Zen's to give: it
   turned requests down for a few minutes after many in a short time, OpenCode's own command line's too (measured
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
@@ -400,10 +410,18 @@ answer keeps its words, Ollama's too.
   (`claude_code_version_not_measured`) and runs; a version listed as broken refuses the run, saying which version and to
   install another (none is listed yet). `dotx doctor` shows it in its **claude code** row. A run on one goes whole to
   Claude Code, started without a terminal (`claude -p`, its input and output
-  lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
-  the name you call Dot by, what Dot's nightly reflection keeps of you, and, under your message, the notes of Dot's
-  memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
-  what the memory held), and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
+  lines of JSON) in Dot's workspace, as Dot: the model is told, after Claude Code's own prompt, the system prompt
+  Dot's own loop builds for the run, whole (item 1691: how to work and verify, the plan, how a run ends, trust and
+  safety, the character, what the adopted harness learned, the skills listed for the chat, the team, the environment
+  and what Dot knows of you; before it, a run on the plan was told 3.9 KB of its own, now about 32 KB), then what this
+  harness changes of it (the door, the tools' names, Claude Code's own tools off), passed with
+  `--append-system-prompt-file` at every start, a `--resume` too, so Claude Code's compaction keeps it: a file only you
+  can read in the run's private folder, removed as the run ends, since the prompt holds what Dot knows of you and the
+  program's arguments are shown by `ps` to every process; Claude Code records it with the session, and a resume sends
+  it as recorded until a compaction renders it again; under your message
+  come how the run was started, the notes of Dot's memory recalled for it, as Dot's own loop hands them (item 1055:
+  before it, a run on the plan said it did not know what the memory held), and the skills that fit its goal that the
+  prompt does not list; and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
   chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
   head is read by a new chat instead of written again), every tool a run of Dot's own loop gets (`code_run`, item 1501, among
   them: found with `ToolSearch` like the others) (Claude Code's own are
@@ -412,8 +430,10 @@ answer keeps its words, Ollama's too.
   connected, your mail and calendars, drafts, the vault, Dot's own list, and the team, as the run's mode and agent allow
   them (item 1063: before it, a run on the plan had no tool to message an agent, give it a work order or delegate). Its
   prompt names the team as Dot's own does: the team its chat is with, the agents it may message by name and role, and
-  how to give them work orders. Only the tools of Dot's own loop stay out (finish, the plan, `use_tools` and a reaction:
-  the program runs its own loop), and a run another run handed its work to asks you nothing and hands nothing on, as
+  how to give them work orders. Only the tools of Dot's own loop stay out (`use_tools` and a reaction: the program
+  finds its tools in its own way; `finish` is the door's since item 1076, and `update_plan` and `mark_plan_step` since
+  item 1693, so the plan you watch moves as on Dot's own runs, a resumed run takes the plan of the run it goes on from,
+  and a `delegate` that names a step closes it), and a run another run handed its work to asks you nothing and hands nothing on, as
   in Dot's own loop. An agent a run on the plan messages works on its own model, or on the plan when it names none.
   Each call goes through the run's approvals, sandbox,
   shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The
@@ -423,7 +443,9 @@ answer keeps its words, Ollama's too.
   the model to look a tool up before its first call of it rather than guess its parameters, item 1201; `terminal_open`
   and `wait_until`, which the shell's description sends the model to, are in the prompt whole from the start, marked
   `anthropic/alwaysLoad` in the door's list, as the model called them by their names alone, with no arguments or
-  guessed ones, item 1341), no settings
+  guessed ones, item 1341; so is every tool of Dot's core group, as Dot's own loop gives a run whose tools come in
+  groups the core ones whole, item 1692: "Invalid arguments" came in 19 % of the plan's runs against 6 % of the loop's,
+  most of them core tools called before they were looked up; about 27,000 characters more in the prompt), no settings
   file of yours, a project's or the workspace's
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
   (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door and the search do
@@ -491,11 +513,13 @@ answer keeps its words, Ollama's too.
   tool of it meets ends it as the emergency stop, not as an error the model reads; a message sent as it ends is kept or
   marked unread as Dot's own loop does, not dropped; a resumed run says which it goes on from and is told that the steps
   of that run are not in its session; and Claude Code's own limit on a call of Dot's tool is a day, so a question or an
-  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. A run here that ended
-  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called, which the store keeps as
-  for any run (item 1714: they waited for the night's reflection before, which reads only some). What Dot's own runs
-  bring besides (the checks of a finish and playbooks) a run here does not
-  have, and these models cannot be the fast, vision or standby model chosen on the
+  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. Its end is
+  decided as on Dot's own runs (item 1694): a turn that ends after the model worked without `finish` is nudged towards
+  it (`finish_nudges`), a `finish` with plan steps open is reminded of them (`stall_limit`), and in goal mode a
+  `finish` goes to the goal check, read from Dot's record of the run's calls and words, which settles it or sends it
+  back to work with its reason (`goal_patience`); the lessons of its end are drawn from the same record (a run on
+  OpenCode's are drawn from the results of Dot's tools the store keeps, item 1714). What Dot's own
+  runs bring besides (the playbooks offered, Dot's own compaction) a run here does not have, and these models cannot be the fast, vision or standby model chosen on the
   Models page, whose calls include conversations and pictures; they can be the review model (item 1032) and the own
   work model, whose look has its tools there (item 1063). They can be the models of the improvement loop's roles
   (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which

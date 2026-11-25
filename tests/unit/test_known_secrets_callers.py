@@ -74,8 +74,6 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "tools/coding_work.py:_track": (True,),
     "tools/objectives.py:_add_tool.run": (True,),
     "tools/objectives.py:_update_tool.run": (True,),
-    # The part a help offer says a free agent could take, masked before the office shows it (item 896).
-    "server/routes_agents.py:agents_router.help_offers": (True,),
     # A skill the owner said in a chat (item 893), masked before it is written.
     "tools/skill_save.py:_skill_save_tool.run": (True,),
     # ----- Refusing, blocking or choosing: nothing a run can watch tells it a value (``filled=False``). -----
@@ -123,9 +121,9 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # An agent is exported only if its words hold none; the file has the values masked.
     "server/routes_agents.py:agents_router.export_agent": (False,),
     "server/routes_agents.py:agents_router.use_template": (False,),
-    # The owner's lines of a run on the Claude plan (item 1055), as the prompt of Dot's own loop takes them: a line of
-    # Dot's that the gate refuses by a value is left out.
-    "claude_code/run.py:_prompt_of": (False,),
+    # The prompt of a run on the Claude plan or OpenCode (items 1055, 1691 and 1695), as Dot's own loop builds it: the
+    # owner's lines and the harness's texts, a line that holds a value the gate refuses by left out.
+    "agent/handover.py:prompt_facts": (False,),
     # ----- Both: refuses by the first list, then masks by the second. -----
     # A step of a run that read outside content is refused for the secret it would send out of the Mac; its record
     # masks them all.
