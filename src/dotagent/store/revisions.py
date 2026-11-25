@@ -100,6 +100,7 @@ NOT_STATE: dict[str, str] = {
     "paced_actions": "the pace of a run's actions on a host, not shown",
     "spends": "what a run spent, the spending page",
     "chat_permits": "a chat's 'don't ask again', the rules page",
+    "chat_index": "the words of the chats that search_chats reads, kept by triggers of their own, not shown",
 }
 
 
