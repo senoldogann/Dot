@@ -31,6 +31,7 @@ final class AppModel {
     private(set) var online: Bool = true
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
+    private(set) var startedChats: [String: String] = [:]
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -75,6 +76,7 @@ final class AppModel {
         if next.online != online { online = next.online }
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
+        if next.startedChats != startedChats { startedChats = next.startedChats }
     }
 
     /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
@@ -105,6 +107,12 @@ final class AppModel {
     var askPhases: [String: AskPhase] = [:]
     /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
     var startingChats: [String: String] = [:]
+
+    /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
+    /// is read (item 1849).
+    func firstWords(of thread: String) -> String? {
+        startedChats.first { $0.value == thread }.flatMap { startingChats[$0.key] }
+    }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
