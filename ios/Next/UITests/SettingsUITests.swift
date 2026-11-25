@@ -36,6 +36,8 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Morning brief"].waitForExistence(timeout: 10))
         let toggle: XCUIElement = app.switches["Morning brief on"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        // XCUITest reads a toggle's value as "1"/"0" whatever its `accessibilityValue` says (measured on iOS 26.5: a
+        // check against "On" failed with `Optional("1")`, this one passes; the ink switch keeps the switch trait).
         XCTAssertEqual(toggle.value as? String, "1", "switched on")
         app.buttons.matching(identifier: "Actions").firstMatch.tap()
         XCTAssertTrue(app.buttons["Run now"].waitForExistence(timeout: 3), "the row's menu runs it now")
