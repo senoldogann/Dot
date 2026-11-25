@@ -331,9 +331,10 @@ struct CampaignPage: View {
             problem = nil
         case .failure(let box):
             // A refused action most often means the campaign moved on meanwhile (a session achieved it: 409): read it
-            // again, so the actions offered are what the daemon takes now; the failure stays shown.
+            // again, so the actions offered are what the daemon takes now; the failure stays shown above it. When the
+            // read fails too, the page's own banner says why, once.
             await load()
-            problem = box.failure
+            if state.value != nil { problem = box.failure }
         }
         acting = false
     }
