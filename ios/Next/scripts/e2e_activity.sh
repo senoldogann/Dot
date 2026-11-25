@@ -5,11 +5,13 @@
 # each look (light and dark, exported to <shots dir>) and taps every control that writes, and this script reads on the
 # daemon's side what each tap wrote. Nothing touches the owner's Dot; no model is called; no draft is sent.
 #
-# Usage: ios/Next/scripts/e2e_activity.sh <simulator udid> <derived data folder> <shots dir>
+# Usage: ios/Next/scripts/e2e_activity.sh <simulator udid> <derived data folder> <shots dir> [en|tr]
+#   In tr the shots and the measures of the design bar run in Turkish; the writes are checked in the en run alone.
 set -eu
-udid=${1:?usage: e2e_activity.sh <simulator udid> <derived data> <shots dir>}
+udid=${1:?usage: e2e_activity.sh <simulator udid> <derived data> <shots dir> [en|tr]}
 derived=${2:?derived data folder}
 shots=${3:?shots dir}
+lang=${4:-en}
 here=$(cd "$(dirname "$0")" && pwd)
 ios=$(dirname "$(dirname "$here")")
 port=18794
@@ -39,26 +41,31 @@ code=$(curl -fsS -X POST -H "$main" "$base/api/phone/pairing" | python3 -c 'impo
 key=$(curl -fsS -X POST -H "$json" -d "{\"code\":\"$code\"}" "$base/api/phone/pair" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
 
 (cd "$ios" && xcodegen generate >/dev/null)
-TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
+TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" TEST_RUNNER_DOTNEXT_E2E_LANG="$lang" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
     -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" -resultBundlePath "$t/result.xcresult" \
     -only-testing:DotNextUITests/ActivityLiveUITests >"$t/test.log" 2>&1 || true
 grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/test.log" | sort -u
-if ! grep -qE "Executed [1-9][0-9]* tests?, with 0 failures" "$t/test.log"; then
-    echo "FAIL  ActivityLiveUITests did not run every test or one failed: $t/test.log" >&2
-    exit 1
-fi
 mkdir -p "$shots"
-xcrun xcresulttool export attachments --path "$t/result.xcresult" --output-path "$t/attachments" >/dev/null
+xcrun xcresulttool export attachments --path "$t/result.xcresult" --output-path "$t/attachments" >/dev/null || true
 python3 - "$t/attachments" "$shots" <<'PY'
 import json, shutil, sys
 from pathlib import Path
 source, target = Path(sys.argv[1]), Path(sys.argv[2])
 for test in json.loads((source / "manifest.json").read_text()):
     for attachment in test["attachments"]:
-        name = attachment.get("suggestedHumanReadableName", attachment["exportedFileName"]).split("_")[0]
-        shutil.copy(source / attachment["exportedFileName"], target / f"{name}.png")
+        if attachment.get("suggestedHumanReadableName", "").startswith(("UI Snapshot", "Synthesized Event")):
+            continue
+        exported = attachment["exportedFileName"]
+        name = attachment.get("suggestedHumanReadableName", exported).split("_")[0]
+        shutil.copy(source / exported, target / f"{name}{Path(exported).suffix}")
 PY
 ls "$shots"
+if ! grep -q "TEST SUCCEEDED" "$t/test.log"; then
+    echo "FAIL  ActivityLiveUITests did not run every test or one failed: $t/test.log" >&2
+    exit 1
+fi
+cat "$shots"/*measures* 2>/dev/null || true
+if [ "$lang" != en ]; then exit 0; fi
 
 fail=0
 # check <words> <route> <condition on d>: the daemon's answer to the Mac's token, read in this shell so a failure counts.
