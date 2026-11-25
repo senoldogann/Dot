@@ -30,9 +30,10 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request stops its run still going; a run of main is never stopped halfway.
+# A new push to a pull request stops its run still going; a run of main is never stopped halfway. Another label added
+# to the pull request starts a run that runs no job (each job's `if`), in a group of its own, so it stops nothing.
 concurrency:
-  group: ios-${{ github.ref }}
+  group: ios-${{ github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'ios-full' && '-other-label' || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The Xcode every job uses, from those the runner image holds (/Applications/Xcode_<version>.app). DotNext targets iOS
@@ -47,6 +48,7 @@ env:
 # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
 jobs:
   engine:
+    if: github.event.action != 'labeled' || github.event.label.name == 'ios-full'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -64,6 +66,7 @@ jobs:
         run: swift test
 
   build:
+    if: github.event.action != 'labeled' || github.event.label.name == 'ios-full'
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -105,13 +108,6 @@ jobs:
       max-parallel: 2
       matrix:
         part: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full')) && '["controls", "chat", "rows"]' || '["chat"]') }}
-        include:
-          - part: chat
-            only: -only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/SettingsUITests
-          - part: controls
-            only: -only-testing:DotNextUITests/SettingsControlsUITests/testEveryControlOfTheNativePagesDoesSomething
-          - part: rows
-            only: -only-testing:DotNextUITests/SettingsControlsUITests/testEveryRowOfSettingsOpensItsPage
     name: tests (${{ matrix.part }})
     steps:
       # StringCatalogTests reads Resources/Localizable.xcstrings at its source path.
@@ -158,9 +154,15 @@ jobs:
       - name: Test
         timeout-minutes: 55
         env:
-          ONLY: ${{ matrix.only }}
+          PART: ${{ matrix.part }}
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
+          case "$PART" in
+            chat) ONLY="-only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/SettingsUITests" ;;
+            controls) ONLY="-only-testing:DotNextUITests/SettingsControlsUITests/testEveryControlOfTheNativePagesDoesSomething" ;;
+            rows) ONLY="-only-testing:DotNextUITests/SettingsControlsUITests/testEveryRowOfSettingsOpensItsPage" ;;
+            *) echo "no tests named for the part $PART" >&2; exit 2 ;;
+          esac
           run=$(ls "$RUNNER_TEMP"/dd/Build/Products/*.xctestrun | head -1)
           # shellcheck disable=SC2086
           xcodebuild test-without-building -xctestrun "$run" -destination "id=$UDID" $ONLY \
@@ -189,8 +191,11 @@ jobs:
           if-no-files-found: ignore
 
   e2e:
-    needs: tests
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full')
+    # After the tests, so alone, and whatever they gave: a whole run reports its end to end even when a part failed.
+    needs: [build, tests]
+    if: >-
+      !cancelled() && needs.build.result == 'success' &&
+      (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full'))
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -265,7 +270,7 @@ jobs:
   # one. Not one for main's protection to require: a pull request that changes nothing under ios/ runs none of this
   # workflow, so the check would never arrive.
   ios:
-    if: always()
+    if: always() && (github.event.action != 'labeled' || github.event.label.name == 'ios-full')
     needs: [engine, build, tests, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
