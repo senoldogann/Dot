@@ -34,12 +34,14 @@ It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 """
 
 import asyncio
+import json
 import os
 import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import SplitResult, parse_qs, urlsplit
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -86,6 +88,8 @@ ANSWER: str = "\n\n".join(
 
 
 # The page "browse:" opens: a button that counts its clicks, a field, and a clock that ticks so the cast sends frames.
+# What the page received (its clicks, its field's text) it reports to its own server at /state, which keeps it in
+# $DOT_HOME/play-page.json: the end-to-end check reads the page's own state, not Dot's count of what was sent.
 PLAY_PAGE: bytes = b"""<!doctype html><html><head><title>DotNext play</title>
 <meta name="viewport" content="width=device-width"><style>
 body { font: 20px -apple-system, sans-serif; margin: 40px; background: #f4f4f2; color: #222; }
@@ -101,13 +105,23 @@ input { font-size: 24px; padding: 12px; width: 60%; margin-top: 24px; }
 let clicks = 0; const t0 = Date.now();
 setInterval(() => { document.getElementById("clock").textContent = ((Date.now() - t0) / 1000).toFixed(1); }, 100);
 const count = document.getElementById("count");
-document.getElementById("press").onclick = () => { clicks += 1; count.textContent = clicks + " clicks"; };
-document.getElementById("field").oninput = (e) => { document.getElementById("echo").textContent = e.target.value; };
+const field = document.getElementById("field");
+const report = () => fetch("/state?clicks=" + clicks + "&text=" + encodeURIComponent(field.value));
+document.getElementById("press").onclick = () => { clicks += 1; count.textContent = clicks + " clicks"; report(); };
+field.oninput = () => { document.getElementById("echo").textContent = field.value; report(); };
 </script></body></html>"""
 
 
 class _PlayPage(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
+        parts: SplitResult = urlsplit(self.path)
+        if parts.path == "/state":
+            asked: dict[str, list[str]] = parse_qs(parts.query, keep_blank_values=True)
+            state: dict[str, int | str] = {"clicks": int(asked["clicks"][0]), "text": asked["text"][0]}
+            (Path(os.environ["DOT_HOME"]) / "play-page.json").write_text(json.dumps(state), encoding="utf-8")
+            self.send_response(204)
+            self.end_headers()
+            return
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(PLAY_PAGE)))
