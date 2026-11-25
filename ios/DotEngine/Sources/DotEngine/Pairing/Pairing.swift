@@ -94,6 +94,8 @@ public enum PairingFailure: Error, Equatable, Sendable {
     case malformedCode
     /// The daemon refused the code (wrong, used or out of date).
     case codeRefused
+    /// The Mac holds keys for as many phones as it takes (422 from `check_room`): one is removed on the Mac first.
+    case tooManyPhones
     /// The daemon is from before the sync calls: "Update Dot on your Mac".
     case daemonTooOld
     /// The Mac could not be reached.
@@ -115,6 +117,7 @@ public func pair(host: DaemonHost, typedCode: String, session: URLSession, keys:
     do {
         key = try await DaemonAPI.pair(code: code, host: host, session: session)
     } catch {
+        if error.statusCode == 422 { throw .tooManyPhones }
         if let status: Int = error.statusCode, (400..<500).contains(status), status != 404 { throw .codeRefused }
         throw .unreachable(detail: error.description)
     }
