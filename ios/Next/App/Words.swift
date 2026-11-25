@@ -225,6 +225,22 @@ func composerActionWords(_ action: ComposerAction) -> String {
     }
 }
 
+/// The title of a way to send a follow-up while a run works, in the composer's long-press menu.
+func followUpTitle(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Steer now", comment: "Composer long-press menu: sends the draft into the run at work")
+    case .queue: String(localized: "Queue", comment: "Follow-up setting: queued after the run")
+    }
+}
+
+/// What a way to send a follow-up does, under its title in the composer's long-press menu.
+func followUpDetail(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Interrupt what the agent is doing", comment: "Composer long-press menu: what Steer now does")
+    case .queue: String(localized: "Run after the current turn", comment: "Composer long-press menu: what Queue does")
+    }
+}
+
 /// A picker section's header (PLAN §22).
 func pickerHeader(_ kind: PickerKind) -> String {
     switch kind {

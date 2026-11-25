@@ -159,7 +159,6 @@ TR: dict[str, str] = {
     "State": "Durum",
     "Steer": "Yönlendir",
     "Stop dictating": "Dikteyi durdur",
-    "Stop this run?": "Bu çalışma durdurulsun mu?",
     "Stops the run that waits for this answer": "Bu yanıtı bekleyen çalışmayı durdurur",
     "Tell the running task": "Çalışan göreve yaz",
     "That message already started; your words stay here": "O mesaj zaten başladı; yazdıkların burada kalıyor",
@@ -420,8 +419,6 @@ TR: dict[str, str] = {
     "Starting": "Başlıyor",
     "Status words": "Durum sözcükleri",
     "Status · semibold": "Durum · yarı kalın",
-    "Stop everything": "Her şeyi durdur",
-    "Stop everything Dot is doing?": "Dot'un yaptığı her şey durdurulsun mu?",
     "Surfaces (no strokes)": "Yüzeyler (çerçevesiz)",
     "Symbols": "Simgeler",
     "System": "Sistem",
@@ -505,7 +502,6 @@ TR: dict[str, str] = {
     'Ask': 'Sor',
     'Ask Dot in a chat to do something every morning, or make one with +.': "Bir sohbette Dot'tan her sabah bir şey yapmasını iste ya da + ile bir tane oluştur.",
     'Ask before deleting a chat': 'Sohbeti silmeden önce sor',
-    'Ask before stopping a run': 'Bir işi durdurmadan önce sor',
     'Asking for the camera…': 'Kamera izni isteniyor…',
     'Asks first': 'Önce sorar',
     'Auto': 'Otomatik',
@@ -552,7 +548,6 @@ TR: dict[str, str] = {
     'Drop': 'Bırak',
     'Edit scheduled task': 'Zamanlanmış görevi düzenle',
     'English': 'İngilizce',
-    'Every run stops, desktop control is blocked and schedules wait until you release the stop.': 'Her iş durur, masaüstü denetimi engellenir ve zamanlamalar sen durdurmayı kaldırana kadar bekler.',
     'Everything is stopped: no run starts and schedules wait until you release the stop.': 'Her şey durduruldu: sen durdurmayı kaldırana kadar hiçbir iş başlamaz, zamanlamalar bekler.',
     'Failed %lld times in a row': 'Üst üste %lld kez başarısız oldu',
     'Failed with code %lld.': '%lld koduyla başarısız oldu.',
@@ -671,7 +666,6 @@ TR: dict[str, str] = {
     "The Mac's tailnet name does not resolve. Open Tailscale on this iPhone and connect.": "Mac'in tailnet adı çözümlenmiyor. Bu iPhone'da Tailscale'i aç ve bağlan.",
     "The app's language": 'Uygulamanın dili',
     'The code on the Mac fills the address; the 8-character sign-in code is typed below.': "Mac'teki kod adresi doldurur; 8 karakterlik giriş kodu aşağıya yazılır.",
-    'The emergency stop always asks first.': 'Acil durdurma her zaman önce sorar.',
     'The page did not open': 'Sayfa açılmadı',
     'The quick brown fox jumps over the lazy dog.': 'Pijamalı hasta yağız şoföre çabucak güvendi.',
     "The secure connection failed. Check the Mac's Tailscale HTTPS certificate.": "Güvenli bağlantı kurulamadı. Mac'in Tailscale HTTPS sertifikasını denetle.",
@@ -761,6 +755,10 @@ TR: dict[str, str] = {
     'Your Mac answered with what this app cannot read (%@). Update Dot on the Mac or this app.': "Mac'in bu uygulamanın okuyamadığı bir yanıt verdi (%@). Mac'teki Dot'u ya da bu uygulamayı güncelle.",
     "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi; bu yüzden anahtar gönderilmedi. Biraz sonra yeniden denetle.",
     "Your Mac did not answer the check of this phone's key.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi.",
+    # C2: the composer's long-press menu while a run works.
+    'Steer now': 'Şimdi yönlendir',
+    'Interrupt what the agent is doing': 'Ajanın yaptığı işin arasına gir',
+    'Run after the current turn': 'Bu tur bitince çalışır',
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).

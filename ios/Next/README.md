@@ -11,7 +11,9 @@ the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/Work
 `Answer.swift`, `Composer.swift`): the work log with the four tool modes (the table is on `ToolCallMode` in
 `DotEngine/Sync/Transcript.swift`) and the fold of a finished run, markdown answers, the ask dock in the composer's place
 (approvals, questions, hand-offs, secrets typed in a secure field), the composer (+ menu, model · effort chip, on-device
-dictation, Send / Queue / Steer / Stop), the queue sheet and the edit of a queued message, the run inspector, reactions.
+dictation, Send / Queue / Steer / Stop; while a run works a long press on the button offers Steer now and Queue, the
+follow-up setting's way checked, and sends the draft the way picked; a run stops from the composer's Stop, the chat's
+header has none), the queue sheet and the edit of a queued message, the run inspector, reactions.
 While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
 and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
 every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;
@@ -21,12 +23,13 @@ Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's 
 daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
 iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
 Forget this phone's key), Notifications (the three kinds of `/api/phone/push-settings`), General (Dot's and the owner's
-names, the language, the clock, Queue or Steer, confirmations, dictation's language), Appearance (light, dark or
+names, the language, the clock, Queue or Steer, the confirmation of deleting a chat, dictation's language), Appearance (light, dark or
 system, the text size with a live preview, the tool calls in chat, response streaming, the reading width), Chat
 (haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
 only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
 on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
-runs' proposed rewrites with Use and Drop), Health and version, Usage; every other page of the web app's settings is
+runs' proposed rewrites with Use and Drop), Health and version, Usage; the phone does not engage the emergency stop (the
+Mac's failsafe does), and while it holds Settings says so at the top with Release the stop; every other page of the web app's settings is
 a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`: the key never in the address, a
 script on the Mac's origin alone writes it where the page keeps it; only the Mac's origin loads). A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused

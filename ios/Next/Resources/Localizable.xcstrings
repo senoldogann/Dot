@@ -979,17 +979,6 @@
         }
       }
     },
-    "Ask before stopping a run": {
-      "comment": "General: confirm Stop in a chat",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir işi durdurmadan önce sor"
-          }
-        }
-      }
-    },
     "Asking for the camera…": {
       "comment": "QR scan: the camera permission is being asked",
       "localizations": {
@@ -2508,17 +2497,6 @@
         }
       }
     },
-    "Every run stops, desktop control is blocked and schedules wait until you release the stop.": {
-      "comment": "Emergency stop confirmation: what it does",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Her iş durur, masaüstü denetimi engellenir ve zamanlamalar sen durdurmayı kaldırana kadar bekler."
-          }
-        }
-      }
-    },
     "Everything is stopped: no run starts and schedules wait until you release the stop.": {
       "comment": "Settings: the emergency stop holds",
       "localizations": {
@@ -3054,6 +3032,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mürekkep birincil · yalın ikincil · yalın zeminde kırmızı yazı."
+          }
+        }
+      }
+    },
+    "Interrupt what the agent is doing": {
+      "comment": "Composer long-press menu: what Steer now does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanın yaptığı işin arasına gir"
           }
         }
       }
@@ -4917,6 +4906,17 @@
         }
       }
     },
+    "Run after the current turn": {
+      "comment": "Composer long-press menu: what Queue does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu tur bitince çalışır"
+          }
+        }
+      }
+    },
     "Running": {
       "comment": "This Mac: Tailscale runs",
       "localizations": {
@@ -5808,6 +5808,17 @@
         }
       }
     },
+    "Steer now": {
+      "comment": "Composer long-press menu: sends the draft into the run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi yönlendir"
+          }
+        }
+      }
+    },
     "Stop": {
       "comment": "Chat toolbar: stops the run at work",
       "localizations": {
@@ -5841,28 +5852,6 @@
         }
       }
     },
-    "Stop everything": {
-      "comment": "Confirmation button of the emergency stop",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Her şeyi durdur"
-          }
-        }
-      }
-    },
-    "Stop everything Dot is doing?": {
-      "comment": "Confirmation of the emergency stop",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un yaptığı her şey durdurulsun mu?"
-          }
-        }
-      }
-    },
     "Stop the run at work": {
       "comment": "Composer command: what /stop does",
       "localizations": {
@@ -5870,17 +5859,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan işi durdur"
-          }
-        }
-      }
-    },
-    "Stop this run?": {
-      "comment": "Confirmation of Stop from the chat header",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bu çalışma durdurulsun mu?"
           }
         }
       }
@@ -6365,17 +6343,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disk dolu."
-          }
-        }
-      }
-    },
-    "The emergency stop always asks first.": {
-      "comment": "General: footer under the confirmations",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acil durdurma her zaman önce sorar."
           }
         }
       }
