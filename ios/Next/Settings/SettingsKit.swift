@@ -18,6 +18,8 @@ enum SettingsPage: Hashable, Sendable {
     case system
     case usage
     case maintenance
+    /// The Connect apps sheet (item 1862): a search result that opens it, never pushed.
+    case connectApps
 }
 
 /// What a page read from the Mac: still on its way, there, or why not.

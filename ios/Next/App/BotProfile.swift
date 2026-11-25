@@ -64,7 +64,7 @@ struct BotProfile: View {
                 }
             }
         }
-        .navigationDestination(for: SettingsPage.self) { page in SettingsDestination(page: page, start: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)) }
+        .navigationDestination(for: SettingsPage.self) { page in SettingsDestination(page: page, start: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed)) }
         .task { await loadSchedules() }
         .refreshable {
             await model.loadAgents()

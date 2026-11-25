@@ -41,7 +41,7 @@ struct HomeShell: View {
             .background(Tone.ground)
         }
         .sheet(isPresented: $showsSettings) {
-            SettingsSheet(start: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false), close: { showsSettings = false })
+            SettingsSheet(start: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed), close: { showsSettings = false })
         }
         .sheet(isPresented: $showsNewBot) {
             NewBotSheet(
@@ -50,7 +50,7 @@ struct HomeShell: View {
                     selection = BotRoute(bot: record.id, thread: nil)
                 }, close: { showsNewBot = false })
         }
-        .sheet(isPresented: $showsApps) { ConnectAppsSheet() }
+        .sheet(isPresented: $showsApps) { ConnectAppsSheet(opensDetail: nil) }
         .task { await model.loadAgents() }
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
@@ -568,19 +568,5 @@ struct NewBotSheet: View {
             }
             making = false
         }
-    }
-}
-
-/// Connect apps (PLAN §27): helper G2 builds the sheet; until it lands, the entry point says what comes.
-struct ConnectAppsSheet: View {
-    @Environment(\.dismiss) private var dismiss: DismissAction
-
-    var body: some View {
-        EmptyState(
-            title: String(localized: "Connect apps", comment: "Home: opens the sheet that connects apps"), systemImage: "square.grid.2x2",
-            detail: String(localized: "Connecting apps from the phone comes in the next version. Until then, connect them on your Mac.", comment: "Connect apps sheet: placeholder until it is built"),
-            actionTitle: nil, action: {}
-        )
-        .inspectorSheet(title: String(localized: "Connect apps", comment: "Home: opens the sheet that connects apps"), close: { dismiss() })
     }
 }

@@ -15,7 +15,7 @@ struct SettingsSheet: View {
     @State private var owner: String = ""
     /// Why the owner's name could not be read (the card then says "You").
     @State private var ownerProblem: SettingsFailure?
-    @State private var showsApps: Bool = false
+    @State private var connectApps: ConnectAppsOpening
 
     let start: SettingsStart
     let close: () -> Void
@@ -25,6 +25,7 @@ struct SettingsSheet: View {
         self.close = close
         _path = State(initialValue: start.path)
         _query = State(initialValue: start.query)
+        _connectApps = State(initialValue: start.connectApps)
     }
 
     var body: some View {
@@ -43,7 +44,9 @@ struct SettingsSheet: View {
         }
         .task { failsafe = await model.read { api throws(DaemonRequestError) in try await api.failsafe() } }
         .task { await readOwner() }
-        .sheet(isPresented: $showsApps) { ConnectAppsSheet() }
+        .sheet(isPresented: Binding(get: { connectApps != .closed }, set: { if !$0 { connectApps = .closed } })) {
+            ConnectAppsSheet(opensDetail: connectApps.detail)
+        }
     }
 
     private func readOwner() async {
@@ -71,7 +74,7 @@ struct SettingsSheet: View {
                 PageRow(page: .caps, systemImage: "gauge.with.dots.needle.33percent", title: String(localized: "Usage limits and caps", comment: "Settings row: the plan's windows and the caps of what tasks spend"), description: nil, detail: nil)
             }
             GroupedSection(header: nil, footer: nil) {
-                Button { showsApps = true } label: {
+                Button { connectApps = .list } label: {
                     ListRow(
                         systemImage: "square.grid.2x2", title: String(localized: "Connect apps", comment: "Home: opens the sheet that connects apps"),
                         description: String(localized: "Search plugins", comment: "Settings: the line under Connect apps"), accessory: .chevron)
@@ -153,6 +156,8 @@ struct SettingsSheet: View {
         }
     }
 
+    /// The row that opens Connect apps (item 1862, PLAN §27, which overrides §26's cut of Connectors), until the settings
+    /// sheet of PLAN §27 carries it.
     // MARK: Search
 
     private var results: some View {
@@ -165,7 +170,12 @@ struct SettingsSheet: View {
                 SettingsScroll(title: String(localized: "Settings", comment: "Title of the settings tab")) {
                     GroupedSection(header: nil, footer: nil) {
                         ForEach(found) { entry in
-                            if let page = index.first(where: { $0.0.id == entry.id })?.1 {
+                            if index.first(where: { $0.0.id == entry.id })?.1 == .connectApps {
+                                Button { connectApps = .list } label: {
+                                    ListRow(systemImage: nil, title: entry.title, description: entry.path.isEmpty ? nil : entry.path, accessory: .chevron)
+                                }
+                                .buttonStyle(RowPressStyle())
+                            } else if let page = index.first(where: { $0.0.id == entry.id })?.1 {
                                 NavigationLink(value: page) {
                                     ListRow(systemImage: nil, title: entry.title, description: entry.path.isEmpty ? nil : entry.path, accessory: .chevron)
                                 }
@@ -201,6 +211,7 @@ struct SettingsDestination: View {
         case .system: SystemPage()
         case .usage: UsagePage()
         case .maintenance: MaintenancePage()
+        case .connectApps: EmptyView()
         }
     }
 }
@@ -211,6 +222,19 @@ struct SettingsStart: Equatable, Sendable {
     let query: String
     let editsFirstSchedule: Bool
     let triesRaise: Bool
+    let connectApps: ConnectAppsOpening
+}
+
+/// Whether Settings opens with Connect apps shown, and on which service's detail.
+enum ConnectAppsOpening: Equatable, Sendable {
+    case closed
+    case list
+    case detail(String)
+
+    var detail: String? {
+        if case .detail(let id) = self { return id }
+        return nil
+    }
 }
 
 /// How the link to the Mac stands, in one word.
@@ -278,6 +302,9 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "maintenance", String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), system,
             "updates versions resume restart continue claude opencode cli",
             String(localized: "updates versions resume restart continue", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
+        entry(
+            "connect-apps", String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), "", "connectors connect apps services mcp accounts google github slack notion plugins",
+            String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),
     ]
     return all
 }

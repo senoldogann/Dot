@@ -117,7 +117,7 @@ struct RootView: View {
                         .onAppear { model.showSettingsFixture(fixture) }
             #endif
             case .home(let scene):
-                paired(HomeShell(opensFirstChat: false, settings: scene == .settings ? SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false) : nil))
+                paired(HomeShell(opensFirstChat: false, settings: scene == .settings ? SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed) : nil))
             case .liveChat: paired(HomeShell(opensFirstChat: true, settings: nil))
             case nil: paired(HomeShell(opensFirstChat: false, settings: nil))
             }
