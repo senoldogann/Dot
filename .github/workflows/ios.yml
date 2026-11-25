@@ -6,8 +6,8 @@
 # tests once (build-for-testing) and runs the String Catalog check on that build; `tests` runs the unit and UI tests
 # from that build in three parts side by side; `e2e` runs Settings end to end against a throwaway daemon of this checkout
 # (scripts/e2e_settings.sh); `ios` is the one check that says all of them passed. Each test job keeps its .xcresult
-# and the screenshots in it for 7 days. At most four of the account's five macOS runners at once (`build`, `engine` and
-# `e2e`, then the three `tests` parts beside `e2e`): docs/development.md.
+# and the screenshots in it for 7 days. Four of the account's five macOS runners at once (`build`, `engine` and `e2e`,
+# then the three `tests` parts beside `e2e`), five while `engine` still runs then: docs/development.md.
 name: ios
 
 on:
@@ -124,17 +124,32 @@ jobs:
           echo "udid=$udid" >> "$GITHUB_OUTPUT"
           xcrun simctl boot "$udid"
           xcrun simctl bootstatus "$udid"
-      # Shorter than the job, so that a test that hangs still leaves its result and screenshots to the steps below.
+      # A fresh simulator's first launch of an app is slow enough that XCTest's launch timed out once on the runner
+      # ("Timed out while launching application via Xcode", run 45578426723): the app is installed and opened once
+      # here, before any test, so the tests do not pay for it.
+      - name: First launch
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dd/Build" && tar -C "$RUNNER_TEMP/dd/Build" -xzf "$RUNNER_TEMP/products.tgz"
+          app="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/DotNext.app"
+          xcrun simctl install "$UDID" "$app"
+          xcrun simctl launch "$UDID" dev.dotagent.phone.next
+          sleep 10
+          xcrun simctl terminate "$UDID" dev.dotagent.phone.next
+      # Shorter than the job, so that a test that hangs still leaves its result and screenshots to the steps below. A
+      # failed test runs once more: the runner's simulator also failed once to start the UI test runner at all; a test
+      # that fails twice fails the part, and each try is in the log.
       - name: Test
         timeout-minutes: 40
         env:
           ONLY: ${{ matrix.part.only }}
           UDID: ${{ steps.sim.outputs.udid }}
         run: |
-          mkdir -p "$RUNNER_TEMP/dd/Build" && tar -C "$RUNNER_TEMP/dd/Build" -xzf "$RUNNER_TEMP/products.tgz"
           run=$(ls "$RUNNER_TEMP"/dd/Build/Products/*.xctestrun | head -1)
           # shellcheck disable=SC2086
           xcodebuild test-without-building -xctestrun "$run" -destination "id=$UDID" $ONLY \
+            -retry-tests-on-failure -test-iterations 2 \
             -resultBundlePath "$RUNNER_TEMP/tests.xcresult" | grep --line-buffered -E "error:|Test Case|Executed|TEST "
           test "${PIPESTATUS[0]}" -eq 0
       - name: Screenshots out of the result
