@@ -164,6 +164,13 @@ def test_a_skill_without_a_frontmatter_is_read_as_claude_code_reads_it_but_none_
     assert titled.description == "Only a title"
     tabled: str = "# Kit\n\n| Name | Value |\n|---|---|\n\n```bash\nkit run\n```\n\n- a list\n\nRuns the kit.\n"
     assert parse_others_skill(tmp_path / "kit" / "SKILL.md", tabled, "home").description == "Runs the kit."
+    coded: str = "```bash\nkit run\n```\n\n- a list\n"
+    assert parse_others_skill(tmp_path / "code-only" / "SKILL.md", coded, "home").description == "code-only"
+    listed: str = "- a list\n| a | row |\n"
+    assert parse_others_skill(tmp_path / "list-only" / "SKILL.md", listed, "home").description == "list-only"
+    late: str = "- a list\n\n## The kit\n\n- more\n"
+    assert parse_others_skill(tmp_path / "late-title" / "SKILL.md", late, "home").description == "The kit"
+    assert parse_others_skill(tmp_path / "bare-hash" / "SKILL.md", "#\n", "home").description == "bare-hash"
     assert parse_others_skill(tmp_path / "tidy" / "SKILL.md", _simple("tidy"), "home") == parse_skill(
         tmp_path / "tidy" / "SKILL.md", _simple("tidy"), "home"
     )

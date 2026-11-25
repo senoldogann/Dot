@@ -352,7 +352,10 @@ answer keeps its words, Ollama's too.
   not cut short here: OpenCode does not say when it takes one in), skills and saving one, the team and helpers, your
   mail and calendars, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
   them and as Dot's own loop withholds them (no accounts, no skills, no helpers). It has none of Dot's for what its own
-  tools do (files, commands, web fetch and search) and no `finish`: the run ends with its last answer.
+  tools do (files, `shell`, `web_fetch` and `web_search`) and no `finish`: the run ends with its last answer. It does
+  have Dot's terminal sessions (`terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`), `web_crawl` and
+  `web_extract`: a command sent to a terminal session runs in Dot's own terminal, under Dot's gate and Dot's sandbox as
+  Dot's own commands do, not in the OpenCode server above.
   `tests/unit/test_harness_tool_parity.py` lists each tool one way lacks and why. OpenCode puts every one of a
   server's tools in its prompt, so the agent's tool definitions are about 75,000 characters (43 tools, 41,000, before). Dot serves them to the OpenCode server it started as an MCP server of its own on a loopback port, one door per
   chat (`dot_` and eight hex digits, with a secret of its own), and a chat's session sees its own door's tools only;
