@@ -107,7 +107,10 @@ func toolLine(_ entry: ToolEntry) -> String {
         return entry.state == .running
             ? String(localized: "Waiting for a condition", comment: "Tool row: a wait_until step at work")
             : String(localized: "Waited for a condition", comment: "Tool row: a wait_until step")
-    case .helper where !target.isEmpty: return String(localized: "Started a helper: \(target)", comment: "Tool row: a helper started; the argument is its goal")
+    case .helper where !target.isEmpty:
+        return entry.state == .running
+            ? String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
+            : String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
     default: return target.isEmpty ? toolName(entry.tool) : "\(toolName(entry.tool)) · \(target)"
     }
 }
@@ -122,8 +125,8 @@ func toolSymbol(_ kind: ToolKind) -> String {
     case .wait: "hourglass"
     case .web: "globe"
     case .screen: "cursorarrow.click"
-    case .helper: "person.2"
-    case .other: "wrench.and.screwdriver"
+    case .helper: "hammer"
+    case .other: "hammer"
     }
 }
 

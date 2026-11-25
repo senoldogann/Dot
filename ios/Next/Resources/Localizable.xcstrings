@@ -2032,6 +2032,28 @@
         }
       }
     },
+    "Delegated task “%@” finished": {
+      "comment": "Tool row: a task handed to a helper, ended; the argument is its goal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” görevi devredildi ve bitti"
+          }
+        }
+      }
+    },
+    "Delegating “%@”": {
+      "comment": "Tool row: a task handed to a helper, at work; the argument is its goal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” devrediliyor"
+          }
+        }
+      }
+    },
     "Delete": {
       "comment": "Confirmation button that deletes a chat\nSchedule menu: delete",
       "localizations": {
@@ -5544,6 +5566,35 @@
         }
       }
     },
+    "Ran %lld commands": {
+      "comment": "Work log: consecutive commands said as one line; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Ran %lld command"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Ran %lld commands"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld komut çalıştırdı"
+          }
+        }
+      }
+    },
     "Reaching your Mac…": {
       "comment": "Chat list while the first list read is under way",
       "localizations": {
@@ -6849,17 +6900,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Başladı"
-          }
-        }
-      }
-    },
-    "Started a helper: %@": {
-      "comment": "Tool row: a helper started; the argument is its goal",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yardımcı başlatıldı: %@"
           }
         }
       }

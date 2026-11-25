@@ -43,20 +43,92 @@ enum TranscriptBlock: Identifiable {
     }
 }
 
+/// One line of a stretch of steps: a step, or consecutive commands said as one "Ran 3 commands" (item 1769, after
+/// another coding agent's work log).
+enum StepGroup: Identifiable, Equatable {
+    case row(TranscriptItem)
+    case commands([ToolEntry])
+
+    var id: String {
+        switch self {
+        case .row(let item): item.id
+        case .commands(let entries): "commands:" + (entries.first?.id ?? "")
+        }
+    }
+
+    /// The lines of `rows`: two or more consecutive commands that all ended well become one line; a command at work or
+    /// one that failed stands alone, so neither is hidden in a fold. Pure.
+    static func of(_ rows: [TranscriptItem]) -> [StepGroup] {
+        var groups: [StepGroup] = []
+        var run: [ToolEntry] = []
+        func flush() {
+            if run.count >= 2 { groups.append(.commands(run)) } else { groups.append(contentsOf: run.map { .row(.tool($0)) }) }
+            run = []
+        }
+        for row in rows {
+            if case .tool(let entry) = row, entry.kind == .command, entry.state == .done {
+                run.append(entry)
+            } else {
+                flush()
+                groups.append(.row(row))
+            }
+        }
+        flush()
+        return groups
+    }
+}
+
 /// A stretch of steps, no gap between them.
 struct StepRun: View {
     let rows: [TranscriptItem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(rows) { row in
-                switch row {
-                case .tool(let entry): WorkToolRow(entry: entry).id(entry.id)
-                case .thought(let id, let text, let live): ThoughtRow(text: text, live: live).id(id)
-                default: EmptyView()
+            ForEach(StepGroup.of(rows)) { group in
+                switch group {
+                case .commands(let entries): CommandGroupRow(entries: entries).id(group.id)
+                case .row(.tool(let entry)): WorkToolRow(entry: entry).id(entry.id)
+                case .row(.thought(let id, let text, let live)): ThoughtRow(text: text, live: live).id(id)
+                case .row: EmptyView()
                 }
             }
         }
+    }
+}
+
+/// Consecutive commands that ended well as one quiet line, "Ran 3 commands", with the terminal's symbol; a tap opens
+/// each of them as its own row (item 1769).
+struct CommandGroupRow: View {
+    let entries: [ToolEntry]
+    @State private var open: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { open.toggle() } label: {
+                HStack(spacing: Space.xs) {
+                    Symbol(name: toolSymbol(.command), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
+                    Text(String(localized: "Ran \(entries.count) commands", comment: "Work log: consecutive commands said as one line; the argument is how many"))
+                        .textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(1)
+                    Spacer(minLength: Space.xs)
+                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
+                }
+                .frame(minHeight: Metric.toolRow)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .haptic(.selection, trigger: open)
+            .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
+            .accessibilityHint(open ? String(localized: "Hides the steps", comment: "VoiceOver hint of an open work-log group") : String(localized: "Shows the steps", comment: "VoiceOver hint of a closed work-log group"))
+            if open {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(entries, id: \.id) { entry in WorkToolRow(entry: entry) }
+                }
+                .padding(.leading, Space.xs)
+                .transition(.opacity)
+            }
+        }
+        .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
     }
 }
 
@@ -501,8 +573,9 @@ struct ThoughtRow: View {
                     if live {
                         Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.footnote).modifier(Shimmer())
                     } else {
-                        Text(thoughtHeadline(text)).textRole(.footnote).foregroundStyle(Tone.tertiary)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 1)
+                        Text(thoughtHeadline(text)).textRole(.footnote).foregroundStyle(Tone.secondary)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 6 : 3)
+                            .multilineTextAlignment(.leading)
                     }
                     Spacer(minLength: Space.xs)
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
