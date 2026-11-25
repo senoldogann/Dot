@@ -883,7 +883,9 @@ picture within a third of a second.
   meanwhile. A page that falls behind (a slow network) drops frames until the next key frame and so shows the screen
   as it is now, not with a growing delay.
 - `GET /api/screen/live` is read with the installation's token or a phone's key, like any other answer of the API: a
-  plain HTTP answer whose body is the stream, as the daemon lets no WebSocket through. Its format is in
+  plain HTTP answer whose body is the stream, as the daemon lets no WebSocket through. `?quality=light` (item 1837) is
+  a capture of its own for a phone on a weak link: 1280 pixels, 30 frames a second, a fifth of the bit rate and a key
+  frame every 2 s rather than 4; the page reads `hd`, the default. Its format is in
   `dotagent/desktop/live.py`. A Mac that has not granted Screen Recording to the app that runs Dot answers with that
   error.
 - The whole screen goes: what it shows, passwords typed in the open included, is seen by whoever holds a key.
