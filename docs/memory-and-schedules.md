@@ -294,6 +294,14 @@ dotx memory reindex      # embed every note again, for example after changing [m
   subject; the 10 are notes reworded, whose changed value is a name, or a version after a word that names a thing), and none of the 8 facts that stayed true was put
   aside. A store of two or three notes ties the two versions in the search and the older wins the tie, so the first
   count before is a floor, not a rate for a large store; the shown count is not affected.
+- Every note says where it came from (item 1864): you, a task in a chat (a chat, a `dotx` command, a code review), a
+  scheduled task, a watcher's task (a watched mail or event, a reply to a mail), a helper task another task started, Dot
+  on its own initiative, or the nightly reflection. The store sets it (`origin`) from the run that saved the note, as
+  the run's source says it, and no argument of a tool reaches it, so no model writes it; a note's rewrite by another
+  task takes that task's origin, your correction keeps the one it had. The Memory page says it in the note's line
+  ("Saved 2 hours ago by a scheduled task") and the notes' API carries it. A note stored before item 1864 got its
+  origin from its run where the run is still stored; where it is gone (the runs are kept for a time and notes for
+  longer: 1,083 of the owner's 1,272 notes on 2026-11-25), it has none and says "a task".
 - Saving a note close to an existing one (`similar_threshold`) tells the model the notes that remain, which decides
   whether the old note is outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"

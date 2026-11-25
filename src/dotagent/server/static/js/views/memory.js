@@ -80,13 +80,23 @@ export function scoreLine(score) {
 // The agents by id, from the page, so a lesson can say whose it is.
 let agentNames = {};
 
-/** When a note was saved and by whom: "Saved 2h ago by a run" (the run's name leads to it), by the nightly reflection, or by you. */
+// Who saved a note, by its origin (item 1864), which Dot sets from the run that saved it: a note stored before origins
+// were kept, whose run is gone, has none and says "a task".
+const ORIGIN_TASKS = {
+  chat: "a task in a chat",
+  schedule: "a scheduled task",
+  watcher: "a watcher's task",
+  helper: "a helper task",
+  initiative: "Dot on its own",
+};
+
+/** When a note was saved and by whom: "Saved 2h ago by a scheduled task" (the task leads to its run), by the nightly reflection, or by you. */
 function savedLine(record) {
   const by =
-    record.source_run === "reflection"
+    record.origin === "reflection" || record.source_run === "reflection"
       ? " by the nightly reflection"
       : record.source_run
-        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, "a task")]
+        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, ORIGIN_TASKS[record.origin] ?? "a task")]
         : " by you";
   return el("span", { title: dateTimeFull(record.created_at) }, "Saved ", ago(record.created_at), by);
 }

@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1864](1864.md) | done | 2026-11-25 | Every note says where it came from: an `origin` the store sets from the run that saved it |
 | [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
 | [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
 | [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
