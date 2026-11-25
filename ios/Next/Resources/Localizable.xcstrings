@@ -5937,7 +5937,7 @@
       }
     },
     "Paused": {
-      "comment": "Schedule: switched off",
+      "comment": "Live picture status: nothing is read (the view is away)\nSchedule: switched off",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6615,7 +6615,7 @@
       }
     },
     "Reconnecting…": {
-      "comment": "Chat subtitle: the link to the Mac broke and is being opened again",
+      "comment": "Chat subtitle: the link to the Mac broke and is being opened again\nLive picture status: the stream broke and is tried again",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9157,7 +9157,7 @@
       }
     },
     "Try again": {
-      "comment": "Settings: repeats a read or write that failed\nUnder a refused message: sends it again",
+      "comment": "Live picture: reads the stream again (web watch.retry)\nSettings: repeats a read or write that failed\nUnder a refused message: sends it again",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9245,7 +9245,7 @@
       }
     },
     "Typing": {
-      "comment": "Work line: the run waits for its model to answer",
+      "comment": "Live caption: the run types\nWork line: the run waits for its model to answer",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10017,6 +10017,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir sohbete yaz"
+          }
+        }
+      }
+    },
+    "Writing": {
+      "comment": "Capsule: the run's model is writing its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıyor"
           }
         }
       }
