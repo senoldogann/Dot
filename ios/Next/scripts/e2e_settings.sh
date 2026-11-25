@@ -18,7 +18,9 @@ log="$t/daemon.log"
 DOT_HOME="$t/home" DOT_LOG_DIR="$t/logs" DOT_CHROME_DIR="$t/chrome" \
     uv run --project "$daemon" python "$here/e2e_daemon.py" "$port" --seed >"$log" 2>&1 &
 pid=$!
-trap 'kill $pid 2>/dev/null || true' EXIT
+# `uv run` may outlive a kill of its own pid by a moment: the daemon is stopped by its command line too, so that a
+# second run of this script finds the port free.
+trap 'kill $pid 2>/dev/null || true; pkill -f "e2e_daemon.py $port" 2>/dev/null || true' EXIT
 tries=0
 until grep -q READY "$log"; do
     tries=$((tries + 1))
@@ -33,11 +35,16 @@ phone="Authorization: Bearer $key"
 curl -fsS -X POST -H "$main" -H "Content-Type: application/json" \
     -d '{"name":"E2E brief","goal":"Say good morning.","cron":"0 8 * * *","mode":"task"}' "$base/api/schedules" >/dev/null
 
-TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
-    -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
-    -only-testing:DotNextUITests/SettingsLiveUITests 2>&1 | grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" | sort -u
-
+# The UI test's own assertions (what each page shows) count as much as the daemon's side below: its status is kept.
 fail=0
+if ! TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
+    -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
+    -only-testing:DotNextUITests/SettingsLiveUITests >"$t/xcodebuild.log" 2>&1; then
+    echo "FAIL  SettingsLiveUITests (xcodebuild test failed; its log: $t/xcodebuild.log)" >&2
+    fail=1
+fi
+grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" "$t/xcodebuild.log" | sort -u
+
 check() {
     if python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if ($2) else 1)"; then echo "ok    $1"; else echo "FAIL  $1" >&2; fail=1; fi
 }

@@ -1,0 +1,228 @@
+# The iPhone app's checks (item 1850): DotNext (ios/Next) and its engine (ios/DotEngine) are built and tested here, on
+# GitHub's macOS runners (free for a public repository), so the owner's Mac no longer queues helpers behind one Xcode
+# and is left the final screenshots. ios/Next/README.md "CI" says how to read a run and fetch its screenshots.
+#
+# The jobs: `engine` runs `swift test` of the engine; `build` makes the project with XcodeGen, builds DotNext and its
+# tests once (build-for-testing) and runs the String Catalog check on that build; `tests` runs the unit and UI tests
+# from that build in three parts side by side; `e2e` runs Settings end to end against a throwaway daemon of this checkout
+# (scripts/e2e_settings.sh); `ios` is the one check that says all of them passed. Each test job keeps its .xcresult
+# and the screenshots in it for 7 days. At most four of the account's five macOS runners at once (`build`, `engine` and
+# `e2e`, then the three `tests` parts beside `e2e`): docs/development.md.
+name: ios
+
+on:
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  push:
+    branches: [main]
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+
+# The jobs only read the code: the token GitHub hands them can do nothing more.
+permissions:
+  contents: read
+
+# A new push to a pull request stops its run still going; a run of main is never stopped halfway.
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The Xcode every job uses, from those the runner image holds (/Applications/Xcode_<version>.app). DotNext targets iOS
+# 26 and the engine needs Swift tools 6.2; Xcode 26.1 failed at DotNext's asset catalog, 26.6 (the image's default)
+# builds it.
+env:
+  XCODE: "26.6"
+  SIMULATOR: "iPhone 17 Pro"
+
+# Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
+jobs:
+  engine:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "/Applications/Xcode_$XCODE.app"
+          xcodebuild -version
+          xcrun simctl list runtimes
+      - name: swift test
+        working-directory: ios/DotEngine
+        run: swift test
+
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_$XCODE.app"
+      - name: XcodeGen
+        run: brew install xcodegen && (cd ios && xcodegen generate)
+      # Signed ad hoc (`-`): the simulator then gives the app its app group and Keychain group, as on the owner's Mac.
+      - name: Build DotNext and its tests
+        run: |
+          xcodebuild build-for-testing -project ios/Dot.xcodeproj -scheme DotNext \
+            -destination 'generic/platform=iOS Simulator' -configuration Debug \
+            CODE_SIGN_IDENTITY=- -derivedDataPath "$RUNNER_TEMP/dd" > "$RUNNER_TEMP/build.log" 2>&1 || {
+            grep -E "error:|warning: .*(fatal|failed)" "$RUNNER_TEMP/build.log" | sort -u | head -60; tail -30 "$RUNNER_TEMP/build.log"; exit 1; }
+          grep -E "\*\* .* \*\*" "$RUNNER_TEMP/build.log"
+      - name: String Catalog
+        run: ios/Next/scripts/check_strings.sh "$RUNNER_TEMP/dd"
+      - name: Keep the build for the tests
+        run: tar -C "$RUNNER_TEMP/dd/Build" -czf "$RUNNER_TEMP/products.tgz" Products
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dotnext-build
+          path: ${{ runner.temp }}/products.tgz
+          retention-days: 1
+
+  tests:
+    needs: build
+    runs-on: macos-26
+    timeout-minutes: 50
+    # The parts by the time they took on the runner: the unit tests with the chat's and Settings' UI tests 4 minutes,
+    # each test of SettingsControlsUITests (it taps every row, and every control of every native page) about 20.
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - name: chat
+            only: -only-testing:DotNextTests -only-testing:DotNextUITests/ChatUITests -only-testing:DotNextUITests/SettingsUITests
+          - name: controls
+            only: -only-testing:DotNextUITests/SettingsControlsUITests/testEveryControlOfTheNativePagesDoesSomething
+          - name: rows
+            only: -only-testing:DotNextUITests/SettingsControlsUITests/testEveryRowOfSettingsOpensItsPage
+    name: tests (${{ matrix.part.name }})
+    steps:
+      # StringCatalogTests reads Resources/Localizable.xcstrings at its source path.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_$XCODE.app"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dotnext-build
+          path: ${{ runner.temp }}
+      - name: Simulator
+        id: sim
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          name = sys.argv[1]
+          devices = json.load(sys.stdin)["devices"]
+          def version(key):
+              return tuple(int(n) for n in re.search(r"iOS-(\d+)-(\d+)", key).groups())
+          found = [(version(k), d["udid"]) for k, ds in devices.items() if ".iOS-2" in k for d in ds if d["name"] == name]
+          print(max(found)[1])' "$SIMULATOR")
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid"
+      # Shorter than the job, so that a test that hangs still leaves its result and screenshots to the steps below.
+      - name: Test
+        timeout-minutes: 40
+        env:
+          ONLY: ${{ matrix.part.only }}
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dd/Build" && tar -C "$RUNNER_TEMP/dd/Build" -xzf "$RUNNER_TEMP/products.tgz"
+          run=$(ls "$RUNNER_TEMP"/dd/Build/Products/*.xctestrun | head -1)
+          # shellcheck disable=SC2086
+          xcodebuild test-without-building -xctestrun "$run" -destination "id=$UDID" $ONLY \
+            -resultBundlePath "$RUNNER_TEMP/tests.xcresult" | grep --line-buffered -E "error:|Test Case|Executed|TEST "
+          test "${PIPESTATUS[0]}" -eq 0
+      - name: Screenshots out of the result
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/tests.xcresult/Info.plist" ] || exit 0
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/tests.xcresult" --output-path "$RUNNER_TEMP/shots"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ios-tests-${{ matrix.part.name }}
+          path: |
+            ${{ runner.temp }}/tests.xcresult
+            ${{ runner.temp }}/shots
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_$XCODE.app"
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: The daemon's environment
+        run: uv sync --locked
+      - name: XcodeGen
+        run: brew install xcodegen && (cd ios && xcodegen generate)
+      - name: Simulator
+        id: sim
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, re, sys
+          name = sys.argv[1]
+          devices = json.load(sys.stdin)["devices"]
+          def version(key):
+              return tuple(int(n) for n in re.search(r"iOS-(\d+)-(\d+)", key).groups())
+          found = [(version(k), d["udid"]) for k, ds in devices.items() if ".iOS-2" in k for d in ds if d["name"] == name]
+          print(max(found)[1])' "$SIMULATOR")
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid"
+      # The script makes its three folders with mktemp; DOT_HOME and the others point at the runner's temp too, so
+      # nothing it starts can reach a default home. It runs once more when the first try failed: on the runner the UI
+      # test runner sometimes fails to start ("Timed out waiting for AX loaded notification", run 45569714390) before
+      # any test ran. The second try starts a new daemon in new folders; a failure of both fails the job.
+      - name: Settings end to end
+        timeout-minutes: 45
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          export DOT_HOME="$RUNNER_TEMP/home" DOT_LOG_DIR="$RUNNER_TEMP/logs" DOT_CHROME_DIR="$RUNNER_TEMP/chrome"
+          if ! ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"; then
+            echo "::warning title=e2e::the first try failed; trying once more"
+            rm -rf "$RUNNER_TEMP/dd/Logs/Test"
+            ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"
+          fi
+      - name: Screenshots out of the result
+        if: always()
+        run: |
+          result=$(find "$RUNNER_TEMP/dd/Logs/Test" -name '*.xcresult' -maxdepth 1 2>/dev/null | head -1)
+          [ -n "$result" ] || exit 0
+          cp -R "$result" "$RUNNER_TEMP/e2e.xcresult"
+          xcrun xcresulttool export attachments --path "$result" --output-path "$RUNNER_TEMP/shots"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ios-e2e
+          path: |
+            ${{ runner.temp }}/e2e.xcresult
+            ${{ runner.temp }}/shots
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # The one check to read: it passes only when every job above passed. Not one for main's protection to require: a
+  # pull request that changes nothing under ios/ runs none of this workflow, so the check would never arrive.
+  ios:
+    if: always()
+    needs: [engine, build, tests, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
