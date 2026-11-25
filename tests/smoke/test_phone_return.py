@@ -586,6 +586,7 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
                 # The page's copy stands while the network still sleeps: `.waiting` is the chat drawn from it, before
                 # Dot answers. A clock of its own would measure how loaded the Mac is (538 ms on a CI runner).
                 in_place_ms: float = _IN_PLACE_S * 1000 - (time.monotonic() - started) * 1000
+                assert in_place_ms > 0, f"the page took {_IN_PLACE_S - in_place_ms / 1000:.1f} s to open"
                 await expect(again.locator(".waiting .stage-heading-title")).to_have_text(title, timeout=in_place_ms)
                 await expect(again.locator(".waiting .stage-name")).to_be_visible(timeout=100)
                 named: str = await again.locator(".waiting .stage-name").inner_text()
