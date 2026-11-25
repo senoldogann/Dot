@@ -171,6 +171,11 @@ def themes_dir() -> Path:
     return dot_home() / "themes"
 
 
+def prices_path() -> Path:
+    """The prices of the models Dot keeps from the public price list (item 1856), refreshed once a day."""
+    return dot_home() / "prices.json"
+
+
 def checks_dir() -> Path:
     """Where the owner's checks live (item 1855): executable files a schedule or a watcher runs without a model to say
     whether to wake. Dot runs them, so a run changes them only as it changes Dot's other code."""

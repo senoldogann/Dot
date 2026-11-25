@@ -38,6 +38,7 @@ from dotagent.config_edit import BUDGET_SETTINGS, BudgetSetting, set_budget
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path, workspace_dir
+from dotagent.llm.pricing import PriceBook, TokenUse, estimate, tier_sizes
 from dotagent.llm.router import parse_model_ref
 from dotagent.notify.needs_you import NeedsYou, read_needs_you
 from dotagent.notify.owner import tell_owner
@@ -113,7 +114,7 @@ from dotagent.store.models import (
     ThreadRecord,
     chat_team,
 )
-from dotagent.store.stats import RunCosts, Usage, local_day_start
+from dotagent.store.stats import RunBudget, RunCosts, Usage, local_day_start
 from dotagent.tools.schedule import chat_options, schedule_mode
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -351,14 +352,45 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         owner's caps and what like runs spent (item 1731)."""
         run: RunRecord = await store.get_run(run_id)
         costs: RunCosts = await store.run_costs(run_id)
-        return costs.model_copy(update={"budget": await run_budget(ctx.runtime.budget, store, run)})
+        budget: RunBudget = await run_budget(ctx.runtime.budget, store, run)
+        # Dollars beside the tokens (item 1856): the run's own, and with its helpers beside what its cap counts.
+        book: PriceBook | None = ctx.runtime.prices.book
+        sizes: tuple[int, ...] = tier_sizes(book)
+        family: dict[str, list[TokenUse]] = await store.token_uses_of_family(run_id, sizes)
+        own: list[TokenUse] = family.get("own", [])
+        return costs.model_copy(
+            update={
+                "budget": budget.model_copy(
+                    update={"spent_cost": estimate(book, [*own, *family.get("helpers", [])], sizes)}
+                ),
+                "cost": estimate(book, own, sizes),
+            }
+        )
 
     @router.get("/usage")
     async def usage(query: Annotated[UsageQuery, Query()]) -> Usage:
         """What the owner's runs used in the last ``days`` days (item 1403): for each local day the runs started on it,
         their steps, the tokens in and out and their minutes, and the last window of the Claude plan each kind of
-        window was seen in. Time and tokens are what Dot records; it holds no price per model, so it shows no money."""
-        return await store.usage(query.days)
+        window was seen in, each day and each of the runs that used the most with what its tokens cost in dollars, as
+        estimated from the public price list (item 1856)."""
+        used: Usage = await store.usage(query.days)
+        book: PriceBook | None = ctx.runtime.prices.book
+        sizes: tuple[int, ...] = tier_sizes(book)
+        by_day: dict[str, list[TokenUse]] = await store.token_uses_by_day(
+            local_day_start(time.time(), query.days - 1), sizes
+        )
+        by_run: dict[str, list[TokenUse]] = await store.token_uses_of_runs([run.run_id for run in used.top_runs], sizes)
+        return used.model_copy(
+            update={
+                "days": tuple(
+                    day.model_copy(update={"cost": estimate(book, by_day.get(day.day, []), sizes)}) for day in used.days
+                ),
+                "top_runs": tuple(
+                    run.model_copy(update={"cost": estimate(book, by_run.get(run.run_id, []), sizes)})
+                    for run in used.top_runs
+                ),
+            }
+        )
 
     @router.get("/budget")
     async def budget_view() -> BudgetView:

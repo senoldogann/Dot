@@ -34,6 +34,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import fold_search, plain_line
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
+from dotagent.llm.pricing import TokenUse
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, Effort, ImageData, Message, OneMessage, Speed
 from dotagent.notify.tells import (
     TELL_RESPONSE_EVENT,
@@ -45,6 +46,7 @@ from dotagent.notify.tells import (
 )
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
+from dotagent.store.costs import uses_by_day, uses_of_family, uses_of_runs
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
 from dotagent.store.failed import failed_result_sql
 from dotagent.store.models import (
@@ -4750,6 +4752,19 @@ class Store:
         """What the runs of the last ``days`` local days used, a row for each day, and the Claude plan's windows their
         steps recorded (item 1403), read on a read-only connection."""
         return await asyncio.to_thread(collect_usage, self._database, days, time.time())
+
+    async def token_uses_by_day(self, since: float, sizes: Sequence[int]) -> dict[str, list[TokenUse]]:
+        """The tokens by model of the runs created since ``since``, by local day (item 1856), read on a read-only
+        connection."""
+        return await asyncio.to_thread(uses_by_day, self._database, since, sizes)
+
+    async def token_uses_of_runs(self, run_ids: Sequence[str], sizes: Sequence[int]) -> dict[str, list[TokenUse]]:
+        """The tokens by model of each of ``run_ids`` (item 1856), read on a read-only connection."""
+        return await asyncio.to_thread(uses_of_runs, self._database, run_ids, sizes)
+
+    async def token_uses_of_family(self, run_id: str, sizes: Sequence[int]) -> dict[str, list[TokenUse]]:
+        """The tokens by model of the run ``run_id`` (``own``) and of its helpers (``helpers``), item 1856."""
+        return await asyncio.to_thread(uses_of_family, self._database, run_id, sizes)
 
     async def run_costs(self, run_id: str) -> RunCosts:
         """What the run cost and where it went, read on a read-only connection; its minutes run to now while it

@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1856](1856.md) | done | 2026-11-25 | What a run and a task cost in dollars, estimated from a public price list, beside their tokens |
 | [1855](1855.md) | done | 2026-11-25 | A schedule or a watcher may run a check first, without a model, and wake one only when it says so |
 | [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
 | [1851](1851.md) | done | 2026-11-25 | The orphan-groups test keeps a Dot home of its own, which no other pytest worker writes into |

@@ -72,6 +72,7 @@ from dotagent.help.added import AddedServers, added_server_configs, read_added_s
 from dotagent.help.meaning import HelpVectors
 from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
+from dotagent.llm.price_list import PriceList, open_price_list
 from dotagent.llm.roles import ModelRoles, learning_of
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.builtin import builtin_servers
@@ -267,6 +268,8 @@ class Runtime:
     phone: PhoneDesk | None
     # The Mac's dictation model (item 626): what the owner says into a page, and what is said in a video (item 1212).
     transcriber: Transcriber
+    # The models' prices from the public price list (item 1856), which the estimates in dollars read.
+    prices: PriceList
 
     @property
     def search_key_present(self) -> bool:
@@ -632,6 +635,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         approvals.switch_free(config.policy.free)
         assistant: Assistant = Assistant(config.assistant, await asyncio.to_thread(mac_first_name))
         roles: ModelRoles = ModelRoles(config.models, config.initiative.look_model, learning_of(config.harness))
+        prices: PriceList = open_price_list()
+        await prices.load()
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -679,6 +684,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             peers=peers,
             phone=_phone(config),
             transcriber=Transcriber(voice_dir()),
+            prices=prices,
             meetings=MeetingDesk(
                 store,
                 approvals,
