@@ -1,6 +1,7 @@
 import Foundation
 
-/// How much of the work log a chat shows (D9, §20): a pure view filter, default Show all. The table below is the
+/// How much of the work log a chat shows (D9, §20): a pure view filter, default Hide all (item 1769, the web's
+/// "What it is doing"). The table below is the
 /// contract (PLAN.md §13 S6); `shows(_:mode:)` is it in code and `WorkLogTests` checks every cell.
 ///
 /// | What                                   | Show all | Hide successful | Hide all | Zen    |

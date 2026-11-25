@@ -308,8 +308,7 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    // The capsule says Working and its clock alone (item 1769): what the run does is the live line's.
-                    status: capsuleStatus, activity: nil,
+                    status: capsuleStatus,
                     since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
                     helpers: helpers.filter { helperState($0.status).isLive }.count),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
