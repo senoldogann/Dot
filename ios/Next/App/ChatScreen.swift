@@ -23,7 +23,7 @@ struct ChatScreen: View {
     /// Begins the edit of the first queued message at once (the debug fixtures); `false` in the app.
     let editsFirstQueued: Bool
     @Environment(AppModel.self) private var model: AppModel
-    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
+    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
     @AppStorage(PrefKey.confirmStop) private var confirmStop: Bool = true
@@ -44,6 +44,8 @@ struct ChatScreen: View {
     @State private var reading: ReadingMark = ReadingMark()
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
+    /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
+    @State private var stepsShown: Bool = false
     @State private var confirmingStop: Bool = false
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
@@ -62,7 +64,11 @@ struct ChatScreen: View {
         guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { return [] }
         return helpers.filter { $0.parentRunId == run.id }
     }
-    private var mode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .showAll }
+    /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
+    private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
+    /// Whether the chosen mode hides the steps, so that the live line says the work (item 1769).
+    private var linesTheWork: Bool { chosenMode == .hideAll || chosenMode == .zen }
+    private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
 
@@ -175,12 +181,15 @@ struct ChatScreen: View {
                     Group {
                         switch block {
                         case .item(let item): row(item)
-                        case .tools(let entries): ToolRun(entries: entries)
+                        case .steps(let rows): StepRun(rows: rows)
                         }
                     }
                     .id(block.id)
                     // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
                     .onAppear { reading.topVisible = block.id }
+                }
+                if linesTheWork, let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
+                    WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                 }
             }
             .frame(maxWidth: proseWidth)

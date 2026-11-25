@@ -416,6 +416,8 @@ struct DocumentScanner: UIViewControllerRepresentable {
 
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
+    /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
+    /// transcript's live line says).
     let status: ChatStatus?
     /// "Waiting on 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
     /// a step of its own ("Working" and the turn's clock).

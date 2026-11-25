@@ -153,6 +153,7 @@ from dotagent.claude_code.stream import (
     tool_prefix,
     user_line,
 )
+from dotagent.claude_code.versions import thinking_display
 from dotagent.config import AgentConfig
 from dotagent.core.errors import (
     ClaudeCodeBroke,
@@ -484,6 +485,7 @@ def claude_argv(
     model: str,
     effort: Effort | None,
     speed: Speed,
+    thinking: tuple[str, ...],
     prompt_file: Path,
     config_file: Path,
     door: str,
@@ -491,10 +493,12 @@ def claude_argv(
 ) -> tuple[str, ...]:
     """The command of a run: ``model`` (Claude Code's alias) at ``effort`` (``--effort``, a level of
     :func:`run_effort`; none for a model without levels) and ``speed`` (fast mode through ``--settings``, the
-    one settings source a run reads, item 1014; :func:`run_speed`), with what ``prompt_file`` holds after Claude Code's
-    own system prompt (at every start: the program records it with the session, which a resume sends as recorded until
-    a compaction renders it again), the door ``door`` of ``config_file`` as its only MCP server and its tools as the
-    only ones, in the session ``resume`` names or a new one; its input and output are lines of JSON."""
+    one settings source a run reads, item 1014; :func:`run_speed`), ``thinking`` (the arguments that pass on the
+    model's thinking, :func:`~dotagent.claude_code.versions.thinking_display`, item 1768), with what ``prompt_file``
+    holds after Claude Code's own system prompt (at every start: the program records it with the session, which a
+    resume sends as recorded until a compaction renders it again), the door ``door`` of ``config_file`` as its only
+    MCP server and its tools as the only ones, in the session ``resume`` names or a new one; its input and output are
+    lines of JSON."""
     again: tuple[str, ...] = () if resume is None else ("--resume", resume)
     fast: tuple[str, ...] = ("--settings", FAST_SETTINGS) if speed == "fast" else ()
     level: tuple[str, ...] = () if effort is None else ("--effort", effort)
@@ -512,6 +516,7 @@ def claude_argv(
         model,
         *level,
         *fast,
+        *thinking,
         "--append-system-prompt-file",
         str(prompt_file),
         "--tools",
@@ -1470,6 +1475,8 @@ class _Launch:
     queue: asyncio.Queue[_Item]
     quiet: _Quiet
     silence_s: float
+    # The arguments that pass on the model's thinking on this program's version (item 1768).
+    thinking: tuple[str, ...]
 
     async def start(self, resume: str | None, continuing: bool, fresh: bool = False) -> _Program:
         """Start the program in the session ``resume`` names, or in a new one when it is ``None``; ``fresh`` says it is
@@ -1481,6 +1488,7 @@ class _Launch:
             self.ref.model,
             run_effort(self.info.efforts, run.effort, runtime.config.models.effort),
             run_speed(self.ref, run.speed),
+            self.thinking,
             self.prompt_file,
             self.config_file,
             self.door,
@@ -1812,6 +1820,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
                 queue=queue,
                 quiet=quiet,
                 silence_s=provider.config.silence_s,
+                thinking=thinking_display((await provider.version_of(program)).version),
             )
             pictures: tuple[ImageData, ...] = await asyncio.to_thread(_images, agent.opening.files, info.vision)
             current: _Program = await launch.start(None if chat is None else chat.session_id, continuing=False)
