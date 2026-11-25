@@ -352,7 +352,8 @@ answer keeps its words, Ollama's too.
   not cut short here: OpenCode does not say when it takes one in), skills and saving one, the team and helpers, your
   mail and calendars, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
   them and as Dot's own loop withholds them (no accounts, no skills, no helpers). It has none of Dot's for what its own
-  tools do (files, `shell`, `web_fetch` and `web_search`) and no `finish`: the run ends with its last answer. It does
+  tools do (files, `shell`, `web_fetch` and `web_search`); `finish` and the plan's tools are its since item 1695
+  (below). It does
   have Dot's terminal sessions (`terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`), `web_crawl` and
   `web_extract`: a command sent to a terminal session runs in Dot's own terminal, under Dot's gate and Dot's sandbox as
   Dot's own commands do, not in the OpenCode server above.
