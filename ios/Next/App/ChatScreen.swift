@@ -150,7 +150,6 @@ struct ChatScreen: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.m) {
-                    chatStart
                     if chat?.freshness == .deleted {
                         Notice(tone: .info, message: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), dismiss: nil)
                     }
@@ -210,23 +209,6 @@ struct ChatScreen: View {
                 }
             }
             .safeAreaInset(edge: .bottom) { bottom(proxy) }
-        }
-    }
-
-    /// Where the chat begins: who works in it, on which Mac, since when (a short chat does not look empty).
-    @ViewBuilder private var chatStart: some View {
-        if let started = view?.thread.createdAt {
-            HStack(spacing: Space.xs) {
-                DotFace(size: 20)
-                Text(
-                    [view?.thread.agentId ?? String(localized: "Dot", comment: "The assistant's name in a chat's subtitle"), model.macName,
-                        Date(timeIntervalSince1970: started).formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: " · ")
-                )
-                .textRole(.label).foregroundStyle(Tone.tertiary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.bottom, Space.xs)
-            .accessibilityElement(children: .combine)
         }
     }
 
