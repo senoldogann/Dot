@@ -25,9 +25,10 @@ later; nothing of Dot needs Node to run.
 
 ## The checks every change passes
 
-The gate (`.github/workflows/gate.yml`) runs these on every pull request that changes more than prose. Run them once
-before you push; while you work, the tests of what you changed are enough. `-n auto` (pytest-xdist) spreads the tests
-over your Mac's cores:
+The gate (`.github/workflows/gate.yml`) runs these on every pull request that changes more than prose; one whose
+files nothing of the macOS jobs reads (`ios/`, the item records: `scripts/python_ci.py`) runs the Linux checks alone.
+Run them once before you push; while you work, the tests of what you changed are enough. `-n auto` (pytest-xdist)
+spreads the tests over your Mac's cores:
 
 ```bash
 uv run ruff format --check src tests
