@@ -323,6 +323,13 @@ class ClaudeCodeCut(ClaudeCodeBroke):
     ``stderr``, ``inited``, ``steps``, ``silent_s``), and the run goes on in place when that is safe (item 1581)."""
 
 
+class ClaudeCodeRefused(ClaudeCodeError):
+    """The model's provider declined a run's message (item 1761): Anthropic's safeguards flagged it, or it was said to
+    break the usage policy. Asked the same again on the same model, it is declined again, so it lasts
+    (:func:`failure_kind`): a schedule does not try its task once more, and the message says to change the model or the
+    task."""
+
+
 class ClaudeCodeBrokenVersion(ClaudeCodeError):
     """The installed ``claude`` program is a version Dot is known not to work with (item 1673): a run on it is refused,
     saying which version and what to install."""

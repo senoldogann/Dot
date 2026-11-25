@@ -31,6 +31,9 @@ MCP_TOOL_PREFIX: str = "mcp__"
 # The words of a result that says the plan's limit stopped the turn ("Claude AI usage limit reached|<epoch>", "5-hour
 # limit reached ∙ resets 3pm", "You've hit your limit").
 _LIMIT_WORDS: re.Pattern[str] = re.compile(r"usage limit|limit reached|hit your limit|rate limit", re.IGNORECASE)
+# The words of a turn's error when the model's provider declined the message itself (item 1761): "Opus 5's safeguards
+# flagged this message (https://www.anthropic.com/legal/aup)", and the older "appears to violate our Usage Policy".
+_REFUSED_WORDS: re.Pattern[str] = re.compile(r"safeguards flagged|violates? our usage policy", re.IGNORECASE)
 # The reset an older limit error carries after a bar, in epoch seconds.
 _LIMIT_EPOCH: re.Pattern[str] = re.compile(r"\|(\d{9,11})\b")
 
@@ -316,6 +319,11 @@ def init_problem(init: Init, door: str) -> str | None:
 def limit_said(text: str) -> bool:
     """Whether a turn's error says the plan's limit stopped it."""
     return _LIMIT_WORDS.search(text) is not None
+
+
+def refusal_said(text: str) -> bool:
+    """Whether a turn's error says the model's provider declined the message (:data:`_REFUSED_WORDS`)."""
+    return _REFUSED_WORDS.search(text) is not None
 
 
 def limit_resets(window: LimitWindow | None, text: str) -> float | None:

@@ -8,9 +8,12 @@ import json
 import stat
 from pathlib import Path
 
+import pytest
+
 from dotagent.agent.limits import LimitReached, RunLimits
 from dotagent.agent.picks import owner_server_groups
 from dotagent.agent.prompt import AgentBrief, team_sections
+from dotagent.claude_code.ask import Answer, Question, reply_of
 from dotagent.claude_code.models import (
     PlanModel,
     PlanModels,
@@ -62,7 +65,13 @@ from dotagent.claude_code.stream import (
     read_line,
     user_line,
 )
-from dotagent.core.errors import ClaudeCodeBroke, ClaudeCodeError, failure_kind
+from dotagent.core.errors import (
+    ClaudeCodeBroke,
+    ClaudeCodeError,
+    ProviderRefusedError,
+    ProviderTransportError,
+    failure_kind,
+)
 from dotagent.llm.claude_code import model_info_of
 from dotagent.llm.router import ModelRef, offers_fast_mode
 from dotagent.llm.types import Effort, ImageData, ToolSpec
@@ -626,3 +635,16 @@ def test_a_run_short_of_a_tool_says_which_and_why_and_a_bridge_that_came_up_shor
         "Claude Code did not list it among the tools Dot's bridge gave it (it listed: finish, shell)" in bridge.message
     )
     assert tools_not_listed(("finish",), [], {}).message.count("it listed: none") == 1
+
+
+def test_a_question_the_models_safeguards_flagged_is_a_refusal_not_a_failure_to_try_again() -> None:
+    """Item 1761: Claude Code's answer that the model's safeguards flagged the message was a broken session, which the
+    router tries again with the same question on the same model; it is the model's refusal, which a try does not
+    change."""
+    said: str = "API Error: Opus 5's safeguards flagged this message (https://www.anthropic.com/legal/aup)."
+    flagged: Answer = Answer((), (), (), (), (), None, {"type": "result", "is_error": True, "result": said})
+    with pytest.raises(ProviderRefusedError, match="safeguards flagged"):
+        reply_of(flagged, Question("Be brief.", "Review this.", None), "claude_code:opus", 0.0)
+    broke: Answer = Answer((), (), (), (), (), None, {"type": "result", "is_error": True, "result": "Stream closed"})
+    with pytest.raises(ProviderTransportError, match="session failed"):
+        reply_of(broke, Question("Be brief.", "Review this.", None), "claude_code:opus", 0.0)

@@ -486,7 +486,8 @@ earlier runs.
   switched off, deleted or whose agent is paused, is dropped. A try is claimed in the store before its run starts, so a
   crash loses it rather than starting it twice. Its failure counts in the schedule's row of failures as any run's.
   Your stop, the emergency stop, a run's limit of minutes or tokens, its own report of failure and a lasting error (a
-  key, credits) are not tried again. Your own chats are not either: only tasks of a schedule are.
+  key, credits, a message the model's safeguards flagged, which the same model declines again: item 1761) are not
+  tried again. Your own chats are not either: only tasks of a schedule are.
 - The scheduler goes on past a failure: the schedules, the campaigns, the nightly reflection and the harness's step are
   each looked at on their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick
   tries again. Only 20 ticks in a row in which the part that fires schedules or the part that starts a campaign's
