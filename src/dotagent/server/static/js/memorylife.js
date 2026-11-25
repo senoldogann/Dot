@@ -1,4 +1,5 @@
-// The life of the notes on Settings › Memory (item 584): the changes runs proposed for the owner's notes, the notes
+// The life of the notes on Settings › Memory (item 584): the changes runs proposed for the owner's notes, the notes and
+// lessons tasks proposed to remember (item 1865), the notes
 // proposed to be forgotten, the trash of the ones the owner forgot, and the choice of the order the notes are listed in. Nothing here deletes a note on its own: a note that
 // rested for [memory] forget_after_days is only proposed, and the owner's Forget moves it to the trash, where it waits
 // [memory] trash_days and Restore brings it back.
@@ -256,6 +257,89 @@ export function changesSection(hooks) {
 
   async function load() {
     notes = await api.get("/memories/proposed");
+    paint();
+  }
+
+  return { element: section, load };
+}
+
+// Who proposed a note or lesson that waits (item 1865), by the origin of its task (item 1864).
+const WAITING_FROM = {
+  schedule: "a scheduled task",
+  watcher: "a watcher's task",
+  helper: "a helper task",
+  initiative: "Dot on its own",
+  chat: "a task in a chat",
+};
+
+/**
+ * What tasks proposed to remember that waits for the owner (item 1865): the notes a scheduled task, a watcher's task or a
+ * helper held instead of saving them, and the lessons that wait, each with Save and Dismiss. Returns the section, hidden
+ * while nothing waits, and `load()`. `hooks.noteText(content)` draws the words; `hooks.onDecided()` runs after a save.
+ */
+export function waitingSection(hooks) {
+  let waiting = [];
+  const count = el("span", { class: "life-count" });
+  const rows = el("div", { class: "note-rows note-proposed-rows" });
+  const section = setSection({
+    title: ["Notes tasks proposed", count],
+    lead: "A scheduled task, a watcher's task or a helper saves nothing on its own: what it would remember waits here, and no task is handed it until you save it.",
+    body: setCard(rows),
+  });
+  section.classList.add("notes-waiting");
+  section.dataset.waiting = "";
+  section.hidden = true;
+
+  function path(item, action) {
+    const run = encodeURIComponent(item.run_id);
+    return item.kind === "note" ? `/memories/waiting/${run}/${item.index}/${action}` : `/runs/${run}/lessons/${item.index}/${action}`;
+  }
+
+  async function decide(item, action, words) {
+    try {
+      await api.post(path(item, action), {});
+      toast("ok", words);
+    } finally {
+      await load();
+      hooks.onDecided();
+    }
+  }
+
+  function paint() {
+    if (waiting.length === 0) {
+      section.hidden = true;
+      return;
+    }
+    count.textContent = String(waiting.length);
+    rows.replaceChildren(
+      ...waiting.map((item) => {
+        const save = el("button", { class: "btn ghost sm", type: "button", title: "Save it: tasks are handed it from now on" }, icon("check"), "Save");
+        save.addEventListener("click", () => attempt(() => decide(item, "save", item.kind === "note" ? "Saved the note." : "Saved the lesson.")));
+        const dismiss = el("button", { class: "btn ghost sm", type: "button", title: "Dismiss it: it is not saved" }, icon("x"), "Dismiss");
+        dismiss.addEventListener("click", () => attempt(() => decide(item, "dismiss", "Dismissed.")));
+        const from = el("span", { title: dateTimeFull(item.at) }, [
+          item.kind === "note" ? "Note proposed " : "Lesson proposed ",
+          ago(item.at),
+          " by ",
+          el("a", { href: `#/runs/${item.run_id}`, title: item.goal }, WAITING_FROM[item.origin] ?? "a task"),
+        ]);
+        const outside = item.tainted
+          ? el("span", { class: "badge b-warn", title: "The task that proposed it had read content other people can write." }, icon("alert"), "From outside content")
+          : null;
+        return el(
+          "div",
+          { class: "note-row", dataset: { waiting: `${item.run_id}:${item.kind}:${item.index}` } },
+          // Whole: Save makes these very words a note every task may be handed.
+          el("div", { class: "note-main" }, hooks.noteText(item.text), el("div", { class: "note-meta" }, outside, el("span", { class: "note-when" }, from))),
+          el("div", { class: "note-actions note-decide" }, save, dismiss),
+        );
+      }),
+    );
+    section.hidden = false;
+  }
+
+  async function load() {
+    waiting = await api.get("/memories/waiting");
     paint();
   }
 

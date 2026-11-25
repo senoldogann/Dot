@@ -12,6 +12,7 @@ from typing import Annotated
 
 from pydantic import Field
 
+from dotagent.memory.held import MOST_HELD, HeldNote, hold_note
 from dotagent.memory.render import render_note
 from dotagent.memory.service import (
     CORE_TAG,
@@ -19,16 +20,19 @@ from dotagent.memory.service import (
     SEPARATE_TAG,
     MemoryHit,
     SavedMemory,
+    checked_text,
     forget_memory,
     normalize_tags,
+    propose_memory_rewrite,
     recall_for,
     rewrite_memory_note,
 )
-from dotagent.memory.supersede import Replacing, save_replacing
+from dotagent.memory.supersede import Replacing, normalize_subject, save_replacing
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import known_secrets
 from dotagent.store.models import MemoryRecord, MemoryRewrite
+from dotagent.store.provenance import holds_saves
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -50,6 +54,19 @@ _SUMMARY_CHARS: int = 200
 _MOST_SUBJECT_CHARS: int = 60
 # The longest a note may be saved for a while: past a few years a fact is one that holds until it changes.
 _MOST_VALID_DAYS: int = 3650
+# What a scheduled task's, a watcher's or a helper's save and rewrite say (item 1865): they wait for the owner.
+_HELD: str = (
+    "Proposed, not saved: a scheduled task, a watcher's task or a helper writes no lasting note on its own, so this "
+    "waits for the owner on the Memory page, who saves it or dismisses it. Go on with the task; no other run is "
+    "handed it until then."
+)
+_HELD_CHANGE: str = (
+    "Proposed: a scheduled task, a watcher's task or a helper changes no note on its own, so your change waits for the "
+    "owner on the Memory page and is not handed to any run until they take it."
+)
+_HELD_DAYS: str = (
+    " The days you gave are not kept with a proposal: the note keeps the time it has when the owner takes the change."
+)
 # What a run's rewrite of a note the owner wrote or approved says: it waits for them (audit 2026-11-24, D1).
 _PROPOSED: str = (
     "Proposed: the owner wrote or approved this note, so your change waits for them on the Memory page and is not "
@@ -203,6 +220,28 @@ def _save_tool(max_chars: int) -> RegisteredTool:
         # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94). A run that had read
         # content third parties can author saves a tainted note: yolo removes the approval, not the origin.
         expires_at: float | None = expiry_of(args.valid_days, time.time())
+        if holds_saves(await ctx.runtime.memory.store.origin_of_run(ctx.run_id)):
+            held: HeldNote | None = await hold_note(
+                ctx.runtime.bus,
+                ctx.runtime.memory.store,
+                ctx.run_id,
+                checked_text(args.content, ctx.runtime.memory.config.max_chars),
+                normalize_tags(_own_tags(args.tags)),
+                None if args.subject is None else normalize_subject(args.subject),
+                expires_at,
+                ctx.ever_tainted(),
+            )
+            if held is None:
+                return ok(
+                    f"Not kept: this task holds the {MOST_HELD} notes one task may propose, so this one is neither "
+                    "saved nor proposed. Go on with the task; tell the owner in your answer if it matters."
+                )
+            if held.state != "proposed":
+                return ok(
+                    f"Not proposed again: the owner {held.state} these words already in this task "
+                    f"[{ctx.run_id} #{held.index}]. Go on with the task."
+                )
+            return ok(f"{_HELD} [{ctx.run_id} #{held.index}] {held.content}")
         # Read at any time in the run, not as it stands: the owner's "go on" clears the run's taint, not the page's
         # words it may quote (the review of 2026-11-01, as skill_save does).
         saved: Replacing = await save_replacing(
@@ -331,6 +370,18 @@ def _update_tool(max_chars: int) -> RegisteredTool:
         refused: ToolResult | None = await _secret_refusal(args.content)
         if refused is not None:
             return refused
+        if holds_saves(await ctx.runtime.memory.store.origin_of_run(ctx.run_id)):
+            waiting: MemoryRecord = await propose_memory_rewrite(
+                ctx.runtime.memory,
+                args.memory_id,
+                args.content,
+                _own_tags(args.tags, (await ctx.runtime.memory.store.get_memory(args.memory_id)).tags),
+                ctx.run_id,
+                ctx.ever_tainted(),
+            )
+            # A proposal keeps no time of its own: the note keeps the time it has when the owner takes the change.
+            days: str = "" if args.valid_days is None else _HELD_DAYS
+            return ok(f"{_HELD_CHANGE}{days} The note runs are handed stays: {render_note(waiting)}")
         rewrite: MemoryRewrite = await rewrite_memory_note(
             ctx.runtime.memory,
             args.memory_id,

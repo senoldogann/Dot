@@ -51,3 +51,14 @@ def note_origin(source_run: str | None, run: tuple[str, str | None] | None) -> M
         return None
     source, parent_run_id = run
     return run_origin(source, parent_run_id)
+
+
+# The origins whose runs propose what they would remember, and the owner decides (item 1865,
+# :mod:`dotagent.agent.held_notes`): runs nobody watches as they work, or that another run started.
+HELD_ORIGINS: frozenset[MemoryOrigin] = frozenset({"schedule", "watcher", "helper"})
+
+
+def holds_saves(origin: MemoryOrigin | None) -> bool:
+    """Whether a run whose notes have ``origin`` proposes what it would remember instead of saving it: the origin is in
+    :data:`HELD_ORIGINS`. A run the store does not hold has none, as its notes would (:func:`note_origin`)."""
+    return origin in HELD_ORIGINS
