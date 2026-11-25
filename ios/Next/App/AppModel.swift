@@ -64,6 +64,8 @@ final class AppModel {
         func showFixture(_ fixture: EngineSnapshot, mac: String) {
             show(fixture)
             fixtureMac = mac
+            // The models and defaults the chip and the chat's settings read, from the Settings fixture's daemon.
+            fixtureAPI = SettingsFixture.root.api()
             phase = .ready
         }
     #endif
@@ -102,6 +104,10 @@ final class AppModel {
 
     /// The models the daemon offers (`GET /api/models`), for the composer's chip.
     var models: [ProviderModels] = []
+    /// The daemon's main model and approval mode (`GET /api/status`), what "Default" means in the chat's settings.
+    var chatDefaults: ChatDefaults?
+    /// Why the models could not be read, for the model picker to say with a retry; `nil` once they are.
+    var modelsProblem: String?
     /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
     var palette: PaletteView?
     var agents: [AgentSummary] = []
@@ -352,14 +358,37 @@ extension AppModel {
         }
     }
 
-    /// The models the daemon offers, read once per launch for the composer's chip.
+    /// The models the daemon offers and its defaults, read once per launch for the composer's chip and the chat's
+    /// settings (each again on the next ask while it could not be read).
+    /// A read that fails says why (`modelsProblem`), for the picker to show with its retry: the defaults' too, without
+    /// which no row is marked chosen or Default.
     func loadModels() async {
-        guard let engine, models.isEmpty else { return }
-        do {
-            models = try await engine.api.models()
-        } catch {
-            logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+        guard let api: DaemonAPI = settingsAPI else { return }
+        let place: String = String(localized: "Settings › Models", comment: "Where on the Mac: the Models page")
+        var problem: String?
+        if models.isEmpty {
+            do {
+                models = try await api.models()
+            } catch {
+                logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+                problem = failureWords(settingsFailure(error), macPlace: place)
+            }
         }
+        if chatDefaults == nil {
+            do {
+                let status: StatusView = try await api.fullStatus()
+                chatDefaults = ChatDefaults(model: status.models.main, approvals: status.approvals)
+            } catch {
+                logger.warning("the daemon's defaults could not be read error=\(String(describing: error), privacy: .public)")
+                problem = problem ?? failureWords(settingsFailure(error), macPlace: place)
+            }
+        }
+        modelsProblem = problem
+    }
+
+    /// A model's name as the daemon gives it, else the reference's last part ("claude_code:opus" → "opus").
+    func modelLabel(_ ref: String) -> String {
+        models.flatMap(\.models).first { $0.ref == ref }?.label ?? String(ref.split(separator: ":").last ?? Substring(ref))
     }
 
     /// The pickers' lists, read once per launch; a list that cannot be read stays empty and says so in the log.

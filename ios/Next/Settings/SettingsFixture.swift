@@ -179,11 +179,12 @@
 
         private var models: String {
             let option: (String, String) -> String = { ref, label in
-                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium"}"#
+                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#
-                + #"{"provider":"opencode_go","models":[\#(option("opencode_go:deepseek-v4.1-flash", "DeepSeek V4.1 Flash"))],"error":null}"#
+                + #"{"provider":"opencode_go","models":[\#(option("opencode_go:deepseek-v4.1-flash", "DeepSeek V4.1 Flash"))],"error":null},"#
+                + #"{"provider":"ollama","models":[\#(option("ollama:gemma4:cloud", "gemma4:cloud")),\#(option("ollama:qwen3.5", "qwen3.5"))],"error":null}"#
                 + "]"
         }
 

@@ -528,6 +528,17 @@
         }
       }
     },
+    "A second AI answers for you; you are asked only what it is unsure about": {
+      "comment": "Approval mode auto, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İkinci bir yapay zekâ senin yerine yanıtlar; yalnızca emin olmadığı şeyler sana sorulur"
+          }
+        }
+      }
+    },
     "A secret is at least %lld characters, so it can be masked where a command prints it. A short code (an SMS code, a PIN) can go as a message, which Dot sees.": {
       "comment": "Ask dock: a secret that is too short; the argument is the least length",
       "localizations": {
@@ -605,6 +616,17 @@
         }
       }
     },
+    "Add %@ to favourites": {
+      "comment": "VoiceOver: stars a model; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini favorilere ekle"
+          }
+        }
+      }
+    },
     "Address": {
       "comment": "This Mac: the Mac's tailnet address",
       "localizations": {
@@ -667,6 +689,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tümü"
+          }
+        }
+      }
+    },
+    "All models": {
+      "comment": "Chat settings filter: every model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm modeller"
           }
         }
       }
@@ -968,6 +1001,17 @@
         }
       }
     },
+    "Ask only to pay or send": {
+      "comment": "Approval mode yolo: asks only before a payment, a message or a public post",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca ödeme ve gönderimde sor"
+          }
+        }
+      }
+    },
     "Asking for the camera…": {
       "comment": "QR scan: the camera permission is being asked",
       "localizations": {
@@ -1008,6 +1052,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Otomatik"
+          }
+        }
+      }
+    },
+    "Auto-accept edits": {
+      "comment": "Approval mode: edits go ahead, the rest is asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenlemeleri kabul et"
           }
         }
       }
@@ -1155,6 +1210,17 @@
         }
       }
     },
+    "Catalog": {
+      "comment": "Chat settings section: hidden models",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Katalog"
+          }
+        }
+      }
+    },
     "Changes": {
       "comment": "Inspector section: what the runs changed",
       "localizations": {
@@ -1184,6 +1250,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbet"
+          }
+        }
+      }
+    },
+    "Chat settings": {
+      "comment": "Title of the chat's settings sheet: model, reasoning, approvals",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet ayarları"
           }
         }
       }
@@ -1272,6 +1349,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir ya da daha fazlasını seç, sonra gönder."
+          }
+        }
+      }
+    },
+    "Clear the search": {
+      "comment": "VoiceOver: empties the model search",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aramayı temizle"
           }
         }
       }
@@ -1668,6 +1756,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reddedildi"
+          }
+        }
+      }
+    },
+    "Default": {
+      "comment": "Chat settings: the badge of the daemon's main model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan"
           }
         }
       }
@@ -2119,6 +2218,17 @@
         }
       }
     },
+    "Dot asks only before a payment, a message or mail sent for you, or a public post": {
+      "comment": "Approval mode yolo, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot yalnızca ödemeden, senin adına gönderilen mesaj ya da e-postadan veya herkese açık paylaşımdan önce sorar"
+          }
+        }
+      }
+    },
     "Dot follows its approval mode alone.": {
       "comment": "Rules: what holds without rules",
       "localizations": {
@@ -2284,6 +2394,28 @@
         }
       }
     },
+    "Dot's setting": {
+      "comment": "Chat settings: the approval mode configured on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un ayarı"
+          }
+        }
+      }
+    },
+    "Dot's setting (%@)": {
+      "comment": "Chat settings: the approval mode configured on the Mac; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un ayarı (%@)"
+          }
+        }
+      }
+    },
     "Down": {
       "comment": "System: a service is down",
       "localizations": {
@@ -2368,6 +2500,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sıradaki mesaj düzenleniyor"
+          }
+        }
+      }
+    },
+    "Edits and everyday work go ahead; Dot asks you about the rest": {
+      "comment": "Approval mode ask, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenlemeler ve gündelik işler yapılır; geri kalanını Dot sana sorar"
           }
         }
       }
@@ -2548,6 +2691,17 @@
         }
       }
     },
+    "Extra high": {
+      "comment": "Reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çok yüksek"
+          }
+        }
+      }
+    },
     "Failed": {
       "comment": "Component gallery (debug builds): a heading or sample text\nStatus word: the run failed",
       "localizations": {
@@ -2592,6 +2746,17 @@
         }
       }
     },
+    "Fast mode": {
+      "comment": "Chat settings row: the model's fast mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı mod"
+          }
+        }
+      }
+    },
     "Fast model": {
       "comment": "Models: the role for quick small steps",
       "localizations": {
@@ -2599,6 +2764,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hızlı model"
+          }
+        }
+      }
+    },
+    "Favourites": {
+      "comment": "Chat settings filter: the starred models",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoriler"
           }
         }
       }
@@ -2658,6 +2834,17 @@
         }
       }
     },
+    "Filter the models": {
+      "comment": "VoiceOver: the filter button beside the model search",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelleri süz"
+          }
+        }
+      }
+    },
     "Find a free afternoon slot": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -2665,6 +2852,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Boş bir öğleden sonra bul"
+          }
+        }
+      }
+    },
+    "Find a model": {
+      "comment": "Chat settings: the search field's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model bul"
           }
         }
       }
@@ -2698,6 +2896,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un sorduklarını katla"
+          }
+        }
+      }
+    },
+    "Folded, %lld models": {
+      "comment": "VoiceOver: a folded provider group; the argument is its model count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Folded, %lld model"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Folded, %lld models"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı, %lld model"
           }
         }
       }
@@ -2742,6 +2969,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonun anahtarı unutulsun mu? Yeni bir kodla yeniden eşleştirirsin."
+          }
+        }
+      }
+    },
+    "Free": {
+      "comment": "Chat settings filter: the models served at no cost",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ücretsiz"
+          }
+        }
+      }
+    },
+    "Free mode, which asks nothing, is switched for all of Dot on the Mac.": {
+      "comment": "Chat settings: free mode is not a chat's choice",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiçbir şey sormayan serbest mod, Mac'te Dot'un tamamı için açılıp kapanır."
           }
         }
       }
@@ -2933,6 +3182,17 @@
         }
       }
     },
+    "Hide %@": {
+      "comment": "VoiceOver: hides a model from the list; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini gizle"
+          }
+        }
+      }
+    },
     "Hide all": {
       "comment": "Tool calls setting: no tool call shows",
       "localizations": {
@@ -2973,6 +3233,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adımları gizler"
+          }
+        }
+      }
+    },
+    "High": {
+      "comment": "Reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yüksek"
           }
         }
       }
@@ -3307,6 +3578,17 @@
         }
       }
     },
+    "Low": {
+      "comment": "Reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşük"
+          }
+        }
+      }
+    },
     "Main model": {
       "comment": "Models: the main model",
       "localizations": {
@@ -3340,6 +3622,28 @@
         }
       }
     },
+    "Manage hidden models": {
+      "comment": "Chat settings row: shows every model with a switch to hide it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gizli modelleri yönet"
+          }
+        }
+      }
+    },
+    "Max": {
+      "comment": "Reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yüksek"
+          }
+        }
+      }
+    },
     "Measured with Dot": {
       "comment": "Maintenance: Dot was measured on this version",
       "localizations": {
@@ -3347,6 +3651,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot ile ölçüldü"
+          }
+        }
+      }
+    },
+    "Medium": {
+      "comment": "Reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orta"
           }
         }
       }
@@ -3391,6 +3706,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Milyon token"
+          }
+        }
+      }
+    },
+    "Minimal": {
+      "comment": "Reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En az"
           }
         }
       }
@@ -3655,6 +3981,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcı yok"
+          }
+        }
+      }
+    },
+    "No model matches.": {
+      "comment": "Chat settings: the search or filter left no model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşleşen model yok."
           }
         }
       }
@@ -4110,6 +4447,17 @@
         }
       }
     },
+    "Open": {
+      "comment": "VoiceOver: an open provider group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
+          }
+        }
+      }
+    },
     "Open Tailscale": {
       "comment": "Pairing screen: opens the Tailscale app",
       "localizations": {
@@ -4194,6 +4542,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Web sayfasını açar"
+          }
+        }
+      }
+    },
+    "Options": {
+      "comment": "Chat settings section: reasoning, fast mode, approvals, plan first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçenekler"
           }
         }
       }
@@ -4414,6 +4773,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan"
+          }
+        }
+      }
+    },
+    "Plan first": {
+      "comment": "Chat settings row: the next message writes its plan and asks before it changes anything",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce plan"
           }
         }
       }
@@ -4715,6 +5085,17 @@
         }
       }
     },
+    "Reading the models…": {
+      "comment": "Chat settings: the daemon's models are being read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modeller okunuyor…"
+          }
+        }
+      }
+    },
     "Reading width": {
       "comment": "Appearance section: how wide prose runs on iPad",
       "localizations": {
@@ -4759,6 +5140,17 @@
         }
       }
     },
+    "Reasoning": {
+      "comment": "Chat settings row: the model's reasoning level",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akıl yürütme"
+          }
+        }
+      }
+    },
     "Recent": {
       "comment": "Chat list section: the other chats, newest first",
       "localizations": {
@@ -4766,6 +5158,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son"
+          }
+        }
+      }
+    },
+    "Recently used": {
+      "comment": "Model picker section: the chosen model and the ones picked last",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son kullanılanlar"
           }
         }
       }
@@ -4799,6 +5202,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaldır"
+          }
+        }
+      }
+    },
+    "Remove %@ from favourites": {
+      "comment": "VoiceOver: unstars a model; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini favorilerden çıkar"
           }
         }
       }
@@ -5529,6 +5943,17 @@
         }
       }
     },
+    "Show %@": {
+      "comment": "VoiceOver: shows a hidden model again; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini göster"
+          }
+        }
+      }
+    },
     "Show all": {
       "comment": "Tool calls setting: every tool call shows",
       "localizations": {
@@ -6112,6 +6537,17 @@
         }
       }
     },
+    "Tap the eye of a model to hide it from this list or show it again.": {
+      "comment": "Chat settings: how hiding a model works",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir modeli bu listeden gizlemek ya da yeniden göstermek için gözüne dokun."
+          }
+        }
+      }
+    },
     "Tasks at work": {
       "comment": "System: the number of active runs",
       "localizations": {
@@ -6464,6 +6900,28 @@
         }
       }
     },
+    "The models could not be read: %@": {
+      "comment": "Model picker: the daemon's models could not be read; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modeller okunamadı: %@"
+          }
+        }
+      }
+    },
+    "The next message writes its plan and asks before it changes anything.": {
+      "comment": "Chat settings: what plan first does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki mesaj önce planını yazar ve bir şeyi değiştirmeden önce sorar."
+          }
+        }
+      }
+    },
     "The order is the priority when several hold.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -6702,6 +7160,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu iPhone'un ağı"
+          }
+        }
+      }
+    },
+    "This model has no fast mode.": {
+      "comment": "Chat settings: fast mode is off for a model without it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu modelin hızlı modu yok."
           }
         }
       }
@@ -7527,6 +7996,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dün"
+          }
+        }
+      }
+    },
+    "You approve every change: files, commands, clicks, messages": {
+      "comment": "Approval mode supervised, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her değişikliği sen onaylarsın: dosyalar, komutlar, tıklamalar, mesajlar"
           }
         }
       }
