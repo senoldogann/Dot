@@ -18,6 +18,7 @@ from dotagent.agent.context_parts import ContextParts
 from dotagent.core.errors import StoreError
 from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
+from dotagent.llm.pricing import CostEstimate
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.endings import ENDING_LABELS, Ending, classify_ending
 from dotagent.store.failed import failed_result_sql
@@ -474,6 +475,8 @@ class RunBudget(FrozenModel):
     day_cap: int
     source_day: int
     source_day_cap: int
+    # What ``spent`` cost in dollars (item 1856), given by the route that has the prices.
+    spent_cost: CostEstimate | None = None
 
 
 class RunCosts(FrozenModel):
@@ -497,6 +500,8 @@ class RunCosts(FrozenModel):
     # What the provider's cache did for the run and why a cold step was cold (item 1742); ``None`` for a run with no
     # measured step.
     cache: CacheReport | None = None
+    # What the run's own tokens cost in dollars (item 1856), given by the route that has the prices.
+    cost: CostEstimate | None = None
 
 
 class UsageDay(FrozenModel):
@@ -510,6 +515,8 @@ class UsageDay(FrozenModel):
     input_tokens: int
     output_tokens: int
     minutes: float
+    # What the day's tokens cost in dollars (item 1856), given by the route that has the prices.
+    cost: CostEstimate | None = None
 
 
 class TopRun(FrozenModel):
@@ -526,6 +533,8 @@ class TopRun(FrozenModel):
     steps: int
     tokens: int
     created_at: float
+    # What its tokens cost in dollars (item 1856), given by the route that has the prices.
+    cost: CostEstimate | None = None
 
 
 class Usage(FrozenModel):

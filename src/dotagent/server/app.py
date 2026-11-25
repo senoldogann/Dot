@@ -29,6 +29,7 @@ from dotagent.core.errors import (
     PhoneRefused,
     PhoneSetupError,
     PluginError,
+    PrecheckError,
     PreviewError,
     ProviderError,
     RunConflict,
@@ -128,6 +129,8 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (McpError, 422),
     (SkillError, 422),
     (PluginError, 422),
+    # A check that failed when the owner started its schedule by hand: they read why.
+    (PrecheckError, 422),
     (ProviderError, 502),
 )
 
