@@ -58,6 +58,8 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_desktop_stop.py",
     "test_desktop_terminal_steps.py",
     "test_guard.py",
+    # It builds the whole registry, the desktop tools with it, as test_tool_groups.py does.
+    "test_harness_tool_parity.py",
     "test_imessage_channel.py",
     "test_live_screen.py",
     "test_qr.py",
