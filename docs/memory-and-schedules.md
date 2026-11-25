@@ -272,8 +272,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
   stopped being true. Nothing is deleted: the page lists it among the notes that rest, pinning it or taking its `rest`
   tag off wakes it, and after `forget_after_days` it is only ever proposed to be forgotten. A search and the notes a run starts with
   pass over it, so the run reads the fact as it stands; the answer to the save lists what it replaced. A note saved
-  again with the words of one that rests is said now: it wakes, takes the subject, and the other notes of the subject
-  rest (the city that was Oulu, then Helsinki, said to be Oulu again is Oulu). A value filled into a page is masked in
+  again with the words of one that rests is said now: it wakes, takes the subject when it has none (a note keeps the
+  subject it was given), and the other notes of its subject rest (the city that was Oulu, then Helsinki, said to be
+  Oulu again is Oulu); a run that read outside content gives a clean note no subject and puts no clean note aside,
+  whatever the mark of the note it saved again. A value filled into a page is masked in
   the subject as in the note's words. With no subject,
   a save replaces a note close to it (`similar_threshold`, so only with embeddings on) only when its words say the
   fact changed and nothing else: the same sentence with a number, a time or a version swapped after a word a value follows (`at 09:00` and

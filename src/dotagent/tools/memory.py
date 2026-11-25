@@ -283,7 +283,7 @@ def _forget_tool() -> RegisteredTool:
         description=(
             "Forget a saved note by its id, for example because it is outdated or wrong. It is no longer recalled or "
             "found: it goes to the owner's trash, where it waits some days and the owner can restore it (you cannot). "
-            "For a fact that changed, save the new one under the old note's subject."
+            "For a fact that changed, save the new one under the old note's subject (forget it if it has none)."
         ),
         args_model=ForgetArgs,
         modes=ACTING_MODES,
