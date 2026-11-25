@@ -227,6 +227,27 @@ async def test_a_note_saved_while_reading_outside_content_replaces_only_a_note_t
         assert {note.id for note in cleaner.replaced} == {clean.id, later.saved.record.id}
 
 
+async def test_a_run_that_read_outside_content_saving_a_clean_notes_words_again_puts_no_clean_note_aside(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A note saved again keeps its own clean mark (item 979), so the run's own mark judges what it replaces and whether
+    it names the note's subject (the pre-push review of item 1729)."""
+    async with _index(tmp_path, monkeypatch, None) as index:
+        oulu: MemoryRecord = (await _save(index, OULU, None)).saved.record
+        await _save(index, HELSINKI, CITY)
+        again: Replacing = await _save(index, OULU, CITY, tainted=True)
+        assert (again.saved.created, again.replaced) == (False, ())
+        assert (await index.store.get_memory(oulu.id)).subject is None
+        awake: list[str] = [
+            note.content for note in await index.store.list_memories(10, 0) if REST_TAG not in note.tags
+        ]
+        assert sorted(awake) == sorted([OULU, HELSINKI])
+        named: MemoryRecord = (await _save(index, "The user's office is in Turku.", "user-office")).saved.record
+        kept: Replacing = await _save(index, "The user's office is in Turku.", CITY)
+        assert (kept.saved.record.id, kept.saved.record.subject) == (named.id, "user-office")
+        assert kept.replaced == ()
+
+
 async def test_with_no_subject_a_swapped_value_replaces_the_near_note_and_a_cosine_alone_does_not(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -136,17 +136,18 @@ def holds(older: MemoryRecord, agent_id: str | None, said_at: float, now: float)
     )
 
 
-def replaceable(older: MemoryRecord, newer: MemoryRecord, owner_saved: Set[str]) -> bool:
+def replaceable(older: MemoryRecord, newer: MemoryRecord, tainted: bool, owner_saved: Set[str]) -> bool:
     """Whether a run's ``newer`` note may put ``older`` aside: ``older`` is a run's own, not the owner's (written,
-    pinned, corrected, a lesson they saved, a standing note), and ``newer`` did not read outside content when ``older``
-    did not."""
+    pinned, corrected, a lesson they saved, a standing note), and neither ``newer`` nor the run that saved it
+    (``tainted``) read outside content when ``older`` did not: a note saved again keeps its own mark (item 979), so a
+    run that read a page and saves the words of a clean note is judged by its own."""
     return (
         older.source_run is not None
         and older.pinned_at is None
         and older.edited_by != OWNER_EDIT
         and older.id not in owner_saved
         and not stands(older)
-        and not (newer.tainted and not older.tainted)
+        and not ((newer.tainted or tainted) and not older.tainted)
     )
 
 
@@ -178,8 +179,12 @@ async def save_replacing(
     key: str | None = None if subject is None else normalize_subject(subject)
     saved: SavedMemory = await save_memory(index, content, tags, run_id, None, expires_at, tainted)
     newer: MemoryRecord = saved.record
-    if key is not None and newer.subject != key:
+    # A note saved again keeps the subject it has, and takes none from a run that read outside content when it did
+    # not, as with its tags (item 979): the subject is shown to every later run. The notes of the subject it holds are
+    # the ones it replaces.
+    if key is not None and newer.subject is None and (saved.created or newer.tainted or not tainted):
         newer = await index.store.set_memory_subject(newer.id, key)
+    key = newer.subject
     now: float = time.time()
     said_at: float = newer.created_at if saved.created else now
     found: dict[str, tuple[MemoryRecord, str]] = {}
@@ -198,7 +203,7 @@ async def save_replacing(
     replaced: list[MemoryRecord] = []
     kept: list[MemoryRecord] = []
     for older, why in matching:
-        if not replaceable(older, newer, owner_saved):
+        if not replaceable(older, newer, tainted, owner_saved):
             kept.append(older)
             continue
         resting: MemoryRecord = await index.store.retire_memory(
