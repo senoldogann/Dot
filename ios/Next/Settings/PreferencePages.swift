@@ -10,7 +10,6 @@ struct GeneralPage: View {
     @Environment(AppModel.self) private var model: AppModel
     @AppStorage(PrefKey.timestampFormat) private var timestampRaw: String = TimestampFormat.system.rawValue
     @AppStorage(PrefKey.followUp) private var followUpRaw: String = FollowUp.queue.rawValue
-    @AppStorage(PrefKey.confirmStop) private var confirmStop: Bool = true
     @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
     @AppStorage(PrefKey.dictationLanguage) private var dictationRaw: String = DictationLanguage.app.rawValue
     @State private var assistant: Loadable<AssistantView> = .loading
@@ -61,11 +60,7 @@ struct GeneralPage: View {
                     description: String(localized: "Goes into the running task at its next step", comment: "Follow-up setting: what Steer does"), isSelected: followUpRaw == FollowUp.steer.rawValue
                 ) { followUpRaw = FollowUp.steer.rawValue }
             }
-            GroupedSection(
-                header: String(localized: "Confirmations", comment: "General section: which actions ask first"),
-                footer: String(localized: "The emergency stop always asks first.", comment: "General: footer under the confirmations")
-            ) {
-                ToggleRow(systemImage: "stop.circle", title: String(localized: "Ask before stopping a run", comment: "General: confirm Stop in a chat"), description: nil, isOn: $confirmStop)
+            GroupedSection(header: String(localized: "Confirmations", comment: "General section: which actions ask first"), footer: nil) {
                 ToggleRow(systemImage: "trash", title: String(localized: "Ask before deleting a chat", comment: "General: confirm deleting a chat"), description: nil, isOn: $confirmDelete)
             }
             GroupedSection(

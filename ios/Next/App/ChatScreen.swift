@@ -20,7 +20,6 @@ struct ChatScreen: View {
     @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
-    @AppStorage(PrefKey.confirmStop) private var confirmStop: Bool = true
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
     @State private var attachments: [ComposerAttachment] = []
@@ -34,7 +33,6 @@ struct ChatScreen: View {
     @State private var topVisible: String?
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
-    @State private var confirmingStop: Bool = false
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
@@ -89,11 +87,6 @@ struct ChatScreen: View {
             .toolbar { header }
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
-            .confirmationDialog(
-                String(localized: "Stop this run?", comment: "Confirmation of Stop from the chat header"), isPresented: $confirmingStop, titleVisibility: .visible
-            ) {
-                Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), role: .destructive) { stop() }
-            }
             .onAppear {
                 model.open(thread)
                 draft = model.draft(of: thread)
@@ -511,9 +504,6 @@ struct ChatScreen: View {
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button(String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"), systemImage: "folder") { panel = .inspector }
             Button(String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers"), systemImage: "person.2") { panel = .agents }
-            if activeRun != nil {
-                Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), systemImage: "stop.fill") { if confirmStop { confirmingStop = true } else { stop() } }
-            }
         }
     }
 
