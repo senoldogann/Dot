@@ -224,6 +224,17 @@
         }
       }
     },
+    "%lld selected": {
+      "comment": "Chat list select mode: how many chats are checked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seçili"
+          }
+        }
+      }
+    },
     "%lld steps could not be shown": {
       "comment": "Notice in a chat: frames the app could not read; the argument is how many",
       "localizations": {
@@ -1188,6 +1199,17 @@
         }
       }
     },
+    "Chats with a run at work or waiting on you are kept; stop or answer them first.": {
+      "comment": "Bulk delete confirmation: chats at work or waiting on the owner are not deleted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan ya da seni bekleyen sohbetler silinmez; önce durdur ya da yanıtla."
+          }
+        }
+      }
+    },
     "Check again": {
       "comment": "This Mac: runs the diagnosis again",
       "localizations": {
@@ -1672,6 +1694,35 @@
         }
       }
     },
+    "Delete %lld chats with everything they hold?": {
+      "comment": "Confirmation of deleting the selected chats; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld chat with everything it holds?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld chats with everything they hold?"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sohbet içindeki her şeyle birlikte silinsin mi?"
+          }
+        }
+      }
+    },
     "Delete chat": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1734,6 +1785,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reddet"
+          }
+        }
+      }
+    },
+    "Deselect all": {
+      "comment": "Chat list select mode: clears the checks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçimi kaldır"
           }
         }
       }
@@ -4334,6 +4396,17 @@
         }
       }
     },
+    "Pinned": {
+      "comment": "Chat list section: the chats the owner pinned, on top",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabitlenenler"
+          }
+        }
+      }
+    },
     "Plan": {
       "comment": "Inspector section: the run's plan",
       "localizations": {
@@ -5148,6 +5221,28 @@
         }
       }
     },
+    "Select": {
+      "comment": "Chat list toolbar: checks chats to act on several",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seç"
+          }
+        }
+      }
+    },
+    "Select all": {
+      "comment": "Chat list select mode: checks every chat shown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tümünü seç"
+          }
+        }
+      }
+    },
     "Send": {
       "comment": "VoiceOver: the composer's send button",
       "localizations": {
@@ -5595,6 +5690,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Küçük değişiklik modeli"
+          }
+        }
+      }
+    },
+    "Some chats were not deleted: %@": {
+      "comment": "Toast: the Mac refused to delete chats; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bazı sohbetler silinmedi: %@"
           }
         }
       }

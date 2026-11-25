@@ -23,6 +23,10 @@ three lines are clipped from the top rather than cut at the head, so a new word 
 (item 1848). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
+Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
+it) selects several chats (Select in the bar or on a row's menu) and pins or deletes them together, with a Pinned
+section on top.
+
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
 daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
 iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
@@ -168,6 +172,10 @@ Settings and every control of each native page and fails on one after which noth
 `scripts/e2e_settings.sh <simulator udid> <derived data> [daemon checkout]` starts a throwaway daemon with a seeded
 proposal, pairs a phone, makes a schedule, runs `SettingsLiveUITests` (every page that writes) and reads on the
 daemon's side what each tap wrote.
+
+`scripts/e2e_chats.sh <simulator udid> <derived data>` starts a throwaway daemon on a free port, makes two "[test]"
+chats and runs `ChatListLiveUITests` (which checks the pins); it reads the deletion on the daemon, and fails on a UI
+test that fails.
 
 ## Screenshots
 

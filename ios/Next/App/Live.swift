@@ -108,20 +108,15 @@ func engineLine(_ helper: HelperView) -> String {
 
 // MARK: The chat list
 
+/// The chats tab: the chat list beside the open chat (a stack on a phone, a split view on a wide screen).
 struct ChatsTab: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var selection: String?
-    @State private var query: String = ""
-    @State private var renaming: ThreadRow?
-    @State private var newTitle: String = ""
-    @State private var deleting: ThreadRow?
-    @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
-    @State private var composing: Bool = false
     let opensFirstChat: Bool
 
     var body: some View {
         AdaptiveSplit(selection: $selection) {
-            list
+            ChatListView(scope: .all, selection: $selection)
         } detail: { id in
             if model.startingChats[id] != nil {
                 StartingChat(key: id)
@@ -141,6 +136,45 @@ struct ChatsTab: View {
         .onChange(of: model.list.rows.count) { _, count in
             if opensFirstChat, selection == nil, count > 0 { selection = model.list.ordered.first?.summary.id }
         }
+    }
+}
+
+/// Which chats a list shows: all of them, or one bot's (Dot's own, `agent` nil, or an agent's), as a bot's profile will
+/// (PLAN §27).
+enum ChatListScope: Equatable, Sendable {
+    case all
+    case bot(agent: String?)
+
+    func holds(_ row: ThreadRow) -> Bool {
+        switch self {
+        case .all: true
+        case .bot(let agent): row.summary.actorId == agent
+        }
+    }
+}
+
+/// A list of chats, self-contained so it can stand in a tab or in a bot's profile (PLAN §23, §27): the Pinned section
+/// on top, then Needs you, Working, Recent; search; swipes and a context menu per row; Select mode with Pin and Delete
+/// for several chats at once; the pencil starts a new chat. `selection` is the chat open beside it.
+struct ChatListView: View {
+    let scope: ChatListScope
+    @Binding var selection: String?
+    @Environment(AppModel.self) private var model: AppModel
+    @State private var query: String = ""
+    @State private var renaming: ThreadRow?
+    @State private var newTitle: String = ""
+    @State private var deleting: ThreadRow?
+    @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
+    @State private var composing: Bool = false
+    /// Select mode (Select in the bar, or Select on a row's menu): rows take a check, the bottom bar acts on them.
+    @State private var selecting: Bool = false
+    @State private var picked: Set<String> = []
+    @State private var deletingPicked: Bool = false
+    /// What the daemon refused to delete, said once.
+    @State private var toast: ToastMessage?
+
+    var body: some View {
+        list
         .alert(String(localized: "Rename", comment: "Context menu of a chat"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField(String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), text: $newTitle)
             Button(String(localized: "Cancel", comment: "Edit sheet toolbar: discards the edits"), role: .cancel) { renaming = nil }
@@ -160,6 +194,16 @@ struct ChatsTab: View {
                 deleting = nil
             }
         }
+        .confirmationDialog(
+            pickedDeleteTitle, isPresented: $deletingPicked, titleVisibility: .visible
+        ) {
+            Button(String(localized: "Delete", comment: "Confirmation button that deletes a chat"), role: .destructive) { deletePicked() }
+                .accessibilityIdentifier("chats.confirmDelete")
+        } message: {
+            if pickedRows.contains(where: isWorking) {
+                Text(String(localized: "Chats with a run at work or waiting on you are kept; stop or answer them first.", comment: "Bulk delete confirmation: chats at work or waiting on the owner are not deleted"))
+            }
+        }
         .sheet(isPresented: $composing) {
             NewChatSheet(
                 close: { composing = false },
@@ -168,6 +212,52 @@ struct ChatsTab: View {
                     selection = key
                 })
         }
+        .toastHost($toast, seconds: 5) { _ in }
+        .onChange(of: model.refusedDeletes) { _, refused in
+            guard let detail = refused.values.first else { return }
+            toast = ToastMessage(
+                id: UUID(), text: String(localized: "Some chats were not deleted: \(detail)", comment: "Toast: the Mac refused to delete chats; the argument is its words"),
+                systemImage: "exclamationmark.triangle", actionTitle: nil)
+            model.forgetRefusedDeletes()
+        }
+    }
+
+    /// The checked chats the list shows now: a check hidden by the search or gone from the list is not acted on.
+    private var pickedRows: [ThreadRow] { rows.filter { picked.contains($0.summary.id) } }
+
+    private var pickedDeleteTitle: String {
+        let count: Int = pickedRows.filter { !isWorking($0) }.count
+        return String(localized: "Delete \(count) chats with everything they hold?", comment: "Confirmation of deleting the selected chats; the argument is how many")
+    }
+
+    /// A chat the daemon refuses to delete (409): its newest run queued, running, waiting on the owner or ending
+    /// (`WORKING_STATUSES`), or an ask open. A helper still at work is not in the row; its refusal comes back as a toast.
+    private func isWorking(_ row: ThreadRow) -> Bool {
+        chatHoldsWork(row)
+    }
+
+    private func deletePicked() {
+        for row in pickedRows where !isWorking(row) { model.perform(.delete(thread: row.summary.id)) }
+        if let open = selection, picked.contains(open) { selection = nil }
+        endSelecting()
+    }
+
+    /// Pins every selected chat, or unpins them when all of them are pinned already.
+    private func pinPicked() {
+        let pin: Bool = !pickedRows.allSatisfy { $0.summary.pinnedAt != nil }
+        for row in pickedRows where (row.summary.pinnedAt != nil) != pin { model.perform(.pin(thread: row.summary.id, pinned: pin)) }
+        endSelecting()
+    }
+
+    /// Starts select mode, or adds the row to the checks already made.
+    private func beginSelecting(with row: ThreadRow?) {
+        if let row { picked.insert(row.summary.id) }
+        selecting = true
+    }
+
+    private func endSelecting() {
+        selecting = false
+        picked = []
     }
 
     /// Deletes at once when the owner turned the confirmation off (Settings › General › Confirmations).
@@ -177,13 +267,14 @@ struct ChatsTab: View {
 
     private var rows: [ThreadRow] {
         let words: String = query.trimmingCharacters(in: .whitespaces)
-        let all: [ThreadRow] = model.list.ordered
+        let all: [ThreadRow] = model.list.ordered.filter(scope.holds)
         guard !words.isEmpty else { return all }
         return all.filter { $0.summary.title.localizedStandardContains(words) || $0.summary.lastMessage.localizedStandardContains(words) }
     }
 
     private var list: some View {
-        List(selection: $selection) {
+        // In select mode a tap checks a row and opens nothing.
+        List(selection: selecting ? .constant(nil) : $selection) {
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
             }
@@ -194,9 +285,11 @@ struct ChatsTab: View {
                 }
                 .listRowBackground(Tone.ground)
             }
-            section(String(localized: "Needs you", comment: "Chat list section: chats that wait for the owner"), rows.filter { chatStatus(of: $0) == .waitingOnYou })
-            section(String(localized: "Working", comment: "Chat list section: chats with a run at work"), rows.filter { [.working, .starting].contains(chatStatus(of: $0)) })
-            section(String(localized: "Recent", comment: "Chat list section: the other chats, newest first"), rows.filter { ![.waitingOnYou, .working, .starting].contains(chatStatus(of: $0)) })
+            let grouped: ChatListSections = chatListSections(rows)
+            section(String(localized: "Pinned", comment: "Chat list section: the chats the owner pinned, on top"), grouped.pinned)
+            section(String(localized: "Needs you", comment: "Chat list section: chats that wait for the owner"), grouped.needsYou)
+            section(String(localized: "Working", comment: "Chat list section: chats with a run at work"), grouped.working)
+            section(String(localized: "Recent", comment: "Chat list section: the other chats, newest first"), grouped.recent)
         }
         .listStyle(.plain)
         .focusEffectDisabled()
@@ -215,10 +308,73 @@ struct ChatsTab: View {
         .navigationTitle(String(localized: "Chats", comment: "Title of the chat list"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $query, prompt: String(localized: "Search chats", comment: "Placeholder of the chat list's search field"))
-        .toolbar {
+        .toolbar { listToolbar }
+        .toolbar(selecting ? .hidden : .automatic, for: .tabBar)
+        .animation(.default, value: selecting)
+    }
+
+    @ToolbarContentBuilder private var listToolbar: some ToolbarContent {
+        if selecting {
+            ToolbarItem(placement: .topBarLeading) {
+                let all: Bool = !rows.isEmpty && pickedRows.count == rows.count
+                Button(all ? String(localized: "Deselect all", comment: "Chat list select mode: clears the checks") : String(localized: "Select all", comment: "Chat list select mode: checks every chat shown")) {
+                    picked = all ? [] : Set(rows.map(\.summary.id))
+                }
+                .accessibilityIdentifier("chats.selectAll")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                // The system's ✓ of a confirm role: select mode ends, nothing else changes.
+                Button(role: .confirm) { endSelecting() }
+                    .accessibilityIdentifier("chats.doneSelecting")
+            }
+            ToolbarItemGroup(placement: .bottomBar) {
+                let allPinned: Bool = !pickedRows.isEmpty && pickedRows.allSatisfy { $0.summary.pinnedAt != nil }
+                Button(allPinned ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: allPinned ? "pin.slash" : "pin") { pinPicked() }
+                    .disabled(pickedRows.isEmpty)
+                    .accessibilityIdentifier("chats.pinPicked")
+                Spacer()
+                Text(String(localized: "\(pickedRows.count) selected", comment: "Chat list select mode: how many chats are checked")).textRole(.footnote).foregroundStyle(Tone.secondary)
+                    .accessibilityIdentifier("chats.pickedCount")
+                Spacer()
+                Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash", role: .destructive) { deletingPicked = true }
+                    .tint(Tone.failure)
+                    .disabled(pickedRows.allSatisfy(isWorking))
+                    .accessibilityIdentifier("chats.deletePicked")
+            }
+        } else {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(String(localized: "Select", comment: "Chat list toolbar: checks chats to act on several")) { beginSelecting(with: nil) }
+                    .disabled(rows.isEmpty)
+                    .accessibilityIdentifier("chats.select")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), systemImage: "square.and.pencil") { composing = true }
+                    .accessibilityIdentifier("chats.new")
             }
+        }
+    }
+
+    /// A row, with its check in select mode (a tap checks it there and opens nothing).
+    @ViewBuilder private func selectableRow(_ row: ThreadRow) -> some View {
+        if selecting {
+            let on: Bool = picked.contains(row.summary.id)
+            Button {
+                if on { picked.remove(row.summary.id) } else { picked.insert(row.summary.id) }
+            } label: {
+                HStack(spacing: Space.s) {
+                    Image(systemName: on ? "checkmark.circle.fill" : "circle").font(.system(.title3, weight: .regular))
+                        .foregroundStyle(on ? Tone.text : Tone.tertiary)
+                        .accessibilityHidden(true)
+                    ChatRow(chat: ChatRowModel(row: row, now: .now))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .haptic(.selection, trigger: on)
+            .accessibilityAddTraits(on ? [.isSelected] : [])
+            .accessibilityIdentifier("chats.row")
+        } else {
+            ChatRow(chat: ChatRowModel(row: row, now: .now)).accessibilityIdentifier("chats.row")
         }
     }
 
@@ -232,31 +388,39 @@ struct ChatsTab: View {
         if !rows.isEmpty {
             Section {
                 ForEach(rows, id: \.summary.id) { row in
-                    ChatRow(chat: ChatRowModel(row: row, now: .now))
+                    selectableRow(row)
                         .tag(row.summary.id)
                         .listRowBackground(selection == row.summary.id ? Tone.nested : Tone.ground)
                         .focusEffectDisabled()
                         .listRowSeparatorTint(Tone.separator)
                         .listRowInsets(EdgeInsets(top: Space.s, leading: Space.gutter, bottom: Space.s, trailing: Space.gutter))
+                        // In select mode a row only takes its check: no swipe, no menu.
                         .swipeActions(edge: .leading) {
-                            Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: row.summary.pinnedAt != nil ? "pin.slash" : "pin") {
-                                model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
+                            if !selecting {
+                                Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: row.summary.pinnedAt != nil ? "pin.slash" : "pin") {
+                                    model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
+                                }
+                                .tint(Tone.glyph)
                             }
-                            .tint(Tone.glyph)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash") { askOrDelete(row) }
-                                .tint(Tone.failure)
+                            if !selecting {
+                                Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash") { askOrDelete(row) }
+                                    .tint(Tone.failure)
+                            }
                         }
                         .contextMenu {
-                            Button(String(localized: "Rename", comment: "Context menu of a chat"), systemImage: "pencil") {
-                                newTitle = row.summary.title
-                                renaming = row
+                            if !selecting {
+                                Button(String(localized: "Rename", comment: "Context menu of a chat"), systemImage: "pencil") {
+                                    newTitle = row.summary.title
+                                    renaming = row
+                                }
+                                Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: row.summary.pinnedAt != nil ? "pin.slash" : "pin") {
+                                    model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
+                                }
+                                Button(String(localized: "Select", comment: "Chat list toolbar: checks chats to act on several"), systemImage: "checkmark.circle") { beginSelecting(with: row) }
+                                Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash", role: .destructive) { askOrDelete(row) }
                             }
-                            Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: "pin") {
-                                model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
-                            }
-                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash", role: .destructive) { askOrDelete(row) }
                         }
                 }
             } header: {
@@ -264,6 +428,38 @@ struct ChatsTab: View {
             }
         }
     }
+}
+
+/// Whether a chat holds work the daemon will not delete under (`WORKING_STATUSES`: queued, running, blocked, ending) or
+/// an ask open to the owner (pure).
+func chatHoldsWork(_ row: ThreadRow) -> Bool {
+    row.asks > 0 || ["queued", "running", "blocked", "ending"].contains(row.summary.latestStatus)
+}
+
+extension AppModel {
+    /// The list told the owner of the refused deletes.
+    func forgetRefusedDeletes() {
+        guard let engine else { return }
+        Task { await engine.store.forgetRefusedDeletes() }
+    }
+}
+
+/// The chat list's sections (PLAN §23): the pinned chats on top whatever their state, then the chats that wait for
+/// the owner, those at work, and the rest newest first.
+struct ChatListSections: Equatable {
+    let pinned: [ThreadRow]
+    let needsYou: [ThreadRow]
+    let working: [ThreadRow]
+    let recent: [ThreadRow]
+}
+
+func chatListSections(_ rows: [ThreadRow]) -> ChatListSections {
+    let pinned: [ThreadRow] = rows.filter { $0.summary.pinnedAt != nil }
+    let rest: [ThreadRow] = rows.filter { $0.summary.pinnedAt == nil }
+    return ChatListSections(
+        pinned: pinned, needsYou: rest.filter { chatStatus(of: $0) == .waitingOnYou },
+        working: rest.filter { [.working, .starting].contains(chatStatus(of: $0)) },
+        recent: rest.filter { ![.waitingOnYou, .working, .starting].contains(chatStatus(of: $0)) })
 }
 
 /// What a chat row shows.

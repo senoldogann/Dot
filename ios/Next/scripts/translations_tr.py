@@ -778,6 +778,15 @@ TR: dict[str, str] = {
     "Update Dot on your Mac to see the provider programs' versions.": "Sağlayıcı programlarının sürümlerini görmek için Mac'indeki Dot'u güncelle.",
     "Updates": "Güncellemeler",
     "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
+    # Helper L1 (items 1800-1802): the chat list's select mode, the chat's settings, voice typing, Settings › Voice.
+    'Chats with a run at work or waiting on you are kept; stop or answer them first.': 'Çalışan ya da seni bekleyen sohbetler silinmez; önce durdur ya da yanıtla.',
+    'Some chats were not deleted: %@': 'Bazı sohbetler silinmedi: %@',
+    '%lld selected': '%lld seçili',
+    'Delete %lld chats with everything they hold?': '%lld sohbet içindeki her şeyle birlikte silinsin mi?',
+    'Deselect all': 'Seçimi kaldır',
+    'Pinned': 'Sabitlenenler',
+    'Select': 'Seç',
+    'Select all': 'Tümünü seç',
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
@@ -785,4 +794,5 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
+    "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),
 }

@@ -32,6 +32,8 @@ final class AppModel {
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
     private(set) var startedChats: [String: String] = [:]
+    /// The chats whose delete the daemon refused, with its words (item 1800).
+    private(set) var refusedDeletes: [String: String] = [:]
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -77,6 +79,7 @@ final class AppModel {
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
         if next.startedChats != startedChats { startedChats = next.startedChats }
+        if next.refusedDeletes != refusedDeletes { refusedDeletes = next.refusedDeletes }
     }
 
     /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
