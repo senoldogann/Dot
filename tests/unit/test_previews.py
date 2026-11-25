@@ -128,6 +128,7 @@ def test_a_path_through_a_file_is_not_found_and_a_loop_of_links_is_refused(tmp_p
         located_file("~/workspace/a", home, workspace)
 
 
+@pytest.mark.macos
 def test_the_files_of_applications_stay_hidden_whatever_case_their_path_is_written_in(tmp_path: Path) -> None:
     """Item 215: the Mac's disk finds a file whatever case its path is written in, so ~/Library is told apart from the
     home's other folders in any case."""

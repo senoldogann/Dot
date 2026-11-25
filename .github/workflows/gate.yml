@@ -1,6 +1,7 @@
 # The gate every change passes before it is merged. The format check, the lint, mypy, the checks of the interface and
 # the unit tests but those that need macOS (item 1270) run on Linux: the marker on the PyObjC dependencies lets `uv
-# sync` install there. Every unit test, `dotx eval check` and the smoke tests run on macOS.
+# sync` install there. The unit tests Linux leaves out (`--macos-only`), `dotx eval check` and the smoke tests run on
+# macOS.
 # The smoke tests here are every one that needs no service, chosen by their marks: a scripted model or a stand-in
 # plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model skips itself
 # here. Beside them, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's Chrome,
@@ -14,7 +15,8 @@
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing heavy, as
-# no command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell's
+# no command below reads it; but docs/freedom.md, which tests/unit/test_freedom_contract.py reads, and a skill's SKILL.md
+# under src/, which Dot reads, do run the gate. The desktop shell's
 # checks (desktop.yml) and zizmor's audit of the workflows (zizmor.yml) run from here for a pull request that changes
 # what they read (item 1189), so that `ci` waits for them, and from their own workflows for a push to main.
 #
@@ -26,7 +28,14 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
+    # Everything but prose; a later pattern wins, so docs/freedom.md runs it.
+    paths:
+      - "**"
+      - "!*.md"
+      - "!docs/**"
+      - "docs/freedom.md"
+      - "!.github/ISSUE_TEMPLATE/**"
+      - "!.github/pull_request_template.md"
   # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457), the core
   # of the browser tests with it (item 486); a call ignores the paths above, so the gate always runs whole there.
   workflow_call:
@@ -95,6 +104,8 @@ jobs:
               continue
             fi
             case "$file" in
+              # docs/freedom.md is read by a test (tests/unit/test_freedom_contract.py): it is not prose alone here.
+              docs/freedom.md) prose=false ;;
               # The push filter's `docs/**` and templates first: `*.md` below would catch a file under docs/ too, and
               # it takes the root only.
               docs/*|.github/ISSUE_TEMPLATE/*|.github/pull_request_template.md) ;;
@@ -118,9 +129,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Ripgrep too: the unit tests of the search run here, and the macOS job leaves them to this one.
       - uses: $/.github/actions/prepare
         with:
           node: true
+          ripgrep: true
       # The release is one version. This fails in seconds, on Linux, before the macOS tests.
       - name: Versions
         run: uv run python scripts/check_versions.py
@@ -146,7 +159,7 @@ jobs:
         run: npm run check
       # The unit tests on Linux (item 1270), where a cloud agent works: those that need macOS itself are left out
       # (tests/unit/conftest.py) and every other one runs, so that a module that loads AppKit, Quartz or a macOS-only
-      # flag for a name or a type fails here, not on the agent's machine. macOS runs all of them below.
+      # flag for a name or a type fails here, not on the agent's machine. macOS runs those left out, below.
       - name: Unit tests on Linux
         env:
           DOT_HOME: ${{ github.workspace }}/.ci/home
@@ -156,15 +169,17 @@ jobs:
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           uv run pytest tests/unit -q -n auto -p no:cacheprovider
 
-  # What of this pull request can affect a browser part, the desktop shell and the workflows. A push and a release do
-  # not ask: they run every browser part, and desktop.yml and zizmor.yml run on their own for a push that changes what
-  # they read. When the answer cannot be read, everything runs, which is the failure that still tests the change.
+  # What of this pull request can affect the macOS jobs of the gate, a browser part, the desktop shell and the
+  # workflows. A push and a release do not ask: they run every browser part, and desktop.yml and zizmor.yml run on
+  # their own for a push that changes what they read. When the answer cannot be read, everything runs, which is the
+  # failure that still tests the change.
   changes:
     needs: [prose]
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prose.outputs.prose_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      python: ${{ steps.decide.outputs.python }}
       browser: ${{ steps.decide.outputs.browser }}
       desktop: ${{ steps.decide.outputs.desktop }}
       workflows: ${{ steps.decide.outputs.workflows }}
@@ -173,7 +188,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
-      - name: Which files run the browser parts, the desktop checks and zizmor
+      - name: Which files run the gate's macOS jobs, the browser parts, the desktop checks and zizmor
         id: decide
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -183,21 +198,22 @@ jobs:
               echo "browser=$1"
               echo "desktop=$2"
               echo "workflows=$3"
+              echo "python=$4"
             } >> "$GITHUB_OUTPUT"
           }
           if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
             echo "the base is not a sha; everything runs"
-            decide true true true
+            decide true true true true
             exit 0
           fi
           if ! git fetch --no-tags --depth=1 origin "$BASE"; then
             echo "the base could not be fetched; everything runs"
-            decide true true true
+            decide true true true true
             exit 0
           fi
           if ! files="$(git diff --name-only --no-renames "$BASE" HEAD)"; then
             echo "the changed files could not be listed; everything runs"
-            decide true true true
+            decide true true true true
             exit 0
           fi
           # The desktop checks read desktop/ and their workflow, which the gate calls; zizmor reads all of .github/.
@@ -210,21 +226,36 @@ jobs:
             workflows=true
           fi
           echo "desktop: $desktop, workflows: $workflows"
+          # The gate's macOS jobs (scripts/python_ci.py): skipped only when every file is one nothing of them reads.
+          if ! python="$(printf '%s\n' "$files" | python3 scripts/python_ci.py)"; then
+            echo "the gate's macOS jobs: their check failed, so they run"
+            python=true
+          elif [[ "$python" != "true" && "$python" != "false" ]]; then
+            echo "the gate's macOS jobs: their check gave no answer ($python), so they run"
+            python=true
+          else
+            echo "the gate's macOS jobs: $python"
+          fi
           if ! answer="$(printf '%s\n' "$files" | python3 scripts/browser_ci.py)"; then
             echo "the path check failed; the browser parts run"
-            decide true "$desktop" "$workflows"
+            decide true "$desktop" "$workflows" "$python"
             exit 0
           fi
           if [[ "$answer" != "true" && "$answer" != "false" ]]; then
             echo "the path check gave no answer; the browser parts run"
-            decide true "$desktop" "$workflows"
+            decide true "$desktop" "$workflows" "$python"
             exit 0
           fi
-          decide "$answer" "$desktop" "$workflows"
+          decide "$answer" "$desktop" "$workflows" "$python"
 
   gate:
-    needs: [prose]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
+    # A pull request whose files nothing of this job reads skips it (scripts/python_ci.py); a decision that failed
+    # runs it.
+    needs: [prose, changes]
+    if: >-
+      ${{ !cancelled() && (github.event_name != 'pull_request'
+      || needs.prose.outputs.prose_only != 'true'
+      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}
     runs-on: macos-latest
     timeout-minutes: 30
     env:
@@ -239,8 +270,10 @@ jobs:
           ripgrep: true
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
-      - name: Unit tests
-        run: uv run pytest tests/unit -q -n auto -p no:cacheprovider
+      # Only the unit tests Linux leaves out (tests/unit/conftest.py: its list and the tests marked macos): `checks`
+      # runs every other one, so each runs once.
+      - name: Unit tests that need macOS
+        run: uv run pytest tests/unit -q -n auto -p no:cacheprovider --macos-only
       # The smoke tests' files are dealt to two parts in turn (tests/smoke/conftest.py), the second in `smoke`.
       - name: Offline smoke tests, part 1
         run: >
@@ -249,8 +282,13 @@ jobs:
 
   smoke:
     name: gate (part 2)
-    needs: [prose]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
+    # A pull request whose files nothing of this job reads skips it (scripts/python_ci.py); a decision that failed
+    # runs it.
+    needs: [prose, changes]
+    if: >-
+      ${{ !cancelled() && (github.event_name != 'pull_request'
+      || needs.prose.outputs.prose_only != 'true'
+      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}
     runs-on: macos-latest
     # Room for one retry of the smoke tests below. A second failure still ends the job, inside this bound.
     timeout-minutes: 50
@@ -268,20 +306,21 @@ jobs:
       - name: Eval references
         run: uv run dotx eval check
       - name: Offline smoke tests, part 2
-        # One retry of a failed run. The second result is the job's: a failure that is still there fails this job,
-        # and ci with it. Not continue-on-error.
+        # One retry of the tests that failed (pytest's --last-failed, its cache under the runner's temp): the second
+        # result is the job's, and a failure that is still there fails this job, and ci with it. Not continue-on-error.
+        # A first run that recorded no failure (it broke before) runs every test again.
         run: |
           run_part() {
-            uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10 \
-              -m "not live and not browser and not internet and not desktop and not hosted"
+            uv run pytest tests/smoke -q -n auto -o cache_dir="$RUNNER_TEMP/pytest-cache" --part 2/2 --durations=10 \
+              -m "not live and not browser and not internet and not desktop and not hosted" "$@"
           }
           if run_part; then
             exit 0
           fi
-          echo "smoke part 2 failed once; running it once more. A second failure fails this job and ci."
+          echo "smoke part 2 failed once; running its failed tests once more. A second failure fails this job and ci."
           rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
-          run_part
+          run_part --last-failed --last-failed-no-failures all
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
@@ -348,22 +387,33 @@ jobs:
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Core browser tests
-        # PART_TESTS is split into its globs on purpose. One retry of a failed run. The second result is the part's:
-        # a failure that is still there fails this part, and ci with it. Not continue-on-error.
+        # PART_TESTS is split into its globs on purpose. One retry of the tests that failed (pytest's --last-failed,
+        # its cache under the runner's temp; a first run that recorded no failure runs every test again): a flaky test
+        # of the pages part had made it run its 149 tests twice, 20 minutes in place of 10, in three runs of six. The
+        # second result is the part's: a failure that is still there fails this part, and ci with it. Not
+        # continue-on-error. Each test's time goes to a JUnit file, kept for the parts' next sharing out.
         run: |
           run_part() {
             # PART_TESTS is split into its globs on purpose.
-            uv run pytest -q -p no:cacheprovider --durations=10 \
+            uv run pytest -q -o cache_dir="$RUNNER_TEMP/pytest-cache" --durations=15 \
               -m "browser and not live and not internet and not hosted and not desktop" \
-              $PART_TESTS
+              $PART_TESTS "$@"
           }
-          if run_part; then
+          if run_part --junitxml="$RUNNER_TEMP/junit/first.xml"; then
             exit 0
           fi
-          echo "browser tests failed once; running them once more. A second failure fails this job and ci."
+          echo "browser tests failed once; running the failed ones once more. A second failure fails this job and ci."
           rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
-          run_part
+          run_part --last-failed --last-failed-no-failures all --junitxml="$RUNNER_TEMP/junit/retry.xml"
+      - name: The tests' times
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browser-times-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/junit
+          retention-days: 14
+          if-no-files-found: ignore
 
   # The desktop shell's checks (desktop.yml) for a pull request that changes desktop/ or their workflow (item 1189).
   # Called from here rather than started by their own path filter, so that `ci`, the check main's protection requires,
