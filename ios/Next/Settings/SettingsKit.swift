@@ -80,6 +80,10 @@ func failureWords(_ failure: SettingsFailure, macPlace: String) -> String {
             comment: "Settings: the daemon refused a phone's key; first argument its words, second where on the Mac")
     case .daemonTooOld:
         String(localized: "Update Dot on your Mac: this page needs a newer Dot.", comment: "Settings: the Mac's Dot lacks this page's route")
+    case .unreadable(let path):
+        String(
+            localized: "Your Mac answered with what this app cannot read (\(path)). Update Dot on the Mac or this app.",
+            comment: "Settings: the daemon's answer did not decode; the argument is the route")
     case .other(let words):
         String(localized: "That did not work: \(words)", comment: "Settings: a read or write failed; the argument is the daemon's words")
     }
@@ -113,6 +117,8 @@ struct FailureBanner: View {
                     .buttonStyle(SecondaryButtonStyle())
                 case .daemonTooOld:
                     EmptyView()
+                case .unreadable:
+                    if let retry { retryButton(retry) }
                 case .other:
                     if let retry { retryButton(retry) }
                 }

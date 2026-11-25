@@ -28,7 +28,7 @@ final class RealDaemonWalkUITests: XCTestCase {
         let app: XCUIApplication = try launch(scene: "settings")
         XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 20), "the emergency stop at the top (never pressed here)")
         open(app, "This Mac")
-        XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key before the key was sent."].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 30))
         app.navigationBars.buttons.element(boundBy: 0).tap()
         let pages: [String] = ["Notifications", "General", "Appearance", "Chat", "Models", "Usage limits and caps", "Scheduled tasks", "Rules", "Memory", "Health and version", "Usage"]
         for page in pages {

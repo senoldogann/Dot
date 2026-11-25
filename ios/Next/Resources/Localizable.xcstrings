@@ -7491,6 +7491,17 @@
         }
       }
     },
+    "Your Mac answered with what this app cannot read (%@). Update Dot on the Mac or this app.": {
+      "comment": "Settings: the daemon's answer did not decode; the argument is the route",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in bu uygulamanın okuyamadığı bir yanıt verdi (%@). Mac'teki Dot'u ya da bu uygulamayı güncelle."
+          }
+        }
+      }
+    },
     "Your Mac could not be reached.": {
       "comment": "Settings: a read or write got no answer from the Mac",
       "localizations": {
@@ -7535,13 +7546,13 @@
         }
       }
     },
-    "Your Mac proved it holds this phone's key before the key was sent.": {
+    "Your Mac proved it holds this phone's key.": {
       "comment": "This Mac: the proof matched",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac'in, anahtar gönderilmeden önce bu telefonun anahtarını tuttuğunu kanıtladı."
+            "value": "Mac'in bu telefonun anahtarını tuttuğunu kanıtladı."
           }
         }
       }

@@ -152,8 +152,8 @@ public func traceId(random: UInt64) -> String {
     String(random, radix: 36).padding(toLength: 10, withPad: "0", startingAt: 0).prefix(10).uppercased()
 }
 
-/// The Mac's address from the QR code Settings › Phone shows (`GET /api/phone/qr/dot`: `https://<reach>/`, the address
-/// only; the sign-in code is still typed, as a QR carrying it needs a daemon change under "Always needs a human").
+/// The Mac's address from the address QR code Settings › Phone shows (`GET /api/phone/qr/dot`: `https://<reach>/`); the
+/// code for Dot Next with the sign-in code too is `pairingStart`'s.
 /// `nil` for anything that is not a tailnet daemon address, so a stray code fills nothing.
 public func addressFromQR(_ payload: String) -> DaemonHost? {
     try? parseDaemonHost(payload, buildHost: nil).get()

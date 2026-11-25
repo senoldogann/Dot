@@ -33,7 +33,7 @@ final class SettingsLiveUITests: XCTestCase {
 
         // This Mac: every hop passes and the daemon proved it holds the key.
         open(app, "This Mac")
-        XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key before the key was sent."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 15))
         back(app)
 
         // Notifications: Done or failed off.

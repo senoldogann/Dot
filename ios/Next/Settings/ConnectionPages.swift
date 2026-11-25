@@ -13,7 +13,9 @@ struct DiagnosisRun: Sendable, Equatable {
 
 extension AppModel {
     /// Probes the way to the Mac hop by hop (research G2 #5): the link, `/api/health` without the key, `/api/proof`
-    /// (the key is sent only after the daemon proved it holds it), then `/api/status` with it.
+    /// (without the key), then `/api/status` with it, and only when the daemon proved it holds the key (or is a Dot from
+    /// before the proof, which the screen says). This is a check of the paired Mac, not a gate: the engine's own reads
+    /// and streams send the key from the first request.
     func diagnoseConnection() async -> DiagnosisRun? {
         guard let api: DaemonAPI = settingsAPI else { return nil }
         let link: LinkState = engine?.link.state ?? .up
@@ -27,7 +29,7 @@ extension AppModel {
         var status: ProbeAnswer = .notRun
         if case .answered(let code, _) = health, (200..<300).contains(code) {
             proof = await api.proveKey(nonce: proofNonce())
-            if proof != .mismatch { status = await api.probeStatus() }
+            if proof == .proven || proof == .unsupported { status = await api.probeStatus() }
         }
         let probe: DiagnosisProbe = DiagnosisProbe(link: link, health: health, status: status, proof: proof)
         return DiagnosisRun(probe: probe, diagnosis: diagnose(probe), trace: trace, at: .now)
@@ -162,7 +164,7 @@ struct MacPage: View {
 
     private var proofWords: String {
         switch run?.probe.proof {
-        case .proven: String(localized: "Your Mac proved it holds this phone's key before the key was sent.", comment: "This Mac: the proof matched")
+        case .proven: String(localized: "Your Mac proved it holds this phone's key.", comment: "This Mac: the proof matched")
         case .mismatch: String(localized: "This address did not prove it holds this phone's key; the key was not sent.", comment: "This Mac: the proof did not match")
         case .unsupported: String(localized: "This Dot cannot prove it holds the key; update Dot on your Mac.", comment: "This Mac: the daemon has no proof route")
         case .notRun, nil: String(localized: "Not checked yet.", comment: "This Mac: the proof was not asked")

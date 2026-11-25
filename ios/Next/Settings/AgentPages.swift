@@ -331,6 +331,13 @@ struct WindowRow: View {
     }
 }
 
+/// Millions of tokens as typed, in tokens; `nil` for what is not a number or does not fit (pure).
+func capTokens(_ millions: String) -> Int? {
+    guard let value = Int(millions), value >= 0 else { return nil }
+    let (tokens, overflow): (Int, Bool) = value.multipliedReportingOverflow(by: 1_000_000)
+    return overflow ? nil : tokens
+}
+
 /// Changes one cap, in millions of tokens.
 struct CapEditSheet: View {
     let key: CapKey
@@ -367,13 +374,13 @@ struct CapEditSheet: View {
                         Task {
                             saving = true
                             var changed: BudgetCaps = caps
-                            changed[keyPath: key.keyPath] = noCap ? 0 : (Int(millions) ?? 0) * 1_000_000
+                            changed[keyPath: key.keyPath] = noCap ? 0 : capTokens(millions) ?? 0
                             problem = await save(changed)
                             saving = false
                             if problem == nil { dismiss() }
                         }
                     }
-                    .disabled(saving || (!noCap && Int(millions) == nil))
+                    .disabled(saving || (!noCap && capTokens(millions) == nil))
                 }
             }
         }

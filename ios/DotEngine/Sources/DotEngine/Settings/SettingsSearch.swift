@@ -59,6 +59,8 @@ public enum SettingsFailure: Sendable, Equatable {
     case notForAPhone(String)
     /// 404 on a route this app needs: the Mac's Dot is older than it.
     case daemonTooOld
+    /// The Mac answered with what this app cannot read (a Dot of another version): the route's path.
+    case unreadable(path: String)
     /// Anything else, with the daemon's words or the code.
     case other(String)
 }
@@ -67,7 +69,7 @@ public enum SettingsFailure: Sendable, Equatable {
 public func settingsFailure(_ error: DaemonRequestError) -> SettingsFailure {
     switch error {
     case .transport: return .unreachable
-    case .undecodable(let path, _): return .other(path)
+    case .undecodable(let path, _): return .unreadable(path: path)
     case .status(_, let code, _):
         if code == 401 { return .keyRefused }
         if error.refusedToAPhone { return .notForAPhone(error.detail) }

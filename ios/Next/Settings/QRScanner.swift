@@ -4,9 +4,9 @@ import SwiftUI
 import UIKit
 import os
 
-/// Scans the QR code Settings › Phone on the Mac shows, for the Mac's address (PARITY "Pair by QR"). The code carries
-/// the address only (`GET /api/phone/qr/dot`), so the sign-in code is still typed. Camera denied or missing says so and
-/// leaves the typed address in place.
+/// Scans a QR code Settings › Phone on the Mac shows (PARITY "Pair by QR"): the code for Dot Next
+/// (`GET /api/phone/pair-qr`, the address and the sign-in code, paired on one tap) or the address alone
+/// (`GET /api/phone/qr/dot`, the code then typed). Camera denied or missing says so and leaves the typed way open.
 struct QRScanSheet: View {
     let found: (PairingStart) -> Void
     @Environment(\.dismiss) private var dismiss: DismissAction

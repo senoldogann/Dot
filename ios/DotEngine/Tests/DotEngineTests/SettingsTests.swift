@@ -94,6 +94,7 @@ final class SettingsFailureTests: XCTestCase {
         XCTAssertEqual(settingsFailure(.status(path: "/api/budget", code: 404, body: #"{"detail":"Not Found"}"#)), .daemonTooOld, "an unknown route")
         XCTAssertEqual(settingsFailure(.status(path: "/api/memories/x", code: 404, body: #"{"message":"no note x","context":{}}"#)), .other("no note x"), "a missing item is not an old daemon")
         XCTAssertEqual(settingsFailure(.status(path: "/api/x", code: 500, body: "")), .other("HTTP 500"))
+        XCTAssertEqual(settingsFailure(.undecodable(path: "/api/budget", detail: "keyNotFound")), .unreadable(path: "/api/budget"))
     }
 }
 
