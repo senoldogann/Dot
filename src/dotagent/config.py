@@ -1154,12 +1154,20 @@ class ReconScope(FrozenModel):
         return _bare_hosts(hosts, "[recon] scopes hosts")
 
 
+class ReconAuthority(FrozenModel):
+    """Who allows a test of a host (items 1887 and 1888): ``program`` is ``None`` for a host of the owner's own list,
+    and otherwise the program or engagement whose scope covers it, with the rules it wrote in ``note``."""
+
+    program: str | None
+    note: str
+
+
 class ReconConfig(FrozenModel):
     """Network reconnaissance (``[recon]``, item 776, docs/recon.md). A passive audit reads what a browser's visit
     reads, on any public site; an active one asks which common ports answer, and runs only on a host whose name is in
     ``owned_hosts`` or in a scope of ``scopes``, or is a subdomain of one: the owner's own, or one a program or an
-    engagement they are in allows them to test. Nothing else can widen it, and both lists are empty until the owner
-    writes them."""
+    engagement they are in allows them to test. Both lists are empty until the owner writes them; the scopes
+    ``dotx scope`` keeps in ``scopes.toml`` (:mod:`dotagent.scopes`) widen it too."""
 
     owned_hosts: tuple[str, ...] = ()
     scopes: tuple[ReconScope, ...] = ()
@@ -1169,16 +1177,16 @@ class ReconConfig(FrozenModel):
     def _host_names(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
         return _bare_hosts(hosts, "[recon] owned_hosts")
 
-    def authorising(self, host: str) -> tuple[str, str] | None:
-        """Who allows a test of ``host``: ``("owned", "")`` for a host of the owner's list, the program's name and the
-        rules it wrote for a host in one of the scopes, and ``None`` for a host nothing allows. A name covers its
-        subdomains (``example.com`` covers ``www.example.com``, and not ``notexample.com``)."""
+    def authorising(self, host: str) -> ReconAuthority | None:
+        """Who allows a test of ``host``: the owner (``program`` ``None``) for a host of the owner's list, the program
+        and the rules it wrote for a host in one of the scopes, and ``None`` for a host nothing allows. A name covers
+        its subdomains (``example.com`` covers ``www.example.com``, and not ``notexample.com``)."""
         wanted: str = host.strip().lower().rstrip(".")
         if any(wanted == entry or wanted.endswith(f".{entry}") for entry in self.owned_hosts):
-            return "owned", ""
+            return ReconAuthority(program=None, note="")
         for scope in self.scopes:
             if any(wanted == entry or wanted.endswith(f".{entry}") for entry in scope.hosts):
-                return scope.program, scope.note
+                return ReconAuthority(program=scope.program, note=scope.note)
         return None
 
 

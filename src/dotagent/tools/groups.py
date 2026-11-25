@@ -114,8 +114,8 @@ _PURPOSES: dict[str, str] = {
     "video": "watching a video file or a video link: frames of what it shows and a transcript of what is said",
     "proof": "a check (a test run, a command) that must exit 0 before the run counts as done, when the owner names one",
     "recon": (
-        "a site or host you own, or one a registered scope lets you test: addresses, TLS, headers, technology, open "
-        "ports, and a form's payload check"
+        "a site or host you own, or one a bug bounty scope lets you test (dotx scope): addresses, TLS, headers, "
+        "technology, open ports, and a form's payload check"
     ),
     "pipeline": (
         "the ledger of a continuing piece of work (clients, leads) in its record file: each one's status and next "

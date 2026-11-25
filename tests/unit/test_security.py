@@ -6,10 +6,14 @@ from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 from urllib.parse import parse_qs, urlsplit
 
+import pytest
+
+from dotagent import scopes as dot_scopes
 from dotagent.config import ReconScope, load_default_config
 from dotagent.tools.context import ToolContext
 from dotagent.tools.security import SecurityArgs, _run, forms_on
@@ -128,7 +132,7 @@ async def test_a_host_that_is_not_the_owners_is_refused() -> None:
     result = await _run(SecurityArgs(target="https://example.com/login"), _context(owned=()))
     assert result.is_error
     assert "[recon] owned_hosts" in result.text
-    assert "[recon] scopes" in result.text
+    assert "dotx scope add" in result.text
 
 
 async def test_a_host_in_a_scope_of_a_program_is_tested_and_the_program_is_named() -> None:
@@ -202,3 +206,22 @@ def test_forms_keep_hidden_fields_and_the_selected_option() -> None:
 
 def test_a_form_on_another_scheme_is_not_kept() -> None:
     assert forms_on("https://example.com/", '<form action="mailto:hello@example.com"></form>') == ()
+
+
+def _broken_scopes(folder: Path, content: bytes) -> Path:
+    """A ``scopes.toml`` in ``folder`` holding ``content``, written before the async test reads it."""
+    path: Path = folder / "scopes.toml"
+    path.write_bytes(content)
+    return path
+
+
+async def test_a_broken_scopes_file_stops_the_scan_with_the_file_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken: Path = _broken_scopes(tmp_path, b"\xff\xfe not text")
+    monkeypatch.setattr(dot_scopes, "scopes_path", lambda: broken)
+    result = await _run(SecurityArgs(target="https://example.com/login"), _context(owned=()))
+    assert result.is_error
+    assert str(broken) in result.text
+    assert "cannot be read as UTF-8" in result.text
+    assert "No form of example.com is tested" in result.text

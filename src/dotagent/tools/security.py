@@ -18,6 +18,8 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 from pydantic import Field
 
+from dotagent import scopes
+from dotagent.config import ReconAuthority
 from dotagent.core.errors import ToolInputError, WebError
 from dotagent.core.text import truncate_tail
 from dotagent.policy.types import ActionInfo
@@ -103,7 +105,7 @@ class SecurityArgs(ToolArgs):
         min_length=3,
         max_length=300,
         description=(
-            "The page with the forms, on a host in `[recon] owned_hosts` or in a scope of `[recon] scopes`: a URL "
+            "The page with the forms, on a host you own or a registered scope allows (`dotx scope check`): a URL "
             "(`https://example.com/login`) or a bare domain."
         ),
     )
@@ -456,8 +458,8 @@ def _render(
         lines.append(f"{skipped} form(s) posted to another host and were not tried.")
     lines.append("")
     lines.append(
-        "Benign, read-only payloads; nothing was written, dropped or taken. A quick check of a host in "
-        "`[recon] owned_hosts` or in a scope of `[recon] scopes`, not a substitute for a full assessment."
+        "Benign, read-only payloads; nothing was written, dropped or taken. A quick check of a host you own or a "
+        "registered scope allows, not a substitute for a full assessment."
     )
     return "\n".join(lines)
 
@@ -491,13 +493,17 @@ async def _run(args: SecurityArgs, ctx: ToolContext) -> ToolResult:
     if isinstance(parsed, str):
         return fail(parsed)
     target: Target = parsed
-    authority: tuple[str, str] | None = ctx.runtime.config.recon.authorising(target.host)
+    try:
+        authority: ReconAuthority | None = scopes.authorising(target.host, ctx.runtime.config.recon)
+    except scopes.ScopesFileError as exc:
+        return fail(f"{exc.message} No form of {target.host} is tested until the scopes can be read.")
     if authority is None:
         listed: str = ", ".join(ctx.runtime.config.recon.owned_hosts)
         return fail(
-            f"{target.host} is in neither [recon] owned_hosts nor a scope of [recon] scopes, so its forms are not "
-            "tested. Add the host there (a name covers its subdomains), or add the scope of the bug bounty program or "
-            "engagement that covers it as [[recon.scopes]] with its program and hosts, and run it again."
+            f"{target.host} is in neither [recon] owned_hosts nor a scope of any bug bounty program, so its forms are "
+            "not tested. If a program you are in lists it, register the program in one command — dotx scope add "
+            '--program "Bugcrowd · Acme" --url <its page> --hosts ' + f"{target.host} — and run it again; "
+            f"`dotx scope check {target.host}` says who covers it."
             + (f" The owner listed {listed} instead." if listed else "")
         )
     limit: int = min(ctx.runtime.config.web.fetch_max_bytes, _MAX_BODY_BYTES)
@@ -532,9 +538,8 @@ async def _run(args: SecurityArgs, ctx: ToolContext) -> ToolResult:
             findings.append(finding)
         await asyncio.sleep(_SPACING_S)
     report: str = _render(target, page, forms, attempts, findings, skipped)
-    if authority[0] != "owned":
-        program, note = authority
-        report = f"{report}\nScope: {program}{f' — {note}' if note else ''}"
+    if authority.program is not None:
+        report = f"{report}\nScope: {authority.program}{f' — {authority.note}' if authority.note else ''}"
     return mark_untrusted(ok(truncate_tail(report, ctx.output_chars)))
 
 
@@ -544,8 +549,8 @@ def build_security_tool() -> RegisteredTool:
         name=SECURITY_TOOL,
         description=(
             "Test the forms of a page you may test for SQL injection, reflected XSS, a login bypass and default "
-            "credentials. Only a host in `[recon] owned_hosts` or in a scope of `[recon] scopes` — a bug bounty "
-            "program or an engagement you are in — is touched, the payloads are read-only, and every form action must "
+            "credentials. Only a host you own or that a registered bug bounty scope allows is touched — `dotx scope "
+            "add` writes a program's scope in one command — the payloads are read-only, and every form action must "
             'stay on that host. `depth = "forms"` lists the forms without sending anything.'
         ),
         args_model=SecurityArgs,

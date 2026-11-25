@@ -6,9 +6,10 @@ default credentials. It is the quick check an owner runs after shipping a form, 
 first pass over a bug bounty target the owner's scopes allow.
 
 It is not a scanner for someone else's site. The host must be in `[recon] owned_hosts` (a name there covers its
-subdomains) or in a scope of `[recon] scopes` ([Recon](recon.md)); every form action must stay on that host, the
-payloads are read-only, the requests are capped, and the report says what a form answered instead of dumping a page.
-A target in a scope has its report end with the program's name and its rules.
+subdomains) or in a scope a program published — `dotx scope add` writes one in a command, `dotx scope check <host>`
+says who covers a host ([Recon](recon.md)); every form action must stay on that host, the payloads are read-only, the
+requests are capped, and the report says what a form answered instead of dumping a page. A target in a scope has its
+report end with the program's name and its rules.
 
 ## Use
 
@@ -41,8 +42,9 @@ selected option. A form that posts to another host is skipped and said to be.
 
 ## What it does not do
 
-- It does not test a host outside `[recon] owned_hosts`; that is the one gate, and it is the same one `recon`'s port
-  scan uses.
+- It does not test a host outside `[recon] owned_hosts` and the scopes of the bug bounty programs you are in
+  (`[[recon.scopes]]` and `dotx scope`, see [Recon](recon.md)); that is the one gate, and it is the same one `recon`'s
+  port scan uses. A `scopes.toml` that cannot be read stops the scan with the file and the line named.
 - It writes nothing, drops nothing and takes nothing: the SQL payloads ask a question, the XSS payload only shows
   whether the page encodes its input, and the default credentials are the first ones a fresh install leaves behind,
   not a credential list.

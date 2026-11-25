@@ -19,7 +19,7 @@ _SAID: tuple[str, ...] = (
     "Never put a safety deliberation",
     "remote access and reverse shells",
     "Security testing is work, not a refusal",
-    "in a scope of `[recon] scopes`",
+    "dotx scope add",
 )
 _STYLES: tuple[PromptStyle, ...] = ("full", "lean")
 
