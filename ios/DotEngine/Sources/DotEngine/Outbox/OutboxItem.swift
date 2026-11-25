@@ -18,8 +18,9 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case message(thread: String, text: String, images: [String], uploaded: [String], picks: MessagePicks)
         /// A message into the run at work (`POST /runs/{id}/steer`).
         case steer(run: String, thread: String, text: String, images: [String], uploaded: [String])
-        /// A message that starts a chat of its own (`POST /runs`).
-        case newChat(text: String, images: [String], uploaded: [String])
+        /// A message that starts a chat of its own (`POST /runs`), with Dot (`agent` `nil`) or with one of the owner's
+        /// agents (item 1881: a new chat from a bot's menu or profile).
+        case newChat(text: String, images: [String], uploaded: [String], agent: String?)
         /// An answer to an ask; `remember` is "Always allow in this chat" (item 866), offered only where the daemon keeps it.
         case decision(approval: String, run: String, thread: String, approve: Bool, note: String, remember: Bool)
         case stop(run: String, thread: String)
@@ -107,14 +108,14 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     /// The words of a message, steer or new chat.
     public var text: String? {
         switch action {
-        case .message(_, let text, _, _, _), .steer(_, _, let text, _, _), .newChat(let text, _, _): text
+        case .message(_, let text, _, _, _), .steer(_, _, let text, _, _), .newChat(let text, _, _, _): text
         default: nil
         }
     }
 
     public var images: [String] {
         switch action {
-        case .message(_, _, let images, _, _), .steer(_, _, _, let images, _), .newChat(_, let images, _): images
+        case .message(_, _, let images, _, _), .steer(_, _, _, let images, _), .newChat(_, let images, _, _): images
         default: []
         }
     }
@@ -132,7 +133,7 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
             case .message(let thread, let text, let images, _, let picks): .message(thread: thread, text: text, images: images, uploaded: uploaded, picks: picks)
             case .steer(let run, let thread, let text, let images, _):
                 .steer(run: run, thread: thread, text: text, images: images, uploaded: uploaded)
-            case .newChat(let text, let images, _): .newChat(text: text, images: images, uploaded: uploaded)
+            case .newChat(let text, let images, _, let agent): .newChat(text: text, images: images, uploaded: uploaded, agent: agent)
             default: action
             }
         var copy: OutboxItem = OutboxItem(id: id, action: next, createdAt: createdAt)

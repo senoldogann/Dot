@@ -182,13 +182,21 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
     public let attachments: [String]
     public let mode: String
     public let standing: Bool
+    /// The agent the chat is with; `nil` (left out of the body) for Dot.
+    public let agentId: String?
 
-    public init(goal: String, key: String, attachments: [String]) {
+    enum CodingKeys: String, CodingKey {
+        case goal, key, attachments, mode, standing
+        case agentId = "agent_id"
+    }
+
+    public init(goal: String, key: String, attachments: [String], agentId: String?) {
         self.goal = goal
         self.key = key
         self.attachments = attachments
         self.mode = "auto"
         self.standing = false
+        self.agentId = agentId
     }
 }
 

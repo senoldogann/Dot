@@ -42,9 +42,10 @@ public struct Engine: Sendable {
         return key
     }
 
-    public func startChat(_ text: String, photos: [Data]) async throws -> String {
+    /// A new chat with Dot (`agent` `nil`) or with one of the owner's agents.
+    public func startChat(_ text: String, photos: [Data], agent: String?) async throws -> String {
         let key: String = newMessageKey()
-        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: []), id: key, images: photos)
+        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: [], agent: agent), id: key, images: photos)
         return key
     }
 
