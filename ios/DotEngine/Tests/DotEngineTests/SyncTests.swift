@@ -30,6 +30,21 @@ final class SyncTests: XCTestCase {
         return try await snapshot(of: rig.store, "the chat is live") { $0.chats["thr_1"]?.freshness == .live && $0.list.freshness == .live }
     }
 
+    /// Item 1849: the chat a new chat's first message started is kept by its outbox key for the session, even when the
+    /// list already holds its row as the daemon's answer comes, which drops the accepted message at once.
+    func testANewChatsThreadIsKeptByItsKeyAfterItsAcceptedMessageIsDropped() async throws {
+        await rig.supervisor.start()
+        _ = try await snapshot(of: rig.store, "the list is live") { $0.list.freshness == .live && $0.list.rows.contains { $0.summary.id == "thr_1" } }
+        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: []), createdAt: 1)
+        let run: RunRecord = RunRecord(
+            id: "run_1", threadId: "thr_1", goal: "Book the dentist", mode: "task", model: "m", status: "running", createdAt: 1, finishedAt: nil,
+            result: "", parentRunId: nil, source: "phone", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+        await rig.store.outcome(.started(item, run: run))
+        let kept: EngineSnapshot = try await snapshot(of: rig.store, "the started chat is named") { $0.startedChats["key_new"] != nil }
+        XCTAssertEqual(kept.startedChats["key_new"], "thr_1")
+        XCTAssertNil(kept.accepted["key_new"], "the list has the row, so the overlay was dropped at once")
+    }
+
     // MARK: Live words
 
     /// The owner's report of 2026-11-25: a step's thinking and its words stream as they are written, each delta drawn on

@@ -135,7 +135,7 @@ struct ChatsTab: View {
                 .background(Tone.ground)
         }
         // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it (item 1849).
-        .onChange(of: selection.flatMap { model.accepted[$0]?.thread }) { _, thread in
+        .onChange(of: selection.flatMap { model.startedChats[$0] }) { _, thread in
             if let thread { selection = thread }
         }
         .onChange(of: model.list.rows.count) { _, count in

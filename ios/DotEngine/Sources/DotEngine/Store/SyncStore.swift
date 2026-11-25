@@ -27,10 +27,13 @@ public struct EngineSnapshot: Sendable, Equatable {
     public var savedAt: [String: Double]
     /// When a chat's copy was saved while a run of it worked.
     public var workingAt: [String: Double]
+    /// The chats this phone started, by the outbox key of their first message: the thread the daemon named for each
+    /// (item 1849). Kept for the session, unlike `accepted`, which drops a new chat's entry once the list has its row.
+    public var startedChats: [String: String]
 
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
-        workingAt: [:])
+        workingAt: [:], startedChats: [:])
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -315,11 +318,17 @@ public actor SyncStore {
             default: nil
             }
         let before: Set<String> = key.flatMap { runsAtSend.removeValue(forKey: $0) } ?? []
+        var changed: Bool = false
+        if case .started(let item, let run) = outcome {
+            state.startedChats[item.id] = run.threadId
+            changed = true
+        }
         if let message: AcceptedMessage = accepted(from: outcome, at: clock.now(), runsBefore: before) {
             state.accepted[message.key] = message
             pruneAccepted()
-            publish()
+            changed = true
         }
+        if changed { publish() }
     }
 
     /// Drops the overlay of a message the chat now shows in its own place.
