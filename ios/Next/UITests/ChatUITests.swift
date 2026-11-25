@@ -3,8 +3,13 @@ import XCTest
 /// The ask dock and the queue's edit on the real chat screen, drawn from the debug build's fixtures (wave N2).
 final class ChatUITests: XCTestCase {
     private func launch(_ scene: String) -> XCUIApplication {
+        launch(scene, defaults: [])
+    }
+
+    /// `defaults` are `UserDefaults` given as arguments (`-key value`), over what an earlier test left on the simulator.
+    private func launch(_ scene: String, defaults: [String]) -> XCUIApplication {
         let app: XCUIApplication = XCUIApplication()
-        app.launchArguments = ["-DotNextScene", scene, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-DotNextScene", scene, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + defaults
         app.launch()
         return app
     }
@@ -16,7 +21,8 @@ final class ChatUITests: XCTestCase {
         let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
         XCTAssertTrue(status.waitForExistence(timeout: 10))
         let first: String = status.label
-        XCTAssertTrue(first.hasPrefix("Writing, "), "the capsule says what the run does: \(first)")
+        // Item 1769: the capsule says Working and its clock; what the run does is the live line's.
+        XCTAssertTrue(first.hasPrefix("Working, "), "the capsule says Working: \(first)")
         let second: String = nextLabel(of: status, after: first, within: 2.5)
         XCTAssertNotEqual(second, first, "the clock moved on its own: \(first) -> \(second)")
         let third: String = nextLabel(of: status, after: second, within: 2.5)
@@ -34,6 +40,26 @@ final class ChatUITests: XCTestCase {
             now = element.label
         }
         return now
+    }
+
+    /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
+    /// does; a tap shows the steps and a second folds them back.
+    func testTheLiveLineSaysTheWorkAndATapShowsTheSteps() {
+        let app: XCUIApplication = launch("n2-asks", defaults: ["-toolCallMode", "hideAll"])
+        let line: XCUIElement = app.buttons["work.line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 10))
+        XCTAssertEqual(line.label, "Waiting for you")
+        let step: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Browsed")).firstMatch
+        XCTAssertFalse(step.exists, "the steps are hidden")
+        line.tap()
+        XCTAssertTrue(step.waitForExistence(timeout: 3), "a tap shows the steps")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "work-line-steps"
+        shot.lifetime = .keepAlways
+        add(shot)
+        line.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: step)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "a second tap folds them back")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {

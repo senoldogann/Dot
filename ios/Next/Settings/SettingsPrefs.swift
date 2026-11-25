@@ -14,6 +14,12 @@ enum PrefKey {
     static let confirmDelete: String = "confirmDelete"
     static let haptics: String = "haptics"
     static let dictationLanguage: String = "dictationLanguage"
+    /// The monospaced size of what a command or a tool said, in points; 0 follows the text size (item 1769).
+    static let terminalFontSize: String = "terminalFontSize"
+    /// The monospaced size of code blocks and diffs, in points; 0 follows the text size (item 1769).
+    static let codeFontSize: String = "codeFontSize"
+    /// Whether a long line of code wraps instead of scrolling sideways (item 1769).
+    static let codeWordBreak: String = "codeWordBreak"
 }
 
 /// Light, dark, or as the iPhone is.
