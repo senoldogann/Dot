@@ -116,7 +116,8 @@ struct HelperRow: View {
     }
 
     private var clock: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        // Ticks counted from the helper's start: a schedule from `.now` began again at every drawing of the sheet.
+        TimelineView(.periodic(from: run.startedAt, by: 1)) { context in
             Text(elapsedWords(from: run.startedAt, to: run.endedAt ?? context.date))
                 .textRole(.label)
                 .foregroundStyle(Tone.tertiary)

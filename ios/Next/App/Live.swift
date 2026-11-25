@@ -130,8 +130,8 @@ struct ChatsTab: View {
                 detail: String(localized: "Pick a chat on the left, or start a new one.", comment: "iPad detail column when no chat is selected"), actionTitle: nil, action: {})
                 .background(Tone.ground)
         }
-        .onChange(of: model.snapshot.list.rows.count) { _, count in
-            if opensFirstChat, selection == nil, count > 0 { selection = model.snapshot.list.ordered.first?.summary.id }
+        .onChange(of: model.list.rows.count) { _, count in
+            if opensFirstChat, selection == nil, count > 0 { selection = model.list.ordered.first?.summary.id }
         }
         .alert(String(localized: "Rename", comment: "Context menu of a chat"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField(String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), text: $newTitle)
@@ -162,7 +162,7 @@ struct ChatsTab: View {
 
     private var rows: [ThreadRow] {
         let words: String = query.trimmingCharacters(in: .whitespaces)
-        let all: [ThreadRow] = model.snapshot.list.ordered
+        let all: [ThreadRow] = model.list.ordered
         guard !words.isEmpty else { return all }
         return all.filter { $0.summary.title.localizedStandardContains(words) || $0.summary.lastMessage.localizedStandardContains(words) }
     }
@@ -172,7 +172,7 @@ struct ChatsTab: View {
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
             }
-            ForEach(model.snapshot.pendingChats) { pending in
+            ForEach(model.pendingChats) { pending in
                 VStack(alignment: .leading, spacing: Space.xxs) {
                     Text(pending.text).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(2)
                     Text(deliveryWords(pending.delivery)).textRole(.footnote).foregroundStyle(Tone.secondary)
@@ -189,11 +189,11 @@ struct ChatsTab: View {
         .overlay {
             if rows.isEmpty && !query.isEmpty {
                 ContentUnavailableView.search(text: query)
-            } else if rows.isEmpty, model.snapshot.list.freshness == .live {
+            } else if rows.isEmpty, model.list.freshness == .live {
                 EmptyState(
                     title: String(localized: "No chats yet", comment: "Chat list empty state title"), systemImage: "bubble.left.and.bubble.right",
                     detail: String(localized: "Start one with the pencil above.", comment: "Chat list empty state detail"), actionTitle: nil, action: {})
-            } else if rows.isEmpty, model.snapshot.list.freshness == .empty, model.snapshot.transport == .connecting {
+            } else if rows.isEmpty, model.list.freshness == .empty, model.transport == .connecting {
                 LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way"))
             }
         }
@@ -210,7 +210,7 @@ struct ChatsTab: View {
     /// The list's own line when it is not live (transport apart from freshness).
     private var listLine: String? {
         freshnessLine(
-            freshness: model.snapshot.list.freshness, transport: model.snapshot.transport, savedAt: model.snapshot.savedAt["list"], workingAt: nil, now: .now)
+            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
     }
 
     @ViewBuilder private func section(_ title: String, _ rows: [ThreadRow]) -> some View {
@@ -352,7 +352,7 @@ struct LiveAgentsSheet: View {
     @State private var stopping: Set<String> = []
 
     var body: some View {
-        let helpers: [HelperView] = model.snapshot.chats[thread]?.view?.helpers ?? []
+        let helpers: [HelperView] = model.chats[thread]?.view?.helpers ?? []
         Group {
             if helpers.isEmpty {
                 EmptyState(
@@ -396,8 +396,8 @@ enum LatencyProbe {
             let count: Int = UserDefaults.standard.integer(forKey: "DotNextProbe")
             guard count > 0 else { return }
             for number in 1...count {
-                while !(model.snapshot.chats[thread]?.freshness == .live
-                    && model.snapshot.chats[thread]?.view?.runs.contains(where: \.isActive) == false)
+                while !(model.chats[thread]?.freshness == .live
+                    && model.chats[thread]?.view?.runs.contains(where: \.isActive) == false)
                 {
                     try? await Task.sleep(for: .milliseconds(100))
                     if Task.isCancelled { return }

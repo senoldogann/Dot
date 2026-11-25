@@ -21,7 +21,16 @@ final class AppModel {
     }
 
     private(set) var phase: Phase = .loading
-    private(set) var snapshot: EngineSnapshot = .empty
+    // The store's snapshot by part (item 1848): a screen is drawn again only when a part it reads changed, so a streamed word
+    // redraws the open chat and not the chat list beneath it, the tab bar or Settings.
+    private(set) var list: ListProjection = ListProjection()
+    private(set) var chats: [String: ChatProjection] = [:]
+    private(set) var outbox: [OutboxItem] = []
+    private(set) var accepted: [String: AcceptedMessage] = [:]
+    private(set) var transport: Transport = .connecting
+    private(set) var online: Bool = true
+    private(set) var savedAt: [String: Double] = [:]
+    private(set) var workingAt: [String: Double] = [:]
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -41,7 +50,7 @@ final class AppModel {
             var drawn: EngineSnapshot = .empty
             drawn.transport = fixture.transport
             drawn.online = fixture.transport != .offline
-            snapshot = drawn
+            show(drawn)
             fixtureMac = "MacBook Air"
             fixtureAPI = fixture.api()
             phase = fixture == .pairing || fixture == .pairingLink ? .unpaired : .ready
@@ -50,11 +59,41 @@ final class AppModel {
 
         /// Draws a fixture's snapshot with no engine (the screenshot harness and the UI tests).
         func showFixture(_ fixture: EngineSnapshot, mac: String) {
-            snapshot = fixture
+            show(fixture)
             fixtureMac = mac
             phase = .ready
         }
     #endif
+
+    /// Takes the store's newest snapshot: each part is set only when it changed, so its readers alone are drawn again.
+    private func show(_ next: EngineSnapshot) {
+        if next.list != list { list = next.list }
+        if next.chats != chats { chats = next.chats }
+        if next.outbox != outbox { outbox = next.outbox }
+        if next.accepted != accepted { accepted = next.accepted }
+        if next.transport != transport { transport = next.transport }
+        if next.online != online { online = next.online }
+        if next.savedAt != savedAt { savedAt = next.savedAt }
+        if next.workingAt != workingAt { workingAt = next.workingAt }
+    }
+
+    /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
+    func pending(in thread: String) -> [PendingMessage] {
+        var parts: EngineSnapshot = .empty
+        parts.chats = chats[thread].map { [thread: $0] } ?? [:]
+        parts.outbox = outbox
+        parts.accepted = accepted
+        parts.online = online
+        return parts.pending(in: thread)
+    }
+
+    /// New chats not yet in the list, from the outbox and the link.
+    var pendingChats: [PendingMessage] {
+        var parts: EngineSnapshot = .empty
+        parts.outbox = outbox
+        parts.online = online
+        return parts.pendingChats
+    }
 
     /// The models the daemon offers (`GET /api/models`), for the composer's chip.
     var models: [ProviderModels] = []
@@ -121,7 +160,10 @@ final class AppModel {
         watching = Task { [weak self] in
             for await next in await engine.store.updates() {
                 guard let self else { return }
-                if next != self.snapshot { self.snapshot = next }
+                self.show(next)
+                // At most one picture a display frame at 30 Hz: the store's stream keeps only the newest, so the words
+                // that came meanwhile are drawn together, never dropped (item 1848).
+                try? await Task.sleep(for: .milliseconds(33))
             }
         }
         Task { await engine.supervisor.start() }
@@ -183,7 +225,7 @@ final class AppModel {
         }
         hosts.forget()
         self.engine = nil
-        snapshot = .empty
+        show(.empty)
         phase = .unpaired
     }
 

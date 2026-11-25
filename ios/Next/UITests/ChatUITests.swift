@@ -17,11 +17,23 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(status.waitForExistence(timeout: 10))
         let first: String = status.label
         XCTAssertTrue(first.hasPrefix("Writing, "), "the capsule says what the run does: \(first)")
-        let moved: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", first), object: status)
-        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 2.5), .completed, "the clock moved on its own: \(first) -> \(status.label)")
-        let second: String = status.label
-        let again: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", second), object: status)
-        XCTAssertEqual(XCTWaiter.wait(for: [again], timeout: 2.5), .completed, "and again a second later: \(second) -> \(status.label)")
+        let second: String = nextLabel(of: status, after: first, within: 2.5)
+        XCTAssertNotEqual(second, first, "the clock moved on its own: \(first) -> \(second)")
+        let third: String = nextLabel(of: status, after: second, within: 2.5)
+        XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
+    }
+
+    /// The element's label once it differs from `label`, read every 100 ms (an `XCTNSPredicateExpectation` reads it about
+    /// once a second, so a tick could be seen a second late, past the wait on a slow runner); the last label read when
+    /// nothing changed within `seconds`.
+    private func nextLabel(of element: XCUIElement, after label: String, within seconds: TimeInterval) -> String {
+        let deadline: Date = Date().addingTimeInterval(seconds)
+        var now: String = element.label
+        while now == label, Date() < deadline {
+            usleep(100_000)
+            now = element.label
+        }
+        return now
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
