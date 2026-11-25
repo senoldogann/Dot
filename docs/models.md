@@ -469,7 +469,8 @@ answer keeps its words, Ollama's too.
   calls no tool is not a failed run, and a schedule's row says `failed`, not `done`, for one that ended so.
   The door's secret is in a file only you can read in a folder of the run's own, removed as the run ends, never in the
   program's arguments. The
-  timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
+  timeline shows the model's text and thinking as they come (the summary of its thinking, which Claude Code 2.1.331 and
+  later is asked for with `--thinking-display summarized`; an older version passes on none) and each step with its tools, its tokens and the plan's
   window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
   composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first
   message, the apps' tools through the door, and so the accounts picked, whose mail and calendars the door gives (item
