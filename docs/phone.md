@@ -959,7 +959,8 @@ The card is drawn from the last read, kept in the same file, before the network 
 
 The iPhone app's Activity tab shows what the owner needs away from the Mac to watch, answer or direct Dot's own work;
 the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. The screen stands alone: Dot's profile shows it whole, an agent's profile only that agent's runs and rows (by the
-row's `actor_id` and the run's `agent_id`), without what belongs to Dot as a whole and without Mark as read. Each part is
+row's `actor_id` and the run's `agent_id`), without what belongs to Dot as a whole and without Mark as read; it never marks the moment, and its counts are of
+that agent's runs among the fifty newest the daemon lists, so in a busy week they can be lower than what it did. Each part is
 read from its own route, so one that fails leaves the others on screen with one notice over the page; the tab reads
 again every 30 seconds while it is on screen and when it is pulled down.
 
