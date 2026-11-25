@@ -5820,7 +5820,7 @@
       }
     },
     "Stop": {
-      "comment": "Chat toolbar: stops the run at work",
+      "comment": "Composer and ask dock: stops the run at work",
       "localizations": {
         "tr": {
           "stringUnit": {

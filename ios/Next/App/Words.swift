@@ -220,7 +220,7 @@ func composerActionWords(_ action: ComposerAction) -> String {
     case .send: String(localized: "Send", comment: "VoiceOver: the composer's send button")
     case .queue: String(localized: "Queue: starts after this run", comment: "Composer: queues the message after the run at work")
     case .steer: String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue")
-    case .stop: String(localized: "Stop", comment: "Chat toolbar: stops the run at work")
+    case .stop: String(localized: "Stop", comment: "Composer and ask dock: stops the run at work")
     case .confirmEdit: String(localized: "Save the queued message", comment: "Composer: confirms the edit of a queued message")
     }
 }

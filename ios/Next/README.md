@@ -11,9 +11,9 @@ the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/Work
 `Answer.swift`, `Composer.swift`): the work log with the four tool modes (the table is on `ToolCallMode` in
 `DotEngine/Sync/Transcript.swift`) and the fold of a finished run, markdown answers, the ask dock in the composer's place
 (approvals, questions, hand-offs, secrets typed in a secure field), the composer (+ menu, model · effort chip, on-device
-dictation, Send / Queue / Steer / Stop; while a run works a long press on the button offers Steer now and Queue, the
-follow-up setting's way checked, and sends the draft the way picked; a run stops from the composer's Stop, the chat's
-header has none), the queue sheet and the edit of a queued message, the run inspector, reactions.
+dictation, Send / Queue / Steer / Stop; while a run works and the draft has words a long press on the button offers
+Steer now and Queue, the follow-up setting's way checked, and sends the draft the way picked; a run stops from the
+composer's Stop, the chat's header has none), the queue sheet and the edit of a queued message, the run inspector, reactions.
 While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
 and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
 every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;

@@ -18,6 +18,17 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ask before sending any mail"].waitForExistence(timeout: 5), "the rules of the fixture daemon")
     }
 
+    /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
+    func testTheMacsEmergencyStopIsShownAndReleased() {
+        let app: XCUIApplication = launch("settings-stopped")
+        let notice: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Everything is stopped")).firstMatch
+        XCTAssertTrue(notice.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Emergency stop"].exists, "the phone has no button that engages it")
+        app.buttons["Release the stop"].tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: notice)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "released, the notice goes")
+    }
+
     func testTheDiagnosisNamesTheFailingHopWhenTheMacIsUnreachable() {
         let app: XCUIApplication = launch("settings-offline")
         XCTAssertTrue(app.staticTexts["The Mac's tailnet name does not resolve. Open Tailscale on this iPhone and connect."].waitForExistence(timeout: 10))
