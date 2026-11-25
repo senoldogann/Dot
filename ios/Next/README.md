@@ -26,9 +26,9 @@ system, the text size with a live preview, the tool calls in chat, response stre
 (haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
 only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
 on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
-runs' proposed rewrites with Use and Drop), Health and version, Usage; every other page of the web app's settings is
-a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`: the key never in the address, a
-script on the Mac's origin alone writes it where the page keeps it; only the Mac's origin loads). A search with synonyms finds any page in English or
+runs' proposed rewrites with Use and Drop), Health and version, Usage, Maintenance (Dot's and the provider programs'
+versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
+line says, and no Settings row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),

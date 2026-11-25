@@ -240,7 +240,7 @@ jobs:
             echo "::warning title=e2e::the first try failed; trying once more"
             mv "$RUNNER_TEMP/dd/Logs/Test" "$RUNNER_TEMP/try1/xcresults" 2>/dev/null || true
             TMPDIR="$RUNNER_TEMP/try2" ios/Next/scripts/e2e_settings.sh "$UDID" "$RUNNER_TEMP/dd"
-            echo "- passed on retry: SettingsLiveUITests (e2e; the first try's logs are in the artifact ios-e2e, try1/)" >> "$GITHUB_STEP_SUMMARY"
+            echo "- passed on retry: the live Settings UI tests (e2e; the first try's logs are in the artifact ios-e2e, try1/)" >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Screenshots and logs
         if: always()

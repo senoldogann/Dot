@@ -1149,7 +1149,12 @@ Dot stopped answering for more than 2 s since it started (item 1672), newest fir
 Details, where Dot's work was at that moment: a thread of the daemon asks its event loop to answer every half second,
 and when the loop has not answered for 2 s it reads the loop's stack and logs `loop_stalled` (then `loop_stall_ended`
 with the seconds), which names the call that blocks every run, stream and page at once
-(`GET /api/diagnostics/stalls`: `stall_s`, `stalls` with `began_at`, `seconds`, `ongoing`, `stack`). **Open source
+(`GET /api/diagnostics/stalls`: `stall_s`, `stalls` with `began_at`, `seconds`, `ongoing`, `stack`). The provider
+programs Dot starts, Claude Code and OpenCode, are read with their versions for the phone's Maintenance (item 1790):
+where each is on the owner's PATH (or that it is not), the version its `--version` says, and how Dot fares on it, by
+the versions Claude Code was measured on (item 1673: `supported`, `graceful`, `broken`, `unknown`) and `unknown` for
+OpenCode, of which Dot keeps no such list (`GET /api/diagnostics/programs`: `programs` with `name`, `command`, `path`,
+`version`, `support`, `why`). **Open source
 licences** (`#/licences`,
 item 371) shows the notices that come with the pages (the fonts, the icons, and the code taken from other projects,
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
