@@ -71,7 +71,6 @@ TR: dict[str, str] = {
     "Copy the answer": "Yanıtı kopyala",
     "Shows the whole thinking": "Düşüncenin tamamını gösterir",
     "Thinking": "Düşünüyor",
-    "Thought": "Düşündü",
     "Decline": "Reddet",
     "Declined": "Reddedildi",
     "Denied": "Reddedildi",

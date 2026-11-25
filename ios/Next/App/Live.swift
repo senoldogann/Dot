@@ -436,7 +436,7 @@ struct LiveAgentsSheet: View {
         return HelperRun(
             id: helper.runId, title: helper.shortTitle, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
             endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper),
-            doing: helper.step.map { stepWords(tool: $0.tool, target: $0.target) })
+            doing: helper.step.map { stepWords(tool: $0.tool, target: $0.target) } ?? (state.isLive ? ChatStatus.starting.word : nil))
     }
 }
 

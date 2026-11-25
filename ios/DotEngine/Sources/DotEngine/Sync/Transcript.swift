@@ -19,6 +19,9 @@ import Foundation
 /// | an ask nobody had to answer (`approval_auto` the policy allowed) | not drawn: the run's inspector keeps it ||||
 /// | the owner's words, Dot's notes         | shown    | shown           | shown    | shown  |
 ///
+/// The helper group and the plan are cards of the transcript this engine builds; the app's stream draws neither (item
+/// 1880: the working capsule's people and plan segments keep them), and reads a Zen run's plan from every row.
+///
 /// The app draws two or more consecutive commands that ended well as one "Ran N commands" line that opens to them (item
 /// 1769); a command at work or one that failed stands alone. This filter keeps each of them a row.
 /// "Response streaming" off: the words and the thinking being written are not drawn; an answer appears once it is whole.

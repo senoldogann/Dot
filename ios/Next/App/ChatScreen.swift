@@ -73,9 +73,11 @@ struct ChatScreen: View {
     private var phase: ChatPhase { chatPhase(of: view) }
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
-    private var builtItems: [TranscriptItem] {
+    private var builtItems: [TranscriptItem] { transcript(in: mode) }
+
+    private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
         // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
-        transcript(
+        DotEngine.transcript(
             of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), mode: mode, streaming: streaming,
             context: TranscriptContext(answeredHere: model.answeredHere))
     }
@@ -564,10 +566,11 @@ struct ChatScreen: View {
         return String(localized: "Waiting on \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
     }
 
-    /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none.
+    /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the
+    /// plan out of its transcript, and the pill is its only place, so it is read from a transcript of every row.
     private func newestPlan(_ items: [TranscriptItem]) -> [PlanStep]? {
         guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { return nil }
-        return plan(of: run.id, in: items)
+        return plan(of: run.id, in: mode == .zen ? transcript(in: .showAll) : items)
     }
 
     @ViewBuilder private func sheet(_ panel: ChatPanel) -> some View {
