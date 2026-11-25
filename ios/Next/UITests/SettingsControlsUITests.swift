@@ -65,6 +65,8 @@ final class SettingsControlsUITests: XCTestCase {
             } else if app.navigationBars.buttons["Cancel"].exists {
                 app.navigationBars.buttons["Cancel"].tap()
                 if app.buttons["Discard"].waitForExistence(timeout: 1) { app.buttons["Discard"].tap() }
+                // A sheet that is still closing swallows the next push.
+                sleep(1)
             } else if app.navigationBars.buttons["Close"].exists {
                 app.navigationBars.buttons["Close"].tap()
             } else if app.menuItems.firstMatch.exists || app.collectionViews["menu"].exists {
@@ -95,7 +97,7 @@ final class SettingsControlsUITests: XCTestCase {
     /// Every control of each native page.
     func testEveryControlOfTheNativePagesDoesSomething() {
         let pages: [String] = [
-            "This Mac", "Notifications", "General", "Appearance", "Chat", "Models", "Usage limits and caps", "Scheduled tasks", "Rules", "Memory",
+            "This Mac", "Notifications", "General", "Appearance", "Chat", "Models", "Usage limits and caps", "Scheduled tasks", "Rules", "Memory", "Agents",
             "Health and version", "Usage",
         ]
         var dead: [String] = []

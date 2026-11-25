@@ -52,6 +52,7 @@ struct SettingsTab: View {
                 PageRow(page: .schedules, systemImage: "clock", title: String(localized: "Scheduled tasks", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .rules, systemImage: "lock.shield", title: String(localized: "Rules", comment: "Settings row: what Dot may do without asking"), description: nil, detail: nil)
                 PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
             }
             GroupedSection(header: String(localized: "System", comment: "Settings section: health, version"), footer: nil) {
                 PageRow(page: .system, systemImage: "heart.text.square", title: String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), description: nil, detail: nil)
@@ -149,9 +150,10 @@ struct SettingsTab: View {
         case .chat: ChatSettingsPage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
-        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule)
+        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
         case .rules: RulesPage()
         case .memory: MemoryPage()
+        case .agents: AgentsHome()
         case .system: SystemPage()
         case .usage: UsagePage()
         case .maintenance: MaintenancePage()
@@ -219,6 +221,9 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
         entry(
             "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals",
             String(localized: "notes remember lessons proposals", comment: "Settings search synonyms of Memory (space separated)"), .memory),
+        entry(
+            "agents", String(localized: "Agents", comment: "Title of the agents list"), agents, "agent agents helpers chat",
+            String(localized: "agent agents helpers chat", comment: "Settings search synonyms of Agents (space separated)"), .agents),
         entry(
             "system", String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), system,
             "daemon health emergency stop version uptime failsafe", String(localized: "health emergency stop version", comment: "Settings search synonyms of System (space separated)"), .system),

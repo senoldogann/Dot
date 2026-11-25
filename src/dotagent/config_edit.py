@@ -60,7 +60,9 @@ type ConfigTable = Literal[
 type AgentSetting = Literal["resume"]
 type AssistantSetting = Literal["name", "owner", "introduced"]
 type ChannelsSetting = Literal["imessage", "progress"]
-type CodeReviewSetting = Literal["model", "fallback", "small_model", "small_max_lines", "max_minutes"]
+type CodeReviewSetting = Literal[
+    "model", "effort", "fallback", "fallback_effort", "small_model", "small_max_lines", "max_minutes"
+]
 type BrowserSetting = Literal[
     "mode",
     "raise_window",
