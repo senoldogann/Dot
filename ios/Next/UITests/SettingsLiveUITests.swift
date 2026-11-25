@@ -31,8 +31,8 @@ final class SettingsLiveUITests: XCTestCase {
         let app: XCUIApplication = try launch()
         XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 15))
 
-        // This Mac: every hop passes and the daemon proved it holds the key.
-        open(app, "This Mac")
+        // Dot's computer (the This Mac page): every hop passes and the daemon proved it holds the key.
+        open(app, "Dot's computer")
         XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 15))
         back(app)
 
@@ -114,9 +114,10 @@ final class SettingsLiveUITests: XCTestCase {
         }
         back(app)
 
-        // The emergency stop, then its release.
-        app.swipeDown()
-        app.buttons["Emergency stop"].tap()
+        // The emergency stop (at the end of the sheet), then its release.
+        let stop: XCUIElement = app.buttons["Emergency stop"]
+        for _ in 0..<8 where !stop.isHittable { app.swipeUp() }
+        stop.tap()
         app.buttons["Stop everything"].tap()
         let release: XCUIElement = app.buttons["Release the stop"]
         XCTAssertTrue(release.waitForExistence(timeout: 10))
