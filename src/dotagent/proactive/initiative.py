@@ -471,6 +471,8 @@ class Initiative:
                     HOP_STOP_TITLE,
                     one_line(f"{todo.title}: {exc.message}", _TELL_CHARS),
                     f"#/runs/{todo.source_run_id}",
+                    "initiative",
+                    "",
                 )
             return
         except BaseException:
