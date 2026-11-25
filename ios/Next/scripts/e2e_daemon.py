@@ -1,8 +1,9 @@
 """A throwaway Dot daemon for DotNext's end-to-end check from the simulator (wave N1-client).
 
 It serves the real app (routes, stores, streams, the revision watch) on 127.0.0.1 in a home of its own, with a model
-that replies by a script instead of a service, so no model is called and nothing leaves this Mac. The owner's words
-choose the script:
+that replies by a script instead of a service, so no model is called and nothing leaves this Mac (unless
+``DOTNEXT_E2E_MODEL`` names a real model for a live check: then that model is called, in the yolo mode). The owner's
+words choose the script:
 
 - "helper: ...": the run starts a helper (``delegate``, wait false) that waits 90 s, then ends;
 - "wait: ...": the run waits 2 min in ``wait_until`` (a steer meanwhile shows "read after this step", and ends it);
@@ -14,9 +15,13 @@ choose the script:
 - "fail: ...": the model fails, so the run fails with one line of cause;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
+- "browse: ...": the run opens a local page in its (headless) browser, then waits 8 min with the tab open, so the phone
+  can follow the browser live and take its page over (items 1839-1840); the page counts its clicks and shows what is
+  typed in its field, and a clock on it ticks so the cast keeps sending frames;
 - anything else: an answer at once, after a few words streamed.
 
-The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
+The home's approval mode is ``supervised`` (``yolo`` with ``DOTNEXT_E2E_MODEL``), so every acting step asks (reads
+do not). With ``--seed`` the home also
 holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop.
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
@@ -31,7 +36,9 @@ It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 import asyncio
 import os
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from dotagent.agent.manager import RunManager
@@ -78,11 +85,52 @@ ANSWER: str = "\n\n".join(
 )
 
 
+# The page "browse:" opens: a button that counts its clicks, a field, and a clock that ticks so the cast sends frames.
+PLAY_PAGE: bytes = b"""<!doctype html><html><head><title>DotNext play</title>
+<meta name="viewport" content="width=device-width"><style>
+body { font: 20px -apple-system, sans-serif; margin: 40px; background: #f4f4f2; color: #222; }
+button { font-size: 28px; padding: 24px 48px; border-radius: 16px; border: 0; background: #222; color: #fff; }
+input { font-size: 24px; padding: 12px; width: 60%; margin-top: 24px; }
+#clock { font-size: 64px; font-variant-numeric: tabular-nums; margin: 24px 0; }
+.tall { height: 1600px; background: linear-gradient(#f4f4f2, #c9d3dd); }
+</style></head><body>
+<h1>Play page</h1><div id="clock">0.0</div>
+<button id="press" type="button">Press me</button> <span id="count">0 clicks</span><br>
+<input id="field" placeholder="Type here" autocomplete="off"><p id="echo"></p><div class="tall"></div>
+<script>
+let clicks = 0; const t0 = Date.now();
+setInterval(() => { document.getElementById("clock").textContent = ((Date.now() - t0) / 1000).toFixed(1); }, 100);
+const count = document.getElementById("count");
+document.getElementById("press").onclick = () => { clicks += 1; count.textContent = clicks + " clicks"; };
+document.getElementById("field").oninput = (e) => { document.getElementById("echo").textContent = e.target.value; };
+</script></body></html>"""
+
+
+class _PlayPage(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(PLAY_PAGE)))
+        self.end_headers()
+        self.wfile.write(PLAY_PAGE)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+def serve_play_page() -> str:
+    """The play page on a free port of this Mac, served on a thread for the life of the script; its address."""
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _PlayPage)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_address[1]}/"
+
+
 class ScriptProvider:
     """Replies by the owner's last words (module docstring); a tool's result is answered with a closing text."""
 
-    def __init__(self) -> None:
+    def __init__(self, play_page: str) -> None:
         self._calls: int = 0
+        self._play_page: str = play_page
 
     @property
     def name(self) -> str:
@@ -98,8 +146,9 @@ class ScriptProvider:
         latest: str = request.messages[at].content.strip() if at >= 0 else ""
         owner: str = latest
         # A tool already answered since the owner's words: the step is over, the run ends with a text.
-        answered: bool = any(m.role == "tool" for m in request.messages[at + 1 :])
         steps: int = sum(1 for m in request.messages[at + 1 :] if m.role == "tool")
+        tools_since: list[str] = [m.tool_name or "" for m in request.messages[at + 1 :] if m.role == "tool"]
+        answered: bool = bool(tools_since)
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
         if any(tool.name == "goal_verdict" for tool in request.tools):
@@ -113,6 +162,14 @@ class ScriptProvider:
             )
         elif latest.startswith("stream:"):
             return await self._stream(request, sink, steps)
+        elif latest.startswith("browse:") and tools_since == ["browser_new_tab"]:
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="wait_until",
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 8},
+                ),
+            )
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -131,6 +188,8 @@ class ScriptProvider:
                     arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
                 ),
             )
+        elif latest.startswith("browse:"):
+            calls = (ToolCall(id=f"call_{self._calls}", name="browser_new_tab", arguments={"url": self._play_page}),)
         elif latest.startswith("wait:"):
             calls = (
                 ToolCall(
@@ -265,9 +324,12 @@ def prepare_home() -> None:
     if home.exists() and any(home.iterdir()) and not made_here:
         raise SystemExit(f"DOT_HOME={home} is not empty and was not made by this script: give it a mktemp -d folder")
     ensure_layout()
+    # DOTNEXT_E2E_MODEL runs a real model instead of the script (a live check, e.g. "claude_code:haiku" on the owner's
+    # Claude plan): in yolo, since nobody answers asks in it; the browser is still this home's own headless Chrome.
+    real: str | None = os.environ.get("DOTNEXT_E2E_MODEL")
     config.write_text(
-        f'{CONFIG_MARK}\n[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n\n'
-        '[policy]\napprovals = "supervised"\n',
+        f'{CONFIG_MARK}\n[models]\nmain = "{real or MODEL}"\n\n[browser]\nheadless = true\n\n'
+        f'[policy]\napprovals = "{"yolo" if real else "supervised"}"\n',
         encoding="utf-8",
     )
 
@@ -291,7 +353,9 @@ async def seed(runtime: Runtime) -> None:
 async def serve(port: int, seeded: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await runtime.router.register("ollama", ScriptProvider())
+    play_page: str = serve_play_page()
+    print(f"PLAY {play_page}", flush=True)
+    await runtime.router.register("ollama", ScriptProvider(play_page))
     if seeded:
         await seed(runtime)
     manager: RunManager = RunManager(runtime)

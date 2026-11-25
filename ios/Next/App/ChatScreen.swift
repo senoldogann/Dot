@@ -112,6 +112,7 @@ struct ChatScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { header }
+            .liveFollow(thread: thread)
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
             .onAppear {
