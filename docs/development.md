@@ -150,7 +150,10 @@ macOS alone, where the unit tests Linux leaves out run (`--macos-only`, item 187
 lists and the tests marked `macos`, so each unit test runs once, on one of the two), and `dotx eval check` and the
 smoke tests stay there. A pull request whose every file is one nothing of the macOS jobs reads (`ios/`, `roadmap/`,
 `changes/`, prose, the iOS and desktop workflows: `scripts/python_ci.py`, item 1871) skips `gate` and `gate (part 2)`;
-`checks` still runs, a file the script does not know runs them, and a push to `main` and the release run them always. Those tests are every smoke test that needs no service, chosen by its
+`checks` still runs, a file the script does not know runs them, and a push to `main` and the release run them always.
+A failed run of the smoke tests' second part or of a browser part runs only its failed tests once more (pytest's
+`--last-failed`, item 1874), and each browser part keeps its tests' times as a JUnit artifact, `browser-times-<n>`,
+for the next sharing out of the parts. Those tests are every smoke test that needs no service, chosen by its
 marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). They run spread over the cores
 with `-n auto` (pytest-xdist), and over two runners at once (item 944): the smoke tests' files are dealt to two parts
 in turn by their sorted paths (`--part k/n`, `tests/smoke/conftest.py`), the first run by the `gate` job after the unit
