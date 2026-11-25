@@ -1,5 +1,5 @@
-// A message for a chat whose run works (items 898, 1233 and 1245): the agent page's box, the office's and the home's
-// send it as one sent in that chat goes. Its own module, so that the home does not load the agents' pages to send.
+// A message for a chat whose run works (items 898, 1233 and 1245): the agent page's box and the home's send
+// it as one sent in that chat goes. Its own module, so that the home does not load the agents' pages to send.
 
 import { api } from "./api.js";
 import { BUSY_SEND, settingValue } from "./appearance/settings.js";

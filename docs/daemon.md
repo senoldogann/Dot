@@ -1149,7 +1149,12 @@ Dot stopped answering for more than 2 s since it started (item 1672), newest fir
 Details, where Dot's work was at that moment: a thread of the daemon asks its event loop to answer every half second,
 and when the loop has not answered for 2 s it reads the loop's stack and logs `loop_stalled` (then `loop_stall_ended`
 with the seconds), which names the call that blocks every run, stream and page at once
-(`GET /api/diagnostics/stalls`: `stall_s`, `stalls` with `began_at`, `seconds`, `ongoing`, `stack`). **Open source
+(`GET /api/diagnostics/stalls`: `stall_s`, `stalls` with `began_at`, `seconds`, `ongoing`, `stack`). The provider
+programs Dot starts, Claude Code and OpenCode, are read with their versions for the phone's Maintenance (item 1790):
+where each is on the owner's PATH (or that it is not), the version its `--version` says, and how Dot fares on it, by
+the versions Claude Code was measured on (item 1673: `supported`, `graceful`, `broken`, `unknown`) and `unknown` for
+OpenCode, of which Dot keeps no such list (`GET /api/diagnostics/programs`: `programs` with `name`, `command`, `path`,
+`version`, `support`, `why`). **Open source
 licences** (`#/licences`,
 item 371) shows the notices that come with the pages (the fonts, the icons, and the code taken from other projects,
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
@@ -1536,7 +1541,6 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `source: "cli"` is how `dotx run` hands its run to the daemon (`"review"` for `dotx run --review`, kept under Code reviews; a run of the pages has `"ui"`, the default), with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400), with `team_id` opens a chat with one of your teams (item 610); `/events` and a run's stream leave out the loop's snapshots (`loop_state`), which only the loop reads back (item 1170); `/events?tail=N` (1 to 2000) reads a run's newest N events instead of the ones after `after`, oldest first, and says it knew `tail` with the header `X-Dot-Events-Tail: N` (item 1370: a client that was away through a long run reads the end of it; one that finds no header is talking to a daemon that ignores `tail`) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs (`stored=true`: only those stored so far, item 734); lifecycle of all runs |
-| `GET /runs/streams?ids=a,b&after=N`                                              | the events of several runs (12 at most) on one stream, without their sub-runs, the stored ones after `N` first, ending once none works (item 889: the office's, as a browser keeps six connections to a server); 404 for a run that is not, 422 for none or too many |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `GET\|POST /runs/{id}/messages/{message}/reactions`, `DELETE /runs/{id}/messages/{message}/reactions/{reaction}` | the reactions on a message of Dot's (item 586; `message` is `answer` or `step-<n>`, `n` written as the number it is, from 1: `step-01` and `step-0` are 422, so that a message has one key; item 612): list them; put one on (`{"reaction": "good"}`, one of `good`, `love`, `wrong`, `again`, `remember`, `explain`, `hold`) and do what it says, 201, or 200 when it was there (the reply has `reactions`, `effect`, `said` and `run_id`; 404 for no run or a step it did not say, 422 for a message with no words, for the answer of a run that works, or for a 📌 on a message that holds a secret); take one back |

@@ -1,16 +1,19 @@
 """The routes of Settings › System's Diagnostics (item 370) and Open source licences (item 371): what the daemon's
-processes take, the room Dot's folders take, its logs and the end of one, and the licences of what Dot uses. Each is
-read when it is asked for."""
+processes take, the room Dot's folders take, its logs and the end of one, the provider programs on the Mac with their
+versions (item 1794), and the licences of what Dot uses. Each is read when it is asked for."""
 
 import asyncio
 import os
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 
-from dotagent.core.paths import log_dir
+from dotagent.claude_code.versions import CLAUDE_VERSIONS, VersionVerdict, claude_version, parse_version, verdict_of
+from dotagent.core.paths import claude_code_command, log_dir, opencode_command
 from dotagent.core.types import FrozenModel
 from dotagent.loop_watch import STALL_S, LoopStall
+from dotagent.opencode.server import find_program
 from dotagent.server.context import ServerContext
 from dotagent.server.diagnostics import (
     MAX_TAIL_LINES,
@@ -29,6 +32,64 @@ from dotagent.server.licences import LicencesView, read_licences
 class StallsView(FrozenModel):
     stall_s: float
     stalls: list[LoopStall]
+
+
+class ProviderProgram(FrozenModel):
+    """A provider's program on the Mac (item 1794): its name, the command Dot starts, where it was found (``None``: not
+    installed), the version it says, and how Dot fares on it: ``supported`` (measured), ``graceful`` (runs, older than
+    measured), ``broken`` (a run on it is refused), ``unknown`` (Dot keeps no measure of it) or ``missing``."""
+
+    name: str
+    command: str
+    path: str | None
+    version: str | None
+    support: Literal["supported", "graceful", "broken", "unknown", "missing"]
+    why: str
+
+
+class ProgramsView(FrozenModel):
+    programs: list[ProviderProgram]
+
+
+# OpenCode has no table of versions Dot was measured on, as Claude Code has (item 1673).
+_OPENCODE_UNMEASURED: str = "Dot keeps no list of the OpenCode versions it was measured on"
+
+
+async def _claude_program(command: str, env: dict[str, str]) -> ProviderProgram:
+    program: Path | None = await asyncio.to_thread(find_program, command, env.get("PATH", ""))
+    if program is None:
+        return ProviderProgram(
+            name="Claude Code", command=command, path=None, version=None, support="missing", why="not installed"
+        )
+    verdict: VersionVerdict = verdict_of(parse_version(await claude_version(program, env)), CLAUDE_VERSIONS)
+    version: str | None = None if verdict.version is None else verdict.shown
+    return ProviderProgram(
+        name="Claude Code",
+        command=command,
+        path=str(program),
+        version=version,
+        support=verdict.support,
+        why=verdict.why,
+    )
+
+
+async def _opencode_program(command: str, env: dict[str, str]) -> ProviderProgram:
+    program: Path | None = await asyncio.to_thread(find_program, command, env.get("PATH", ""))
+    if program is None:
+        return ProviderProgram(
+            name="OpenCode", command=command, path=None, version=None, support="missing", why="not installed"
+        )
+    # ``program --version`` the same way as Claude Code's: what it writes, or nothing within its time.
+    found: tuple[int, int, int] | None = parse_version(await claude_version(program, env))
+    version: str | None = None if found is None else ".".join(str(part) for part in found)
+    return ProviderProgram(
+        name="OpenCode",
+        command=command,
+        path=str(program),
+        version=version,
+        support="unknown",
+        why=_OPENCODE_UNMEASURED,
+    )
 
 
 def about_router(ctx: ServerContext) -> APIRouter:
@@ -58,6 +119,19 @@ def about_router(ctx: ServerContext) -> APIRouter:
         """The times the daemon's loop stopped answering for more than ``stall_s`` seconds, newest first, each with
         where it was (item 1672)."""
         return StallsView(stall_s=STALL_S, stalls=ctx.loop_watch.stalls())
+
+    @router.get("/diagnostics/programs")
+    async def programs() -> ProgramsView:
+        """The provider programs Dot starts (Claude Code, OpenCode): where each is on the login shell's PATH, the
+        version it says and how Dot fares on it (item 1794). Each is asked ``--version`` once per request."""
+        env: dict[str, str] = ctx.runtime.shell_env
+        found: list[ProviderProgram] = list(
+            await asyncio.gather(
+                _claude_program(claude_code_command(ctx.runtime.config.providers.claude_code.command), env),
+                _opencode_program(opencode_command(ctx.runtime.config.providers.opencode.command), env),
+            )
+        )
+        return ProgramsView(programs=found)
 
     @router.get("/licences")
     async def licences() -> LicencesView:
