@@ -1,10 +1,11 @@
-"""Which files of a pull request run the gate's macOS jobs, `gate` and `gate (part 2)` (gate.yml).
+"""Which files of a pull request or a push to main run the gate's macOS jobs, `gate` and `gate (part 2)` (gate.yml).
 
 Those jobs test the Python package on macOS: the unit tests that need macOS, `dotx eval check` and the smoke tests. A
 pull request whose every file is one of a short list that nothing they run reads skips them, so that an iPhone app's
 change or an item's records do not hold two of the account's five macOS runners. Everything else runs them, a file
-this script does not know included: a new folder runs the gate until it is listed here. A push to main and a release
-run them always, and `checks` (Linux) runs for every pull request that is more than prose.
+this script does not know included: a new folder runs the gate until it is listed here. A push to main asks it too
+(item 1886: the files changed since main's last green gate); a release and a run by hand run them always, and `checks`
+(Linux) runs for every pull request and push that is more than prose.
 
 The list: the iPhone app (`ios/`, tested by ios.yml), the item records (`roadmap/`, `changes/`, which `checks` reads),
 prose (`docs/`, the Markdown at the root, the issue and pull request templates) and the workflows of other checks
