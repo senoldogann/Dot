@@ -20,6 +20,7 @@ from dotagent.core.errors import (
     DesktopPermissionError,
     DesktopStepNotSent,
     FailSafeTriggered,
+    OwnerAtTheMac,
     ValueNotKept,
 )
 from dotagent.core.logs import get_logger
@@ -43,6 +44,13 @@ from dotagent.desktop.types import (
 from dotagent.policy.elements import Element, typing_reasons
 
 _log = get_logger("dotagent.desktop.actions")
+
+# The steps that take the Mac's own pointer or keyboard, or its front (item 1890): their events go where the owner's
+# hands are. A click on a ref may be done as a press through accessibility (:func:`pressed_on_click`), and takes them
+# only when it is not (:func:`_claim_input`); press, focus, set_value and menu go through accessibility; wait pauses.
+INPUT_ACTIONS: frozenset[str] = frozenset(
+    {"double_click", "right_click", "hover", "type", "paste", "key", "scroll", "drag", "activate"}
+)
 
 _CORNER_PT: float = 2.0
 _DRIFT_PT: float = 12.0
@@ -122,7 +130,8 @@ class StepEnv:
 
     ``expected_front`` is the application that held the keyboard focus after the previous step and ``expected_pointer``
     where the previous pointer step left the pointer; a difference means that something else interfered.
-    ``secure_field`` decides what a step does at a secure text field.
+    ``secure_field`` decides what a step does at a secure text field. ``owner_here`` is whether the owner is at the Mac
+    as the step begins (item 1890): a step that would take the pointer or the keyboard is then not sent.
     """
 
     app: AppInfo
@@ -139,6 +148,7 @@ class StepEnv:
     # The Chromes Dot's browser works in, which a name that fits several applications means (item 343).
     preferred: frozenset[int]
     secure_field: SecureFieldCheck
+    owner_here: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,6 +714,24 @@ def pressed_on_click(step: Step, role: str | None, enabled: bool) -> bool:
     )
 
 
+def takes_input(step: Step) -> bool:
+    """Whether ``step`` surely takes the pointer, the keyboard or the front (item 1890): a click but one on a ref,
+    which a press through accessibility may do instead, and every step of :data:`INPUT_ACTIONS`."""
+    if step.action == "click":
+        return step.ref is None or bool(step.modifiers)
+    return step.action in INPUT_ACTIONS
+
+
+def _claim_input(env: StepEnv, step: Step) -> None:
+    """Refuse, before anything of it goes, a step that would take the pointer, the keyboard or the front while the owner
+    is at the Mac (item 1890)."""
+    if env.owner_here:
+        raise OwnerAtTheMac(
+            f"{step.action} needs the Mac's own pointer and keyboard, and the owner is at the Mac; nothing was sent",
+            {"action": step.action},
+        )
+
+
 def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effect:
     if count == 1 and step.ref is not None:
         number, element = _element_for(env, step.ref)
@@ -717,15 +745,18 @@ def _click(env: StepEnv, step: Step, inspection: Inspection, count: int) -> Effe
                 if not (isinstance(code, int) and code in _ACTION_UNSUPPORTED):
                     raise
                 # It takes no press: the click is a real one, with its window in front, as any click is.
+                _claim_input(env, step)
                 apps.activate(env.app, env.config.activate_timeout_s)
             else:
                 return _effect(
                     f"clicked {inspection.target} (through accessibility: the pointer did not move)", None, True, aim
                 )
-        elif apps.frontmost_pid() != env.app.pid:
-            # The last view showed a control the batch would press, so its window was left behind; it is no longer
-            # one (disabled meanwhile): a real click goes to its window in front, as every other click does.
-            apps.activate(env.app, env.config.activate_timeout_s)
+        else:
+            _claim_input(env, step)
+            if apps.frontmost_pid() != env.app.pid:
+                # The last view showed a control the batch would press, so its window was left behind; it is no longer
+                # one (disabled meanwhile): a real click goes to its window in front, as every other click does.
+                apps.activate(env.app, env.config.activate_timeout_s)
     point: Point = _point_for(env, step.ref, step.x, step.y)
     _check_corner(env, point)
     hid.post(hid.left_click_events(env.source, point, count, step.modifiers or ()))
@@ -1011,6 +1042,8 @@ def execute_step(env: StepEnv, step: Step, reviewed: Inspection) -> Effect:
     555)."""
     check_failsafe(env)
     inspection: Inspection = _reviewed_again(env, step, reviewed)
+    if takes_input(step):
+        _claim_input(env, step)
     match step.action:
         case "click":
             return _click(env, step, inspection, 1)

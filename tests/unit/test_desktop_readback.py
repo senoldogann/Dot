@@ -34,6 +34,7 @@ def _env(tmp_path: Path) -> StepEnv:
         expected_pointer=None,
         preferred=frozenset(),
         secure_field=lambda inspection, what: None,
+        owner_here=False,
     )
 
 

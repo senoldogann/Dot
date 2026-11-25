@@ -247,6 +247,11 @@ class DesktopStepNotSent(DesktopError):
     longer what was reviewed, the pointer was not where the step before left it."""
 
 
+class OwnerAtTheMac(DesktopStepNotSent):
+    """A step that would move the Mac's own pointer or send keys was not sent while the owner is at the Mac (item
+    1890): it waits for them to step away."""
+
+
 class ValueNotKept(DesktopError):
     """A field whose value a step set reads back as something else (item 1146): the step went out, and what it asked
     for is not so."""

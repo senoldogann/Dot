@@ -311,7 +311,7 @@ async def test_the_card_of_a_step_asked_again_shows_the_line_the_return_runs(tmp
     reviews: list[StepReview] = []
 
     async def act(
-        thread_id: str, app: str | None, steps: list[Step], review, secure_field, budget: int, who: str
+        thread_id: str, app: str | None, steps: list[Step], review, secure_field, budget: int, who: str, first: int
     ) -> ActOutcome:
         context: StepContext = _terminal(Element(role="AXTextArea", name="shell"), line="rm -rf ~/Projects")
         step: Step = Step(action="key", key="return")

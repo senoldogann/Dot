@@ -260,12 +260,16 @@ class ScreenshotView(FrozenModel):
 
 class ActOutcome(FrozenModel):
     """The result of a batch: what each step did, why the batch stopped early (if it did) and the window afterwards.
-    ``view_note`` says why there is no view (the window is gone, the application quit)."""
+    ``view_note`` says why there is no view (the window is gone, the application quit). ``waits_from`` is the step
+    that was not sent, with those after it, because it would take the pointer or the keyboard while the owner is at the
+    Mac (item 1890); ``owner_came_back`` says that a step of the batch had taken them before."""
 
     steps: tuple[StepReport, ...]
     stopped: str | None
     view: SnapshotView | None
     view_note: str | None
+    waits_from: int | None = None
+    owner_came_back: bool = False
 
 
 class OpenedApp(FrozenModel):

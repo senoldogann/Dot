@@ -29,7 +29,9 @@ from dotagent.core.errors import (
     DesktopStepNotSent,
     FailSafeTriggered,
     HandedOff,
+    OwnerAtTheMac,
     PolicyDenied,
+    RunCancelled,
     ValueNotKept,
 )
 from dotagent.core.logs import get_logger
@@ -42,6 +44,7 @@ from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Effect, Inspection, SecureFieldCheck, StepEnv
 from dotagent.desktop.memory import AppMemory, ThreadDesktop
 from dotagent.desktop.pointer import PointerOverlay, label_of
+from dotagent.desktop.presence import WAITS_FOR_AWAY, OwnerPresence, owner_back_note, owner_here_note
 from dotagent.desktop.render import describe_step
 from dotagent.desktop.safety import StepContext
 from dotagent.desktop.types import (
@@ -90,6 +93,8 @@ _FRONT_ACTIONS: frozenset[str] = frozenset({"click", "double_click", "right_clic
 # How often a run that waits for its turn at the desktop looks whether the run that holds it waits for the owner, and
 # how long that wait has lasted before it counts as one (a policy check answers in milliseconds), item 555.
 _TURN_POLL_S: float = 0.5
+# How often a batch that waits for the owner to step away looks again (item 1890).
+_AWAY_POLL_S: float = 5.0
 _ASKING_GRACE_S: float = 2.0
 # How long a step waits for the words it was expected to show (item 1146), how often the window is read meanwhile, and
 # how long the steps of one batch may wait together, so that the waits cannot carry a batch past its tool's time.
@@ -146,6 +151,9 @@ class _Batch:
     env: StepEnv
     state: ThreadDesktop
     side_effects: bool
+    # The step that waits for the owner to step away, with the steps after it (item 1890); None when none does.
+    waits_from: int | None
+    came_back: bool
 
 
 def _window_view(max_chars: int) -> ViewRequest:
@@ -423,8 +431,13 @@ class DesktopSession:
         failsafe_file: Path,
         browser_chrome: Callable[[], frozenset[int]],
         pointer: PointerOverlay | None = None,
+        presence: OwnerPresence | None = None,
     ) -> None:
         self._config: DesktopConfig = config
+        # Whether the owner is at the Mac (item 1890), which holds back the steps that take the pointer or the keyboard.
+        # Only the daemon's session reads the Mac's clock of the last input: a test gives a clock of its own, or none,
+        # and then nothing waits.
+        self._presence: OwnerPresence | None = presence
         self._failsafe_file: Path = failsafe_file
         # Dot's own pointer on the screen (item 706), which shows where the steps go; it never does a step. A test
         # gives its own, or none is drawn: only the daemon's session starts the helper that draws it.
@@ -822,6 +835,7 @@ class DesktopSession:
         preferred: frozenset[int] = self._browser_chrome()
         app: AppInfo = _pick_app(state, name, running, preferred)
         _refuse_secrets(app)
+        owner_here: bool = self._owner_here()
         env: StepEnv = StepEnv(
             app=app,
             app_element=ax.app_element(app.pid, self._config.ax_timeout_s),
@@ -836,9 +850,11 @@ class DesktopSession:
             expected_pointer=None,
             preferred=preferred,
             secure_field=secure_field,
+            owner_here=owner_here,
         )
         actions.check_failsafe(env)
-        if _needs_front(steps, memory.known_nodes(memory.memory_of(state, app.pid))):
+        # The front is the owner's while they are at the Mac (item 1890): the step that needs it waits for them to go.
+        if not owner_here and _needs_front(steps, memory.known_nodes(memory.memory_of(state, app.pid))):
             apps.activate(app, self._config.activate_timeout_s)
         return replace(env, expected_front=apps.frontmost_pid())
 
@@ -876,9 +892,40 @@ class DesktopSession:
         # was reviewed for, not to whatever is there after the wait (item 555).
         if time.monotonic() - asked_at > _ANSWERED_AT_ONCE_S:
             env = replace(env, expected_pointer=None)
-        effect: Effect = await self._call(partial(actions.execute_step, env, step, inspection))
+        effect: Effect = await self._execute(env, step, inspection)
         self._lines = safety.lines_after(typed, step, inspection.context)
         return replace(effect, about=inspection.target)
+
+    def _owner_here(self) -> bool:
+        """Whether the owner is at the Mac, so that no step may take the pointer or the keyboard (item 1890)."""
+        return self._config.input_only_when_away and self._presence is not None and not self._presence.away()
+
+    async def _execute(self, env: StepEnv, step: Step, inspection: Inspection) -> Effect:
+        """Perform a step on the worker thread. The input a step may post is noted as Dot's own (item 1890): macOS's
+        clock of the last input counts it as a touch, which must not read as the owner's."""
+        presence: OwnerPresence | None = self._presence
+        if presence is None or env.owner_here or not (step.action == "click" or actions.takes_input(step)):
+            return await self._call(partial(actions.execute_step, env, step, inspection))
+        began: float = presence.now()
+        try:
+            return await self._call(partial(actions.execute_step, env, step, inspection))
+        finally:
+            presence.note_own_input(began, presence.now())
+
+    async def until_away(self, cancel: asyncio.Event, limit_s: float) -> float | None:
+        """Wait until the owner has stepped away (item 1890): the seconds it took, or ``None`` once ``limit_s`` went by
+        with them at the Mac. A session that reads no presence does not wait. Raises when the run is stopped."""
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        began: float = loop.time()
+        while self._owner_here():
+            waited: float = loop.time() - began
+            if waited >= limit_s:
+                return None
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(cancel.wait(), min(_AWAY_POLL_S, limit_s - waited))
+            if cancel.is_set():
+                raise RunCancelled("the run was stopped while it waited for the owner to step away", {})
+        return loop.time() - began
 
     async def _run_steps(
         self,
@@ -888,12 +935,20 @@ class DesktopSession:
         steps: Sequence[Step],
         reviewer: StepReviewer,
         who: str = DOT_NAME,
+        first: int = 1,
     ) -> _Batch:
         """Run the steps in order until one fails, is refused or is taken over by the user, each with whether it went
         out and what was checked of it (item 1146). The batch stops too at a step whose expected words were not seen,
-        and before a step that acts on what the steps before it left when one of their own checks is not verified."""
+        and before a step that acts on what the steps before it left when one of their own checks is not verified, and
+        at a step that would take the pointer or the keyboard while the owner is at the Mac (item 1890). The steps are
+        numbered from ``first``: a batch that waited for the owner goes on with the rest of its steps."""
         reports: list[StepReport] = []
         stopped: str | None = None
+        waits_from: int | None = None
+        # Whether a step of the batch took the pointer or the keyboard: one that then waits for the owner says that
+        # they came back (item 1890).
+        took_input: bool = False
+        came_back: bool = False
         side_effects: bool = False
         unverified: int | None = None
         expect_left: float = _EXPECT_BATCH_S
@@ -905,7 +960,8 @@ class DesktopSession:
                 )
             )
 
-        for index, step in enumerate(steps, start=1):
+        last: int = first + len(steps) - 1
+        for index, step in enumerate(steps, start=first):
             if stopped is None and unverified is not None and step.acts_on_what_was_left():
                 # What to do next is said whole (item 1149): a run of the owner's wrote the field again with other
                 # text, twice, where its line below showed that the field held what was meant.
@@ -917,6 +973,7 @@ class DesktopSession:
             if stopped is not None:
                 report(index, step, "skipped", "", "not_sent")
                 continue
+            env = replace(env, owner_here=self._owner_here())
             try:
                 await self._refuse_shown_already(env.app, step)
                 effect: Effect = await self._run_step(env, step, index, reviewer)
@@ -951,6 +1008,12 @@ class DesktopSession:
                 continue
             except FailSafeTriggered:
                 raise
+            except OwnerAtTheMac:
+                report(index, step, "skipped", WAITS_FOR_AWAY, "not_sent")
+                waits_from = index
+                came_back = took_input
+                stopped = owner_back_note(index) if took_input else owner_here_note(index)
+                continue
             except ValueNotKept as error:
                 # The value was set and the field reads something else: the step went out and did not take.
                 reports.append(
@@ -978,6 +1041,7 @@ class DesktopSession:
                     drawn.x, drawn.y, step.action in _RIPPLES, label_of(who, step.action, effect.about)
                 )
             side_effects = side_effects or step.has_side_effects()
+            took_input = took_input or actions.takes_input(step) or effect.pointer is not None
             pointer = effect.pointer if effect.pointer is not None else env.expected_pointer
             env = replace(env, expected_pointer=pointer)
             if effect.switched_to is not None:
@@ -1005,7 +1069,7 @@ class DesktopSession:
                 )
             if unverified is None and holds_back(effect.checks):
                 unverified = index
-            if index < len(steps):
+            if index < last:
                 pause: float = self._config.settle_ms / 3000 if effect.opens_ui else _STEP_GAP_S
                 await asyncio.sleep(pause)
                 remeasured: StepEnv = await self._call(partial(_remeasure, env))
@@ -1016,7 +1080,15 @@ class DesktopSession:
                 env = remeasured
                 if taker is not None:
                     stopped = f"{taker} came to the front after step {index}; look at the screen before going on"
-        return _Batch(reports=tuple(reports), stopped=stopped, env=env, state=state, side_effects=side_effects)
+        return _Batch(
+            reports=tuple(reports),
+            stopped=stopped,
+            env=env,
+            state=state,
+            side_effects=side_effects,
+            waits_from=waits_from,
+            came_back=came_back,
+        )
 
     async def _shows(self, app: AppInfo, text: str) -> bool:
         """Whether the front window of ``app`` shows ``text`` (:func:`_shows_job`), under the rules a look at it
@@ -1081,10 +1153,13 @@ class DesktopSession:
         secure_field: SecureFieldCheck,
         max_chars: int,
         who: str = DOT_NAME,
+        first: int = 1,
     ) -> ActOutcome:
         """Perform a batch of steps in one application, each reviewed first, and show the window afterwards, at most
         ``max_chars`` of its text. ``secure_field`` decides what a step does at a secure text field: a step it refuses
-        fails and stops the batch. ``who`` is the name Dot's pointer says does the steps (item 869)."""
+        fails and stops the batch. ``who`` is the name Dot's pointer says does the steps (item 869). ``first`` is the
+        number of the first step: a batch that waited for the owner to step away goes on from there (item 1890), and
+        ``waits_from`` of the outcome names the step that waits."""
         async with self._turn():
             await self._prepare(self._prepare_acting)
             await self._note_front_before(thread_id)
@@ -1095,7 +1170,7 @@ class DesktopSession:
             env: StepEnv = await self._call(partial(self._open_env, state, app, steps, secure_field))
             _log.info("desktop_act", thread=thread_id, app=env.app.name, steps=len(steps))
             batch: _Batch = await self._run_steps(
-                thread_id, memory.targeting(state, env.app.pid), env, steps, reviewer, who
+                thread_id, memory.targeting(state, env.app.pid), env, steps, reviewer, who, first
             )
             if batch.side_effects:
                 quiet_s: float = self._config.settle_quiet_ms / 1000
@@ -1105,7 +1180,14 @@ class DesktopSession:
             view, note, updated = await self._closing_view(batch.state, batch.env.app, max_chars)
             self._remember(thread_id, updated)
             await self._note_front_left(thread_id)
-            return ActOutcome(steps=batch.reports, stopped=batch.stopped, view=view, view_note=note)
+            return ActOutcome(
+                steps=batch.reports,
+                stopped=batch.stopped,
+                view=view,
+                view_note=note,
+                waits_from=batch.waits_from,
+                owner_came_back=batch.came_back,
+            )
 
     async def preview(self, thread_id: str, app: str | None, steps: Sequence[Step]) -> tuple[StepContext, ...]:
         """The context of each step as far as it is known before anything runs: used to judge a batch up front."""

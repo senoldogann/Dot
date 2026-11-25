@@ -65,6 +65,7 @@ from dotagent.core.paths import (
     workspace_dir,
 )
 from dotagent.desktop.pointer import PointerOverlay
+from dotagent.desktop.presence import mac_presence
 from dotagent.dot_app import app_path, build_path, runtime_path
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
@@ -652,7 +653,11 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             browser=browsers.main,
             browsers=browsers,
             desktop=DesktopSession(
-                config.desktop, failsafe_path(), browsers.chrome_pids, PointerOverlay(config.desktop.show_pointer)
+                config.desktop,
+                failsafe_path(),
+                browsers.chrome_pids,
+                PointerOverlay(config.desktop.show_pointer),
+                mac_presence(config.desktop.away_after_s),
             ),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),

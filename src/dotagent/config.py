@@ -569,6 +569,12 @@ class DesktopConfig(FrozenModel):
     give_front_back: bool
     # Whether Dot's own pointer shows where the steps of desktop_act go (item 706).
     show_pointer: bool
+    # Whether the steps that move the Mac's own pointer or send keys wait while the owner is at the Mac (item 1890),
+    # how long nobody may have touched the keyboard, the mouse or the trackpad before the owner is away, and how long a
+    # batch waits for that before it gives up the steps it holds.
+    input_only_when_away: bool
+    away_after_s: int = Field(ge=0)
+    away_wait_s: int = Field(ge=0)
     launch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     activate_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)

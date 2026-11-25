@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1890](1890.md) | done | 2026-11-25 | Dot takes the Mac's pointer and keyboard only while the owner is away |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
 | [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |
