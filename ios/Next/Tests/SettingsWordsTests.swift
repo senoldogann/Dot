@@ -99,11 +99,12 @@ final class SettingsWordsTests: XCTestCase {
         XCTAssertFalse(report.contains("phone."), "no key in the report")
     }
 
-    func testTheSearchIndexFindsRulesByApprovalsAndAWebPageByItsWebWords() {
+    func testTheSearchIndexFindsRulesByApprovalsAndMaintenanceByResume() {
         let index: [(SettingsEntry, SettingsPage)] = settingsIndex()
         let ids: (String) -> [String] = { query in searchSettings(query, in: index.map(\.0)).map(\.id) }
         XCTAssertEqual(ids("approvals").first, "rules")
-        XCTAssertTrue(ids("imessage").contains("web.channels"))
+        XCTAssertEqual(ids("resume"), ["maintenance"])
+        XCTAssertEqual(ids("imessage"), [], "the Mac's pages have no row on the phone (PLAN §26)")
         XCTAssertTrue(ids("budget").contains("caps"))
         XCTAssertEqual(Set(index.map(\.0.id)).count, index.count, "every entry has its own id")
     }
