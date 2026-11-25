@@ -1,15 +1,15 @@
 import DotEngine
 import SwiftUI
 
-/// The Settings tab (PLAN §4.4, the reference's structure with Dot's pages; UI-STANDARD 14:25): the emergency stop at
-/// the top, then Connections, the phone's own preferences, Agents, System, and every other web settings page as a row
-/// with the "Web" mark, so nothing of the web app is out of reach. A search with synonyms finds any page.
+/// The Settings tab (PLAN §4.4, the reference's structure with Dot's pages; UI-STANDARD 14:25): while the Mac's
+/// emergency stop holds, a notice with its release at the top, then Connections, the phone's own preferences, Agents,
+/// System, and every other web settings page as a row with the "Web" mark, so nothing of the web app is out of reach.
+/// A search with synonyms finds any page.
 struct SettingsTab: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var path: [SettingsPage]
     @State private var query: String
     @State private var failsafe: Loadable<FailsafeState> = .loading
-    @State private var stopAsked: Bool = false
     @State private var stopProblem: SettingsFailure?
     @State private var releasing: Bool = false
 
@@ -75,7 +75,8 @@ struct SettingsTab: View {
         }
     }
 
-    /// The emergency stop, one tap from the top (PLAN §4.4), and while it holds, what holds and how to release it.
+    /// While the Mac's emergency stop holds, what holds and how to release it. The phone does not engage it (owner's
+    /// decision 2026-11-25): the Mac's own failsafe does.
     @ViewBuilder private var stopBlock: some View {
         if failsafe.value?.engaged == true {
             VStack(alignment: .leading, spacing: Space.s) {
@@ -93,24 +94,6 @@ struct SettingsTab: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .disabled(releasing)
             }
-        } else {
-            Button(String(localized: "Emergency stop", comment: "Settings: stops every run of Dot at once"), systemImage: "stop.circle", role: .destructive) { stopAsked = true }
-                .buttonStyle(DestructiveButtonStyle())
-                .frame(maxWidth: .infinity)
-                .confirmationDialog(String(localized: "Stop everything Dot is doing?", comment: "Confirmation of the emergency stop"), isPresented: $stopAsked, titleVisibility: .visible) {
-                    Button(String(localized: "Stop everything", comment: "Confirmation button of the emergency stop"), role: .destructive) {
-                        Task {
-                            switch await model.write({ api throws(DaemonRequestError) in try await api.emergencyStop() }) {
-                            case .success(let state):
-                                failsafe = .loaded(state)
-                                stopProblem = nil
-                            case .failure(let box): stopProblem = box.failure
-                            }
-                        }
-                    }
-                } message: {
-                    Text(String(localized: "Every run stops, desktop control is blocked and schedules wait until you release the stop.", comment: "Emergency stop confirmation: what it does"))
-                }
         }
         if let stopProblem {
             FailureBanner(failure: stopProblem, macPlace: String(localized: "Settings › System", comment: "Where on the Mac: the System page"), retry: nil)

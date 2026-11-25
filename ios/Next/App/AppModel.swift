@@ -349,17 +349,6 @@ extension AppModel {
         }
     }
 
-    /// The emergency stop (Settings, the daemon's failsafe): every run stops. `nil` when it worked, else why not.
-    func emergencyStop() async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
-        do {
-            _ = try await engine.api.emergencyStop()
-            return nil
-        } catch {
-            return String(describing: error)
-        }
-    }
-
     func actions(of run: String) async -> RunActions? {
         guard let engine else { return nil }
         return try? await engine.api.runActions(run: run)

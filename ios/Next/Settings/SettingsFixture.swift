@@ -130,7 +130,6 @@
             switch (method, path) {
             case ("GET", "/api/status"): return (200, status(engaged: behaviour == .stopped))
             case ("GET", "/api/failsafe"): return (200, #"{"engaged":\#(behaviour == .stopped),"cancelled_runs":[]}"#)
-            case ("POST", "/api/failsafe"): return (200, #"{"engaged":true,"cancelled_runs":["run_a"]}"#)
             case ("DELETE", "/api/failsafe"): return (200, #"{"engaged":false,"cancelled_runs":[]}"#)
             case ("GET", "/api/assistant"), ("PUT", "/api/assistant"):
                 return (200, #"{"name":"Dot","owner":"Şenol","mac_name":"MacBook Air","introduced":true}"#)

@@ -12,7 +12,7 @@ final class SettingsControlsUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-DotNextScene", "settings-home", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
     }
 
     /// The labels of the buttons and switches of the page's scroll view that stand on screen, top to bottom, the page
@@ -79,7 +79,7 @@ final class SettingsControlsUITests: XCTestCase {
     }
 
     func testEveryRowOfSettingsOpensItsPage() {
-        let rows: [String] = controls(skipping: ["Emergency stop"])
+        let rows: [String] = controls(skipping: [])
         XCTAssertGreaterThan(rows.count, 20, "the rows of Settings: \(rows)")
         for row in rows {
             let target: XCUIElement = element(row)
@@ -89,7 +89,6 @@ final class SettingsControlsUITests: XCTestCase {
             restore(to: "Settings")
             XCTAssertEqual(title, "Settings", "back from \(row)")
         }
-        XCTAssertTrue(tapChanges("Emergency stop", on: "Settings"), "Emergency stop asks first")
     }
 
     /// Every control of each native page.
