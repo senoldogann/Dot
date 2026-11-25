@@ -125,7 +125,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # any chat and reads one run, in the office group; 32,279 measured here.
 # Raised by 100 for `memory_save`'s `subject` (item 1729): a fact that changed replaces its older note; 32,367 measured
 # here.
-BUDGET_TOKENS: int = 32_450
+# Raised by 100 for `show_page`'s words on pictures, videos and a page too long (item 1721), the steered calls and
+# OpenCode's tools (items 1720 and 1722); 32,420 measured here.
+BUDGET_TOKENS: int = 32_550
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -164,7 +166,8 @@ SYSTEM_BUDGET_TOKENS: int = 9_050
 # Raised by 200 for `search_chats` of item 1740 above (23,208 measured, with the growth of main it was made on).
 # Raised by 100 for `memory_save`'s `subject` of item 1729, a fact that changed replacing its older note (23,286
 # measured).
-TOOLS_BUDGET_TOKENS: int = 23_350
+# Raised by 100 for `show_page`'s words of item 1721 above (23,331 measured).
+TOOLS_BUDGET_TOKENS: int = 23_450
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
