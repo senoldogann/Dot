@@ -334,7 +334,8 @@ public actor SyncStore {
                 }
                 continue
             }
-            if delivery(of: message, in: chat) == nil { state.accepted[key] = nil }
+            let current: AcceptedMessage = following(message, in: chat)
+            state.accepted[key] = delivery(of: current, in: chat) == nil ? nil : current
         }
     }
 

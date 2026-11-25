@@ -1,3 +1,4 @@
+import DotEngine
 #if DEBUG
 import SwiftUI
 
@@ -249,18 +250,18 @@ private struct ChromeGallery: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.groupedGutter) {
                 Text(String(localized: "Composer at rest", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerShell(text: $empty, placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), modelTitle: String(localized: "Default · medium", comment: "Component gallery (debug builds): a heading or sample text"), send: {})
+                ComposerView(text: $empty, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !empty.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
                 Text(String(localized: "Composer expanded", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerShell(text: $long, placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), modelTitle: String(localized: "Default · medium", comment: "Component gallery (debug builds): a heading or sample text"), send: {})
+                ComposerView(text: $long, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
                 Text(String(localized: "Floating control", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .working, elapsed: Duration.seconds(192).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated)), queued: 2, helpers: 3),
+                    summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpers: 3),
                     showsScrollToBottom: true, openStatus: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, elapsed: nil, queued: 0, helpers: 0),
+                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: nil, queued: 0, helpers: 0),
                     showsScrollToBottom: false, openStatus: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: nil, elapsed: nil, queued: 0, helpers: 0),
+                    summary: WorkingSummary(status: nil, activity: nil, since: nil, queued: 0, helpers: 0),
                     showsScrollToBottom: true, openStatus: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
             }
             .padding(.horizontal, Space.gutter)
@@ -343,7 +344,7 @@ struct SampleChatScreen: View {
             switch panel {
             case .agents: AgentsSheet(runs: Samples.helperRuns(now: .now), close: { self.panel = nil })
             case .background: BackgroundWorkSheet(items: Samples.backgroundWork, close: { self.panel = nil })
-            case .files:
+            case .files, .queue, .inspector, .model:
                 EmptyState(
                     title: String(localized: "No changes yet", comment: "Changes panel empty state"), systemImage: "folder",
                     detail: String(localized: "Files the run changes show here.", comment: "Changes panel empty state detail"),
@@ -367,11 +368,11 @@ struct SampleChatScreen: View {
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .trailing, spacing: Space.xs) {
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, elapsed: Self.elapsed, queued: 2, helpers: 2),
+                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: Date(timeIntervalSinceNow: -180), queued: 2, helpers: 2),
                     showsScrollToBottom: true, openStatus: { panel = .background }, openQueue: {}, openHelpers: { panel = .agents },
                     scrollToBottom: {})
                     .frame(maxWidth: .infinity, alignment: .center)
-                ComposerShell(text: $draft, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), modelTitle: String(localized: "Default · medium", comment: "Composer model chip: the model and the reasoning effort"), send: {})
+                ComposerView(text: $draft, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
             }
             .frame(maxWidth: proseWidth)
             .padding(.horizontal, Space.s)
@@ -381,9 +382,6 @@ struct SampleChatScreen: View {
 
     /// Who and where (plan §18): the agent and the Mac.
     private var subtitle: String { [chat.agent, Samples.macName].joined(separator: " · ") }
-
-    /// A sample clock, formatted by the system so it reads "3 min" in English and "3 dk" in Turkish.
-    private static let elapsed: String = Duration.seconds(180).formatted(.units(allowed: [.minutes], width: .abbreviated))
 
     /// The reading column: about 68 characters of the body font on a wide screen, the full width on a phone.
     private var proseWidth: CGFloat? {

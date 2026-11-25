@@ -964,7 +964,7 @@ chat), `runs` (its newest `tail` runs, 20 by default and 50 at most, oldest firs
 `newest_events` (the tail of its
 events, 200 at most, `newest_events_cut` when older ones were left out), `queue` (as `GET /api/threads/{id}/queue`),
 `asks` (the approvals and questions waiting, its helpers' among them), `helpers` (the runs its runs started in chats of
-their own, newest first, each with `run_id`, `thread_id` (the helper's own chat, which a row opens), `title` (the first
+their own, newest first, the newest 50 at most (`background` is drawn from them), each with `run_id`, `thread_id` (the helper's own chat, which a row opens), `title` (the first
 sentence of its goal with no ids in it, 80 characters at most), `status`, `started_at`, `finished_at`, `provider`,
 `model`, `effort`, `step` while it works (`tool`, a short `target` from its arguments, the plain `line` such as "Running
 a command", and `at`), `blocking` (whether the run that started it still waits for it, false once let go to the
@@ -975,8 +975,8 @@ switched-on loop), with `id`, `title` and `started_at`), `schedules` (as the cha
 each change of their status moves the chat's revision. 404 for no chat. A cold
 open is this one call, made beside the stream's.
 
-**`GET /api/threads/view`** answers the chats as the list shows them (`ThreadsView`): `revision`, the newest of any
-chat's when read, and for each chat its `summary`, `revision` and `asks` (how many wait in it, a helper's counted in its
+**`GET /api/threads/view`** answers the chats as the list shows them (`ThreadsView`): `revision`, the shared counter every
+chat's revision is taken from (it moves on a deleted chat too, so it may be above every chat's), and for each chat its `summary`, `revision` and `asks` (how many wait in it, a helper's counted in its
 parent's chat).
 
 **`GET /api/threads/{id}/stream?cursors=<run id>:<event id>,...`** is the chat's event stream. `cursors` names, for

@@ -6,8 +6,16 @@ The native app that replaces `ios/Dot` wave by wave (the plan lives in the owner
 and later, iPhone and iPad. No push and no Live Activity until the swap (owner's decision): the old app keeps them.
 
 Wave N0 gave the design system, the components and the gallery; wave N1-client the engine (`ios/DotEngine`, below)
-and the screens wired to it: pairing, the chat list, a chat, the helpers and background sheets, settings. The full
-chat (work log groups, ask dock, composer modes, inspector) is wave N2.
+and the screens wired to it: pairing, the chat list, a chat, the helpers and background sheets, settings. Wave N2 made
+the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/WorkLog.swift`, `AskDock.swift`,
+`Answer.swift`, `Composer.swift`): the work log with the four tool modes (the table is on `ToolCallMode` in
+`DotEngine/Sync/Transcript.swift`) and the fold of a finished run, markdown answers, the ask dock in the composer's place
+(approvals, questions, hand-offs, secrets typed in a secure field), the composer (+ menu, model · effort chip, on-device
+dictation, Send / Queue / Steer / Stop), the queue sheet and the edit of a queued message, the run inspector, reactions.
+While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
+and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
+every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;
+what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 ## The engine: `ios/DotEngine`
 
@@ -77,6 +85,14 @@ Build DotNext for the simulator signed locally (`CODE_SIGN_IDENTITY=-`, so it ha
 message: `helper: …` starts a helper, `wait: …` waits in `wait_until`, `slow: …` takes 8 s. A debug launch with
 `-DotNextScene live-chat -DotNextProbe 20` sends 20 messages in the first chat and writes send → first event on screen
 to `Library/Caches/dotnext-latency.txt`.
+
+## The chat's fixtures
+
+Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtures.swift`, decoded from the contract's
+JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`, `n2-editing`, `n2-failed`,
+`n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`. The UI tests (`UITests/ChatUITests.swift`, target
+`DotNextUITests`) run on them. The e2e daemon's script words for the chat: `approve:`, `question:`, `secret:`, `tools:`,
+`fail:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
 
 ## Screenshots
 

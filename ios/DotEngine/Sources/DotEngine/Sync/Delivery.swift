@@ -72,6 +72,17 @@ public func accepted(from outcome: OutboxOutcome, at: Double, runsBefore: Set<St
     }
 }
 
+/// An accepted queued message with the words its queued message holds now: an edit (on this phone or the Mac) changes
+/// the words the run it starts will have, so the overlay follows them and is dropped once that run shows. Pure.
+public func following(_ message: AcceptedMessage, in chat: ChatProjection) -> AcceptedMessage {
+    guard message.kind == .queue, let id: String = message.queuedId,
+        let queued: QueuedMessageView = chat.view?.queue.messages.first(where: { $0.id == id }), queued.text != message.text
+    else { return message }
+    return AcceptedMessage(
+        key: message.key, thread: message.thread, text: queued.text, kind: message.kind, queuedId: message.queuedId, runId: message.runId,
+        at: message.at, runsBefore: message.runsBefore)
+}
+
 /// Where an accepted message stands in the chat's picture, or `nil` once the chat shows it in its own place (the overlay
 /// is then dropped). Pure.
 public func delivery(of message: AcceptedMessage, in chat: ChatProjection) -> Delivery? {

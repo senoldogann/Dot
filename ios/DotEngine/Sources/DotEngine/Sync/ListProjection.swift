@@ -19,6 +19,14 @@ public struct ListProjection: Codable, Sendable, Equatable {
         deleted = [:]
     }
 
+    /// A list drawn from rows with no stream behind it (the debug build's fixtures).
+    public static func drawn(rows: [ThreadRow]) -> ListProjection {
+        var list: ListProjection = ListProjection()
+        list.rows = rows
+        list.freshness = .live
+        return list
+    }
+
     /// The rows in the list's order: pinned first, then by the newest run.
     public var ordered: [ThreadRow] {
         rows.sorted { left, right in

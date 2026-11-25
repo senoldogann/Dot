@@ -208,6 +208,7 @@ targets:
       - path: Next
         excludes:
           - "Tests/**"
+          - "UITests/**"
           - "scripts/**"
           - "README.md"
     settings:
@@ -249,6 +250,10 @@ targets:
         # reached over the tailnet's HTTPS otherwise.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        NSCameraUsageDescription: Dot uses the camera when you take a photo or scan a page to send to it.
+        NSMicrophoneUsageDescription: Dot listens while you dictate a message, and only then. The words are written on this iPhone; no audio is sent anywhere.
+        NSPhotoLibraryUsageDescription: Dot opens your photos when you choose one to send to it.
+        NSSpeechRecognitionUsageDescription: Dot turns your voice into the words of a message on this iPhone when you press the microphone.
         CFBundleURLTypes:
           - CFBundleURLName: dev.dotagent.phone.next
             CFBundleURLSchemes:
@@ -265,8 +270,24 @@ targets:
     scheme:
       testTargets:
         - DotNextTests
+        - DotNextUITests
         - package: DotEngine/DotEngineTests
 
+  # The chat's UI tests (wave N2): the ask dock and the queue's edit on the debug build's fixtures.
+  DotNextUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Next/UITests
+    dependencies:
+      - target: DotNext
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.dotagent.phone.next.uitests
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: DotNext
   # Unit tests of DotNext's pure parts: the palette's contrast, the type rhythm, the reading column, component rules.
   DotNextTests:
     type: bundle.unit-test

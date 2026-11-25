@@ -43,6 +43,14 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Dot uses the camera when you take a photo or scan a page to send to it.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dot listens while you dictate a message, and only then. The words are written on this iPhone; no audio is sent anywhere.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Dot opens your photos when you choose one to send to it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Dot turns your voice into the words of a message on this iPhone when you press the microphone.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

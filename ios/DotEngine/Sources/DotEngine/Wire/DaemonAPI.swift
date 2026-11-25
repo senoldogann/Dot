@@ -142,11 +142,23 @@ public struct QueueMessage: Codable, Sendable, Hashable {
     public let text: String
     public let key: String
     public let attachments: [String]
+    /// The skills and accounts picked in the composer (PLAN §22) and "plan first" (`/plan`).
+    public let skills: [String]
+    public let accounts: [String]
+    public let planFirst: Bool
 
-    public init(text: String, key: String, attachments: [String]) {
+    public init(text: String, key: String, attachments: [String], skills: [String], accounts: [String], planFirst: Bool) {
         self.text = text
         self.key = key
         self.attachments = attachments
+        self.skills = skills
+        self.accounts = accounts
+        self.planFirst = planFirst
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case text, key, attachments, skills, accounts
+        case planFirst = "plan_first"
     }
 }
 
@@ -199,6 +211,13 @@ private struct DecisionBody: Encodable {
     let remember: Bool
 }
 private struct SecretBody: Encodable { let value: String }
+private struct ReactionBody: Encodable { let reaction: String }
+private struct AsideBody: Encodable { let text: String }
+private struct LoopBody: Encodable {
+    let every: String
+    let text: String
+}
+private struct ChoicesBody: Encodable { let choices: ChatChoices }
 private struct QueueEditBody: Encodable {
     let text: String
     let attachments: [String]?
@@ -239,10 +258,62 @@ extension DaemonAPI {
         try await send("POST", "/api/runs", body: Self.json(message))
     }
 
-    public func decide(approval: String, approve: Bool, note: String) async throws(DaemonRequestError) -> ApprovalRecord {
+    public func decide(approval: String, approve: Bool, note: String, remember: Bool) async throws(DaemonRequestError) -> ApprovalRecord {
         try await send(
-            "POST", "/api/approvals/\(approval)/decision", body: Self.json(DecisionBody(approve: approve, note: note, remember: false)))
+            "POST", "/api/approvals/\(approval)/decision", body: Self.json(DecisionBody(approve: approve, note: note, remember: remember)))
     }
+
+    /// Puts a reaction on a message of Dot's (`POST /runs/{id}/messages/{message}/reactions`, item 586).
+    public func react(run: String, message: String, reaction: String) async throws(DaemonRequestError) {
+        try await sendVoid("POST", "/api/runs/\(run)/messages/\(message)/reactions", body: Self.json(ReactionBody(reaction: reaction)))
+    }
+
+    public func unreact(run: String, message: String, reaction: String) async throws(DaemonRequestError) {
+        try await sendVoid("DELETE", "/api/runs/\(run)/messages/\(message)/reactions/\(reaction)", body: nil)
+    }
+
+    /// Keeps the choices the chat's next follow-up starts with (item 199).
+    public func setChoices(thread: String, choices: ChatChoices) async throws(DaemonRequestError) {
+        try await sendVoid("PATCH", "/api/threads/\(thread)", body: Self.json(ChoicesBody(choices: choices)))
+    }
+
+    /// The models of every provider the daemon knows (`GET /api/models`).
+    public func models() async throws(DaemonRequestError) -> [ProviderModels] { try await get("/api/models", query: []) }
+
+    /// The emergency stop (`POST /api/failsafe`): every run stops, desktop control is blocked and the scheduler held
+    /// until it is released on the Mac.
+    public func emergencyStop() async throws(DaemonRequestError) -> FailsafeState { try await send("POST", "/api/failsafe", body: nil) }
+
+    public func failsafe() async throws(DaemonRequestError) -> FailsafeState { try await get("/api/failsafe", query: []) }
+
+    /// A screenshot a tool returned (`GET /api/images/{name}`).
+    public func image(named name: String) async throws(DaemonRequestError) -> Data {
+        let path: String = "/api/images/\(name)"
+        return try await data(request(method: "GET", path: path, query: [], body: nil), path: path)
+    }
+
+    /// A side question the run answers without seeing it (`/btw`, item 650's aside): the answer's words.
+    public func aside(run: String, question: String) async throws(DaemonRequestError) -> AsideAnswer {
+        try await send("POST", "/api/runs/\(run)/btw", body: Self.json(AsideBody(text: question)))
+    }
+
+    /// A loop of the chat (`/loop 30m <message>`, item 281): the message asked again on that rhythm.
+    public func loop(run: String, every: String, text: String) async throws(DaemonRequestError) {
+        try await sendVoid("POST", "/api/runs/\(run)/loop", body: Self.json(LoopBody(every: every, text: text)))
+    }
+
+    /// What the composer's menus offer: skills and accounts (`GET /api/palette`).
+    public func palette() async throws(DaemonRequestError) -> PaletteView { try await get("/api/palette", query: []) }
+
+    public func agents() async throws(DaemonRequestError) -> [AgentSummary] { try await get("/api/agents", query: []) }
+
+    public func teams() async throws(DaemonRequestError) -> [TeamSummary] { try await get("/api/teams", query: []) }
+
+    /// What a run did that undo can or cannot take back (`GET /api/runs/{id}/actions`).
+    public func runActions(run: String) async throws(DaemonRequestError) -> RunActions { try await get("/api/runs/\(run)/actions", query: []) }
+
+    /// What a run changed (`GET /api/runs/{id}/changes`).
+    public func changes(run: String) async throws(DaemonRequestError) -> RunChanges { try await get("/api/runs/\(run)/changes", query: []) }
 
     /// One approval as it stands now (`pending`, `approved`, `denied`, `expired`, `left`).
     public func approval(_ id: String) async throws(DaemonRequestError) -> ApprovalRecord {

@@ -133,7 +133,7 @@ from dotagent.store.models import (
     WorkOrderStatus,
 )
 from dotagent.store.revisions import COUNTER_KEY as REVISION_COUNTER_KEY
-from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_sql, revision_statements
+from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_statements, revision_statements
 from dotagent.store.stats import (
     RETRIED_CHATS,
     RETRIED_FAILURES,
@@ -2035,10 +2035,10 @@ class Store:
     @_writing
     async def bump_thread_revision(self, thread_id: str) -> None:
         """Move the chat's revision for state this process keeps in memory (a chat's terminal sessions), with the
-        statement the triggers run (:func:`dotagent.store.revisions.bump_sql`)."""
-        statements: list[str] = [part.strip() for part in bump_sql("SELECT ?").split(";") if part.strip()]
-        await self._db.execute(statements[0])
-        await self._db.execute(statements[1], (thread_id,))
+        statements the triggers run (:func:`dotagent.store.revisions.bump_statements`)."""
+        counter, chats = bump_statements("SELECT ?")
+        await self._db.execute(counter)
+        await self._db.execute(chats, (thread_id,))
         await self._db.commit()
 
     # ----- key/value -----------------------------------------------------------------------

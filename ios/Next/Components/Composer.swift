@@ -1,47 +1,77 @@
+import DotEngine
+import PhotosUI
 import SwiftUI
+import UIKit
+import VisionKit
 
 /// The composer's two shapes (review S4): compact at rest (one row), split into the field and a toolbar once the
-/// owner writes more than a line or focuses it.
+/// owner writes more than a line, focuses it, adds a file or edits a queued message.
 enum ComposerLayout: Equatable, Sendable {
     case compact
     case expanded
 
-    /// Expanded while focused or while the text is longer than one short line.
     static func of(text: String, isFocused: Bool) -> ComposerLayout {
         if isFocused || text.contains("\n") || text.count > 32 { return .expanded }
         return .compact
     }
 }
 
-/// The send button: an ink disc of 30 pt inside a 44 pt target; empty text dims it.
-struct SendButton: View {
-    let isEnabled: Bool
-    let send: () -> Void
-    /// The other way to send (D10: long-press on Send): into the running task while one works; `nil` for none.
-    var alternate: (() -> Void)? = nil
+/// A photo the owner added to the message, as JPEG.
+struct ComposerAttachment: Identifiable, Equatable {
+    let id: UUID
+    let jpeg: Data
+    let preview: UIImage
+}
+
+/// A model and effort the chip offers.
+struct ModelChoice: Hashable, Identifiable {
+    let ref: String
+    let label: String
+    let effort: String?
+    var id: String { ref + "|" + (effort ?? "") }
+}
+
+/// The composer's button: an ink disc of 30 pt in a 44 pt target. Its glyph says what a press does (send, queue,
+/// steer, stop, confirm an edit); the other way to send stands in a visible menu on a long press and as a VoiceOver
+/// action (D10).
+struct ComposerButton: View {
+    let buttons: ComposerButtons
+    let perform: (ComposerAction) -> Void
 
     var body: some View {
-        Button(action: send) {
-            Image(systemName: "arrow.up")
+        Button { perform(buttons.primary) } label: {
+            Image(systemName: glyph(buttons.primary))
                 .font(.system(.callout, weight: .semibold))
-                .foregroundStyle(isEnabled ? Tone.onAction : Tone.tertiary)
+                .foregroundStyle(buttons.enabled ? Tone.onAction : Tone.tertiary)
                 .frame(width: Metric.sendDisc, height: Metric.sendDisc)
-                .background(isEnabled ? Tone.action : Tone.nested, in: Circle())
+                .background(buttons.enabled ? Tone.action : Tone.nested, in: Circle())
                 .frame(width: Metric.hit, height: Metric.hit)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(!isEnabled)
+        .disabled(!buttons.enabled)
+        .keyboardShortcut(.return, modifiers: .command)
         .contextMenu {
-            if let alternate {
-                Button(String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue"), systemImage: "arrow.turn.down.right", action: alternate)
+            if let alternate = buttons.alternate {
+                Button(composerActionWords(alternate), systemImage: glyph(alternate)) { perform(alternate) }
             }
         }
-        .accessibilityLabel(String(localized: "Send", comment: "VoiceOver: the composer's send button"))
+        .accessibilityLabel(composerActionWords(buttons.primary))
+        .accessibilityIdentifier("composer.send")
         .accessibilityActions {
-            if let alternate {
-                Button(String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue"), action: alternate)
+            if let alternate = buttons.alternate {
+                Button(composerActionWords(alternate)) { perform(alternate) }
             }
+        }
+    }
+
+    private func glyph(_ action: ComposerAction) -> String {
+        switch action {
+        case .send: "arrow.up"
+        case .queue: "text.line.last.and.arrowtriangle.forward"
+        case .steer: "arrow.turn.down.right"
+        case .stop: "stop.fill"
+        case .confirmEdit: "checkmark"
         }
     }
 }
@@ -64,80 +94,334 @@ struct ComposerIconButton: View {
     }
 }
 
-/// The composer's glass shell (plan §4.1, R-a §3): radius 27, compact at rest with attach, the field and Send on one
-/// row; expanded with the field above and attach, the model chip, the microphone and Send beneath it. The real
-/// behaviour (drafts, queue/steer, attachments) comes in wave N2.
-struct ComposerShell: View {
-    @Binding var text: String
-    let placeholder: String
-    let modelTitle: String
-    let send: () -> Void
-    /// Long-press on Send: the other way to send (steer while a run works); `nil` for none.
-    var steer: (() -> Void)? = nil
-    @FocusState private var isFocused: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+/// What the composer's pickers offer for a trigger (PLAN §22): the sections of one panel.
+struct ComposerSuggestions: Sendable {
+    let sections: @Sendable (PickerTrigger) -> [PickerSection]
 
-    var body: some View {
-        let layout: ComposerLayout = ComposerLayout.of(text: text, isFocused: isFocused)
-        // One field in one place whatever the layout: a field made anew when the composer grows on focus would take the
-        // focus away again, and the keyboard would never stay (found in the N1 end-to-end check).
-        let compact: Bool = layout == .compact
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .bottom, spacing: 0) {
-                if compact {
-                    ComposerIconButton(systemImage: "plus", label: String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"), action: {})
-                }
-                field(lines: compact ? 1...4 : 1...6)
-                    .padding(.vertical, compact ? Space.s : 0)
-                    .padding(.horizontal, compact ? 0 : Space.m - Space.xxs)
-                    .padding(.top, compact ? 0 : Space.m)
-                if compact {
-                    ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button"), action: {})
-                    SendButton(isEnabled: canSend, send: send, alternate: steer)
-                }
-            }
-            if !compact {
-                HStack(spacing: 0) {
-                    ComposerIconButton(systemImage: "plus", label: String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"), action: {})
-                    Menu {
-                        Button(String(localized: "Default model", comment: "Composer model menu: use the daemon's default model"), action: {})
-                    } label: {
-                        HStack(spacing: Space.xxs) {
-                            Text(modelTitle).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
-                            Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
-                        }
-                        .padding(.horizontal, Space.xs)
-                        .frame(minHeight: Metric.hit)
-                        .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel(String(localized: "Model, \(modelTitle)", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
-                    Spacer(minLength: 0)
-                    ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button"), action: {})
-                    SendButton(isEnabled: canSend, send: send, alternate: steer)
-                }
-            }
-        }
-        .padding(.horizontal, Space.xxs)
-        .interactiveGlass(in: rounded(Radius.composer))
-        .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
+    static let none: ComposerSuggestions = ComposerSuggestions(sections: { _ in [] })
+}
+
+/// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
+/// button on one row; expanded with the field above and +, the model · effort chip, the microphone and the button
+/// beneath. Photos, the camera, files and a document scan go on the + menu; `/` offers commands and skills, `@` agents.
+struct ComposerView: View {
+    @Binding var text: String
+    @Binding var attachments: [ComposerAttachment]
+    let placeholder: String
+    let buttons: ComposerButtons
+    let perform: (ComposerAction) -> Void
+    let model: ModelChoice?
+    let models: [String: [ModelChoice]]
+    let chooseModel: ((ModelChoice) -> Void)?
+    let suggestions: ComposerSuggestions
+    @FocusState private var isFocused: Bool
+    @State private var dictation: Dictation = Dictation()
+    @State private var dictationBase: String = ""
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var picking: Picker?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+
+    enum Picker: String, Identifiable {
+        case photos, camera, files, scan
+        var id: String { rawValue }
     }
 
-    private var canSend: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var body: some View {
+        // At the accessibility sizes the field takes its own line: one row would push the button off the edge.
+        let layout: ComposerLayout =
+            attachments.isEmpty && !dynamicTypeSize.isAccessibilitySize ? ComposerLayout.of(text: text, isFocused: isFocused) : .expanded
+        let compact: Bool = layout == .compact
+        VStack(alignment: .leading, spacing: Space.xs) {
+            suggestionList
+            if case .failed(let words) = dictation.state {
+                Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.m)
+                    .onTapGesture { dictation.clearFailure() }
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                if !attachments.isEmpty { attachmentStrip }
+                // One field in one place whatever the layout: a field made anew when the composer grows on focus would
+                // take the focus away again (found in the N1 end-to-end check).
+                HStack(alignment: .bottom, spacing: 0) {
+                    if compact { plusMenu }
+                    TextField(placeholder, text: $text, axis: .vertical)
+                        .textRole(.body).foregroundStyle(Tone.text).tint(Tone.text)
+                        .lineLimit(compact ? 1...4 : 1...6)
+                        .focused($isFocused)
+                        .accessibilityIdentifier("composer.field")
+                        .padding(.vertical, compact ? Space.s : 0)
+                        .padding(.horizontal, compact ? 0 : Space.m - Space.xxs)
+                        .padding(.top, compact ? 0 : Space.m)
+                    if compact {
+                        micButton
+                        ComposerButton(buttons: buttons, perform: perform)
+                    }
+                }
+                if !compact {
+                    HStack(spacing: 0) {
+                        plusMenu
+                        Spacer(minLength: 0)
+                        modelChip
+                        micButton
+                        ComposerButton(buttons: buttons, perform: perform)
+                    }
+                }
+            }
+            .padding(.horizontal, Space.xxs)
+            .interactiveGlass(in: rounded(Radius.composer))
+        }
+        .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
+        .photosPicker(isPresented: Binding(get: { picking == .photos }, set: { if !$0 { picking = nil } }), selection: $photoItems, maxSelectionCount: 6, matching: .images)
+        .onChange(of: photoItems) { _, items in
+            Task {
+                for item in items {
+                    if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) { add(image) }
+                }
+                photoItems = []
+            }
+        }
+        .fileImporter(isPresented: Binding(get: { picking == .files }, set: { if !$0 { picking = nil } }), allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            for url in urls {
+                let opened: Bool = url.startAccessingSecurityScopedResource()
+                defer { if opened { url.stopAccessingSecurityScopedResource() } }
+                if let data = try? Data(contentsOf: url), let image = UIImage(data: data) { add(image) }
+            }
+        }
+        .fullScreenCover(item: Binding(get: { picking == .camera || picking == .scan ? picking : nil }, set: { picking = $0 })) { which in
+            if which == .camera {
+                CameraPicker { image in
+                    if let image { add(image) }
+                    picking = nil
+                }
+                .ignoresSafeArea()
+            } else {
+                DocumentScanner { pages in
+                    pages.forEach(add)
+                    picking = nil
+                }
+                .ignoresSafeArea()
+            }
+        }
+    }
 
-    private func field(lines: ClosedRange<Int>) -> some View {
-        TextField(placeholder, text: $text, axis: .vertical)
-            .textRole(.body)
-            .foregroundStyle(Tone.text)
-            .tint(Tone.text)
-            .lineLimit(lines)
-            .focused($isFocused)
+    private func add(_ image: UIImage) {
+        guard let jpeg: Data = image.jpegData(compressionQuality: 0.8) else { return }
+        attachments.append(ComposerAttachment(id: UUID(), jpeg: jpeg, preview: image))
+    }
+
+    private var plusMenu: some View {
+        Menu {
+            Button(String(localized: "Photos", comment: "Composer + menu: picks photos"), systemImage: "photo.on.rectangle") { picking = .photos }
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button(String(localized: "Camera", comment: "Composer + menu: takes a photo"), systemImage: "camera") { picking = .camera }
+            }
+            Button(String(localized: "Files", comment: "Composer + menu: picks image files"), systemImage: "folder") { picking = .files }
+            if VNDocumentCameraViewController.isSupported {
+                Button(String(localized: "Scan a document", comment: "Composer + menu: scans paper pages"), systemImage: "doc.viewfinder") { picking = .scan }
+            }
+            if UIPasteboard.general.hasImages {
+                Button(String(localized: "Paste image", comment: "Composer + menu: adds the image on the clipboard"), systemImage: "doc.on.clipboard") {
+                    UIPasteboard.general.images?.forEach(add)
+                }
+            }
+        } label: {
+            Symbol(name: "plus", context: .toolbar).foregroundStyle(Tone.secondary).frame(width: Metric.hit, height: Metric.hit).contentShape(Rectangle())
+        }
+        .accessibilityLabel(String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"))
+    }
+
+    @ViewBuilder private var modelChip: some View {
+        if let model, let chooseModel {
+            Menu {
+                ForEach(models.keys.sorted(), id: \.self) { provider in
+                    Section(provider) {
+                        ForEach(models[provider] ?? []) { choice in
+                            Button {
+                                chooseModel(choice)
+                            } label: {
+                                if choice == model { Label(chipWords(choice), systemImage: "checkmark") } else { Text(chipWords(choice)) }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: Space.xxs) {
+                    Text(model.label).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
+                    if let effort = model.effort { Text(effort.capitalized).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
+                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
+                }
+                .padding(.horizontal, Space.xs)
+                .frame(minHeight: Metric.hit)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel(String(localized: "Model, \(chipWords(model))", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+        }
+    }
+
+    private func chipWords(_ choice: ModelChoice) -> String {
+        [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private var micButton: some View {
+        ComposerIconButton(
+            systemImage: dictation.state.isActive ? "waveform" : "mic",
+            label: dictation.state.isActive
+                ? String(localized: "Stop dictating", comment: "VoiceOver: the microphone while it listens")
+                : String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button")
+        ) {
+            if !dictation.state.isActive { dictationBase = text }
+            let written: DictationWritten = DictationWritten()
+            dictation.toggle { heard in
+                guard let next = DictationText.update(current: text, lastWritten: written.text, base: dictationBase, heard: heard) else {
+                    dictation.stop()
+                    return
+                }
+                text = next
+                written.text = next
+            }
+        }
+    }
+
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: Space.xs) {
+                ForEach(attachments) { attachment in
+                    Image(uiImage: attachment.preview).resizable().scaledToFill().frame(width: 56, height: 56).clipShape(rounded(Radius.inner))
+                        .overlay(alignment: .topTrailing) {
+                            Button { attachments.removeAll { $0.id == attachment.id } } label: {
+                                Image(systemName: "xmark.circle.fill").symbolRenderingMode(.palette).foregroundStyle(Tone.onAction, Tone.action)
+                                    .frame(width: Metric.hit, height: Metric.hit, alignment: .topTrailing)
+                            }
+                            .buttonStyle(.plain)
+                            .offset(x: 8, y: -8)
+                            .accessibilityLabel(String(localized: "Remove the photo", comment: "VoiceOver: removes a photo from the message"))
+                        }
+                        .accessibilityLabel(String(localized: "Photo", comment: "VoiceOver: a photo added to the message"))
+                }
+            }
+            .padding(.horizontal, Space.m)
+            .padding(.top, Space.m)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    /// The one panel above the composer (§22): a quiet uppercase header per section, rows of icon · name · description,
+    /// filtered as the owner types; a tap puts the token in the text.
+    @ViewBuilder private var suggestionList: some View {
+        let sections: [PickerSection] = pickerTrigger(in: text).map(suggestions.sections) ?? []
+        if !sections.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    ForEach(sections) { section in
+                        Text(pickerHeader(section.kind)).textRole(.label).fontWeight(.semibold).textCase(.uppercase).tracking(1.2)
+                            .foregroundStyle(Tone.tertiary).padding(.horizontal, Space.m).padding(.top, Space.xs)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach(section.items) { item in
+                            Button {
+                                text = completing(text, with: item.token)
+                            } label: {
+                                HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                                    Symbol(name: pickerSymbol(item.kind), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
+                                    Text(item.kind == .command || item.kind == .skill ? item.token : item.name).textRole(.body).foregroundStyle(Tone.text)
+                                        .lineLimit(1).layoutPriority(1)
+                                    Text(item.detail).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.horizontal, Space.m)
+                                .frame(minHeight: Metric.hit)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("picker.row")
+                        }
+                    }
+                }
+                .padding(.vertical, Space.xs)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            // Bounded, so the composer under it stays above the keyboard.
+            .frame(maxHeight: 230)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(Tone.card, in: rounded(Radius.bubble))
+        }
+    }
+}
+
+/// The bar over the composer while a queued message is edited (§20): "Editing queued message · Cancel".
+struct EditingQueuedBar: View {
+    let cancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            Symbol(name: "pencil", context: .tool).foregroundStyle(Tone.secondary)
+            Text(String(localized: "Editing queued message", comment: "Bar over the composer while a queued message is edited")).textRole(.footnote).foregroundStyle(Tone.secondary)
+            Spacer(minLength: 0)
+            Button(String(localized: "Cancel", comment: "Edit sheet toolbar: discards the edits"), action: cancel)
+                .textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).frame(minHeight: Metric.hit)
+                .accessibilityIdentifier("composer.cancelEdit")
+        }
+        .padding(.horizontal, Space.m)
+    }
+}
+
+/// The system camera.
+struct CameraPicker: UIViewControllerRepresentable {
+    let done: (UIImage?) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker: UIImagePickerController = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(done: done) }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let done: (UIImage?) -> Void
+        init(done: @escaping (UIImage?) -> Void) { self.done = done }
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            done(info[.originalImage] as? UIImage)
+        }
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { done(nil) }
+    }
+}
+
+/// The system document scanner: each page as an image.
+struct DocumentScanner: UIViewControllerRepresentable {
+    let done: ([UIImage]) -> Void
+
+    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
+        let scanner: VNDocumentCameraViewController = VNDocumentCameraViewController()
+        scanner.delegate = context.coordinator
+        return scanner
+    }
+
+    func updateUIViewController(_ controller: VNDocumentCameraViewController, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator(done: done) }
+
+    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+        let done: ([UIImage]) -> Void
+        init(done: @escaping ([UIImage]) -> Void) { self.done = done }
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
+            done((0..<scan.pageCount).map { scan.imageOfPage(at: $0) })
+        }
+        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) { done([]) }
+        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) { done([]) }
     }
 }
 
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
     let status: ChatStatus?
-    let elapsed: String?
+    /// What the run does this moment ("Thinking", "Running du -sh ~"), said in the status's place while it works: a sign
+    /// of life in every tool mode, Zen too.
+    let activity: String?
+    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not.
+    let since: Date?
     let queued: Int
     let helpers: Int
 
@@ -181,24 +465,35 @@ struct FloatingWorkingControl: View {
             : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let status = summary.status {
-                segment(action: openStatus, label: [status.word, summary.elapsed].compactMap { $0 }.joined(separator: ", ")) {
-                    HStack(spacing: Space.xxs + 1) {
-                        StatusWord(status: status)
-                        if let elapsed = summary.elapsed {
-                            Text(elapsed).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
+                // The status and its clock are drawn every second, whether events come or not: a clock drawn with
+                // the screen froze between events and jumped when they came (the owner's report of 2026-11-25).
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
+                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
+                        HStack(spacing: Space.xxs + 1) {
+                            if let activity = summary.activity {
+                                ActivityWord(text: activity)
+                            } else {
+                                StatusWord(status: status)
+                            }
+                            if let clock {
+                                Text(clock).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
+                            }
                         }
                     }
+                    .accessibilityIdentifier("capsule.status")
                 }
             }
             if summary.queued > 0 {
-                divider
+                if summary.status != nil { divider }
                 segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")) {
-                    Label { Text(verbatim: "\(summary.queued)") } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
+                    Label { Text(String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")).lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
                         .foregroundStyle(Tone.secondary)
                 }
+                .accessibilityIdentifier("capsule.queue")
             }
             if summary.helpers > 0 {
-                divider
+                if summary.status != nil || summary.queued > 0 { divider }
                 segment(action: openHelpers, label: String(localized: "\(summary.helpers) helpers working", comment: "VoiceOver: the capsule segment of helpers at work; the argument is their count")) {
                     Label { Text(verbatim: "\(summary.helpers)") } icon: { Image(systemName: "person.2") }.textRole(.label).fontWeight(.medium)
                         .foregroundStyle(Tone.secondary)
@@ -228,5 +523,20 @@ struct FloatingWorkingControl: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// What a run does now, as the capsule's status word: the working spinner and one short line.
+struct ActivityWord: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: Space.xxs + 1) {
+            ProgressView().controlSize(.mini).tint(Tone.secondary)
+            Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).truncationMode(.tail).frame(maxWidth: 200, alignment: .leading)
+        }
+        .foregroundStyle(ChatStatus.working.tone.color)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
     }
 }

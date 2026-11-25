@@ -106,7 +106,7 @@ public actor Outbox {
         }
         let kept: OutboxItem.Action =
             switch action {
-            case .message(let thread, let text, _, _): names.isEmpty ? action : .message(thread: thread, text: text, images: names, uploaded: [])
+            case .message(let thread, let text, _, _, let picks): names.isEmpty ? action : .message(thread: thread, text: text, images: names, uploaded: [], picks: picks)
             case .steer(let run, let thread, let text, _, _):
                 names.isEmpty ? action : .steer(run: run, thread: thread, text: text, images: names, uploaded: [])
             case .newChat(let text, _, _): names.isEmpty ? action : .newChat(text: text, images: names, uploaded: [])
@@ -152,7 +152,7 @@ public actor Outbox {
             case .steer(_, let thread, let text, let images, _) = items[at].action
         else { return nil }
         let old: OutboxItem = items.remove(at: at)
-        let fresh: OutboxItem = renewed(old, action: .message(thread: thread, text: text, images: images, uploaded: []))
+        let fresh: OutboxItem = renewed(old, action: .message(thread: thread, text: text, images: images, uploaded: [], picks: .none))
         items.insert(fresh, at: at)
         save()
         start()
@@ -170,7 +170,7 @@ public actor Outbox {
         }
         let next: OutboxItem.Action =
             switch action {
-            case .message(let thread, let text, _, _): .message(thread: thread, text: text, images: renamed, uploaded: [])
+            case .message(let thread, let text, _, _, let picks): .message(thread: thread, text: text, images: renamed, uploaded: [], picks: picks)
             case .steer(let run, let thread, let text, _, _): .steer(run: run, thread: thread, text: text, images: renamed, uploaded: [])
             case .newChat(let text, _, _): .newChat(text: text, images: renamed, uploaded: [])
             default: action
@@ -227,6 +227,12 @@ public actor Outbox {
             items[now].attempts += 1
             save()
             let item: OutboxItem = items[now]
+            // A photo whose file is gone is not left out in silence (the review's pre-existing finding): the message
+            // stays for the owner with the reason, never sent short of a photo.
+            if let missing: String = item.images.first(where: { !FileManager.default.isReadableFile(atPath: imageFolder.appending(path: $0).path) }) {
+                refuse(item, failure: .photoMissing(name: missing))
+                continue
+            }
             do {
                 let outcome: OutboxOutcome = try await perform(item)
                 finish(item.id, outcome)
@@ -287,9 +293,11 @@ public actor Outbox {
     /// moot (a card closed, a message already gone, a run already over) are outcomes, not failures.
     private func perform(_ item: OutboxItem) async throws(DaemonRequestError) -> OutboxOutcome {
         switch item.action {
-        case .message(let thread, let text, _, _):
+        case .message(let thread, let text, _, _, let picks):
             let ids: [String] = try await upload(item)
-            return .delivered(item, queue: try await api.queue(QueueMessage(text: text, key: item.id, attachments: ids), thread: thread))
+            let message: QueueMessage = QueueMessage(
+                text: text, key: item.id, attachments: ids, skills: picks.skills, accounts: picks.accounts, planFirst: picks.planFirst)
+            return .delivered(item, queue: try await api.queue(message, thread: thread))
         case .steer(let run, _, let text, _, _):
             let ids: [String] = try await upload(item)
             try await api.steer(SteerMessage(text: text, key: item.id, attachments: ids), run: run)
@@ -297,9 +305,9 @@ public actor Outbox {
         case .newChat(let text, _, _):
             let ids: [String] = try await upload(item)
             return .started(item, run: try await api.startChat(NewChatMessage(goal: text, key: item.id, attachments: ids)))
-        case .decision(let approval, _, _, let approve, let note):
+        case .decision(let approval, _, _, let approve, let note, let remember):
             do {
-                return .answered(item, status: try await api.decide(approval: approval, approve: approve, note: note).status)
+                return .answered(item, status: try await api.decide(approval: approval, approve: approve, note: note, remember: remember).status)
             } catch where error.statusCode == 409 || error.statusCode == 404 || error.statusCode == 422 {
                 // The card closed while the phone was away: the card's own record says how it stands.
                 return .expired(item, status: try await api.approval(approval).status)
@@ -346,6 +354,16 @@ public actor Outbox {
         case .delete(let thread):
             try await api.delete(threads: [thread])
             return .done(item)
+        case .react(let run, _, let message, let reaction, let on):
+            do {
+                if on { try await api.react(run: run, message: message, reaction: reaction) } else { try await api.unreact(run: run, message: message, reaction: reaction) }
+            } catch where error.statusCode == 404 && !on {
+                // Not there: nothing to take back.
+            }
+            return .done(item)
+        case .choices(let thread, let choices):
+            try await api.setChoices(thread: thread, choices: choices)
+            return .done(item)
         }
     }
 
@@ -353,11 +371,14 @@ public actor Outbox {
     private func upload(_ item: OutboxItem) async throws(DaemonRequestError) -> [String] {
         var uploaded: [String] =
             switch item.action {
-            case .message(_, _, _, let ids), .steer(_, _, _, _, let ids), .newChat(_, _, let ids): ids
+            case .message(_, _, _, let ids, _), .steer(_, _, _, _, let ids), .newChat(_, _, let ids): ids
             default: []
             }
         for (number, name) in item.images.enumerated() where number >= uploaded.count {
-            guard let data: Data = try? Data(contentsOf: imageFolder.appending(path: name)) else { continue }
+            // Checked readable before the sending began; read again here, a file gone meanwhile is the same refusal.
+            guard let data: Data = try? Data(contentsOf: imageFolder.appending(path: name)) else {
+                throw DaemonRequestError.undecodable(path: name, detail: "the photo's file could not be read")
+            }
             uploaded.append(try await api.uploadAttachment(name: name, jpeg: data))
             if let at: Int = items.firstIndex(where: { $0.id == item.id }) {
                 items[at] = items[at].with(uploaded: uploaded)

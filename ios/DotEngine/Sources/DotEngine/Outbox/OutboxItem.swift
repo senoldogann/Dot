@@ -15,12 +15,13 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     public enum Action: Codable, Sendable, Equatable {
         /// A message for a chat (`POST /threads/{id}/queue`): starts a run when none works, queued behind one that does.
         /// `images` are file names in the outbox's folder, `uploaded` the daemon's ids of those already kept there.
-        case message(thread: String, text: String, images: [String], uploaded: [String])
+        case message(thread: String, text: String, images: [String], uploaded: [String], picks: MessagePicks)
         /// A message into the run at work (`POST /runs/{id}/steer`).
         case steer(run: String, thread: String, text: String, images: [String], uploaded: [String])
         /// A message that starts a chat of its own (`POST /runs`).
         case newChat(text: String, images: [String], uploaded: [String])
-        case decision(approval: String, run: String, thread: String, approve: Bool, note: String)
+        /// An answer to an ask; `remember` is "Always allow in this chat" (item 866), offered only where the daemon keeps it.
+        case decision(approval: String, run: String, thread: String, approve: Bool, note: String, remember: Bool)
         case stop(run: String, thread: String)
         /// Stops a helper by the path its view names.
         case stopHelper(path: String, run: String, thread: String)
@@ -33,6 +34,10 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case rename(thread: String, title: String)
         case pin(thread: String, pinned: Bool)
         case delete(thread: String)
+        /// A reaction put on (`on`) or taken off a message of Dot's (`message` is `answer` or `step-N`).
+        case react(run: String, thread: String, message: String, reaction: String, on: Bool)
+        /// The model and effort the chat's next follow-up starts with (`PATCH /threads/{id}` choices).
+        case choices(thread: String, choices: ChatChoices)
     }
 
     public enum Phase: String, Codable, Sendable {
@@ -53,6 +58,8 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case tooOld
         /// The answer could not be read.
         case unreadable
+        /// A photo of the message could not be read from the phone; the message is kept for the owner.
+        case photoMissing(name: String)
     }
 
     /// The item's id; for a keyed message, the key the daemon starts it once by.
@@ -88,9 +95,10 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     /// The chat the item belongs to; `nil` for a new chat.
     public var thread: String? {
         switch action {
-        case .message(let thread, _, _, _), .steer(_, let thread, _, _, _), .decision(_, _, let thread, _, _), .stop(_, let thread),
+        case .message(let thread, _, _, _, _), .steer(_, let thread, _, _, _), .decision(_, _, let thread, _, _, _), .stop(_, let thread),
             .stopHelper(_, _, let thread), .reorder(let thread, _), .removeQueued(let thread, _), .steerQueued(let thread, _),
-            .editQueued(let thread, _, _, _), .resumeQueue(let thread), .rename(let thread, _), .pin(let thread, _), .delete(let thread):
+            .editQueued(let thread, _, _, _), .resumeQueue(let thread), .rename(let thread, _), .pin(let thread, _), .delete(let thread),
+            .react(_, let thread, _, _, _), .choices(let thread, _):
             thread
         case .newChat: nil
         }
@@ -99,14 +107,14 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     /// The words of a message, steer or new chat.
     public var text: String? {
         switch action {
-        case .message(_, let text, _, _), .steer(_, _, let text, _, _), .newChat(let text, _, _): text
+        case .message(_, let text, _, _, _), .steer(_, _, let text, _, _), .newChat(let text, _, _): text
         default: nil
         }
     }
 
     public var images: [String] {
         switch action {
-        case .message(_, _, let images, _), .steer(_, _, _, let images, _), .newChat(_, let images, _): images
+        case .message(_, _, let images, _, _), .steer(_, _, _, let images, _), .newChat(_, let images, _): images
         default: []
         }
     }
@@ -121,7 +129,7 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     func with(uploaded: [String]) -> OutboxItem {
         let next: Action =
             switch action {
-            case .message(let thread, let text, let images, _): .message(thread: thread, text: text, images: images, uploaded: uploaded)
+            case .message(let thread, let text, let images, _, let picks): .message(thread: thread, text: text, images: images, uploaded: uploaded, picks: picks)
             case .steer(let run, let thread, let text, let images, _):
                 .steer(run: run, thread: thread, text: text, images: images, uploaded: uploaded)
             case .newChat(let text, let images, _): .newChat(text: text, images: images, uploaded: uploaded)

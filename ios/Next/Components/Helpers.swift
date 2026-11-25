@@ -46,11 +46,9 @@ struct HelperRun: Identifiable, Equatable, Sendable {
     let engine: String
 }
 
-/// The elapsed time of a run in the locale's short units ("41 min 15 s", "41 dk 15 sn"); hours appear past 60 minutes.
+/// The elapsed time of a run in the app's one duration shape ("41 dk 15 sn", §19).
 func elapsedWords(from start: Date, to end: Date) -> String {
-    let seconds: Int = max(0, Int(end.timeIntervalSince(start)))
-    let units: Set<Duration.UnitsFormatStyle.Unit> = seconds >= 3600 ? [.hours, .minutes] : [.minutes, .seconds]
-    return Duration.seconds(seconds).formatted(.units(allowed: units, width: .abbreviated))
+    durationWords(Int(end.timeIntervalSince(start)), locale: .current)
 }
 
 /// One helper in the agents sheet (owner's reference, plan §18): a status dot and the state word after the title, a
@@ -71,7 +69,7 @@ struct HelperRow: View {
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: Space.xxs) {
                         titleLine
-                        Text(run.engine).textRole(.label).foregroundStyle(Tone.tertiary)
+                        stateLine
                         if dynamicTypeSize.isAccessibilitySize { clock }
                     }
                     Spacer(minLength: Space.xs)
@@ -102,15 +100,19 @@ struct HelperRow: View {
         }
     }
 
-    /// "title · state", the state in its tone, wrapping as one text.
+    /// The title on one line, cut at its end (§19: the state word never wraps glued to it).
     private var titleLine: some View {
-        var title: AttributedString = AttributedString(run.title)
-        title.foregroundColor = Tone.text
-        var dot: AttributedString = AttributedString(" · ")
-        dot.foregroundColor = Tone.tertiary
+        Text(run.title).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1).truncationMode(.tail)
+    }
+
+    /// "state · engine" on the second line, the state in its tone.
+    private var stateLine: some View {
         var state: AttributedString = AttributedString(run.state.word)
         state.foregroundColor = run.state.tone.color
-        return Text(title + dot + state).textRole(.footnote).fontWeight(.medium)
+        var rest: AttributedString = AttributedString(run.engine.isEmpty ? "" : " · " + run.engine)
+        rest.foregroundColor = Tone.tertiary
+        return Text(state + rest).textRole(.label).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
     }
 
     private var clock: some View {

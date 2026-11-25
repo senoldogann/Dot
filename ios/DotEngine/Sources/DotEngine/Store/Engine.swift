@@ -29,9 +29,9 @@ public struct Engine: Sendable {
     // MARK: Doings (through the outbox)
 
     /// Sends the owner's words to a chat as the D10 default: queued behind the run at work, or started when none works.
-    public func send(_ text: String, thread: String, photos: [Data]) async throws -> String {
+    public func send(_ text: String, thread: String, photos: [Data], picks: MessagePicks) async throws -> String {
         let key: String = newMessageKey()
-        try await outbox.enqueue(.message(thread: thread, text: text, images: [], uploaded: []), id: key, images: photos)
+        try await outbox.enqueue(.message(thread: thread, text: text, images: [], uploaded: [], picks: picks), id: key, images: photos)
         return key
     }
 

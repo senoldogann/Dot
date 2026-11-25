@@ -2,6 +2,7 @@ import DotEngine
 import Foundation
 import Observation
 import SwiftUI
+import UIKit
 import os
 
 /// The app's one adapter to the engine (plan §5): it holds the engine of the paired daemon, mirrors the store's snapshot
@@ -26,9 +27,36 @@ final class AppModel {
     @ObservationIgnored private var watching: Task<Void, Never>?
     @ObservationIgnored private let keys: PhoneKeyStore = PhoneKeyStore()
     @ObservationIgnored private let hosts: HostStore = HostStore()
+    /// The Mac's name a debug fixture shows in place of a paired host's.
+    private(set) var fixtureMac: String?
+    /// The paired Mac's name, for a chat's subtitle ("Dot · <Mac>").
+    var macName: String? { host?.name ?? fixtureMac }
+
+    #if DEBUG
+        /// Draws a fixture's snapshot with no engine (the screenshot harness and the UI tests).
+        func showFixture(_ fixture: EngineSnapshot, mac: String) {
+            snapshot = fixture
+            fixtureMac = mac
+            phase = .ready
+        }
+    #endif
+
+    /// The models the daemon offers (`GET /api/models`), for the composer's chip.
+    var models: [ProviderModels] = []
+    /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
+    var palette: PaletteView?
+    var agents: [AgentSummary] = []
+    var teams: [TeamSummary] = []
+    /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
+    var askPhases: [String: AskPhase] = [:]
+    /// The asks this phone answered, kept so the transcript can say "by you on this phone".
+    var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
+        didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
+    }
+    @ObservationIgnored let images: NSCache<NSString, UIImage> = NSCache()
     /// Debug builds only: the time each probe message was sent, by its client key (`LatencyProbe`).
     @ObservationIgnored var probeSent: [String: Date] = [:]
-    @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "app")
+    @ObservationIgnored let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "app")
 
     init() {}
 
@@ -149,11 +177,11 @@ final class AppModel {
 
     /// The owner's words for a chat: queued behind the run at work (D10 default) or, with `steer`, into it.
     @discardableResult
-    func send(_ text: String, thread: String, steerInto run: String?) async -> String? {
+    func send(_ text: String, thread: String, steerInto run: String?, photos: [Data], picks: MessagePicks) async -> String? {
         guard let engine else { return nil }
         do {
-            if let run { return try await engine.steer(text, run: run, thread: thread, photos: []) }
-            return try await engine.send(text, thread: thread, photos: [])
+            if let run { return try await engine.steer(text, run: run, thread: thread, photos: photos) }
+            return try await engine.send(text, thread: thread, photos: photos, picks: picks)
         } catch {
             // Only writing the message's photos beside the outbox can fail here.
             logger.error("a message could not be kept thread=\(thread, privacy: .public) error=\(String(describing: error), privacy: .public)")
@@ -161,10 +189,10 @@ final class AppModel {
         }
     }
 
-    func startChat(_ text: String) async {
+    func startChat(_ text: String, photos: [Data]) async {
         guard let engine else { return }
         do {
-            _ = try await engine.startChat(text, photos: [])
+            _ = try await engine.startChat(text, photos: photos)
         } catch {
             logger.error("a new chat could not be kept error=\(String(describing: error), privacy: .public)")
         }
@@ -195,6 +223,127 @@ final class AppModel {
     func takeBack(_ key: String) async -> String? {
         guard let engine else { return nil }
         return await engine.outbox.discard(key)?.item.text
+    }
+}
+
+// MARK: The chat (wave N2)
+
+extension AppModel {
+    /// Answers an ask through the outbox (an answer says the same twice, plan §11) and remembers that this phone
+    /// answered it, for the transcript's "by you on this phone".
+    func decide(_ ask: Ask, approve: Bool, note: String, remember: Bool, thread: String) {
+        answeredHere.insert(ask.id)
+        perform(.decision(approval: ask.id, run: ask.runId, thread: thread, approve: approve, note: note, remember: remember))
+    }
+
+    /// Gives a secret at once (never through the outbox's file: a secret is kept nowhere on the phone).
+    func giveSecret(_ ask: Ask, value: String) {
+        guard let engine else { return }
+        askPhases[ask.id] = .submitting
+        answeredHere.insert(ask.id)
+        Task {
+            do throws(DaemonRequestError) {
+                _ = try await engine.giveSecret(approval: ask.id, value: value)
+            } catch {
+                if error.statusCode == 409 || error.statusCode == 404 {
+                    askPhases[ask.id] = .answeredElsewhere
+                } else if let code = error.statusCode {
+                    askPhases[ask.id] = .refused("HTTP \(code)")
+                } else {
+                    askPhases[ask.id] = .retry(String(describing: error))
+                }
+            }
+        }
+    }
+
+    /// The models the daemon offers, read once per launch for the composer's chip.
+    func loadModels() async {
+        guard let engine, models.isEmpty else { return }
+        do {
+            models = try await engine.api.models()
+        } catch {
+            logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// The pickers' lists, read once per launch; a list that cannot be read stays empty and says so in the log.
+    func loadPalette() async {
+        guard let engine, palette == nil else { return }
+        do {
+            palette = try await engine.api.palette()
+            agents = try await engine.api.agents()
+            teams = try await engine.api.teams()
+        } catch {
+            logger.warning("the composer's lists could not be read error=\(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// A side question (`/btw`): the run's answer, or why there is none.
+    func aside(run: String, question: String) async -> String {
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        do {
+            return try await engine.api.aside(run: run, question: question).answer
+        } catch {
+            return String(localized: "The side question could not be asked: \(String(describing: error))", comment: "Composer: /btw failed; the argument is why")
+        }
+    }
+
+    /// A loop of the chat (`/loop`); `nil` when it was made, else why not.
+    func loop(run: String, every: String, text: String) async -> String? {
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        do {
+            try await engine.api.loop(run: run, every: every, text: text)
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+
+    /// A screenshot a tool returned, kept in memory for the session.
+    func image(named name: String) async -> UIImage? {
+        if let held: UIImage = images.object(forKey: name as NSString) { return held }
+        guard let engine else { return nil }
+        do {
+            let data: Data = try await engine.api.image(named: name)
+            guard let image: UIImage = UIImage(data: data) else { return nil }
+            images.setObject(image, forKey: name as NSString)
+            return image
+        } catch {
+            logger.warning("a screenshot could not be read name=\(name, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    /// The emergency stop (Settings, the daemon's failsafe): every run stops. `nil` when it worked, else why not.
+    func emergencyStop() async -> String? {
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        do {
+            _ = try await engine.api.emergencyStop()
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+
+    func actions(of run: String) async -> RunActions? {
+        guard let engine else { return nil }
+        return try? await engine.api.runActions(run: run)
+    }
+
+    func changes(of run: String) async -> RunChanges? {
+        guard let engine else { return nil }
+        return try? await engine.api.changes(run: run)
+    }
+
+    /// The owner's half-written words of a chat, kept across launches (per-chat drafts).
+    /// A fixture's chat (debug builds) starts with no draft and keeps none, so a scene draws the same each time.
+    func draft(of thread: String) -> String {
+        fixtureMac != nil ? "" : UserDefaults.standard.string(forKey: "draft.\(thread)") ?? ""
+    }
+
+    func keep(draft: String, of thread: String) {
+        guard fixtureMac == nil else { return }
+        if draft.isEmpty { UserDefaults.standard.removeObject(forKey: "draft.\(thread)") } else { UserDefaults.standard.set(draft, forKey: "draft.\(thread)") }
     }
 }
 

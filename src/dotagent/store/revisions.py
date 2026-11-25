@@ -103,13 +103,20 @@ NOT_STATE: dict[str, str] = {
 }
 
 
-def bump_sql(threads: str) -> str:
-    """The statements that move the revision of the chats ``threads`` (a SELECT of their ids) to a new one."""
+def bump_statements(threads: str) -> tuple[str, str]:
+    """The two statements that move the revision of the chats ``threads`` (a SELECT of their ids) to a new one: the
+    counter's step, then the chats' revision set to it."""
     return (
-        f"UPDATE kv SET value = CAST(value AS INTEGER) + 1 WHERE key = '{COUNTER_KEY}';"
-        f" UPDATE threads SET revision = (SELECT CAST(value AS INTEGER) FROM kv WHERE key = '{COUNTER_KEY}')"
-        f" WHERE id IN ({threads});"
+        f"UPDATE kv SET value = CAST(value AS INTEGER) + 1 WHERE key = '{COUNTER_KEY}'",
+        f"UPDATE threads SET revision = (SELECT CAST(value AS INTEGER) FROM kv WHERE key = '{COUNTER_KEY}')"
+        f" WHERE id IN ({threads})",
     )
+
+
+def bump_sql(threads: str) -> str:
+    """:func:`bump_statements` as one text, the body of a trigger."""
+    counter, chats = bump_statements(threads)
+    return f"{counter}; {chats};"
 
 
 def _trigger(source: RevisionSource, event: str) -> str:

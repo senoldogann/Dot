@@ -30,6 +30,43 @@ final class SyncTests: XCTestCase {
         return try await snapshot(of: rig.store, "the chat is live") { $0.chats["thr_1"]?.freshness == .live && $0.list.freshness == .live }
     }
 
+    // MARK: Live words
+
+    /// The owner's report of 2026-11-25: a step's thinking and its words stream as they are written, each delta drawn on
+    /// its own (no burst at the end), and the capsule's word follows what the run does. 25 thinking deltas, then 25 of
+    /// words, each awaited in the transcript before the next is sent.
+    func testFiftyDeltasRenderOneByOneThinkingThenWords() async throws {
+        _ = try await openLive()
+        let draw: @Sendable (EngineSnapshot) -> [TranscriptItem] = { snap in
+            transcript(of: snap.chats["thr_1"]!, pending: [], mode: .showAll, streaming: true, context: .none)
+        }
+        for index in 1...25 {
+            daemon.thinking("run_1", "t\(index) ", step: 1)
+            let snap: EngineSnapshot = try await snapshot(of: rig.store, "thinking delta \(index) drawn") { snap in
+                draw(snap).contains { if case .thought(_, let text, true) = $0 { text.hasSuffix("t\(index) ") } else { false } }
+            }
+            XCTAssertEqual(activity(of: snap.chats["thr_1"]!, run: "run_1"), .thinking)
+            XCTAssertTrue(transcript(of: snap.chats["thr_1"]!, pending: [], mode: .zen, streaming: true, context: .none).allSatisfy {
+                if case .thought = $0 { false } else { true }
+            }, "Zen draws no thinking")
+        }
+        for index in 1...25 {
+            daemon.delta("run_1", "w\(index) ", step: 1)
+            let snap: EngineSnapshot = try await snapshot(of: rig.store, "word delta \(index) drawn") { snap in
+                draw(snap).contains { if case .answer(_, let text, true, nil) = $0 { text.hasSuffix("w\(index) ") } else { false } }
+            }
+            XCTAssertEqual(activity(of: snap.chats["thr_1"]!, run: "run_1"), .writing)
+            XCTAssertTrue(transcript(of: snap.chats["thr_1"]!, pending: [], mode: .zen, streaming: true, context: .none).contains {
+                if case .answer(_, _, true, _) = $0 { true } else { false }
+            }, "Zen streams the words too")
+        }
+        // The step is stored: the live rows give way to the stored thought and words, under the same thought id.
+        daemon.say("run_1", "assistant", ["step": .int(1), "text": .string("Booked."), "thinking": .string("stored thought"), "tool_calls": .array([])])
+        let stored: EngineSnapshot = try await snapshot(of: rig.store, "the step stored") { $0.chats["thr_1"]?.writing.isEmpty == true && $0.chats["thr_1"]?.thinking.isEmpty == true }
+        XCTAssertEqual(draw(stored).compactMap { if case .thought(let id, let text, let live) = $0 { "\(id) \(text) \(live)" } else { nil } }, ["th:run_1:1 stored thought false"])
+        XCTAssertNil(activity(of: stored.chats["thr_1"]!, run: "run_1"))
+    }
+
     // MARK: R-e gaps
 
     /// R-e #3: the stream breaks, the queue changes meanwhile with no word on any stream; the stream comes back and the
@@ -134,13 +171,13 @@ final class SyncTests: XCTestCase {
             $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "steer" } == true && $0.accepted.isEmpty
         }
         let items: [TranscriptItem] = transcript(
-            of: delivered.chats["thr_1"]!, pending: delivered.pending(in: "thr_1"), mode: .showAll, streaming: true)
+            of: delivered.chats["thr_1"]!, pending: delivered.pending(in: "thr_1"), mode: .showAll, streaming: true, context: .none)
         XCTAssertTrue(items.contains { if case .owner(_, "Also check the logs", .readsAfterStep) = $0 { true } else { false } })
         daemon.say("run_1", "tool_result", ["call_id": .string("w1"), "ok": .bool(true)])
         let read: EngineSnapshot = try await snapshot(of: rig.store, "the step ended") {
             $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "tool_result" } == true
         }
-        let after: [TranscriptItem] = transcript(of: read.chats["thr_1"]!, pending: [], mode: .showAll, streaming: true)
+        let after: [TranscriptItem] = transcript(of: read.chats["thr_1"]!, pending: [], mode: .showAll, streaming: true, context: .none)
         XCTAssertTrue(after.contains { if case .owner(_, "Also check the logs", nil) = $0 { true } else { false } })
     }
 
@@ -254,7 +291,7 @@ final class SyncTests: XCTestCase {
         // link says up.
         daemon.offline = false
         let sleeps: Int = rig.clock.askedCount
-        let key: String = try await rig.engine.send("Thursday afternoon please", thread: "thr_1", photos: [])
+        let key: String = try await rig.engine.send("Thursday afternoon please", thread: "thr_1", photos: [], picks: .none)
         let waiting: EngineSnapshot = try await snapshot(of: rig.store, "in the outbox") { !$0.outbox.isEmpty }
         XCTAssertEqual(waiting.pending(in: "thr_1").map(\.delivery), [.offline])
         // The outbox waits for the link (30 s at most, or until it comes back) instead of sending.
@@ -293,11 +330,11 @@ final class SyncTests: XCTestCase {
     func testAMessageThatStartedARunLeavesTheOverlayOnceTheRunIsInThePicture() async throws {
         daemon.say("run_1", "run_finished", ["status": .string("done"), "result": .string("Booked")])
         _ = try await openLive()
-        _ = try await rig.engine.send("And add it to my calendar", thread: "thr_1", photos: [])
+        _ = try await rig.engine.send("And add it to my calendar", thread: "thr_1", photos: [], picks: .none)
         let shown: EngineSnapshot = try await snapshot(of: rig.store, "the new run is in the view and the overlay gone") {
             $0.outbox.isEmpty && $0.accepted.isEmpty && $0.chats["thr_1"]?.view?.runs.contains { $0.goal == "And add it to my calendar" } == true
         }
-        let items: [TranscriptItem] = transcript(of: shown.chats["thr_1"]!, pending: shown.pending(in: "thr_1"), mode: .showAll, streaming: true)
+        let items: [TranscriptItem] = transcript(of: shown.chats["thr_1"]!, pending: shown.pending(in: "thr_1"), mode: .showAll, streaming: true, context: .none)
         XCTAssertEqual(items.filter { if case .owner(_, "And add it to my calendar", _) = $0 { true } else { false } }.count, 1, "shown once")
     }
 

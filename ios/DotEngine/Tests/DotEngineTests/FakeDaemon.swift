@@ -51,7 +51,7 @@ final class FakeDaemon: @unchecked Sendable {
     func decideElsewhere(_ approval: String, status: String) { lock.withLock { decided[approval] = status } }
 
     private func approvalRecord(_ id: String, status: String) -> ApprovalRecord {
-        ApprovalRecord(id: id, runId: "run_1", createdAt: 1, status: status, tool: "shell", summary: "", severity: "medium")
+        ApprovalRecord(id: id, runId: "run_1", createdAt: 1, status: status, tool: "shell", summary: "", severity: "medium", args: nil, note: nil, keptUntil: nil)
     }
     /// No request gets anywhere (`notConnectedToInternet`).
     var offline: Bool {
@@ -152,7 +152,7 @@ final class FakeDaemon: @unchecked Sendable {
         let at: Double = lock.withLock { Double(nextEvent) }
         let record: RunRecord = RunRecord(
             id: id, threadId: thread, goal: goal, mode: "task", model: "scripted", status: status, createdAt: at,
-            finishedAt: nil, result: status == "done" ? "Done: \(goal)" : "", parentRunId: parent, source: "ui", effort: nil)
+            finishedAt: nil, result: status == "done" ? "Done: \(goal)" : "", parentRunId: parent, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         lock.withLock { runs[id] = record }
         var queued: [String: JSONValue] = ["goal": .string(goal)]
         if let parent { queued["parent_run_id"] = .string(parent) }
@@ -184,7 +184,7 @@ final class FakeDaemon: @unchecked Sendable {
                 runs[run] = RunRecord(
                     id: record.id, threadId: record.threadId, goal: record.goal, mode: record.mode, model: record.model,
                     status: data["status"]?.string ?? "done", createdAt: record.createdAt, finishedAt: Double(nextEvent),
-                    result: data["result"]?.string ?? "", parentRunId: record.parentRunId, source: record.source, effort: nil)
+                    result: data["result"]?.string ?? "", parentRunId: record.parentRunId, source: record.source, effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
             }
             return made
         }
@@ -205,6 +205,11 @@ final class FakeDaemon: @unchecked Sendable {
     /// Words being written (id 0).
     func delta(_ run: String, _ text: String, step: Int) {
         push(EventRecord(id: 0, runId: run, ts: 0, kind: "delta", data: ["kind": .string("text"), "text": .string(text), "step": .int(step)]))
+    }
+
+    /// Thinking being written (id 0).
+    func thinking(_ run: String, _ text: String, step: Int) {
+        push(EventRecord(id: 0, runId: run, ts: 0, kind: "delta", data: ["kind": .string("thinking"), "text": .string(text), "step": .int(step)]))
     }
 
     /// Moves a chat's revision; `tell` false is a change whose `thread_changed` was lost.

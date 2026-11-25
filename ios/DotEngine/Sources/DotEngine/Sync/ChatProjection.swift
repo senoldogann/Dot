@@ -86,12 +86,19 @@ public struct ChatProjection: Codable, Sendable, Equatable {
     public internal(set) var runs: [String: RunTimeline]
     /// The words being written of a run's open step (id-0 deltas), by run id: shown until the step's stored event comes.
     public internal(set) var writing: [String: String]
+    /// The thinking of a run's open step as the model writes it (id-0 `thinking` deltas), by run id: the step's stored
+    /// `assistant` event keeps it from then on. Live only: never cached.
+    public internal(set) var thinking: [String: LiveThought] = [:]
     public internal(set) var freshness: Freshness
     public internal(set) var marks: SyncMarks
     /// How many frames could not be read (the chat says some steps could not be shown).
     public internal(set) var unreadable: Int
     /// The newest revision the stream told (`thread_changed`, `synchronized`).
     public internal(set) var toldRevision: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case threadId, view, runs, writing, freshness, marks, unreadable, toldRevision
+    }
 
     public init(threadId: String) {
         self.threadId = threadId
@@ -102,6 +109,26 @@ public struct ChatProjection: Codable, Sendable, Equatable {
         marks = .none
         unreadable = 0
         toldRevision = nil
+    }
+
+    /// A chat drawn from a view and stored events with no stream behind it, in the given freshness: the debug build's
+    /// fixtures (the screenshot harness and the UI tests), never the engine's own path.
+    public static func drawn(view: ThreadView, events: [EventRecord], freshness: Freshness) -> ChatProjection {
+        var chat: ChatProjection = ChatProjection(threadId: view.thread.id)
+        chat.view = view
+        for event in events {
+            let timeline: RunTimeline = chat.runs[event.runId] ?? RunTimeline()
+            chat.runs[event.runId] = timeline.adding(event) ?? timeline
+        }
+        chat.freshness = freshness
+        return chat
+    }
+
+    /// The same chat with the words being written of `run` (a fixture's streaming answer).
+    public func writing(_ words: String, run: String) -> ChatProjection {
+        var next: ChatProjection = self
+        next.writing[run] = words
+        return next
     }
 
     /// The cursors the stream is opened with: each run held, its newest id (the newest 20 runs that hold events).
@@ -131,6 +158,7 @@ public enum ChatReducer {
         var next: ChatProjection = cached
         next.marks = .none
         next.writing = [:]
+        next.thinking = [:]
         next.freshness = cached.freshness == .deleted ? .deleted : (cached.view == nil ? .empty : .cached)
         return next
     }
@@ -144,6 +172,7 @@ public enum ChatReducer {
         next.marks.synchronizedRevision = nil
         next.marks.viewConnection = nil
         next.writing = [:]
+        next.thinking = [:]
         next.freshness = state.view == nil ? .empty : .syncing
         return askView(next)
     }
@@ -164,6 +193,7 @@ public enum ChatReducer {
         next.marks.streamOpen = false
         next.marks.synchronizedRevision = nil
         next.writing = [:]
+        next.thinking = [:]
         next.freshness = state.view == nil ? .empty : .cached
         return next
     }
@@ -192,7 +222,15 @@ public enum ChatReducer {
         if let newest: RunDetail = view.newest {
             var timeline: RunTimeline = next.runs[newest.run.id] ?? RunTimeline()
             for event in view.newestEvents {
-                if let added: RunTimeline = timeline.adding(event) { timeline = added }
+                if let added: RunTimeline = timeline.adding(event) {
+                    timeline = added
+                    // A step the view brought before the stream did ends its live words and thinking as the stream's
+                    // own event would (the stream's copy then adds nothing, and so ends nothing).
+                    if endsWriting(event) {
+                        next.writing[event.runId] = nil
+                        next.thinking[event.runId] = nil
+                    }
+                }
             }
             next.runs[newest.run.id] = timeline
         }
@@ -221,17 +259,25 @@ public enum ChatReducer {
             let timeline: RunTimeline = next.runs[event.runId] ?? RunTimeline()
             guard let added: RunTimeline = timeline.adding(event) else { return (state, []) }
             next.runs[event.runId] = added
-            if endsWriting(event) { next.writing[event.runId] = nil }
-            if let view: ThreadView = next.view, let step: HelperStep = helperStep(of: event),
-                let at: Int = view.helpers.firstIndex(where: { $0.runId == event.runId })
-            {
+            if endsWriting(event) {
+                next.writing[event.runId] = nil
+                next.thinking[event.runId] = nil
+            }
+            if let view: ThreadView = next.view, let at: Int = view.helpers.firstIndex(where: { $0.runId == event.runId }) {
+                // One source for a helper's state (the lead's look at N1c): its own events move its step and, at its end,
+                // its status, so the capsule never counts a helper the agents sheet shows as done.
                 var helpers: [HelperView] = view.helpers
-                helpers[at] = helpers[at].doing(step)
+                if let step: HelperStep = helperStep(of: event) {
+                    helpers[at] = helpers[at].doing(step)
+                } else if event.kind == "run_finished" {
+                    helpers[at] = helpers[at].ended(status: event.data["status"]?.string ?? "done", at: event.ts)
+                }
                 next.view = view.with(helpers: helpers)
             }
             return (next, [])
         case .delta(let event):
             next.writing = writing(next.writing, delta: event, runs: next.runs)
+            next.thinking = thinking(next.thinking, delta: event, runs: next.runs)
             return (next, [])
         case .live:
             return (state, [])
@@ -322,6 +368,35 @@ public enum ChatReducer {
         ["assistant", "tool_call", "run_finished"].contains(event.kind)
     }
 
+    /// The thinking being written goes only on the open step, as the words do (`writing`); a `reset` (the step is asked
+    /// again) drops it, and a step after the one held starts it again.
+    static func thinking(_ current: [String: LiveThought], delta: EventRecord, runs: [String: RunTimeline]) -> [String: LiveThought] {
+        let kind: String? = delta.data["kind"]?.string
+        if kind == "reset" {
+            var next: [String: LiveThought] = current
+            next[delta.runId] = nil
+            return next
+        }
+        guard kind == "thinking", let piece: String = delta.data["text"]?.string, isOpen(delta, runs: runs) else { return current }
+        let step: Int = delta.data["step"]?.int ?? 0
+        var next: [String: LiveThought] = current
+        let held: LiveThought? = current[delta.runId]
+        next[delta.runId] = LiveThought(step: step, text: held?.step == step ? held!.text + piece : piece)
+        return next
+    }
+
+    /// Whether a delta belongs to its run's open step: the run has not ended and the step's reply is not stored.
+    static func isOpen(_ delta: EventRecord, runs: [String: RunTimeline]) -> Bool {
+        let stored: [EventRecord] = runs[delta.runId]?.events ?? []
+        if stored.contains(where: { $0.kind == "run_finished" }) { return false }
+        if let step: Int = delta.data["step"]?.int,
+            stored.contains(where: { $0.kind == "assistant" && ($0.data["step"]?.int ?? -1) >= step })
+        {
+            return false
+        }
+        return true
+    }
+
     /// Words being written go only on the open step (plan §9): a run that has ended, or whose step was stored, takes none.
     static func writing(_ current: [String: String], delta: EventRecord, runs: [String: RunTimeline]) -> [String: String] {
         guard delta.data["kind"]?.string == "text", let piece: String = delta.data["text"]?.string else {
@@ -332,16 +407,21 @@ public enum ChatReducer {
             }
             return current
         }
-        let stored: [EventRecord] = runs[delta.runId]?.events ?? []
-        if stored.contains(where: { $0.kind == "run_finished" }) { return current }
         // A step whose reply is stored is no longer open: words for it that come late are not drawn twice.
-        if let step: Int = delta.data["step"]?.int,
-            stored.contains(where: { $0.kind == "assistant" && ($0.data["step"]?.int ?? -1) >= step })
-        {
-            return current
-        }
+        guard isOpen(delta, runs: runs) else { return current }
         var next: [String: String] = current
         next[delta.runId, default: ""] += piece
         return next
+    }
+}
+
+/// The thinking of a run's open step while the model writes it.
+public struct LiveThought: Sendable, Equatable {
+    public let step: Int
+    public let text: String
+
+    public init(step: Int, text: String) {
+        self.step = step
+        self.text = text
     }
 }

@@ -25,7 +25,7 @@ final class OutboxTests: XCTestCase {
         Outbox(directory: folder, api: daemon.api(), link: link, clock: clock, policy: quick, jitter: { 0 }, mayStartChat: mayStartChat)
     }
 
-    private func message(_ text: String) -> OutboxItem.Action { .message(thread: "thr_1", text: text, images: [], uploaded: []) }
+    private func message(_ text: String) -> OutboxItem.Action { .message(thread: "thr_1", text: text, images: [], uploaded: [], picks: .none) }
 
     private func onDisk() -> [OutboxItem] { Outbox.read(folder.appending(path: "outbox.json")) }
 
@@ -155,6 +155,22 @@ final class OutboxTests: XCTestCase {
         XCTAssertEqual((try? FileManager.default.contentsOfDirectory(atPath: images.path)) ?? [], [])
     }
 
+    func testAMessageWhosePhotoIsGoneIsKeptWithTheReasonNeverSentShort() async throws {
+        let link: LinkWatcher = LinkWatcher(initial: .down)
+        let outbox: Outbox = box(link, mayStartChat: { true })
+        try await outbox.enqueue(message("two photos"), id: newMessageKey(), images: [Data("a".utf8), Data("b".utf8)])
+        let images: URL = folder.appending(path: "outbox-images")
+        let first: String = try XCTUnwrap(try FileManager.default.contentsOfDirectory(atPath: images.path).sorted().first)
+        try FileManager.default.removeItem(at: images.appending(path: first))
+        link.report(.up)
+        await outbox.nudge()
+        try await items(outbox, "refused") { $0.first?.phase == .failed }
+        let left: [OutboxItem] = await outbox.current
+        XCTAssertEqual(left.first?.failure, .photoMissing(name: first))
+        XCTAssertEqual(daemon.acceptedTexts, [], "not sent short of a photo")
+        XCTAssertEqual(daemon.uploadCount, 0)
+    }
+
     func testEditTakesAMessageBackWithItsPhotos() async throws {
         let outbox: Outbox = box(LinkWatcher(initial: .down), mayStartChat: { true })
         let key: String = newMessageKey()
@@ -179,8 +195,8 @@ final class OutboxTests: XCTestCase {
         daemon.decideElsewhere("apr_mac", status: "denied")
         let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
         let outcomes: Collected = await collect(outbox)
-        try await outbox.enqueue(.decision(approval: "apr_ok", run: "run_1", thread: "thr_1", approve: true, note: ""), id: newMessageKey(), images: [])
-        try await outbox.enqueue(.decision(approval: "apr_mac", run: "run_1", thread: "thr_1", approve: true, note: ""), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.decision(approval: "apr_ok", run: "run_1", thread: "thr_1", approve: true, note: "", remember: false), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.decision(approval: "apr_mac", run: "run_1", thread: "thr_1", approve: true, note: "", remember: false), id: newMessageKey(), images: [])
         try await outcomes.wait { $0.count == 2 }
         guard case .answered(_, "approved") = outcomes.all[0] else { return XCTFail("answered: \(outcomes.all[0])") }
         guard case .expired(_, "denied") = outcomes.all[1] else { return XCTFail("already decided on the Mac: \(outcomes.all[1])") }

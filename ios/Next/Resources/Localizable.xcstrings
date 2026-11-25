@@ -1,6 +1,17 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ (Recommended)": {
+      "comment": "Ask dock: the option Dot recommends; the argument is its label",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (Önerilen)"
+          }
+        }
+      }
+    },
     "%@, failed": {
       "comment": "VoiceOver: a tool call that failed; the argument is its line",
       "localizations": {
@@ -81,6 +92,39 @@
         }
       }
     },
+    "%lld in · %lld out": {
+      "comment": "Inspector: tokens read and written",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld giriş · %lld çıkış"
+          }
+        }
+      }
+    },
+    "%lld of %lld": {
+      "comment": "Ask dock: which ask is shown; the arguments are its place and the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld"
+          }
+        }
+      }
+    },
+    "%lld other steps": {
+      "comment": "Work fold tally: steps of other kinds; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld başka adım"
+          }
+        }
+      }
+    },
     "%lld queued": {
       "comment": "VoiceOver: the capsule segment of queued messages; the argument is their count",
       "localizations": {
@@ -92,13 +136,64 @@
         }
       }
     },
-    "%lld steps could not be shown": {
-      "comment": "Notice in a chat: frames the app could not read; the argument is how many",
+    "%lld screen steps": {
+      "comment": "Work fold tally: steps on the Mac's screen; the argument is how many",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
+            "value": "%lld ekran adımı"
+          }
+        }
+      }
+    },
+    "%lld steps could not be shown": {
+      "comment": "Notice in a chat: frames the app could not read; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld step could not be shown"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld steps could not be shown"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
             "value": "%lld adım gösterilemedi"
+          }
+        }
+      }
+    },
+    "%lld steps no undo can take back": {
+      "comment": "Inspector: steps that acted outside the undo journal; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri alınamayan %lld adım"
+          }
+        }
+      }
+    },
+    "%lld web steps": {
+      "comment": "Work fold tally: browser or web steps; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld web adımı"
           }
         }
       }
@@ -110,6 +205,83 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld çalışıyor"
+          }
+        }
+      }
+    },
+    "%lldh %lldm": {
+      "comment": "A duration of hours and minutes, e.g. 12h 5m",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sa %lld dk"
+          }
+        }
+      }
+    },
+    "%lldh %lldm %llds": {
+      "comment": "A duration of hours, minutes and seconds, e.g. 1h 47m 23s",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sa %lld dk %lld sn"
+          }
+        }
+      }
+    },
+    "%lldm %llds": {
+      "comment": "A duration of minutes and seconds, e.g. 41m 15s",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dk %lld sn"
+          }
+        }
+      }
+    },
+    "%llds": {
+      "comment": "A duration of seconds, e.g. 14s",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sn"
+          }
+        }
+      }
+    },
+    "1 other step": {
+      "comment": "Work fold tally: one step of another kind",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 başka adım"
+          }
+        }
+      }
+    },
+    "1 screen step": {
+      "comment": "Work fold tally: one step on the Mac's screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 ekran adımı"
+          }
+        }
+      }
+    },
+    "1 web step": {
+      "comment": "Work fold tally: one browser or web step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 web adımı"
           }
         }
       }
@@ -147,6 +319,17 @@
         }
       }
     },
+    "A message written while Dot works waits here and starts after the run.": {
+      "comment": "Queue sheet empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot çalışırken yazılan mesaj burada bekler ve çalışma bitince başlar."
+          }
+        }
+      }
+    },
     "A row with no glyph": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -154,6 +337,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Simgesiz bir satır"
+          }
+        }
+      }
+    },
+    "A secret is at least %lld characters, so it can be masked where a command prints it. A short code (an SMS code, a PIN) can go as a message, which Dot sees.": {
+      "comment": "Ask dock: a secret that is too short; the argument is the least length",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir gizli bilgi en az %lld karakterdir; böylece bir komut onu yazdırdığında gizlenebilir. Kısa bir kod (SMS kodu, PIN) mesaj olarak gidebilir; Dot onu görür."
           }
         }
       }
@@ -169,6 +363,17 @@
         }
       }
     },
+    "Accounts": {
+      "comment": "Composer picker header: the accounts signed in",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hesaplar"
+          }
+        }
+      }
+    },
     "Activity": {
       "comment": "Tab bar: what Dot did while the owner was away\nTitle of the activity tab",
       "localizations": {
@@ -176,6 +381,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Etkinlik"
+          }
+        }
+      }
+    },
+    "Again: Dot does it once more": {
+      "comment": "Reaction menu: what 🔁 does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tekrar: Dot bir kez daha yapar"
           }
         }
       }
@@ -214,12 +430,34 @@
       }
     },
     "Allow once": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Ask dock: allows this step once\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Bir kez izin ver"
+          }
+        }
+      }
+    },
+    "Allowed": {
+      "comment": "Transcript anchor: an approval allowed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzin verildi"
+          }
+        }
+      }
+    },
+    "Always allow in this chat": {
+      "comment": "Ask dock: allows steps of this kind in this chat without asking",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbette hep izin ver"
           }
         }
       }
@@ -235,6 +473,39 @@
         }
       }
     },
+    "And book the car service too": {
+      "comment": "Debug fixture: a half-written draft kept while a queued message is edited",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Araba servisini de ayarla"
+          }
+        }
+      }
+    },
+    "Answered": {
+      "comment": "Transcript anchor: a question answered",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtlandı"
+          }
+        }
+      }
+    },
+    "Answered on your Mac or another device": {
+      "comment": "Ask dock: someone answered it elsewhere",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde ya da başka bir cihazda yanıtlandı"
+          }
+        }
+      }
+    },
     "Appearance": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row",
       "localizations": {
@@ -246,6 +517,28 @@
         }
       }
     },
+    "Approval mode": {
+      "comment": "Inspector row: the run's approval mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onay modu"
+          }
+        }
+      }
+    },
+    "Approval needed": {
+      "comment": "Ask dock title: an approval",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onay gerekiyor"
+          }
+        }
+      }
+    },
     "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -253,6 +546,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'tan her şeyi isteyebilirsin: bir iş, bir ders, Mac'te bir ayak işi."
+          }
+        }
+      }
+    },
+    "Ask a side question the run does not see": {
+      "comment": "Composer command: what /btw does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışmanın görmediği bir yan soru sor"
+          }
+        }
+      }
+    },
+    "Ask again every so often: /loop 30m <message>": {
+      "comment": "Composer command: what /loop does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belli aralıklarla yeniden sor: /loop 30m <mesaj>"
           }
         }
       }
@@ -323,6 +638,17 @@
         }
       }
     },
+    "Browsed %@": {
+      "comment": "Tool row: a browser or web step; the argument is its page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıldı: %@"
+          }
+        }
+      }
+    },
     "Buttons": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -356,6 +682,28 @@
         }
       }
     },
+    "Camera": {
+      "comment": "Composer + menu: takes a photo",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera"
+          }
+        }
+      }
+    },
+    "Can't reach your Mac": {
+      "comment": "Empty chat when offline with nothing saved",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'ine ulaşılamıyor"
+          }
+        }
+      }
+    },
     "Cancel": {
       "comment": "Edit sheet toolbar: discards the edits",
       "localizations": {
@@ -363,6 +711,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vazgeç"
+          }
+        }
+      }
+    },
+    "Changes": {
+      "comment": "Inspector section: what the runs changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişiklikler"
           }
         }
       }
@@ -422,6 +781,17 @@
         }
       }
     },
+    "Choose one or more, then send them.": {
+      "comment": "Ask dock: a question that takes several options",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir ya da daha fazlasını seç, sonra gönder."
+          }
+        }
+      }
+    },
     "Clicked “Thu 15:30”": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -451,6 +821,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapat"
+          }
+        }
+      }
+    },
+    "Code": {
+      "comment": "Code block header when no language is named",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kod"
           }
         }
       }
@@ -495,6 +876,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Komut"
+          }
+        }
+      }
+    },
+    "Commands": {
+      "comment": "Composer picker header: Dot's commands",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Komutlar"
           }
         }
       }
@@ -587,6 +979,17 @@
         }
       }
     },
+    "Context used": {
+      "comment": "Inspector row: how full the model's context is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanılan bağlam"
+          }
+        }
+      }
+    },
     "Copied": {
       "comment": "Code block header after a copy",
       "localizations": {
@@ -620,6 +1023,17 @@
         }
       }
     },
+    "Copy the answer": {
+      "comment": "VoiceOver: copies Dot's answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtı kopyala"
+          }
+        }
+      }
+    },
     "Dark": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -642,19 +1056,30 @@
         }
       }
     },
-    "Default model": {
-      "comment": "Composer model menu: use the daemon's default model",
+    "Decline": {
+      "comment": "Ask dock: refuses to give a secret",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Varsayılan model"
+            "value": "Reddet"
+          }
+        }
+      }
+    },
+    "Declined": {
+      "comment": "Transcript anchor: a secret declined",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reddedildi"
           }
         }
       }
     },
     "Default · medium": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nComposer model chip: the model and the reasoning effort",
+      "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -719,8 +1144,19 @@
         }
       }
     },
+    "Denied": {
+      "comment": "Transcript anchor: an approval denied",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reddedildi"
+          }
+        }
+      }
+    },
     "Deny": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Ask dock: refuses the step\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -752,6 +1188,39 @@
         }
       }
     },
+    "Dictation could not start. Type the message instead.": {
+      "comment": "Composer: dictation failed to start",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte başlatılamadı. Mesajı yazarak gönder."
+          }
+        }
+      }
+    },
+    "Dictation is not available now. Type the message instead.": {
+      "comment": "Composer: dictation cannot start now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte şu an kullanılamıyor. Mesajı yazarak gönder."
+          }
+        }
+      }
+    },
+    "Dictation on this phone is not available for your language. Type the message instead.": {
+      "comment": "Composer: no on-device recognizer for the language",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonda dilin için cihaz içi dikte yok. Mesajı yazarak gönder."
+          }
+        }
+      }
+    },
     "Disabled": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -775,12 +1244,23 @@
       }
     },
     "Dismiss": {
-      "comment": "VoiceOver: the ✕ that closes a notice",
+      "comment": "Ask dock: lets an ask that ended go\nVoiceOver: the ✕ that closes a notice",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Kapat"
+          }
+        }
+      }
+    },
+    "Do this step yourself on your Mac (Dot's window comes to the front and Dot waits), then tap I did it. Taking the browser over from the phone comes in a later version.": {
+      "comment": "Ask dock: what a hand-off asks of the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu adımı Mac'inde kendin yap (Dot'un penceresi öne gelir ve Dot bekler), sonra Yaptım'a dokun. Tarayıcıyı telefondan devralmak sonraki bir sürümde gelecek."
           }
         }
       }
@@ -796,6 +1276,17 @@
         }
       }
     },
+    "Done by you": {
+      "comment": "Transcript anchor: a hand-off done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen yaptın"
+          }
+        }
+      }
+    },
     "Dot": {
       "comment": "The assistant's name in a chat's subtitle",
       "localizations": {
@@ -803,6 +1294,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot"
+          }
+        }
+      }
+    },
+    "Dot asked and went on": {
+      "comment": "Transcript anchor: a question the run left",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sordu ve devam etti"
+          }
+        }
+      }
+    },
+    "Dot asked you": {
+      "comment": "VoiceOver: the ask dock",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sana sordu"
+          }
+        }
+      }
+    },
+    "Dot asks for a secret": {
+      "comment": "Ask dock title: a key, token or password",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir gizli bilgi istiyor"
+          }
+        }
+      }
+    },
+    "Dot is asking you": {
+      "comment": "Ask dock title: a question",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sana soruyor"
+          }
+        }
+      }
+    },
+    "Dot needs you to take over this step": {
+      "comment": "Ask dock title: a hand-off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bu adımı senin yapmanı istiyor"
           }
         }
       }
@@ -840,6 +1386,17 @@
         }
       }
     },
+    "Dot's note: %@": {
+      "comment": "VoiceOver: a note of Dot's in the chat; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un notu: %@"
+          }
+        }
+      }
+    },
     "Edit": {
       "comment": "Under a refused message: puts its words back in the composer",
       "localizations": {
@@ -851,6 +1408,17 @@
         }
       }
     },
+    "Edited %@": {
+      "comment": "Tool row: a file edited; the argument is its path",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenlendi: %@"
+          }
+        }
+      }
+    },
     "Edited src/parser/tokens.py": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -858,6 +1426,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "src/parser/tokens.py düzenlendi"
+          }
+        }
+      }
+    },
+    "Editing queued message": {
+      "comment": "Bar over the composer while a queued message is edited",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıradaki mesaj düzenleniyor"
+          }
+        }
+      }
+    },
+    "Edits it in the composer": {
+      "comment": "VoiceOver hint of a queued message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazma alanında düzenler"
           }
         }
       }
@@ -906,6 +1496,28 @@
         }
       }
     },
+    "Every run stops, desktop control is blocked and schedules wait until you release the stop on your Mac.": {
+      "comment": "Emergency stop confirmation: what it does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm çalışmalar durur, masaüstü denetimi kapanır ve zamanlanmış görevler, durdurmayı Mac'inde kaldırana kadar bekler."
+          }
+        }
+      }
+    },
+    "Everything stopped. Release the stop on your Mac to let Dot work again.": {
+      "comment": "Settings: the emergency stop worked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her şey durdu. Dot'un yeniden çalışması için durdurmayı Mac'inde kaldır."
+          }
+        }
+      }
+    },
     "Expanded": {
       "comment": "VoiceOver value of an open disclosure",
       "localizations": {
@@ -913,6 +1525,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açık"
+          }
+        }
+      }
+    },
+    "Explain: Dot says why": {
+      "comment": "Reaction menu: what ❓ does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıkla: Dot nedenini söyler"
           }
         }
       }
@@ -928,6 +1551,28 @@
         }
       }
     },
+    "Files": {
+      "comment": "Composer + menu: picks image files",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyalar"
+          }
+        }
+      }
+    },
+    "Files of this chat": {
+      "comment": "Composer picker header: the files this chat's runs changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbetin dosyaları"
+          }
+        }
+      }
+    },
     "Files the run changes show here.": {
       "comment": "Changes panel empty state detail",
       "localizations": {
@@ -935,6 +1580,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışmanın değiştirdiği dosyalar burada görünür."
+          }
+        }
+      }
+    },
+    "Fill in the pending answers": {
+      "comment": "Ask dock title while a question shows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekleyen yanıtları doldur"
           }
         }
       }
@@ -968,6 +1624,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yüzen denetim"
+          }
+        }
+      }
+    },
+    "Fold what Dot asked": {
+      "comment": "Ask dock: folds it to its header",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un sorduklarını katla"
+          }
+        }
+      }
+    },
+    "Follow-up while Dot works": {
+      "comment": "Settings section: what a message written during a run does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot çalışırken yazılan mesaj"
           }
         }
       }
@@ -1027,6 +1705,28 @@
         }
       }
     },
+    "Goes into the running task at its next step": {
+      "comment": "Follow-up setting: what Steer does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan göreve bir sonraki adımında gider"
+          }
+        }
+      }
+    },
+    "Good: Dot keeps doing it this way": {
+      "comment": "Reaction menu: what 👍 does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İyi: Dot böyle yapmayı sürdürür"
+          }
+        }
+      }
+    },
     "Ground · card and grouped · nested and pressed · sheet · opaque glass for Reduce Transparency.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1056,6 +1756,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlık"
+          }
+        }
+      }
+    },
+    "Helpers": {
+      "comment": "Inspector section: the chat's helpers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcılar"
           }
         }
       }
@@ -1126,6 +1837,28 @@
         }
       }
     },
+    "Hold: the run waits until you write": {
+      "comment": "Reaction menu: what ✋ does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beklet: sen yazana kadar çalışma bekler"
+          }
+        }
+      }
+    },
+    "I did it": {
+      "comment": "Ask dock: says a handed-over step is done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yaptım"
+          }
+        }
+      }
+    },
     "Ink": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1170,6 +1903,39 @@
         }
       }
     },
+    "It resets at %@.": {
+      "comment": "Usage limit card; the argument is the clock time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ saatinde sıfırlanır."
+          }
+        }
+      }
+    },
+    "It resets within a few hours.": {
+      "comment": "Usage limit card when the plan did not say when",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Birkaç saat içinde sıfırlanır."
+          }
+        }
+      }
+    },
+    "It was deleted on your Mac or another device.": {
+      "comment": "Empty state of a deleted chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde ya da başka bir cihazda silindi."
+          }
+        }
+      }
+    },
     "It was signed without its app group. Install a build signed for Dot Next.": {
       "comment": "Detail when the app group of the app is missing",
       "localizations": {
@@ -1177,6 +1943,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu derleme uygulama grubu olmadan imzalanmış. Dot Next için imzalanmış bir derleme kur."
+          }
+        }
+      }
+    },
+    "Kept for you": {
+      "comment": "Ask dock title: a step kept after nobody answered in time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senin için saklandı"
           }
         }
       }
@@ -1269,6 +2046,28 @@
         }
       }
     },
+    "Loops and background work": {
+      "comment": "Inspector section: the chat's loops and background commands",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Döngüler ve arka plan işleri"
+          }
+        }
+      }
+    },
+    "Make a plan first, then do it": {
+      "comment": "Composer command: what /plan does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce bir plan yap, sonra uygula"
+          }
+        }
+      }
+    },
     "Memory": {
       "comment": "Settings row",
       "localizations": {
@@ -1287,6 +2086,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'a yaz"
+          }
+        }
+      }
+    },
+    "Model for this chat": {
+      "comment": "Inspector section: the chat's model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbetin modeli"
           }
         }
       }
@@ -1320,6 +2130,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pzt"
+          }
+        }
+      }
+    },
+    "Move down": {
+      "comment": "VoiceOver action: moves a queued message one place later",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aşağı taşı"
+          }
+        }
+      }
+    },
+    "Move up": {
+      "comment": "VoiceOver action: moves a queued message one place earlier",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yukarı taşı"
           }
         }
       }
@@ -1368,6 +2200,17 @@
         }
       }
     },
+    "Next ask": {
+      "comment": "Ask dock: shows the ask after",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki soru"
+          }
+        }
+      }
+    },
     "No changes yet": {
       "comment": "Changes panel empty state",
       "localizations": {
@@ -1401,6 +2244,17 @@
         }
       }
     },
+    "No file changed yet.": {
+      "comment": "Inspector: no changes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz değişen dosya yok."
+          }
+        }
+      }
+    },
     "No helpers": {
       "comment": "Agents sheet empty state: the chat started no helper",
       "localizations": {
@@ -1412,6 +2266,28 @@
         }
       }
     },
+    "Nobody answered in time": {
+      "comment": "Ask dock: the ask expired",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kimse zamanında yanıtlamadı"
+          }
+        }
+      }
+    },
+    "Not paired with a Mac": {
+      "comment": "Emergency stop: no Mac to stop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir Mac ile eşleşmedi"
+          }
+        }
+      }
+    },
     "Not sent: %@": {
       "comment": "Under an owner's message the Mac refused; the argument is the Mac's own words",
       "localizations": {
@@ -1419,6 +2295,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gönderilmedi: %@"
+          }
+        }
+      }
+    },
+    "Not sent: a photo of it could not be read on this phone": {
+      "comment": "Under an owner's message whose photo file is gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: fotoğraflarından biri bu telefonda okunamadı"
           }
         }
       }
@@ -1474,6 +2361,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sen yokken yeni bir şey olmadı"
+          }
+        }
+      }
+    },
+    "Nothing of this chat is saved on this phone yet. It loads once the phone reaches your Mac.": {
+      "comment": "Empty chat when offline with nothing saved",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbetten bu telefonda henüz bir şey kayıtlı değil. Telefon Mac'ine ulaşınca yüklenir."
+          }
+        }
+      }
+    },
+    "Nothing queued": {
+      "comment": "Queue sheet empty state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırada bir şey yok"
+          }
+        }
+      }
+    },
+    "Nothing was heard. Try again.": {
+      "comment": "Composer: dictation heard nothing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiçbir şey duyulmadı. Yeniden dene."
           }
         }
       }
@@ -1610,6 +2530,28 @@
         }
       }
     },
+    "Opens the helpers": {
+      "comment": "VoiceOver hint of the helper group in a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcıları açar"
+          }
+        }
+      }
+    },
+    "Or write your own answer": {
+      "comment": "Ask dock: the field beside a question's options",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya da kendi yanıtını yaz"
+          }
+        }
+      }
+    },
     "Pair": {
       "comment": "Pairing screen: the button that pairs the phone",
       "localizations": {
@@ -1617,6 +2559,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eşleştir"
+          }
+        }
+      }
+    },
+    "Pair this phone again in Settings.": {
+      "comment": "Empty chat when the key was refused",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonu Ayarlar'dan yeniden eşleştir."
           }
         }
       }
@@ -1632,6 +2585,17 @@
         }
       }
     },
+    "Paste image": {
+      "comment": "Composer + menu: adds the image on the clipboard",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görseli yapıştır"
+          }
+        }
+      }
+    },
     "Pay the 20 € deposit on the clinic's page?": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1639,6 +2603,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kliniğin sayfasında 20 € kapora ödensin mi?"
+          }
+        }
+      }
+    },
+    "Photo": {
+      "comment": "VoiceOver: a photo added to the message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğraf"
+          }
+        }
+      }
+    },
+    "Photos": {
+      "comment": "Composer + menu: picks photos",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğraflar"
           }
         }
       }
@@ -1665,6 +2651,50 @@
         }
       }
     },
+    "Pin: Dot keeps a note of it": {
+      "comment": "Reaction menu: what 📌 does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İğnele: Dot bunu not eder"
+          }
+        }
+      }
+    },
+    "Plan": {
+      "comment": "Inspector section: the run's plan",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan"
+          }
+        }
+      }
+    },
+    "Plan · %lld of %lld done": {
+      "comment": "Plan card header; the arguments are the steps done and all steps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan · %lld / %lld bitti"
+          }
+        }
+      }
+    },
+    "Previous ask": {
+      "comment": "Ask dock: shows the ask before",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önceki soru"
+          }
+        }
+      }
+    },
     "Primary words": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1683,6 +2713,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Soru"
+          }
+        }
+      }
+    },
+    "Queue": {
+      "comment": "Follow-up setting: queued after the run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıraya al"
+          }
+        }
+      }
+    },
+    "Queue a message": {
+      "comment": "Placeholder of the composer while a run works and follow-ups queue",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajı sıraya al"
+          }
+        }
+      }
+    },
+    "Queue: starts after this run": {
+      "comment": "Composer: queues the message after the run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıraya al: bu çalışmadan sonra başlar"
+          }
+        }
+      }
+    },
+    "Queued": {
+      "comment": "Title of the queue sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırada"
+          }
+        }
+      }
+    },
+    "Queued %lld of %lld: %@": {
+      "comment": "VoiceOver: a queued message; the arguments are its place, the count and its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırada %lld / %lld: %@"
           }
         }
       }
@@ -1709,6 +2794,17 @@
         }
       }
     },
+    "Ran %@": {
+      "comment": "Tool row: a command that ran; the argument is the command",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalıştırıldı: %@"
+          }
+        }
+      }
+    },
     "Reaching your Mac…": {
       "comment": "Chat list while the first list read is under way",
       "localizations": {
@@ -1716,6 +2812,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'ine ulaşılıyor…"
+          }
+        }
+      }
+    },
+    "React": {
+      "comment": "VoiceOver: the menu of reactions under an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tepki ver"
+          }
+        }
+      }
+    },
+    "Read %@": {
+      "comment": "Tool row: a file read; the argument is its path",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Okundu: %@"
           }
         }
       }
@@ -1797,8 +2915,41 @@
         }
       }
     },
+    "Remove": {
+      "comment": "Queue sheet: removes a queued message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaldır"
+          }
+        }
+      }
+    },
+    "Remove reaction: %@": {
+      "comment": "VoiceOver: takes a reaction off; the argument is its meaning",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tepkiyi kaldır: %@"
+          }
+        }
+      }
+    },
+    "Remove the photo": {
+      "comment": "VoiceOver: removes a photo from the message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğrafı kaldır"
+          }
+        }
+      }
+    },
     "Removed from the queue": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Component gallery (debug builds): a heading or sample text\nToast after removing a queued message",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1830,6 +2981,28 @@
         }
       }
     },
+    "Resume now": {
+      "comment": "Usage limit card: starts the work again now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi sürdür"
+          }
+        }
+      }
+    },
+    "Resume queue": {
+      "comment": "Queue sheet: lets a held queue go on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırayı sürdür"
+          }
+        }
+      }
+    },
     "Rows and sections": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1852,6 +3025,28 @@
         }
       }
     },
+    "Run": {
+      "comment": "Inspector section: the newest run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma"
+          }
+        }
+      }
+    },
+    "Running %@": {
+      "comment": "Tool row: a command at work; the argument is the command",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışıyor: %@"
+          }
+        }
+      }
+    },
     "Running the unit tests again with the fix": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1859,6 +3054,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düzeltmeyle birim testlerini yeniden çalıştırıyor"
+          }
+        }
+      }
+    },
+    "Same as /btw": {
+      "comment": "Composer command: what /side does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "/btw ile aynı"
           }
         }
       }
@@ -1874,6 +3080,50 @@
         }
       }
     },
+    "Save securely": {
+      "comment": "Ask dock: sends a secret to the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güvenle kaydet"
+          }
+        }
+      }
+    },
+    "Save the queued message": {
+      "comment": "Composer: confirms the edit of a queued message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıradaki mesajı kaydet"
+          }
+        }
+      }
+    },
+    "Saved securely": {
+      "comment": "Transcript anchor: a secret given (§20: stays one line)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güvenle kaydedildi"
+          }
+        }
+      }
+    },
+    "Scan a document": {
+      "comment": "Composer + menu: scans paper pages",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belge tara"
+          }
+        }
+      }
+    },
     "Scheduled tasks": {
       "comment": "Settings row",
       "localizations": {
@@ -1881,6 +3131,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zamanlanmış görevler"
+          }
+        }
+      }
+    },
+    "Screenshot": {
+      "comment": "VoiceOver: a screenshot a tool step returned",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekran görüntüsü"
           }
         }
       }
@@ -1903,6 +3164,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbetlerde ara"
+          }
+        }
+      }
+    },
+    "Searched %@": {
+      "comment": "Tool row: a search; the argument is what was searched",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arandı: %@"
           }
         }
       }
@@ -1940,6 +3212,17 @@
         }
       }
     },
+    "Send as a message": {
+      "comment": "Ask dock: sends a short code in words instead of as a secret",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj olarak gönder"
+          }
+        }
+      }
+    },
     "Send as a new message": {
       "comment": "Under a steer refused because its run ended",
       "localizations": {
@@ -1951,6 +3234,17 @@
         }
       }
     },
+    "Send now": {
+      "comment": "Queue sheet: sends a queued message into the running task now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi gönder"
+          }
+        }
+      }
+    },
     "Send now into the running task": {
       "comment": "Composer long-press: steer instead of queue",
       "localizations": {
@@ -1958,6 +3252,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan göreve şimdi gönder"
+          }
+        }
+      }
+    },
+    "Sending your answer…": {
+      "comment": "Ask dock: the answer is on its way",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtın gönderiliyor…"
           }
         }
       }
@@ -1991,6 +3296,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "12 e-posta gönderildi; 2'si geri döndü, aşağıda listeli."
+          }
+        }
+      }
+    },
+    "Sent once to your Mac, held for this chat's commands; never kept on this phone.": {
+      "comment": "Ask dock: where a secret goes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'ine bir kez gönderilir, bu sohbetin komutları için tutulur; bu telefonda hiç saklanmaz."
           }
         }
       }
@@ -2061,6 +3377,39 @@
         }
       }
     },
+    "Show full message": {
+      "comment": "Under a long owner's message: unfolds it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm mesajı göster"
+          }
+        }
+      }
+    },
+    "Show less": {
+      "comment": "Under a long owner's message: folds it again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daha az göster"
+          }
+        }
+      }
+    },
+    "Show what Dot asked": {
+      "comment": "Ask dock: unfolds it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un sorduklarını göster"
+          }
+        }
+      }
+    },
     "Shows the steps": {
       "comment": "VoiceOver hint of a closed work-log group",
       "localizations": {
@@ -2068,6 +3417,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adımları gösterir"
+          }
+        }
+      }
+    },
+    "Shows the whole thinking": {
+      "comment": "VoiceOver hint of a thinking row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşüncenin tamamını gösterir"
+          }
+        }
+      }
+    },
+    "Side answer": {
+      "comment": "Title of the alert with a /btw answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yan yanıt"
           }
         }
       }
@@ -2083,6 +3454,72 @@
         }
       }
     },
+    "Skills": {
+      "comment": "Composer picker header: the skills a run can use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beceriler"
+          }
+        }
+      }
+    },
+    "Skip": {
+      "comment": "Ask dock: skips a question or a kept step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atla"
+          }
+        }
+      }
+    },
+    "Skip this question": {
+      "comment": "Ask dock: skips one question without an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu soruyu atla"
+          }
+        }
+      }
+    },
+    "Skip this step": {
+      "comment": "Ask dock: skips a handed-over step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu adımı atla"
+          }
+        }
+      }
+    },
+    "Skipped": {
+      "comment": "Transcript anchor: a question or hand-off skipped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atlandı"
+          }
+        }
+      }
+    },
+    "Speech recognition is off for Dot. Turn it on in Settings › Dot Next › Speech Recognition.": {
+      "comment": "Composer: dictation cannot start, speech permission denied",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot için konuşma tanıma kapalı. Ayarlar › Dot Next › Konuşma Tanıma'dan aç."
+          }
+        }
+      }
+    },
     "Start one with the pencil above.": {
       "comment": "Chat list empty state detail",
       "localizations": {
@@ -2094,13 +3531,57 @@
         }
       }
     },
+    "Started": {
+      "comment": "Inspector row: when the run started",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başladı"
+          }
+        }
+      }
+    },
+    "Started a helper: %@": {
+      "comment": "Tool row: a helper started; the argument is its goal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcı başlatıldı: %@"
+          }
+        }
+      }
+    },
     "Starting": {
-      "comment": "Status word: a run is starting",
+      "comment": "Status word: a run is about to start\nStatus word: a run is starting",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Başlıyor"
+          }
+        }
+      }
+    },
+    "Starts after the run at work": {
+      "comment": "Follow-up setting: what Queue does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan iş bitince başlar"
+          }
+        }
+      }
+    },
+    "State": {
+      "comment": "Inspector row: the run's status",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durum"
           }
         }
       }
@@ -2127,6 +3608,17 @@
         }
       }
     },
+    "Steer": {
+      "comment": "Follow-up setting: sent into the run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yönlendir"
+          }
+        }
+      }
+    },
     "Stop": {
       "comment": "Chat toolbar: stops the run at work",
       "localizations": {
@@ -2145,6 +3637,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ durdur"
+          }
+        }
+      }
+    },
+    "Stop dictating": {
+      "comment": "VoiceOver: the microphone while it listens",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikteyi durdur"
           }
         }
       }
@@ -2171,8 +3674,30 @@
         }
       }
     },
+    "Stop the run at work": {
+      "comment": "Composer command: what /stop does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan işi durdur"
+          }
+        }
+      }
+    },
+    "Stop this run?": {
+      "comment": "Confirmation of Stop from the chat header",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu çalışma durdurulsun mu?"
+          }
+        }
+      }
+    },
     "Stopped": {
-      "comment": "Helper state: the helper ended because the owner stopped it",
+      "comment": "Helper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2183,12 +3708,23 @@
       }
     },
     "Stopping…": {
-      "comment": "Helper state: the owner pressed Stop, the helper has not ended yet",
+      "comment": "Helper state: the owner pressed Stop and it has not ended yet\nHelper state: the owner pressed Stop, the helper has not ended yet",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Durduruluyor…"
+          }
+        }
+      }
+    },
+    "Stops the run that waits for this answer": {
+      "comment": "VoiceOver hint of Stop in the ask dock",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu yanıtı bekleyen çalışmayı durdurur"
           }
         }
       }
@@ -2204,6 +3740,28 @@
         }
       }
     },
+    "Submit %lld answers": {
+      "comment": "Ask dock: sends the answers of several questions; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yanıtı gönder"
+          }
+        }
+      }
+    },
+    "Submit answer": {
+      "comment": "Ask dock: sends the answer of the question",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtı gönder"
+          }
+        }
+      }
+    },
     "Surfaces (no strokes)": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2211,6 +3769,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yüzeyler (çerçevesiz)"
+          }
+        }
+      }
+    },
+    "Switch the model of this chat": {
+      "comment": "Composer command: what /model does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbetin modelini değiştir"
           }
         }
       }
@@ -2281,6 +3850,28 @@
         }
       }
     },
+    "Teams": {
+      "comment": "Composer picker header: the owner's teams",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekipler"
+          }
+        }
+      }
+    },
+    "Tell the running task": {
+      "comment": "Placeholder of the composer while a run works and follow-ups steer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan göreve yaz"
+          }
+        }
+      }
+    },
     "Tertiary words": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2299,6 +3890,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu kod yanlış, kullanılmış ya da süresi geçmiş. Mac'inde yeni bir tane oluştur."
+          }
+        }
+      }
+    },
+    "That message already started; your words stay here": {
+      "comment": "Toast: a queued message being edited left the queue",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mesaj zaten başladı; yazdıkların burada kalıyor"
+          }
+        }
+      }
+    },
+    "The Claude plan's usage limit was reached": {
+      "comment": "Usage limit card title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude planının kullanım sınırına ulaşıldı"
+          }
+        }
+      }
+    },
+    "The Mac refused the answer": {
+      "comment": "Ask dock: the answer was refused without a reason",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac yanıtı reddetti"
+          }
+        }
+      }
+    },
+    "The Mac refused the answer: %@": {
+      "comment": "Ask dock: the answer was refused; the argument is the Mac's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac yanıtı reddetti: %@"
           }
         }
       }
@@ -2332,6 +3967,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'in ekranı"
+          }
+        }
+      }
+    },
+    "The answer could not be sent": {
+      "comment": "Ask dock: sending failed; Try again follows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt gönderilemedi"
           }
         }
       }
@@ -2380,6 +4026,28 @@
         }
       }
     },
+    "The loop was not made: %@": {
+      "comment": "Composer: /loop failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Döngü kurulamadı: %@"
+          }
+        }
+      }
+    },
+    "The microphone is off for Dot. Turn it on in Settings › Dot Next › Microphone.": {
+      "comment": "Composer: dictation cannot start, microphone permission denied",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot için mikrofon kapalı. Ayarlar › Dot Next › Mikrofon'dan aç."
+          }
+        }
+      }
+    },
     "The order is the priority when several hold.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2387,6 +4055,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Birkaçı birden geçerliyse sıra önceliği gösterir."
+          }
+        }
+      }
+    },
+    "The other way is always on a long press of the button.": {
+      "comment": "Footer of the follow-up setting",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer yol her zaman düğmeye uzun basınca çıkar."
+          }
+        }
+      }
+    },
+    "The queue is held: nothing starts until you resume it.": {
+      "comment": "Queue sheet: the queue is held",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sıra bekletiliyor: sen sürdürene kadar hiçbir şey başlamaz."
           }
         }
       }
@@ -2424,6 +4114,28 @@
         }
       }
     },
+    "The side question could not be asked: %@": {
+      "comment": "Composer: /btw failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yan soru sorulamadı: %@"
+          }
+        }
+      }
+    },
+    "The stop did not reach your Mac: %@": {
+      "comment": "Settings: the emergency stop failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durdurma Mac'ine ulaşmadı: %@"
+          }
+        }
+      }
+    },
     "The test failed because the tokenizer read past the end of an **unterminated string**. I stopped the loop at the last character and kept the error the parser already raises; see [the failing case](https://example.invalid/case) and the change below.": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -2431,6 +4143,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Test, belirteçleyici **kapanmamış bir dizenin** sonunu aştığı için başarısız oldu. Döngüyü son karakterde durdurdum ve ayrıştırıcının zaten verdiği hatayı korudum; [başarısız örneğe](https://example.invalid/case) ve aşağıdaki değişikliğe bak."
+          }
+        }
+      }
+    },
+    "There is no microphone to listen to here. Type the message instead.": {
+      "comment": "Composer: dictation found no microphone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada dinlenecek mikrofon yok. Mesajı yazarak gönder."
+          }
+        }
+      }
+    },
+    "Thinking": {
+      "comment": "Capsule: the run's model is thinking",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşünüyor"
           }
         }
       }
@@ -2457,6 +4191,17 @@
         }
       }
     },
+    "This chat": {
+      "comment": "Title of the run inspector",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbet"
+          }
+        }
+      }
+    },
     "This chat was deleted": {
       "comment": "Chat subtitle: the chat was deleted on the Mac or the web",
       "localizations": {
@@ -2475,6 +4220,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonun anahtarı reddedildi"
+          }
+        }
+      }
+    },
+    "Thought": {
+      "comment": "Work log: a step's thinking, folded",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşündü"
           }
         }
       }
@@ -2508,6 +4264,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anahtarlar"
+          }
+        }
+      }
+    },
+    "Tokens": {
+      "comment": "Inspector row: tokens the run read and wrote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token"
+          }
+        }
+      }
+    },
+    "Took": {
+      "comment": "Inspector row: how long the run worked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Süre"
           }
         }
       }
@@ -2590,7 +4368,7 @@
       }
     },
     "Undo": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Component gallery (debug builds): a heading or sample text\nToast action: takes the last change back",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2644,6 +4422,28 @@
         }
       }
     },
+    "Waited for a condition": {
+      "comment": "Tool row: a wait_until step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir koşul beklendi"
+          }
+        }
+      }
+    },
+    "Waiting for a condition": {
+      "comment": "Tool row: a wait_until step at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir koşul bekleniyor"
+          }
+        }
+      }
+    },
     "Waiting for the link": {
       "comment": "Under an owner's message: it is kept and goes when the phone is online",
       "localizations": {
@@ -2651,6 +4451,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlantı bekleniyor"
+          }
+        }
+      }
+    },
+    "Waiting for your answer": {
+      "comment": "Transcript anchor: an ask the dock holds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtını bekliyor"
           }
         }
       }
@@ -2721,6 +4532,17 @@
         }
       }
     },
+    "What it acts on": {
+      "comment": "Ask dock: the header of the box with the command or path",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neye uygulanacak"
+          }
+        }
+      }
+    },
     "What should Dot work on?": {
       "comment": "New chat sheet: the prompt above the composer",
       "localizations": {
@@ -2765,6 +4587,17 @@
         }
       }
     },
+    "Worked for %@": {
+      "comment": "Work fold: how long a stretch of work took; the argument is a duration",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ çalıştı"
+          }
+        }
+      }
+    },
     "Worked for 2m 14s · 4 steps": {
       "comment": "Work-log group summary (sample)",
       "localizations": {
@@ -2805,6 +4638,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışıyor"
+          }
+        }
+      }
+    },
+    "Writing": {
+      "comment": "Capsule: the run's model is writing its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıyor"
+          }
+        }
+      }
+    },
+    "Wrong: reaches a working run at its next step": {
+      "comment": "Reaction menu: what 👎 does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanlış: çalışan göreve bir sonraki adımında ulaşır"
           }
         }
       }
@@ -2864,6 +4719,39 @@
         }
       }
     },
+    "Your answer": {
+      "comment": "Ask dock: the field of a question's answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtın"
+          }
+        }
+      }
+    },
+    "Your answer goes once the phone is online": {
+      "comment": "Ask dock: the answer is kept while offline",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtın telefon çevrimiçi olunca gider"
+          }
+        }
+      }
+    },
+    "Your answer is needed": {
+      "comment": "Ask dock header",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtın gerekiyor"
+          }
+        }
+      }
+    },
     "Your assistant · runs everything": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -2886,6 +4774,39 @@
         }
       }
     },
+    "by %@": {
+      "comment": "Transcript anchor: who answered; the argument is the review model's or rule's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· %@"
+          }
+        }
+      }
+    },
+    "by you on the Mac or the web": {
+      "comment": "Transcript anchor: who answered",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Mac'te ya da web'de sen"
+          }
+        }
+      }
+    },
+    "by you on this phone": {
+      "comment": "Transcript anchor: who answered",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· bu telefonda sen"
+          }
+        }
+      }
+    },
     "card": {
       "comment": "Component gallery (debug builds): the name of a surface colour token",
       "localizations": {
@@ -2893,6 +4814,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "kart"
+          }
+        }
+      }
+    },
+    "done": {
+      "comment": "VoiceOver: a plan step's state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bitti"
+          }
+        }
+      }
+    },
+    "edited %lld files": {
+      "comment": "Work fold tally: files edited; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dosya düzenledi"
+          }
+        }
+      }
+    },
+    "edited 1 file": {
+      "comment": "Work fold tally: one file edited",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 dosya düzenledi"
+          }
+        }
+      }
+    },
+    "failed": {
+      "comment": "VoiceOver: a plan step's state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "başarısız"
           }
         }
       }
@@ -2930,6 +4895,17 @@
         }
       }
     },
+    "in progress": {
+      "comment": "VoiceOver: a plan step's state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sürüyor"
+          }
+        }
+      }
+    },
     "mac.your-tailnet.ts.net": {
       "comment": "Pairing screen: placeholder of the Mac's address field",
       "localizations": {
@@ -2952,6 +4928,72 @@
         }
       }
     },
+    "ran %lld commands": {
+      "comment": "Work fold tally: commands run; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld komut çalıştırdı"
+          }
+        }
+      }
+    },
+    "ran 1 command": {
+      "comment": "Work fold tally: one command run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 komut çalıştırdı"
+          }
+        }
+      }
+    },
+    "read %lld files": {
+      "comment": "Work fold tally: files read; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dosya okudu"
+          }
+        }
+      }
+    },
+    "read 1 file": {
+      "comment": "Work fold tally: one file read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 dosya okudu"
+          }
+        }
+      }
+    },
+    "searched %lld times": {
+      "comment": "Work fold tally: searches; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kez arama yaptı"
+          }
+        }
+      }
+    },
+    "searched once": {
+      "comment": "Work fold tally: one search",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 kez arama yaptı"
+          }
+        }
+      }
+    },
     "sheet": {
       "comment": "Component gallery (debug builds): the name of a surface colour token",
       "localizations": {
@@ -2959,6 +5001,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "sayfa"
+          }
+        }
+      }
+    },
+    "skipped": {
+      "comment": "VoiceOver: a plan step's state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "atlandı"
+          }
+        }
+      }
+    },
+    "started %lld helpers": {
+      "comment": "Work fold tally: helpers started; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcı başlattı"
+          }
+        }
+      }
+    },
+    "started 1 helper": {
+      "comment": "Work fold tally: one helper started",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 yardımcı başlattı"
+          }
+        }
+      }
+    },
+    "to do": {
+      "comment": "VoiceOver: a plan step's state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "yapılacak"
           }
         }
       }
@@ -2981,6 +5067,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "uv run pytest tests/unit/test_parser.py -q"
+          }
+        }
+      }
+    },
+    "waited %lld times": {
+      "comment": "Work fold tally: waits; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kez bekledi"
+          }
+        }
+      }
+    },
+    "waited once": {
+      "comment": "Work fold tally: one wait",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 kez bekledi"
+          }
+        }
+      }
+    },
+    "without asking": {
+      "comment": "Transcript anchor: answered by the review model or a rule",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· sormadan"
+          }
+        }
+      }
+    },
+    "· a helper asks": {
+      "comment": "Ask dock: the ask is a helper's",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· bir yardımcı soruyor"
           }
         }
       }

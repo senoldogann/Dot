@@ -100,13 +100,46 @@ public struct RunRecord: Codable, Sendable, Hashable {
     public let parentRunId: String?
     public let source: String
     public let effort: String?
+    /// The tokens the run's model read and wrote, in all (absent in older daemons' views).
+    public let inputTokens: Int?
+    public let outputTokens: Int?
+    /// The approval mode it ran with (`supervised`, `ask`, `auto`, `yolo`).
+    public let approvals: String?
+    /// The owner's reaction the run follows up (item 844): the transcript draws no owner's message for it.
+    public let followsReaction: String?
+
+    public init(
+        id: String, threadId: String, goal: String, mode: String, model: String, status: String, createdAt: Double, finishedAt: Double?,
+        result: String, parentRunId: String?, source: String, effort: String?, inputTokens: Int?, outputTokens: Int?,
+        approvals: String?, followsReaction: String?
+    ) {
+        self.id = id
+        self.threadId = threadId
+        self.goal = goal
+        self.mode = mode
+        self.model = model
+        self.status = status
+        self.createdAt = createdAt
+        self.finishedAt = finishedAt
+        self.result = result
+        self.parentRunId = parentRunId
+        self.source = source
+        self.effort = effort
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.approvals = approvals
+        self.followsReaction = followsReaction
+    }
 
     enum CodingKeys: String, CodingKey {
-        case id, goal, mode, model, status, result, source, effort
+        case id, goal, mode, model, status, result, source, effort, approvals
         case threadId = "thread_id"
         case createdAt = "created_at"
         case finishedAt = "finished_at"
         case parentRunId = "parent_run_id"
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case followsReaction = "follows_reaction"
     }
 
     /// Whether the run still goes (it can be stopped, a steer reaches it).
@@ -120,6 +153,20 @@ public struct ChatChoices: Codable, Sendable, Hashable {
     public let speed: String
     public let approvals: String?
     public let goalMode: Bool?
+
+    public init(mode: String, model: String?, effort: String?, speed: String, approvals: String?, goalMode: Bool?) {
+        self.mode = mode
+        self.model = model
+        self.effort = effort
+        self.speed = speed
+        self.approvals = approvals
+        self.goalMode = goalMode
+    }
+
+    /// The same choices with another model and effort.
+    public func with(model next: String?, effort level: String?) -> ChatChoices {
+        ChatChoices(mode: mode, model: next, effort: level, speed: speed, approvals: approvals, goalMode: goalMode)
+    }
 
     enum CodingKeys: String, CodingKey {
         case mode, model, effort, speed, approvals
@@ -181,11 +228,34 @@ public struct ApprovalRecord: Codable, Sendable, Hashable {
     public let tool: String
     public let summary: String
     public let severity: String
+    /// What the ask carries: a question's `question`, `options` and `multiple`; a secret's `label` and `why`; an
+    /// approval's `target`, `kind` and `flags`.
+    public let args: [String: JSONValue]?
+    public let note: String?
+    /// When a step kept for the owner lapses (item 482); `nil` for any other.
+    public let keptUntil: Double?
+
+    public init(
+        id: String, runId: String, createdAt: Double, status: String, tool: String, summary: String, severity: String,
+        args: [String: JSONValue]?, note: String?, keptUntil: Double?
+    ) {
+        self.id = id
+        self.runId = runId
+        self.createdAt = createdAt
+        self.status = status
+        self.tool = tool
+        self.summary = summary
+        self.severity = severity
+        self.args = args
+        self.note = note
+        self.keptUntil = keptUntil
+    }
 
     enum CodingKeys: String, CodingKey {
-        case id, status, tool, summary, severity
+        case id, status, tool, summary, severity, args, note
         case runId = "run_id"
         case createdAt = "created_at"
+        case keptUntil = "kept_until"
     }
 }
 
@@ -251,6 +321,18 @@ public struct HelperView: Codable, Sendable, Hashable {
         case startedAt = "started_at"
         case finishedAt = "finished_at"
     }
+
+    /// The same helper ended with `status` at `at`.
+    public func ended(status next: String, at: Double) -> HelperView {
+        HelperView(
+            runId: runId, parentRunId: parentRunId, threadId: threadId, agentId: agentId, title: title, status: next,
+            startedAt: startedAt, finishedAt: at, provider: provider, model: model, effort: effort, step: nil,
+            blocking: blocking, stop: stop)
+    }
+
+    /// The helper's title as a row shows it: the first sentence of what the daemon names it, ids taken out, at most 40
+    /// characters (the lead's look at N1c: a goal is no title).
+    public var shortTitle: String { DotEngine.shortTitle(title) }
 
     /// The same helper doing `next`.
     public func doing(_ next: HelperStep) -> HelperView {
@@ -377,4 +459,113 @@ public struct PairedKey: Codable, Sendable {
 /// `GET /api/status`, the part the cache keys on.
 public struct DaemonStatus: Codable, Sendable, Hashable {
     public let version: String
+}
+
+/// A model as the pickers show it (`GET /api/models`), the part the composer's chip reads.
+public struct ModelOption: Codable, Sendable, Hashable {
+    public let ref: String
+    public let label: String
+    public let efforts: [String]
+    public let defaultEffort: String?
+    public let contextLength: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case ref, label, efforts
+        case defaultEffort = "default_effort"
+        case contextLength = "context_length"
+    }
+}
+
+/// The models of one provider, or why it listed none.
+public struct ProviderModels: Codable, Sendable, Hashable {
+    public let provider: String
+    public let models: [ModelOption]
+    public let error: String?
+}
+
+/// `GET`/`POST /api/failsafe`.
+public struct FailsafeState: Codable, Sendable, Hashable {
+    public let engaged: Bool
+}
+
+/// One file a run changed, and whether one button takes the change back.
+public struct FileEditView: Codable, Sendable, Hashable {
+    public let path: String
+    public let state: String
+    public let changes: Int?
+}
+
+/// How many steps acted through a kind of tool no undo journal holds (item 1404).
+public struct OutsideSteps: Codable, Sendable, Hashable {
+    public let category: String
+    public let steps: Int
+}
+
+/// `GET /api/runs/{id}/actions`, the part the inspector reads.
+public struct RunActions: Codable, Sendable, Hashable {
+    public let edits: [FileEditView]
+    public let outside: [OutsideSteps]
+    public let ended: Bool
+
+    /// The steps no undo can take back, in all.
+    public var unrecoverable: Int { outside.reduce(0) { $0 + $1.steps } }
+}
+
+/// A file the chat's runs changed, with its diff (`GET /api/runs/{id}/changes`).
+public struct FileChange: Codable, Sendable, Hashable {
+    public let path: String
+    public let created: Bool
+    public let gone: Bool
+    public let added: Int
+    public let removed: Int
+    public let diff: String
+}
+
+public struct RunChanges: Codable, Sendable, Hashable {
+    public let files: [FileChange]
+    public let added: Int
+    public let removed: Int
+}
+
+/// A side question's answer (`POST /api/runs/{id}/btw`).
+public struct AsideAnswer: Codable, Sendable, Hashable {
+    public let question: String
+    public let answer: String
+}
+
+public struct PaletteSkill: Codable, Sendable, Hashable {
+    public let name: String
+    public let description: String
+}
+
+public struct PaletteAccount: Codable, Sendable, Hashable {
+    public let address: String
+    public let providerName: String
+    public let reads: String
+
+    enum CodingKeys: String, CodingKey {
+        case address, reads
+        case providerName = "provider_name"
+    }
+}
+
+/// `GET /api/palette`, the part the composer reads.
+public struct PaletteView: Codable, Sendable, Hashable {
+    public let skills: [PaletteSkill]
+    public let accounts: [PaletteAccount]
+}
+
+public struct NamedRecord: Codable, Sendable, Hashable {
+    public let id: String
+    public let name: String
+    public let role: String?
+}
+
+/// An agent or a team as `/api/agents` and `/api/teams` list them, the part the `@` menu reads.
+public struct AgentSummary: Codable, Sendable, Hashable {
+    public let record: NamedRecord
+}
+
+public struct TeamSummary: Codable, Sendable, Hashable {
+    public let record: NamedRecord
 }

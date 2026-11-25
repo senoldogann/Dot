@@ -24,10 +24,13 @@ struct TrailingFractionLayout: Layout {
 /// The owner's message (plan §4.1): a bubble at most 85 % wide, radius 20, the nested fill, no stroke.
 struct UserBubble: View {
     let text: String
+    /// The lines shown while a long message is folded; `nil` shows it whole.
+    var lineLimit: Int? = nil
 
     var body: some View {
         TrailingFractionLayout(fraction: Metric.bubbleFraction) {
             Text(text)
+                .lineLimit(lineLimit)
                 .textRole(.body)
                 .foregroundStyle(Tone.text)
                 .textSelection(.enabled)

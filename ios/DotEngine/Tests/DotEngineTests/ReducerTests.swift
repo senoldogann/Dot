@@ -11,7 +11,7 @@ final class ReducerTests: XCTestCase {
     private func record(_ id: String, status: String, at: Double) -> RunRecord {
         RunRecord(
             id: id, threadId: "thr_1", goal: "goal of \(id)", mode: "task", model: "m", status: status, createdAt: at, finishedAt: nil,
-            result: "", parentRunId: nil, source: "ui", effort: nil)
+            result: "", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
     }
 
     private func view(revision: Int, runs: [RunRecord], events: [EventRecord]) -> ThreadView {
@@ -80,16 +80,55 @@ final class ReducerTests: XCTestCase {
         XCTAssertTrue(broken.writing.isEmpty, "a break drops the live words: the stored event brings them back")
     }
 
+    func testThinkingGoesOnlyOnTheOpenStepAndAResetDropsIt() {
+        var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [record("run_a", status: "running", at: 1)])
+        let delta: (String, String, Int) -> StreamFrame = { kind, text, step in
+            .delta(EventRecord(id: 0, runId: "run_a", ts: 0, kind: "delta", data: ["kind": .string(kind), "text": .string(text), "step": .int(step)]))
+        }
+        chat = ChatReducer.frame(chat, delta("thinking", "Which ", 1), connection: connection).0
+        chat = ChatReducer.frame(chat, delta("thinking", "day?", 1), connection: connection).0
+        XCTAssertEqual(chat.thinking["run_a"], LiveThought(step: 1, text: "Which day?"))
+        chat = ChatReducer.frame(chat, delta("reset", "", 1), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"], "a step asked again starts its thinking again")
+        chat = ChatReducer.frame(chat, delta("thinking", "Monday", 1), connection: connection).0
+        chat = ChatReducer.frame(chat, .event(event(20, "run_a", "assistant", ["text": .string(""), "step": .int(1)])), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"], "the stored reply ends the live thinking")
+        chat = ChatReducer.frame(chat, delta("thinking", "late", 1), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"], "thinking of a stored step is not drawn again")
+        chat = ChatReducer.frame(chat, delta("thinking", "next", 2), connection: connection).0
+        XCTAssertEqual(chat.thinking["run_a"]?.step, 2)
+        XCTAssertTrue(ChatReducer.broke(chat, connection: connection).thinking.isEmpty, "a break drops the live thinking")
+    }
+
+    /// The pre-push review of item 1756: a view read that brings the step's stored reply before the stream does ends the
+    /// live thinking and words, so the stored thought is not drawn beside a live one under the same id.
+    func testAViewThatBringsTheStoredStepFirstEndsTheLiveThinking() {
+        let running: RunRecord = record("run_a", status: "running", at: 1)
+        var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [running])
+        let delta: (String) -> StreamFrame = { kind in
+            .delta(EventRecord(id: 0, runId: "run_a", ts: 0, kind: "delta", data: ["kind": .string(kind), "text": .string("Which day"), "step": .int(1)]))
+        }
+        chat = ChatReducer.frame(chat, delta("thinking"), connection: connection).0
+        chat = ChatReducer.frame(chat, delta("text"), connection: connection).0
+        let stored: EventRecord = event(20, "run_a", "assistant", ["text": .string("Which day"), "thinking": .string("Which day"), "step": .int(1)])
+        chat = ChatReducer.viewLoaded(chat, view: view(revision: 6, runs: [running], events: [stored]), connection: connection).0
+        chat = ChatReducer.frame(chat, .event(stored), connection: connection).0
+        XCTAssertNil(chat.thinking["run_a"])
+        XCTAssertNil(chat.writing["run_a"])
+        let ids: [String] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none).map(\.id)
+        XCTAssertEqual(ids.filter { $0 == "th:run_a:1" }.count, 1, "one thought row: \(ids)")
+    }
+
     func testAnUnknownKindMovesTheCursorAndDrawsNothing() {
         var (chat, connection): (ChatProjection, Int) = live(revision: 5, runs: [record("run_a", status: "running", at: 1)])
         let message: SSEMessage = SSEMessage(
             event: "brand_new_kind", data: #"{"id":30,"run_id":"run_a","ts":1,"kind":"brand_new_kind","data":{"x":1}}"#, id: "30")
         let frame: StreamFrame = readFrame(message)
         guard case .event = frame else { return XCTFail("an unknown stored kind is an event, kept for its cursor") }
-        let before: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true)
+        let before: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none)
         chat = ChatReducer.frame(chat, frame, connection: connection).0
         XCTAssertEqual(chat.runs["run_a"]?.cursor, 30)
-        XCTAssertEqual(transcript(of: chat, pending: [], mode: .showAll, streaming: true), before, "nothing is drawn for it")
+        XCTAssertEqual(transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none), before, "nothing is drawn for it")
         let liveOnly: StreamFrame = readFrame(SSEMessage(event: "mystery", data: #"{"id":0,"run_id":"run_a","ts":1,"kind":"mystery","data":{}}"#, id: nil))
         XCTAssertEqual(ChatReducer.frame(chat, liveOnly, connection: connection).0, chat, "a live-only unknown kind changes nothing")
     }
@@ -246,11 +285,11 @@ final class ReducerTests: XCTestCase {
         ]
         for frame in frames { chat = ChatReducer.frame(chat, frame, connection: connection).0 }
         let ids: (ToolCallMode, Bool) -> [String] = { mode, streaming in
-            transcript(of: chat, pending: [], mode: mode, streaming: streaming).map(\.id)
+            transcript(of: chat, pending: [], mode: mode, streaming: streaming, context: .none).map(\.id)
         }
         XCTAssertEqual(ids(.showAll, true), ["u:run_a", "t:c1", "a:12", "t:c2", "w:run_a"])
         XCTAssertEqual(ids(.hideSuccessful, true), ["u:run_a", "a:12", "t:c2", "w:run_a"], "a failure always shows")
-        XCTAssertEqual(ids(.hideAll, true), ["u:run_a", "a:12", "w:run_a"])
+        XCTAssertEqual(ids(.hideAll, true), ["u:run_a", "a:12", "t:c2", "w:run_a"], "a failed tool still shows (the mode table)")
         XCTAssertEqual(ids(.zen, true), ["u:run_a", "w:run_a"], "Zen keeps the last answer only")
         XCTAssertEqual(ids(.showAll, false), ["u:run_a", "t:c1", "a:12", "t:c2"], "streaming off: an answer shows once it is whole")
     }
@@ -282,9 +321,9 @@ final class ReducerTests: XCTestCase {
     func testARunAHelpersReportStartedOpensWithDotsNoteNotTheOwnersWords() {
         let report: RunRecord = RunRecord(
             id: "run_r", threadId: "thr_1", goal: "A helper that worked in the background ended", mode: "task", model: "m", status: "done",
-            createdAt: 2, finishedAt: 3, result: "", parentRunId: nil, source: "helper_report", effort: nil)
+            createdAt: 2, finishedAt: 3, result: "", parentRunId: nil, source: "helper_report", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
         let (chat, _): (ChatProjection, Int) = live(revision: 2, runs: [record("run_a", status: "done", at: 1), report])
-        let items: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true)
+        let items: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none)
         XCTAssertEqual(items.first { $0.id == "u:run_r" }, .note(id: "u:run_r", text: "A helper that worked in the background ended"))
         XCTAssertEqual(items.first { $0.id == "u:run_a" }, .owner(id: "u:run_a", text: "goal of run_a", delivery: nil))
     }
@@ -298,9 +337,20 @@ final class ReducerTests: XCTestCase {
         ] {
             chat = ChatReducer.frame(chat, frame, connection: connection).0
         }
-        let answers: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true).filter {
+        let answers: [TranscriptItem] = transcript(of: chat, pending: [], mode: .showAll, streaming: true, context: .none).filter {
             if case .answer = $0 { true } else { false }
         }
-        XCTAssertEqual(answers, [.answer(id: "r:run_a", text: "Booked", writing: false)])
+        XCTAssertEqual(answers, [.answer(id: "r:run_a", text: "Booked", writing: false, endedAt: 12)])
+    }
+
+    func testAHelpersEndOnTheStreamEndsItInTheViewSoTheCapsuleStopsCountingIt() {
+        var (chat, connection): (ChatProjection, Int) = live(revision: 2, runs: [record("run_a", status: "running", at: 1)])
+        let helper: HelperView = HelperView(
+            runId: "run_h", parentRunId: "run_a", threadId: "thr_h", agentId: nil, title: "t", status: "running", startedAt: 1, finishedAt: nil,
+            provider: "p", model: "m", effort: nil, step: nil, blocking: false, stop: "/api/runs/run_h/cancel")
+        chat.view = chat.view?.with(helpers: [helper])
+        chat = ChatReducer.frame(chat, .event(event(30, "run_h", "run_finished", ["status": .string("done")])), connection: connection).0
+        XCTAssertEqual(chat.view?.helpers.first?.status, "done")
+        XCTAssertEqual(chat.view?.helpers.first?.finishedAt, 30)
     }
 }
