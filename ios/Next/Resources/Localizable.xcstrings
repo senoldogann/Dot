@@ -7524,6 +7524,28 @@
         }
       }
     },
+    "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.": {
+      "comment": "Diagnosis: the proof request got no answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi; bu yüzden anahtar gönderilmedi. Biraz sonra yeniden denetle."
+          }
+        }
+      }
+    },
+    "Your Mac did not answer the check of this phone's key.": {
+      "comment": "This Mac: the proof request got no answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi."
+          }
+        }
+      }
+    },
     "Your Mac does not take this from a phone (%@). Open on the Mac: %@.": {
       "comment": "Settings: the daemon refused a phone's key; first argument its words, second where on the Mac",
       "localizations": {
