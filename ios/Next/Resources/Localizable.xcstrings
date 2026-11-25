@@ -118,6 +118,17 @@
         }
       }
     },
+    "%lld connected": {
+      "comment": "Connect apps: the pill that lists the connected services alone; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld bağlı"
+          }
+        }
+      }
+    },
     "%lld helpers": {
       "comment": "Helper group header, first part; the argument is how many helpers the run started",
       "localizations": {
@@ -898,6 +909,17 @@
         }
       }
     },
+    "Apps": {
+      "comment": "Connect apps: the header of the apps a search or a filter found",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulamalar"
+          }
+        }
+      }
+    },
     "As the default": {
       "comment": "Schedule edit: the default approval mode",
       "localizations": {
@@ -1129,6 +1151,17 @@
         }
       }
     },
+    "Business": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İş"
+          }
+        }
+      }
+    },
     "Buttons": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1349,6 +1382,17 @@
         }
       }
     },
+    "Clear search": {
+      "comment": "Connect apps: clears the search and the filters",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aramayı temizle"
+          }
+        }
+      }
+    },
     "Clicked “Thu 15:30”": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1514,6 +1558,17 @@
         }
       }
     },
+    "Communication": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İletişim"
+          }
+        }
+      }
+    },
     "Compare three clinics": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -1580,6 +1635,39 @@
         }
       }
     },
+    "Connect": {
+      "comment": "Connect apps: the pill that starts connecting a service",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlan"
+          }
+        }
+      }
+    },
+    "Connect an app and Dot can use it in its tasks.": {
+      "comment": "Connect apps: the empty state of the connected list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir uygulama bağla, Dot onu görevlerinde kullanabilsin."
+          }
+        }
+      }
+    },
+    "Connect apps": {
+      "comment": "Title of the Connect apps sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulamaları bağla"
+          }
+        }
+      }
+    },
     "Connected": {
       "comment": "Settings: the Mac answers",
       "localizations": {
@@ -1587,6 +1675,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlı"
+          }
+        }
+      }
+    },
+    "Connected app": {
+      "comment": "Connect apps detail: a way Dot reaches a service, through its MCP server",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı uygulama"
+          }
+        }
+      }
+    },
+    "Connected as": {
+      "comment": "Connect apps detail: the accounts and vaults of a connected service",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı hesap"
+          }
+        }
+      }
+    },
+    "Connected: Dot can use it in its tasks.": {
+      "comment": "Connect apps detail: the service is connected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlı: Dot onu görevlerinde kullanabilir."
           }
         }
       }
@@ -1719,6 +1841,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Koyu"
+          }
+        }
+      }
+    },
+    "Data": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veri"
           }
         }
       }
@@ -2005,6 +2138,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açılır ok · yarı kalın"
+          }
+        }
+      }
+    },
+    "Disconnect": {
+      "comment": "Connect apps detail: takes a service's connection away",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantıyı kes"
+          }
+        }
+      }
+    },
+    "Disconnect %@?": {
+      "comment": "Connect apps detail: confirmation of Disconnect; the argument is the service",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ bağlantısı kesilsin mi?"
           }
         }
       }
@@ -2313,6 +2468,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot kendi yüzünü taşır; diğer ajanlar yalın bir daire."
+          }
+        }
+      }
+    },
+    "Dot's browser": {
+      "comment": "Connect apps detail: a way Dot reaches a service, in its own browser",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un tarayıcısı"
           }
         }
       }
@@ -2702,6 +2869,17 @@
         }
       }
     },
+    "Featured": {
+      "comment": "Connect apps: the section of the most used services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Öne çıkanlar"
+          }
+        }
+      }
+    },
     "Feel": {
       "comment": "Chat settings section: haptics",
       "localizations": {
@@ -2775,6 +2953,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Model bul"
+          }
+        }
+      }
+    },
+    "Finish on your Mac": {
+      "comment": "Connect apps: the step of this service is answered on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde bitir"
+          }
+        }
+      }
+    },
+    "Finish on your Mac: Dot waits for your answer there.": {
+      "comment": "Connect apps detail: Dot is connecting or macOS asks on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde bitir: Dot orada yanıtını bekliyor."
+          }
+        }
+      }
+    },
+    "Finish on your Mac: answer macOS there, or sign in on the page that opened in Dot's browser.": {
+      "comment": "Connect apps detail: the step started from the phone is answered on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde bitir: macOS'un sorusunu orada yanıtla ya da Dot'un tarayıcısında açılan sayfada oturum aç."
+          }
+        }
+      }
+    },
+    "Finish on your Mac: open Settings › Connectors › %@. Your Mac takes a sign-in, a key or a token there, not from a phone.": {
+      "comment": "Connect apps detail: the service is connected on the Mac alone; the argument is the service",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde bitir: Ayarlar › Bağlayıcılar › %@ sayfasını aç. Mac'in oturum açmayı, anahtarı ya da jetonu telefondan değil, orada alır."
           }
         }
       }
@@ -3285,6 +3507,17 @@
         }
       }
     },
+    "Its actions leave the tasks that start after, and Dot forgets its sign-in.": {
+      "comment": "Connect apps detail: what Disconnect does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eylemleri bundan sonra başlayan görevlerden çıkar ve Dot oturum açmasını unutur."
+          }
+        }
+      }
+    },
     "Its agent is paused": {
       "comment": "Schedule: the agent it runs as is paused",
       "localizations": {
@@ -3450,6 +3683,17 @@
         }
       }
     },
+    "Lists the connected apps alone": {
+      "comment": "VoiceOver: the hint of the connected pill",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca bağlı uygulamaları listeler"
+          }
+        }
+      }
+    },
     "Loading": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -3501,6 +3745,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düşük"
+          }
+        }
+      }
+    },
+    "Mac app": {
+      "comment": "Connect apps detail: a way Dot reaches a service, by driving its app on the Mac",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac uygulaması"
           }
         }
       }
@@ -3824,6 +4080,28 @@
         }
       }
     },
+    "No apps here": {
+      "comment": "Connect apps: a chip lists nothing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada uygulama yok"
+          }
+        }
+      }
+    },
+    "No apps listed": {
+      "comment": "Connect apps: the Mac lists no service",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listelenen uygulama yok"
+          }
+        }
+      }
+    },
     "No camera here": {
       "comment": "QR scan: the device has no camera (the simulator)",
       "localizations": {
@@ -3908,6 +4186,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ağ yok. Uçak Modu'nu kapat ya da bir Wi-Fi'ye bağlan."
+          }
+        }
+      }
+    },
+    "No results for “%@”": {
+      "comment": "Connect apps: a search found nothing; the argument is the query",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“%@” için sonuç yok"
           }
         }
       }
@@ -4121,6 +4410,17 @@
         }
       }
     },
+    "Nothing connected yet": {
+      "comment": "Connect apps: no service is connected",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz bağlı bir şey yok"
+          }
+        }
+      }
+    },
     "Nothing new since you were away": {
       "comment": "Activity tab empty state title",
       "localizations": {
@@ -4161,6 +4461,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz hatırlanan bir şey yok"
+          }
+        }
+      }
+    },
+    "Nothing to connect from here: open Settings › Connectors on your Mac to see what it needs.": {
+      "comment": "Connect apps detail: no way of the service has a step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buradan bağlanacak bir şey yok: neye ihtiyaç duyduğunu görmek için Mac'inde Ayarlar › Bağlayıcılar'ı aç."
           }
         }
       }
@@ -4605,6 +4916,29 @@
         }
       }
     },
+    "Password manager": {
+      "comment": "Connect apps detail: a way Dot reaches a service, through 1Password's command line",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola yöneticisi"
+          }
+        }
+      }
+    },
+    "Password managers": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parola yöneticileri"
+          }
+        }
+      }
+    },
     "Paste image": {
       "comment": "Composer + menu: adds the image on the clipboard",
       "localizations": {
@@ -4777,6 +5111,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Birincil yazı"
+          }
+        }
+      }
+    },
+    "Productivity": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üretkenlik"
           }
         }
       }
@@ -5155,6 +5500,17 @@
         }
       }
     },
+    "Research": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Araştırma"
+          }
+        }
+      }
+    },
     "Resets %@": {
       "comment": "Usage: when a plan window resets",
       "localizations": {
@@ -5474,6 +5830,17 @@
         }
       }
     },
+    "Search apps and skills": {
+      "comment": "Connect apps: the search field's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulamalarda ve becerilerde ara"
+          }
+        }
+      }
+    },
     "Search chats": {
       "comment": "Placeholder of the chat list's search field",
       "localizations": {
@@ -5683,6 +6050,17 @@
         }
       }
     },
+    "Settings › Connectors": {
+      "comment": "Where on the Mac: the Connectors page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Bağlayıcılar"
+          }
+        }
+      }
+    },
     "Settings › General": {
       "comment": "Where on the Mac: the General page",
       "localizations": {
@@ -5837,6 +6215,17 @@
         }
       }
     },
+    "Show all apps": {
+      "comment": "Connect apps: leaves the connected list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm uygulamaları göster"
+          }
+        }
+      }
+    },
     "Show full message": {
       "comment": "Under a long owner's message: unfolds it",
       "localizations": {
@@ -5899,6 +6288,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düşüncenin tamamını gösterir"
+          }
+        }
+      }
+    },
+    "Shows what it can do": {
+      "comment": "VoiceOver: a Connect apps row opens the service's detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neler yapabildiğini gösterir"
           }
         }
       }
@@ -5998,6 +6398,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Standart"
+          }
+        }
+      }
+    },
+    "Start again on the Mac": {
+      "comment": "Connect apps detail: takes the Mac's step once more",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'te yeniden başlat"
           }
         }
       }
@@ -6266,6 +6677,17 @@
         }
       }
     },
+    "Support": {
+      "comment": "Connect apps: a section of services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Destek"
+          }
+        }
+      }
+    },
     "Surfaces (no strokes)": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -6295,6 +6717,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Simgeler"
+          }
+        }
+      }
+    },
+    "Synced folder": {
+      "comment": "Connect apps detail: a way Dot reaches a service, through a folder it keeps in sync",
+      "extractionState": "manual",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşitlenen klasör"
           }
         }
       }
@@ -6669,6 +7103,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Uygulamanın dili"
+          }
+        }
+      }
+    },
+    "The apps Dot works with are listed on your Mac. Check the connection and try again.": {
+      "comment": "Connect apps: the offline state's line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un çalıştığı uygulamalar Mac'inde listelenir. Bağlantıyı denetle ve yeniden dene."
           }
         }
       }
@@ -7179,6 +7624,17 @@
         }
       }
     },
+    "Try another word or another section.": {
+      "comment": "Connect apps: the search empty state's line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başka bir sözcük ya da başka bir bölüm dene."
+          }
+        }
+      }
+    },
     "Turkish": {
       "comment": "A language's name",
       "localizations": {
@@ -7432,6 +7888,17 @@
         }
       }
     },
+    "Waiting": {
+      "comment": "Connect apps: the pill of a service Dot is connecting or macOS asks about",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekliyor"
+          }
+        }
+      }
+    },
     "Waiting for a condition": {
       "comment": "Tool row: a wait_until step at work",
       "localizations": {
@@ -7593,6 +8060,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Neye uygulanacak"
+          }
+        }
+      }
+    },
+    "What it can do": {
+      "comment": "Connect apps detail: the ways Dot reaches the service",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neler yapabilir"
           }
         }
       }
@@ -7905,6 +8383,17 @@
         }
       }
     },
+    "Your Mac's Dot lists no app to connect. Update Dot on the Mac.": {
+      "comment": "Connect apps: the empty state's line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot bağlanacak uygulama listelemiyor. Mac'teki Dot'u güncelle."
+          }
+        }
+      }
+    },
     "Your Mac's address": {
       "comment": "Pairing screen section: the Mac's address",
       "localizations": {
@@ -8077,6 +8566,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "bağlantı tailscale adres anahtar eşleştir tanıla ağ"
+          }
+        }
+      }
+    },
+    "connectors apps services accounts": {
+      "comment": "Settings search synonyms of Connect apps (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bağlayıcılar uygulamalar hizmetler hesaplar"
           }
         }
       }
