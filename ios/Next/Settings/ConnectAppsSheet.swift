@@ -357,14 +357,15 @@ struct ConnectAppsSheet: View {
         return DisconnectOutcome(failure: nil, notices: notices)
     }
 
-    /// Whether the daemon says a service waits (macOS asks on the Mac, Dot tries a server or waits for its sign-in), so
-    /// the sheet reads again by itself, as the web asks again then and only then.
+    /// Whether a service waits on the Mac, so the sheet reads again by itself: the daemon says it waits (macOS asks,
+    /// Dot tries a server or waits for its sign-in), or the owner started its step here and it is not connected yet,
+    /// so that "Finish on your Mac" turns into Connected without a pull to refresh. The web asks again then too.
     private var waitsOnTheMac: Bool {
         guard let loaded = sources.value else { return false }
-        return connectApps(loaded).contains { $0.action == .waiting }
+        return connectApps(loaded).contains { $0.action == .waiting || (finishing.contains($0.id) && !$0.isConnected) }
     }
 
-    /// Reads again every five seconds while a service waits on the Mac, until the sheet closes.
+    /// Reads again every five seconds while a service waits on the Mac; the task ends with the sheet.
     private func keepReading() async {
         while !Task.isCancelled {
             do {

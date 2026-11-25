@@ -70,3 +70,18 @@ def test_the_checked_in_scorecard_reads_and_holds_its_unproven_rows() -> None:
     rows = maturity.read_rows(maturity.SCORECARD.read_text(encoding="utf-8"))
     unproven: set[str] = {row.feature for row in rows if row.proven is None}
     assert "Meetings (Google Meet)" in unproven
+
+
+def test_the_daily_check_exits_2_on_a_table_it_cannot_read_and_1_on_stale_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    card: Path = tmp_path / "maturity.md"
+    monkeypatch.setattr(stale, "SCORECARD", card)
+    monkeypatch.setattr(sys, "argv", ["maturity_lapsed.py", "--today", "2026-11-25"])
+    card.write_text(_card("| Schedules | last week | runs | |"), encoding="utf-8")
+    assert stale.main() == 2
+    assert "maturity.md" in capsys.readouterr().err
+    card.write_text(_card(*_ROWS), encoding="utf-8")
+    assert stale.main() == 1
+    card.write_text(_card(_ROWS[0]), encoding="utf-8")
+    assert stale.main() == 0
