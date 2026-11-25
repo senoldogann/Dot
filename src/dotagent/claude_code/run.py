@@ -201,6 +201,7 @@ from dotagent.tools.meta import (
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.tools.shell import kill_group
+from dotagent.tools.terminal import chatless_specs, tells_no_chat
 
 log = get_logger(__name__)
 
@@ -446,6 +447,13 @@ def dot_tool(tool: str, door: str) -> str | None:
     is Claude Code's own and not a call of Dot's."""
     prefix: str = tool_prefix(door)
     return tool.removeprefix(prefix) if tool.startswith(prefix) else None
+
+
+def _offered_specs(run: RunRecord, tools: ToolRegistry) -> tuple[ToolSpec, ...]:
+    """The specs of ``tools`` as ``run`` is offered them: without a command in the background where no chat is told of
+    its end (item 1760)."""
+    specs: tuple[ToolSpec, ...] = tuple(tool.spec for tool in tools.tools.values())
+    return chatless_specs(specs) if tells_no_chat(run) else specs
 
 
 def door_specs(specs: Iterable[ToolSpec]) -> tuple[ToolSpec, ...]:
@@ -1659,7 +1667,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     quiet: _Quiet = _Quiet(heard=time.monotonic(), queue=queue)
     door: Door = new_door(
         CLAUDE_DOOR,
-        door_specs(tool.spec for tool in tools.tools.values()),
+        door_specs(_offered_specs(run, tools)),
         LOADED_TOOLS,
         partial(
             _watched_call,
