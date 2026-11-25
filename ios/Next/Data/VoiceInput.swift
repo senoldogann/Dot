@@ -56,6 +56,9 @@ final class VoiceInput {
     @ObservationIgnored private var finalWait: CheckedContinuation<Void, Never>?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var limit: Task<Void, Never>?
+    /// Segments begun again after the recognizer heard no speech, with no word since: past `quietRestarts` the go ends.
+    @ObservationIgnored private var quietRuns: Int = 0
+    static let quietRestarts: Int = 3
     @ObservationIgnored private let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "voice")
 
     /// What a go needs: where it is written down (the Mac's API for `.mac`), its language, the preferred order of the
@@ -132,7 +135,10 @@ final class VoiceInput {
                 fail(String(localized: "Dot is not paired with a Mac. Choose This device in Settings › Voice.", comment: "Composer: voice set to the Mac without a paired Mac"))
                 return
             }
-            feed = MacVoiceFeed(api: api, language: languageTag(start.locale))
+            // A stream that cannot be opened or fed ends the go at once, said with the Mac's words (not only at ✓).
+            feed = MacVoiceFeed(api: api, language: languageTag(start.locale)) { @Sendable [weak self] in
+                Task { @MainActor in await self?.finish(keep: true, why: nil) }
+            }
         }
         self.recognizer = recognizer
         do {
@@ -247,33 +253,50 @@ final class VoiceInput {
         tap?.request = request
         current = ""
         let segment: ObjectIdentifier = ObjectIdentifier(request)
-        task = Self.recognize(with: recognizer, request: request) { @Sendable [weak self] words, final, failed in
-            Task { @MainActor in self?.took(words: words, final: final, failed: failed, segment: segment) }
+        task = Self.recognize(with: recognizer, request: request) { @Sendable [weak self] words, final, error in
+            Task { @MainActor in self?.took(words: words, final: final, error: error, segment: segment) }
         }
     }
 
     private nonisolated static func recognize(
-        with recognizer: SFSpeechRecognizer, request: SFSpeechAudioBufferRecognitionRequest, deliver: @escaping @Sendable (String?, Bool, Bool) -> Void
+        with recognizer: SFSpeechRecognizer, request: SFSpeechAudioBufferRecognitionRequest,
+        deliver: @escaping @Sendable (String?, Bool, RecognizerError?) -> Void
     ) -> SFSpeechRecognitionTask {
         recognizer.recognitionTask(with: request) { result, error in
-            deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, error != nil)
+            deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, error.map(RecognizerError.init))
         }
     }
 
-    private func took(words: String?, final: Bool, failed: Bool, segment: ObjectIdentifier) {
+    private func took(words: String?, final: Bool, error: RecognizerError?, segment: ObjectIdentifier) {
         // A late answer of a segment already closed.
         guard let request, ObjectIdentifier(request) == segment else { return }
-        if let words { current = words }
+        if let words, !words.isEmpty {
+            current = words
+            quietRuns = 0
+        }
         heard = (segments + [current]).filter { !$0.isEmpty }.joined(separator: " ")
-        guard final || failed else { return }
+        guard final || error != nil else { return }
         if !current.isEmpty { segments.append(current) }
         current = ""
         if phase == .transcribing {
             finalWait?.resume()
             finalWait = nil
-        } else if phase == .recording, let recognizer {
-            // The recognizer closed a segment on a pause (or heard nothing for a while): the go goes on.
+            return
+        }
+        guard phase == .recording, let recognizer else { return }
+        if let error {
+            logger.warning("the recognizer stopped domain=\(error.domain, privacy: .public) code=\(error.code) detail=\(error.detail, privacy: .public)")
+        }
+        switch voiceSegmentNext(final: final, error: error, quietRuns: quietRuns, limit: Self.quietRestarts) {
+        case .goOn:
+            // A pause the recognizer closed a segment on, or a silence: the go goes on.
+            if error != nil { quietRuns += 1 }
             beginSegment(recognizer)
+        case .stopQuiet:
+            Task { await finish(keep: true, why: String(localized: "Dictation stopped: nothing more was heard. What was heard is in the box.", comment: "Composer: voice typing ended after several silences")) }
+        case .stopFailed:
+            let detail: String = error?.detail ?? ""
+            Task { await finish(keep: true, why: String(localized: "Dictation stopped: \(detail). What was heard is in the box.", comment: "Composer: the phone's recognizer failed; the argument is its words")) }
         }
     }
 
@@ -475,11 +498,19 @@ final class MacVoiceFeed: Sendable {
     private let continuation: AsyncStream<Data>.Continuation
     private let sender: Task<String, Error>
 
-    init(api: DaemonAPI, language: String) {
+    /// `failed` is told when the stream cannot be opened or fed before its end (not when it is dropped).
+    init(api: DaemonAPI, language: String, failed: @escaping @Sendable () -> Void) {
         let (stream, continuation): (AsyncStream<Data>, AsyncStream<Data>.Continuation) = AsyncStream.makeStream(of: Data.self)
         self.continuation = continuation
         sender = Task {
-            let opened: VoiceStream = try await api.openVoiceStream(language: language)
+            let opened: VoiceStream
+            do {
+                opened = try await api.openVoiceStream(language: language)
+            } catch {
+                continuation.finish()
+                if !Task.isCancelled { failed() }
+                throw error
+            }
             do {
                 var pending: Data = Data()
                 var number: Int = 0
@@ -500,6 +531,8 @@ final class MacVoiceFeed: Sendable {
                 return try await api.endVoiceStream(opened.id).text
             } catch {
                 try? await api.dropVoiceStream(opened.id)
+                continuation.finish()
+                if !Task.isCancelled { failed() }
                 throw error
             }
         }

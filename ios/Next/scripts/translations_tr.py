@@ -761,6 +761,8 @@ TR: dict[str, str] = {
     "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi; bu yüzden anahtar gönderilmedi. Biraz sonra yeniden denetle.",
     "Your Mac did not answer the check of this phone's key.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi.",
     # Helper L1 (items 1800-1802): the chat list's select mode, the chat's settings, voice typing, Settings › Voice.
+    'Dictation stopped: nothing more was heard. What was heard is in the box.': 'Dikte durdu: başka bir şey duyulmadı. Duyulanlar kutuda.',
+    'Dictation stopped: %@. What was heard is in the box.': 'Dikte durdu: %@. Duyulanlar kutuda.',
     'Default level': 'Varsayılan düzey',
     'The models could not be read: %@': 'Modeller okunamadı: %@',
     'Recently used': 'Son kullanılanlar',

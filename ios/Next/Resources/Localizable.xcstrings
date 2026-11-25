@@ -2303,6 +2303,28 @@
         }
       }
     },
+    "Dictation stopped: %@. What was heard is in the box.": {
+      "comment": "Composer: the phone's recognizer failed; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte durdu: %@. Duyulanlar kutuda."
+          }
+        }
+      }
+    },
+    "Dictation stopped: nothing more was heard. What was heard is in the box.": {
+      "comment": "Composer: voice typing ended after several silences",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte durdu: başka bir şey duyulmadı. Duyulanlar kutuda."
+          }
+        }
+      }
+    },
     "Dictation writes your words on this iPhone; no audio leaves it.": {
       "comment": "General: footer under dictation",
       "localizations": {

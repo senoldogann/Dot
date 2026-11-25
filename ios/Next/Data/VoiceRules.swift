@@ -107,6 +107,45 @@ func languageTag(_ locale: Locale) -> String {
     return language == "tr" ? "tr-TR" : language == "en" ? "en-US" : language
 }
 
+/// A recognizer's error as the rules read it: its domain and code, and its words for the owner.
+struct RecognizerError: Equatable, Sendable {
+    let domain: String
+    let code: Int
+    let detail: String
+
+    init(domain: String, code: Int, detail: String) {
+        self.domain = domain
+        self.code = code
+        self.detail = detail
+    }
+
+    init(_ error: Error) {
+        let ns: NSError = error as NSError
+        self.init(domain: ns.domain, code: ns.code, detail: ns.localizedDescription)
+    }
+
+    /// "No speech detected" (Speech's assistant domain, 1110): a silence, not a failure.
+    var isSilence: Bool { domain == "kAFAssistantErrorDomain" && code == 1110 }
+}
+
+/// What a segment's end leads to while the owner records.
+enum VoiceSegmentNext: Equatable, Sendable {
+    /// A new segment on the same microphone.
+    case goOn
+    /// Silences past the limit with no word: the go ends with what was heard.
+    case stopQuiet
+    /// A real failure of the recognizer: the go ends, its words said.
+    case stopFailed
+}
+
+/// A pause the recognizer closed a segment on goes on; a silence goes on up to `limit` times in a row with no word; any
+/// other error ends the go (never a silent loop of new segments that hear nothing).
+func voiceSegmentNext(final: Bool, error: RecognizerError?, quietRuns: Int, limit: Int) -> VoiceSegmentNext {
+    guard let error else { return .goOn }
+    guard error.isSilence else { return .stopFailed }
+    return quietRuns < limit ? .goOn : .stopQuiet
+}
+
 /// A recording's clock: "0:07", "1:42", "12:03".
 func recordingClock(_ seconds: Int) -> String {
     String(format: "%d:%02d", seconds / 60, seconds % 60)

@@ -122,6 +122,15 @@ final class ChatSettingsAndVoiceTests: XCTestCase {
         XCTAssertEqual(TranscribeOn.current(defaults), .device, "this phone until the owner picks the Mac")
     }
 
+    func testARecognizerErrorIsNotAPause() {
+        let silence: RecognizerError = RecognizerError(domain: "kAFAssistantErrorDomain", code: 1110, detail: "No speech detected")
+        let broken: RecognizerError = RecognizerError(domain: "kAFAssistantErrorDomain", code: 1101, detail: "Local speech recognition failed")
+        XCTAssertEqual(voiceSegmentNext(final: true, error: nil, quietRuns: 0, limit: 3), .goOn, "a pause goes on")
+        XCTAssertEqual(voiceSegmentNext(final: false, error: silence, quietRuns: 2, limit: 3), .goOn, "a silence goes on a few times")
+        XCTAssertEqual(voiceSegmentNext(final: false, error: silence, quietRuns: 3, limit: 3), .stopQuiet, "then the go ends")
+        XCTAssertEqual(voiceSegmentNext(final: false, error: broken, quietRuns: 0, limit: 3), .stopFailed, "a failure ends it at once")
+    }
+
     func testTheClockTheLanguageTagAndTheLevels() {
         XCTAssertEqual(recordingClock(7), "0:07")
         XCTAssertEqual(recordingClock(102), "1:42")
