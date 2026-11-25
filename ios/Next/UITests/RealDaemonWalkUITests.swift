@@ -58,9 +58,7 @@ final class RealDaemonWalkUITests: XCTestCase {
         field.tap()
         field.typeText("[test] Reply with the single word: ready")
         app.buttons["composer.send"].tap()
-        let row: XCUIElement = app.collectionViews.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "[test]")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "the new chat in the list")
-        row.tap()
+        // The new chat opens at once and turns into the real chat in place (item 1849): no row to tap in the list.
         let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND NOT (label CONTAINS %@)", "ready", "[test]")).firstMatch
         XCTAssertTrue(answer.waitForExistence(timeout: 180), "Dot's answer")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())

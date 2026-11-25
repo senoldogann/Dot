@@ -7,6 +7,18 @@ the pull request's checks began under none of its files, and otherwise brings th
 (`gh pr update-branch`) and stops, so that the checks run again on what the merge would make. A break across files
 that neither shares is what `main`'s own run of the gate, on every push, shows after the merge.
 
+Markdown no test reads does not count as a shared file (item 1863). Nearly every pull request writes
+`roadmap/INDEX.md` and a page under `docs/`, so each merge sent every other pull request back to run its 20 to 30
+minutes of checks again. `roadmap/INDEX.md` never counts: the gate's item-records check fails a stale one, and the rows
+two pull requests add at the same place conflict, which makes the second unmergeable rather than wrong. Any other
+Markdown file counts when a test names it: its file name, quoted, in a file under `tests/` of `main` or of the pull
+request's head (`tests/unit/test_css_tokens.py` reads `docs/daemon.md` as `"daemon.md"`), so a test added tomorrow
+counts without a list to keep. The items' records (`roadmap/<n>.md`, `changes/<n>.md`, which a test may name by number)
+and every `SKILL.md` (Dot reads them) always count; neither is a file two pull requests share in practice. A file under
+`docs/` that is not Markdown (a schema a test loads) is code. One check reads every file,
+`tests/unit/test_own_words.py`, and its names are found within a line: two edits that merge cleanly cannot make a match
+neither made but by splitting a name over the line between them, which `main`'s own run catches.
+
 The checks' run is the latest of `gate.yml` for the pull request's head; the commits `main` took since are those its
 log, first parent, dates from :data:`MARGIN` before that run was made (a merge's commit is dated when it is merged).
 When it was made, not when it began: a run started again (`gh run rerun`) begins anew but checks the same merge of the
@@ -58,6 +70,26 @@ def shared_files(changed: list[str], moved: list[str]) -> list[str]:
     return sorted(set(changed) & set(moved))
 
 
+def asks_the_tests(path: str) -> bool:
+    """Whether ``path`` counts only when a test names it: Markdown, but the roadmap's index (which never counts), an
+    item's records and a skill (which always do)."""
+    name: str = path.rsplit("/", 1)[-1]
+    return (
+        path.endswith(".md")
+        and path != "roadmap/INDEX.md"
+        and not path.startswith(("roadmap/", "changes/"))
+        and name != "SKILL.md"
+    )
+
+
+def counts(path: str, named_by_a_test: bool) -> bool:
+    """Whether ``main`` changing ``path`` under the pull request sends it back to run its checks on main: every file
+    but `roadmap/INDEX.md` and Markdown no test names (``named_by_a_test``, read only for :func:`asks_the_tests`)."""
+    if path == "roadmap/INDEX.md":
+        return False
+    return named_by_a_test if asks_the_tests(path) else True
+
+
 def counted_since(created_at: str, margin: timedelta) -> str:
     """The moment from which `main`'s commits count as unchecked: ``margin`` before the run was made (ISO 8601)."""
     made: datetime = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
@@ -94,6 +126,18 @@ def _moved_since(run: GateRun) -> list[str]:
         "--no-renames", "--format=", "origin/main",
     ]  # fmt: skip
     return [line for line in _run(argv).splitlines() if line]
+
+
+def _named_by_a_test(path: str, head: str) -> bool:
+    """Whether a file under `tests/` of `main` or of ``head`` names ``path``'s file name in quotes."""
+    name: str = path.rsplit("/", 1)[-1]
+    argv: list[str] = [
+        "git", "grep", "-q", "-F", "-e", f'"{name}"', "-e", f"'{name}'", "origin/main", head, "--", "tests",
+    ]  # fmt: skip
+    done: subprocess.CompletedProcess[str] = subprocess.run(argv, capture_output=True, text=True, check=False)
+    if done.returncode not in (0, 1):
+        raise MergeRefused(f"{' '.join(argv)} failed ({done.returncode}): {done.stderr.strip()[:600]}")
+    return done.returncode == 0
 
 
 def _gate_runs(head: str) -> list[GateRun]:
@@ -193,7 +237,11 @@ def merge(number: int, method: str) -> int:
     _run(["git", "fetch", "--quiet", "origin", "main", head])
     # A head brought up to main since (item 1078): its checks ran on main as it is, every file of it.
     moved: list[str] = [] if _holds(head, "origin/main") else _moved_since(run)
-    shared: list[str] = shared_files(changed, moved)
+    shared: list[str] = [
+        path
+        for path in shared_files(changed, moved)
+        if counts(path, asks_the_tests(path) and _named_by_a_test(path, head))
+    ]
     if shared:
         _run(["gh", "pr", "update-branch", str(number)])
         print(f"main changed {', '.join(shared)} since the checks of {head} began: brought up to main; merge again "

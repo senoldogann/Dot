@@ -212,7 +212,7 @@ async def _events(runtime: Runtime, run_id: str, kind: str) -> list[EventRecord]
 
 async def _start_campaign(manager: RunManager) -> RunRecord:
     return await manager.start_campaign(
-        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None
+        GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None, ()
     )
 
 
@@ -432,7 +432,17 @@ async def test_a_session_the_daemon_cut_off_is_not_resumed_and_the_next_session_
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         await store.set_campaign_targets(campaign.id, TARGETS, VERIFICATION)
         cut: RunRecord = await store.create_run(
@@ -653,7 +663,17 @@ async def test_the_stop_and_the_achieved_of_a_campaign_ask_the_command_that_driv
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         # The session's run is at work in the store; no handle of this process holds it.
         session: RunRecord = await store.create_run(
@@ -755,7 +775,7 @@ async def test_a_campaign_whose_session_still_works_is_not_deleted(login_env: di
         ) as client,
     ):
         session: RunRecord = await manager.start_campaign(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None, ()
         )
         assert session.campaign_id is not None
         async with asyncio.timeout(_TIME_LIMIT_S):
@@ -782,11 +802,11 @@ async def test_a_campaign_that_asks_for_the_owners_chrome_is_refused_while_that_
     async with _session(_config(60.0), login_env, model, Notices()) as (runtime, manager):
         with pytest.raises(BrowserError, match="Chrome is not running"):
             await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), "attach"
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), "attach", ()
             )
         assert await runtime.store.list_campaigns() == []
         opening: RunRecord = await manager.start_campaign(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), "own"
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), "own", ()
         )
         assert opening.campaign_id is not None
         assert (await runtime.store.get_campaign(opening.campaign_id)).browser == "own"
@@ -809,12 +829,12 @@ async def test_a_campaign_without_a_chrome_is_checked_against_the_mode_the_daemo
         await runtime.browser.switch(own.model_copy(update={"mode": "attach"}), browser_data_dir("attach", own.profile))
         with pytest.raises(BrowserError, match="Chrome is not running"):
             await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None, ()
             )
         assert await runtime.store.list_campaigns() == []
         await runtime.browser.switch(own, browser_data_dir("own", own.profile))
         opening: RunRecord = await manager.start_campaign(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "ask", None, (), None, ()
         )
         assert opening.campaign_id is not None
         assert (await runtime.store.get_campaign(opening.campaign_id)).browser is None
@@ -849,7 +869,7 @@ async def test_the_emergency_stop_ends_a_session_as_one_and_holds_the_campaign_w
         runtime.bus.subscribe_kinds(frozenset({CAMPAIGN_ENDED_EVENT})) as ending,
     ):
         session: RunRecord = await manager.start_campaign(
-            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None, ()
         )
         assert session.campaign_id is not None
         async with asyncio.timeout(_TIME_LIMIT_S):
@@ -904,7 +924,7 @@ async def test_a_campaign_stopped_while_its_session_starts_starts_no_session(log
         manager: _StoppedWhileStarting = _StoppedWhileStarting(runtime)
         try:
             opening: RunRecord = await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None
+                GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None, ()
             )
             assert opening.campaign_id is not None
             async with asyncio.timeout(_TIME_LIMIT_S):
@@ -954,7 +974,7 @@ async def test_an_emergency_stop_while_a_session_starts_ends_it_and_the_schedule
             campaigns: list[str] = []
             for _ in range(2):
                 opening: RunRecord = await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None
+                    GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None, ()
                 )
                 assert opening.campaign_id is not None
                 async with asyncio.timeout(_TIME_LIMIT_S):
@@ -1080,7 +1100,17 @@ async def test_a_session_whose_dotx_command_died_is_followed_once_the_daemon_clo
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         # The command that drove the session is gone, and the lock of its owner with it.
         left: RunRecord = await store.create_run(
@@ -1151,7 +1181,7 @@ async def test_a_campaign_whose_opening_session_could_not_start_in_any_way_is_no
             threads: int = await asyncio.to_thread(_threads, db_path())
             with pytest.raises(OSError, match="No space left on device"):
                 await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), "own"
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), "own", ()
                 )
             assert await runtime.store.list_campaigns() == []
             assert await manager.resume_campaigns() == 0
@@ -1182,7 +1212,7 @@ async def test_a_campaign_whose_opening_session_failed_after_its_run_was_stored_
         try:
             with pytest.raises(StoreError, match="the disk is full"):
                 await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, chat.id, UI_SOURCE, None, "standard", None, "ask", None, (), None
+                    GOAL, "task", SCRIPTED_MODEL, chat.id, UI_SOURCE, None, "standard", None, "ask", None, (), None, ()
                 )
         finally:
             runtime.bus.emit = emit  # type: ignore[method-assign]
@@ -1214,7 +1244,17 @@ async def test_a_session_that_ends_as_the_daemon_stops_is_followed_unless_the_sh
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         session: RunRecord = await store.create_run(
             thread.id, GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, "medium", "standard", None, "ask", False,
@@ -1240,7 +1280,17 @@ async def test_a_session_that_could_not_start_in_any_way_is_tried_again_after_th
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         manager: _LaunchFails = _LaunchFails(runtime)
         try:
@@ -1269,7 +1319,17 @@ async def test_a_campaign_whose_sessions_keep_failing_stops_saying_so(login_env:
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         try:
             for status in ("failed", "failed", "done", "failed", "failed"):
@@ -1302,7 +1362,17 @@ async def test_a_claim_that_comes_after_the_owner_stopped_the_campaign_leaves_it
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         assert await store.stop_active_campaign(campaign.id)
         assert not await store.achieve_campaign(campaign.id, "Fifty leads.", only_active=True)
@@ -1323,7 +1393,17 @@ async def test_a_campaign_whose_session_ended_without_planning_the_next_is_plann
         store = runtime.store
         thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
         campaign: CampaignRecord = await store.create_campaign(
-            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+            "Leads",
+            GOAL,
+            thread.id,
+            SCRIPTED_MODEL,
+            runtime.config.models.effort,
+            "standard",
+            None,
+            "ask",
+            (),
+            "own",
+            (),
         )
         session: RunRecord = await store.create_run(
             thread.id,

@@ -16,7 +16,13 @@ Steer now and Queue, the follow-up setting's way checked, and sends the draft th
 composer's Stop, the chat's header has none), the queue sheet and the edit of a queued message, the run inspector, reactions.
 While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
 and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
-every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;
+every second whether events come or not. A new chat opens as soon as its first message is sent, under the outbox's
+key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
+while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
+once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
+(the app's model publishes the store's snapshot by part, at most 30 times a second), and the live thinking's last
+three lines are clipped from the top rather than cut at the head, so a new word never moves the words before it
+(item 1848). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
@@ -92,6 +98,41 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 (cd DotEngine && swift test)
 ```
 
+## CI
+
+`.github/workflows/ios.yml` runs the above on GitHub's macOS runners, so the Mac does not have to: `engine`
+(`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), `tests (chat)`,
+`tests (controls)` and `tests (rows)` (the unit and UI tests from that build; each test of `SettingsControlsUITests`
+takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
+throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
+
+- A pull request that changes `ios/**` runs `engine`, `build` and `tests (chat)` (about 20 minutes).
+- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs on a push to `main`, every night,
+  when asked (`gh workflow run ios.yml --ref <branch>`), and on a pull request with the label `ios-full`
+  (`gh pr edit <pr> --add-label ios-full`; adding it starts the run).
+- A run holds two macOS runners at most, so that three of the account's five stay free for the gate.
+- A test that fails, unit or UI, runs once more (`-retry-tests-on-failure`; `e2e` runs its whole script once more): a
+  fresh runner's simulator sometimes fails to launch the app or start the test runner. A test that fails twice fails
+  the part; one that passed only on its retry is named in the job's summary as "passed on retry: <test>" and as a
+  warning, so the retry hides no flaky test.
+
+Run a test on the Mac only to reproduce a failure CI showed, and the screenshots for the owner.
+
+```bash
+gh pr checks <pr>                                   # the ios jobs among the others
+gh run list --workflow ios.yml --branch <branch>    # the runs, newest first
+gh run view <run id> --log-failed                   # the lines of the step that failed
+gh run download <run id> -n ios-tests-chat -D /tmp/ios-chat   # also ios-tests-controls, ios-tests-rows, ios-e2e
+open /tmp/ios-chat/tests.xcresult                   # the whole result in Xcode; shots/ holds every screenshot as PNG
+```
+
+The artifacts are kept 7 days: `tests.xcresult` (or `e2e.xcresult`, with `e2e-logs/`: the daemon's and xcodebuild's
+logs of each try, and the first try's result when it was retried) and `shots/`, its attachments exported with
+`xcrun xcresulttool export attachments` (`shots/manifest.json` names the test of each file): the screenshot and
+description XCTest keeps of a failure, and whatever a test attaches with `XCTAttachment` and `lifetime = .keepAlways`.
+A passing test keeps no screenshot of its own; the owner's screenshots of every scene stay `scripts/shots.sh` on the
+Mac.
+
 ## End to end against a throwaway daemon
 
 ```bash
@@ -104,7 +145,11 @@ Build DotNext for the simulator signed locally (`CODE_SIGN_IDENTITY=-`, so it ha
 `http://127.0.0.1:18765` (debug builds only take a loopback address) and the code. The script's model replies by the
 message: `helper: …` starts a helper, `wait: …` waits in `wait_until`, `slow: …` takes 8 s. A debug launch with
 `-DotNextScene live-chat -DotNextProbe 20` sends 20 messages in the first chat and writes send → first event on screen
-to `Library/Caches/dotnext-latency.txt`.
+to `Library/Caches/dotnext-latency.txt`. `ios/Next/scripts/e2e_streaming.sh <udid> <derived data> [test] [video]`
+runs `StreamingLiveUITests` on such a daemon: a new chat stays open when its first message is sent, and the
+`stream:` script (four steps that think aloud and read a file, then a long answer, about 40 words a second) is measured
+by the debug frame meter (`-DotNextFrameMeter 1`: frames, hitches, frames over 16.7 ms, hitch time per second, one line
+per run in `Library/Caches/dotnext-frames.txt`).
 
 ## The chat's fixtures
 
@@ -112,7 +157,7 @@ Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtu
 JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`, `n2-editing`, `n2-failed`,
 `n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`. The UI tests (`UITests/ChatUITests.swift`, target
 `DotNextUITests`) run on them. The e2e daemon's script words for the chat: `approve:`, `question:`, `secret:`, `tools:`,
-`fail:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
+`fail:`, `stream:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
 
 ## Settings' fixtures and end to end
 

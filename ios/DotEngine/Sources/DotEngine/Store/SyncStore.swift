@@ -27,10 +27,13 @@ public struct EngineSnapshot: Sendable, Equatable {
     public var savedAt: [String: Double]
     /// When a chat's copy was saved while a run of it worked.
     public var workingAt: [String: Double]
+    /// The chats this phone started, by the outbox key of their first message: the thread the daemon named for each
+    /// (item 1849), kept for the session.
+    public var startedChats: [String: String]
 
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
-        workingAt: [:])
+        workingAt: [:], startedChats: [:])
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -315,20 +318,27 @@ public actor SyncStore {
             default: nil
             }
         let before: Set<String> = key.flatMap { runsAtSend.removeValue(forKey: $0) } ?? []
+        var changed: Bool = false
+        if case .started(let item, let run) = outcome {
+            state.startedChats[item.id] = run.threadId
+            changed = true
+        }
         if let message: AcceptedMessage = accepted(from: outcome, at: clock.now(), runsBefore: before) {
             state.accepted[message.key] = message
             pruneAccepted()
-            publish()
+            changed = true
         }
+        if changed { publish() }
     }
 
     /// Drops the overlay of a message the chat now shows in its own place.
     private func pruneAccepted() {
         for (key, message) in state.accepted {
             guard let thread: String = message.thread, let chat: ChatProjection = state.chats[thread] else {
-                // A new chat: dropped once the list has its row.
-                if message.kind == .run, let thread: String = message.thread, state.list.rows.contains(where: { $0.summary.id == thread }),
-                    state.chats[thread] == nil
+                // A new chat: dropped once the list has its row, unless this phone started it (item 1849): the chat opens
+                // at once and draws the owner's words from this overlay until its own picture shows them, below.
+                if message.kind == .run, state.startedChats[key] == nil, let thread: String = message.thread,
+                    state.list.rows.contains(where: { $0.summary.id == thread }), state.chats[thread] == nil
                 {
                     state.accepted[key] = nil
                 }

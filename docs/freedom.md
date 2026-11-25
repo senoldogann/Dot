@@ -100,8 +100,9 @@ is told so. A run that did what the policy would have asked about can always be 
   classification and not a hand-written action: shell (read, write and delete in and outside the workspace, `curl`, `git
   push`, a deploy, mail), files (write and edit anywhere, Dot's own files, a protected place), the browser (navigate,
   click, type, submit a form, a post, a payment, an upload, a vault login), the desktop (click, type, open an app,
-  AppleScript), the web, MCP, schedules, memory, delegation and teams, the terminal, waits, drafts, the phone and
-  code mode's `code_run`. A real
+  AppleScript), the web, MCP, schedules, memory, delegation and teams, the terminal, waits, drafts, the phone,
+  `add_proof` and code mode's `code_run`. A proof check (item 1853) is a `shell` call Dot makes for the run, judged as
+  that row of the table is, so it adds no ask. A real
   `RunGate` on a real store decides each in every way a run can stand: yolo and free (also over `ask`, `auto` and
   `supervised`, in a chat of Dot's own, after outside content), and yolo alone in each kind of chat. Where this page names an
   ask the owner is asked and nothing else; everywhere else the call goes through unasked and a step the policy would have

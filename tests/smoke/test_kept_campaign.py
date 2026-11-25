@@ -136,7 +136,7 @@ async def test_a_session_keeps_a_question_and_allow_once_brings_the_next_session
         await scheduler.start()
         try:
             opening: RunRecord = await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), None
+                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), None, ()
             )
             assert opening.campaign_id is not None
             campaign_id: str = opening.campaign_id
@@ -204,7 +204,7 @@ async def test_allow_once_of_a_step_an_earlier_session_kept_reaches_the_session_
         await scheduler.start()
         try:
             opening: RunRecord = await manager.start_campaign(
-                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), None
+                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), None, ()
             )
             assert opening.campaign_id is not None
             campaign_id: str = opening.campaign_id

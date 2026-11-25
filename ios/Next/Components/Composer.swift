@@ -479,8 +479,10 @@ struct FloatingWorkingControl: View {
         return layout {
             if let status = summary.status {
                 // The status and its clock are drawn every second, whether events come or not: a clock drawn with
-                // the screen froze between events and jumped when they came (the owner's report of 2026-11-25).
-                TimelineView(.periodic(from: .now, by: 1)) { context in
+                // the screen froze between events and jumped when they came (the owner's report of 2026-11-25). The
+                // ticks are counted from the run's start, never from `.now`: a schedule from `.now` began again at
+                // every drawing of the screen, so words streaming faster than once a second held the clock still.
+                TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
                     segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
                         HStack(spacing: Space.xxs + 1) {

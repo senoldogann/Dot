@@ -1,0 +1,123 @@
+import QuartzCore
+import SwiftUI
+
+/// Debug builds: measures the chat's frames while a run works (`-DotNextFrameMeter 1`), the record of the streaming
+/// check (`scripts/e2e_streaming.sh`). A display link counts every frame from the run's start to its end; a frame later
+/// than one and a half of the display's interval is a hitch, and what it ran over is hitch time. Beside it a probe asks
+/// the main thread every 8 ms and times how long it waits (a simulator that is not on screen slows its display link,
+/// the main thread's waits are measured either way). One line per run goes to `Library/Caches/dotnext-frames.txt`:
+/// frames, hitches, frames over 16.7 ms, the longest frame, hitch time per second; the probe's waits over 16.7 ms and
+/// over 50 ms, its longest, and the main thread's blocked time per second.
+@MainActor
+final class FrameMeter: NSObject {
+    static let shared: FrameMeter = FrameMeter()
+    private var link: CADisplayLink?
+    private var last: CFTimeInterval = 0
+    private var started: CFTimeInterval = 0
+    private var frames: Int = 0
+    private var hitches: Int = 0
+    private var over16: Int = 0
+    private var longest: CFTimeInterval = 0
+    private var hitchTime: CFTimeInterval = 0
+    private var probe: Task<Void, Never>?
+    private var waits: Int = 0
+    private var waitsOver16: Int = 0
+    private var waitsOver50: Int = 0
+    private var longestWait: Double = 0
+    private var blocked: Double = 0
+
+    static var enabled: Bool {
+        #if DEBUG
+            UserDefaults.standard.bool(forKey: "DotNextFrameMeter")
+        #else
+            false
+        #endif
+    }
+
+    func start() {
+        guard link == nil else { return }
+        frames = 0
+        hitches = 0
+        over16 = 0
+        longest = 0
+        hitchTime = 0
+        last = 0
+        waits = 0
+        waitsOver16 = 0
+        waitsOver50 = 0
+        longestWait = 0
+        blocked = 0
+        started = CACurrentMediaTime()
+        probe = Task.detached { [weak self] in
+            while !Task.isCancelled {
+                let asked: Double = CACurrentMediaTime()
+                await MainActor.run { self?.waited(CACurrentMediaTime() - asked) }
+                try? await Task.sleep(for: .milliseconds(8))
+            }
+        }
+        let made: CADisplayLink = CADisplayLink(target: self, selector: #selector(frame(_:)))
+        made.add(to: .main, forMode: .common)
+        link = made
+    }
+
+    @objc private func frame(_ link: CADisplayLink) {
+        defer { last = link.timestamp }
+        guard last > 0 else { return }
+        let interval: CFTimeInterval = link.timestamp - last
+        let expected: CFTimeInterval = link.duration > 0 ? link.duration : 1.0 / 60.0
+        frames += 1
+        longest = max(longest, interval)
+        if interval > 1.0 / 60.0 + 0.0005 { over16 += 1 }
+        if interval > expected * 1.5 {
+            hitches += 1
+            hitchTime += interval - expected
+        }
+    }
+
+    private func waited(_ seconds: Double) {
+        waits += 1
+        longestWait = max(longestWait, seconds)
+        if seconds > 1.0 / 60.0 { waitsOver16 += 1 }
+        if seconds > 0.05 { waitsOver50 += 1 }
+        if seconds > 1.0 / 60.0 { blocked += seconds }
+    }
+
+    func stop() {
+        guard let link else { return }
+        link.invalidate()
+        self.link = nil
+        probe?.cancel()
+        probe = nil
+        let seconds: Double = max(CACurrentMediaTime() - started, 0.001)
+        let line: String = String(
+            format: "frames=%d hitches=%d over16ms=%d longest_ms=%.1f hitch_ms_per_s=%.1f | main_waits=%d over16ms=%d over50ms=%d longest_ms=%.1f blocked_ms_per_s=%.1f | seconds=%.1f\n",
+            frames, hitches, over16, longest * 1000, hitchTime * 1000 / seconds, waits, waitsOver16, waitsOver50, longestWait * 1000,
+            blocked * 1000 / seconds, seconds)
+        let file: URL = URL.cachesDirectory.appending(path: "dotnext-frames.txt")
+        if let handle = try? FileHandle(forWritingTo: file) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: file)
+        }
+    }
+}
+
+/// Starts the frame meter when a run of the open chat starts and writes its line when the run ends (debug builds with
+/// `-DotNextFrameMeter 1`; nothing otherwise).
+struct FrameMeterHook: ViewModifier {
+    let running: Bool
+
+    func body(content: Content) -> some View {
+        if FrameMeter.enabled {
+            content
+                .onChange(of: running, initial: true) { _, now in
+                    if now { FrameMeter.shared.start() } else { FrameMeter.shared.stop() }
+                }
+                .onDisappear { FrameMeter.shared.stop() }
+        } else {
+            content
+        }
+    }
+}

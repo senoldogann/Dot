@@ -244,7 +244,7 @@ async def test_dots_newest_run_is_its_own_chats_and_not_an_agents_a_helpers_a_te
         team = await store.create_team("Crew", "", [agent.id], None)
         await run(await store.create_thread("With the crew", "ui", team.id), None, None, None)
         campaign = await store.create_campaign(
-            "Long", "goal", chat.id, "ollama:m", "medium", "standard", None, "ask", [], None
+            "Long", "goal", chat.id, "ollama:m", "medium", "standard", None, "ask", [], None, ()
         )
         await run(await store.create_thread("A session", "campaign"), None, campaign.id, None)
         assert await store.latest_dot_run() == dots

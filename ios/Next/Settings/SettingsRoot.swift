@@ -38,7 +38,7 @@ struct SettingsTab: View {
         SettingsScroll(title: String(localized: "Settings", comment: "Title of the settings tab")) {
             stopBlock
             GroupedSection(header: String(localized: "Connections", comment: "Settings section: the Mac, notifications, this phone"), footer: nil) {
-                PageRow(page: .mac, systemImage: "desktopcomputer", title: String(localized: "This Mac", comment: "Settings row: the paired Mac"), description: nil, detail: transportWord(model.snapshot.transport))
+                PageRow(page: .mac, systemImage: "desktopcomputer", title: String(localized: "This Mac", comment: "Settings row: the paired Mac"), description: nil, detail: transportWord(model.transport))
                 PageRow(page: .notifications, systemImage: "bell", title: String(localized: "Notifications", comment: "Settings row"), description: nil, detail: nil)
             }
             GroupedSection(header: nil, footer: nil) {

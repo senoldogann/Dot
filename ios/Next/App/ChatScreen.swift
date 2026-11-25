@@ -8,6 +8,12 @@ enum ChatScrollMemory {
     static var anchors: [String: String] = [:]
 }
 
+/// The row of a chat that came into sight last, kept by reference: writing it draws nothing again (item 1848).
+@MainActor
+final class ReadingMark {
+    var topVisible: String?
+}
+
 /// One chat (wave N2, plan §4.1): the transcript with its work log, the ask dock in the composer's place, the
 /// composer with Send / Queue / Stop, the queue with its edit, the header's quick panels and the run inspector.
 struct ChatScreen: View {
@@ -28,9 +34,13 @@ struct ChatScreen: View {
     @State private var dockFolded: Bool = false
     @State private var shownAsks: [DockEntry] = []
     @State private var dismissedAsks: Set<String> = []
-    @State private var nearEnd: Bool = true
+    @State private var position: ScrollPosition = ScrollPosition()
+    /// The transcript follows new words (the owner is at its end, or went back to it).
+    @State private var pinned: Bool = true
+    /// The owner's finger moves the transcript, or it glides on after it.
+    @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
-    @State private var topVisible: String?
+    @State private var reading: ReadingMark = ReadingMark()
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
     /// The answer of a side question (`/btw`), shown in an alert.
@@ -41,7 +51,7 @@ struct ChatScreen: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.locale) private var locale: Locale
 
-    private var chat: ChatProjection? { model.snapshot.chats[thread] }
+    private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
     private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
     private var helpers: [HelperView] { view?.helpers ?? [] }
@@ -51,16 +61,16 @@ struct ChatScreen: View {
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
     private var builtItems: [TranscriptItem] {
-        guard let chat else { return [] }
-        return transcript(
-            of: chat, pending: model.snapshot.pending(in: thread), mode: mode, streaming: streaming,
+        // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
+        transcript(
+            of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), mode: mode, streaming: streaming,
             context: TranscriptContext(answeredHere: model.answeredHere))
     }
 
     private var dock: [DockEntry] {
         let ownRuns: Set<String> = Set((view?.runs ?? []).filter { $0.parentRunId == nil }.map(\.id))
         return dockEntries(
-            asks: view?.asks ?? [], chatRuns: ownRuns, outbox: model.snapshot.outbox, online: model.snapshot.online, local: model.askPhases,
+            asks: view?.asks ?? [], chatRuns: ownRuns, outbox: model.outbox, online: model.online, local: model.askPhases,
             shown: shownAsks, decided: decidedAsks, answeredHere: model.answeredHere
         ).filter { !dismissedAsks.contains($0.id) }
     }
@@ -80,7 +90,7 @@ struct ChatScreen: View {
         let items: [TranscriptItem] = builtItems
         return content(items)
             .background(Tone.ground)
-            .navigationTitle(view?.thread.title ?? model.snapshot.list.rows.first { $0.summary.id == thread }?.summary.title ?? "")
+            .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
             .navigationSubtitle(subtitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
@@ -99,7 +109,7 @@ struct ChatScreen: View {
             .onDisappear {
                 model.close(thread)
                 if edit == nil { model.keep(draft: draft, of: thread) }
-                if let topVisible { ChatScrollMemory.anchors[thread] = topVisible }
+                if let topVisible = reading.topVisible { ChatScrollMemory.anchors[thread] = topVisible }
             }
             .onChange(of: draft) { _, words in if edit == nil { model.keep(draft: words, of: thread) } }
             .onChange(of: dock) { _, entries in shownAsks = entries }
@@ -108,6 +118,7 @@ struct ChatScreen: View {
             .task { await model.loadModels() }
             .modifier(ComposerLists(thread: thread, lastRun: view?.runs.last(where: { $0.parentRunId == nil })?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
+            .modifier(FrameMeterHook(running: activeRun != nil))
             .onKeyPress(.escape) {
                 if panel != nil {
                     panel = nil
@@ -124,13 +135,13 @@ struct ChatScreen: View {
             EmptyState(
                 title: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), systemImage: "trash",
                 detail: String(localized: "It was deleted on your Mac or another device.", comment: "Empty state of a deleted chat"), actionTitle: nil, action: {})
-        } else if items.isEmpty, model.snapshot.transport == .offline || model.snapshot.transport == .keyRefused {
+        } else if items.isEmpty, model.transport == .offline || model.transport == .keyRefused {
             EmptyState(
-                title: model.snapshot.transport == .keyRefused
+                title: model.transport == .keyRefused
                     ? String(localized: "This phone's key was refused", comment: "Chat subtitle: the Mac no longer takes this phone's key")
                     : String(localized: "Can't reach your Mac", comment: "Empty chat when offline with nothing saved"),
                 systemImage: "wifi.slash",
-                detail: model.snapshot.transport == .keyRefused
+                detail: model.transport == .keyRefused
                     ? String(localized: "Pair this phone again in Settings.", comment: "Empty chat when the key was refused")
                     : String(localized: "Nothing of this chat is saved on this phone yet. It loads once the phone reaches your Mac.", comment: "Empty chat when offline with nothing saved"),
                 actionTitle: nil, action: {})
@@ -140,87 +151,72 @@ struct ChatScreen: View {
     }
 
     private func transcriptView(_ items: [TranscriptItem]) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Space.m) {
-                    chatStart
-                    if chat?.freshness == .deleted {
-                        Notice(tone: .info, message: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), dismiss: nil)
-                    }
-                    if let unreadable = chat?.unreadable, unreadable > 0 {
-                        Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
-                    }
-                    ForEach(TranscriptBlock.of(items)) { block in
-                        Group {
-                            switch block {
-                            case .item(let item): row(item)
-                            case .tools(let entries): ToolRun(entries: entries)
-                            }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: Space.m) {
+                if chat?.freshness == .deleted {
+                    Notice(tone: .info, message: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), dismiss: nil)
+                }
+                if let unreadable = chat?.unreadable, unreadable > 0 {
+                    Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
+                }
+                ForEach(TranscriptBlock.of(items)) { block in
+                    Group {
+                        switch block {
+                        case .item(let item): row(item)
+                        case .tools(let entries): ToolRun(entries: entries)
                         }
-                        .id(block.id)
-                        .onAppear { topVisible = block.id }
                     }
-                    Color.clear.frame(height: 1).id("end")
-                }
-                .frame(maxWidth: proseWidth)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, Space.gutter)
-                .padding(.vertical, Space.m)
-            }
-            .overlay {
-                if items.isEmpty, chat?.freshness != .deleted {
-                    LoadingState(message: String(localized: "Syncing…", comment: "Chat subtitle: the chat is being brought up to date"))
+                    .id(block.id)
+                    // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
+                    .onAppear { reading.topVisible = block.id }
                 }
             }
-            // A short chat stands at the top under the header; a long one opens at its end (the lead's look at N1c), or
-            // where the owner left it.
-            .defaultScrollAnchor(.top, for: .alignment)
-            .scrollDismissesKeyboard(.interactively)
-            .onScrollGeometryChange(for: Double.self) { geometry in
-                Double(geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height)
-            } action: { _, distance in
-                nearEnd = followsNewWords(distanceFromEnd: distance, viewport: 800)
-            }
-            .onChange(of: items.last) { _, _ in
-                // Follow new words only while the owner reads near the end (plan §13 S5).
-                if nearEnd { proxy.scrollTo("end", anchor: .bottom) }
-            }
-            .task(id: nearEnd) {
-                // The jump button comes after a short pause, so it does not flicker while words stream (debounced).
-                if nearEnd {
-                    showsJump = false
-                    return
-                }
-                do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-                showsJump = !nearEnd
-            }
-            .task(id: thread) {
-                try? await Task.sleep(for: .milliseconds(80))
-                if let anchor = ChatScrollMemory.anchors[thread] {
-                    proxy.scrollTo(anchor, anchor: .top)
-                } else {
-                    proxy.scrollTo("end", anchor: .bottom)
-                }
-            }
-            .safeAreaInset(edge: .bottom) { bottom(proxy) }
-        }
-    }
-
-    /// Where the chat begins: who works in it, on which Mac, since when (a short chat does not look empty).
-    @ViewBuilder private var chatStart: some View {
-        if let started = view?.thread.createdAt {
-            HStack(spacing: Space.xs) {
-                DotFace(size: 20)
-                Text(
-                    [view?.thread.agentId ?? String(localized: "Dot", comment: "The assistant's name in a chat's subtitle"), model.macName,
-                        Date(timeIntervalSince1970: started).formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: " · ")
-                )
-                .textRole(.label).foregroundStyle(Tone.tertiary)
-            }
+            .frame(maxWidth: proseWidth)
             .frame(maxWidth: .infinity)
-            .padding(.bottom, Space.xs)
-            .accessibilityElement(children: .combine)
+            .padding(.horizontal, Space.gutter)
+            .padding(.vertical, Space.m)
         }
+        .overlay {
+            if items.isEmpty, chat?.freshness != .deleted {
+                LoadingState(message: String(localized: "Syncing…", comment: "Chat subtitle: the chat is being brought up to date"))
+            }
+        }
+        // A short chat stands at the top under the header; a long one opens at its end (the lead's look at N1c), or
+        // where the owner left it.
+        .defaultScrollAnchor(.top, for: .alignment)
+        .scrollPosition($position)
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
+        // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
+        // their scroll back to the end starts it again; words that grow the transcript never stop it.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
+        } action: { _, atEnd in
+            if atEnd { pinned = true } else if ownerScrolls { pinned = false }
+        }
+        // Once the new words are laid out (never before, which left them under the composer), the end is shown.
+        .onScrollGeometryChange(for: Double.self) { geometry in Double(geometry.contentSize.height) } action: { _, _ in
+            if pinned, !ownerScrolls { position.scrollTo(edge: .bottom) }
+        }
+        .task(id: pinned) {
+            // The jump button comes after a short pause, so it does not flicker while words stream (debounced).
+            if pinned {
+                showsJump = false
+                return
+            }
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            showsJump = !pinned
+        }
+        .task(id: thread) {
+            try? await Task.sleep(for: .milliseconds(80))
+            if let anchor = ChatScrollMemory.anchors[thread] {
+                pinned = false
+                position.scrollTo(id: anchor, anchor: .top)
+            } else {
+                position.scrollTo(edge: .bottom)
+            }
+        }
+        .safeAreaInset(edge: .bottom) { bottom() }
     }
 
     @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
@@ -291,7 +287,7 @@ struct ChatScreen: View {
 
     // MARK: The bottom: capsule, dock or composer
 
-    @ViewBuilder private func bottom(_ proxy: ScrollViewProxy) -> some View {
+    @ViewBuilder private func bottom() -> some View {
         let entries: [DockEntry] = dock
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
@@ -300,7 +296,10 @@ struct ChatScreen: View {
                     since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
                     helpers: helpers.filter { helperState($0.status).isLive }.count),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
-                scrollToBottom: { withAnimation { proxy.scrollTo("end", anchor: .bottom) } }
+                scrollToBottom: {
+                    pinned = true
+                    withAnimation { position.scrollTo(edge: .bottom) }
+                }
             )
             .frame(maxWidth: .infinity, alignment: .center)
             if !entries.isEmpty {
@@ -412,7 +411,7 @@ struct ChatScreen: View {
             skills: (model.palette?.skills ?? []).map { PickerItem(kind: .skill, token: "/" + $0.name, name: $0.name, detail: $0.description) },
             agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role ?? "") },
             teams: model.teams.map { PickerItem(kind: .team, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: "") },
-            chats: model.snapshot.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
+            chats: model.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
                 PickerItem(kind: .chat, token: "@\"" + row.summary.title + "\"", name: row.summary.title, detail: rowTime(row.summary.latestCreatedAt, now: .now))
             },
             accounts: (model.palette?.accounts ?? []).map { PickerItem(kind: .account, token: "@" + $0.address, name: $0.address, detail: [$0.providerName, $0.reads].filter { !$0.isEmpty }.joined(separator: " · ")) },
@@ -509,7 +508,7 @@ struct ChatScreen: View {
 
     private var subtitle: String {
         if let chat, let line = freshnessLine(
-            freshness: chat.freshness, transport: model.snapshot.transport, savedAt: model.snapshot.savedAt[thread], workingAt: model.snapshot.workingAt[thread], now: .now)
+            freshness: chat.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread], now: .now)
         {
             return line
         }

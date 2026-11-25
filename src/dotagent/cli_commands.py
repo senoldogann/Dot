@@ -24,6 +24,8 @@ class RunCommand(FrozenModel):
     standing: bool
     browser: BrowserMode | None
     thread: str | None
+    proof: list[str]
+    proof_timeout_s: int
     review: bool
     no_input: bool
     thinking: bool

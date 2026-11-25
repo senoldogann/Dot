@@ -38,14 +38,15 @@ def test_the_scripted_vectors_have_the_cosines_the_cases_give() -> None:
             assert _cosine(vectors[text], question) == pytest.approx(fact.question_cosine, abs=1e-9), case.id
 
 
-def test_the_cases_are_forty_two_and_name_their_answers() -> None:
-    assert len(CASES) == 42
-    assert len({case.id for case in CASES}) == 42
+def test_the_cases_are_forty_six_and_name_their_answers() -> None:
+    assert len(CASES) == 46
+    assert len({case.id for case in CASES}) == 46
     for case in CASES:
         assert 0 <= case.answer < len(case.facts), case.id
         assert all(place < case.answer for place in case.outdated), case.id
         assert (case.kind == "update") == bool(case.outdated), case.id
         assert len({fact.text for fact in case.facts}) == len(case.facts), case.id
+        assert all(place in case.outdated for place in case.echoed), case.id
 
 
 def test_cosines_no_vectors_have_are_refused_with_the_case_named() -> None:
@@ -81,6 +82,10 @@ async def test_a_search_over_replaced_notes_shows_the_newest_first_and_the_outda
     assert (used.cases, used.first, used.stale) == (4, 3, 1)
     kept: Tally = groups["facts that did not change"]
     assert (kept.cases, kept.first, kept.found) == (8, 8, 8)
+    # Item 1866: before it, a run handed the old note that saved its words again after the newer note woke the old one
+    # and, with a subject, put the newer aside: newest first 0 of 4, among the three 2 of 4, the old shown in 4.
+    echoed: Tally = groups["old note saved again by a run"]
+    assert (echoed.cases, echoed.first, echoed.found, echoed.stale) == (4, 4, 4, 0)
     lines: list[str] = render_results("scripted", results)
     assert f"the {SHOWN} best notes" in lines[0]
     assert "facts that changed" in lines[2]

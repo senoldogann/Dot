@@ -294,6 +294,34 @@ dotx memory reindex      # embed every note again, for example after changing [m
   subject; the 10 are notes reworded, whose changed value is a name, or a version after a word that names a thing), and none of the 8 facts that stayed true was put
   aside. A store of two or three notes ties the two versions in the search and the older wins the tie, so the first
   count before is a floor, not a rate for a large store; the shown count is not affected.
+- Every note says where it came from (item 1864): you, a task in a chat (a chat, a `dotx` command, a code review), a
+  scheduled task, a watcher's task (a watched mail or event, a reply to a mail), a helper task another task started, Dot
+  on its own initiative, or the nightly reflection. The store sets it (`origin`) from the run that saved the note, as
+  the run's source says it, and no argument of a tool reaches it, so no model writes it; a note's rewrite by another
+  task takes that task's origin, your correction keeps the one it had. The Memory page says it in the note's line
+  ("Saved 2 hours ago by a scheduled task") and the notes' API carries it. A note stored before item 1864 got its
+  origin from its run where the run is still stored; where it is gone (the runs are kept for a time and notes for
+  longer: 1,083 of the owner's 1,272 notes on 2026-11-25), it has none and says "a task".
+- A scheduled task, a watcher's task (a watched item, a reply to a mail) and a helper task another task started write no
+  lasting note on their own (item 1865): nobody watches them as they work. Their `memory_save` keeps the note on the
+  task, with its tags, subject and time, and answers that it waits for you; their `memory_update` waits beside the note
+  as the change proposed, as a task's change of your own note does; and the lessons drawn from them stay proposed
+  whatever `[agent] lessons` says. **Notes tasks proposed** on the Memory page (`GET /api/memories/waiting`) lists what
+  waits from the last 30 days, the notes and the lessons, each with Save (`POST
+  /api/memories/waiting/<run>/<index>/save`, or the lesson's own Save) and Dismiss; a saved note is written as the task
+  would have written it, unmarked, since you read it. No other task is handed it before. Nothing is asked or refused
+  that was not before: the calls are classified and approved as they were, in `yolo` and free mode too. Why proposals
+  and not nothing: on the owner's Mac on 2026-11-25 the 39 notes of scheduled tasks included some of the most used
+  lessons (a webmail's routes handed 46 and 34 times, LinkedIn's 31, 24 and 22), and all 282 lesson decisions stored
+  were made by `auto`, none on a task's page, so the proposals wait where you look at notes rather than on the task.
+- What recall gave a task is never saved back as a new note (item 1866). The store records every note a task was
+  handed (at its start, by a search, at a site, after a failed call), and a `memory_save` whose words are a handed
+  note's, or hold a handed note of four words or more whole (the line recall drew it in, a sentence around it), saves
+  nothing and tells the model to save only what is new or to correct the note with `memory_update`. The words are
+  compared exactly, case, accents, spacing and punctuation aside, so `4 CPU cores` against `8 CPU cores` is a new fact.
+  Before, such a save woke a note a newer one had replaced, and with a subject put the newer one aside: `dotx eval
+  memory` has four cases of it (E01 to E04, a task handed the old fact that saves it again after the newer note): the
+  newest came first in 0 of 4 and was among the three in 2, the outdated was shown in 4; now 4, 4 and 0.
 - Saving a note close to an existing one (`similar_threshold`) tells the model the notes that remain, which decides
   whether the old note is outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"

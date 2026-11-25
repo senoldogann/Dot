@@ -524,8 +524,11 @@ async def test_the_model_can_save_search_and_forget_notes(runtime: Runtime) -> N
     assert not found.untrusted
     assert (action.kind, action.risk) == ("memory_read", "safe")
 
+    # The search handed the run the note: its words saved again are recall's echo, not saved (item 1866).
     again, _ = await _call(runtime, "memory_save", {"content": WIFI, "tags": []})
-    assert again.text.startswith("Already saved: ")
+    assert again.text.startswith("Not saved: these are the words of a note you were handed"), again.text
+    assert identified.group(1) in again.text
+    assert await runtime.store.count_memories() == 1
 
     renamed: str = WIFI.replace("Nebula", "Orion")
     updated, action = await _call(

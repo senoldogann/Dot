@@ -52,7 +52,7 @@ async def test_a_store_keeps_the_speed_and_one_from_before_fast_mode_holds_the_s
             thread.id, "Again.", [], "chat", OPUS, None, "fast", None, NO_PICKS, None, None, None, "test"
         )
         campaign: CampaignRecord = await store.create_campaign(
-            "Keep at it", "Keep at it.", thread.id, OPUS, "high", "fast", None, "ask", [], "own"
+            "Keep at it", "Keep at it.", thread.id, OPUS, "high", "fast", None, "ask", [], "own", ()
         )
         assert await _speeds(store, run, campaign) == ("fast", "fast", "fast", "fast")
     finally:

@@ -10,6 +10,7 @@ from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, At
 from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import Disliked, RunLessons
+from dotagent.agent.proof import ProofSpec
 from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
@@ -50,6 +51,7 @@ from dotagent.repair.problems import Problem
 from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
+    MAX_PROOF_CHECKS,
     REFUSES_CHARS,
     AgentLook,
     AgentRecord,
@@ -471,6 +473,9 @@ class StartRunRequest(FrozenModel):
     plan_first: bool = False
     # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
     loop: str | None = Field(default=None, min_length=2, max_length=8)
+    # Commands that must exit 0 before the run (with standing, the campaign) is done (item 1853). Not with an agent, a
+    # team or a loop.
+    proof: list[ProofSpec] = Field(default_factory=list, max_length=MAX_PROOF_CHECKS)
     key: MessageKey | None = None
     # Who sent it: Dot's pages and phones (``ui``), or ``dotx run``, which hands its run to the daemon (``cli``) and
     # keeps the source a run of its own process has. The two weigh the same for the policy
@@ -495,6 +500,8 @@ class StartRunRequest(FrozenModel):
             raise ValueError("a loop asks again in a chat; a campaign (standing) goes on by itself")
         if self.browser is not None and not self.standing:
             raise ValueError("browser chooses the Chrome of a campaign: it goes with standing only")
+        if self.proof and (self.agent_id is not None or self.team_id is not None or self.loop is not None):
+            raise ValueError("proof checks hold a run of Dot's or a campaign: not an agent's, a team's or a loop")
         return self
 
 

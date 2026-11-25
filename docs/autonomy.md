@@ -7,6 +7,7 @@ other, so every mix works. Each has a default in the configuration, and a single
 | --------- | ----------------------------------- | ------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
 | Approvals | `supervised`, `ask`, `auto`, `yolo` | `ask`   | `[policy] approvals`                 | `--approvals`, `--auto-approve`, `--yolo`; `approvals` of `POST /api/runs`; the composer |
 | Goal mode | on, off                             | on for a task or research run, off for a chat | `[agent] goal_mode`, `goal_patience` (4) | `--goal-mode`, `--no-goal-mode`; `goal_mode` of `POST /api/runs`; the composer |
+| Proof checks | commands with a time limit       | none    | none                                 | `--proof`, `--proof-timeout`; `proof` of `POST /api/runs`; the run's own `add_proof` |
 
 `GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and the
 facts under More on its side panel's Task tab show them. The composer of the web UI sends nothing for a picker you did
@@ -151,6 +152,35 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event, which the conversation
 does not show (items 1098 and 1112): the answer says what came of the work.
+
+**Proof checks** (item 1853) take "done" out of a model's word. A task run can carry up to 5 commands (a test run,
+`curl -fsS` of a page, `test -s report.pdf`), each with a time limit (300 s unless given, at most `[shell] max_timeout_s`, 1800 by default), that must
+exit 0 before the run is done. You set them as the run starts: `dotx run --proof "uv run pytest tests -q"` (repeat it
+for more; `--proof-timeout S` for their limit) or `proof: [{"command": ..., "timeout_s": ...}]` of `POST /api/runs`.
+The run sets them itself with `add_proof` (the `proof` tool group), and is told to when you name a check that must
+pass or the goal has a command that proves it. A check is only ever added: no tool changes or removes one, so a run
+cannot soften what it is held to. A chat or a research run (no `shell`, no `finish` to hold), a run on the Claude plan
+or OpenCode (whose turns end in their own program) is refused checks, and the start of a run of an agent, a team or
+a loop takes none from you; a run that goes on from another (resumed, or handed a failed or blocked run's note) keeps that run's checks.
+
+When the run calls `finish` with success, after the reminders of an open plan and before the goal check (with goal
+mode on or off), Dot runs every check as a `shell` call of the run itself: one step in the conversation, made by Dot
+instead of the model, through the same gate, sandbox, events, masking and time limit as a call of the model's. Dot adds
+no rule to the gate: a check asks what that command would ask typed by the model in the run's mode, so a `yolo` or
+free-mode run asks nothing new ([Freedom](freedom.md)). Then:
+
+- every check exits 0: the goal check, when on, decides as before, and sees the passing runs among the facts;
+- one exits otherwise, or is killed at its limit: the run is sent back with each failing command and the last 3000
+  characters of what it printed (the whole result is the call above it), and works on; this counts toward
+  `goal_patience`, and past it the run ends failed with its answer and "the proof did not pass";
+- one cannot run (the gate, you or a cap refused it, the run has no `shell`, or its limit is past `[shell]
+  max_timeout_s`, which the shell would cut it to; a check over it is refused when it is set): the run ends failed with
+  its answer and
+  "the proof could not run", naming why. It is not sent back, as the same call would be refused again, and no model
+  decides in the check's place.
+
+A finish past the run's limit runs the checks too; there, a failing one ends the run failed. Each look is a
+`proof_check` event (each command, who set it, `passed`, `failed` or `not_run`), and each check a `proof` event.
 
 **The check may look at the work itself** (item 1363). The digest says that a file was written, never what it holds; so
 a check that cannot tell whether the goal is reached from the digest and the facts answers `inspect`, naming in `reads`
@@ -368,11 +398,21 @@ started. After a shutdown, the chat's queue goes on once the new run ends done; 
 until you resume it. The daemon still resumes on its own only a run that was cut off, not one that failed or is blocked.
 
 By default (`resume = "safe"` in `[agent]`, item 248) the daemon also resumes runs on its own when it starts: runs of
-the web UI, cut off at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a
-question to you counts: it is asked again). A run of `dotx run`, of a schedule or of an eval, a run that itself resumed
-another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
-changed something (a command, a write, a click, an agent it made, a notification or a page it showed (item 552), or a
-delegation, whose run may have done anything) wait for you. `resume
+the web UI and the phone, cut off at most `resume_within_s` seconds before (30 minutes) by a restart, a shutdown or a
+crash of the daemon. Since item 1854 a call that was cut while it ran and may have changed something (a command, a
+write, an agent it made, a delegation) no longer holds the run back: the note names it, and the run is told, in the
+words OpenClaw's runs follow, that Dot restarted while it worked and to check the current state of what was in progress
+(files, processes, helpers, outside actions) before it repeats any of it, then to go on. What still waits for you: a
+run cut in a call that reaches beyond the Mac (a payment, a message or mail, a post, an upload or data sent out, a
+release: the set a schedule's task is never tried again for; done or not, a second try could do it twice), or in a
+call whose kind Dot cannot tell (a click the screen classifies, a browser click, whose element only the tab's snapshot
+of the daemon that ended knew, an unknown tool); a run of `dotx run`, of a
+channel, of an eval or a code review; a schedule's run, which the scheduler starts once more instead (item 1206); and a
+run that itself resumed another, so a run that brings the daemon down is not resumed again and again. A run you
+stopped is never resumed, by Stop, Ctrl-C or the emergency stop. The resumed run keeps the approval mode, the taint,
+the plan, the ledger and the proof checks (below) of the run it goes on from, and asks what that mode asks. So a
+restart (`dotx service restart`, an update) no longer loses a run's work, and an update need not wait for the runs to
+end; `--when-idle` is still there for a restart that should not cut a step in the middle. `resume
 = "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Details writes the choice into
 the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt
 (item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else
@@ -405,7 +445,9 @@ others can write (web pages, mail, downloads), a lesson with an address to go to
 `javascript:`; a site named bare is know-how and stays) or an account name in it, which such content may have planted,
 is left out before it is asked. `auto` saves at most `lessons_per_day` (40) lessons in 24 hours, counting only its own saves (one kind of task takes at most half of them, and a run that read outside content none of the last quarter, item 1713); past it a kept
 lesson is left out with that reason, and its run's page still offers Save anyway, which is not capped (item 1247: the owner's runs made 3 to 97 a
-day). The kept lessons are saved as notes tagged `lesson` whose source is the run, and
+day). A scheduled task's, a watcher's task's or a helper's lessons are never decided by `auto`: they wait under
+**Notes tasks proposed** on Settings › Memory, and count toward no cap (item 1865). The kept lessons are saved as notes
+tagged `lesson` whose source is the run, and
 "Lessons from this task", at the foot of the side panel's Task tab of the run's page (item 856), which counts them (item
 842: they stood in the conversation; there they stand now only while a lesson waits for your decision, notes wait for
 your look after a 👎 or they could not be drawn), says "Saved on its own" with Undo, which forgets the note (a note that

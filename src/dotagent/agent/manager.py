@@ -38,6 +38,7 @@ from dotagent.agent.campaign import (
     sessions_without_progress,
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
+from dotagent.agent.held_notes import dismiss_held_note, save_held_note
 from dotagent.agent.helper_reports import (
     HELPER_RELEASED_EVENT,
     HELPER_RESUMED_EVENT,
@@ -97,6 +98,7 @@ from dotagent.agent.playbooks import (
     playbook_case,
 )
 from dotagent.agent.progress import can_ask_user
+from dotagent.agent.proof import limit_refused, proof_refused, run_checks
 from dotagent.agent.reaction_words import ANSWER as ANSWER_MESSAGE
 from dotagent.agent.reaction_words import RELEASE_NOTE, follow_up_goal, queued_reaction_note
 from dotagent.agent.reflection import reflect, whole_run_case
@@ -167,6 +169,7 @@ from dotagent.llm.types import (
 )
 from dotagent.memory.echo import echoed_notes
 from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
+from dotagent.memory.supersede import Replacing
 from dotagent.notify.owner import tell_owner
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
@@ -206,6 +209,7 @@ from dotagent.store.models import (
     EventRecord,
     FollowUpOf,
     MemoryRecord,
+    ProofCheck,
     QueuedMessage,
     RunMode,
     RunPicks,
@@ -448,6 +452,16 @@ def agent_bounds(
 def _offers(info: ModelInfo, effort: Effort) -> bool:
     """Whether the model ``info`` tells of offers the level ``effort``: a model with fewer than two has no choice."""
     return len(info.efforts) >= 2 and effort in info.efforts
+
+
+def _check_proof(proof: Sequence[ProofCheck], mode: RunMode, ref: ModelRef, max_timeout_s: int) -> None:
+    """Refuse proof checks (item 1853) for a run that cannot carry them: not a task, or on a program that ends its turns
+    without Dot's loop; and checks whose limit is past ``[shell] max_timeout_s``, which the shell would cut."""
+    if not proof:
+        return
+    refused: str | None = proof_refused(mode, ref.provider) or limit_refused(proof, max_timeout_s)
+    if refused is not None:
+        raise ConfigError(refused, {"mode": mode, "model": ref.label, "proof": [check.command for check in proof]})
 
 
 def _check_speed(ref: ModelRef, speed: Speed) -> None:
@@ -1033,12 +1047,15 @@ class RunManager:
         *,
         model_text: str | None = None,
         resumed: Resumption | None = None,
+        proof: tuple[ProofCheck, ...] = (),
     ) -> RunRecord:
         """Queue a run as :meth:`start` does, with what the owner picked in the composer for its message (item 318),
         which are refused unless the run can start with them (:meth:`_check_picks`). ``model_text`` is the first
         message when it is not the goal (a handoff note in front of the owner's words); ``resumed`` carries the plan
-        of the run it goes on from."""
+        of the run it goes on from; ``proof`` are the checks the owner holds its finish to (item 1853), refused for a
+        run that cannot carry them (:func:`~dotagent.agent.proof.proof_refused`)."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        _check_proof(proof, mode, ref, self._runtime.config.shell.max_timeout_s)
         await self.check_model_answers(ref)
         _check_speed(ref, speed)
         if effort is not None:
@@ -1062,6 +1079,7 @@ class RunManager:
                 once=once,
                 carried=(),
                 picks=picks,
+                proof=proof,
             ),
             None,
             None,
@@ -1483,6 +1501,7 @@ class RunManager:
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
         browser: BrowserMode | None,
+        proof: tuple[ProofCheck, ...],
     ) -> RunRecord:
         """Start a campaign on ``goal`` ("Keep going until done") with its opening session: a run of ``source`` on
         ``thread_id`` (a new thread when ``None``), which becomes the campaign's conversation. Every session keeps the
@@ -1493,7 +1512,8 @@ class RunManager:
         that its sessions do not fail one after the other.
 
         A campaign is a task, so a chat or a research run is refused. Goal mode is refused too: ``campaign_achieved``
-        checks the campaign's outcome, and a session ends when its own work is done.
+        checks the campaign's outcome, and a session ends when its own work is done. ``proof`` are the checks the owner
+        holds that claim to (item 1853), which ``campaign_achieved`` runs before it judges it.
         """
         if mode != "task":
             raise ConfigError("a campaign is a task: only a task run can keep going until done", {"mode": mode})
@@ -1503,6 +1523,7 @@ class RunManager:
             )
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else self._main_model
+        _check_proof(proof, mode, parse_model_ref(model_ref), runtime.config.shell.max_timeout_s)
         await self.check_model_answers(parse_model_ref(model_ref))
         _check_speed(parse_model_ref(model_ref), speed)
         if effort is not None:
@@ -1530,6 +1551,7 @@ class RunManager:
             approval_mode,
             [file.path for file in files],
             browser,
+            proof,
         )
         try:
             run, _ = await self._launch(
@@ -3077,6 +3099,15 @@ class RunManager:
         """Take back the save of a lesson of a run (see :func:`dotagent.agent.lessons.undo_lesson`)."""
         return await undo_lesson(self._runtime, self._deciding, run_id, index)
 
+    async def save_held_note(self, run_id: str, index: int) -> Replacing:
+        """Save a note a scheduled task, a watcher's task or a helper held for the owner (item 1865, see
+        :func:`dotagent.agent.held_notes.save_held_note`)."""
+        return await save_held_note(self._runtime, self._deciding, run_id, index)
+
+    async def dismiss_held_note(self, run_id: str, index: int) -> None:
+        """Dismiss a note a run held for the owner (see :func:`dotagent.agent.held_notes.dismiss_held_note`)."""
+        await dismiss_held_note(self._runtime, self._deciding, run_id, index)
+
     async def propose_lesson(self, run_id: str, words: str) -> LessonView:
         """Propose a lesson from the owner's words about a run, to wait on the run's page for Save or Dismiss (item 584,
         see :func:`dotagent.agent.lessons.propose_lesson`): after the lessons the run's own end is drawing, so that the
@@ -3496,6 +3527,7 @@ class RunManager:
             identities=await self._ledger_ids(old.thread_id),
             ladder="restored" if snapshot is not None else "reset",
             stopped=tuple(stopped_line(group) for group in self._stopped_groups.get(old.id, [])),
+            proof=await run_checks(self._runtime.store, old.id),
         )
 
     async def _continuation(self, thread_id: str) -> tuple[str, Resumption] | None:

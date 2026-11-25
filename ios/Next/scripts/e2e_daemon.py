@@ -12,6 +12,8 @@ choose the script:
 - "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
 - "tools: ...": the run reads two files and keeps a plan, so a finished run folds its steps;
 - "fail: ...": the model fails, so the run fails with one line of cause;
+- "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
+  streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
@@ -55,6 +57,26 @@ MODEL: str = "ollama:scripted"
 # The first line of the config this script writes: a home that holds it is this script's own, and may be used again.
 CONFIG_MARK: str = "# A throwaway home of ios/Next/scripts/e2e_daemon.py"
 
+# The "stream:" script's words: a thought of about 40 words said four times a step, and an answer of about 300 words.
+THOUGHT: str = (
+    "Enough for a status summary, but the money line schedule at 06:40 failed last night. Let me check why quickly, "
+    "that is a detail worth one look: the log of the run, the schedule's last output and whether the key expired."
+)
+ANSWER: str = "\n\n".join(
+    [
+        "## Where things stand",
+        "The morning brief ran at 07:00 and reached you. The money line schedule failed at 06:40 because the "
+        "exchange answered with a timeout three times; the next run at 18:40 will try again on its own.",
+        "- **Clients:** two new replies in the pipeline, both asking for a quote by Friday.\n"
+        "- **Builds:** the iPhone app's last build passed its checks; one pull request waits on your look.\n"
+        "- **Money:** nothing was spent today; the paper trades are flat.",
+        "### What I would do next",
+        "1. Answer the two clients with the approved price list.\n2. Look at the pull request together.\n"
+        "3. Leave the money line alone until tonight's run shows whether the timeout repeats.",
+        " ".join(["The rest of the day is quiet: no meeting, no ask waiting on you, the queue is empty."] * 8),
+    ]
+)
+
 
 class ScriptProvider:
     """Replies by the owner's last words (module docstring); a tool's result is answered with a closing text."""
@@ -77,6 +99,7 @@ class ScriptProvider:
         owner: str = latest
         # A tool already answered since the owner's words: the step is over, the run ends with a text.
         answered: bool = any(m.role == "tool" for m in request.messages[at + 1 :])
+        steps: int = sum(1 for m in request.messages[at + 1 :] if m.role == "tool")
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
         if any(tool.name == "goal_verdict" for tool in request.tools):
@@ -88,6 +111,8 @@ class ScriptProvider:
                     arguments={"decision": "achieved", "reason": "The scripted step is done.", "unproven_steps": []},
                 ),
             )
+        elif latest.startswith("stream:"):
+            return await self._stream(request, sink, steps)
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -176,6 +201,32 @@ class ScriptProvider:
             thinking="",
             tool_calls=calls,
             usage=Usage(input_tokens=100, output_tokens=10, cached_tokens=0),
+            finish="tool_calls" if calls else "stop",
+            raw_finish="tool_calls" if calls else "stop",
+            raw=(),
+        )
+
+    async def _stream(self, request: ChatRequest, sink: DeltaSink, steps: int) -> ModelReply:
+        """One step of the "stream:" script: thinking and a file read for the first four, then the long answer."""
+        thinking: str = " ".join(THOUGHT for _ in range(4))
+        for word in thinking.split(" "):
+            await sink(StreamDelta(kind="thinking", text=word + " "))
+            await asyncio.sleep(0.025)
+        calls: tuple[ToolCall, ...] = ()
+        text: str = ""
+        if steps < 4:
+            calls = (ToolCall(id=f"call_{self._calls}", name="read_file", arguments={"path": "/etc/hosts"}),)
+        else:
+            text = ANSWER
+            for word in text.split(" "):
+                await sink(StreamDelta(kind="text", text=word + " "))
+                await asyncio.sleep(0.025)
+        return ModelReply(
+            model=request.model,
+            text=text,
+            thinking=thinking,
+            tool_calls=calls,
+            usage=Usage(input_tokens=100, output_tokens=400, cached_tokens=0),
             finish="tool_calls" if calls else "stop",
             raw_finish="tool_calls" if calls else "stop",
             raw=(),

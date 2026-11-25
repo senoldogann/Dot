@@ -1373,7 +1373,7 @@ that address: it reads what the browser keeps for the address, the token among i
 ```bash
 dotx service install     # a launchd agent: starts the daemon at every login and after a crash, never after a clean stop
 dotx service status      # whether the job is loaded and the daemon answers, and whether a restart waits (for the runs and the night's learning)
-dotx service restart     # restart the daemon now, cutting off the runs at work
+dotx service restart     # restart the daemon now; the runs it cuts off go on by themselves when it is back (item 1854)
 dotx service restart --when-idle   # return at once; restart the daemon once no run works and the night's learning is over
 dotx service permissions # make macOS ask, in the name of the service, for the desktop permissions it lacks
 dotx service uninstall   # stop the daemon and remove the job
@@ -1396,7 +1396,10 @@ dotx service uninstall   # stop the daemon and remove the job
   daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
   `service install` waits so too. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
   `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
-  off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the service, the
+  off, and the daemon's next start resumes them as `[agent] resume` says: with the default `safe`, a run of the pages
+  goes on by itself, told to check what it left half done, unless what was cut may have paid, sent or posted for you
+  (item 1854, [Autonomy](autonomy.md)). So a restart no longer loses a run's work, and an update need not wait for the
+  runs to end; `--when-idle` stays for a restart that should not cut a step in the middle. When launchd has no job of the service, the
   command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
   them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the daemon would stop
   under the run, and the run's end would kill the command before it loads the daemon again (or, for the uninstall,

@@ -2,6 +2,8 @@
 the daemon resumes on its own, and what the resumed run is told."""
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -13,13 +15,16 @@ from dotagent.agent.resume import (
     OUTWARD_FLAGS,
     REPEATABLE_META_TOOLS,
     RESUME_SOURCE,
+    SENT_OUT_FLAGS,
     CallEnd,
     InterruptedCall,
     Resumption,
+    _action_of,
     can_resume,
     cut_by_restart,
     cut_off_by,
     handoff_of,
+    held_back,
     helper_not_resumed,
     identities_of,
     resume_note,
@@ -33,10 +38,11 @@ from dotagent.policy import engine
 from dotagent.policy.types import ActionKind
 from dotagent.process_groups import GroupRecord
 from dotagent.runtime import _tool_groups
-from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler import SCHEDULE_SOURCE, recovery
 from dotagent.server import UI_SOURCE
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_SHUTDOWN, RESULT_STOPPED
 from dotagent.store.models import RunRecord, RunStatus
+from dotagent.tools.context import ToolContext
 
 GOAL: str = "Write the report from data.csv."
 READ: ToolCall = ToolCall(id="call_1", name="read_file", arguments={"path": "data.csv"})
@@ -119,34 +125,38 @@ def test_only_the_newest_run_of_a_thread_that_the_daemon_cut_off_can_be_resumed(
     assert not resumes_on_start(scheduled_cut, "run_1", [])
 
 
-def test_the_daemon_resumes_on_its_own_only_runs_of_the_web_ui_whose_calls_cut_off_while_they_ran_only_read() -> None:
+def test_the_daemon_resumes_on_its_own_a_run_of_the_web_ui_unless_a_cut_call_may_have_paid_sent_or_posted() -> None:
+    """Item 1854: a cut call that may have changed something is told in the note; only one that may have paid, sent or
+    posted for the owner, or whose kind cannot be told, holds the run back for the owner."""
     read: InterruptedCall = _call("read_file", "read", "cut_off", "")
     assert resumes_on_start(RESTARTED, "run_1", [read])
     assert resumes_on_start(SHUT_DOWN, "run_1", [])
-    # A call that finished is reported with its result, and one that had not started did nothing.
     finished_write: InterruptedCall = _call("write_file", "write", "succeeded", "Wrote report.md")
     unstarted_shell: InterruptedCall = _call("shell", "shell", "not_started", "")
     assert resumes_on_start(RESTARTED, "run_1", [finished_write, read, unstarted_shell])
-    assert not resumes_on_start(RESTARTED, "run_1", [_call("write_file", "write", "cut_off", "")])
-    # A delegated run may have done anything its mode allows; a call that could not be classified may have too.
-    assert not resumes_on_start(RESTARTED, "run_1", [_call("delegate", "delegate", "cut_off", "")])
+    # A write, a command, a delegation or an agent made, cut while it ran: the run goes on and checks the state.
+    for tool, kind in (("write_file", "write"), ("shell", "shell"), ("delegate", "delegate"), ("create_agent", "meta")):
+        assert resumes_on_start(RESTARTED, "run_1", [_call(tool, kind, "cut_off", "")]), tool
+    # A call that pays, sends or posts was cut: done or not, a second try could do it twice.
+    for flag in OUTWARD_FLAGS:
+        sent: InterruptedCall = InterruptedCall(
+            tool="shell", arguments="{}", kind="shell", end="cut_off", result="", flags=(flag,)
+        )
+        assert not resumes_on_start(RESTARTED, "run_1", [read, sent]), flag
+        # Finished, its result is in the note and nothing is repeated blind.
+        assert resumes_on_start(RESTARTED, "run_1", [sent.model_copy(update={"end": "succeeded"})]), flag
+    # A call whose kind cannot be told may be one of those.
     assert not resumes_on_start(RESTARTED, "run_1", [_call("desktop_act", None, "cut_off", "")])
     assert not resumes_on_start(RESTARTED, "run_2", [read])
     for source in ("cli", SCHEDULE_SOURCE, RESUME_SOURCE):
         assert not resumes_on_start(_run("failed", RESULT_RESTARTED, source, None), "run_1", [read])
+    # The owner's stop is no cut-off: such a run never goes on by itself.
+    assert not resumes_on_start(_run("cancelled", RESULT_STOPPED, UI_SOURCE, None), "run_1", [])
 
 
-def test_a_meta_call_is_repeated_only_when_a_second_call_sets_what_the_first_set() -> None:
+def test_a_meta_call_is_told_as_repeatable_only_when_a_second_call_sets_what_the_first_set() -> None:
     """Item 552: the kind ``meta`` is the kind of tools that make an agent, show a notification or a page and ask the
-    owner, as well as of the plan and the help; a run cut off in one of those is not resumed on its own, nor told that
-    the call only reads."""
-    # The plan and the groups of tools are set again, a question the end of the daemon closed is asked again.
-    for tool in ("update_plan", "mark_plan_step", "use_tools", "skill", "schedule_list", "find_help", "ask_user"):
-        assert resumes_on_start(RESTARTED, "run_1", [_call(tool, "meta", "cut_off", "")]), tool
-    for tool in ("create_agent", "notify", "show_page", "consult", "campaign_targets"):
-        assert not resumes_on_start(RESTARTED, "run_1", [_call(tool, "meta", "cut_off", "")]), tool
-    # A page shown by its path is a read of its file (item 598), and a second call shows it twice all the same.
-    assert not resumes_on_start(RESTARTED, "run_1", [_call("show_page", "read", "cut_off", "")])
+    owner, as well as of the plan and the help; the note tells a cut one as repeatable only when it sets again."""
     resumption: Resumption = Resumption(
         from_run_id="run_1",
         cut_off="daemon_restarted",
@@ -220,12 +230,25 @@ def test_the_resumed_run_is_told_how_each_call_of_the_step_ended_and_takes_over_
 
 def test_a_run_cut_off_between_steps_is_told_only_its_goal_and_to_go_on() -> None:
     resumption: Resumption = Resumption(
-        from_run_id="run_1", cut_off="daemon_shutdown", automatic=True, calls=(), plan=EMPTY_PLAN
+        from_run_id="run_1", cut_off="daemon_shutdown", automatic=False, calls=(), plan=EMPTY_PLAN
     )
     assert resume_note(GOAL, resumption) == (
         "[system note] The run that worked on this goal was cut off: the Dot daemon was shut down while it ran. You go "
         f"on with it; the conversation above holds every step it took. Its goal:\n{GOAL}\n\nPick up where it left off: "
         "do not redo what is done, check what a call that was cut off may have changed, and finish the goal."
+    )
+
+
+def test_a_run_the_daemon_resumed_by_itself_is_told_to_check_the_state_before_it_repeats_anything() -> None:
+    """Item 1854: OpenClaw's words for a run its gateway's restart cut."""
+    resumption: Resumption = Resumption(
+        from_run_id="run_1", cut_off="daemon_restarted", automatic=True, calls=(), plan=EMPTY_PLAN
+    )
+    assert resume_note(GOAL, resumption).startswith(
+        "[system note] Dot restarted while you were working on this goal, and goes on with it now: the Dot daemon "
+        "stopped while it ran (a crash, or a restart that did not wait for it). The conversation above holds every "
+        "step it took. Before you repeat anything, check the current state of what was in progress (files, processes, "
+        f"helpers, outside actions), then continue. Its goal:\n{GOAL}\n\n"
     )
 
 
@@ -322,3 +345,25 @@ def test_the_note_names_the_work_in_the_background_the_start_stopped() -> None:
     note: str = resume_note(GOAL, resumption)
     assert "was stopped when Dot started again; it no longer runs" in note and f"- {line}" in note
     assert "no longer runs" not in resume_note(GOAL, resumption.model_copy(update={"stopped": ()}))
+
+
+def test_a_cut_call_that_sent_something_out_holds_the_run_as_the_schedulers_set_does() -> None:
+    """Item 1854: an upload, a release or data sent out holds a run back as a payment does: the scheduler's set."""
+    assert recovery.OUTWARD_FLAGS == SENT_OUT_FLAGS >= OUTWARD_FLAGS
+    for flag in ("upload", "release", "external_send", "exfiltration", "social"):
+        sent: InterruptedCall = InterruptedCall(
+            tool="shell", arguments="{}", kind="shell", end="cut_off", result="", flags=(flag,)
+        )
+        assert not resumes_on_start(RESTARTED, "run_1", [sent]), flag
+
+
+async def test_a_browser_click_is_not_classified_again_by_a_daemon_that_holds_no_snapshot_of_its_tab() -> None:
+    """Item 1854: ``browser_act`` reads the element of a click from the tab's last snapshot, which a daemon that has
+    just started does not hold; classified again, a click on "Pay now" would raise nothing. Its kind is unknown."""
+    tools: dict[str, object] = {"browser_act": object()}
+    context: ToolContext = cast(
+        ToolContext, SimpleNamespace(runtime=SimpleNamespace(registry=SimpleNamespace(tools=tools)))
+    )
+    click: ToolCall = ToolCall(id="call_9", name="browser_act", arguments={"action": "click", "ref": "e12"})
+    assert await _action_of(click, context) is None
+    assert held_back(_call("browser_act", None, "cut_off", ""))
