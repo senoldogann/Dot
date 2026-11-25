@@ -45,7 +45,13 @@ final class StreamingLiveUITests: XCTestCase {
         let starting: CGRect = mine.frame
         // The daemon's answer comes in the same screen: the chat became the real one and was never left.
         let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Echo: Say hello")).firstMatch
-        XCTAssertTrue(answer.waitForExistence(timeout: 30), "the run's answer in the opened chat")
+        // The owner's words stay on screen through the swap: never a "Syncing…" blank in between.
+        let deadline: Date = Date().addingTimeInterval(30)
+        while !answer.exists, Date() < deadline {
+            XCTAssertTrue(mine.exists, "the owner's message left the screen before the answer came")
+            usleep(200_000)
+        }
+        XCTAssertTrue(answer.exists, "the run's answer in the opened chat")
         XCTAssertTrue(mine.exists, "still the same chat")
         // The design bar: the bubble stands where the real chat draws it, no jump at the swap (over 1 pt is a bug).
         let real: CGRect = mine.frame

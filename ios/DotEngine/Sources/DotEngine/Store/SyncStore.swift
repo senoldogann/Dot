@@ -28,7 +28,7 @@ public struct EngineSnapshot: Sendable, Equatable {
     /// When a chat's copy was saved while a run of it worked.
     public var workingAt: [String: Double]
     /// The chats this phone started, by the outbox key of their first message: the thread the daemon named for each
-    /// (item 1849). Kept for the session, unlike `accepted`, which drops a new chat's entry once the list has its row.
+    /// (item 1849), kept for the session.
     public var startedChats: [String: String]
 
     public static let empty: EngineSnapshot = EngineSnapshot(
@@ -335,9 +335,10 @@ public actor SyncStore {
     private func pruneAccepted() {
         for (key, message) in state.accepted {
             guard let thread: String = message.thread, let chat: ChatProjection = state.chats[thread] else {
-                // A new chat: dropped once the list has its row.
-                if message.kind == .run, let thread: String = message.thread, state.list.rows.contains(where: { $0.summary.id == thread }),
-                    state.chats[thread] == nil
+                // A new chat: dropped once the list has its row, unless this phone started it (item 1849): the chat opens
+                // at once and draws the owner's words from this overlay until its own picture shows them, below.
+                if message.kind == .run, state.startedChats[key] == nil, let thread: String = message.thread,
+                    state.list.rows.contains(where: { $0.summary.id == thread }), state.chats[thread] == nil
                 {
                     state.accepted[key] = nil
                 }
