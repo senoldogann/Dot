@@ -626,6 +626,7 @@ paired`) and nothing is kept for it.
 | `GET /api/away?since=<seconds>` | any token | 1424 | 200, what Dot did on its own |
 | `GET /api/away/read` | any token | 1356 | 200, `{read_at}` |
 | `POST /api/away/read` | any token | 1356 | 200, `{read_at}` |
+| `GET /api/drafts?limit=` | any token | 1825 | 200, the drafts that wait for you, newest first |
 | `GET /api/threads/view?limit=` | any token | 1686 | 200, the chats with their revisions |
 | `GET /api/threads/stream` | any token | 1686 | the list's event stream |
 | `GET /api/threads/{id}/view?tail=&before=` | any token | 1686 | 200, the chat at its revision |
@@ -953,6 +954,32 @@ approvals Dot answered for you. Putting the card away marks the `until` of the c
 /api/away/read`), so that the Mac and every phone agree on what is news; the card goes at once, and a mark that does not
 get through (no link, no answer) is kept in `awareness.json` and sent first by the next read, so a card put away stays away.
 The card is drawn from the last read, kept in the same file, before the network answers.
+
+### The Activity tab of Dot Next (item 1826)
+
+The iPhone app's Activity tab shows what the owner needs away from the Mac to watch, answer or direct Dot's own work;
+the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. Each part is
+read from its own route, so one that fails leaves the others on screen with one notice over the page; the tab reads
+again every 30 seconds while it is on screen and when it is pulled down.
+
+- **While you were away**: the card of `GET /api/away` against the moment of `GET /api/away/read` (the first visit from
+  any device marks it and shows nothing), its two newest runs and the two runs with the most decisions until Show more,
+  each opening its chat; Mark as read posts the card's `until`.
+- **Ready**: the drafts that wait (`GET /api/drafts`, a failed send among them, in red with the application's words). A
+  draft opens as its card: to whom, the subject and the words, which may be changed; Send (with Mail or Messages) and
+  Discard each ask first (`POST /api/drafts/{id}/send` and `/discard`); one answered on another screen (409) leaves the
+  list.
+- **Dot's proposals**: the versions of Self-improvement that wait (`GET /api/harness`, state `candidate` or `probed`),
+  each with its habits and tips; Use puts one in use (asking first when a line may come from content others can write;
+  one the checks refuse offers no Use) and Set aside keeps it for the record (`POST /api/harness/{id}/adopt` and
+  `/retire`).
+- **Needs you, Working, Later today, Earlier today, Learned today**: the sections of `GET /api/activity`; a row of a run
+  opens its chat (a delegated run the chat at the top of its chain), where an ask is answered with its whole card.
+- **Dot comes to you**: the morning brief and the evening check-in with their switches (`PUT /api/brief`, `PUT
+  /api/checkin` with their time and days as they are), the brief's Write one now (`POST /api/schedules/{id}/run`) and
+  the last one's chat; **On its own** (`/api/initiative`: the switch, the list with Remove and Again, a thing added);
+  **Watchers** (`GET /api/watchers`, each with how its looks go and its switch, sent whole with `PATCH
+  /api/watchers/{id}`).
 
 ### A chat kept in sync: views, revisions and streams (item 1686)
 
