@@ -85,3 +85,12 @@ def test_the_daily_check_exits_2_on_a_table_it_cannot_read_and_1_on_stale_rows(
     assert stale.main() == 1
     card.write_text(_card(_ROWS[0]), encoding="utf-8")
     assert stale.main() == 0
+
+
+def test_the_daily_check_exits_2_on_a_scorecard_that_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(stale, "SCORECARD", tmp_path / "gone.md")
+    monkeypatch.setattr(sys, "argv", ["maturity_lapsed.py", "--today", "2026-11-25"])
+    assert stale.main() == 2
+    assert "gone.md" in capsys.readouterr().err

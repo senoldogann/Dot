@@ -36,7 +36,7 @@ def main() -> int:
     today: date = parser.parse_args().today
     try:
         rows: list[Row] = read_rows(SCORECARD.read_text(encoding="utf-8"))
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         print(f"{SCORECARD.name}: {error}", file=sys.stderr)
         return EXIT_UNREADABLE
     stale: list[Row] = lapsed(rows, today, LIMIT_DAYS)
