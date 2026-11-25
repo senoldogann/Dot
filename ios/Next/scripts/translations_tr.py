@@ -152,7 +152,6 @@ TR: dict[str, str] = {
     "Skipped": "Atlandı",
     "Speech recognition is off for Dot. Turn it on in Settings › Dot Next › Speech Recognition.": "Dot için konuşma tanıma kapalı. Ayarlar › Dot Next › Konuşma Tanıma'dan aç.",
     "Started": "Başladı",
-    "Started a helper: %@": "Yardımcı başlatıldı: %@",
     "Starts after the run at work": "Çalışan iş bitince başlar",
     "State": "Durum",
     "Steer": "Yönlendir",
@@ -834,6 +833,9 @@ TR: dict[str, str] = {
     'Word break': 'Satır kaydır',
     'On: a long line wraps. Off: it scrolls sideways.': 'Açık: uzun satır alta kayar. Kapalı: yana kaydırılır.',
     'Custom font size': 'Özel yazı boyutu',
+    'Ran %lld commands': '%lld komut çalıştırdı',
+    'Delegating “%@”': '“%@” devrediliyor',
+    'Delegated task “%@” finished': '“%@” görevi devredildi ve bitti',
     # G2: Connect apps (items 1861-1862)
     'Connect apps': 'Uygulamaları bağla',
     '%lld connected': '%lld bağlı',
@@ -884,6 +886,7 @@ TR: dict[str, str] = {
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
+    "Ran %lld commands": ("Ran %lld command", "Ran %lld commands"),
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),

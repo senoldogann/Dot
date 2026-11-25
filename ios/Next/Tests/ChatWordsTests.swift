@@ -49,7 +49,8 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(toolLine(entry("draft_reply", "")), "Draft reply", "a name with no phrase reads as a sentence")
         XCTAssertEqual(toolLine(entry("mcp__microsoft-learn__search", "")), "Microsoft Learn · Search")
         XCTAssertTrue(isDotTool(entry("work_orders", "")))
-        XCTAssertTrue(isDotTool(entry("delegate", "fix it")))
+        XCTAssertFalse(isDotTool(entry("delegate", "fix it")), "a delegated task wears the hammer")
+        XCTAssertEqual(toolSymbol(.helper), "hammer")
         XCTAssertFalse(isDotTool(entry("shell", "ls")))
     }
 
@@ -70,5 +71,15 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(colored, 4, "the newest eight characters in four steps")
         XCTAssertEqual(String(faded.characters), "The words arrive softly", "the words are kept")
         XCTAssertEqual(fadedTail(AttributedString("x"), characters: 0), AttributedString("x"))
+    }
+
+    func testConsecutiveCommandsThatEndedWellReadAsOneLine() {
+        let command: (String, DotEngine.ToolState) -> TranscriptItem = { id, state in
+            .tool(ToolEntry(id: id, tool: "shell", kind: .command, target: "ls", args: "", output: "", state: state, images: [], startedAt: 0, endedAt: 1))
+        }
+        let read: TranscriptItem = .tool(ToolEntry(id: "r", tool: "read_file", kind: .read, target: "/a", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1))
+        let groups: [StepGroup] = StepGroup.of([command("c1", .done), command("c2", .done), read, command("c3", .done), command("c4", .failed), command("c5", .done), command("c6", .running)])
+        // Item 1769: "Ran 2 commands"; a single command, a failed one and one at work each stand alone.
+        XCTAssertEqual(groups.map(\.id), ["commands:c1", "r", "c3", "c4", "c5", "c6"])
     }
 }

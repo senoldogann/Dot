@@ -45,9 +45,10 @@ func dotToolWords(_ tool: String) -> String? {
     }
 }
 
-/// Whether a call is one of Dot's own tools, which wears Dot's mark.
+/// Whether a call is one of Dot's own tools, which wears Dot's mark; a task handed to a helper wears the hammer, as the
+/// owner's reference draws it.
 func isDotTool(_ entry: ToolEntry) -> Bool {
-    entry.kind == .helper || dotToolWords(entry.tool) != nil
+    entry.kind != .helper && dotToolWords(entry.tool) != nil
 }
 
 /// A tool's name in words as the web says it: `draft_reply` reads "Draft reply", a connected app's
