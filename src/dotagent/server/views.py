@@ -346,6 +346,13 @@ class ThreadsQuery(FrozenModel):
     limit: int = Field(default=100, ge=1, le=500)
 
 
+class ChatSearchQuery(FrozenModel):
+    """The words the phone's home search looks for in what the chats say (item 1882), and how many finds to return."""
+
+    q: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=20, ge=1, le=50)
+
+
 class HelpersQuery(FrozenModel):
     limit: int = Field(default=50, ge=1, le=200)
 
