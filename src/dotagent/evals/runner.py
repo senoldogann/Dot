@@ -102,6 +102,19 @@ def eval_config(config: AppConfig) -> AppConfig:
             ),
             # The plugin scout's night is read by the review model too, on the same tick.
             "scout": config.scout.model_copy(update={"time": REFLECTION_OFF}),
+            # The owner's caps of what the runs spend (item 1731) would ask nobody in an attempt: a task's own
+            # limits bound it.
+            "budget": config.budget.model_copy(
+                update={
+                    "run_tokens": 0,
+                    "day_tokens": 0,
+                    "ui_day_tokens": 0,
+                    "schedule_day_tokens": 0,
+                    "initiative_day_tokens": 0,
+                    "review_day_tokens": 0,
+                    "delegate_day_tokens": 0,
+                }
+            ),
             "mcp": [],
             "builtin_mcp": config.builtin_mcp.model_copy(update={"web_research": False}),
             "skills": SkillsConfig(dirs=[], elsewhere=False),

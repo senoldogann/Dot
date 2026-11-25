@@ -5,11 +5,17 @@ import { test } from "node:test";
 
 import {
   barShare,
+  budgetLine,
+  capMillions,
+  capTokens,
   dayLabel,
   dayLine,
   isWorking,
   localDay,
   sinceWords,
+  sourceName,
+  todayLine,
+  topRunLine,
   totalLine,
   usedSoFar,
   windowLine,
@@ -119,4 +125,27 @@ test("only a task at work says what it has used so far", () => {
     window: null,
   });
   assert.equal(usedSoFar({ ...costs, status: "done" }, NOW), null);
+});
+
+test("a task against its cap says what it and its helpers used and what tasks like it usually use (item 1731)", () => {
+  const budget = { estimate: { runs: 12, median: 2_300_000, p90: 26_000_000 }, spent: 12_000_000, cap: 500_000_000, source: "ui", day: 0, day_cap: 0, source_day: 0, source_day_cap: 0 };
+  assert.equal(budgetLine(budget), "With helpers 12.0M of its 500.0M cap · usually 2.3M, 9 in 10 under 26.0M");
+  assert.equal(budgetLine({ ...budget, cap: 0, estimate: null }), "With helpers 12.0M, no cap · too few tasks like it to say what it usually uses");
+  assert.equal(budgetLine(undefined), null);
+});
+
+test("a cap's box holds whole millions, and anything else is no cap value", () => {
+  assert.equal(capMillions(500_000_000), "500");
+  assert.equal(capTokens(" 750 "), 750_000_000);
+  assert.equal(capTokens("0"), 0);
+  assert.equal(capTokens("-1"), null);
+  assert.equal(capTokens("1.5"), null);
+  assert.equal(capTokens(""), null);
+});
+
+test("today against the day's cap, and one of the costliest tasks, in a line", () => {
+  assert.equal(todayLine({ caps: { day_tokens: 4_000_000_000 }, today: 1_200_000 }), "Today 1.2M of 4000.0M");
+  assert.equal(todayLine({ caps: { day_tokens: 0 }, today: 1_200_000 }), "Today 1.2M, no cap");
+  assert.equal(topRunLine({ source: "delegate", model: "claude_code:sonnet", steps: 371, tokens: 209_800_000 }), "Helpers · claude_code:sonnet · 371 steps · 209.8M");
+  assert.equal(sourceName("work_order"), "work order");
 });

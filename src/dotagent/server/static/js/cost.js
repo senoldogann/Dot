@@ -8,11 +8,12 @@
 
 import { compact, duration, el } from "./dom.js";
 import { panelSection } from "./panels.js";
-import { usedSoFar } from "./usagewords.js";
+import { budgetLine, usedSoFar } from "./usagewords.js";
 
 const HINTS = {
   sofar: "What this task has used since it began: its time, what was sent to the model and what it wrote, and its steps",
   window: "How full the window of your Claude plan was when the task's newest step ran, and when it resets",
+  budget: "The tokens of this task and its helpers against the cap you set in Settings › Models › Caps, and what tasks like it (same model, mode and source, last 30 days) usually used",
   model: "The seconds the model took to answer: its steps and its side calls together",
   summaries: "The time spent summing up the older part of the chat, and its share of the task",
   tools: "The seconds the actions took, with the time spent waiting for your answer",
@@ -72,8 +73,10 @@ export function createCostCard() {
     ].filter(([, value]) => value !== "None");
     // What a task at work has used so far, above the details (item 1403); none once it has ended.
     const sofar = usedSoFar(costs, Date.now() / 1000);
+    // The task against its cap and what tasks like it usually use (item 1731), from its first step on.
+    const budget = budgetLine(costs.budget);
     // Read every ten seconds while the run works; drawn again only when a figure changed (item 310).
-    const from = JSON.stringify([sofar, facts]);
+    const from = JSON.stringify([sofar, budget, facts]);
     if (from === drawn) {
       return;
     }
@@ -89,8 +92,9 @@ export function createCostCard() {
             el("div", { class: "cost-so-far-line", title: HINTS.sofar }, sofar.line),
             sofar.window === null ? null : el("div", { class: "cost-so-far-window", title: HINTS.window }, sofar.window),
           );
+    const limit = budget === null ? null : el("div", { class: "cost-budget hint", title: HINTS.budget }, budget);
     // The native replaceChildren writes a null as the word: a part that is not there is left out first.
-    body.replaceChildren(...[head, grid].filter((part) => part !== null));
+    body.replaceChildren(...[head, limit, grid].filter((part) => part !== null));
   }
 
   return { element: card.element, paint };

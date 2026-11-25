@@ -869,6 +869,21 @@ class WatchersConfig(FrozenModel):
     judged_per_look: int = Field(ge=1, le=200)
 
 
+class BudgetConfig(FrozenModel):
+    """The caps of what the runs spend, in tokens (input and output of every model call, as the Usage page counts
+    them; 0: no cap). ``run_tokens`` holds a run and the runs it delegated to, ``day_tokens`` every run that began on
+    the local day, and each ``<source>_day_tokens`` the runs of that source that began on it. A run past a cap is paused
+    and the owner is asked whether it goes on, in every approval mode (:mod:`dotagent.agent.budget`, docs/limits.md)."""
+
+    run_tokens: int = Field(ge=0)
+    day_tokens: int = Field(ge=0)
+    ui_day_tokens: int = Field(ge=0)
+    schedule_day_tokens: int = Field(ge=0)
+    initiative_day_tokens: int = Field(ge=0)
+    review_day_tokens: int = Field(ge=0)
+    delegate_day_tokens: int = Field(ge=0)
+
+
 class InitiativeConfig(FrozenModel):
     """Dot's own initiative (item 715, docs/proactive.md): the owner switches it on in Schedules; these say when the Mac
     counts as idle, how far apart Dot's own runs start, how often it looks for work, how many runs try one thing, and
@@ -1271,6 +1286,7 @@ class AppConfig(FrozenModel):
     scheduler: SchedulerConfig
     watchers: WatchersConfig
     initiative: InitiativeConfig
+    budget: BudgetConfig
     skills: SkillsConfig
     plugins: PluginsConfig
     scout: ScoutConfig

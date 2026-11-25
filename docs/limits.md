@@ -69,6 +69,26 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   in the other modes the next hand-off is not made, the run it came from is told and goes on, and you get one card,
   **Allow once** (the run's count goes back to 0) or **Stop**, and a thing on Dot's list that the limit stops is let go
   and you are told. Real chains here went one deep.
+- **Caps that ask** (`[budget]`, item 1731): a cap in tokens for a run with the runs it delegated to
+  (`run_tokens`, 500M by default), for every run that began today (`day_tokens`, 4,000M) and for one source's runs of
+  the day (`schedule_day_tokens` and `initiative_day_tokens` 500M, `review_day_tokens` 1,000M, `ui_day_tokens` and
+  `delegate_day_tokens` none); 0 is no cap. They count what the Usage page counts (input and output, cached input
+  included) and a run counts on the day it began. Before the calls of a step run, a run past one waits and asks you:
+  **Continue** lets as many tokens again go past that cap (for the run, or for the day), **Stop** ends the run as the
+  Stop button does, and no answer within `approval_timeout_s` stops it. It asks in every mode, Pay or send (yolo) and
+  free mode included: your own word ([Freedom](freedom.md)). Two runs past the same day's cap get one card, and its
+  answer holds for both. What you let past a cap is kept until the daemon restarts; then the next step past it asks
+  again. A step that only finishes or closes its plan is not held, a step at work when a cap passes goes on, and a
+  helper's tokens count against its parent's cap at the parent's next step (its own cap and the day's hold it
+  meanwhile). The defaults are above everything measured on a busy Mac in November 2026 (the most one run used with
+  its helpers: 438M; the busiest day: 2,423M; schedules' busiest day 86M, reviews' 397M). Settings › Models › Caps sets
+  them (`GET`/`PUT /api/budget`, with today's tokens in all and by source); a phone may lower or set a cap, not raise
+  or take one off (item 678). OpenCode's agent's own tools (its shell and files) are held at its next call of one of
+  Dot's tools, and a deleted chat's runs no longer count for the day. A run's Cost card says, from its first
+  step, what it and its helpers used against its cap and what runs like it usually use (the median and the 90th
+  percentile of the last 50 ended runs of the same model, mode and source in 30 days, with their helpers; none from
+  fewer than three; `budget` of `GET /runs/{id}/stats`). Unlike `run_max_tokens`, which tells the run to finish, a cap
+  only pauses it. No money: Dot keeps no price for a model, and a plan is a window that fills.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
   What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
   item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and

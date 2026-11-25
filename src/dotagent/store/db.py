@@ -58,6 +58,7 @@ from dotagent.store.models import (
     AwayRule,
     Behavior,
     BrowserMode,
+    BudgetSpent,
     CampaignEntry,
     CampaignEntryKind,
     CampaignRecord,
@@ -115,6 +116,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     SentMessage,
     ShownPage,
+    SourceSpend,
     StepRow,
     TeamRecord,
     ThreadRecord,
@@ -3934,6 +3936,48 @@ class Store:
             (run_id, run_id),
         )
         return 0 if row is None else int(row["n"])
+
+    async def budget_spent(self, run_id: str, since: float) -> BudgetSpent:
+        """What the caps of ``[budget]`` hold the run ``run_id`` to, in one read: its source, the tokens of it and of
+        the runs started on its behalf, of every run created since ``since`` (the local day's start) and of those of its
+        source among them."""
+        row = await self._one(
+            "SELECT r.source AS source,"
+            " (SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM runs WHERE id = r.id OR parent_run_id = r.id)"
+            " AS family,"
+            " (SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM runs WHERE created_at >= ?) AS day,"
+            " (SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM runs WHERE created_at >= ?"
+            " AND source = r.source) AS source_day"
+            " FROM runs AS r WHERE r.id = ?",
+            (since, since, run_id),
+        )
+        if row is None:
+            raise NotFoundError("there is no such run", {"run_id": run_id})
+        return BudgetSpent(
+            source=str(row["source"]), run=int(row["family"]), day=int(row["day"]), source_day=int(row["source_day"])
+        )
+
+    async def spent_by_source_since(self, since: float) -> list[SourceSpend]:
+        """The tokens of the runs created since ``since``, summed by their source, the most first."""
+        rows = await self._all(
+            "SELECT source, COALESCE(SUM(input_tokens + output_tokens), 0) AS tokens FROM runs WHERE created_at >= ?"
+            " GROUP BY source ORDER BY tokens DESC",
+            (since,),
+        )
+        return [SourceSpend(source=str(row["source"]), tokens=int(row["tokens"])) for row in rows]
+
+    async def similar_spends(self, model: str, mode: str, source: str, since: float, limit: int) -> list[int]:
+        """The tokens each of the last ``limit`` ended runs of ``model``, ``mode`` and ``source`` created since
+        ``since`` used with the runs started on their behalf, the newest first: what a run like them is estimated
+        from."""
+        rows = await self._all(
+            "SELECT r.input_tokens + r.output_tokens + COALESCE((SELECT SUM(c.input_tokens + c.output_tokens)"
+            " FROM runs AS c WHERE c.parent_run_id = r.id), 0) AS spent FROM runs AS r"
+            " WHERE r.model = ? AND r.mode = ? AND r.source = ? AND r.created_at >= ? AND r.finished_at IS NOT NULL"
+            " ORDER BY r.created_at DESC LIMIT ?",
+            (model, mode, source, since, limit),
+        )
+        return [int(row["spent"]) for row in rows]
 
     async def delegated_usage(self, run_id: str) -> tuple[int, int]:
         """The input and the output tokens of the runs started on behalf of ``run_id`` (the runs it delegated to), as

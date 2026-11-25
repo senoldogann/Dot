@@ -103,6 +103,10 @@ function choiceText(option) {
   );
 }
 
+// The card of a task past a cap of what it spends (item 1731, agent/budget.py): Continue lets as many tokens again
+// go, Stop ends the task. It is never remembered, has no rule and no note.
+const BUDGET = "budget";
+
 function titleOf(severity) {
   if (severity === "question") {
     return "Dot is asking you";
@@ -112,6 +116,9 @@ function titleOf(severity) {
   }
   if (severity === "handoff") {
     return "Dot needs you to take over this step";
+  }
+  if (severity === BUDGET) {
+    return "A task reached its budget";
   }
   return "Approval needed";
 }
@@ -295,6 +302,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
+  const isBudget = approval.severity === BUDGET;
   // A card that asks for a key, a token or a password (item 857): its value goes to its own route alone, never as a note.
   const isSecret = approval.severity === "secret";
   // An answer to a question the run left goes on with the work in the run's conversation, so it needs words.
@@ -362,7 +370,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
     const ticks = several ? choices.map((option) => el("input", { type: "checkbox", value: option.label })) : [];
     // "Don't ask again in this chat" (item 866): on a question of the policy open now, of a step that may be
     // remembered, in a chat that is not of Dot's own initiative.
-    const remember = rememberable(approval, isQuestion || isHandoff || isLeft) ? el("input", { type: "checkbox", class: "approval-remember-box" }) : null;
+    const remember = rememberable(approval, isQuestion || isHandoff || isLeft || isBudget) ? el("input", { type: "checkbox", class: "approval-remember-box" }) : null;
     // An answer to a question is the options ticked and what was written; it is never empty.
     const submit = (approve) => {
       const answer = isQuestion && approve ? chosenAnswer(ticks.filter((tick) => tick.checked).map((tick) => tick.value), note.value) : note.value.trim();
@@ -404,12 +412,14 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
                   ),
                 ),
           );
-    const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : isKept ? "Allow once" : "Approve";
-    const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : isKept ? "Skip" : "Deny";
+    const more = typeof approval.args.more_words === "string" ? ` (+${approval.args.more_words})` : "";
+    const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : isBudget ? `Continue${more}` : isKept ? "Allow once" : "Approve";
+    const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : isBudget ? "Stop" : isKept ? "Skip" : "Deny";
+    note.hidden = isBudget;
     const yesButton = el("button", { class: "btn primary", type: "button", onclick: () => submit(true) }, yes);
     // A yes with a note is the note first (item 1140): the daemon holds the step until the run read it, and the step
     // goes through once if the note still calls for it. The button says so while a note is written.
-    if (!isQuestion && !isHandoff && !isLeft) {
+    if (!isQuestion && !isHandoff && !isLeft && !isBudget) {
       note.addEventListener("input", () => {
         const noted = note.value.trim() !== "";
         yesButton.textContent = noted ? "Send note" : yes;
@@ -432,8 +442,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
         isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil, approval.scopeCampaignId !== null || leftNote === LEFT_IN_CAMPAIGN) : leftNote) : null,
         // A chip is left out only when the words are the step's own, the command cut out of them, never a reason's.
-        isQuestion ? options : technicalDetails(approval.args, words?.cut ? text : ""),
-        isQuestion || isHandoff ? null : asks !== null ? el("div", { class: "small muted" }, asks) : ruleOffer(approval),
+        isQuestion ? options : isBudget ? null : technicalDetails(approval.args, words?.cut ? text : ""),
+        isQuestion || isHandoff || isBudget ? null : asks !== null ? el("div", { class: "small muted" }, asks) : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(
           "div",
