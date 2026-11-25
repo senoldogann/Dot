@@ -1,58 +1,56 @@
 import DotEngine
 import SwiftUI
 
-// The Activity tab (item 1826, P1-gaps §8 under the phone scope of PLAN §26): what Dot did while the owner was away,
-// the drafts that wait, the proposals of Self-improvement, what is in motion today, and the ways Dot comes to the owner
-// (the morning brief, the evening check-in, its own initiative, the watchers), each on the daemon's own routes. The
-// setup of those (times, the watchers' choices) is the Mac's.
+// Activity (item 1826, P1-gaps §8 under the phone scope of PLAN §26): what Dot did while the owner was away, the
+// drafts that wait, the proposals of Self-improvement, what is in motion today, and the ways Dot comes to the owner (the
+// morning brief, the evening check-in, its own initiative, the watchers), each on the daemon's own routes. The setup of
+// those (times, the watchers' choices) is the Mac's. `ActivityScreen` stands alone (PLAN §27: Dot's profile opens it
+// whole, an agent's profile scoped to its own work); `ActivityTab` is only its wrapper while the tab bar stays.
 
-/// A page the Activity tab pushes.
-enum ActivityRoute: Hashable, Sendable {
-    case chat(String)
-    case initiative
-    case watchers
-}
-
-/// What the tab's screens ask of it: open a run's chat, open a chat, say something in the toast.
+/// What the screens of Activity ask of the one that holds them: open a run's chat, open a chat, say something in the
+/// toast.
 struct ActivityActions {
     let openRun: (_ run: String, _ rootThread: String?) -> Void
     let openChat: (_ thread: String) -> Void
     let say: (_ words: String, _ symbol: String) -> Void
 }
 
+/// The tab's wrapper: a stack holding the whole screen (to be removed with the tab bar, PLAN §27).
 struct ActivityTab: View {
+    var body: some View {
+        NavigationStack { ActivityScreen(agent: nil) }
+    }
+}
+
+/// Activity as a screen of its own, pushed in any navigation stack. `agent` `nil` shows all of Dot's (Dot's profile);
+/// an agent's id shows only that agent's runs and rows (its profile), without what belongs to Dot as a whole (the
+/// drafts, the proposals, the brief, the check-in, its own initiative, the watchers).
+struct ActivityScreen: View {
+    let agent: String?
     @Environment(AppModel.self) private var model: AppModel
-    @State private var path: [ActivityRoute] = []
+    @State private var openedChat: String?
     @State private var toast: ToastMessage?
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ActivityHome(actions: actions)
-                .navigationDestination(for: ActivityRoute.self) { route in
-                    switch route {
-                    case .chat(let thread): ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
-                    case .initiative: InitiativePage(actions: actions)
-                    case .watchers: WatchersPage(actions: actions)
-                    }
-                }
-                // A failure's Diagnose opens This Mac here too (`FailureBanner`).
-                .navigationDestination(for: SettingsPage.self) { page in
-                    if case .mac = page { MacPage() }
-                }
-        }
-        .toastHost($toast, seconds: 4) { _ in }
+        ActivityHome(agent: agent, actions: actions)
+            .navigationDestination(item: $openedChat) { thread in ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false) }
+            // A failure's Diagnose opens This Mac here too (`FailureBanner`).
+            .navigationDestination(for: SettingsPage.self) { page in
+                if case .mac = page { MacPage() }
+            }
+            .toastHost($toast, seconds: 4) { _ in }
     }
 
     private var actions: ActivityActions {
         ActivityActions(
             openRun: { run, root in Task { await openRun(run, rootThread: root) } },
-            openChat: { thread in path.append(.chat(thread)) },
+            openChat: { thread in openedChat = thread },
             say: { words, symbol in toast = ToastMessage(id: UUID(), text: words, systemImage: symbol, actionTitle: nil) })
     }
 
     private func openRun(_ run: String, rootThread: String?) async {
         switch await model.chat(ofRun: run, rootThread: rootThread) {
-        case .success(let thread): path.append(.chat(thread))
+        case .success(let thread): openedChat = thread
         case .failure(let box):
             toast = ToastMessage(
                 id: UUID(), text: failureWords(box.failure, macPlace: activityMacPlace), systemImage: "exclamationmark.triangle", actionTitle: nil)
@@ -87,9 +85,9 @@ struct ActivityPicture: Sendable {
         return nil
     }
 
-    /// Whether every part is still on its way.
+    /// Whether the parts every view of the screen reads are still on their way.
     var cold: Bool {
-        if case .loading = activity, case .loading = away, case .loading = drafts, case .loading = brief { return true }
+        if case .loading = activity, case .loading = away { return true }
         return false
     }
 
@@ -122,6 +120,8 @@ private let versionsRead: Int = 100
 private let refreshSeconds: Double = 30
 
 struct ActivityHome: View {
+    /// `nil`: all of Dot's; an agent's id: only its own work.
+    let agent: String?
     let actions: ActivityActions
     @Environment(AppModel.self) private var model: AppModel
     @Environment(\.locale) private var locale: Locale
@@ -168,14 +168,21 @@ struct ActivityHome: View {
     }
 
     @ViewBuilder private var content: some View {
-        if case .loaded(let away?) = picture.away, !awayLine(away).isEmpty {
-            AwayCard(view: away, showsAll: $showsAllAway, open: { actions.openRun($0, nil) }) { await markRead(away) }
+        if case .loaded(let whole?) = picture.away {
+            let away: AwayView = agent.map { scoped(whole, to: $0) } ?? whole
+            if !awayLine(away).isEmpty {
+                AwayCard(view: away, showsAll: $showsAllAway, open: { actions.openRun($0, nil) }, markRead: agent == nil ? { await markRead(whole) } : nil)
+            }
         }
-        if let drafts = picture.drafts.value, !drafts.isEmpty { readySection(drafts) }
-        if let harness = picture.harness.value, !harness.proposals.isEmpty { proposalsSection(harness) }
-        if let activity = picture.activity.value { activitySections(activity) }
-        comesToYouSection
-        watchSection
+        if agent == nil {
+            if let drafts = picture.drafts.value, !drafts.isEmpty { readySection(drafts) }
+            if let harness = picture.harness.value, !harness.proposals.isEmpty { proposalsSection(harness) }
+        }
+        if let whole = picture.activity.value { activitySections(agent.map { scoped(whole, to: $0) } ?? whole) }
+        if agent == nil {
+            comesToYouSection
+            watchSection
+        }
     }
 
     // MARK: Ready
@@ -283,7 +290,9 @@ struct ActivityHome: View {
                 }
             }
             if let initiative = picture.initiative.value {
-                NavigationLink(value: ActivityRoute.initiative) {
+                NavigationLink {
+                    InitiativePage(actions: actions)
+                } label: {
                     ListRow(
                         systemImage: "wand.and.stars", title: String(localized: "On its own", comment: "Activity: Dot's own initiative while the Mac is idle"),
                         description: initiativeLine(initiative), accessory: .chevron)
@@ -291,7 +300,9 @@ struct ActivityHome: View {
                 .buttonStyle(RowPressStyle())
             }
             if let watchers = picture.watchers.value {
-                NavigationLink(value: ActivityRoute.watchers) {
+                NavigationLink {
+                    WatchersPage(actions: actions)
+                } label: {
                     ListRow(
                         systemImage: "eye", title: String(localized: "Watchers", comment: "Activity: what Dot keeps an eye on for the owner"),
                         description: watchersLine(watchers), accessory: .chevron)
@@ -335,6 +346,16 @@ struct ActivityHome: View {
     }
 
     private func load() async {
+        if agent != nil {
+            async let activity = model.read { api throws(DaemonRequestError) in try await api.activity() }
+            async let away = readAway()
+            var fresh: ActivityPicture = picture
+            fresh.activity = await activity
+            fresh.away = await away
+            picture = picture.merged(with: fresh)
+            problem = fresh.failure
+            return
+        }
         async let activity = model.read { api throws(DaemonRequestError) in try await api.activity() }
         async let away = readAway()
         async let drafts = model.read { api throws(DaemonRequestError) in try await api.waitingDrafts(limit: draftsRead) }
