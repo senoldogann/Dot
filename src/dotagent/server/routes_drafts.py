@@ -1,15 +1,33 @@
-"""Routes for the drafts runs write (item 314): a draft as it stands, and the owner's Send, with the words the card
-holds then, and Discard."""
+"""Routes for the drafts runs write (item 314): the drafts that wait for the owner (item 1825), a draft as it stands,
+and the owner's Send, with the words the card holds then, and Discard."""
 
-from fastapi import APIRouter
+from typing import Annotated
 
+from fastapi import APIRouter, Query
+from pydantic import Field
+
+from dotagent.core.types import FrozenModel
 from dotagent.drafts.service import DraftWords, discard_draft, send_draft
 from dotagent.server.context import ServerContext
 from dotagent.store.models import DraftRecord
 
 
+class DraftsQuery(FrozenModel):
+    """How many of the drafts that wait for the owner to read, the newest first."""
+
+    limit: int = Field(default=50, ge=1, le=200)
+
+
 def drafts_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
+
+    @router.get("/drafts")
+    async def waiting_drafts(query: Annotated[DraftsQuery, Query()]) -> list[DraftRecord]:
+        """The drafts that wait for the owner, the newest first (item 1825): those no one sent or discarded yet and
+        those whose last send failed, for the iPhone app's Activity, which lists them as Ready."""
+        waiting: list[DraftRecord] = await ctx.runtime.store.list_drafts("waiting", query.limit)
+        failed: list[DraftRecord] = await ctx.runtime.store.list_drafts("failed", query.limit)
+        return sorted([*waiting, *failed], key=lambda draft: draft.created_at, reverse=True)[: query.limit]
 
     @router.get("/drafts/{draft_id}")
     async def get_draft(draft_id: str) -> DraftRecord:
