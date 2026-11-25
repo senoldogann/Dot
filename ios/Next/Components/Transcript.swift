@@ -139,9 +139,16 @@ struct CodeBlock: View {
 /// text size (item 1769).
 struct MonoSize: ViewModifier {
     let points: Double
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
+    /// The chosen size at the default text size, scaled with the text size as the code role is.
     func body(content: Content) -> some View {
-        if points > 0 { content.font(.system(size: points, design: .monospaced)) } else { content }
+        if points > 0 {
+            let traits: UITraitCollection = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+            content.font(.system(size: UIFontMetrics(forTextStyle: .footnote).scaledValue(for: points, compatibleWith: traits), design: .monospaced))
+        } else {
+            content
+        }
     }
 }
 
