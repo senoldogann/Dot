@@ -164,6 +164,8 @@ async def test_a_run_goes_whole_to_claude_code_and_its_calls_go_through_the_gate
         ("--setting-sources", ""),
         ("--permission-mode", "dontAsk"),
         ("--permission-prompts", "none"),
+        # The stand-in says 2.1.331, which passes on the model's thinking when asked (item 1768).
+        ("--thinking-display", "summarized"),
     ):
         assert args[args.index(flag) + 1] == value
     for flag in (
