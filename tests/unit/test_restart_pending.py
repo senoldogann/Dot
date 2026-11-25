@@ -131,7 +131,11 @@ async def test_a_restart_that_gave_up_keeps_its_flag_and_restarts_once_when_dot_
         # The run is not stopped and a new one may start: the restart waits while any works.
         other: RunRecord = await _run_in(store, "running", 2)
         await store.set_run_status(holder.id, "done")
-        await asyncio.sleep(0.1)
+        # The waiter's next look names the other run; waited for, not timed, as a loaded runner looks late.
+        for _ in range(1000):
+            if (read_flag(database) or gave_up).waiting_for == other.id:
+                break
+            await asyncio.sleep(0.01)
         assert not program.done() and seen.restarts == 0
         assert (read_flag(database) or gave_up).waiting_for == other.id
         await store.set_run_status(other.id, "done")
