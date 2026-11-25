@@ -17,18 +17,23 @@ choose the script:
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
-holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop.
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop. With
+``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
+failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
+own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
+``e2e_activity.sh`` marks "while you were away" read from before them.
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
     DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome \\
-        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed]
+        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity]
 
 It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 ``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
 """
 
 import asyncio
+import json
 import os
 import sys
 import time
@@ -47,10 +52,20 @@ from dotagent.llm.types import (
     Usage,
 )
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.thread_sync import watch_revisions
+from dotagent.store.db import Store
+from dotagent.store.models import (
+    ApprovalRecord,
+    DraftRecord,
+    RunRecord,
+    RunStatus,
+    ScheduleRecord,
+    ThreadRecord,
+)
 
 TOKEN: str = "dotnext-e2e-token"
 MODEL: str = "ollama:scripted"
@@ -288,12 +303,84 @@ async def seed(runtime: Runtime) -> None:
     )
 
 
-async def serve(port: int, seeded: bool) -> None:
+async def _schedule_run(store: Store, name: str, goal: str, status: RunStatus, answer: str) -> RunRecord:
+    """A run of a schedule of ``name`` that ended ``status`` with ``answer``, in the schedule's own chat."""
+    schedule: ScheduleRecord = await store.add_schedule(
+        name, "0 7 * * *", None, goal, "task", time.time() + 86_400, UNSET_OPTIONS, None, True
+    )
+    chat: ThreadRecord = await store.create_thread(name, "schedule")
+    await store.link_schedule_thread(chat.id, schedule.id)
+    run: RunRecord = await store.create_run(
+        chat.id, goal, "task", MODEL, None, "schedule", "medium", "standard", None, "yolo", False, None, None, None
+    )
+    await store.finish_run(run.id, status, answer)
+    return run
+
+
+async def seed_activity(runtime: Runtime) -> None:
+    """What the Activity tab shows (module docstring): runs of schedules, decisions made for the owner, drafts, a thing
+    on Dot's list."""
+    store: Store = runtime.store
+    mail: RunRecord = await _schedule_run(
+        store,
+        "Client mail check",
+        "Read new client mail and draft replies.",
+        "done",
+        "Two clients wrote; both replies are drafted for you.",
+    )
+    await _schedule_run(
+        store, "Nightly backup", "Back up the projects folder.", "failed", "The backup disk was not mounted."
+    )
+    for decided_by in ("yolo", "yolo", "reviewer"):
+        asked: ApprovalRecord = await store.create_approval(mail.id, "shell", "Run a command", "medium", {})
+        await store.decide_approval(asked.id, "approved", decided_by, "")
+    await store.add_draft(
+        mail.id,
+        "mail",
+        ["ayse@example.com"],
+        [],
+        "Re: The March invoice",
+        "Hi Ayşe,\n\nThanks, the invoice is paid; the receipt is attached.\n\nŞenol",
+    )
+    refused: DraftRecord = await store.add_draft(
+        mail.id, "message", ["+90 555 111 22 33"], [], "", "Running ten minutes late, see you at the café."
+    )
+    await store.claim_draft(refused.id, list(refused.to), [], "", refused.body)
+    await store.settle_draft(refused.id, "Messages could not reach the number.")
+    await store.create_harness_version(
+        None,
+        "proposer",
+        "Run the tests of what changed before the whole suite.",
+        "- Run the tests of the files a change touched first.",
+        "",
+        json.dumps({"scope": "tests"}),
+    )
+    await store.create_harness_version(
+        None,
+        "proposer",
+        "Read the README of a repository before editing it.",
+        "- Read a repository's README before the first edit.",
+        "",
+        json.dumps({"tainted": True, "tainted_by": ["a web page"]}),
+    )
+    await store.add_todo(
+        "Tidy the Downloads folder",
+        "tidy the downloads folder",
+        "It holds 2,000 files from the last year.",
+        "run",
+        mail.id,
+        False,
+    )
+
+
+async def serve(port: int, seeded: bool, activity: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register("ollama", ScriptProvider())
     if seeded:
         await seed(runtime)
+    if activity:
+        await seed_activity(runtime)
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", port)
@@ -324,4 +411,4 @@ async def serve(port: int, seeded: bool) -> None:
 
 if __name__ == "__main__":
     prepare_home()
-    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:]))
+    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:], "--seed-activity" in sys.argv[2:]))
