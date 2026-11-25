@@ -319,6 +319,7 @@ struct CampaignPage: View {
     private func load() async {
         let id: String = id
         state = await model.read { api throws(DaemonRequestError) in try await api.campaign(id) }
+        if state.value != nil { problem = nil }
     }
 
     private func act(_ action: CampaignAction) async {
@@ -328,7 +329,11 @@ struct CampaignPage: View {
         case .success(let campaign):
             state = .loaded(campaign)
             problem = nil
-        case .failure(let box): problem = box.failure
+        case .failure(let box):
+            // A refused action most often means the campaign moved on meanwhile (a session achieved it: 409): read it
+            // again, so the actions offered are what the daemon takes now; the failure stays shown.
+            await load()
+            problem = box.failure
         }
         acting = false
     }

@@ -38,7 +38,9 @@ model with its reasoning, changed from the phone too: item 1770, a §24 picker s
 windows, today's tokens, the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last
 run, paused, failed; a switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks
 in it; free mode, switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every
-note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and
+note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last
+progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and Mark achieved as the daemon
+takes them), Health and
 version, Usage, Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the
 computer stays on the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no
 Settings row opens the web app. A search with synonyms finds any page in English or
@@ -54,6 +56,8 @@ Stop, which asks, Resume and Mark achieved as the daemon takes them), Health and
 versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
 line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
 line says, and no Settings row opens the web app. A search with synonyms finds any page in English or
+computer stays on the Mac (PLAN §26), which the list's last line says, but for Connect apps (PLAN §27), and no Settings
+row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
