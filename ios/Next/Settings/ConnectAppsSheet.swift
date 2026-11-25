@@ -91,7 +91,7 @@ struct ConnectAppsSheet: View {
                 chips(connectSections(apps))
                 if let refreshProblem {
                     FailureBanner(failure: refreshProblem, macPlace: macPlace, retry: { Task { await load() } })
-                        .padding(.horizontal, Space.gutter).padding(.bottom, Space.s)
+                        .padding(.horizontal, Space.gutter).padding(.bottom, 8)
                 }
                 if !words.isEmpty || onlyConnected || section != nil {
                     filtered(filterConnectApps(apps, section: section, onlyConnected: onlyConnected, query: words), skills: skills, words: words)
@@ -99,7 +99,7 @@ struct ConnectAppsSheet: View {
                     whole(apps)
                 }
             }
-            .padding(.bottom, Space.xxl * 2)
+            .padding(.bottom, 64)
             .readableColumn()
         }
         .scrollDismissesKeyboard(.interactively)
@@ -117,7 +117,7 @@ struct ConnectAppsSheet: View {
                 detail: String(localized: "Your Mac's Dot lists no app to connect. Update Dot on the Mac.", comment: "Connect apps: the empty state's line"),
                 actionTitle: nil
             ) {}
-            .padding(.top, Space.xxl)
+            .padding(.top, 24)
         }
         if !featured.isEmpty {
             group(featuredSection, apps: featured)
@@ -136,7 +136,7 @@ struct ConnectAppsSheet: View {
                     detail: String(localized: "Connect an app and Dot can use it in its tasks.", comment: "Connect apps: the empty state of the connected list"),
                     actionTitle: String(localized: "Show all apps", comment: "Connect apps: leaves the connected list")
                 ) { onlyConnected = false }
-                .padding(.top, Space.xxl)
+                .padding(.top, 24)
             } else {
                 EmptyState(
                     title: words.isEmpty
@@ -150,7 +150,7 @@ struct ConnectAppsSheet: View {
                     section = nil
                     onlyConnected = false
                 }
-                .padding(.top, Space.xxl)
+                .padding(.top, 24)
             }
         } else {
             if !apps.isEmpty {
@@ -185,7 +185,7 @@ struct ConnectAppsSheet: View {
             Text(String(localized: "\(count) connected", comment: "Connect apps: the pill that lists the connected services alone; the argument is how many"))
                 .textRole(.body).fontWeight(.medium)
                 .foregroundStyle(onlyConnected ? Tone.onAction : Tone.text)
-                .padding(.horizontal, Space.m)
+                .padding(.horizontal, ConnectMetric.inset)
                 .frame(minHeight: 36)
                 .background(onlyConnected ? Tone.action : Color.clear, in: Capsule())
                 .contentShape(Capsule())
@@ -198,7 +198,7 @@ struct ConnectAppsSheet: View {
 
     private func chips(_ sections: [String]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Space.xs) {
+            HStack(spacing: 8) {
                 Chip(title: String(localized: "All", comment: "Connect apps: the chip of every section"), systemImage: nil, isSelected: section == nil && !onlyConnected) {
                     section = nil
                     onlyConnected = false
@@ -212,7 +212,6 @@ struct ConnectAppsSheet: View {
             }
             .padding(.horizontal, Space.gutter)
         }
-        .padding(.bottom, Space.xs)
         .haptic(.selection, trigger: section)
     }
 
@@ -222,7 +221,7 @@ struct ConnectAppsSheet: View {
                 Button {
                     section = opens
                 } label: {
-                    HStack(spacing: Space.xs) {
+                    HStack(spacing: ConnectMetric.lineGap) {
                         Text(title).textRole(.headline).fontWeight(.regular).foregroundStyle(Tone.text)
                         Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
                     }
@@ -237,8 +236,8 @@ struct ConnectAppsSheet: View {
                     .accessibilityAddTraits(.isHeader)
             }
         }
-        .padding(.horizontal, Space.gutter)
-        .padding(.top, Space.xs)
+        .padding(.horizontal, ConnectMetric.inset)
+        .padding(.top, ConnectMetric.lineGap)
     }
 
     private func row(_ app: ConnectApp) -> some View {
@@ -246,7 +245,7 @@ struct ConnectAppsSheet: View {
     }
 
     private func skillRow(_ skill: PaletteSkill) -> some View {
-        HStack(spacing: Space.m) {
+        HStack(spacing: ConnectMetric.gap) {
             LogoTile(logo: nil, glyph: "puzzlepiece.extension", name: skill.name)
             VStack(alignment: .leading, spacing: 2) {
                 Text(skill.name).textRole(.body).foregroundStyle(Tone.text)
@@ -254,13 +253,13 @@ struct ConnectAppsSheet: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, Space.gutter)
-        .padding(.vertical, Space.s)
+        .padding(.horizontal, ConnectMetric.inset)
+        .padding(.vertical, ConnectMetric.rowPadding)
         .accessibilityElement(children: .combine)
     }
 
     private var searchCapsule: some View {
-        HStack(spacing: Space.s) {
+        HStack(spacing: ConnectMetric.gap) {
             Image(systemName: "magnifyingglass").font(.system(.body, weight: .medium)).foregroundStyle(Tone.glyph)
             TextField(String(localized: "Search apps and skills", comment: "Connect apps: the search field's placeholder"), text: $query)
                 .textRole(.body)
@@ -278,12 +277,12 @@ struct ConnectAppsSheet: View {
                 .accessibilityLabel(String(localized: "Clear search", comment: "Connect apps: clears the search and the filters"))
             }
         }
-        .padding(.leading, Space.l)
-        .padding(.trailing, query.isEmpty ? Space.l : Space.xxs)
+        .padding(.leading, ConnectMetric.inset)
+        .padding(.trailing, query.isEmpty ? ConnectMetric.inset : ConnectMetric.lineGap)
         .frame(minHeight: 50)
         .interactiveGlass(in: Capsule())
         .padding(.horizontal, Space.gutter)
-        .padding(.bottom, Space.xs)
+        .padding(.bottom, 8)
     }
 
     // MARK: Reads and writes
@@ -358,11 +357,11 @@ struct ConnectAppsSheet: View {
         return DisconnectOutcome(failure: nil, notices: notices)
     }
 
-    /// Whether a service waits on the Mac, so the sheet reads again by itself (the web asks again while a server is
-    /// tried or waits for a sign-in).
+    /// Whether the daemon says a service waits (macOS asks on the Mac, Dot tries a server or waits for its sign-in), so
+    /// the sheet reads again by itself, as the web asks again then and only then.
     private var waitsOnTheMac: Bool {
         guard let loaded = sources.value else { return false }
-        return connectApps(loaded).contains { $0.action == .waiting || (finishing.contains($0.id) && !$0.isConnected) }
+        return connectApps(loaded).contains { $0.action == .waiting }
     }
 
     /// Reads again every five seconds while a service waits on the Mac, until the sheet closes.
@@ -410,28 +409,45 @@ private struct ConnectAppRow: View {
     let finishing: Bool
     let open: () -> Void
     let connect: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
-        HStack(spacing: Space.m) {
-            Button(action: open) {
-                HStack(spacing: Space.m) {
-                    LogoTile(logo: app.logo, glyph: app.glyph, name: app.name)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(app.name).textRole(.body).foregroundStyle(Tone.text).lineLimit(1)
-                        Text(line).textRole(.footnote).foregroundStyle(finishing && !app.isConnected ? Tone.warn : Tone.secondary).lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
+        // At the accessibility sizes the pill stands under the words, so neither the name nor the line is cut.
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: ConnectMetric.gap) {
+                    opener
+                    pill
                 }
-                .contentShape(Rectangle())
+            } else {
+                HStack(spacing: ConnectMetric.gap) {
+                    opener
+                    pill
+                }
             }
-            .buttonStyle(RowPressStyle())
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel([app.name, line].joined(separator: ", "))
-            .accessibilityHint(String(localized: "Shows what it can do", comment: "VoiceOver: a Connect apps row opens the service's detail"))
-            pill
         }
-        .padding(.horizontal, Space.gutter)
-        .padding(.vertical, Space.s)
+        .padding(.horizontal, ConnectMetric.inset)
+        .padding(.vertical, ConnectMetric.rowPadding)
+    }
+
+    private var opener: some View {
+        Button(action: open) {
+            // At the accessibility sizes the tile stands by the name, as Apple's own lists set an icon on the first line.
+            HStack(alignment: dynamicTypeSize.isAccessibilitySize ? .top : .center, spacing: ConnectMetric.gap) {
+                LogoTile(logo: app.logo, glyph: app.glyph, name: app.name)
+                VStack(alignment: .leading, spacing: ConnectMetric.lineGap) {
+                    Text(app.name).textRole(.body).foregroundStyle(Tone.text).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    Text(line).textRole(.footnote).foregroundStyle(finishing && !app.isConnected ? Tone.warn : Tone.secondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowPressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([app.name, line].joined(separator: ", "))
+        .accessibilityHint(String(localized: "Shows what it can do", comment: "VoiceOver: a Connect apps row opens the service's detail"))
     }
 
     private var line: String {
@@ -452,6 +468,16 @@ private struct ConnectAppRow: View {
     }
 }
 
+/// The sheet's measures, on the design bar's 4 pt scale: one inset on both sides, one gap between a row's parts.
+private enum ConnectMetric {
+    static let inset: CGFloat = 16
+    static let gap: CGFloat = 12
+    static let rowPadding: CGFloat = 12
+    static let lineGap: CGFloat = 4
+    /// The pill's visible height inside its 44 pt target.
+    static let pill: CGFloat = 32
+}
+
 /// The trailing pill of a row: Connect in ink, Connected and Waiting quiet.
 private struct ConnectPill: View {
     let title: String
@@ -462,8 +488,8 @@ private struct ConnectPill: View {
         Button(action: action) {
             Text(title).textRole(.footnote).fontWeight(.medium)
                 .foregroundStyle(quiet ? Tone.tertiary : Tone.text)
-                .padding(.horizontal, Space.m)
-                .frame(minHeight: 34)
+                .padding(.horizontal, ConnectMetric.inset)
+                .frame(minHeight: ConnectMetric.pill)
                 .background(Tone.nested, in: Capsule())
                 .frame(minHeight: Metric.hit)
                 .contentShape(Rectangle())
@@ -478,7 +504,9 @@ struct LogoTile: View {
     let logo: String?
     let glyph: String?
     let name: String
-    @ScaledMetric(relativeTo: .body) private var size: CGFloat = 44
+    @ScaledMetric(relativeTo: .body) private var scaled: CGFloat = 44
+    /// Grows with the text up to 64 pt, so the words keep the row's width at the accessibility sizes.
+    private var size: CGFloat { min(scaled, 64) }
 
     var body: some View {
         mark
@@ -542,7 +570,7 @@ private struct ConnectAppDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.groupedGutter) {
-                HStack(spacing: Space.m) {
+                HStack(spacing: ConnectMetric.gap) {
                     LogoTile(logo: app.logo, glyph: app.glyph, name: app.name)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(app.name).textRole(.title).foregroundStyle(Tone.text)
