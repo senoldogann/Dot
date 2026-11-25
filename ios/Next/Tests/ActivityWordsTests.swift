@@ -12,9 +12,35 @@ final class ActivityWordsTests: XCTestCase {
     }
 
     private func row(kind: String, section: String, href: String, runId: String?) -> ActivityRow {
+        row(kind: kind, section: section, href: href, runId: runId, actor: nil)
+    }
+
+    private func row(kind: String, section: String, href: String, runId: String?, actor: String?) -> ActivityRow {
         ActivityRow(
-            id: "x", section: section, kind: kind, title: "T", detail: "", since: 0, href: href, runId: runId, status: "done", minutes: nil, tokens: nil,
-            steps: nil, parentRunId: nil, rootThreadId: nil)
+            id: runId ?? "x", section: section, kind: kind, title: "T", detail: "", since: 0, href: href, runId: runId, status: "done", minutes: nil, tokens: nil,
+            steps: nil, parentRunId: nil, rootThreadId: nil, actorId: actor)
+    }
+
+    private func run(_ id: String, agent: String?, status: String) -> AwayRun {
+        AwayRun(runId: id, title: id, source: "team", campaign: false, agentId: agent, status: status, createdAt: 0, finishedAt: nil, answer: "")
+    }
+
+    func testAnAgentsProfileShowsOnlyItsOwnWork() {
+        let all: ActivityView = ActivityView(
+            waiting: [], working: [row(kind: "run", section: "working", href: "", runId: "a", actor: "agt_scout")],
+            endedDelegated: [], recent: [row(kind: "run", section: "recent", href: "", runId: "b", actor: nil), row(kind: "run", section: "recent", href: "", runId: "c", actor: "agt_scout")],
+            learnedToday: [], due: [], generatedAt: 0)
+        let scout: ActivityView = scoped(all, to: "agt_scout")
+        XCTAssertEqual((scout.working + scout.recent).map(\.id), ["a", "c"])
+        let away: AwayView = AwayView(
+            since: 0, until: 1, done: 2, failed: 1, cancelled: 0, working: 0, campaignSessions: 0,
+            runs: [run("r1", agent: "agt_scout", status: "failed"), run("r2", agent: nil, status: "done"), run("r3", agent: "agt_scout", status: "done")],
+            decisions: AwayDecisions(reviewerApproved: 0, reviewerDenied: 0, yoloApproved: 4, yoloDenied: 0), decisionRuns: [], drafts: 3)
+        let mine: AwayView = scoped(away, to: "agt_scout")
+        XCTAssertEqual(mine.runs.map(\.runId), ["r1", "r3"])
+        XCTAssertEqual([mine.done, mine.failed, mine.drafts, mine.decisions.yoloApproved], [1, 1, 0, 0], "Dot-wide counts are not the agent's")
+        XCTAssertEqual(scoped(away, to: "agt_other").runs, [])
+        XCTAssertEqual(awayLine(scoped(away, to: "agt_other")), "", "no card for an agent that did nothing")
     }
 
     func testNothingDoneWhileAwayIsNoCardAndEachKindOfNewsIsOnePart() {
