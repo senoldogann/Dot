@@ -14,6 +14,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1865](1865.md) | done | 2026-11-25 | A scheduled task, a watcher's task and a helper propose what they would remember; the owner decides |
 | [1864](1864.md) | done | 2026-11-25 | Every note says where it came from: an `origin` the store sets from the run that saved it |
 | [1863](1863.md) | done | 2026-11-25 | A merge no longer sends the other pull requests back to main for Markdown no test names |
+| [1862](1862.md) | done | 2026-11-25 | Connect apps on the phone: one sheet over the Mac's catalogue |
 | [1861](1861.md) | done | 2026-11-25 | DotNext's engine reads the Connectors catalogue and says what a phone may start |
 | [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
 | [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
