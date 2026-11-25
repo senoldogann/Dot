@@ -63,9 +63,9 @@ struct ChatScreen: View {
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
     private var builtItems: [TranscriptItem] {
-        guard let chat else { return [] }
-        return transcript(
-            of: chat, pending: model.pending(in: thread), mode: mode, streaming: streaming,
+        // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
+        transcript(
+            of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), mode: mode, streaming: streaming,
             context: TranscriptContext(answeredHere: model.answeredHere))
     }
 

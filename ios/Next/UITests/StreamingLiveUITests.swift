@@ -34,6 +34,34 @@ final class StreamingLiveUITests: XCTestCase {
         add(attachment)
     }
 
+    func testANewChatStaysOpenAndBecomesTheRealChat() throws {
+        let app: XCUIApplication = try launch(scene: "chats")
+        let pencil: XCUIElement = app.buttons["New chat"]
+        XCTAssertTrue(pencil.waitForExistence(timeout: 20))
+        pencil.tap()
+        type(app, "Say hello for the new chat")
+        let mine: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "You: Say hello for the new chat")).firstMatch
+        XCTAssertTrue(mine.waitForExistence(timeout: 10), "the new chat opens with the owner's message")
+        let starting: CGRect = mine.frame
+        // The daemon's answer comes in the same screen: the chat became the real one and was never left.
+        let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Echo: Say hello")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 30), "the run's answer in the opened chat")
+        XCTAssertTrue(mine.exists, "still the same chat")
+        // The design bar: the bubble stands where the real chat draws it, no jump at the swap (over 1 pt is a bug).
+        let real: CGRect = mine.frame
+        let measured: String = "starting \(starting), real \(real)"
+        add(XCTAttachment(string: measured))
+        XCTAssertEqual(starting.minX, real.minX, accuracy: 1, measured)
+        XCTAssertEqual(starting.minY, real.minY, accuracy: 1, measured)
+        XCTAssertEqual(starting.width, real.width, accuracy: 1, measured)
+        XCTAssertEqual(starting.height, real.height, accuracy: 1, measured)
+        XCTAssertFalse(app.navigationBars["Chats"].exists, "never thrown back to the chat list")
+        shot(app, "new-chat-open")
+        // Back leads to the list, where the chat has its one row.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.navigationBars["Chats"].waitForExistence(timeout: 5))
+    }
+
     func testAStreamingRunIsMeasured() throws {
         let app: XCUIApplication = try launch(scene: "live-chat")
         type(app, "stream: where do we stand")

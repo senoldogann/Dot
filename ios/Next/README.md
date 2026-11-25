@@ -14,7 +14,8 @@ the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/Work
 dictation, Send / Queue / Steer / Stop), the queue sheet and the edit of a queued message, the run inspector, reactions.
 While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
 and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
-every second whether events come or not. The transcript follows new words only
+every second whether events come or not. A new chat opens as soon as its first message is sent, under the outbox's
+key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
 once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
 (the app's model publishes the store's snapshot by part, at most 30 times a second), and the live thinking's last

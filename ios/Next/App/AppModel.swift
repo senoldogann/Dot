@@ -103,6 +103,8 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    var startingChats: [String: String] = [:]
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
@@ -266,12 +268,17 @@ final class AppModel {
         }
     }
 
-    func startChat(_ text: String, photos: [Data]) async {
-        guard let engine else { return }
+    /// Starts a new chat through the outbox: its key, which the chat list opens at once (item 1849) and swaps for the
+    /// chat's own id once the daemon names it; `nil` when the message could not be kept.
+    func startChat(_ text: String, photos: [Data]) async -> String? {
+        guard let engine else { return nil }
         do {
-            _ = try await engine.startChat(text, photos: photos)
+            let key: String = try await engine.startChat(text, photos: photos)
+            startingChats[key] = text
+            return key
         } catch {
             logger.error("a new chat could not be kept error=\(String(describing: error), privacy: .public)")
+            return nil
         }
     }
 

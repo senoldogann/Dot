@@ -11,6 +11,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
 | [1851](1851.md) | done | 2026-11-25 | The orphan-groups test keeps a Dot home of its own, which no other pytest worker writes into |
 | [1850](1850.md) | done | 2026-11-25 | The iPhone app is tested on GitHub's macOS runners |
+| [1849](1849.md) | done | 2026-11-25 | DotNext opens a new chat as soon as its first message is sent |
 | [1848](1848.md) | done | 2026-11-25 | DotNext streams a run smoothly: the end is followed after layout and only at the end, a word redraws the open chat alone, the live thinking no longer reflows |
 | [1847](1847.md) | done | 2026-11-25 | DotNext drops the "Dot · <Mac> · <date>" line at the top of a chat |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
