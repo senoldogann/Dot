@@ -18,6 +18,8 @@ enum SettingsPage: Hashable, Sendable {
     case system
     case usage
     case maintenance
+    case campaigns
+    case campaign(String)
     /// The Connect apps sheet (item 1862): a search result that opens it, never pushed.
     case connectApps
 }

@@ -130,6 +130,28 @@ final class SettingsLiveUITests: XCTestCase {
         back(app)
         back(app)
 
+        // Campaigns: the seeded campaign is stopped (it asks first), then resumed (item 1895).
+        open(app, "Campaigns")
+        let campaign: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "E2E campaign")).firstMatch
+        XCTAssertTrue(campaign.waitForExistence(timeout: 10))
+        campaign.tap()
+        let stop: XCUIElement = app.buttons["Stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !stop.isHittable { app.swipeUp() }
+        stop.tap()
+        XCTAssertTrue(app.staticTexts["Stop this campaign?"].waitForExistence(timeout: 5), "Stop asks first")
+        // The dialog's own Stop: the page's row lies under the dialog and cannot be tapped.
+        let confirm: XCUIElement? = app.buttons.matching(identifier: "Stop").allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(confirm, "the dialog's Stop")
+        confirm?.tap()
+        let resume: XCUIElement = app.buttons["Resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), "stopped")
+        XCTAssertTrue(app.staticTexts["Stopped"].exists)
+        resume.tap()
+        XCTAssertTrue(app.buttons["Stop"].waitForExistence(timeout: 10), "resumed")
+        back(app)
+        back(app)
+
         // Usage limits and caps: lower the cap of one task (a daemon with item 1731), or say Dot is too old.
         open(app, "Usage limits and caps")
         let oneTask: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "One task")).firstMatch

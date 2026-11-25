@@ -98,7 +98,7 @@ final class SettingsControlsUITests: XCTestCase {
     func testEveryControlOfTheNativePagesDoesSomething() {
         let pages: [String] = [
             "This Mac", "Notifications", "General", "Appearance", "Chat", "Models", "Usage limits and caps", "Scheduled tasks", "Rules", "Memory", "Agents",
-            "Health and version", "Usage",
+            "Campaigns", "Health and version", "Usage",
         ]
         var dead: [String] = []
         for page in pages {

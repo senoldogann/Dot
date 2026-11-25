@@ -58,6 +58,7 @@ struct SettingsTab: View {
                 PageRow(page: .rules, systemImage: "lock.shield", title: String(localized: "Rules", comment: "Settings row: what Dot may do without asking"), description: nil, detail: nil)
                 PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
+                PageRow(page: .campaigns, systemImage: "target", title: String(localized: "Campaigns", comment: "Settings row: goals Dot keeps working on"), description: nil, detail: nil)
             }
             GroupedSection(header: nil, footer: nil) { connectAppsRow }
             GroupedSection(header: String(localized: "System", comment: "Settings section: health, version"), footer: nil) {
@@ -177,6 +178,8 @@ struct SettingsTab: View {
         case .system: SystemPage()
         case .usage: UsagePage()
         case .maintenance: MaintenancePage()
+        case .campaigns: CampaignsPage()
+        case .campaign(let id): CampaignPage(id: id)
         case .connectApps: EmptyView()
         }
     }
@@ -224,7 +227,7 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
     func entry(_ id: String, _ title: String, _ path: String, _ english: String, _ local: String, _ page: SettingsPage) -> (SettingsEntry, SettingsPage) {
         (SettingsEntry(id: id, title: title, path: path, synonyms: [english, local]), page)
     }
-    let all: [(SettingsEntry, SettingsPage)] = [
+    var all: [(SettingsEntry, SettingsPage)] = [
         entry(
             "mac", String(localized: "This Mac", comment: "Settings row: the paired Mac"), connections, "connection tailscale address key pair diagnose network status proof",
             String(localized: "connection tailscale address key pair diagnose network", comment: "Settings search synonyms of This Mac (space separated)"), .mac),
@@ -272,5 +275,6 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "connect-apps", String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), "", "connectors connect apps services mcp accounts google github slack notion plugins",
             String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),
     ]
+    all.append(campaignsIndexEntry())
     return all
 }

@@ -64,6 +64,7 @@ curl -fsS -H "$main" "$base/api/memories?limit=50" | check "Memory: the note edi
 curl -fsS -H "$main" "$base/api/memories/proposed" | check "Memory: no proposal waits" 'd == []'
 curl -fsS -H "$main" "$base/api/memories?limit=10" | check "Memory: the proposed words were used" \
     'any("commands written out in full" in (m.get("content") or m.get("record", {}).get("content", "")) for m in (d if isinstance(d, list) else d.get("items", [])))'
+curl -fsS -H "$main" "$base/api/campaigns" | check "Campaigns: the seeded campaign was stopped, then resumed" 'd[0]["record"]["status"] == "active"'
 curl -fsS -H "$main" "$base/api/failsafe" | check "Emergency stop: released" 'd["engaged"] is False'
 if curl -fsS -H "$main" "$base/api/budget" >"$t/budget.json" 2>/dev/null; then
     check "Caps: one task lowered to 300M, the raise refused" 'd["caps"]["run_tokens"] == 300_000_000' <"$t/budget.json"

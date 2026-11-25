@@ -42,6 +42,18 @@ note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a c
 version, Usage, Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the
 computer stays on the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no
 Settings row opens the web app. A search with synonyms finds any page in English or
+computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
+with synonyms finds any page in English or
+system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their own and word
+break, the tool calls in chat, response streaming, the reading width), Chat
+(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
+only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
+on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
+runs' proposed rewrites with Use and Drop), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions;
+Stop, which asks, Resume and Mark achieved as the daemon takes them), Health and version, Usage, Maintenance (Dot's and the provider programs'
+versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
+line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
+line says, and no Settings row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
@@ -185,7 +197,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-models`, `settings-caps`, `settings-caps-refused`,
-`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`, `settings-campaigns`, `settings-campaign`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.
