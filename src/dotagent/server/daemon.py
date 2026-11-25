@@ -30,6 +30,7 @@ from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, runnin
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, EventBus, Subscription
+from dotagent.llm.price_list import keep_prices
 from dotagent.loop_watch import LoopWatch
 from dotagent.meetings.desk import MeetingDesk
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
@@ -266,6 +267,11 @@ def _log_watchers_end(watching: asyncio.Task[None]) -> None:
     log.error("watchers_ended", error=repr(watching.exception()))
 
 
+def _log_prices_end(task: asyncio.Task[None]) -> None:
+    if not task.cancelled() and task.exception() is not None:
+        log.error("prices_loop_crashed", error=repr(task.exception()))
+
+
 def _log_relay_end(relay: asyncio.Task[None]) -> None:
     """A relay of the runs of dotx commands that stops before the daemon does is logged: the pages see those runs only
     as they are stored, and their chats' queues wait, until the daemon starts again."""
@@ -486,6 +492,11 @@ async def run_daemon(config: AppConfig) -> int:
                 )
                 watching.add_done_callback(_log_watchers_end)
                 cleanup.push_async_callback(_cancelled, watching)
+            # The models' prices (item 1856), fetched once a day from the public price list, for the estimates in
+            # dollars.
+            pricing: asyncio.Task[None] = asyncio.create_task(keep_prices(runtime.prices, stopping), name="prices")
+            pricing.add_done_callback(_log_prices_end)
+            cleanup.push_async_callback(_cancelled, pricing)
             # The reactions on Dot's messages (item 586) wait to be told to their runs for a moment; they stop with
             # the daemon.
             reactions: Reactions = Reactions(runtime, manager)

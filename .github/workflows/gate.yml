@@ -137,6 +137,10 @@ jobs:
       # The release is one version. This fails in seconds, on Linux, before the macOS tests.
       - name: Versions
         run: uv run python scripts/check_versions.py
+      # The maturity scorecard's shape (item 1857): the table reads, each feature once, each with how it was proven,
+      # its date a day and never ahead. How old a proof is is checked by maturity.yml, never here.
+      - name: Maturity
+        run: uv run python scripts/check_maturity.py
       # A commit writes its own item's records and no other's (item 1265): the branch's commits are read against main's.
       - name: Item records
         if: github.event_name == 'pull_request'

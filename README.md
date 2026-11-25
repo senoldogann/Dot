@@ -193,6 +193,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Configuration](docs/configuration.md)
 - [Development](docs/development.md): the tests, the gate, measuring the agent
 - [Status and known limits](docs/limits.md)
+- [Maturity: what was last proven on the real Mac](docs/maturity.md)
 
 [CONTRIBUTING.md](CONTRIBUTING.md) says how to propose a change, and [CHANGELOG.md](CHANGELOG.md) what changed.
 
