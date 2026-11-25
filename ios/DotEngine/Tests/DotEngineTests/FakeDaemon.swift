@@ -427,6 +427,11 @@ final class FakeDaemon: @unchecked Sendable {
         return Self.refused(404, "Not Found")
     }
 
+    /// The bodies the phone sent to a path that holds `part`, in order.
+    func bodies(_ method: String, _ part: String) -> [Data] {
+        requests.filter { $0.method == method && $0.path.contains(part) }.compactMap(\.body)
+    }
+
     private func queue(thread: String, body: Data?) -> Reply {
         guard let message: QueueMessage = try? JSONDecoder().decode(QueueMessage.self, from: body ?? Data()) else {
             return Self.refused(422, "bad body")

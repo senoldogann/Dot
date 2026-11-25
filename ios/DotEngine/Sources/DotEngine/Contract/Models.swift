@@ -168,6 +168,20 @@ public struct ChatChoices: Codable, Sendable, Hashable {
         ChatChoices(mode: mode, model: next, effort: level, speed: speed, approvals: approvals, goalMode: goalMode)
     }
 
+    /// The same choices with another speed (`standard` or `fast`).
+    public func with(speed next: String) -> ChatChoices {
+        ChatChoices(mode: mode, model: model, effort: effort, speed: next, approvals: approvals, goalMode: goalMode)
+    }
+
+    /// The same choices with another approval mode; `nil` takes the daemon's `[policy] approvals`.
+    public func with(approvals next: String?) -> ChatChoices {
+        ChatChoices(mode: mode, model: model, effort: effort, speed: speed, approvals: next, goalMode: goalMode)
+    }
+
+    /// What a new chat starts with when the owner chose nothing: the daemon's model, level and approvals, the words
+    /// settling the mode (item 495).
+    public static let daemons: ChatChoices = ChatChoices(mode: "auto", model: nil, effort: nil, speed: "standard", approvals: nil, goalMode: nil)
+
     enum CodingKeys: String, CodingKey {
         case mode, model, effort, speed, approvals
         case goalMode = "goal_mode"
@@ -468,11 +482,18 @@ public struct ModelOption: Codable, Sendable, Hashable {
     public let efforts: [String]
     public let defaultEffort: String?
     public let contextLength: Int?
+    /// It has fast mode (item 223); `nil` from a daemon that does not say.
+    public let fastMode: Bool?
+    /// It can call tools: a run needs them, so the picker leaves the others out (as the web's does).
+    public let tools: Bool?
+    /// The provider serves it at no cost.
+    public let free: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case ref, label, efforts
+        case ref, label, efforts, tools, free
         case defaultEffort = "default_effort"
         case contextLength = "context_length"
+        case fastMode = "fast_mode"
     }
 }
 

@@ -284,7 +284,8 @@ final class AppModel {
     func startChat(_ text: String, photos: [Data]) async -> String? {
         guard let engine else { return nil }
         do {
-            let key: String = try await engine.startChat(text, photos: photos)
+            // The daemon's choices: the chat's settings sheet picks them (item 1801's app part).
+            let key: String = try await engine.startChat(text, photos: photos, start: .daemons)
             startingChats[key] = text
             return key
         } catch {

@@ -213,7 +213,7 @@ final class OutboxTests: XCTestCase {
     func testANewChatWaitsUntilTheListIsLive() async throws {
         let live: Flag = Flag()
         let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { live.value })
-        try await outbox.enqueue(.newChat(text: "A new chat", images: [], uploaded: []), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.newChat(text: "A new chat", images: [], uploaded: [], start: nil), id: newMessageKey(), images: [])
         try await clock.advancePastSleep(of: 5, count: 1, since: 0)
         XCTAssertEqual(daemon.count("POST", "/api/runs"), 0, "not sent onto a list that is not live")
         let kind: SendingKind? = await outbox.current.first?.kind
