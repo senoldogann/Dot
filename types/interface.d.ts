@@ -60,18 +60,6 @@ interface Navigator {
   standalone?: boolean;
 }
 
-/** three.js, which the office of the Agents page loads on demand from the vendored copy (item 885): its module and the
- * kinds the office names, from the development dependency @types/three. */
-type ThreeModule = typeof import("three");
-type ThreeGroup = import("three").Group;
-type ThreeObject = import("three").Object3D;
-type ThreeStandardMaterial = import("three").MeshStandardMaterial;
-type ThreeBasicMaterial = import("three").MeshBasicMaterial;
-type ThreePointLight = import("three").PointLight;
-type ThreeVector3 = import("three").Vector3;
-type ThreeGeometry = import("three").BufferGeometry;
-type ThreeMesh = import("three").Mesh;
-
 /** A rule of a setting of Settings › Appearance that paints the page (appearance/rules.js, item 1067). */
 interface DotAppearanceRule {
   readonly key: string;
