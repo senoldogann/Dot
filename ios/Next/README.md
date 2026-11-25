@@ -29,7 +29,12 @@ section on top. The composer's model chip, and a new chat before its first messa
 (`App/ChatSettingsSheet.swift`, rules in `ChatSettingsRules.swift`) on the app's one model catalog
 (`Components/ModelCatalog.swift`): the recent models, the providers as folding groups with their marks, Default, ✓ and ☆
 favourites, a search with a filter, the reasoning level on the model's own levels, fast mode, the approval mode, plan
-first and hidden models; the picks go to the chat's choices or with a new chat's first message (`POST /api/runs`).
+first and hidden models; the picks go to the chat's choices or with a new chat's first message (`POST /api/runs`). The
+microphone turns the composer into a recorder (`Components/VoiceRecorder.swift`, `Data/VoiceInput.swift`): ✕, a live
+waveform, a clock, ✓; written down on the phone (Speech, on the device, a long dictation going on across the recognizer's
+pauses) or on the Mac (`/api/voice/streams`), as Settings › Voice says (`Settings/VoicePage.swift`, with the preferred
+order of the microphones, `Data/VoiceRules.swift`). A call, Siri, the app leaving the screen or a microphone going away
+end a recording with what was heard.
 
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
 daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
@@ -168,7 +173,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
-`settings-general`, `settings-appearance`, `settings-chat`, `settings-models`, `settings-caps`, `settings-caps-refused`,
+`settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
 `settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`, `pairing`,
 `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
@@ -181,7 +186,7 @@ daemon's side what each tap wrote.
 "[test]" chats and runs `ChatListLiveUITests` (a UI test that fails fails it): two chats pinned and deleted together
 (the deletion read on the daemon), and a new chat on the model, level
 and approvals picked in its settings (a real model, `claude_code:haiku` by default: the owner's Claude plan through the
-`claude` CLI), whose run record it reads.
+`claude` CLI), whose run record it reads, and the recorder on the Mac's dictation.
 
 ## Screenshots
 

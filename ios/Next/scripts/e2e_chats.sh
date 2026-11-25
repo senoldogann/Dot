@@ -1,10 +1,11 @@
 #!/bin/sh
-# The chat list and a new chat's settings end to end (items 1800-1801): a throwaway daemon
+# The chat list, a new chat's settings and voice typing end to end (items 1800-1802): a throwaway daemon
 # (e2e_daemon.py) in three mktemp folders, a phone paired with a code, two "[test]" chats made, then ChatListLiveUITests
 # taps on the simulator and this script reads on the daemon's side what each tap did: the new chat's run on the model,
 # level and approvals picked in its settings (a real model: the owner's Claude plan through the `claude` CLI, which the
 # throwaway home reaches as the owner's own Dot does), the deleted chats (the pins are checked by the UI test, which the
-# script's result counts). Nothing touches the owner's Dot; the "[test]" chats live in the throwaway home.
+# script's result counts). The microphone is granted to the app
+# first (no prompt in a UI test). Nothing touches the owner's Dot; the "[test]" chats live in the throwaway home.
 #
 # Usage: ios/Next/scripts/e2e_chats.sh <simulator udid> <derived data folder> [model ref, default claude_code:haiku]
 set -eu
@@ -43,6 +44,11 @@ for words in "[test] list one" "[test] list two"; do
 done
 # A clean app: its cache and outbox would hold the chats of an earlier throwaway daemon at the same address.
 xcrun simctl uninstall "$udid" dev.dotagent.phone.next 2>/dev/null || true
+# Granted ahead when the simulator answers (its privacy call can hang on a loaded Mac); else the test allows the prompt.
+xcrun simctl privacy "$udid" grant microphone dev.dotagent.phone.next &
+grant=$!
+( sleep 20; kill $grant 2>/dev/null ) &
+wait $grant 2>/dev/null || echo "note  the microphone was not granted ahead; the test answers the prompt"
 
 
 # A UI test that fails fails the script (its xcodebuild's status, not the filter's).
@@ -79,6 +85,7 @@ curl -fsS -H "$main" "$base/api/runs?limit=5" | python3 -c '
 import json,sys
 for r in json.load(sys.stdin):
     if r["goal"].startswith("[test] Reply"): print("      run", r["id"], r["model"], r["effort"], r["approvals"], r["status"])'
+run_test testTheMicrophoneTurnsTheComposerIntoARecorder
 # The "[test]" chats go with the throwaway home; deleted here too, as the owner asked of test chats.
 ids=$(curl -fsS -H "$main" "$base/api/threads" | python3 -c 'import json,sys; print(json.dumps({"ids":[r["id"] for r in json.load(sys.stdin) if r["title"].startswith("[test]")]}))')
 # An empty list is refused (422): only chats left are deleted.

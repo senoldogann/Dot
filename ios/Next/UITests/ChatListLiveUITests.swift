@@ -12,6 +12,7 @@ final class ChatListLiveUITests: XCTestCase {
         let app: XCUIApplication = XCUIApplication()
         app.launchArguments = [
             "-DotNextScene", "chats", "-DotNextHost", host, "-DotNextKey", key, "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            "-voice.transcribeOn", "mac",
         ]
         app.launch()
         return app
@@ -87,4 +88,27 @@ final class ChatListLiveUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 20), .completed, "the chats left the list")
     }
 
+    /// The microphone turns the composer into the recorder (✕, waveform, clock, ✓) on the Mac's dictation; ✕ brings
+    /// the field back with nothing written.
+    func testTheMicrophoneTurnsTheComposerIntoARecorder() throws {
+        let app: XCUIApplication = try launch()
+        XCTAssertTrue(app.buttons["chats.new"].waitForExistence(timeout: 20))
+        app.buttons["chats.new"].tap()
+        let mic: XCUIElement = app.buttons["composer.mic"]
+        XCTAssertTrue(mic.waitForExistence(timeout: 10))
+        mic.tap()
+        // The system asks for the microphone once, unless the script granted it ahead.
+        let springboard: XCUIApplication = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow: XCUIElement = springboard.buttons["Allow"]
+        if allow.waitForExistence(timeout: 3) { allow.tap() }
+        let clock: XCUIElement = any(app, "recorder.clock").firstMatch
+        XCTAssertTrue(clock.waitForExistence(timeout: 10), "the recorder took the composer's place")
+        XCTAssertTrue(app.buttons["recorder.confirm"].exists)
+        let first: String = clock.label
+        let moved: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", first), object: clock)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 3), .completed, "the clock runs")
+        app.buttons["recorder.cancel"].tap()
+        XCTAssertTrue(any(app, "composer.field").firstMatch.waitForExistence(timeout: 5), "the field is back")
+        XCTAssertFalse(clock.exists)
+    }
 }

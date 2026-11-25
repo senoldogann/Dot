@@ -3,8 +3,8 @@ import XCTest
 
 @testable import DotNext
 
-/// The chat's settings sheet (PLAN §24), its pure rules: which models show where and in what order, and what a pick of
-/// a model does to the level and the speed.
+/// The chat's settings sheet (PLAN §24) and Settings › Voice (PLAN §25), their pure rules: which models show where and in
+/// what order, what a pick of a model does to the level and the speed, and which microphone voice input takes.
 final class ChatSettingsAndVoiceTests: XCTestCase {
     private func providers() throws -> [ProviderModels] {
         let option: (String, String, String) -> String = { ref, label, extra in
@@ -83,5 +83,59 @@ final class ChatSettingsAndVoiceTests: XCTestCase {
         XCTAssertEqual(none.togglingFavourite("a").favourites, ["a"])
         XCTAssertEqual(none.togglingFavourite("a").togglingFavourite("a").favourites, [])
         XCTAssertEqual(none.togglingHidden("b").hidden, ["b"])
+    }
+
+    // MARK: Voice
+
+    private let built: MicPort = MicPort(uid: "Built-In", name: "iPhone Microphone", kind: .builtIn)
+    private let car: MicPort = MicPort(uid: "BT-CAR", name: "Toyota Touch&Go", kind: .bluetooth)
+    private let pods: MicPort = MicPort(uid: "BT-PODS", name: "AirPods", kind: .bluetooth)
+    private let usb: MicPort = MicPort(uid: "USB-1", name: "USB Mic", kind: .wired)
+
+    func testTheFirstConnectedMicrophoneOfTheOrderIsTaken() {
+        XCTAssertEqual(preferredMic([built, pods], order: MicSlot.initial), pods, "Other Bluetooth is above the built-in one")
+        XCTAssertEqual(preferredMic([built, pods, usb], order: MicSlot.initial), usb, "Other wired is first")
+        XCTAssertEqual(preferredMic([built], order: MicSlot.initial), built)
+        let builtFirst: [MicSlot] = [.builtIn, .otherWired, .otherBluetooth, .carPlay]
+        XCTAssertEqual(preferredMic([built, pods], order: builtFirst), built, "the owner's order wins")
+        XCTAssertNil(preferredMic([], order: MicSlot.initial))
+    }
+
+    func testAMicrophoneIsLearnedByNameAboveItsKindAndANamedOneIsNotOther() {
+        let learned: [MicSlot] = learning(car, into: MicSlot.initial)
+        XCTAssertEqual(learned, [.otherWired, .named(uid: "BT-CAR", name: "Toyota Touch&Go", kind: .bluetooth), .otherBluetooth, .builtIn, .carPlay])
+        XCTAssertEqual(learning(car, into: learned), learned, "learned once")
+        XCTAssertEqual(learning(built, into: MicSlot.initial), MicSlot.initial, "the built-in one has its own place")
+        // The car below the built-in microphone: AirPods (Other Bluetooth) are still taken first, the car is not.
+        let carLast: [MicSlot] = [.otherWired, .otherBluetooth, .builtIn, .named(uid: "BT-CAR", name: "Toyota Touch&Go", kind: .bluetooth), .carPlay]
+        XCTAssertEqual(preferredMic([built, car], order: carLast), built, "a named microphone is not one of Other")
+        XCTAssertEqual(preferredMic([built, car, pods], order: carLast), pods)
+        XCTAssertEqual(forgetting("BT-CAR", in: carLast), MicSlot.initial)
+    }
+
+    func testTheOrderIsKeptAcrossLaunches() throws {
+        let defaults: UserDefaults = try XCTUnwrap(UserDefaults(suiteName: "voice-test-\(UUID().uuidString)"))
+        XCTAssertEqual(MicSlot.read(defaults), MicSlot.initial)
+        let order: [MicSlot] = learning(usb, into: [.builtIn, .otherWired, .otherBluetooth, .carPlay])
+        MicSlot.write(order, defaults)
+        XCTAssertEqual(MicSlot.read(defaults), order)
+        XCTAssertEqual(TranscribeOn.current(defaults), .device, "this phone until the owner picks the Mac")
+    }
+
+    func testTheClockTheLanguageTagAndTheLevels() {
+        XCTAssertEqual(recordingClock(7), "0:07")
+        XCTAssertEqual(recordingClock(102), "1:42")
+        XCTAssertEqual(languageTag(Locale(identifier: "tr-TR")), "tr-TR")
+        XCTAssertEqual(languageTag(Locale(identifier: "tr")), "tr-TR")
+        XCTAssertEqual(languageTag(Locale(identifier: "en-US")), "en-US")
+        XCTAssertEqual(micLevel(rms: 0), 0)
+        XCTAssertEqual(micLevel(rms: 1), 1)
+        XCTAssertEqual(micLevel(rms: 0.001), 0, accuracy: 0.05, "-60 dB is silence")
+    }
+
+    func testTheWordsHeardGoAfterWhatWasTyped() {
+        XCTAssertEqual(DictationText.merged(base: "", heard: " merhaba "), "merhaba")
+        XCTAssertEqual(DictationText.merged(base: "Hi ", heard: "there"), "Hi there")
+        XCTAssertEqual(DictationText.merged(base: "list:\n", heard: "milk"), "list:\nmilk")
     }
 }

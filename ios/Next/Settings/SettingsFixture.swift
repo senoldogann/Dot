@@ -14,6 +14,7 @@
         case general = "settings-general"
         case appearance = "settings-appearance"
         case chat = "settings-chat"
+        case voice = "settings-voice"
         case models = "settings-models"
         case caps = "settings-caps"
         case capsRefused = "settings-caps-refused"
@@ -53,6 +54,7 @@
             case .general: .general
             case .appearance: .appearance
             case .chat: .chat
+            case .voice: .voice
             case .models: .models
             case .caps, .capsRefused, .oldDaemon: .caps
             case .schedules, .scheduleEdit: .schedules

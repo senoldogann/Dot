@@ -1,6 +1,6 @@
 import XCTest
 
-/// The chat's settings sheet (PLAN §24), drawn from the debug build's fixtures: no daemon.
+/// The chat's settings sheet (PLAN §24) and Settings › Voice (PLAN §25), drawn from the debug build's fixtures: no daemon.
 final class ChatSettingsUITests: XCTestCase {
     private func launch(_ scene: String) -> XCUIApplication {
         let app: XCUIApplication = XCUIApplication()
@@ -109,5 +109,21 @@ final class ChatSettingsUITests: XCTestCase {
         print("design-bar search: \(search.frame) filter \(filter.frame)")
         XCTAssertLessThanOrEqual(abs(search.frame.midY - filter.frame.midY), 1, "the filter and the search field share a centre line")
         XCTAssertGreaterThanOrEqual(filter.frame.height, 44)
+    }
+
+    func testTheVoicePageOffersWhereToTranscribeAndTheMicrophonesInOrder() {
+        let app: XCUIApplication = launch("settings-voice")
+        XCTAssertTrue(app.navigationBars["Voice"].waitForExistence(timeout: 10))
+        let device: XCUIElement = any(app, "voice.device").firstMatch
+        let mac: XCUIElement = any(app, "voice.mac").firstMatch
+        XCTAssertTrue(device.exists)
+        if !device.isSelected { device.tap() }
+        XCTAssertTrue(device.isSelected, "this phone is a choice")
+        mac.tap()
+        XCTAssertTrue(mac.isSelected)
+        device.tap()
+        // The list adds a "Drag" handle of its own to each row: only the rows' own labels are compared.
+        let mics: [String] = any(app, "voice.mic").allElementsBoundByIndex.map { $0.label }.filter { $0 != "Drag" }
+        XCTAssertEqual(mics.map { $0.components(separatedBy: ",").first ?? "" }, ["Other wired", "Other Bluetooth", "Built-in microphone", "CarPlay"])
     }
 }
