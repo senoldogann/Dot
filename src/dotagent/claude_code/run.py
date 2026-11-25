@@ -138,6 +138,7 @@ from dotagent.claude_code.stream import (
     limit_said,
     listed_tools,
     read_line,
+    refusal_said,
     tool_prefix,
     user_line,
 )
@@ -145,6 +146,7 @@ from dotagent.core.errors import (
     ClaudeCodeBroke,
     ClaudeCodeCut,
     ClaudeCodeError,
+    ClaudeCodeRefused,
     ClaudePlanLimitError,
     FailSafeTriggered,
     RunCancelled,
@@ -913,6 +915,13 @@ class _Follow:
             if limit_said(event.text) or (self.window is not None and window_refused(self.window)):
                 resets_at: float | None = limit_resets(self.window, event.text)
                 raise ClaudePlanLimitError(limit_message(self.window, resets_at), resets_at, context)
+            if refusal_said(event.text):
+                # Declined for what it says, the same message is declined again: a try of it would be too (item 1761).
+                raise ClaudeCodeRefused(
+                    f"The model declined the run's message, and asked again it declines it again: change the run's "
+                    f"model or reword the task. Claude Code said: {event.text}",
+                    {**context, "model": self.agent.run.model},
+                )
             raise ClaudeCodeBroke(f"Claude Code's session failed: {event.text or event.subtype}", context)
         if not self.inited:
             raise ClaudeCodeError(

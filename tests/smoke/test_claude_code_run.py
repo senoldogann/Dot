@@ -562,6 +562,21 @@ async def test_an_eval_tells_a_run_the_plans_window_refused_from_its_end(room: R
     assert ended_by_plan_limit(events), ended.result
 
 
+async def test_a_message_the_models_safeguards_flagged_ends_the_run_as_a_failure_a_try_does_not_help(
+    room: Room,
+) -> None:
+    """Item 1761: a firing whose message Opus 5's safeguards flagged ended as a session that broke off, a failure that
+    passes, so its schedule tried the same message on the same model again (21 times in the record). It lasts: the run
+    ends failed saying to change the model or the task, and the schedule does not try it."""
+    ended: RunRecord = await _run_as(room, "Look at the flagged page.", "schedule")
+    assert ended.status == "failed", ended.result
+    assert ended.result.startswith("The model declined the run's message"), ended.result
+    assert "change the run's model or reword the task" in ended.result and "safeguards flagged" in ended.result
+    (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
+    error: object = finished.data["error"]
+    assert isinstance(error, dict) and error["kind"] == "lasting" and error["context"]["model"] == MODEL
+
+
 def _short_bridge(monkeypatch: pytest.MonkeyPatch, left_out: str) -> None:
     """Fake the bridge's list: the door Dot's bridge answers a program with has all its tools but ``left_out``. (The
     bridge's server holds its ``_list`` from its first start, so the door each request finds is what is replaced.)"""

@@ -30,7 +30,7 @@ from pathlib import Path
 from pydantic import JsonValue
 
 from dotagent.claude_code.env import claude_env
-from dotagent.claude_code.stream import MEASURED_BUILT_INS, limit_message, limit_resets, limit_said
+from dotagent.claude_code.stream import MEASURED_BUILT_INS, limit_message, limit_resets, limit_said, refusal_said
 from dotagent.core.errors import (
     ClaudeCodeError,
     ProviderProtocolError,
@@ -256,8 +256,9 @@ def reply_of(answer: Answer, question: Question, model: str, now: float) -> Mode
     """The reply a call's ``answer`` is: the question's tool called with the structured output, or the text. Raises
     :class:`ProviderWindowError` when the plan's window refused it (with when it resets, from ``now``, so that the
     router pauses the model until then),
-    :class:`ProviderTransportError` when the session failed, and :class:`ProviderProtocolError` when the model had more
-    than it may or the answer lacks what the question asked for."""
+    :class:`ProviderRefusedError` when the model's provider declined the question (item 1761),
+    :class:`ProviderTransportError` when the session failed otherwise, and :class:`ProviderProtocolError` when the
+    model had more than it may or the answer lacks what the question asked for."""
     problem: str | None = answer_problem(answer, question.tool is not None)
     if problem is not None:
         raise ProviderProtocolError(
@@ -276,6 +277,10 @@ def reply_of(answer: Answer, question: Question, model: str, now: float) -> Mode
         )
     if result is None:
         raise ProviderTransportError("Claude Code ended without a result", {"model": model})
+    if result.get("is_error") is not False and refusal_said(text):
+        raise ProviderRefusedError(
+            f"{model} declined the question, and asked again it declines it again: {text}", {"model": model}
+        )
     if result.get("is_error") is not False:
         raise ProviderTransportError(
             f"Claude Code's session failed: {text or result.get('subtype', '')}",

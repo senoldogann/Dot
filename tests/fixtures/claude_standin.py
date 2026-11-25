@@ -6,6 +6,8 @@ first message on its input, and answers as the message says:
   Claude Code 2.1.330 gave (``claude_models_response.json``), what it was started with in ``listed.json``;
 - ``extra tools``: an init line that lists a tool of Claude Code's own besides the door's, and nothing more;
 - ``limit``: an init line, then a ``rate_limit_event`` whose window refuses calls;
+- ``flagged``: an init line, then a ``result`` that is the API's error of a message the model's safeguards flagged
+  (item 1761);
 - ``finish then talk``: as ``talk with me``, its first turn a call of ``finish`` that did not succeed (item 1076's
   pre-push review: what comes after it decides the run's end);
 - ``finish then check``: a call of ``finish`` that succeeded and found nothing new, then a call of ``shell`` and a
@@ -244,6 +246,13 @@ async def _work(
         if plan is not None:
             _step([("text", "Looking into it.")], "end_turn")
             _die(str(plan["how"]))
+        if "flagged" in said:
+            words: str = (
+                "API Error: Opus 5's safeguards flagged this message (https://www.anthropic.com/legal/aup). Try "
+                "rephrasing the request in a new session or change your model."
+            )
+            _say({"type": "result", "subtype": "success", "is_error": True, "result": words, "session_id": SESSION})
+            return
         if "limit" in said:
             refused: dict[str, object] = {"status": "rejected", "rateLimitType": "five_hour", "resetsAt": 1_900_000_000}
             _say({"type": "rate_limit_event", "rate_limit_info": refused})
