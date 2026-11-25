@@ -3,11 +3,13 @@ trades a short code for a key of the phone's own (item 670, :mod:`dotagent.serve
 that hold one, with their removal (the installation's token alone reaches these, never a phone's key: the guard's
 ``needs_main_token``). The code and the keys are never logged.
 Setting up Tailscale for it, and keeping the Mac awake while it charges (item 271); Tailscale opened for its install or
-its sign-in, and the QR codes a phone's camera opens (item 421)."""
+its sign-in, and the QR codes a phone's camera opens (item 421), among them the one that opens Dot Next and pairs it
+with the code on screen."""
 
 import asyncio
 import time
 from typing import Literal
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request, Response
 
@@ -23,7 +25,7 @@ from dotagent.notify.leases import ActivityLease, lease_seconds
 from dotagent.notify.live_start import forget_live_start_token, keep_live_start_token
 from dotagent.notify.settings import PushSettings, forget_push_settings, keep_push_settings, push_settings_of
 from dotagent.server.context import ServerContext
-from dotagent.server.guard import PHONE_STATE
+from dotagent.server.guard import PHONE_STATE, refuse_from_a_phone
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
 from dotagent.server.phones import MAX_PHONES, PairedPhones, is_phone_id
 from dotagent.server.views import (
@@ -123,6 +125,23 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         from dotagent.qr import qr_png
 
         png: bytes = await asyncio.to_thread(qr_png, text)
+        return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+    @router.get("/phone/pair-qr")
+    async def pair_qr(http: Request) -> Response:
+        """A QR code of ``dotnext://pair?host=<Dot's address>&code=<the code on screen>``: the iPhone's camera opens Dot
+        Next with both filled, and one tap pairs it. It draws only the code that is good now, made by ``/phone/pairing``
+        (none: 422), never words of the caller's; a phone's key is refused, as it can make no code."""
+        refuse_from_a_phone(http.scope, "show the picture of a sign-in code")
+        running: tuple[str, ...] = tuple(ctx.runtime.config.server.reach)
+        if not running:
+            raise PhoneSetupError("Dot answers to no name on a tailnet yet: set it up in Settings › Phone first", {})
+        if current is None or current.expires_at <= time.time():
+            raise PhoneSetupError("there is no sign-in code on screen: show one first", {})
+        link: str = "dotnext://pair?" + urlencode({"host": f"https://{running[0]}", "code": current.code})
+        from dotagent.qr import qr_png
+
+        png: bytes = await asyncio.to_thread(qr_png, link)
         return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
 
     @router.post("/phone/awake")

@@ -471,6 +471,43 @@ async def test_the_qr_codes_open_tailscales_download_page_and_dots_address_once_
         assert _read_qr(dot.content) == [f"https://{_NAME}/"]
 
 
+async def test_the_pair_qr_opens_dot_next_with_the_address_and_the_code_on_screen() -> None:
+    async with _daemon([_NAME]) as (_runtime, address), _client(address) as client:
+        assert (await client.get("/phone/pair-qr")).status_code == 422, "no code on screen yet"
+        issued = (await client.post("/phone/pairing")).json()
+        picture = await client.get("/phone/pair-qr")
+        assert picture.status_code == 200, picture.text
+        code: str = issued["code"].replace("-", "")
+        assert _read_qr(picture.content) == [f"dotnext://pair?host=https%3A%2F%2F{_NAME}&code={code}"]
+        paired = await client.post("/phone/pair", json={"code": code})
+        assert paired.status_code == 200, paired.text
+        phone = httpx.AsyncClient(
+            base_url=f"{address}/api", headers={"Authorization": f"Bearer {paired.json()['token']}"}
+        )
+        async with phone:
+            refused = await phone.get("/phone/pair-qr")
+        assert refused.status_code == 403 and refused.json()["context"] == {"phone": True}
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
+        await client.post("/phone/pairing")
+        assert (await client.get("/phone/pair-qr")).status_code == 422, "no address on a tailnet"
+
+
+@pytest.mark.browser
+async def test_a_shown_code_comes_with_the_qr_code_for_dot_next() -> None:
+    async with _daemon([_NAME]) as (_runtime, address), async_playwright() as playwright:
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await (await chromium.new_context(reduced_motion="reduce")).new_page()
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/settings/phone")
+            await page.get_by_role("button", name="Show code").click()
+            picture: Locator = page.get_by_alt_text("A QR code that opens Dot Next on the iPhone with this code")
+            await expect(picture).to_be_visible()
+            await expect(page.locator(".phone-pair-qr")).to_contain_text("scan it with the camera")
+        finally:
+            await chromium.close()
+
+
 @pytest.mark.browser
 async def test_what_tailscale_says_while_it_runs_is_shown_in_the_guide(stand_ins: Path) -> None:
     """Tailscale runs signed in, but what it serves cannot be read: the step that serves Dot says what it said."""
