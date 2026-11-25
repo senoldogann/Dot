@@ -66,6 +66,7 @@ from dotagent.claude_code.stream import (
     read_line,
     user_line,
 )
+from dotagent.claude_code.versions import thinking_display
 from dotagent.core.errors import (
     ClaudeCodeBroke,
     ClaudeCodeError,
@@ -104,7 +105,7 @@ def _value(argv: tuple[str, ...], flag: str) -> str:
 def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() -> None:
     door: Door = _door()
     argv: tuple[str, ...] = claude_argv(
-        "/usr/local/bin/claude", "opus", "medium", "standard", PROMPT_FILE, CONFIG, door.name, None
+        "/usr/local/bin/claude", "opus", "medium", "standard", (), PROMPT_FILE, CONFIG, door.name, None
     )
     assert argv[:2] == ("/usr/local/bin/claude", "-p")
     assert _value(argv, "--input-format") == "stream-json"
@@ -135,7 +136,9 @@ def test_the_command_keeps_the_model_to_the_doors_tools_and_holds_no_secret() ->
 
 
 def test_a_chat_with_a_session_resumes_it() -> None:
-    argv: tuple[str, ...] = claude_argv("claude", "sonnet", "medium", "standard", PROMPT_FILE, CONFIG, DOOR, "ses-1")
+    argv: tuple[str, ...] = claude_argv(
+        "claude", "sonnet", "medium", "standard", (), PROMPT_FILE, CONFIG, DOOR, "ses-1"
+    )
     assert _value(argv, "--resume") == "ses-1"
     # The allowed tools stay the last words, so that nothing after them is read as one.
     assert argv[-2:] == ("--allowedTools", f"mcp__{DOOR},ToolSearch")
@@ -421,10 +424,10 @@ def test_only_the_measured_built_in_plugins_pass() -> None:
 def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     """Item 1014: the run's reasoning level goes as --effort when it is one of Claude Code's, and fast mode as the
     --settings the run reads; neither goes when the run has none."""
-    argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", PROMPT_FILE, CONFIG, DOOR, None)
+    argv: tuple[str, ...] = claude_argv("claude", "opus", "xhigh", "fast", (), PROMPT_FILE, CONFIG, DOOR, None)
     assert argv[argv.index("--effort") + 1] == "xhigh"
     assert json.loads(argv[argv.index("--settings") + 1]) == {"fastMode": True}
-    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", PROMPT_FILE, CONFIG, DOOR, None)
+    plain: tuple[str, ...] = claude_argv("claude", "sonnet", "low", "standard", (), PROMPT_FILE, CONFIG, DOOR, None)
     assert "--settings" not in plain
     # The configured default goes when the run chose none, rounded to the levels Claude Code lists for the model, as
     # the composer shows it (item 1367): Opus 4.6 has no xhigh, Haiku 4.5 no level, and then no --effort goes.
@@ -437,7 +440,7 @@ def test_a_runs_effort_and_fast_mode_reach_the_program() -> None:
     assert opus_4_6 is not None and haiku_4_5 is not None
     assert run_effort(opus_4_6.efforts, None, "xhigh") in ("high", "max")
     assert run_effort(haiku_4_5.efforts, None, "xhigh") is None
-    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", PROMPT_FILE, CONFIG, DOOR, None)
+    assert "--effort" not in claude_argv("claude", "haiku", None, "standard", (), PROMPT_FILE, CONFIG, DOOR, None)
     # Fast mode goes to a model that has it alone, as Claude Code last listed them (item 1367).
     keep_models(PlanModels(fetched_at=0.0, models=_listed()))
     assert run_speed(ModelRef(provider="claude_code", model="sonnet"), "fast") == "standard"
@@ -664,3 +667,20 @@ def test_a_question_the_models_safeguards_flagged_is_a_refusal_not_a_failure_to_
     broke: Answer = Answer((), (), (), (), (), None, {"type": "result", "is_error": True, "result": "Stream closed"})
     with pytest.raises(ProviderTransportError, match="session failed"):
         reply_of(broke, Question("Be brief.", "Review this.", None), "claude_code:opus", 0.0)
+
+
+def test_the_thinking_summary_is_asked_for_on_a_version_that_knows_the_flag() -> None:
+    """Item 1768: in a session with no terminal Claude Code asks the API for no summary of the model's thinking unless
+    --thinking-display says so (measured on 2.1.331: 0 characters of thinking without it, 204 with it), so the
+    timeline had no thinking of a run on the plan. An older or unknown version is not given the flag it may refuse."""
+    assert thinking_display((2, 1, 331)) == ("--thinking-display", "summarized")
+    assert thinking_display((2, 2, 0)) == ("--thinking-display", "summarized")
+    assert thinking_display((2, 1, 330)) == ()
+    assert thinking_display(None) == ()
+    argv: tuple[str, ...] = claude_argv(
+        "claude", "opus", "high", "standard", thinking_display((2, 1, 331)), PROMPT_FILE, CONFIG, DOOR, None
+    )
+    assert _value(argv, "--thinking-display") == "summarized"
+    assert "--thinking-display" not in claude_argv(
+        "claude", "opus", "high", "standard", (), PROMPT_FILE, CONFIG, DOOR, None
+    )

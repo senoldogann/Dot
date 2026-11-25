@@ -30,6 +30,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
 | [1771](1771.md) | done | 2026-11-25 | DotNext's Models, Scheduled tasks, Rules, Memory and Agents are native, as much of them as a phone is for |
 | [1770](1770.md) | done | 2026-11-25 | The code review's models and their reasoning are changed from the phone too |
+| [1769](1769.md) | done | 2026-11-25 | DotNext: the work told in one live line, thinking as rows of the work, Dot's own tools in words, softer motion |
+| [1768](1768.md) | done | 2026-11-25 | A run on the Claude plan passes on its model's thinking |
 | [1767](1767.md) | done | 2026-11-25 | DotNext: a long press on Send offers Steer now and Queue |
 | [1766](1766.md) | done | 2026-11-25 | DotNext: the phone does not engage the emergency stop |
 | [1765](1765.md) | done | 2026-11-25 | DotNext: no Stop in the chat's header |

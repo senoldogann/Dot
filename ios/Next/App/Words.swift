@@ -87,9 +87,13 @@ func foldWords(_ fold: WorkFold, locale: Locale) -> String {
     return tally.isEmpty ? worked : worked + " · " + tally
 }
 
-/// A tool call's line: the plain verb of its kind and its target ("Read /src/app.py", "Ran git status").
+/// A tool call's line: the plain verb of its kind and its target ("Read /src/app.py", "Ran git status"); one of Dot's
+/// own tools by its phrase ("Search notes · deploy"), any other by its name in words, never the raw name (item 1769).
 func toolLine(_ entry: ToolEntry) -> String {
     let target: String = entry.target
+    if entry.kind != .helper, entry.kind != .wait, let phrase = dotToolWords(entry.tool) {
+        return target.isEmpty ? phrase : "\(phrase) · \(target)"
+    }
     switch entry.kind {
     case .read where !target.isEmpty: return String(localized: "Read \(target)", comment: "Tool row: a file read; the argument is its path")
     case .edit where !target.isEmpty: return String(localized: "Edited \(target)", comment: "Tool row: a file edited; the argument is its path")
@@ -103,8 +107,13 @@ func toolLine(_ entry: ToolEntry) -> String {
         return entry.state == .running
             ? String(localized: "Waiting for a condition", comment: "Tool row: a wait_until step at work")
             : String(localized: "Waited for a condition", comment: "Tool row: a wait_until step")
-    case .helper where !target.isEmpty: return String(localized: "Started a helper: \(target)", comment: "Tool row: a helper started; the argument is its goal")
-    default: return target.isEmpty ? entry.tool : "\(entry.tool) · \(target)"
+    case .helper where !target.isEmpty:
+        switch entry.state {
+        case .running: return String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
+        case .done: return String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
+        case .failed: return String(localized: "Delegated task “\(target)” failed", comment: "Tool row: a task handed to a helper that failed; the argument is its goal")
+        }
+    default: return target.isEmpty ? toolName(entry.tool) : "\(toolName(entry.tool)) · \(target)"
     }
 }
 
@@ -118,8 +127,8 @@ func toolSymbol(_ kind: ToolKind) -> String {
     case .wait: "hourglass"
     case .web: "globe"
     case .screen: "cursorarrow.click"
-    case .helper: "person.2"
-    case .other: "wrench.and.screwdriver"
+    case .helper: "hammer"
+    case .other: "hammer"
     }
 }
 

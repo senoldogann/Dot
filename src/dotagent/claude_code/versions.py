@@ -93,6 +93,21 @@ def verdict_of(version: Version | None, table: Sequence[VersionRange]) -> Versio
     )
 
 
+# The first version a run was seen to get its model's thinking from (item 1768): Claude Code asks the API for no summary
+# of the thinking in a session with no terminal (``-p``) unless ``--thinking-display summarized`` says so, and its
+# ``showThinkingSummaries`` setting does not reach such a session. Measured on 2.1.331; an older version may not know
+# the flag and would refuse to start.
+THINKING_DISPLAY_SINCE: Version = (2, 1, 331)
+
+
+def thinking_display(version: Version | None) -> tuple[str, ...]:
+    """The arguments that make the program pass on its model's thinking (a summary, as the API gives it): on
+    :data:`THINKING_DISPLAY_SINCE` and later, none on an older or unknown version."""
+    if version is None or version < THINKING_DISPLAY_SINCE:
+        return ()
+    return ("--thinking-display", "summarized")
+
+
 def refusal(verdict: VersionVerdict) -> str:
     """The words of a run refused on a ``broken`` version."""
     return (

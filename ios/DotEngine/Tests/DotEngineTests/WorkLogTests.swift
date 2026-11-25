@@ -56,7 +56,7 @@ final class WorkLogTests: XCTestCase {
         let ids: (ToolCallMode) -> [String] = { transcript(of: self.working, pending: [], mode: $0, streaming: true, context: .none).map(\.id) }
         XCTAssertEqual(ids(.showAll), ["u:run_a", "t:ok", "th:run_a:1", "a:12", "t:bad", "t:open", "plan:run_a", "ask:apr_1"])
         XCTAssertEqual(ids(.hideSuccessful), ["u:run_a", "th:run_a:1", "a:12", "t:bad", "t:open", "plan:run_a", "ask:apr_1"], "running and failed stay")
-        XCTAssertEqual(ids(.hideAll), ["u:run_a", "th:run_a:1", "a:12", "t:bad", "plan:run_a", "ask:apr_1"], "a failed tool still shows")
+        XCTAssertEqual(ids(.hideAll), ["u:run_a", "a:12", "t:bad", "plan:run_a", "ask:apr_1"], "a failed tool still shows; the live line says the thinking")
         XCTAssertEqual(ids(.zen), ["u:run_a", "ask:apr_1"], "Zen: the owner's words and the asks; the reply may not be the last, no thinking")
     }
 
@@ -212,5 +212,62 @@ final class WorkLogTests: XCTestCase {
         XCTAssertEqual(["read_file", "Read", "shell", "Bash", "edit_file", "Write", "grep", "Glob", "wait_until", "browser_open", "WebFetch",
             "screen_click", "delegate", "Task", "remember"].map { ToolKind.of($0) },
             [.read, .read, .command, .command, .edit, .edit, .search, .search, .wait, .web, .web, .screen, .helper, .helper, .other])
+    }
+
+    // MARK: The live line (item 1769)
+
+    private func now(_ events: [EventRecord], stopping: Bool = false) -> WorkNow? {
+        workNow(of: chat([run("run_a", status: "running")], events), run: "run_a", stopping: stopping)
+    }
+
+    func testTheLiveLineSaysWhatTheRunDoesFromItsEvents() {
+        let started: EventRecord = event(1, "run_started", [:])
+        XCTAssertEqual(now([event(1, "run_queued", ["goal": .string("x")])]), .queued, "no run_started yet")
+        XCTAssertEqual(now([started]), .typing, "asked its model: the typing dots")
+        let shell: EventRecord = event(2, "tool_call", ["call_id": .string("c1"), "tool": .string("shell"), "args": .object(["command": .string("swift test")])])
+        guard case .tool(let step)? = now([started, shell]) else { return XCTFail("a call at work") }
+        XCTAssertEqual(step.tool, "shell")
+        XCTAssertEqual(step.target, "swift test")
+        XCTAssertEqual(now([started, shell, result(3, "c1", ok: true)]), .typing, "its result back: the model is asked again")
+        let handoff: EventRecord = event(4, "tool_call", ["call_id": .string("c2"), "tool": .string("delegate"), "args": .object(["agent": .string("Ada"), "goal": .string("g")])])
+        XCTAssertEqual(now([started, handoff]), .handoff(agent: "Ada"))
+        let finish: EventRecord = event(5, "tool_call", ["call_id": .string("c3"), "tool": .string("finish"), "args": .object([:])])
+        XCTAssertEqual(now([started, finish]), .typing, "finish is said by the answer, not the line")
+        let ask: EventRecord = event(6, "approval_requested", ["approval_id": .string("apr_1")])
+        XCTAssertEqual(now([started, ask]), .waitingForYou)
+        XCTAssertEqual(now([started, ask, event(7, "approval_decided", ["approval_id": .string("apr_1"), "status": .string("approved")])]), .typing)
+        XCTAssertEqual(now([started, shell], stopping: true), .stopping)
+        XCTAssertNil(now([started, event(8, "run_finished", ["status": .string("done")])]), "an ended run has no line")
+    }
+
+    func testTheLiveLineSaysWhatTheMessageToldWhileItsCallsRun() {
+        let step: EventRecord = event(
+            2, "assistant", ["step": .int(1), "text": .string("**Kanıt netleşti.** Son bir kontrol yapıyorum."), "tool_calls": .array([.string("shell")])])
+        XCTAssertEqual(now([event(1, "run_started", [:]), step]), .told("Kanıt netleşti. Son bir kontrol yapıyorum"))
+        let quiet: EventRecord = event(3, "assistant", ["step": .int(2), "text": .string("Done."), "tool_calls": .array([.string("finish")])])
+        XCTAssertEqual(now([event(1, "run_started", [:]), step, quiet]), .typing, "a message that only finishes tells nothing next")
+    }
+
+    func testTheLiveThinkingAndWordsComeBeforeTheSteps() {
+        var live: ChatProjection = chat([run("run_a", status: "running")], [event(1, "run_started", [:])])
+        live.thinking["run_a"] = LiveThought(step: 1, text: "Which test fails?")
+        XCTAssertEqual(workNow(of: live, run: "run_a", stopping: false), .thinking)
+        live.writing["run_a"] = "The test"
+        XCTAssertEqual(workNow(of: live, run: "run_a", stopping: false), .writing, "words in sight: the line steps aside")
+    }
+
+    func testHideAllFoldsAllOfAnEndedRunsStepsSoTheyStayReachable() {
+        let finished: ChatProjection = chat(
+            [run("run_a", status: "done")],
+            [
+                event(9, "assistant", ["text": .string(""), "thinking": .string("Read the hosts file first."), "step": .int(1)]),
+                call(10, "r1", "read_file"), result(20, "r1", ok: true),
+                event(150, "run_finished", ["status": .string("done"), "result": .string("All done")]),
+            ])
+        let items: [TranscriptItem] = transcript(of: finished, pending: [], mode: .hideAll, streaming: true, context: .none)
+        XCTAssertEqual(items.map(\.id), ["u:run_a", "f:th:run_a:1", "r:run_a"], "the fold, then the answer")
+        guard case .work(let fold) = items[1] else { return XCTFail("the steps fold") }
+        XCTAssertEqual(fold.items.map(\.id), ["th:run_a:1", "t:r1"], "the thought and the successful read are in it")
+        XCTAssertEqual(transcript(of: finished, pending: [], mode: .zen, streaming: true, context: .none).map(\.id), ["u:run_a", "r:run_a"], "Zen: the answer alone")
     }
 }

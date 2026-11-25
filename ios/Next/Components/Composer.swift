@@ -429,10 +429,9 @@ struct DocumentScanner: UIViewControllerRepresentable {
 
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
+    /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
+    /// transcript's live line says).
     let status: ChatStatus?
-    /// What the run does this moment ("Thinking", "Running du -sh ~"), said in the status's place while it works: a sign
-    /// of life in every tool mode, Zen too.
-    let activity: String?
     /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not.
     let since: Date?
     let queued: Int
@@ -484,13 +483,9 @@ struct FloatingWorkingControl: View {
                 // every drawing of the screen, so words streaming faster than once a second held the clock still.
                 TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
-                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
+                    segment(action: openStatus, label: [status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
                         HStack(spacing: Space.xxs + 1) {
-                            if let activity = summary.activity {
-                                ActivityWord(text: activity)
-                            } else {
-                                StatusWord(status: status)
-                            }
+                            StatusWord(status: status)
                             if let clock {
                                 Text(clock).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
                             }
@@ -541,17 +536,3 @@ struct FloatingWorkingControl: View {
     }
 }
 
-/// What a run does now, as the capsule's status word: the working spinner and one short line.
-struct ActivityWord: View {
-    let text: String
-
-    var body: some View {
-        HStack(spacing: Space.xxs + 1) {
-            ProgressView().controlSize(.mini).tint(Tone.secondary)
-            Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).truncationMode(.tail).frame(maxWidth: 200, alignment: .leading)
-        }
-        .foregroundStyle(ChatStatus.working.tone.color)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(text)
-    }
-}

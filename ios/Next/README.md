@@ -14,9 +14,12 @@ the chat whole (`App/ChatScreen.swift`, `App/ChatSheets.swift`, `Components/Work
 dictation, Send / Queue / Steer / Stop; while a run works and the draft has words a long press on the button offers
 Steer now and Queue, the follow-up setting's way checked, and sends the draft the way picked; a run stops from the
 composer's Stop, the chat's header has none), the queue sheet and the edit of a queued message, the run inspector, reactions.
-While a run works, its step's thinking and words stream as the model writes them (the thinking in every mode but Zen),
-and the floating capsule says what the run does now (thinking, writing, the command that runs) with a clock that ticks
-every second whether events come or not. A new chat opens as soon as its first message is sent, under the outbox's
+While a run works, its step's thinking and words stream as the model writes them (the thinking in Show all and Hide
+successful, as a row of the stretch of work with its first sentence; the words at a steady pace, the newest fading in);
+in Hide all (the default) and Zen one live line under the last message says what the run does now (`WorkLineView`,
+`workNow`: typing, thinking, the command it runs, the file it reads, waiting for you), and a tap on it shows the steps.
+The floating capsule says Working with a clock that ticks every second whether events come or not. Dot's own tools
+read as words with Dot's mark. A new chat opens as soon as its first message is sent, under the outbox's
 key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
 once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
@@ -43,12 +46,15 @@ phone does not engage the emergency stop (the Mac's failsafe does), and while it
 Release the stop. A search with synonyms finds any page in English or
 computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
 with synonyms finds any page in English or
+system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their own and word
+break, the tool calls in chat, response streaming, the reading width), Chat
 (haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
 only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
 on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
 runs' proposed rewrites with Use and Drop), Health and version, Usage, Maintenance (Dot's and the provider programs'
 versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
 line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
+line says, and no Settings row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
