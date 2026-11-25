@@ -33,13 +33,16 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert set(publish["needs"]) == {"tag", "gate"}
     assert publish["environment"] == "pypi"
     assert jobs["gate"] == {"needs": "tag", "uses": "./.github/workflows/gate.yml"}
-    # The gate the release calls runs the core of the browser tests, in its parts. A release is a workflow_call, not a
-    # pull request, so the condition that skips a part for a pull request is true there and the parts run.
+    # The gate the release calls runs the core of the browser tests, in its parts. A release is a workflow_call: the
+    # `changes` job, which reads only a pull request and a push to main (item 1875), does not run there, and a part
+    # whose decision was not made runs.
     gate_jobs = _workflow("gate.yml")["jobs"]
     assert isinstance(gate_jobs, dict)
     browser_if = str(gate_jobs["browser"].get("if", ""))
-    assert "github.event_name != 'pull_request'" in browser_if
+    assert "needs.changes.result != 'success'" in browser_if
     assert "needs.changes.outputs.browser == 'true'" in browser_if
+    changes_if = str(gate_jobs["changes"].get("if", ""))
+    assert "(github.event_name == 'pull_request' || github.event_name == 'push')" in changes_if
     assert [part["name"] for part in gate_jobs["browser"]["strategy"]["matrix"]["part"]] == [
         "pages",
         "phone 1",
@@ -58,14 +61,14 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     # And both halves of the smoke tests (item 944), each on its own runner, with nothing that skips them there but a
     # pull request that changes prose alone (the `prose` job tells the heavy jobs to skip, and a required check that a
     # path filter skips would never be reported at all) or one whose files nothing of them reads (`changes`, its
-    # python answer, scripts/python_ci.py); a decision that failed runs them. Every other run, a release among them,
-    # runs them.
+    # python answer, scripts/python_ci.py; a push to main asks it too, item 1875); a decision that failed or was not
+    # made runs them, so a release runs them.
     prose_skip = (
         "${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}"
     )
     python_skip = (
-        "${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true' && "
-        "(needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}"
+        "${{ !cancelled() && needs.prose.outputs.prose_only != 'true' && "
+        "(needs.changes.result != 'success' || needs.changes.outputs.python == 'true') }}"
     )
     assert gate_jobs["smoke"]["if"] == python_skip
     assert gate_jobs["checks"]["if"] == prose_skip
