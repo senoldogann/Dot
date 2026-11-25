@@ -197,6 +197,17 @@ async def test_a_key_that_was_refused_is_said_on_the_sign_in_with_the_way_to_pai
                         await page.evaluate("document.activeElement && document.activeElement.placeholder") is not None
                     )
                     await context.close()
+            # A Mac's page, with no touch screen, says the refusal in the card's words alone: the style hides the line.
+            desk: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 800})
+            page = await desk.new_page()
+            await page.goto(f"{resting.address}/")
+            await page.evaluate("localStorage.setItem('dot.token', 'a-key-the-daemon-does-not-know')")
+            await page.reload()
+            await expect(page.locator(".signin .note.bad")).to_be_visible(timeout=20_000)
+            # The line is drawn, and the style keeps it out of sight.
+            await expect(page.locator('.signin .link-line[data-kind="refused"]')).to_have_count(1)
+            await expect(page.locator(".signin .link-line")).to_be_hidden()
+            await desk.close()
         finally:
             await browser.close()
 

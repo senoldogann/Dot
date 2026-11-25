@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
 | [1851](1851.md) | done | 2026-11-25 | The orphan-groups test keeps a Dot home of its own, which no other pytest worker writes into |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
