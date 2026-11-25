@@ -6,18 +6,7 @@ import Foundation
 /// The id the daemon gives Dot among the agents (`DOT_AGENT_ID`).
 public let dotAgentId: String = "dot"
 
-/// An agent's face (item 102, `AgentLook`): a shape, an expression and one of the twelve colours.
-public struct AgentLook: Codable, Sendable, Hashable {
-    public let shape: String
-    public let expression: String
-    public let colour: String
-
-    public init(shape: String, expression: String, colour: String) {
-        self.shape = shape
-        self.expression = expression
-        self.colour = colour
-    }
-}
+// `AgentLook`, an agent's face, is shared with Settings › Agents (`SettingsDetailModels.swift`).
 
 /// An agent as the daemon keeps it (`AgentRecord`); Dot's own record has the id `dot`.
 public struct AgentRecord: Codable, Sendable, Hashable, Identifiable {

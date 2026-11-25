@@ -65,6 +65,8 @@ final class SettingsControlsUITests: XCTestCase {
             } else if app.navigationBars.buttons["Cancel"].exists {
                 app.navigationBars.buttons["Cancel"].tap()
                 if app.buttons["Discard"].waitForExistence(timeout: 1) { app.buttons["Discard"].tap() }
+                // A sheet that is still closing swallows the next push.
+                sleep(1)
             } else if title != "Settings", app.navigationBars.buttons["Close"].exists {
                 // The settings sheet's own ✕ closes the sheet: only a sheet over it is closed here.
                 app.navigationBars.buttons["Close"].tap()
@@ -103,7 +105,7 @@ final class SettingsControlsUITests: XCTestCase {
         let pages: [(String, String)] = [
             ("Dot's computer", "This Mac"), ("Notifications", "Notifications"), ("General", "General"), ("Appearance", "Appearance"), ("Chat", "Chat"),
             ("Models", "Models"), ("Usage limits and caps", "Usage limits and caps"), ("Scheduled tasks", "Scheduled tasks"), ("Permissions", "Rules"),
-            ("Memory", "Memory"), ("Health and version", "Health and version"), ("Usage", "Usage"),
+            ("Memory", "Memory"), ("Agents", "Agents"), ("Health and version", "Health and version"), ("Usage", "Usage"),
         ]
         var dead: [String] = []
         for (label, page) in pages {

@@ -468,9 +468,11 @@ public struct ModelOption: Codable, Sendable, Hashable {
     public let efforts: [String]
     public let defaultEffort: String?
     public let contextLength: Int?
+    /// Whether it can use actions (Settings › Models picks among those, item 1770); absent from an older daemon's answer.
+    public let tools: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case ref, label, efforts
+        case ref, label, efforts, tools
         case defaultEffort = "default_effort"
         case contextLength = "context_length"
     }
@@ -481,6 +483,12 @@ public struct ProviderModels: Codable, Sendable, Hashable {
     public let provider: String
     public let models: [ModelOption]
     public let error: String?
+
+    public init(provider: String, models: [ModelOption], error: String?) {
+        self.provider = provider
+        self.models = models
+        self.error = error
+    }
 }
 
 /// `GET`/`POST /api/failsafe`.
