@@ -71,7 +71,7 @@ struct DraftSheet: View {
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, Space.groupedGutter)
         }
-        .inspectorSheet(title: isMail ? String(localized: "Mail", comment: "Draft: an email") : String(localized: "Message", comment: "Draft: an iMessage")) {
+        .fullSheet(title: isMail ? String(localized: "Mail", comment: "Draft: an email") : String(localized: "Message", comment: "Draft: an iMessage")) {
             if dirty { askingClose = true } else { dismiss() }
         }
         .interactiveDismissDisabled(dirty || sending)
@@ -186,7 +186,7 @@ struct ProposalSheet: View {
             .padding(.horizontal, Space.gutter)
             .padding(.vertical, Space.groupedGutter)
         }
-        .inspectorSheet(title: String(localized: "Dot's proposal", comment: "Self-improvement: the sheet of one proposal")) { dismiss() }
+        .fullSheet(title: String(localized: "Dot's proposal", comment: "Self-improvement: the sheet of one proposal")) { dismiss() }
         .confirmationDialog(
             String(localized: "Use a version written from outside content?", comment: "Self-improvement: asks before using a version from outside content"),
             isPresented: $askingUse, titleVisibility: .visible
@@ -242,5 +242,27 @@ struct ProposalSheet: View {
             dismiss()
         case .failure(let box): problem = box.failure
         }
+    }
+}
+
+extension View {
+    /// The inspector's chrome (✕ leading, inline title, the sheet's ground) at full height: a draft's and a proposal's
+    /// actions stand at their foot, which a middle height leaves under the fold on a small phone.
+    func fullSheet(title: String, close: @escaping () -> Void) -> some View {
+        NavigationStack {
+            scrollContentBackground(.hidden)
+                .background(Tone.sheet)
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
+                    }
+                }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Tone.sheet)
+        .tint(Tone.text)
     }
 }

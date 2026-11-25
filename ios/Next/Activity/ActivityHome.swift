@@ -479,14 +479,15 @@ struct ActivityItem: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .top, spacing: Space.s) {
+            // The mark is centred on the row's text block, as `ListRow` and the lists of Apple's apps draw it.
+            HStack(spacing: Space.s) {
                 Symbol(name: symbol, context: .row).foregroundStyle(tone == .neutral ? Tone.text : tone.color).frame(minWidth: Metric.iconSlot)
                 VStack(alignment: .leading, spacing: Space.xxs) {
                     Text(title).textRole(.body).foregroundStyle(Tone.text).lineLimit(2).multilineTextAlignment(.leading)
                     Text(line).textRole(.footnote).foregroundStyle(tone == .neutral ? Tone.secondary : tone.color).multilineTextAlignment(.leading)
                 }
                 Spacer(minLength: Space.s)
-                if opens { Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph).frame(maxHeight: .infinity) }
+                if opens { Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph) }
             }
             .padding(.horizontal, Space.groupedGutter)
             .padding(.vertical, Space.s)
@@ -530,9 +531,9 @@ struct SwitchItem: View {
             Toggle(isOn: $isOn) { EmptyView() }.toggleStyle(InkSwitchStyle()).fixedSize()
                 .accessibilityLabel(title)
         }
-        .padding(.leading, Space.groupedGutter)
-        .padding(.trailing, Space.s)
-        .padding(.vertical, Space.xs)
+        // The insets of `ListRow`, so the rows of a section line up (the design bar: equal insets on each side).
+        .padding(.horizontal, Space.groupedGutter)
+        .padding(.vertical, Space.s)
         .frame(minHeight: Metric.rowWithDescription)
     }
 }
