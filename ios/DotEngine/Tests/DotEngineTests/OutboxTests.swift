@@ -22,7 +22,12 @@ final class OutboxTests: XCTestCase {
     override func tearDown() async throws { try? FileManager.default.removeItem(at: folder) }
 
     private func box(_ link: LinkWatcher, mayStartChat: @escaping @Sendable () async -> Bool) -> Outbox {
-        Outbox(directory: folder, api: daemon.api(), link: link, clock: clock, policy: quick, jitter: { 0 }, mayStartChat: mayStartChat)
+        Outbox(
+            directory: folder, api: daemon.api(), link: link, clock: clock, policy: quick, jitter: { 0 },
+            maySend: { action in
+                if case .newChat = action { return await mayStartChat() }
+                return true
+            })
     }
 
     private func message(_ text: String) -> OutboxItem.Action { .message(thread: "thr_1", text: text, images: [], uploaded: [], picks: .none) }

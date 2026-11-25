@@ -80,15 +80,49 @@ public struct SyncCache: Sendable {
 
     public func loadList(now: Double) -> CacheEnvelope<ListProjection>? { read(list, now: now) }
 
-    /// Forgets every copy (the phone's key was forgotten, or the daemon's version changed).
+    /// Forgets every copy of the chats and the list (the daemon's version changed, or it was reset); the daemon's
+    /// identity and an untold reset stay.
+    public func dropPictures() {
+        try? FileManager.default.removeItem(at: chats)
+        try? FileManager.default.removeItem(at: list)
+    }
+
+    /// Forgets everything (the phone's key was forgotten).
     public func clear() {
         try? FileManager.default.removeItem(at: folder)
     }
 
-    private func write<Content: Codable & Sendable>(_ envelope: CacheEnvelope<Content>, to file: URL) {
+    // MARK: The daemon the copies are of
+
+    private var daemonFile: URL { folder.appending(path: "daemon.json") }
+    private var resetFile: URL { folder.appending(path: "reset.json") }
+
+    /// The daemon the copies came from, kept apart from them so that it is known even before a list was saved.
+    public func loadDaemon() -> DaemonIdentity? {
+        guard let data: Data = try? Data(contentsOf: daemonFile) else { return nil }
+        return try? JSONDecoder().decode(DaemonIdentity.self, from: data)
+    }
+
+    public func saveDaemon(_ identity: DaemonIdentity) { write(identity, to: daemonFile) }
+
+    /// The reset the owner has not been told of yet.
+    public func loadReset() -> DaemonReset? {
+        guard let data: Data = try? Data(contentsOf: resetFile) else { return nil }
+        return try? JSONDecoder().decode(DaemonReset.self, from: data)
+    }
+
+    public func saveReset(_ reset: DaemonReset?) {
+        guard let reset else {
+            try? FileManager.default.removeItem(at: resetFile)
+            return
+        }
+        write(reset, to: resetFile)
+    }
+
+    private func write(_ value: some Encodable, to file: URL) {
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(envelope).write(to: file, options: [.atomic])
+            try JSONEncoder().encode(value).write(to: file, options: [.atomic])
         } catch {
             logger.error("cache write failed file=\(file.lastPathComponent, privacy: .public) error=\(String(describing: error), privacy: .public)")
         }

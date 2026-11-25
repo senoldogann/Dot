@@ -456,9 +456,23 @@ public struct PairedKey: Codable, Sendable {
     public let token: String
 }
 
-/// `GET /api/status`, the part the cache keys on.
+/// `GET /api/status`, the part the cache keys on: the version, and the id of the daemon's database (absent from a daemon
+/// from before it), which a reset of the Mac's Dot changes.
 public struct DaemonStatus: Codable, Sendable, Hashable {
     public let version: String
+    public let storeId: String?
+
+    public init(version: String, storeId: String?) {
+        self.version = version
+        self.storeId = storeId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case storeId = "store_id"
+    }
+
+    public var identity: DaemonIdentity { DaemonIdentity(version: version, store: storeId) }
 }
 
 /// A model as the pickers show it (`GET /api/models`), the part the composer's chip reads.

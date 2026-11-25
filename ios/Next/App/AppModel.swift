@@ -32,6 +32,8 @@ final class AppModel {
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
     private(set) var startedChats: [String: String] = [:]
+    /// The Mac's Dot was reset and the owner has not closed the notice yet.
+    private(set) var reset: DaemonReset?
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -77,6 +79,36 @@ final class AppModel {
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
         if next.startedChats != startedChats { startedChats = next.startedChats }
+        if next.reset != reset { reset = next.reset }
+        if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
+    }
+
+    /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
+    static let newChatDraft: String = "new-chat"
+
+    /// The reset whose words were put in the new chat's draft (its `at`), kept with the draft so that a kill before the
+    /// engine heard of it does not put them there twice.
+    private static let rescuedKey: String = "resetRescuedAt"
+
+    /// A reset left words unsent: they go into the new chat's draft, with the drafts of the old chats (whose chats are
+    /// gone), so that nothing the owner wrote is lost in silence; then the engine is told they were taken.
+    private func rescue(_ fresh: DaemonReset) {
+        guard let engine else { return }
+        let defaults: UserDefaults = UserDefaults.standard
+        let newChatKey: String = "draft.\(Self.newChatDraft)"
+        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && $0 != newChatKey }.sorted()
+        let oldDrafts: [String] = oldKeys.compactMap { defaults.string(forKey: $0) }
+        keep(draft: DaemonRules.draft(keeping: draft(of: Self.newChatDraft), adding: fresh.words + oldDrafts), of: Self.newChatDraft)
+        for key in oldKeys { defaults.removeObject(forKey: key) }
+        defaults.set(fresh.at, forKey: Self.rescuedKey)
+        logger.notice("a reset's words went to the new chat's draft words=\(fresh.words.count) drafts=\(oldDrafts.count)")
+        Task { await engine.store.resetTaken() }
+    }
+
+    /// The owner closed the reset's notice.
+    func resetSeen() {
+        guard let engine else { return }
+        Task { await engine.store.resetSeen() }
     }
 
     /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
