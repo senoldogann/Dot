@@ -3599,6 +3599,8 @@ class RunManager:
             f"{limit} hand-offs in a row since a message of yours, and they go on (yolo and free mode refuse nothing). "
             "Open the run to see it, and stop it there if it is a loop.",
             route,
+            "system",
+            "",
         )
 
     async def _keep_to_the_hop_limit(self, opening: RunOpening, goal: str) -> None:
