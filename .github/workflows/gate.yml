@@ -14,7 +14,8 @@
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing heavy, as
-# no command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell's
+# no command below reads it; but docs/freedom.md, which tests/unit/test_freedom_contract.py reads, and a skill's SKILL.md
+# under src/, which Dot reads, do run the gate. The desktop shell's
 # checks (desktop.yml) and zizmor's audit of the workflows (zizmor.yml) run from here for a pull request that changes
 # what they read (item 1189), so that `ci` waits for them, and from their own workflows for a push to main.
 #
@@ -26,7 +27,14 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
+    # Everything but prose; a later pattern wins, so docs/freedom.md runs it.
+    paths:
+      - "**"
+      - "!*.md"
+      - "!docs/**"
+      - "docs/freedom.md"
+      - "!.github/ISSUE_TEMPLATE/**"
+      - "!.github/pull_request_template.md"
   # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457), the core
   # of the browser tests with it (item 486); a call ignores the paths above, so the gate always runs whole there.
   workflow_call:
@@ -95,6 +103,8 @@ jobs:
               continue
             fi
             case "$file" in
+              # docs/freedom.md is read by a test (tests/unit/test_freedom_contract.py): it is not prose alone here.
+              docs/freedom.md) prose=false ;;
               # The push filter's `docs/**` and templates first: `*.md` below would catch a file under docs/ too, and
               # it takes the root only.
               docs/*|.github/ISSUE_TEMPLATE/*|.github/pull_request_template.md) ;;
@@ -156,15 +166,17 @@ jobs:
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           uv run pytest tests/unit -q -n auto -p no:cacheprovider
 
-  # What of this pull request can affect a browser part, the desktop shell and the workflows. A push and a release do
-  # not ask: they run every browser part, and desktop.yml and zizmor.yml run on their own for a push that changes what
-  # they read. When the answer cannot be read, everything runs, which is the failure that still tests the change.
+  # What of this pull request can affect the macOS jobs of the gate, a browser part, the desktop shell and the
+  # workflows. A push and a release do not ask: they run every browser part, and desktop.yml and zizmor.yml run on
+  # their own for a push that changes what they read. When the answer cannot be read, everything runs, which is the
+  # failure that still tests the change.
   changes:
     needs: [prose]
     if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prose.outputs.prose_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      python: ${{ steps.decide.outputs.python }}
       browser: ${{ steps.decide.outputs.browser }}
       desktop: ${{ steps.decide.outputs.desktop }}
       workflows: ${{ steps.decide.outputs.workflows }}
@@ -173,7 +185,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
-      - name: Which files run the browser parts, the desktop checks and zizmor
+      - name: Which files run the gate's macOS jobs, the browser parts, the desktop checks and zizmor
         id: decide
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -183,21 +195,22 @@ jobs:
               echo "browser=$1"
               echo "desktop=$2"
               echo "workflows=$3"
+              echo "python=$4"
             } >> "$GITHUB_OUTPUT"
           }
           if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
             echo "the base is not a sha; everything runs"
-            decide true true true
+            decide true true true true
             exit 0
           fi
           if ! git fetch --no-tags --depth=1 origin "$BASE"; then
             echo "the base could not be fetched; everything runs"
-            decide true true true
+            decide true true true true
             exit 0
           fi
           if ! files="$(git diff --name-only --no-renames "$BASE" HEAD)"; then
             echo "the changed files could not be listed; everything runs"
-            decide true true true
+            decide true true true true
             exit 0
           fi
           # The desktop checks read desktop/ and their workflow, which the gate calls; zizmor reads all of .github/.
@@ -210,21 +223,36 @@ jobs:
             workflows=true
           fi
           echo "desktop: $desktop, workflows: $workflows"
+          # The gate's macOS jobs (scripts/python_ci.py): skipped only when every file is one nothing of them reads.
+          if ! python="$(printf '%s\n' "$files" | python3 scripts/python_ci.py)"; then
+            echo "the gate's macOS jobs: their check failed, so they run"
+            python=true
+          elif [[ "$python" != "true" && "$python" != "false" ]]; then
+            echo "the gate's macOS jobs: their check gave no answer ($python), so they run"
+            python=true
+          else
+            echo "the gate's macOS jobs: $python"
+          fi
           if ! answer="$(printf '%s\n' "$files" | python3 scripts/browser_ci.py)"; then
             echo "the path check failed; the browser parts run"
-            decide true "$desktop" "$workflows"
+            decide true "$desktop" "$workflows" "$python"
             exit 0
           fi
           if [[ "$answer" != "true" && "$answer" != "false" ]]; then
             echo "the path check gave no answer; the browser parts run"
-            decide true "$desktop" "$workflows"
+            decide true "$desktop" "$workflows" "$python"
             exit 0
           fi
-          decide "$answer" "$desktop" "$workflows"
+          decide "$answer" "$desktop" "$workflows" "$python"
 
   gate:
-    needs: [prose]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
+    # A pull request whose files nothing of this job reads skips it (scripts/python_ci.py); a decision that failed
+    # runs it.
+    needs: [prose, changes]
+    if: >-
+      ${{ !cancelled() && (github.event_name != 'pull_request'
+      || needs.prose.outputs.prose_only != 'true'
+      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}
     runs-on: macos-latest
     timeout-minutes: 30
     env:
@@ -249,8 +277,13 @@ jobs:
 
   smoke:
     name: gate (part 2)
-    needs: [prose]
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}
+    # A pull request whose files nothing of this job reads skips it (scripts/python_ci.py); a decision that failed
+    # runs it.
+    needs: [prose, changes]
+    if: >-
+      ${{ !cancelled() && (github.event_name != 'pull_request'
+      || needs.prose.outputs.prose_only != 'true'
+      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}
     runs-on: macos-latest
     # Room for one retry of the smoke tests below. A second failure still ends the job, inside this bound.
     timeout-minutes: 50
