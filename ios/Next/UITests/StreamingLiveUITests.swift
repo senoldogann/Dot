@@ -40,7 +40,8 @@ final class StreamingLiveUITests: XCTestCase {
         XCTAssertTrue(pencil.waitForExistence(timeout: 20))
         pencil.tap()
         type(app, "Say hello for the new chat")
-        let mine: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "You: Say hello for the new chat")).firstMatch
+        // By its start: on a loaded Mac the simulator's keyboard can drop the last letters typed.
+        let mine: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "You: Say hello")).firstMatch
         XCTAssertTrue(mine.waitForExistence(timeout: 10), "the new chat opens with the owner's message")
         let starting: CGRect = mine.frame
         // The daemon's answer comes in the same screen: the chat became the real one and was never left.
