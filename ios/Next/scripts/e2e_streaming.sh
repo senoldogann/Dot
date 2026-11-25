@@ -13,7 +13,8 @@ only=${3:-}
 video=${4:-}
 here=$(cd "$(dirname "$0")" && pwd)
 ios=$(dirname "$(dirname "$here")")
-port=18794
+# A free port the system picks: a fixed one was taken at times by other checks on the same Mac.
+port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
 t=$(mktemp -d)
 log="$t/daemon.log"
 DOT_HOME="$t/home" DOT_LOG_DIR="$t/logs" DOT_CHROME_DIR="$t/chrome" \
