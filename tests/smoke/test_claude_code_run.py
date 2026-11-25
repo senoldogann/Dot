@@ -387,9 +387,14 @@ async def test_a_model_given_a_tool_that_is_not_dots_ends_the_run_failed_at_once
 
 
 async def test_a_used_up_plan_ends_the_run_failed_with_when_it_resets(room: Room) -> None:
-    ended: RunRecord = await _run(room, "Hit the limit.")
+    """Item 1762: the run's line in the daemon's log is a warning, not an error: the plan's window is no defect of
+    Dot's, and the repair night reads the log's errors as defects."""
+    with capture_logs() as logs:
+        ended: RunRecord = await _run(room, "Hit the limit.")
     assert ended.status == "failed"
     assert "usage limit is reached (five hour window)" in ended.result and "resets at 2030-" in ended.result
+    (failed,) = [line for line in logs if line["event"] == "run failed"]
+    assert failed["log_level"] == "warning" and failed["kind"] == "plan_limit", failed
 
 
 async def test_a_chat_whose_run_did_not_end_clean_starts_a_new_session(room: Room) -> None:
