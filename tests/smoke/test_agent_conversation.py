@@ -372,6 +372,11 @@ async def test_a_phone_opens_an_agent_as_a_chat_and_goes_back_to_the_chats(
             held.set()
             top: Locator = page.locator("main .agent-top")
             await expect(page.get_by_role("textbox", name="Message")).to_be_visible()
+            # The row above the face takes half of what the face's height leaves, once the page measured it (a resize
+            # observer's, at the next frame): read before, the face stood half its height lower (the nightly run).
+            await expect(page.locator("main .agent-home")).to_have_attribute(
+                "style", re.compile(r"--home-start-h: [1-9]")
+            )
             box = await top.bounding_box()
             bar = await page.locator(".stagebar").bounding_box()
             assert box is not None and bar is not None

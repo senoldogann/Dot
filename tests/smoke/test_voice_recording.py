@@ -18,6 +18,7 @@ import asyncio
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -43,6 +44,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.voice.helper import Transcriber
 from dotagent.voice.toolchain import NO_COMPILER
 from dotagent.voice.wav import RECORDING_RATE, TAIL_SECONDS
 
@@ -243,10 +245,12 @@ async def address(runtime: Runtime) -> AsyncIterator[str]:
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
-async def address_without_tools(runtime: Runtime) -> AsyncIterator[str]:
+async def address_without_tools(runtime: Runtime, tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[str]:
     """A second daemon, for the tests of a Mac that cannot write down: the first remembers a compiler it found for its
-    life, and this one never finds one, as no test that uses it gives the Mac a compiler."""
-    async with _serving(runtime) as served:
+    life, and this one never finds one, as no test that uses it gives the Mac a compiler. The transcriber is the
+    runtime's (item 1212), which remembers the compiler, so this daemon is given one of its own."""
+    own: Runtime = replace(runtime, transcriber=Transcriber(tmp_path_factory.mktemp("voice")))
+    async with _serving(own) as served:
         yield served
 
 

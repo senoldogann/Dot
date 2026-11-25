@@ -308,9 +308,9 @@ async def test_slash_loop_in_a_new_chat_starts_it_with_its_loop(tmp_path: Path) 
 
 @pytest.mark.browser
 async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_stops(tmp_path: Path) -> None:
-    """Item 580: a chat with a loop wears its mark at the foot of its creature in the sidebar, turning slowly in a glow
-    that breathes (still under reduced motion), and its row says the loop to a screen reader; the loop stopped, the mark
-    goes without the page being read again. A chat without a loop wears none."""
+    """Item 580: a chat with a loop wears its mark in the sidebar, a small still line icon before the last words of
+    its row (item 1327), and its row says the loop to a screen reader; the loop stopped, the mark goes without the page
+    being read again. A chat without a loop wears none."""
     turns: tuple[ScriptedTurn, ...] = tuple(_finish(f"Answer {number}.") for number in range(1, 6))
     async with _daemon(turns) as (manager, address), async_playwright() as playwright:
         run: RunRecord = await _first_run(manager)
@@ -339,42 +339,17 @@ async def test_a_looping_chat_wears_the_loop_mark_in_the_sidebar_until_its_loop_
                 )
                 mark: Locator = looping.locator(".side-loop")
                 await expect(mark).to_have_attribute("title", re.compile(r"^Loops every 30 minutes, next (\w{3} )?\d"))
-                face = await looping.locator(".side-face .avatar").bounding_box()
+                # A small line icon on the row's last line, before its last words, standing still (item 1327).
+                await expect(looping.locator(".side-chat-last .side-loop")).to_have_count(1)
                 badge = await mark.bounding_box()
-                assert face is not None and badge is not None
-                # At the creature's foot, on its right.
-                assert badge["x"] + badge["width"] > face["x"] + face["width"] - 1
-                assert badge["y"] + badge["height"] > face["y"] + face["height"] - 1
-                # Its glow breathes in a layer of its own whose opacity changes, which the compositor draws; the mark's
-                # own shadow stays still, as a shadow that changed was drawn again on every frame (item 645).
-                glow: dict[str, str] = await mark.evaluate(
-                    "node => { const after = getComputedStyle(node, '::after'); return { own: getComputedStyle(node)"
-                    ".animationName, name: after.animationName, frames: [...document.getAnimations()].filter((one) =>"
-                    " one.animationName === 'loop-glow').flatMap((one) => one.effect.getKeyframes()).flatMap((frame) =>"
-                    " Object.keys(frame)).filter((key) => !['offset', 'easing', 'composite', 'computedOffset']"
-                    ".includes(key)).join() }; }"
+                words = await looping.locator(".side-chat-words").bounding_box()
+                assert badge is not None and words is not None
+                assert badge["x"] + badge["width"] <= words["x"] + 1, (badge, words)
+                assert abs((badge["y"] + badge["height"] / 2) - (words["y"] + words["height"] / 2)) <= 2, (badge, words)
+                still: list[str] = await mark.evaluate(
+                    "node => [getComputedStyle(node).animationName, getComputedStyle(node, '::after').animationName]"
                 )
-                assert glow["own"] == "none", glow
-                assert glow["name"] == ("none" if motion == "reduce" else "loop-glow"), glow
-                assert motion == "reduce" or set(glow["frames"].split(",")) == {"opacity"}, glow
-                if motion != "reduce":
-                    # While Dot's window is not the one in front its glow stands still, and moves again once it is
-                    # (item 662). The browser here is always in front, so the page is told it is not.
-                    states: str = (
-                        "() => [...document.getAnimations()].filter((one) => one.animationName === 'loop-glow')"
-                        ".map((one) => one.playState).join()"
-                    )
-                    assert await page.evaluate(states) == "running"
-                    await page.evaluate(
-                        "() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); }"
-                    )
-                    await expect(page.locator("html")).to_have_attribute("data-away", "")
-                    assert await page.evaluate(states) == "paused"
-                    await page.evaluate(
-                        "() => { document.hasFocus = () => true; window.dispatchEvent(new Event('focus')); }"
-                    )
-                    await expect(page.locator("html")).not_to_have_attribute("data-away", "")
-                    assert await page.evaluate(states) == "running"
+                assert still == ["none", "none"], still
                 await sidebar.screenshot(path=tmp_path / f"loop-mark-{scheme}.png")
                 # While chats are chosen for deletion, the row keeps the mark, ticked or not (item 635).
                 await sidebar.get_by_role("button", name="Select", exact=True).click()

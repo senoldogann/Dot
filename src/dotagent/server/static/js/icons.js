@@ -473,6 +473,7 @@ const FRAMES = {
   arrowUpDown: [0.99, 0.99, 22.02],
   badgeCheck: [-0.97, -0.97, 25.95],
   brain: [-0.97, -0.97, 25.95],
+  calendarClock: [-0.14, -0.64, 25.29],
   check: [3.27, 2.77, 17.45],
   circleDashed: [-0.97, -0.97, 25.95],
   clock: [-0.97, -0.97, 25.95],

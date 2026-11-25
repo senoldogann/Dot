@@ -191,6 +191,12 @@ test("a memory tool's result says which note it changed, and one that changed no
     change: "Forgot",
     words: "old words",
   });
+  const turnedOn = "memory_update is in the tool group memory_admin, which was off; the group is on now.\n\nUpdated: [mem_z] new";
+  assert.deepEqual(memoryChange({ kind: "memory_write", ok: true, text: turnedOn, summary: "" }, { content: "new" }), {
+    id: "mem_z",
+    change: "Updated",
+    words: "new",
+  });
   assert.equal(memoryChange({ kind: "memory_write", ok: true, text: "Already saved: [mem_x]", summary: "" }, {}), null);
   assert.equal(memoryChange({ kind: "file_write", ok: true, text: "Saved: [mem_x]", summary: "" }, {}), null);
 });
