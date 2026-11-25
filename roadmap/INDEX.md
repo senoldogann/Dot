@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1858](1858.md) | done | 2026-11-25 | The prompt surface Dot sends a model is checked in, and a change to it fails until the snapshot is updated |
 | [1857](1857.md) | done | 2026-11-25 | A maturity scorecard: when each feature was last proven on the real Mac, and a daily check of stale proofs |
 | [1856](1856.md) | done | 2026-11-25 | What a run and a task cost in dollars, estimated from a public price list, beside their tokens |
 | [1855](1855.md) | done | 2026-11-25 | A schedule or a watcher may run a check first, without a model, and wake one only when it says so |

@@ -62,6 +62,8 @@ MACOS_ONLY: tuple[str, ...] = (
     "test_harness_tool_parity.py",
     "test_imessage_channel.py",
     "test_live_screen.py",
+    # It renders every built-in tool's schema, the desktop's with it (item 1858).
+    "test_prompt_surface.py",
     "test_qr.py",
     "test_scaffold.py",
     "test_screen_text.py",
