@@ -9,7 +9,7 @@
 import { api, query } from "../api.js";
 import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { changesSection, orderControl, proposedSection, trashSection } from "../memorylife.js";
+import { changesSection, orderControl, proposedSection, trashSection, waitingSection } from "../memorylife.js";
 import { moreButton } from "../menu.js";
 import { emptyPanel, field, inlineError, inlineLoading, segmented, setCard, setRow, setSection } from "../panels.js";
 import { attempt, confirmDialog, formDialog, toast } from "../ui.js";
@@ -80,13 +80,23 @@ export function scoreLine(score) {
 // The agents by id, from the page, so a lesson can say whose it is.
 let agentNames = {};
 
-/** When a note was saved and by whom: "Saved 2h ago by a run" (the run's name leads to it), by the nightly reflection, or by you. */
+// Who saved a note, by its origin (item 1864), which Dot sets from the run that saved it: a note stored before origins
+// were kept, whose run is gone, has none and says "a task".
+const ORIGIN_TASKS = {
+  chat: "a task in a chat",
+  schedule: "a scheduled task",
+  watcher: "a watcher's task",
+  helper: "a helper task",
+  initiative: "Dot on its own",
+};
+
+/** When a note was saved and by whom: "Saved 2h ago by a scheduled task" (the task leads to its run), by the nightly reflection, or by you. */
 function savedLine(record) {
   const by =
-    record.source_run === "reflection"
+    record.origin === "reflection" || record.source_run === "reflection"
       ? " by the nightly reflection"
       : record.source_run
-        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, "a task")]
+        ? [" by ", el("a", { href: `#/runs/${record.source_run}` }, ORIGIN_TASKS[record.origin] ?? "a task")]
         : " by you";
   return el("span", { title: dateTimeFull(record.created_at) }, "Saved ", ago(record.created_at), by);
 }
@@ -737,10 +747,11 @@ export function mount(root, ctx) {
     },
   };
   const changes = changesSection(lifeHooks);
+  const waiting = waitingSection(lifeHooks);
   const proposed = proposedSection(lifeHooks);
   const trash = trashSection(lifeHooks);
   async function refreshLife() {
-    await Promise.all([changes.load(), proposed.load(), trash.load()]);
+    await Promise.all([changes.load(), waiting.load(), proposed.load(), trash.load()]);
   }
   const narrowing = segmented(FILTERS, filter, (id) => {
     filter = id;
@@ -881,7 +892,7 @@ export function mount(root, ctx) {
   learningSection.classList.add("learning-section");
 
   ctx.head.setLead("Notes Dot keeps between tasks. It recalls the ones that fit the task at hand.");
-  root.append(asked, el("div", { class: "set-sections" }, composer, changes.element, proposed.element, notesSection, trash.element, ownerSection, learningSection));
+  root.append(asked, el("div", { class: "set-sections" }, composer, changes.element, waiting.element, proposed.element, notesSection, trash.element, ownerSection, learningSection));
   attempt(reload);
   attempt(refreshLife);
   attempt(loadAsked);

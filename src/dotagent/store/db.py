@@ -97,6 +97,7 @@ from dotagent.store.models import (
     MeetingRecord,
     MeetingStatus,
     MemoryOrder,
+    MemoryOrigin,
     MemoryRecord,
     MemoryRewrite,
     MemoryScore,
@@ -146,6 +147,7 @@ from dotagent.store.models import (
     WorkOrderRecord,
     WorkOrderStatus,
 )
+from dotagent.store.provenance import note_origin
 from dotagent.store.revisions import COUNTER_KEY as REVISION_COUNTER_KEY
 from dotagent.store.revisions import DELETED_END, DELETED_PREFIX, bump_statements, revision_statements
 from dotagent.store.stats import (
@@ -1204,6 +1206,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         edited_by=row["edited_by"],
         proposed=_proposed_change(row),
         subject=row["subject"],
+        origin=row["origin"],
     )
 
 
@@ -1394,6 +1397,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     # The subject a run gave a note when it saved it (item 1729): a newer note of the same subject replaces it. NULL for
     # a note saved with none, and for every note stored before the column.
     ("subject", "TEXT"),
+    # Where the note came from (item 1864, :mod:`dotagent.store.provenance`). Filled once, as the column is added, for
+    # the notes whose run is still stored; NULL for the others.
+    ("origin", "TEXT"),
 )
 # The kv key of the lessons ``auto`` saved lately (item 1713), a JSON list of ``LessonSave``.
 _LESSON_SAVES_KEY: str = "lessons.saved"
@@ -1513,11 +1519,31 @@ async def _add_columns(
     return missing
 
 
+async def _fill_origins(connection: aiosqlite.Connection) -> None:
+    """Give every note the origin its run says (item 1864), once, as the column is added: the owner's, the
+    reflection's, and the origin of each run still stored; a note whose run is gone keeps NULL."""
+    async with connection.execute(
+        "SELECT memories.id AS id, memories.source_run AS source_run, runs.source AS source,"
+        " runs.parent_run_id AS parent_run_id, runs.id IS NOT NULL AS has_run"
+        " FROM memories LEFT JOIN runs ON runs.id = memories.source_run"
+    ) as cursor:
+        rows = await cursor.fetchall()
+    filled: list[tuple[str, str]] = []
+    for row in rows:
+        run: tuple[str, str | None] | None = (str(row["source"]), row["parent_run_id"]) if row["has_run"] else None
+        origin: MemoryOrigin | None = note_origin(row["source_run"], run)
+        if origin is not None:
+            filled.append((origin, str(row["id"])))
+    await connection.executemany("UPDATE memories SET origin = ? WHERE id = ?", filled)
+
+
 async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     """Give a database created by an older version the columns added since, and the indexes on them, each only where it
     is missing: at every open, inside the migration's transaction (:func:`_migrate`)."""
     added_to_runs: tuple[str, ...] = await _add_columns(connection, "runs", _ADDED_RUN_COLUMNS)
-    await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
+    added_to_memories: tuple[str, ...] = await _add_columns(connection, "memories", _ADDED_MEMORY_COLUMNS)
+    if "origin" in added_to_memories:
+        await _fill_origins(connection)
     # Whether the run's answer or calls echoed a note it was handed (item 1715): NULL until it ends, and before.
     await _add_columns(connection, "memory_uses", (("echoed", "INTEGER"),))
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
@@ -6450,6 +6476,20 @@ class Store:
 
         return await self._unit(statements)
 
+    async def origin_of_run(self, run_id: str) -> MemoryOrigin | None:
+        """The origin the notes run ``run_id`` saves now would have (item 1864): ``None`` for a run the store does not
+        hold."""
+        return await self._note_origin(run_id)
+
+    async def _note_origin(self, source_run: str | None) -> MemoryOrigin | None:
+        """The origin of a note ``source_run`` saves now (:func:`note_origin`), from that run as the store holds it."""
+        run: aiosqlite.Row | None = (
+            None
+            if source_run is None
+            else await self._one("SELECT source, parent_run_id FROM runs WHERE id = ?", (source_run,))
+        )
+        return note_origin(source_run, None if run is None else (str(run["source"]), run["parent_run_id"]))
+
     async def _insert_memory(
         self,
         content: str,
@@ -6460,8 +6500,10 @@ class Store:
         expires_at: float | None,
         tainted: bool,
     ) -> MemoryRecord:
-        """The statements that add a note, in the caller's transaction."""
+        """The statements that add a note, in the caller's transaction; its origin is read from ``source_run``
+        (:func:`note_origin`)."""
         now: float = time.time()
+        origin: MemoryOrigin | None = await self._note_origin(source_run)
         record: MemoryRecord = MemoryRecord(
             id=new_id("mem"),
             content=content,
@@ -6475,12 +6517,13 @@ class Store:
             expires_at=expires_at,
             replaced_by=None,
             tainted=tainted,
+            origin=origin,
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
             "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
-            " tainted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at, int(tainted)),
+            " tainted, origin) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at, int(tainted), origin),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -6565,6 +6608,33 @@ class Store:
         )
         return await self._rewrite_memory(memory_id, content, tags, vector, record.source_run, "?", 0, OWNER_EDIT, None)
 
+    @_writing
+    async def propose_memory_change(
+        self, memory_id: str, content: str, tags: Sequence[str], source_run: str, tainted: bool
+    ) -> MemoryRecord:
+        """Keep a run's rewrite of note ``memory_id`` beside it as the change proposed to the owner, whoever wrote the
+        note (item 1865: a scheduled task, a watcher's task or a helper changes no note on its own); the note stays."""
+        updated = await self._db.execute(
+            "UPDATE memories SET proposed_content = ?, proposed_tags = ?, proposed_by = ?, proposed_tainted = ?,"
+            " proposed_at = ? WHERE id = ?",
+            (content, ",".join(tags), source_run, int(tainted), time.time(), memory_id),
+        )
+        if updated.rowcount == 0:
+            raise NotFoundError("memory not found", {"memory_id": memory_id})
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    async def runs_with_events_since(self, kinds: Sequence[str], since: float, limit: int) -> list[str]:
+        """The ids of the runs that have an event of any of ``kinds`` at ``since`` or later, the one of the newest such
+        event first, at most ``limit`` (the ``events_kind_ts`` index reads them)."""
+        marks: str = ",".join("?" * len(kinds))
+        rows = await self._all(
+            f"SELECT run_id, MAX(id) AS newest FROM events WHERE kind IN ({marks}) AND ts >= ?"
+            " GROUP BY run_id ORDER BY newest DESC LIMIT ?",
+            (*kinds, since, limit),
+        )
+        return [str(row["run_id"]) for row in rows]
+
     async def memories_with_proposals(self, limit: int) -> list[MemoryRecord]:
         """The notes a run proposed a change of that waits for the owner, the newest proposal first."""
         rows = await self._all(
@@ -6603,11 +6673,14 @@ class Store:
         ``new_expiry`` when it now stops holding (``None`` keeps the time it had; the owner's note and a pinned one
         keep theirs, read as they stand before this statement writes ``source_run``)."""
         tag_text: str = ",".join(tags)
+        # A rewrite by another run makes the words that run's, and the note takes its origin (item 1864); the same
+        # author's rewrite, the owner's correction among them, keeps the origin the note has.
+        origin: MemoryOrigin | None = await self._note_origin(source_run)
         updated = await self._db.execute(
             f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark},"
             " edited_by = ?, expires_at = CASE WHEN pinned_at IS NOT NULL OR source_run IS NULL THEN expires_at"
-            " ELSE COALESCE(?, expires_at) END WHERE id = ?",
-            (content, tag_text, time.time(), source_run, tainted, edited_by, new_expiry, memory_id),
+            " ELSE COALESCE(?, expires_at) END, origin = CASE WHEN source_run IS ? THEN origin ELSE ? END WHERE id = ?",
+            (content, tag_text, time.time(), source_run, tainted, edited_by, new_expiry, source_run, origin, memory_id),
         )
         if updated.rowcount == 0:
             # The note was deleted while its rewrite waited on the embedding (item 556): nothing of it is written, as
@@ -6893,7 +6966,8 @@ class Store:
             tag_text: str = ",".join(tags)
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
-                " tainted, used_count, last_used_at, merged_from) VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)",
+                " tainted, used_count, last_used_at, merged_from, origin)"
+                " VALUES(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)",
                 (
                     merged_id,
                     kept.content,
@@ -6906,6 +6980,7 @@ class Store:
                     sum(note.used_count for note in ordered),
                     max(used) if used else None,
                     _MERGED_SOURCES.dump_json(tuple(_merged_source(note) for note in ordered)).decode(),
+                    kept.origin,
                 ),
             )
             await self._db.execute(
@@ -7021,7 +7096,7 @@ class Store:
             await self._db.execute(
                 "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, used_count,"
                 " last_used_at, expires_at, replaced_by, tainted, merged_into, merged_from, pinned_at, rested_at,"
-                " edited_by, subject) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?)",
+                " edited_by, subject, origin) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, NULL, ?, ?, ?)",
                 (
                     record.id,
                     record.content,
@@ -7038,6 +7113,7 @@ class Store:
                     record.pinned_at,
                     record.edited_by,
                     record.subject,
+                    record.origin,
                 ),
             )
             await self._db.execute(
@@ -7155,6 +7231,16 @@ class Store:
         """The notes run ``run_id`` was handed so far, however it was handed them (item 308)."""
         rows = await self._all("SELECT DISTINCT memory_id FROM memory_uses WHERE run_id = ?", (run_id,))
         return {str(row["memory_id"]) for row in rows}
+
+    async def handed_memories(self, run_id: str) -> list[MemoryRecord]:
+        """The notes run ``run_id`` was handed so far that are still kept, however it was handed them, the first handed
+        first: what recall put into its context (item 1866)."""
+        rows = await self._all(
+            "SELECT memories.* FROM memories JOIN (SELECT memory_id, MIN(handed_at) AS first FROM memory_uses"
+            " WHERE run_id = ? GROUP BY memory_id) AS handed ON handed.memory_id = memories.id ORDER BY handed.first",
+            (run_id,),
+        )
+        return [_memory(row) for row in rows]
 
     async def handed_in_thread(self, thread_id: str, run_id: str) -> set[str]:
         """The notes the runs of thread ``thread_id`` other than ``run_id`` were handed, however they were handed them:

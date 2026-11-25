@@ -26,6 +26,7 @@ from collections.abc import Set
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
+from dotagent.memory.echo import recalled_echo
 from dotagent.memory.service import (
     JOURNAL_TAG,
     REST_TAG,
@@ -217,3 +218,10 @@ async def save_replacing(
         update={"record": newer, "similar": tuple(hit for hit in saved.similar if hit.record.id not in gone)}
     )
     return Replacing(saved=shown, replaced=tuple(replaced), kept=tuple(kept))
+
+
+async def handed_echo(index: MemoryIndex, run_id: str, content: str) -> MemoryRecord | None:
+    """The note recall handed run ``run_id`` whose words ``content`` is, or holds whole (:func:`recalled_echo`, item
+    1866): a save of it would write recall's own text back as a new note, or wake and re-assert an older fact a newer
+    note replaced since. ``None`` when ``content`` is new to the run."""
+    return recalled_echo(content, await index.store.handed_memories(run_id))
