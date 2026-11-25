@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import regex
 from fastapi import APIRouter, Query, Request
 
+from dotagent.agent.held_notes import WaitingProposal, waiting_proposals
 from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
@@ -390,7 +391,25 @@ def memories_router(ctx: ServerContext) -> APIRouter:
         """The owner's notes a run proposed a change of that waits for them, the newest proposal first."""
         return await index.store.memories_with_proposals(_MOST_PROPOSALS)
 
-    # After the routes above: "owner", "learning", "search" and "proposed" are not ids.
+    @router.get("/memories/waiting")
+    async def waiting_to_remember() -> list[WaitingProposal]:
+        """What scheduled tasks, watchers' tasks and helpers proposed to remember, and the lessons that wait, for the
+        owner to save or dismiss (item 1865), the newest run first."""
+        return await waiting_proposals(index.store, time.time())
+
+    @router.post("/memories/waiting/{run_id}/{index}/save")
+    async def save_waiting_note(run_id: str, index: int) -> list[WaitingProposal]:
+        """Save a note a run held for the owner, as the run would have saved it (409 when it was decided already)."""
+        await ctx.manager.save_held_note(run_id, index)
+        return await waiting_proposals(ctx.runtime.store, time.time())
+
+    @router.post("/memories/waiting/{run_id}/{index}/dismiss")
+    async def dismiss_waiting_note(run_id: str, index: int) -> list[WaitingProposal]:
+        """Dismiss a note a run held for the owner: it is not saved (409 when it was decided already)."""
+        await ctx.manager.dismiss_held_note(run_id, index)
+        return await waiting_proposals(ctx.runtime.store, time.time())
+
+    # After the routes above: "owner", "learning", "search", "proposed" and "waiting" are not ids.
     @router.get("/memories/{memory_id}")
     async def get_memory(memory_id: str) -> MemoryRecord:
         return await index.store.get_memory(memory_id)

@@ -302,6 +302,18 @@ dotx memory reindex      # embed every note again, for example after changing [m
   ("Saved 2 hours ago by a scheduled task") and the notes' API carries it. A note stored before item 1864 got its
   origin from its run where the run is still stored; where it is gone (the runs are kept for a time and notes for
   longer: 1,083 of the owner's 1,272 notes on 2026-11-25), it has none and says "a task".
+- A scheduled task, a watcher's task (a watched item, a reply to a mail) and a helper task another task started write no
+  lasting note on their own (item 1865): nobody watches them as they work. Their `memory_save` keeps the note on the
+  task, with its tags, subject and time, and answers that it waits for you; their `memory_update` waits beside the note
+  as the change proposed, as a task's change of your own note does; and the lessons drawn from them stay proposed
+  whatever `[agent] lessons` says. **Notes tasks proposed** on the Memory page (`GET /api/memories/waiting`) lists what
+  waits from the last 30 days, the notes and the lessons, each with Save (`POST
+  /api/memories/waiting/<run>/<index>/save`, or the lesson's own Save) and Dismiss; a saved note is written as the task
+  would have written it, unmarked, since you read it. No other task is handed it before. Nothing is asked or refused
+  that was not before: the calls are classified and approved as they were, in `yolo` and free mode too. Why proposals
+  and not nothing: on the owner's Mac on 2026-11-25 the 39 notes of scheduled tasks included some of the most used
+  lessons (a webmail's routes handed 46 and 34 times, LinkedIn's 31, 24 and 22), and all 282 lesson decisions stored
+  were made by `auto`, none on a task's page, so the proposals wait where you look at notes rather than on the task.
 - Saving a note close to an existing one (`similar_threshold`) tells the model the notes that remain, which decides
   whether the old note is outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"

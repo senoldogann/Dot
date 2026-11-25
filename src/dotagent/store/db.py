@@ -6476,6 +6476,11 @@ class Store:
 
         return await self._unit(statements)
 
+    async def origin_of_run(self, run_id: str) -> MemoryOrigin | None:
+        """The origin the notes run ``run_id`` saves now would have (item 1864): ``None`` for a run the store does not
+        hold."""
+        return await self._note_origin(run_id)
+
     async def _note_origin(self, source_run: str | None) -> MemoryOrigin | None:
         """The origin of a note ``source_run`` saves now (:func:`note_origin`), from that run as the store holds it."""
         run: aiosqlite.Row | None = (
@@ -6602,6 +6607,33 @@ class Store:
             (memory_id,),
         )
         return await self._rewrite_memory(memory_id, content, tags, vector, record.source_run, "?", 0, OWNER_EDIT, None)
+
+    @_writing
+    async def propose_memory_change(
+        self, memory_id: str, content: str, tags: Sequence[str], source_run: str, tainted: bool
+    ) -> MemoryRecord:
+        """Keep a run's rewrite of note ``memory_id`` beside it as the change proposed to the owner, whoever wrote the
+        note (item 1865: a scheduled task, a watcher's task or a helper changes no note on its own); the note stays."""
+        updated = await self._db.execute(
+            "UPDATE memories SET proposed_content = ?, proposed_tags = ?, proposed_by = ?, proposed_tainted = ?,"
+            " proposed_at = ? WHERE id = ?",
+            (content, ",".join(tags), source_run, int(tainted), time.time(), memory_id),
+        )
+        if updated.rowcount == 0:
+            raise NotFoundError("memory not found", {"memory_id": memory_id})
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    async def runs_with_events_since(self, kinds: Sequence[str], since: float, limit: int) -> list[str]:
+        """The ids of the runs that have an event of any of ``kinds`` at ``since`` or later, the one of the newest such
+        event first, at most ``limit`` (the ``events_kind_ts`` index reads them)."""
+        marks: str = ",".join("?" * len(kinds))
+        rows = await self._all(
+            f"SELECT run_id, MAX(id) AS newest FROM events WHERE kind IN ({marks}) AND ts >= ?"
+            " GROUP BY run_id ORDER BY newest DESC LIMIT ?",
+            (*kinds, since, limit),
+        )
+        return [str(row["run_id"]) for row in rows]
 
     async def memories_with_proposals(self, limit: int) -> list[MemoryRecord]:
         """The notes a run proposed a change of that waits for the owner, the newest proposal first."""

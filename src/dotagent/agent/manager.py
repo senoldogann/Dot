@@ -38,6 +38,7 @@ from dotagent.agent.campaign import (
     sessions_without_progress,
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
+from dotagent.agent.held_notes import dismiss_held_note, save_held_note
 from dotagent.agent.helper_reports import (
     HELPER_RELEASED_EVENT,
     HELPER_RESUMED_EVENT,
@@ -168,6 +169,7 @@ from dotagent.llm.types import (
 )
 from dotagent.memory.echo import echoed_notes
 from dotagent.memory.service import REFLECTION_SOURCE, SavedMemory
+from dotagent.memory.supersede import Replacing
 from dotagent.notify.owner import tell_owner
 from dotagent.opencode.run import run_in_opencode
 from dotagent.policy.types import ApprovalMode
@@ -3096,6 +3098,15 @@ class RunManager:
     async def undo_lesson(self, run_id: str, index: int) -> bool:
         """Take back the save of a lesson of a run (see :func:`dotagent.agent.lessons.undo_lesson`)."""
         return await undo_lesson(self._runtime, self._deciding, run_id, index)
+
+    async def save_held_note(self, run_id: str, index: int) -> Replacing:
+        """Save a note a scheduled task, a watcher's task or a helper held for the owner (item 1865, see
+        :func:`dotagent.agent.held_notes.save_held_note`)."""
+        return await save_held_note(self._runtime, self._deciding, run_id, index)
+
+    async def dismiss_held_note(self, run_id: str, index: int) -> None:
+        """Dismiss a note a run held for the owner (see :func:`dotagent.agent.held_notes.dismiss_held_note`)."""
+        await dismiss_held_note(self._runtime, self._deciding, run_id, index)
 
     async def propose_lesson(self, run_id: str, words: str) -> LessonView:
         """Propose a lesson from the owner's words about a run, to wait on the run's page for Save or Dismiss (item 584,
