@@ -27,6 +27,13 @@ from dotagent.tools.third_party import mentions_third_party
 _HEAD_BYTES: int = 64 * 1024
 _TAIL_BYTES: int = 192 * 1024
 _DRAIN_GRACE_S: float = 0.4
+# The sentence of the description that sends a long command to terminal_open's background; a run no chat is told of its
+# end in is offered neither (``dotagent.tools.terminal.chatless_specs``, item 1760).
+BACKGROUND_HINT: str = (
+    " A command that ends by itself but takes minutes (an eval, a long build or install) goes to terminal_open with "
+    "background when it would run past timeout_s, or when there is other work to do meanwhile: this chat is told when "
+    "it ends, and you read its output then."
+)
 _FIXED_ENV: dict[str, str] = {
     # Tells dotx that a run started the command, so that it does not restart the daemon under the run (item 441).
     RUN_SHELL_MARKER: "1",
@@ -244,15 +251,12 @@ def build_shell_tool() -> RegisteredTool:
             "new file or one written whole: their changes go into the undo journal, show in Changes and can be "
             "undone, while what a command writes (sed -i, a heredoc, a script) cannot. Output is capped: filter with "
             "grep/head/tail/jq. Start long-running servers in the background (nohup cmd > log 2>&1 &); wait with "
-            "wait_until (command, url or file; every_s, within_minutes), not sleep."
-            " A command that ends by itself but takes minutes (an eval, a long build or install) goes to "
-            "terminal_open with background when it would run past timeout_s, or when there is other work to do "
-            "meanwhile: this chat is told when it ends, and you read its output then. Outside yolo, while the owner "
-            "keeps the sandbox on, the command runs in a macOS sandbox that keeps it out of Dot's own files, and "
-            "macOS starts no program that runs as root there (ps, top, sudo): use pgrep -lf and lsof instead of ps. "
-            "Nor does it open an app, a file or an address (open), start launchctl or shortcuts, or hand launchd a "
-            "job: desktop_open_app opens an app. Restart Dot's daemon with dotx service restart --when-idle (where it "
-            "cannot run, tell the user), never with a launchd job of your own."
+            f"wait_until (command, url or file; every_s, within_minutes), not sleep.{BACKGROUND_HINT} Outside yolo, "
+            "while the owner keeps the sandbox on, the command runs in a macOS sandbox that keeps it out of Dot's own "
+            "files, and macOS starts no program that runs as root there (ps, top, sudo): use pgrep -lf and lsof "
+            "instead of ps. Nor does it open an app, a file or an address (open), start launchctl or shortcuts, or "
+            "hand launchd a job: desktop_open_app opens an app. Restart Dot's daemon with dotx service restart "
+            "--when-idle (where it cannot run, tell the user), never with a launchd job of your own."
         ),
         args_model=ShellArgs,
         modes=ACTING_MODES,

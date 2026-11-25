@@ -14,16 +14,19 @@ the step is theirs to run in a terminal of their own. A yolo run asks nothing an
 A command opened with ``background`` (item 229) runs on its own, past the shell's time limit and unread, and its end is
 told to its chat once: to the run at work there, at its next step, else in a run started for it (item 437). A run that
 read the end itself has been told; a delegated run and a campaign's session have no chat of their own to tell, and open
-none.
+none: they are not offered ``background`` (:func:`chatless_specs`, item 1760), and a call that sets it is refused.
 """
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, NoReturn
 
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from dotagent.core.errors import ToolInputError
 from dotagent.core.text import truncate_middle
+from dotagent.core.types import JsonObject
+from dotagent.llm.types import ToolSpec
 from dotagent.policy.paths import classify_path, expand_path
 from dotagent.policy.shell import ShellAssessment, assess_shell, assess_typed, typed_lines
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
@@ -40,6 +43,7 @@ from dotagent.tools.base import (
     ok,
 )
 from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.shell import BACKGROUND_HINT
 
 # How long terminal_open waits for the first output of the program.
 _OPEN_WAIT_S: float = 2.0
@@ -62,6 +66,31 @@ class OpenArgs(ToolArgs):
             "program you type into, nor a server."
         ),
     )
+
+
+def tells_no_chat(run: RunRecord) -> bool:
+    """Whether ``run`` has no chat of its own that the end of a command in the background would be told to: a delegated
+    run and a campaign's session."""
+    return run.parent_run_id is not None or run.campaign_id is not None
+
+
+def chatless_specs(specs: Iterable[ToolSpec]) -> tuple[ToolSpec, ...]:
+    """``specs`` as a run that :func:`tells_no_chat` is offered them (item 1760): terminal_open without ``background``
+    and shell without the sentence that sends a long command there. Offered both, delegated runs on claude_code:sonnet
+    set it once each, 22 times on the owner's Mac, and each call was refused."""
+    return tuple(_chatless(spec) for spec in specs)
+
+
+def _chatless(spec: ToolSpec) -> ToolSpec:
+    if spec.name == "shell":
+        return spec.model_copy(update={"description": spec.description.replace(BACKGROUND_HINT, "")})
+    if spec.name != "terminal_open":
+        return spec
+    properties: JsonValue = spec.parameters["properties"]
+    if not isinstance(properties, dict):
+        raise TypeError(f"terminal_open's parameters have no properties object: {spec.parameters!r}")
+    kept: JsonObject = {name: value for name, value in properties.items() if name != "background"}
+    return spec.model_copy(update={"parameters": {**spec.parameters, "properties": kept}})
 
 
 class SendArgs(ToolArgs):
@@ -141,7 +170,7 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         cwd: Path = expand_path(args.cwd, ctx.workspace) if args.cwd else ctx.workspace
         if args.background:
             run: RunRecord = await ctx.runtime.store.get_run(ctx.run_id)
-            if run.parent_run_id is not None or run.campaign_id is not None:
+            if tells_no_chat(run):
                 raise ToolInputError(
                     "A command in the background is told to its chat when it ends, and a delegated run or a "
                     "campaign's session has none: run it with shell, or in a terminal session you read.",

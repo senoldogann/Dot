@@ -1,7 +1,10 @@
 """What a terminal session makes of a program's output, and of what is typed into it."""
 
+from dotagent.llm.types import ToolSpec
 from dotagent.policy.shell import typed_lines
 from dotagent.terminal.session import asks_for_secret, plain_text
+from dotagent.tools.shell import BACKGROUND_HINT, build_shell_tool
+from dotagent.tools.terminal import build_terminal_tools, chatless_specs
 
 
 def test_escape_sequences_leave_the_output_and_line_ends_become_newlines() -> None:
@@ -33,3 +36,18 @@ def test_keys_that_edit_the_line_count_and_keys_that_cannot_be_followed_leave_a_
     assert typed_lines("", "cat ~/.ss\t") == ((), None)
     assert None in typed_lines("", "echo rm -rf ~/x\x01\x1b[3~\n")[0]
     assert None in typed_lines("", "\x1b[A\n")[0]
+
+
+def test_a_run_no_chat_is_told_in_is_offered_no_command_in_the_background() -> None:
+    """Item 1760: delegated runs were offered terminal_open's background, set it, and were refused, 22 times."""
+    specs: tuple[ToolSpec, ...] = (
+        build_shell_tool().spec,
+        *(tool.spec for tool in build_terminal_tools()),
+    )
+    offered: dict[str, ToolSpec] = {spec.name: spec for spec in chatless_specs(specs)}
+    assert BACKGROUND_HINT in specs[0].description
+    assert "background" in str(specs[1].parameters["properties"])
+    assert "background" not in str(offered["terminal_open"].parameters)
+    assert "terminal_open with background" not in offered["shell"].description
+    assert offered["shell"].description.endswith("never with a launchd job of your own.")
+    assert offered["terminal_send"] == specs[2]
