@@ -137,8 +137,9 @@ class ReconArgs(ToolArgs):
         default="passive",
         description=(
             "`passive` reads the addresses, the TLS certificate, the HTTP answer and its headers, as a browser's visit "
-            "does. `ports` also asks which common ports answer, and reads their banners: only on a host listed in "
-            "[recon] owned_hosts, one you own or may test."
+            "does. `ports` also asks which common ports answer, and reads their banners: only on a host in "
+            "[recon] owned_hosts or in a scope of [recon] scopes — one you own, or one a bug bounty program or an "
+            "engagement allows you to test."
         ),
     )
 
@@ -220,6 +221,17 @@ def owned(host: str, owned_hosts: Sequence[str]) -> bool:
     nothing that only ends in the same letters (``notexample.com``)."""
     wanted: str = host.strip().lower().rstrip(".")
     return any(wanted == entry or wanted.endswith(f".{entry}") for entry in owned_hosts)
+
+
+def _refusal(host: str) -> str:
+    """What a call to a host no scope allows is answered with (item 1887): where to write the scope, and that a program
+    the owner is in counts."""
+    return (
+        f"{host} is in neither [recon] owned_hosts nor a scope of [recon] scopes, and the active audit runs only on a "
+        "host you own or one you may test. Add the domain to owned_hosts (it covers its subdomains), or add the scope "
+        "of the bug bounty program or engagement that covers it as [[recon.scopes]] with its program and hosts, and "
+        "run it again. The passive audit reads any public site."
+    )
 
 
 def _header(headers: Mapping[str, str], name: str) -> str:
@@ -607,11 +619,8 @@ async def _run(args: ReconArgs, ctx: ToolContext) -> ToolResult:
     if isinstance(parsed, str):
         return fail(parsed)
     target: Target = parsed
-    if args.depth == "ports" and not owned(target.host, ctx.runtime.config.recon.owned_hosts):
-        return fail(
-            f"{target.host} is not in [recon] owned_hosts, and ports are scanned only on a host you own or may test. "
-            "Add the domain there (it covers its subdomains), or run the passive audit instead."
-        )
+    if args.depth == "ports" and ctx.runtime.config.recon.authorising(target.host) is None:
+        return fail(_refusal(target.host))
     allow_private: bool = ctx.runtime.config.web.allow_private_hosts
     try:
         resolved: tuple[str, ...] = await checked_addresses(target.host, target.port, allow_private_hosts=allow_private)
@@ -654,6 +663,10 @@ async def _run(args: ReconArgs, ctx: ToolContext) -> ToolResult:
         findings.extend(_port_findings(ports))
     unique: tuple[str, ...] = tuple(dict.fromkeys(findings))[:_MAX_FINDINGS]
     report: str = _render(target, http_result, tls_result, addresses, tech, title, unique, ports, now)
+    authority: tuple[str, str] | None = ctx.runtime.config.recon.authorising(target.host)
+    if authority is not None and authority[0] != "owned":
+        program, note = authority
+        report = f"{report}\n\nScope: {program}{f' — {note}' if note else ''}"
     return mark_untrusted(ok(truncate_tail(report, ctx.output_chars)))
 
 
@@ -664,8 +677,8 @@ def build_recon_tool() -> RegisteredTool:
         description=(
             "Look at a site or a host the way a security engineer starts: its addresses, its TLS certificate, its HTTP "
             "answer and headers, and the technology it names, with what its owner should fix. With depth `ports` on a "
-            "host in [recon] owned_hosts, which ports answer and what their services say. It only reads: it sends no "
-            "payload and tries no exploit."
+            "host in [recon] owned_hosts or in a scope of [recon] scopes, which ports answer and what their services "
+            "say. It only reads: it sends no payload and tries no exploit."
         ),
         args_model=ReconArgs,
         modes=ALL_MODES,

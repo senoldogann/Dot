@@ -279,8 +279,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "was said in it, and a note to the run at work in one (agents_now, read_agent_chat, chats, read_chat, "
         "send_to_chat, search_chats)",
         "- replies: handing a reply to a mail Dot sent to the chat that sent it, where that work goes on (pass_reply)",
-        "- recon: a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check "
-        "(recon, security_scan)",
+        "- recon: a site or host you own, or one a registered scope lets you test: addresses, TLS, headers, "
+        "technology, open ports, and a form's payload check (recon, security_scan)",
         "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "
         "(show_page)",
         "- appearance: read or change Dot’s theme when the owner asks (theme_read, theme_apply, theme_undo)",

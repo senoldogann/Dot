@@ -26,14 +26,29 @@ names its version is a finding, and whether that version has a known bug is a qu
 
 **`ports`** adds a TCP connect to the 34 usual public services (ftp, ssh, smtp, http, https, smb, imap, mysql,
 postgresql, redis, mongodb, rdp, vnc, elasticsearch and the rest) and reads the banner of the ones that greet first.
-It runs **only on a host in `[recon] owned_hosts`**: scanning a host is not reading a page, and the one who runs it must
-be the one who may.
+It runs **only on a host in `[recon] owned_hosts` or in a scope of `[recon] scopes`**: scanning a host is not reading a
+page, and the one who runs it must be the one who may.
 
 ```toml
 [recon]
 # Your own sites; a name covers its subdomains. An empty list allows no scan anywhere.
 owned_hosts = ["example.com", "senoldogan.dev"]
+
+# A bug bounty program or an engagement you are in (item 1887). A host in one is treated as an owned host: the port
+# scan and `security_scan` run on it, and every report names the program that authorised it.
+[[recon.scopes]]
+program = "HackerOne · Acme"          # the program, or the engagement, as you name it
+hosts = ["acme.com", "api.acme.com"]  # a name covers its subdomains
+url = "https://hackerone.com/acme"    # where the scope and its rules are written
+note = "no automated scanning; 5 req/s"   # the rules that came with it
+
+[[recon.scopes]]
+program = "Bugcrowd · Globex"
+hosts = ["globex.io"]
 ```
+
+Writing the scope down is the owner's statement that the program's rules allow the test; Dot asks nothing more before
+it starts, and the refusal a call gets names both lists so a scope can be added instead of the run stopping.
 
 A port whose service should stay behind the firewall (a database, SMB, RDP, VNC, Redis, memcached, Elasticsearch) is a
 finding of its own; so is a banner that names a version. An entry is a bare host name: a wildcard, a port or a scheme

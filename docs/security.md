@@ -1,12 +1,14 @@
 # Security scan: the forms of a host you own
 
-`security_scan` (item 781) reads the forms of a page on a host in `[recon] owned_hosts` and tries a small, benign set
-of payloads on them: SQL injection, reflected XSS, a login bypass and default credentials. It is the quick check an
-owner runs after shipping a form, before a real assessment.
+`security_scan` (item 781) reads the forms of a page on a host in `[recon] owned_hosts` or in a scope of
+`[recon] scopes`, and tries a small, benign set of payloads on them: SQL injection, reflected XSS, a login bypass and
+default credentials. It is the quick check an owner runs after shipping a form, before a real assessment, and the
+first pass over a bug bounty target the owner's scopes allow.
 
 It is not a scanner for someone else's site. The host must be in `[recon] owned_hosts` (a name there covers its
-subdomains), every form action must stay on that host, the payloads are read-only, the requests are capped, and the
-report says what a form answered instead of dumping a page.
+subdomains) or in a scope of `[recon] scopes` ([Recon](recon.md)); every form action must stay on that host, the
+payloads are read-only, the requests are capped, and the report says what a form answered instead of dumping a page.
+A target in a scope has its report end with the program's name and its rules.
 
 ## Use
 
