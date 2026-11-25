@@ -10,8 +10,8 @@
 #
 # The account runs five macOS runners at once and the gate's own jobs need them, so a run holds two at most: `engine`
 # beside `build`, then the `tests` parts two at a time (`max-parallel`), then `e2e` alone. A pull request runs `engine`,
-# `build` and the `chat` part only; the long parts (`controls`, `rows`) and `e2e` run on a push to main, every night,
-# when asked, and on a pull request that carries the label `ios-full` (docs/development.md).
+# `build` and the `chat` part only, and so does a push to main (item 1886); the long parts (`controls`, `rows`) and
+# `e2e` run every night, when asked, and on a pull request that carries the label `ios-full` (docs/development.md).
 name: ios
 
 on:
@@ -42,8 +42,10 @@ concurrency:
 env:
   XCODE: "26.6"
   SIMULATOR: "iPhone 17 Pro"
-  # Whether this run is the whole one: everything but a pull request without the label `ios-full`.
-  FULL: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full') }}
+  # Whether this run is the whole one: the night's, one asked for, and a pull request with the label `ios-full`.
+  FULL: >-
+    ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    || contains(github.event.pull_request.labels.*.name, 'ios-full') }}
 
 # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
 jobs:
@@ -107,7 +109,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        part: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full')) && '["controls", "chat", "rows"]' || '["chat"]') }}
+        part: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'ios-full')) && '["controls", "chat", "rows"]' || '["chat"]') }}
     name: tests (${{ matrix.part }})
     steps:
       # StringCatalogTests reads Resources/Localizable.xcstrings at its source path.
@@ -195,7 +197,8 @@ jobs:
     needs: [build, tests]
     if: >-
       !cancelled() && needs.build.result == 'success' &&
-      (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full'))
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      || contains(github.event.pull_request.labels.*.name, 'ios-full'))
     runs-on: macos-26
     timeout-minutes: 60
     steps:

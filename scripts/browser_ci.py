@@ -1,8 +1,9 @@
 """Which files of a pull request run the browser parts of the gate (gate.yml).
 
-A push to main and a release run every browser part. A pull request runs them when a changed file can affect what
-they do, and skips them otherwise: the account has five macOS runners, and a part that cannot see the change would
-hold one for nothing. The daemon those tests start imports almost all of the package, so a change under
+A release and a run by hand run every browser part, a push to main none (item 1886), and browser.yml runs every
+browser test each night. A pull request runs them when a changed file can affect what they do, and skips them
+otherwise: the account has five macOS runners, and a part that cannot see the
+change would hold one for nothing. The daemon those tests start imports almost all of the package, so a change under
 ``src/dotagent`` runs them, except the command line and the modules the tests never import. A unit test, a smoke
 test that is not one of theirs, the desktop shell and prose do not.
 

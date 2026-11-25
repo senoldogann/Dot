@@ -150,7 +150,7 @@ macOS alone, where the unit tests Linux leaves out run (`--macos-only`, item 187
 lists and the tests marked `macos`, so each unit test runs once, on one of the two), and `dotx eval check` and the
 smoke tests stay there. A pull request whose every file is one nothing of the macOS jobs reads (`ios/`, `roadmap/`,
 `changes/`, prose, the iOS and desktop workflows: `scripts/python_ci.py`, item 1871) skips `gate` and `gate (part 2)`;
-`checks` still runs, a file the script does not know runs them, and a push to `main` and the release run them always.
+`checks` still runs, and a file the script does not know runs them.
 A failed run of the smoke tests' second part or of a browser part runs only its failed tests once more (pytest's
 `--last-failed`, item 1874), and each browser part keeps its tests' times as a JUnit artifact, `browser-times-<n>`,
 for the next sharing out of the parts. Those tests are every smoke test that needs no service, chosen by its
@@ -168,7 +168,16 @@ changed file can affect them (the web UI, the daemon and the browser code the te
 the locks, the workflows: `scripts/browser_ci.py`). The daemon imports almost all of the package, so a change under
 `src/dotagent` still runs them, except the command line and a few modules the tests never import. A unit test, a smoke
 test that is not one of theirs, or the desktop shell does not, and the macOS runners stay free for that pull request.
-A push to `main` and the release run every part. The macOS runners are five at most, the most a free account runs
+A push to `main` (item 1886) runs `gate` and `gate (part 2)` only when a file changed since main's last green gate
+run can affect them (`scripts/python_ci.py`, read against that run's commit, as runs of main that wait replace one
+another and the push before may never have run; a decision that cannot be made runs them), and runs no browser part.
+The owner's word of 2026-11-25 evening, "on GitHub only when really needed", and what it costs: main's own run of
+the browser parts was what showed two pull requests that pass alone and break `main` together through files neither
+shares (one renames a route, the other links to the old one; `scripts/merge_pr.py` brings a branch up to `main` only
+when they share a file). Such a break now shows in the night's `browser.yml`, up to a day after the merge, and a pull
+request opened meanwhile runs its browser parts on the broken `main`. What main skips runs at night and when asked:
+`browser.yml` every browser test, `ios.yml` the whole iPhone suite; a red night is fixed as a red `main` is. The
+release and a run started by hand run every part. The macOS runners are five at most, the most a free account runs
 together, and the Linux jobs do not take one. The job `ci` always runs and passes when every other job passed or was
 skipped: that is the status check `main`'s protection should require (`ci`), in place of `gate`, `gate (part 2)`,
 `browser (pages)`, `browser (phone 1)` and `browser (phone 2)`. A skipped part reports no check of its own, and a
@@ -245,9 +254,9 @@ first, on your Mac).
 (item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), the unit
 and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e` (Settings
 against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes only when
-all of them did. A pull request that changes `ios/` runs `engine`, `build` and `tests (chat)`, about 20 minutes; the
-whole run, about an hour, runs on a push to `main` that changes `ios/`, every night, when asked (`gh workflow run
-ios.yml --ref <branch>`) and on a pull request with the label `ios-full`. A run holds two macOS runners at most
+all of them did. A pull request or a push to `main` that changes `ios/` runs `engine`, `build` and `tests (chat)`,
+about 20 minutes; the whole run, about an hour, runs every night, when asked (`gh workflow run ios.yml --ref
+<branch>`) and on a pull request with the label `ios-full`. A run holds two macOS runners at most
 (`engine` beside `build`, the test parts two at a time, then `e2e` alone), so three of the five stay free for the
 gate's macOS jobs. A test that fails runs once more, as a fresh runner's simulator sometimes fails to launch the app;
 one that passed only on its retry is named in the job's summary ("passed on retry: <test>"). The `ios` check is not one
