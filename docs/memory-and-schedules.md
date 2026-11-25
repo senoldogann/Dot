@@ -385,6 +385,39 @@ composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule w
 `[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against
 `max_schedules`.
 
+**A check first, no model** (item 1855). A repeating schedule may name a **check**: the file name of an executable
+script you put in Dot's `checks` folder (`~/Library/Application Support/Dot/checks/`, made at the daemon's start). Each
+firing runs it first, without a model, for at most 30 seconds, from the workspace, with the environment a run's
+commands get and, while [the sandbox](safety.md) is on, inside it. The contract of what it prints:
+
+- it ends with exit code 0, and the last line it prints that is not blank is exactly `{"wake": true}` or
+  `{"wake": false}`;
+- what it printed before that line is its output.
+
+`{"wake": false}` starts no run: the schedule moves to its next time and its status says *quiet: its check found
+nothing to wake for*, which is not counted as a skipped firing. `{"wake": true}` starts the run, its first message the
+goal followed by the output in a fence (cut at 8,000 characters): a check may read what others wrote (a page, a feed,
+a price), so the output is data, never an instruction, and the run starts tainted, as a watcher's does. Anything else
+is a failure, never taken as quiet: a file that is not there or not executable, an exit code other than 0, a check that
+runs past its 30 seconds, a last line that is not one of the two. The firing is skipped with *skipped: its check
+failed:* and the reason (with the end of what it wrote to stderr), and you are told as of a missed firing (once while
+it fails the same way). **Run now** runs the check too, for its output, and starts the task whatever it says; a check
+that fails there is the error the page shows. A one-time schedule takes no check, and the name must be a plain file
+name (letters, digits, `.`, `-`, `_`), checked to be an executable file when the schedule is saved. Only you set it,
+in the schedule's form (**When › Check first**) or the API (`precheck`); the model's `schedule_create` has no such
+field. The checks folder is among what Dot loads and runs, so a run changes a check only as it changes Dot's other code.
+The scheduler's tick waits for a check, so a slow one holds the next firings back by up to its 30 seconds, and
+the checks of several schedules due in the same tick run one after another: a third one's firing can start up to a
+minute and a half late.
+
+```sh
+#!/bin/sh
+# ~/Library/Application Support/Dot/checks/price-drop.sh
+price=$(curl -fsS https://example.com/api/price) || exit 1
+echo "price is $price"
+if [ "$price" -lt 90 ]; then echo '{"wake": true}'; else echo '{"wake": false}'; fi
+```
+
 **A reply goes to the chat it belongs to** (item 926). When a run sends a message for you (a mail's Send, a mail
 command, a script), Dot keeps the mail addresses that step and the run's calls so far named (the field To, a command's
 recipient) by the run's chat. A run that reads your mail on its own (a schedule such as one that reads your inbox every
@@ -432,7 +465,7 @@ level, approval mode, goal mode, the earlier runs it knows, whether it keeps its
 off, how the end of its runs is told, the agent it runs as and whether it is on (`history_runs`, `same_chat`,
 `stop_after_failures`, `notify`, `agent_id` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
 configured ones and the standard speed; a `PATCH` that leaves `agent_id` out keeps the schedule's agent, and `null`
-makes it Dot's).
+makes it Dot's; `precheck`, its check, likewise: left out of a `PATCH` it stays, `null` removes it, item 1855).
 Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
 chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor an agent; one made
 in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. The editor's page asks

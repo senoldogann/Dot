@@ -774,6 +774,9 @@ class ScheduleCreateRequest(FrozenModel):
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
     notify: NotifyLevel | None = None
     agent_id: str | None = None
+    # Item 1855: the file name of a check in Dot's checks folder that each firing runs first; only a repeating
+    # schedule takes one.
+    precheck: str | None = Field(default=None, max_length=80)
     # Item 464: false saves it switched off, as a template's schedule is until the owner has read its goal; the room for
     # one more switched on is checked when it is switched on.
     enabled: bool = True
@@ -802,6 +805,8 @@ class ScheduleUpdateRequest(FrozenModel):
     notify: NotifyLevel | None = None
     speed: Speed | None = None
     agent_id: str | None = None
+    # Left out, the schedule keeps its check (item 1855), as a client from before it sends none; null removes it.
+    precheck: str | None = Field(default=None, max_length=80)
     # Left out (item 723), the schedule stays switched on or off as it is now: a form opened before the owner switched
     # it in the list put its old state back when it was saved.
     enabled: bool | None = None

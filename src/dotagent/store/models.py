@@ -933,6 +933,10 @@ class ScheduleOptions(FrozenModel):
     # Made by a run that had read content third parties can author (the review of 2026-11-01): its goal may hold their
     # words, so every firing starts tainted, as a watcher's run does. False for every schedule before and the owner's.
     from_outside: bool = False
+    # The file name of a check in Dot's checks folder that each firing runs first, without a model (item 1855): the
+    # run starts only when the check says to wake, with what it printed. None for every schedule before, and for one
+    # without a check. Only the owner sets it (the web page, the API); the schedule tool does not.
+    precheck: str | None = None
 
 
 class ScheduleRecord(FrozenModel):

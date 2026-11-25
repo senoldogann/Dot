@@ -34,6 +34,7 @@ from dotagent.core.paths import (
     browser_incognito_dir,
     browser_profile_dir,
     browser_profiles_dir,
+    checks_dir,
     chrome_data_dir,
     claude_code_dir,
     config_path,
@@ -424,7 +425,8 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     server that comes with Dot, which starts with the daemon and reads it back (item 583), the folder the daemon builds
     the program that writes recordings down in and runs it from (item 626), the home of the OpenCode
     server it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other
-    agents too) and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
+    agents too) and the playbooks it learned, which shape later runs, the owner's checks, which schedules and watchers
+    run without a model (item 1855), and the file of its emergency stop."""
     return (
         *_own_code(),
         *plugin_roots(config.plugins),
@@ -437,6 +439,7 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
         skills_dir(),
         *(Path(entry).expanduser() for entry in config.skills.dirs),
         playbooks_dir(),
+        checks_dir(),
         failsafe_path(),
     )
 

@@ -171,6 +171,12 @@ def themes_dir() -> Path:
     return dot_home() / "themes"
 
 
+def checks_dir() -> Path:
+    """Where the owner's checks live (item 1855): executable files a schedule or a watcher runs without a model to say
+    whether to wake. Dot runs them, so a run changes them only as it changes Dot's other code."""
+    return dot_home() / "checks"
+
+
 def plugins_dir() -> Path:
     """Where the user's plugins live: one folder per plugin in the Claude Code layout."""
     return dot_home() / "plugins"
@@ -253,6 +259,7 @@ def ensure_layout() -> None:
         browser_profile_dir(),
         skills_dir(),
         plugins_dir(),
+        checks_dir(),
     ):
         directory.mkdir(parents=True, exist_ok=True)
     # Set only when it is not so already: a command of a run (``dotx`` in its sandbox) may not change Dot's home.

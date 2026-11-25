@@ -513,6 +513,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 stop_after_failures=request.stop_after_failures,
                 notify=request.notify,
                 agent_id=request.agent_id,
+                precheck=request.precheck,
             ),
         )
         if not request.enabled:
@@ -524,6 +525,8 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
         kept: ScheduleOptions = (await store.get_schedule(schedule_id)).options
         # A change that does not name the agent keeps the schedule's (item 462): only an explicit null makes it Dot's.
         agent_id: str | None = request.agent_id if "agent_id" in request.model_fields_set else kept.agent_id
+        # Its check likewise (item 1855): left out it stays, null removes it.
+        precheck: str | None = request.precheck if "precheck" in request.model_fields_set else kept.precheck
         plan: ScheduleRequest = ScheduleRequest(
             name=request.name,
             goal=request.goal,
@@ -547,6 +550,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 # Nor for where its goal came from: one a run made after reading a page stays so (the review of
                 # 2026-11-01); a schedule the owner makes anew is theirs.
                 from_outside=kept.from_outside,
+                precheck=precheck,
             ),
         )
         # Left out, on or off stays as it is now, not as a form saw it when it opened (item 723).

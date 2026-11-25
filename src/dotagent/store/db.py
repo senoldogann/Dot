@@ -1272,6 +1272,7 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             agent_id=row["agent_id"],
             skills=_skills_of(row["skills"]),
             from_outside=bool(row["from_outside"]),
+            precheck=row["precheck"],
         ),
         runs_failed_in_row=row["runs_failed_in_row"],
         skipped_in_row=row["skipped_in_row"],
@@ -1300,13 +1301,14 @@ type _OptionValues = tuple[
     str | None,
     str | None,
     int,
+    str | None,
 ]
 
 
 def _option_values(options: ScheduleOptions) -> _OptionValues:
     """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
     history_runs, same_chat, speed, stop_after_failures, notify, agent_id, skills (a JSON list, or NULL for none),
-    from_outside."""
+    from_outside, precheck."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
     same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
     return (
@@ -1323,6 +1325,7 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
         options.agent_id,
         dumps_compact(list(options.skills)) if options.skills else None,
         int(options.from_outside),
+        options.precheck,
     )
 
 
@@ -1420,6 +1423,9 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("skills", "TEXT"),
     # Made by a run that had read outside content (the review of 2026-11-01): its firings start tainted.
     ("from_outside", "INTEGER NOT NULL DEFAULT 0"),
+    # The file name of the check a firing runs first, in Dot's checks folder (item 1855); NULL for none. Before
+    # skipped_in_row, which a test drops and adds again, so that a new database's columns stay in one order.
+    ("precheck", "TEXT"),
     # How many firings in a row were skipped with no run (item 1401); 0 for every schedule from before.
     ("skipped_in_row", "INTEGER NOT NULL DEFAULT 0"),
 )
@@ -7372,8 +7378,8 @@ class Store:
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
             " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed,"
-            " stop_after_failures, notify, agent_id, skills, from_outside)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " stop_after_failures, notify, agent_id, skills, from_outside, precheck)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -7413,7 +7419,8 @@ class Store:
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
             " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
-            " stop_after_failures = ?, notify = ?, agent_id = ?, skills = ?, from_outside = ?, enabled = ?,"
+            " stop_after_failures = ?, notify = ?, agent_id = ?, skills = ?, from_outside = ?, precheck = ?,"
+            " enabled = ?,"
             " next_run_at = ?,"
             " runs_failed_in_row = 0, skipped_in_row = 0,"
             " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
@@ -7558,6 +7565,23 @@ class Store:
         await self._db.commit()
         if cursor.rowcount == 0:
             log.info("schedule_skip_not_written", schedule_id=schedule_id, due=due, status=status)
+            return False
+        return True
+
+    @_writing
+    async def record_schedule_quiet(self, schedule_id: str, due: float, next_run_at: float | None, status: str) -> bool:
+        """A firing due at ``due`` whose check said there is nothing to wake for (item 1855): move on to
+        ``next_run_at`` (``None`` ends the schedule) with ``status``, and end the firings skipped in a row, since a
+        quiet check is the schedule doing its work, not a skip. Only while the schedule is still due at ``due``, as
+        :meth:`record_schedule_skip`. Whether it moved on."""
+        cursor = await self._db.execute(
+            "UPDATE schedules SET next_run_at = ?, last_status = ?, skipped_in_row = 0,"
+            " enabled = CASE WHEN ? IS NULL THEN 0 ELSE enabled END WHERE id = ? AND next_run_at IS ?",
+            (next_run_at, status, next_run_at, schedule_id, due),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            log.info("schedule_quiet_not_written", schedule_id=schedule_id, due=due)
             return False
         return True
 
