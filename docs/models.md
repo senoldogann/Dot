@@ -39,7 +39,10 @@ row for each day, today first, with the tasks that began on it, the tokens in an
 now for one at work) and a bar of its tokens against the busiest day. It is `GET /api/usage?days=7` (`days` from 1 to
 92): a day is a local day, a task counts on the day it began, a day with none is there with zeros, and `windows` holds
 the newest window of each kind that a step of the period recorded (`assistant.plan_window`, a Claude plan run's step; a
-task that did not run on the plan records none). Dot keeps no price for a model, so the page shows time and tokens and
+task that did not run on the plan records none), and `top_runs`, the five runs of the period that used the most tokens
+(each its own: a helper is a run of its own), which the page lists under **Tasks that used the most**, each opening its
+task. **Caps** under it sets the caps of what the runs spend, in millions of tokens, with today's tokens in all and by
+source (item 1731, [Limits](limits.md)). Dot keeps no price for a model, so the page shows time and tokens and
 the plan's window, never money. Each role's box opens the composer's
 model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
 starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model

@@ -1161,6 +1161,25 @@ runs_per_hour = 5
 # and not told (the watcher's row says how many).
 judged_per_look = 25
 
+[budget]
+# The caps of what the runs spend, in tokens: the input and output of every model call, cached input included, as
+# Settings › Models › Usage counts them. A run past a cap is paused and you are asked: Continue (as many tokens again)
+# or Stop; no answer within [policy] approval_timeout_s stops it. It asks in every approval mode, yolo and free mode
+# included: your own word of 2026-11-24 (docs/freedom.md). 0: no cap. The defaults are above everything measured on a
+# busy Mac in November 2026 (the most one run and its helpers used: 438M; the busiest day: 2,423M; the busiest day of
+# schedules: 86M, of reviews: 397M), so that only a runaway reaches them.
+# A run and the runs it delegated to.
+run_tokens = 500_000_000
+# Every run that began today (the local day).
+day_tokens = 4_000_000_000
+# The runs of one source that began today: your chats and tasks, schedules, Dot's own initiative, the code reviews
+# before a push, and helpers.
+ui_day_tokens = 0
+schedule_day_tokens = 500_000_000
+initiative_day_tokens = 500_000_000
+review_day_tokens = 1_000_000_000
+delegate_day_tokens = 0
+
 [initiative]
 # Dot's own initiative (item 715, docs/proactive.md): switched on in Schedules, Dot keeps a list of things to do for you
 # and does them while the Mac is idle, in chats of their own, in the approval mode below. The Mac is idle when none of

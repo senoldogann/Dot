@@ -144,3 +144,63 @@ export function usedSoFar(costs, now) {
   const window = costs.plan_window ?? null;
   return { line, window: window === null ? null : `${windowName(window.kind)}: ${windowLine({ ...window, seen_at: null }, now)}` };
 }
+
+// The sources of a task as the owner reads them, for the caps of each and the costliest tasks (item 1731).
+const SOURCES = {
+  ui: "Your chats and tasks",
+  schedule: "Schedules",
+  initiative: "Dot's own work",
+  review: "Code reviews",
+  delegate: "Helpers",
+};
+
+/** The name of a task's `source`: "Schedules"; a source not known is its own word. */
+export function sourceName(source) {
+  return SOURCES[source] ?? source.replaceAll("_", " ");
+}
+
+/** The caps of `[budget]` Settings shows, each with its name, in the order they are set (item 1731). */
+export const CAPS = [
+  ["run_tokens", "One task and its helpers"],
+  ["day_tokens", "All tasks of a day"],
+  ["ui_day_tokens", `${SOURCES.ui}, a day`],
+  ["schedule_day_tokens", `${SOURCES.schedule}, a day`],
+  ["initiative_day_tokens", `${SOURCES.initiative}, a day`],
+  ["review_day_tokens", `${SOURCES.review}, a day`],
+  ["delegate_day_tokens", `${SOURCES.delegate}, a day`],
+];
+
+/** Millions of tokens as the cap's box shows them: 500_000_000 is "500", 0 is "0" (no cap). */
+export function capMillions(tokens) {
+  return String(Math.round(tokens / 1_000_000));
+}
+
+/** The tokens of what the cap's box holds in millions, or null for what is not a whole number of 0 or more. */
+export function capTokens(text) {
+  const trimmed = text.trim();
+  return /^\d+$/.test(trimmed) ? Number(trimmed) * 1_000_000 : null;
+}
+
+/**
+ * A task against its caps, from `budget` of `GET /runs/{id}/stats` (`RunBudget`), or null without one: what it and its
+ * helpers used against its cap, and what tasks like it usually use ("With helpers 12.0M of its 500.0M cap · usually
+ * 2.3M, 9 in 10 under 26.0M").
+ */
+export function budgetLine(budget) {
+  if (budget === null || budget === undefined) {
+    return null;
+  }
+  const used = budget.cap > 0 ? `With helpers ${compact(budget.spent)} of its ${compact(budget.cap)} cap` : `With helpers ${compact(budget.spent)}, no cap`;
+  const usual = budget.estimate === null ? "too few tasks like it to say what it usually uses" : `usually ${compact(budget.estimate.median)}, 9 in 10 under ${compact(budget.estimate.p90)}`;
+  return `${used} · ${usual}`;
+}
+
+/** Today's tokens against the day's cap, from `GET /api/budget`: "Today 1.2M of 4000.0M", or "Today 1.2M, no cap". */
+export function todayLine(view) {
+  return view.caps.day_tokens > 0 ? `Today ${compact(view.today)} of ${compact(view.caps.day_tokens)}` : `Today ${compact(view.today)}, no cap`;
+}
+
+/** One of the tasks that used the most: "Helpers · claude_code:sonnet · 371 steps · 209.8M". */
+export function topRunLine(run) {
+  return `${sourceName(run.source)} · ${run.model} · ${plural(run.steps, "step", "steps")} · ${compact(run.tokens)}`;
+}

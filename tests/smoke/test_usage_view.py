@@ -3,9 +3,12 @@ owner sets no ceiling on a task, so what is spent is what there is to read: ``GE
 last days, a row for each day with the tokens in and out, the steps and the minutes, and the last window of the Claude
 plan each kind of window was seen in; Settings › Models draws it as a Usage section, readable on a phone 390 px wide
 and wide; and the Cost card of a task that is still at work says first what it has used so far, with the plan's window
-its newest step saw. Dot keeps no price for a model, so no money is shown."""
+its newest step saw. Dot keeps no price for a model, so no money is shown. The caps of what the runs spend (item
+1731): ``GET``/``PUT /api/budget``, the costliest tasks and the caps in Settings, the task against its cap on the
+Cost card, and a task past a cap that waits on a card, Continue or Stop, in yolo, until Stop ends it."""
 
 import asyncio
+import os
 import re
 import time
 from collections.abc import AsyncIterator
@@ -153,6 +156,39 @@ async def test_the_api_sums_the_runs_by_day_and_gives_the_last_window_of_each_ki
     assert all(window["status"] == "allowed" and window["resets_at"] for window in week["windows"])
     assert one.status_code == 200 and len(one.json()["days"]) == 1
     assert none.status_code == 422 and long.status_code == 422
+    # The costliest tasks of the period, the most first (item 1731).
+    top: list[dict[str, object]] = week["top_runs"]
+    assert [(entry["run_id"], entry["tokens"], entry["goal"]) for entry in top[:2]] == [
+        (first.id, 1_200, "Write the weekly report"),
+        (second.id, 550, "Check the build"),
+    ]
+
+
+async def test_the_caps_are_read_and_changed_through_the_api_and_kept_in_the_config_file(
+    runtime: Runtime, served: tuple[RunManager, str]
+) -> None:
+    _, address = served
+    before = runtime.budget.config
+    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        read: httpx.Response = await client.get("/api/budget")
+        assert read.status_code == 200, read.text
+        view: dict[str, object] = read.json()
+        assert view["caps"] == before.model_dump()
+        assert isinstance(view["today"], int) and isinstance(view["by_source"], list)
+        try:
+            changed: httpx.Response = await client.put(
+                "/api/budget", json={**before.model_dump(), "run_tokens": 7_000_000}
+            )
+            assert changed.status_code == 200, changed.text
+            assert changed.json()["caps"]["run_tokens"] == 7_000_000
+            assert runtime.budget.config.run_tokens == 7_000_000
+            written: str = (Path(os.environ["DOT_HOME"]) / "config.toml").read_text(encoding="utf-8")
+            assert "[budget]\nrun_tokens = 7000000" in written
+            refused: httpx.Response = await client.put("/api/budget", json={**before.model_dump(), "day_tokens": -1})
+            assert refused.status_code == 422
+        finally:
+            restored: httpx.Response = await client.put("/api/budget", json=before.model_dump())
+            assert restored.status_code == 200, restored.text
 
 
 async def test_settings_models_draws_the_usage_wide_and_on_a_phone_with_the_plans_window(
@@ -194,6 +230,16 @@ async def test_settings_models_draws_the_usage_wide_and_on_a_phone_with_the_plan
                 titles: list[str] = await page.locator(".set-section-title").all_inner_texts()
                 assert titles.index("Usage") < titles.index("Every model, by service"), titles
                 assert "$" not in await usage.inner_text()
+                # The costliest tasks, each opening its task, and the caps in millions (item 1731).
+                costliest: Locator = page.locator("section[data-section='usage-top'] [data-usage-top]")
+                await expect(costliest.first).to_contain_text("Write the weekly report")
+                await expect(costliest.first.locator("a")).to_have_attribute("href", f"#/runs/{first.id}")
+                caps: Locator = page.locator("section[data-section='usage-caps']")
+                await expect(caps.locator("[data-usage-cap]")).to_have_count(7)
+                await expect(caps.locator("[data-usage-cap='run_tokens'] input")).to_have_value("500")
+                await expect(caps.locator("[data-usage-today]")).to_contain_text("Today ")
+                await caps.scroll_into_view_if_needed()
+                await page.screenshot(path=str(tmp_path / f"caps-{width}.png"), animations="disabled")
                 client_width: int = await page.evaluate("document.documentElement.clientWidth")
                 assert await page.evaluate("document.documentElement.scrollWidth") <= client_width
                 box = await usage.bounding_box()
@@ -233,6 +279,10 @@ async def test_the_cost_card_of_a_task_at_work_says_what_it_has_used_so_far_with
                 await expect(sofar.locator(".cost-so-far-window")).to_contain_text(
                     re.compile(r"^5-hour window: 62% used · resets in 1h (?:19|20)m$")
                 )
+                # The task against its cap, from its first step (item 1731).
+                await expect(bill.locator(".cost-budget")).to_contain_text(
+                    re.compile(r"^With helpers .+ of its 500\.0M cap · ")
+                )
                 # The details stay under it, as before.
                 await expect(bill).to_contain_text("Usage in")
                 await bill.scroll_into_view_if_needed()
@@ -256,4 +306,54 @@ async def test_the_cost_card_of_a_task_at_work_says_what_it_has_used_so_far_with
             await expect(bill).to_contain_text("Usage in")
             await expect(bill.locator(".cost-so-far")).to_have_count(0)
         finally:
+            await browser.close()
+
+
+async def test_a_task_past_the_days_cap_waits_on_a_card_in_yolo_and_stop_ends_it(
+    runtime: Runtime, served: tuple[RunManager, str]
+) -> None:
+    manager, address = served
+    before = runtime.budget.config
+    await _finished(runtime, "Earlier today", 1, 2_000, 0)
+    # A day's cap the tasks of today are past already: the task's first step waits for the owner.
+    runtime.budget.apply(before.model_copy(update={"day_tokens": 1_000}))
+    run: RunRecord | None = None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            run = await manager.start(
+                "Summarise the brief",
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                "test",
+                None,
+                None,
+                "standard",
+                None,
+                "yolo",
+                False,
+                (),
+            )
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 900}, reduced_motion="reduce")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/runs/{run.id}")
+            card: Locator = page.locator(".approval").filter(has_text="A task reached its budget")
+            await expect(card).to_be_visible(timeout=20_000)
+            await expect(card).to_contain_text("past the day's cap of 1k ([budget] day_tokens)")
+            await expect(card.get_by_role("button", name="Continue (+1k)")).to_be_visible()
+            await expect(card.get_by_text("Don't ask again in this chat")).to_have_count(0)
+            await card.get_by_role("button", name="Stop").click()
+            async with asyncio.timeout(30):
+                ended: RunRecord = await manager.wait(run.id)
+            assert ended.status == "cancelled"
+            assert [(record.tool, record.status) for record in await runtime.store.run_approvals(run.id)] == [
+                ("budget", "denied")
+            ]
+            await page.close()
+        finally:
+            runtime.budget.apply(before)
+            if run is not None and run.id in manager.active_run_ids():
+                manager.cancel(run.id)
             await browser.close()
