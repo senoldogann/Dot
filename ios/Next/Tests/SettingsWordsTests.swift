@@ -75,6 +75,13 @@ final class SettingsWordsTests: XCTestCase {
         XCTAssertNil(rhythmWords(cron: nil, runAt: nil, locale: english))
     }
 
+    func testACapThatDoesNotFitIsNoCap() {
+        XCTAssertEqual(capTokens("300"), 300_000_000)
+        XCTAssertNil(capTokens("9999999999999999"), "13+ digits overflow: no Save, no crash")
+        XCTAssertNil(capTokens("-1"))
+        XCTAssertNil(capTokens("abc"))
+    }
+
     func testTokensReadAsTheWebSaysThem() {
         XCTAssertEqual(tokenWords(500_000_000, locale: english), "500M")
         XCTAssertEqual(tokenWords(4_000_000_000, locale: english), "4,000M")

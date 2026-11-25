@@ -757,6 +757,8 @@ TR: dict[str, str] = {
     'Once, %@': 'Bir kez, %@',
     'Weekdays at %@': 'Hafta içi saat %@',
     'Weekends at %@': 'Hafta sonu saat %@',
+    "Your Mac proved it holds this phone's key.": "Mac'in bu telefonun anahtarını tuttuğunu kanıtladı.",
+    'Your Mac answered with what this app cannot read (%@). Update Dot on the Mac or this app.': "Mac'in bu uygulamanın okuyamadığı bir yanıt verdi (%@). Mac'teki Dot'u ya da bu uygulamayı güncelle.",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).

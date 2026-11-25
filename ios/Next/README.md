@@ -18,7 +18,7 @@ every second whether events come or not. The copy · reaction · time footer is 
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
-daemon's proof that it holds this phone's key, `GET /api/proof`, before the key is sent; the diagnosis hop by hop,
+daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
 iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
 Forget this phone's key), Notifications (the three kinds of `/api/phone/push-settings`), General (Dot's and the owner's
 names, the language, the clock, Queue or Steer, confirmations, dictation's language), Appearance (light, dark or
@@ -27,8 +27,8 @@ system, the text size with a live preview, the tool calls in chat, response stre
 only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
 on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
 runs' proposed rewrites with Use and Drop), Health and version, Usage; every other page of the web app's settings is
-a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`, the phone's key in the address's
-fragment as `dotx url` does, only the Mac's origin loads). A search with synonyms finds any page in English or
+a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`: the key never in the address, a
+script on the Mac's origin alone writes it where the page keeps it; only the Mac's origin loads). A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
