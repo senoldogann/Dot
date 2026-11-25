@@ -59,7 +59,7 @@ from dotagent.agent.attachments import (
     message_with_attachments,
     steer_event,
 )
-from dotagent.agent.continuity import new_ledger
+from dotagent.agent.continuity import RunLedger, new_ledger, with_actions
 from dotagent.agent.executor import ToolOutcome
 from dotagent.agent.goal_chain import goal_checker_with_standby
 from dotagent.agent.handover import (
@@ -627,6 +627,8 @@ class _Record:
     goal: Message
     history: list[Message]
     facts: RunFacts
+    # What the run did, as the loop's ledger keeps it: what a failure the owner reads says it did last and touched.
+    ledger: RunLedger
     used_tools: bool = False
     nudges: int = 0
     plan_reminders: int = 0
@@ -641,6 +643,7 @@ class _Record:
         self.nudges = 0
         self.history.extend((assistant_message("", None, (outcome.call,)), tool_message(outcome.call, result.text, ())))
         self.facts = with_outcomes(self.facts, (outcome,))
+        self.ledger = with_actions(self.ledger, [(outcome.call, not result.is_error, result.text)])
 
 
 async def _watched_call(
@@ -897,7 +900,7 @@ class _Follow:
             steps: str = ", ".join(str(number) for number in unclosed)
             stopped: str = stop_result(
                 f"finish was called while plan step(s) {steps} were still open",
-                new_ledger(self.agent.run.goal),
+                record.ledger,
                 plan_lines(plan),
             )
             record.settled = RunOutcome(status="failed", result=stopped, needs="")
@@ -1758,7 +1761,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
         runtime, run.thread_id, run.id, await _opening_of(agent, ref, info), agent.opening.files, info.vision
     )
     # What the goal check and the lessons read of the run, as Dot's own loop keeps it (item 1694).
-    record: _Record = _Record(goal=goal, history=[goal], facts=new_facts())
+    record: _Record = _Record(goal=goal, history=[goal], facts=new_facts(), ledger=new_ledger(run.goal))
     door: Door = new_door(
         CLAUDE_DOOR,
         door_specs(_offered_specs(run, tools)),

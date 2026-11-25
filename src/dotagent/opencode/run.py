@@ -520,6 +520,9 @@ class _Follow:
     finishes: bool = False
     # The agent's finishes since its last other call (item 1695): the run ends as the newest says.
     finished_calls: list[FinishArgs] = field(default_factory=list)
+    # The step (its message) that called Dot's finish last: a call of OpenCode's own in that same step ran beside it,
+    # not after it, and drops nothing.
+    finish_step: str | None = None
     # What the agent's finish said (item 1695), ``None`` until it calls it, and again after a later call of Dot's tools.
     finished: FinishArgs | None = None
     # How the newest step ended, in OpenCode's words.
@@ -646,14 +649,17 @@ class _Follow:
             if not call.announced:
                 call.announced = True
                 step.tools.append(event.tool.removeprefix(self.door))
+                if event.tool.removeprefix(self.door) == FINISH_TOOL:
+                    self.finish_step = event.message_id
             return
         name: str = f"{TOOL_PREFIX}{event.tool}"
         # The secrets Dot holds are masked word for word, as the executor masks those of its own calls (item 525).
         known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
         if not call.announced:
             # A call of OpenCode's own tool after a finish is work, which drops what the finish said, as any call does
-            # on the Claude plan (item 1695's pre-push review).
-            self.finished_calls.clear()
+            # on the Claude plan (item 1695's pre-push review); one of the finish's own step ran beside it and is not.
+            if event.message_id != self.finish_step:
+                self.finished_calls.clear()
             call.announced = True
             step.tools.append(name)
             await self.emit(
