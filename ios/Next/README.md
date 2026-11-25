@@ -97,7 +97,7 @@ that changes `ios/**` (and on demand: `gh workflow run ios.yml --ref <branch>`),
 `tests (controls)` and `tests (rows)` (the unit and UI tests from that build, side by side; each test of
 `SettingsControlsUITests` takes about 20 minutes on the runner, so each has a part of its own), `e2e`
 (`scripts/e2e_settings.sh` against a throwaway daemon of the same commit), and `ios`, which passes only when all of
-them did. A UI test that fails is run once more (`-retry-tests-on-failure`): a fresh runner's simulator sometimes fails
+them did. A test that fails, unit or UI, is run once more (`-retry-tests-on-failure`): a fresh runner's simulator sometimes fails
 to launch the app or start the test runner; a test that fails twice fails the part, and the log shows each try. Run a
 test on the Mac only to reproduce a failure CI showed, and the screenshots for the owner.
 

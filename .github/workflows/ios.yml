@@ -4,9 +4,9 @@
 #
 # The jobs: `engine` runs `swift test` of the engine; `build` makes the project with XcodeGen, builds DotNext and its
 # tests once (build-for-testing) and runs the String Catalog check on that build; `tests` runs the unit and UI tests
-# from that build in three parts side by side; `e2e` runs Settings end to end against a throwaway daemon of this checkout
-# (scripts/e2e_settings.sh); `ios` is the one check that says all of them passed. Each test job keeps its .xcresult
-# and the screenshots in it for 7 days. Four of the account's five macOS runners at once (`build`, `engine` and `e2e`,
+# from that build in three parts side by side; `e2e` runs Settings end to end against a throwaway daemon of this
+# checkout (scripts/e2e_settings.sh); `ios` is the one check that says all of them passed. Each test job keeps its
+# .xcresult and the screenshots in it for 7 days. Four of the account's five macOS runners at once (`build`, `engine` and `e2e`,
 # then the three `tests` parts beside `e2e`), five while `engine` still runs then: docs/development.md.
 name: ios
 
@@ -85,7 +85,7 @@ jobs:
   tests:
     needs: build
     runs-on: macos-26
-    timeout-minutes: 50
+    timeout-minutes: 65
     # The parts by the time they took on the runner: the unit tests with the chat's and Settings' UI tests 4 minutes,
     # each test of SettingsControlsUITests (it taps every row, and every control of every native page) about 20.
     strategy:
@@ -137,11 +137,12 @@ jobs:
           xcrun simctl launch "$UDID" dev.dotagent.phone.next
           sleep 10
           xcrun simctl terminate "$UDID" dev.dotagent.phone.next
-      # Shorter than the job, so that a test that hangs still leaves its result and screenshots to the steps below. A
-      # failed test runs once more: the runner's simulator also failed once to start the UI test runner at all; a test
-      # that fails twice fails the part, and each try is in the log.
+      # Shorter than the job, so that a test that hangs still leaves its result and screenshots to the steps below, and
+      # long enough for the longest part (24 minutes) to run twice. A failed test, unit or UI, runs once more: the
+      # runner's simulator also failed once to start the UI test runner at all; a test that fails twice fails the part,
+      # and each try is in the log.
       - name: Test
-        timeout-minutes: 40
+        timeout-minutes: 55
         env:
           ONLY: ${{ matrix.part.only }}
           UDID: ${{ steps.sim.outputs.udid }}

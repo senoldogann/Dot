@@ -239,7 +239,7 @@ When something under `ios/` changes (a pull request or a push to `main`, and whe
 Xcode 26.6 (item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check),
 the unit and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e`
 (Settings against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes
-only when all of them did; a UI test that fails runs once more, as a fresh runner's simulator sometimes fails to
+only when all of them did; a test that fails (unit or UI) runs once more, as a fresh runner's simulator sometimes fails to
 launch the app. A run takes about 30 minutes, its longest part `tests (controls)`. It holds four of the five
 macOS runners at once (`build`, `engine` and `e2e`, then the three test parts beside `e2e`; five while `engine` still
 runs then), so a pull request
