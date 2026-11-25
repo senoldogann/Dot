@@ -10,7 +10,7 @@ from dotagent.store.models import CampaignRecord, ThreadRecord
 async def _campaign(store: Store) -> CampaignRecord:
     thread: ThreadRecord = await store.create_thread("Leads", "test")
     return await store.create_campaign(
-        "Leads", "Find fifty leads.", thread.id, "ollama:a", "medium", "standard", None, "ask", (), "own"
+        "Leads", "Find fifty leads.", thread.id, "ollama:a", "medium", "standard", None, "ask", (), "own", ()
     )
 
 

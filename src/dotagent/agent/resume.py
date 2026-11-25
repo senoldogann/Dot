@@ -41,7 +41,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
 from dotagent.skills.types import SKILL_TOOL
 from dotagent.store.endings import classify_ending
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import EventRecord, ProofCheck, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool
 from dotagent.tools.context import ToolContext
 from dotagent.tools.help import FIND_HELP_TOOL
@@ -142,6 +142,8 @@ class Resumption(FrozenModel):
     # The work the run had going on its own (a shell command, a terminal session, a Claude Code program, a code-mode
     # script) that the daemon's start ended, as it outlived the daemon that started it (item 1670): one line each.
     stopped: tuple[str, ...] = ()
+    # The proof checks of the run it goes on from (item 1853), which hold this run as they held that one.
+    proof: tuple[ProofCheck, ...] = ()
 
 
 def cut_off_by(run: RunRecord) -> CutOff | None:

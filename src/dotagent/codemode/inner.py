@@ -18,8 +18,10 @@ from typing import Protocol
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData, ToolSpec
 
-# The tool that nests calls: the executor hands a :class:`NestedCalls` to this one and to no other.
+# The tools that nest calls: the executor hands a :class:`NestedCalls` to these and to no other. ``code_run``'s code
+# calls the run's tools; ``campaign_achieved`` runs the campaign's proof checks as shell calls (item 1853).
 CODE_RUN_TOOL: str = "code_run"
+CAMPAIGN_ACHIEVED_TOOL: str = "campaign_achieved"
 
 
 @dataclass(frozen=True)
@@ -27,7 +29,8 @@ class NestedResult:
     """What one nested call came to: the text the tool answered (its error's words when ``is_error``), its pictures,
     whether the run is to count it as content third parties can author (``untrusted``), and whether the call was
     ``refused`` by the run's rules, the owner or the review (``is_error`` is then true as well). ``seconds`` is how long
-    the call took in all, ``waited_s`` how much of that it spent waiting for an answer to a question."""
+    the call took in all, ``waited_s`` how much of that it spent waiting for an answer to a question. ``reached_tool``
+    is false for a call that never got to its tool (an unknown tool, arguments its tool refused, a refusal)."""
 
     text: str
     images: tuple[ImageData, ...]
@@ -36,6 +39,7 @@ class NestedResult:
     refused: bool
     seconds: float
     waited_s: float
+    reached_tool: bool
 
 
 class NestedCalls(Protocol):

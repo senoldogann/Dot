@@ -348,7 +348,7 @@ async def test_the_goal_is_built_when_it_fires_from_what_dot_knows_of_itself(
         {"status": "failed", "result": "", "needs": ""},
     )
     campaign = await store.create_campaign(
-        "Grow the list", "Get leads", thread.id, OPUS, "medium", "standard", None, "ask", [], "own"
+        "Grow the list", "Get leads", thread.id, OPUS, "medium", "standard", None, "ask", [], "own", ()
     )
     session: RunRecord = await _quoted_run(store, "Find leads", tainted=False)
     await store.add_campaign_entry(campaign.id, session.id, "progress", "12 leads so far", {"leads": 12.0})

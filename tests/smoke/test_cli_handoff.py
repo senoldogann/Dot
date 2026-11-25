@@ -76,6 +76,8 @@ def _command(approvals: ApprovalMode, review: bool) -> RunCommand:
         standing=False,
         browser=None,
         thread=None,
+        proof=[],
+        proof_timeout_s=300,
         review=review,
         no_input=True,
         thinking=False,

@@ -7,6 +7,7 @@ other, so every mix works. Each has a default in the configuration, and a single
 | --------- | ----------------------------------- | ------- | ------------------------------------ | ---------------------------------------------------------------------------------------- |
 | Approvals | `supervised`, `ask`, `auto`, `yolo` | `ask`   | `[policy] approvals`                 | `--approvals`, `--auto-approve`, `--yolo`; `approvals` of `POST /api/runs`; the composer |
 | Goal mode | on, off                             | on for a task or research run, off for a chat | `[agent] goal_mode`, `goal_patience` (4) | `--goal-mode`, `--no-goal-mode`; `goal_mode` of `POST /api/runs`; the composer |
+| Proof checks | commands with a time limit       | none    | none                                 | `--proof`, `--proof-timeout`; `proof` of `POST /api/runs`; the run's own `add_proof` |
 
 `GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and the
 facts under More on its side panel's Task tab show them. The composer of the web UI sends nothing for a picker you did
@@ -151,6 +152,35 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
 A check can only ask for the original goal to be finished: it adds no work and does not clear the untrusted mark. If the
 check itself fails, the run fails and keeps its answer. Each check is a `goal_check` event, which the conversation
 does not show (items 1098 and 1112): the answer says what came of the work.
+
+**Proof checks** (item 1853) take "done" out of a model's word. A task run can carry up to 5 commands (a test run,
+`curl -fsS` of a page, `test -s report.pdf`), each with a time limit (300 s unless given, at most `[shell] max_timeout_s`, 1800 by default), that must
+exit 0 before the run is done. You set them as the run starts: `dotx run --proof "uv run pytest tests -q"` (repeat it
+for more; `--proof-timeout S` for their limit) or `proof: [{"command": ..., "timeout_s": ...}]` of `POST /api/runs`.
+The run sets them itself with `add_proof` (the `proof` tool group), and is told to when you name a check that must
+pass or the goal has a command that proves it. A check is only ever added: no tool changes or removes one, so a run
+cannot soften what it is held to. A chat or a research run (no `shell`, no `finish` to hold), a run on the Claude plan
+or OpenCode (whose turns end in their own program) is refused checks, and the start of a run of an agent, a team or
+a loop takes none from you; a run that goes on from another (resumed, or handed a failed or blocked run's note) keeps that run's checks.
+
+When the run calls `finish` with success, after the reminders of an open plan and before the goal check (with goal
+mode on or off), Dot runs every check as a `shell` call of the run itself: one step in the conversation, made by Dot
+instead of the model, through the same gate, sandbox, events, masking and time limit as a call of the model's. Dot adds
+no rule to the gate: a check asks what that command would ask typed by the model in the run's mode, so a `yolo` or
+free-mode run asks nothing new ([Freedom](freedom.md)). Then:
+
+- every check exits 0: the goal check, when on, decides as before, and sees the passing runs among the facts;
+- one exits otherwise, or is killed at its limit: the run is sent back with each failing command and the last 3000
+  characters of what it printed (the whole result is the call above it), and works on; this counts toward
+  `goal_patience`, and past it the run ends failed with its answer and "the proof did not pass";
+- one cannot run (the gate, you or a cap refused it, the run has no `shell`, or its limit is past `[shell]
+  max_timeout_s`, which the shell would cut it to; a check over it is refused when it is set): the run ends failed with
+  its answer and
+  "the proof could not run", naming why. It is not sent back, as the same call would be refused again, and no model
+  decides in the check's place.
+
+A finish past the run's limit runs the checks too; there, a failing one ends the run failed. Each look is a
+`proof_check` event (each command, who set it, `passed`, `failed` or `not_run`), and each check a `proof` event.
 
 **The check may look at the work itself** (item 1363). The digest says that a file was written, never what it holds; so
 a check that cannot tell whether the goal is reached from the digest and the facts answers `inspect`, naming in `reads`

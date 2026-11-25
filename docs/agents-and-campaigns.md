@@ -474,7 +474,13 @@ the session before ended, through restarts and days. A campaign whose first sess
   (`campaign_note` does not take one of them again while the campaign is stuck), and asks for another channel (a site's
   API, a command or a skill instead of its pages), another source or another approach, written as a new strategy entry
   first. All four live in `[agent]`.
-- **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
+- **Only a verified outcome ends it.** A campaign can carry proof checks (item 1853): commands that must exit 0, set by
+you as it starts (`dotx run --standing --proof CMD`, `proof` with `standing` of `POST /api/runs`) or by a session with
+`add_proof`, which writes to the campaign (with the `persistence` flag, as `campaign_targets`) and never takes one
+away. `campaign_achieved` runs every one first, as `shell` calls of the session through its gate (their events carry
+`via: proof`), before the typed judge and the goal checker: one that fails refuses the claim with what it printed, and
+the campaign goes on; one that cannot run refuses it and tells the session to write a setback and ask you. Then
+`campaign_achieved` asks the goal checker (the review model) whether the targets
 are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
 evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with
 the checker's reason and the session goes on (one the checker finds out of reach asks you how to go on); accepted, the
