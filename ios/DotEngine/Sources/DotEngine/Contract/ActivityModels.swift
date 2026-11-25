@@ -506,6 +506,10 @@ public struct DraftView: Codable, Sendable, Hashable, Identifiable {
         case runId = "run_id"
         case createdAt = "created_at"
     }
+
+    /// Whether it still waits for the owner: none sent or discarded it yet, or its last send failed (it can be sent
+    /// again).
+    public var isOpen: Bool { status == "waiting" || status == "failed" }
 }
 
 /// The body of `POST /api/drafts/{id}/send`: the words that go (a message has no cc and no subject).
