@@ -74,17 +74,20 @@ struct AgentsTab: View {
 // MARK: Activity
 
 struct ActivityTab: View {
+    @State private var watching: Bool = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.groupedGutter) {
                     GroupedSection(header: nil, footer: String(localized: "Opens the Mac's live screen; nothing plays until you open it.", comment: "Activity tab: footer under Watch the Mac")) {
-                        NavigationLink {
-                            WebSettingsPage(target: WebSettingsPage.Target(tab: "/watch", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen")))
+                        Button {
+                            watching = true
                         } label: {
-                            ListRow(systemImage: "desktopcomputer", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen"), description: nil, accessory: .web)
+                            ListRow(systemImage: "desktopcomputer", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen"), description: nil, accessory: .chevron)
                         }
                         .buttonStyle(RowPressStyle())
+                        .accessibilityIdentifier("activity.watchMac")
                     }
                     EmptyState(
                         title: String(localized: "Nothing new since you were away", comment: "Activity tab empty state title"), systemImage: "clock.arrow.circlepath",
@@ -97,6 +100,7 @@ struct ActivityTab: View {
             .background(Tone.ground)
             .navigationTitle(String(localized: "Activity", comment: "Title of the activity tab"))
             .navigationBarTitleDisplayMode(.inline)
+            .fullScreenCover(isPresented: $watching) { WatchMacScreen(close: { watching = false }) }
         }
     }
 }

@@ -23,7 +23,7 @@ if ! xcrun xcstringstool sync "$work/Localizable.xcstrings" --stringsdata $data 
 fi
 # Raw literals in SwiftUI calls bypass the comment rule: every UI string goes through String(localized:comment:).
 raw=$(grep -rnE '(Text|Button|Label|Tab|navigationTitle|accessibilityLabel|accessibilityHint|confirmationDialog)\("[^"]*[A-Za-z]' \
-    "$next/App" "$next/Components" "$next/Design" "$next/Settings" | grep -v 'Text(verbatim:' || true)
+    "$next/App" "$next/Components" "$next/Design" "$next/Settings" "$next/Watch" | grep -v 'Text(verbatim:' || true)
 python3 - "$next/Resources/Localizable.xcstrings" "$work/Localizable.xcstrings" "$raw" <<'PY'
 import json, sys
 committed = json.load(open(sys.argv[1], encoding="utf-8"))["strings"]

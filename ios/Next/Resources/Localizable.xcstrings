@@ -45,6 +45,17 @@
         }
       }
     },
+    "%@ · %lld steps": {
+      "comment": "Live caption: a batch of steps; the arguments are the first step and the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %lld adım"
+          }
+        }
+      }
+    },
     "%@ · %lld tasks": {
       "comment": "Usage: a day's tokens and tasks",
       "localizations": {
@@ -125,6 +136,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld bağlı"
+          }
+        }
+      }
+    },
+    "%lld fps": {
+      "comment": "Live picture status: frames a second",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld fps"
           }
         }
       }
@@ -1199,6 +1221,17 @@
         }
       }
     },
+    "Automatic quality": {
+      "comment": "Live viewer menu: the link decides HD or light",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otomatik kalite"
+          }
+        }
+      }
+    },
     "Back up the photo library": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1617,6 +1650,28 @@
         }
       }
     },
+    "Clicking": {
+      "comment": "Live caption: the run clicks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tıklıyor"
+          }
+        }
+      }
+    },
+    "Clicking %@": {
+      "comment": "Live caption: the run clicks; the argument is what",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tıklıyor: %@"
+          }
+        }
+      }
+    },
     "Client mail, twice a week": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1933,6 +1988,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlı: Dot onu görevlerinde kullanabilir."
+          }
+        }
+      }
+    },
+    "Connecting to the Mac's screen…": {
+      "comment": "Watch: the live screen is being opened (web watch.connecting)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in ekranına bağlanılıyor…"
           }
         }
       }
@@ -2758,6 +2824,17 @@
         }
       }
     },
+    "Dot is finishing a step; try again in a moment.": {
+      "comment": "Takeover: the page is busy with the run's last step (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir adımı bitiriyor; biraz sonra yeniden dene."
+          }
+        }
+      }
+    },
     "Dot is not paired with a Mac. Choose This device in Settings › Voice.": {
       "comment": "Composer: voice set to the Mac without a paired Mac",
       "localizations": {
@@ -2835,6 +2912,17 @@
         }
       }
     },
+    "Dot waits at its next step while you tap and type on the page.": {
+      "comment": "VoiceOver hint of Take over",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen sayfada dokunup yazarken Dot bir sonraki adımında bekler."
+          }
+        }
+      }
+    },
     "Dot waits for you in 2 chats": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2876,6 +2964,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un tarayıcısı"
+          }
+        }
+      }
+    },
+    "Dot's browser, live": {
+      "comment": "VoiceOver: the mini player of the run's browser",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un tarayıcısı, canlı"
           }
         }
       }
@@ -3756,6 +3855,28 @@
         }
       }
     },
+    "HD": {
+      "comment": "Live picture status: the full HD quality",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HD"
+          }
+        }
+      }
+    },
+    "Hand back": {
+      "comment": "Live viewer: let the run go on with its page (web computer.js Return control)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri ver"
+          }
+        }
+      }
+    },
     "Handing a part to a subagent": {
       "comment": "Work line: work handed to a helper",
       "localizations": {
@@ -3928,6 +4049,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanların çalıştırdığı komutları, düzenlemeleri ve aramaları gizle. Başarılıları gizle, hataları gösterir. Zen yalnızca son yanıtları gösterir. Onaylar, sorular ve hatalar her zaman görünür. Tümünü gizle ve Zen'de son mesajın altındaki tek satır Dot'un ne yaptığını söyler; adımlar için ona dokun."
+          }
+        }
+      }
+    },
+    "Hide the keyboard": {
+      "comment": "Live viewer: hides the keyboard that types on the page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klavyeyi gizle"
+          }
+        }
+      }
+    },
+    "Hide the live picture": {
+      "comment": "Mini player: folds it into a small Live pill",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı görüntüyü gizle"
           }
         }
       }
@@ -4130,6 +4273,17 @@
         }
       }
     },
+    "Its browser's page is shown here only while a task is going on.": {
+      "comment": "Live picture: why an ended run shows no page (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarayıcısının sayfası burada yalnızca bir görev sürerken gösterilir."
+          }
+        }
+      }
+    },
     "Keeping the Mac awake": {
       "comment": "System: the keep-awake state",
       "localizations": {
@@ -4317,6 +4471,28 @@
         }
       }
     },
+    "Live": {
+      "comment": "Live picture status: frames are coming",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı"
+          }
+        }
+      }
+    },
+    "Live picture": {
+      "comment": "VoiceOver: the live picture of the Mac's screen or Dot's browser",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı görüntü"
+          }
+        }
+      }
+    },
     "Loading": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -4335,6 +4511,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekrana baktı"
+          }
+        }
+      }
+    },
+    "Looking at the page": {
+      "comment": "Live caption: the run reads the page or screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfaya bakıyor"
           }
         }
       }
@@ -4368,6 +4555,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düşük"
+          }
+        }
+      }
+    },
+    "Low data": {
+      "comment": "Live picture status: the phone-sized quality for a weak link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Az veri"
+          }
+        }
+      }
+    },
+    "Low data (weak connection)": {
+      "comment": "Live viewer menu: the phone-sized quality",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Az veri (zayıf bağlantı)"
           }
         }
       }
@@ -5440,6 +5649,17 @@
         }
       }
     },
+    "Open full screen": {
+      "comment": "VoiceOver action: opens the live picture full screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tam ekran aç"
+          }
+        }
+      }
+    },
     "Open iOS Settings": {
       "comment": "Opens the app's page in iOS Settings",
       "localizations": {
@@ -5458,6 +5678,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kliniğin randevu sayfasını açtı"
+          }
+        }
+      }
+    },
+    "Opening %@": {
+      "comment": "Live caption: the run opens a page or app; the argument is which",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıyor: %@"
+          }
+        }
+      }
+    },
+    "Opening a page": {
+      "comment": "Live caption: the run opens a page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir sayfa açıyor"
           }
         }
       }
@@ -5782,6 +6024,17 @@
         }
       }
     },
+    "Pinch to zoom, double-tap to zoom in": {
+      "comment": "VoiceOver hint: how to zoom the live picture",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yakınlaştırmak için iki parmakla aç ya da iki kez dokun"
+          }
+        }
+      }
+    },
     "Pinned": {
       "comment": "Chat list section: the chats the owner pinned, on top\nMemory: a pinned note",
       "localizations": {
@@ -5881,6 +6134,28 @@
         }
       }
     },
+    "Pressing %@": {
+      "comment": "Live caption: the run presses a key; the argument is the key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basıyor: %@"
+          }
+        }
+      }
+    },
+    "Pressing a key": {
+      "comment": "Live caption: the run presses a key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir tuşa basıyor"
+          }
+        }
+      }
+    },
     "Preview of a command's output": {
       "comment": "VoiceOver: the terminal preview in Appearance",
       "localizations": {
@@ -5965,6 +6240,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcı programları"
+          }
+        }
+      }
+    },
+    "Quality": {
+      "comment": "Live viewer: the menu of the picture's quality",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalite"
           }
         }
       }
@@ -6537,6 +6823,28 @@
         }
       }
     },
+    "Rotate to landscape": {
+      "comment": "Live viewer: turns the picture on its side, as wide as the screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatay çevir"
+          }
+        }
+      }
+    },
+    "Rotate to portrait": {
+      "comment": "Live viewer: turns the picture upright",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikey çevir"
+          }
+        }
+      }
+    },
     "Rows and sections": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -6797,6 +7105,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "En yeni mesaja kaydır"
+          }
+        }
+      }
+    },
+    "Scrolling": {
+      "comment": "Live caption: the run scrolls the page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydırıyor"
           }
         }
       }
@@ -7336,6 +7655,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfa göster"
+          }
+        }
+      }
+    },
+    "Show the live picture": {
+      "comment": "Mini pill: opens the folded mini player",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı görüntüyü göster"
           }
         }
       }
@@ -7880,6 +8210,17 @@
         }
       }
     },
+    "Take over": {
+      "comment": "Live viewer: hold the run and use its page from the phone (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devral"
+          }
+        }
+      }
+    },
     "Tap the eye of a model to hide it from this list or show it again.": {
       "comment": "Chat settings: how hiding a model works",
       "localizations": {
@@ -8122,6 +8463,17 @@
         }
       }
     },
+    "The Mac stopped sending its screen.": {
+      "comment": "Watch: the live screen's stream ended (web watch.ended)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac ekranını göndermeyi bıraktı."
+          }
+        }
+      }
+    },
     "The Mac writes down five minutes at most; what was said is in the box.": {
       "comment": "Composer: the Mac's recording limit was reached",
       "localizations": {
@@ -8151,6 +8503,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'in ekranı"
+          }
+        }
+      }
+    },
+    "The Mac's screen capture did not start; trying again.": {
+      "comment": "Live picture: the daemon failed to start the capture (5xx)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in ekran kaydı başlamadı; yeniden deneniyor."
           }
         }
       }
@@ -8419,6 +8782,17 @@
         }
       }
     },
+    "The screen could not be shown": {
+      "comment": "Live picture: the daemon refused the stream (web watch.failed)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekran gösterilemedi"
+          }
+        }
+      }
+    },
     "The secure connection failed. Check the Mac's Tailscale HTTPS certificate.": {
       "comment": "Diagnosis: TLS failed",
       "localizations": {
@@ -8437,6 +8811,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yan soru sorulamadı: %@"
+          }
+        }
+      }
+    },
+    "The task has ended": {
+      "comment": "Live picture status: the run is over, its browser has no page to show (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görev bitti"
           }
         }
       }
@@ -8815,6 +9200,17 @@
         }
       }
     },
+    "Type on the page": {
+      "comment": "Live viewer: shows the keyboard that types on the page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfaya yaz"
+          }
+        }
+      }
+    },
     "Type roles": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -8866,6 +9262,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adını ve telefon numaranı yazıyor"
+          }
+        }
+      }
+    },
+    "Typing “%@”": {
+      "comment": "Live caption: the run types; the argument is the text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıyor: “%@”"
           }
         }
       }
@@ -9068,6 +9475,17 @@
         }
       }
     },
+    "Using the page from the phone is off on your Mac: Settings › Browser › Use the page from the screen while I hold the task.": {
+      "comment": "Takeover refused: [browser] remote_input is off on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfayı telefondan kullanmak Mac'inde kapalı: Ayarlar › Tarayıcı › Görevi tutarken sayfayı ekrandan kullan."
+          }
+        }
+      }
+    },
     "Version": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -9178,6 +9596,17 @@
         }
       }
     },
+    "Waiting for the page": {
+      "comment": "Live caption: the run waits for text on the page\nLive picture: the first frame of the run's browser has not come (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfa bekleniyor"
+          }
+        }
+      }
+    },
     "Waiting for you": {
       "comment": "Work line: an approval or a question waits for the owner",
       "localizations": {
@@ -9269,6 +9698,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ saatinde çalışıyordu · eşitleniyor…"
+          }
+        }
+      }
+    },
+    "Watch live": {
+      "comment": "Chat header: opens the live picture of what the run does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı izle"
           }
         }
       }
@@ -9548,6 +9988,17 @@
         }
       }
     },
+    "Working on the page": {
+      "comment": "Live caption: another browser or desktop step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfada çalışıyor"
+          }
+        }
+      }
+    },
     "Write notes": {
       "comment": "Tool row of Dot's own tool: the run's notes written",
       "localizations": {
@@ -9643,6 +10094,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dün"
+          }
+        }
+      }
+    },
+    "You": {
+      "comment": "Mini player: the owner holds the run's page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen"
           }
         }
       }
@@ -9757,6 +10219,17 @@
         }
       }
     },
+    "Your Mac does not let a phone do this.": {
+      "comment": "Takeover refused to a phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in bunu bir telefona yaptırmıyor."
+          }
+        }
+      }
+    },
     "Your Mac does not take this from a phone (%@). Open on the Mac: %@.": {
       "comment": "Settings: the daemon refused a phone's key; first argument its words, second where on the Mac",
       "localizations": {
@@ -9823,6 +10296,17 @@
         }
       }
     },
+    "Your Mac's screen, live": {
+      "comment": "VoiceOver: the mini player of the Mac's screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inin ekranı, canlı"
+          }
+        }
+      }
+    },
     "Your answer": {
       "comment": "Ask dock: the field of a question's answer",
       "localizations": {
@@ -9874,6 +10358,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Senin adın"
+          }
+        }
+      }
+    },
+    "Your taps go to the page.": {
+      "comment": "Takeover: the line under the picture once the phone holds the run (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dokunuşların sayfaya gidiyor."
           }
         }
       }
