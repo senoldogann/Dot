@@ -48,6 +48,7 @@ struct ConnectAppsSheet: View {
         .presentationBackground(Tone.sheet)
         .tint(Tone.text)
         .task { await load() }
+        .task { await keepReading() }
         .sheet(item: $shown) { app in
             ConnectAppDetail(
                 app: current(app), finishing: finishing.contains(app.id), problem: stepProblem,
@@ -326,26 +327,61 @@ struct ConnectAppsSheet: View {
         }
     }
 
-    /// Takes away every connection of `app` Dot can take back; the first refusal stops and is shown.
-    private func disconnect(_ app: ConnectApp) async -> SettingsFailure? {
+    /// Takes away every connection of `app` Dot can take back; the first refusal stops and is shown. A sign-in the
+    /// provider did not end comes back with the daemon's words of where to end it (item 1312).
+    private func disconnect(_ app: ConnectApp) async -> DisconnectOutcome {
+        var notices: [String] = []
         for removal in app.removals {
-            let outcome: Result<Bool, SettingsFailureBox> = await model.write { api throws(DaemonRequestError) in
+            let outcome: Result<String?, SettingsFailureBox> = await model.write { api throws(DaemonRequestError) in
                 switch removal {
-                case .server(let name): _ = try await api.removeMcpServer(name)
-                case .vault: _ = try await api.disconnectVault()
-                case .account(let provider, let address): _ = try await api.signOut(provider: provider, address: address)
+                case .server(let name):
+                    _ = try await api.removeMcpServer(name)
+                    return nil
+                case .vault:
+                    _ = try await api.disconnectVault()
+                    return nil
+                case .account(let provider, let address):
+                    let signedOut: SignedOutView = try await api.signOut(provider: provider, address: address)
+                    return signedOut.revoked ? nil : signedOut.notice
                 }
-                return true
             }
-            if case .failure(let box) = outcome {
+            switch outcome {
+            case .success(let notice):
+                if let notice { notices.append(notice) }
+            case .failure(let box):
                 await load()
-                return box.failure
+                return DisconnectOutcome(failure: box.failure, notices: notices)
             }
         }
         finishing.remove(app.id)
         await load()
-        return nil
+        return DisconnectOutcome(failure: nil, notices: notices)
     }
+
+    /// Whether a service waits on the Mac, so the sheet reads again by itself (the web asks again while a server is
+    /// tried or waits for a sign-in).
+    private var waitsOnTheMac: Bool {
+        guard let loaded = sources.value else { return false }
+        return connectApps(loaded).contains { $0.action == .waiting || (finishing.contains($0.id) && !$0.isConnected) }
+    }
+
+    /// Reads again every five seconds while a service waits on the Mac, until the sheet closes.
+    private func keepReading() async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: .seconds(5))
+            } catch {
+                return
+            }
+            if waitsOnTheMac { await load() }
+        }
+    }
+}
+
+/// What a Disconnect came to: the refusal that stopped it, and the providers' notices of a grant they kept.
+struct DisconnectOutcome: Sendable {
+    let failure: SettingsFailure?
+    let notices: [String]
 }
 
 /// The words of a section of the catalogue (`views/connectors.js` SECTIONS); a section a newer daemon adds is shown by
@@ -496,11 +532,12 @@ private struct ConnectAppDetail: View {
     let finishing: Bool
     let problem: SettingsFailure?
     let connect: () async -> Void
-    let disconnect: () async -> SettingsFailure?
+    let disconnect: () async -> DisconnectOutcome
     @Environment(\.dismiss) private var dismiss: DismissAction
     @State private var asksDisconnect: Bool = false
     @State private var working: Bool = false
     @State private var disconnectProblem: SettingsFailure?
+    @State private var disconnectNotices: [String] = []
 
     var body: some View {
         ScrollView {
@@ -537,7 +574,9 @@ private struct ConnectAppDetail: View {
             Button(String(localized: "Disconnect", comment: "Connect apps detail: takes a service's connection away"), role: .destructive) {
                 Task {
                     working = true
-                    disconnectProblem = await disconnect()
+                    let outcome: DisconnectOutcome = await disconnect()
+                    disconnectProblem = outcome.failure
+                    disconnectNotices = outcome.notices
                     working = false
                 }
             }
@@ -553,6 +592,7 @@ private struct ConnectAppDetail: View {
         if let disconnectProblem {
             FailureBanner(failure: disconnectProblem, macPlace: String(localized: "Settings › Connectors", comment: "Where on the Mac: the Connectors page"), retry: nil)
         }
+        ForEach(disconnectNotices, id: \.self) { notice in Notice(tone: .warn, message: notice, dismiss: nil) }
         switch app.action {
         case .connected:
             Notice(tone: .info, message: String(localized: "Connected: Dot can use it in its tasks.", comment: "Connect apps detail: the service is connected"), dismiss: nil)

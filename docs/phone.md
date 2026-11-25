@@ -56,7 +56,10 @@ code** takes its place. Beside a shown code stands a QR code for the iPhone app 
 never words of the caller's, and only for the Mac's own key, as a phone makes no code): the iPhone's camera opens Dot
 Next with the address and the code filled, and one tap pairs it. Dot Next's Settings hold what you need away from the
 Mac to direct, watch, answer or stop Dot; setting up the Mac stays on the Mac, which the list's last line says ("More
-settings are on your Mac"), and no row of it opens the web app (item 1791). Its **Maintenance** shows Dot's version and
+settings are on your Mac"), and no row of it opens the web app (item 1791). The one exception is **Connect apps** (items
+1861 and 1862): the Mac's Connectors catalogue, where a Mac application's step is started from the phone and answered
+on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
+connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
 which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). The same by hand:
 
