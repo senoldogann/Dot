@@ -348,7 +348,7 @@ struct ActivityHome: View {
     private func load() async {
         if agent != nil {
             async let activity = model.read { api throws(DaemonRequestError) in try await api.activity() }
-            async let away = readAway()
+            async let away = readAwayUnmarked()
             var fresh: ActivityPicture = picture
             fresh.activity = await activity
             fresh.away = await away
@@ -374,6 +374,21 @@ struct ActivityHome: View {
     private func readAway() async -> Loadable<AwayView?> {
         switch await model.awayMoment() {
         case .loaded(let since):
+            switch await model.read({ api throws(DaemonRequestError) in try await api.away(since: since) }) {
+            case .loaded(let view): return .loaded(view)
+            case .loading: return .loading
+            case .failed(let failure): return .failed(failure)
+            }
+        case .loading: return .loading
+        case .failed(let failure): return .failed(failure)
+        }
+    }
+
+    /// "While you were away" from the moment a device marked, or nothing before any did: it never marks the moment.
+    private func readAwayUnmarked() async -> Loadable<AwayView?> {
+        switch await model.awayMarked() {
+        case .loaded(nil): return .loaded(nil)
+        case .loaded(let since?):
             switch await model.read({ api throws(DaemonRequestError) in try await api.away(since: since) }) {
             case .loaded(let view): return .loaded(view)
             case .loading: return .loading
