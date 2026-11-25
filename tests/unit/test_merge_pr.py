@@ -32,6 +32,16 @@ def test_only_the_files_both_changed_send_the_branch_back_to_main() -> None:
     assert merge_pr.shared_files(changed, moved) == ["src/dotagent/agent/loop.py", "tests/unit/test_loop.py"]
 
 
+def test_markdown_counts_when_a_test_names_it_and_the_index_never() -> None:
+    assert not merge_pr.counts("roadmap/INDEX.md", True)
+    assert not merge_pr.counts("docs/runs.md", False) and not merge_pr.counts("ios/Next/README.md", False)
+    assert merge_pr.counts("docs/daemon.md", True)
+    for always in ["roadmap/1324.md", "changes/1863.md", "src/dotagent/skills/builtin/captcha/SKILL.md"]:
+        assert not merge_pr.asks_the_tests(always) and merge_pr.counts(always, False)
+    for code in ["docs/schemas/thread-sync.schema.json", "src/dotagent/agent/loop.py"]:
+        assert not merge_pr.asks_the_tests(code) and merge_pr.counts(code, False)
+
+
 def test_the_newest_run_of_the_gate_counts_and_none_refuses_the_merge() -> None:
     newest = merge_pr.GateRun(run_id=2, created_at="2026-11-03T10:00:00Z", status="completed", conclusion="success")
     older = merge_pr.GateRun(run_id=1, created_at="2026-11-03T09:00:00Z", status="completed", conclusion="failure")
