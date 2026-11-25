@@ -25,10 +25,13 @@ public struct ActivityRow: Codable, Sendable, Hashable, Identifiable {
     public let parentRunId: String?
     /// The chat of the run at the top of a delegated run's chain (item 1074); `nil` for any other row.
     public let rootThreadId: String?
+    /// Whose face the row wears: the agent's id for an agent's run, the campaign's for a session, a delegated run's own;
+    /// `nil` for Dot's own.
+    public let actorId: String?
 
     public init(
         id: String, section: String, kind: String, title: String, detail: String, since: Double, href: String, runId: String?, status: String,
-        minutes: Double?, tokens: Int?, steps: Int?, parentRunId: String?, rootThreadId: String?
+        minutes: Double?, tokens: Int?, steps: Int?, parentRunId: String?, rootThreadId: String?, actorId: String?
     ) {
         self.id = id
         self.section = section
@@ -44,6 +47,7 @@ public struct ActivityRow: Codable, Sendable, Hashable, Identifiable {
         self.steps = steps
         self.parentRunId = parentRunId
         self.rootThreadId = rootThreadId
+        self.actorId = actorId
     }
 
     enum CodingKeys: String, CodingKey {
@@ -51,6 +55,7 @@ public struct ActivityRow: Codable, Sendable, Hashable, Identifiable {
         case runId = "run_id"
         case parentRunId = "parent_run_id"
         case rootThreadId = "root_thread_id"
+        case actorId = "actor_id"
     }
 }
 
@@ -94,6 +99,10 @@ public struct AwayRun: Codable, Sendable, Hashable, Identifiable {
     public let runId: String
     public let title: String
     public let source: String
+    /// Whether it is a session of a campaign.
+    public let campaign: Bool
+    /// The agent the run belongs to; `nil` for Dot's own.
+    public let agentId: String?
     public let status: String
     public let createdAt: Double
     public let finishedAt: Double?
@@ -102,10 +111,14 @@ public struct AwayRun: Codable, Sendable, Hashable, Identifiable {
 
     public var id: String { runId }
 
-    public init(runId: String, title: String, source: String, status: String, createdAt: Double, finishedAt: Double?, answer: String) {
+    public init(
+        runId: String, title: String, source: String, campaign: Bool, agentId: String?, status: String, createdAt: Double, finishedAt: Double?, answer: String
+    ) {
         self.runId = runId
         self.title = title
         self.source = source
+        self.campaign = campaign
+        self.agentId = agentId
         self.status = status
         self.createdAt = createdAt
         self.finishedAt = finishedAt
@@ -113,8 +126,9 @@ public struct AwayRun: Codable, Sendable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case title, source, status, answer
+        case title, source, campaign, status, answer
         case runId = "run_id"
+        case agentId = "agent_id"
         case createdAt = "created_at"
         case finishedAt = "finished_at"
     }
