@@ -8,7 +8,8 @@ struct AwayCard: View {
     let view: AwayView
     @Binding var showsAll: Bool
     let open: (String) -> Void
-    let markRead: () async -> Void
+    /// Marks the whole of Dot's card read for every device; `nil` on an agent's profile, which shows a part of it.
+    let markRead: (() async -> Void)?
     @Environment(\.locale) private var locale: Locale
     @State private var marking: Bool = false
 
@@ -44,17 +45,19 @@ struct AwayCard: View {
                         .buttonStyle(SecondaryButtonStyle())
                 }
                 Spacer(minLength: 0)
-                Button {
-                    marking = true
-                    Task {
-                        await markRead()
-                        marking = false
+                if let markRead {
+                    Button {
+                        marking = true
+                        Task {
+                            await markRead()
+                            marking = false
+                        }
+                    } label: {
+                        Text(String(localized: "Mark as read", comment: "Away card: moves the moment on for every device"))
                     }
-                } label: {
-                    Text(String(localized: "Mark as read", comment: "Away card: moves the moment on for every device"))
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(marking)
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(marking)
             }
             .padding(.horizontal, Space.groupedGutter).padding(.vertical, Space.s)
         }
