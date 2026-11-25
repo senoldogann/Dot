@@ -27,6 +27,18 @@ extension AppModel {
     }
 }
 
+extension AppModel {
+    /// The moment any device last marked "while you were away" read, without marking it: `nil` before any did (an
+    /// agent's profile, which shows a part of the card, never writes the Dot-wide moment).
+    func awayMarked() async -> Loadable<Double?> {
+        switch await read({ api throws(DaemonRequestError) in try await api.awayRead() }) {
+        case .loaded(let marked): return .loaded(marked.readAt)
+        case .loading: return .loading
+        case .failed(let failure): return .failed(failure)
+        }
+    }
+}
+
 /// How a Send or a Discard of a draft went.
 enum DraftOutcome: Equatable {
     /// The daemon took it: the draft as it stands now (`sent`, `discarded`, or `failed` with the application's words).
