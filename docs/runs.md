@@ -973,7 +973,7 @@ the recipients before you send it again, or they get it twice. A second press, h
 draft taken (409). A draft the daemon was handing over when it stopped is marked "Not sent" at its next
 start, as whether it went out is not known: look in Mail's Sent mailbox or the conversation in Messages before you send
 it again. Drafts are kept in the `drafts` table and go with their chat, or with the events of their run when those age
-out, once they are sent or discarded: a draft that waits, failed or is being sent stays (item 686). The API: `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
+out, once they are sent or discarded: a draft that waits, failed or is being sent stays (item 686). The API: `GET /api/drafts` (the drafts that wait for you, newest first, a failed send among them: the iPhone app's Activity lists them as Ready, item 1825), `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
 go; a message has no cc and no subject) and `POST /api/drafts/{id}/discard`. The scripts were not run against Mail or
 Messages themselves, which would send for real: the tests compile them, and give them to a stand-in of `osascript` that
 writes down what it was handed.
