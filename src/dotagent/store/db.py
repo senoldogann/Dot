@@ -35,6 +35,14 @@ from dotagent.core.text import fold_search, plain_line
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, Effort, ImageData, Message, OneMessage, Speed
+from dotagent.notify.tells import (
+    TELL_RESPONSE_EVENT,
+    TELL_SENT_EVENT,
+    TELLS_RUN_ID,
+    OwnerAct,
+    TellResponse,
+    TellSent,
+)
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.backup import PARTIAL_DIR, Backup, list_backups, make_backup
 from dotagent.store.endings import RESULT_RESTARTED, classify_ending
@@ -405,6 +413,8 @@ _PAGE_ID_BYTES: int = 18
 # A chat's last line in the sidebar (item 277): how many characters it keeps, and how many of the latest run's message
 # and answer are read for it (a fence or a heading at the start of an answer takes some of them).
 _LAST_MESSAGE_CHARS: int = 160
+# How many ids one ``IN (...)`` of a query takes (SQLite's own limit is far above).
+_IN_CHUNK: int = 500
 _LAST_MESSAGE_READ_CHARS: int = 1000
 # A run and the later runs still in its chat, oldest first: what a rewind to before the run takes out (item 282). Its
 # two parameters are the run's id.
@@ -4444,6 +4454,60 @@ class Store:
             "SELECT * FROM events WHERE run_id = ? AND kind = ? ORDER BY id DESC LIMIT 1", (run_id, kind)
         )
         return None if row is None else _event(row)
+
+    async def thread_last_call_at(self, thread_id: str, run_id: str) -> float | None:
+        """When a model last answered in a run of the chat ``thread_id`` other than ``run_id`` (item 1742), or ``None``
+        when the chat has had no call: how long ago the provider's cache of the chat was last written or read."""
+        row = await self._one(
+            "SELECT MAX(e.ts) AS last FROM events AS e JOIN runs AS r ON r.id = e.run_id"
+            " WHERE r.thread_id = ? AND r.id != ? AND e.kind = ?",
+            (thread_id, run_id, CALL_EVENT),
+        )
+        return None if row is None or row["last"] is None else float(row["last"])
+
+    async def add_tell_event(self, kind: str, data: JsonObject) -> None:
+        """Keep a tell or the owner's answer to one (item 1743) as an event under :data:`TELLS_RUN_ID`: the events
+        table is where tells are kept, so that the store gains no table."""
+        await self.add_event(TELLS_RUN_ID, kind, data)
+
+    async def tells_since(self, since: float) -> list[TellSent]:
+        """The tells that went out since ``since``, the oldest first."""
+        rows = await self._all(
+            "SELECT ts, data FROM events WHERE run_id = ? AND kind = ? AND ts >= ? ORDER BY id",
+            (TELLS_RUN_ID, TELL_SENT_EVENT, since),
+        )
+        return [TellSent.model_validate({**parse_json_object(row["data"], "tell"), "ts": row["ts"]}) for row in rows]
+
+    async def tell_responses_since(self, since: float) -> list[TellResponse]:
+        """The owner's answers to tells made since ``since``, the oldest first."""
+        rows = await self._all(
+            "SELECT ts, data FROM events WHERE run_id = ? AND kind = ? AND ts >= ? ORDER BY id",
+            (TELLS_RUN_ID, TELL_RESPONSE_EVENT, since),
+        )
+        return [
+            TellResponse.model_validate({**parse_json_object(row["data"], "tell"), "ts": row["ts"]}) for row in rows
+        ]
+
+    async def owner_acts_since(self, since: float, sources: Sequence[str]) -> list[OwnerAct]:
+        """What the owner did in a chat since ``since``: the runs their own messages started (``sources``) and the
+        reactions they put on messages of Dot's, each with its chat."""
+        marks: str = ",".join("?" for _ in sources)
+        runs = await self._all(
+            f"SELECT thread_id, created_at AS ts FROM runs WHERE created_at >= ? AND source IN ({marks})",
+            (since, *sources),
+        )
+        reactions = await self._all("SELECT thread_id, created_at AS ts FROM reactions WHERE created_at >= ?", (since,))
+        return [OwnerAct(thread_id=str(row["thread_id"]), ts=float(row["ts"])) for row in (*runs, *reactions)]
+
+    async def threads_of_runs(self, run_ids: Sequence[str]) -> dict[str, str]:
+        """The chat of each of ``run_ids`` that is still there."""
+        found: dict[str, str] = {}
+        for start in range(0, len(run_ids), _IN_CHUNK):
+            chunk: Sequence[str] = run_ids[start : start + _IN_CHUNK]
+            marks: str = ",".join("?" for _ in chunk)
+            for row in await self._all(f"SELECT id, thread_id FROM runs WHERE id IN ({marks})", tuple(chunk)):
+                found[str(row["id"])] = str(row["thread_id"])
+        return found
 
     async def goal_spend(self, since: float, limit: int) -> list[ChatSpend]:
         """The ``limit`` goals that spent the most tokens in the runs created since ``since``, the chats of one title

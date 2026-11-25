@@ -129,6 +129,38 @@ export function windowLine(window, now) {
   return parts.join(" · ");
 }
 
+const FIRST_STEP_CAUSES = {
+  new_chat: "its first step was cold: a new chat",
+  prefix_changed: "its first step was cold: the instructions changed since the chat's last task",
+  after_pause: "its first step was cold after a pause",
+  unexplained: "its first step was cold a few minutes after the last call",
+};
+const COLD_STEP_CAUSES = { tool_group: "a tool group turned on", compaction: "a summary of the chat", other: "no known cause" };
+
+/**
+ * What the service's cache did for a task (item 1742), from `cache` of `GET /runs/{id}/stats`, as a line: why its first
+ * step was cold, if it was, and how many later steps were read at full price and after what. "None" when the task
+ * found its prompt in the cache from the first step to the last, or measured no step.
+ */
+export function cacheWords(cache) {
+  if (cache === null || cache === undefined) {
+    return "None";
+  }
+  const parts = [];
+  const first = FIRST_STEP_CAUSES[cache.first_cause];
+  if (first !== undefined) {
+    parts.push(first);
+  }
+  if (cache.changed.length > 0) {
+    parts.push(`changed: ${cache.changed.slice(0, 3).join(", ")}${cache.changed.length > 3 ? ` and ${cache.changed.length - 3} more` : ""}`);
+  }
+  if (cache.cold_steps.length > 0) {
+    const causes = [...new Set(cache.cold_steps.map((step) => COLD_STEP_CAUSES[step.cause]))].join(", ");
+    parts.push(`${plural(cache.cold_steps.length, "later step", "later steps")} read at full price after ${causes}`);
+  }
+  return parts.length === 0 ? "None" : parts.join(" · ");
+}
+
 /**
  * What a task has used so far, from the answer of `GET /runs/{id}/stats` (`costs`): `{ line, window }`, or null when the
  * task is not at work (the card then shows what it cost, as it did). `line` is its time, the tokens in and out and its

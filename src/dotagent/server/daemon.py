@@ -39,6 +39,7 @@ from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.needs_you import needs_you_count
 from dotagent.notify.owner import tell_owner
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
+from dotagent.notify.tell_ledger import TELL_SOURCE_KINDS, watch_tells
 from dotagent.oauth.accounts import keep_revoking
 from dotagent.phone.keeper import keep_phone
 from dotagent.proactive.watching import watch_loop
@@ -210,7 +211,7 @@ def _log_push_end(health: NotifyHealth, channel: str, pusher: asyncio.Task[None]
 
 async def _tell_phone_owner(bus: EventBus, title: str, text: str) -> None:
     """Tell the owner the iPhone needs them; a tap opens Settings › Phone, which shows the link's state."""
-    await tell_owner(bus, title, text, "#/settings/phone")
+    await tell_owner(bus, title, text, "#/settings/phone", "system", "")
 
 
 def _log_phone_end(task: asyncio.Task[None]) -> None:
@@ -357,6 +358,12 @@ async def run_daemon(config: AppConfig) -> int:
             phone.mark_live("push")
             pusher.add_done_callback(functools.partial(_log_push_end, phone, "push"))
             cleanup.push_async_callback(_cancelled, pusher)
+            # What the owner is told is kept, to count what they do with it (item 1743).
+            told_feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(TELL_SOURCE_KINDS))
+            teller: asyncio.Task[None] = asyncio.create_task(
+                watch_tells(runtime.store, told_feed, stopping), name="tell-ledger"
+            )
+            cleanup.push_async_callback(_cancelled, teller)
             # A sign-out the provider did not take is asked again now and every hour for a week (item 1312).
             revoking: asyncio.Task[None] = asyncio.create_task(
                 keep_revoking(runtime.accounts, stopping), name="sign-out-revokes"

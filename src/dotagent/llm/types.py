@@ -20,6 +20,9 @@ Speed = Literal["standard", "fast"]
 # one before it with more appended; ``single`` for a question asked once (a review, a summary, a recap). A provider
 # that charges for writing its prompt cache (Anthropic) writes it only for a conversation.
 PromptReuse = Literal["single", "conversation"]
+# How long a provider that offers the choice keeps a cache it wrote (item 1742): ``5m`` is every provider's own, ``1h``
+# a write that costs more and survives the pause of a chat or a schedule that comes back within the hour.
+CacheTtl = Literal["5m", "1h"]
 # Where a model's window comes from (item 250): its provider's API names it, Dot's table of the windows its provider
 # publishes holds it, Dot assumes it for a model neither names, or it is the window Dot asks Ollama for (num_ctx).
 WindowSource = Literal["provider", "published", "assumed", "asked"]
@@ -117,9 +120,14 @@ class ToolSpec(FrozenModel):
 
 
 class Usage(FrozenModel):
+    """A call's tokens. ``input_tokens`` counts the cached and the cache-written tokens too; ``cache_write_tokens`` is
+    what the provider wrote to its cache (Anthropic bills it above the price of input, item 1742), 0 where a provider
+    reports none."""
+
     input_tokens: int
     output_tokens: int
     cached_tokens: int
+    cache_write_tokens: int = 0
 
 
 class ChatRequest(FrozenModel):
@@ -130,7 +138,7 @@ class ChatRequest(FrozenModel):
     ``window`` is the window the call asks the model's provider to give it, the one a run planned with
     (``agent.scaffold.run_window``) or a side call's (``ModelRouter.window_of``), or ``None`` for the provider's own;
     Ollama is the provider that takes it, as ``num_ctx`` (item 520). ``prompt_reuse`` says whether a later call starts
-    with this one's prompt (:data:`PromptReuse`)."""
+    with this one's prompt (:data:`PromptReuse`), and ``cache_ttl`` how long the cache it writes is kept (item 1742)."""
 
     model: str
     messages: tuple[Message, ...]
@@ -143,6 +151,8 @@ class ChatRequest(FrozenModel):
     cache_mark: int | None
     prompt_reuse: PromptReuse
     window: int | None
+    # How long the cache this call writes lives, where its provider offers the choice (:data:`CacheTtl`).
+    cache_ttl: CacheTtl = "5m"
 
 
 class ModelReply(FrozenModel):

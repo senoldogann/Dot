@@ -330,7 +330,13 @@ async def test_a_message_dot_wrote_goes_with_a_fixed_title(tmp_path: Path) -> No
         apple = _Apple({})
         watch = ApnsWatch(store, ApnsSender(_CONFIG, ec.generate_private_key(ec.SECP256R1()), apple))
         await store.set_apns_device("p1", _DEVICE, None, "production", _NOW)
-        told: JsonObject = {"title": "Your rent is due", "text": "Pay it", "url": "#/"}
+        told: JsonObject = {
+            "title": "Your rent is due",
+            "text": "Pay it",
+            "url": "#/",
+            "kind": "watcher",
+            "subject": "w1",
+        }
         await watch.on_event(EventRecord(id=0, run_id=SYSTEM_RUN_ID, ts=_NOW, kind=OWNER_TOLD_EVENT, data=told), _NOW)
         url, _, alert = apple.posted[-1]
         assert url.startswith("https://api.push.apple.com/")
@@ -538,7 +544,13 @@ async def test_a_phone_that_shows_dot_hears_no_alert_of_a_runs_end_and_every_oth
         assert len(_alerts_to(apple, _DEVICE)) == 7
         # A draft written for the owner, what Dot tells them on its own and the warnings of Dot itself go too.
         await watch.on_event(_draft_written(run), _NOW + 6)
-        told: JsonObject = {"title": "Your rent is due", "text": "Pay it", "url": "#/"}
+        told: JsonObject = {
+            "title": "Your rent is due",
+            "text": "Pay it",
+            "url": "#/",
+            "kind": "watcher",
+            "subject": "w1",
+        }
         await watch.on_event(_system(OWNER_TOLD_EVENT, told), _NOW + 6)
         missed: JsonObject = {"schedule_id": "sch_1", "name": "Brief", "status": "missed"}
         await watch.on_event(_system(SCHEDULE_MISSED_EVENT, missed), _NOW + 6)
@@ -610,7 +622,7 @@ async def test_a_phone_is_told_only_the_kinds_of_push_it_switched_on_each_phone_
             _event(run.id, "approval_requested", step),
             _event(run.id, "approval_requested", {**step, "severity": "question"}),
             _draft_written(run),
-            _system(OWNER_TOLD_EVENT, {"title": "Brief", "text": "x", "url": "#/"}),
+            _system(OWNER_TOLD_EVENT, {"title": "Brief", "text": "x", "url": "#/", "kind": "brief", "subject": ""}),
             _event(run.id, "run_finished", {"status": "done", "result": "x"}),
             _system(SCHEDULE_RUN_ENDED_EVENT, sent),
             _system(SCHEDULE_MISSED_EVENT, missed),

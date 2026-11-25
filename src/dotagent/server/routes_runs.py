@@ -600,7 +600,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         minutes: int = max(1, round(request.quiet_s / 60))
         goal: str = " ".join(run.goal.split())[:120]
         await tell_owner(
-            ctx.runtime.bus, "A task makes no progress", f"{minutes} min with no step: {goal}", f"#/runs/{run.id}"
+            ctx.runtime.bus,
+            "A task makes no progress",
+            f"{minutes} min with no step: {goal}",
+            f"#/runs/{run.id}",
+            "system",
+            "",
         )
         log.warning("run_stuck_told", run_id=run.id, quiet_s=request.quiet_s)
         return StuckView(told=True)

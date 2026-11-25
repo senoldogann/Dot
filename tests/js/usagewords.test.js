@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   barShare,
   budgetLine,
+  cacheWords,
   capMillions,
   capTokens,
   dayLabel,
@@ -148,4 +149,24 @@ test("today against the day's cap, and one of the costliest tasks, in a line", (
   assert.equal(todayLine({ caps: { day_tokens: 0 }, today: 1_200_000 }), "Today 1.2M, no cap");
   assert.equal(topRunLine({ source: "delegate", model: "claude_code:sonnet", steps: 371, tokens: 209_800_000 }), "Helpers · claude_code:sonnet · 371 steps · 209.8M");
   assert.equal(sourceName("work_order"), "work order");
+});
+
+test("the cache says why a task's first step was cold and what its cold later steps came after, and nothing when it found its prompt", () => {
+  const report = { first_cause: "warm", changed: [], cold_steps: [] };
+  assert.equal(cacheWords(null), "None");
+  assert.equal(cacheWords(report), "None");
+  assert.equal(cacheWords({ ...report, first_cause: "new_chat" }), "its first step was cold: a new chat");
+  assert.equal(
+    cacheWords({ ...report, first_cause: "prefix_changed", changed: ["system:Skills", "tools:browser", "system:Team", "system:Environment"] }),
+    "its first step was cold: the instructions changed since the chat's last task · changed: system:Skills, tools:browser, system:Team and 1 more",
+  );
+  const steps = [
+    { step: 3, uncached_tokens: 90_000, cause: "tool_group" },
+    { step: 9, uncached_tokens: 50_000, cause: "tool_group" },
+    { step: 12, uncached_tokens: 40_000, cause: "compaction" },
+  ];
+  assert.equal(
+    cacheWords({ ...report, cold_steps: steps }),
+    "3 later steps read at full price after a tool group turned on, a summary of the chat",
+  );
 });

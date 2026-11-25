@@ -482,7 +482,7 @@ class WorkDesk:
         self._stop_attempt(order)
         title: str = one_line(order.title, _LINE_CHARS)
         text: str = f"{title}: waits for you." if moved.tainted else f"{title}: {moved.note}"
-        await tell_owner(self._runtime.bus, NEEDS_YOU_TITLE, text, _ORDERS_PAGE)
+        await tell_owner(self._runtime.bus, NEEDS_YOU_TITLE, text, _ORDERS_PAGE, "system", "")
         log.info("work_order_escalated", order_id=order.id, attempts=order.attempts)
         return f"Work order {order.id} is escalated: the owner is told, and it waits for them."
 

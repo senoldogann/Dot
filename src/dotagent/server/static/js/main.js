@@ -10,7 +10,7 @@ import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { forgetSentPictures } from "./attachments.js";
-import { setPageTitle, watchAttention } from "./attention.js";
+import { reportDismissed, setPageTitle, watchAttention } from "./attention.js";
 import { createLeaveGuard } from "./leaveguard.js";
 import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
@@ -884,6 +884,10 @@ if ("serviceWorker" in navigator) {
   // chat that asks, or the page the notification is about. Only Dot's own worker, of this origin, says so.
   navigator.serviceWorker.addEventListener("message", (event) => {
     const data = event.data;
+    if (event.origin === location.origin && data?.type === "dot:tell-dismissed" && typeof data.route === "string" && data.route.startsWith("#/")) {
+      reportDismissed(data.route, "push");
+      return;
+    }
     if (event.origin !== location.origin || data?.type !== "dot:open-route" || typeof data.route !== "string" || !data.route.startsWith("#/")) {
       return;
     }

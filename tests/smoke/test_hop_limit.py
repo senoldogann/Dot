@@ -21,6 +21,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.notify.tellkinds import TellKind
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import NO_PICKS, ApprovalRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
@@ -85,7 +86,8 @@ async def test_a_hand_off_is_one_hop_further_a_hand_back_keeps_the_count_and_yol
     store = manager._runtime.store
     told: list[tuple[str, str]] = []
 
-    async def noted(bus: object, title: str, text: str, url: str) -> None:
+    async def noted(bus: object, title: str, text: str, url: str, kind: TellKind, subject: str) -> None:
+        assert kind == "system"
         told.append((title, url))
 
     monkeypatch.setattr("dotagent.agent.manager.tell_owner", noted)

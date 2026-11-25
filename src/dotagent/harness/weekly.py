@@ -111,7 +111,7 @@ async def _propose(runtime: Runtime, patterns: Sequence[FailureRow], now: float)
     trial: Trial = Trial(version_id=version.id, started_at=now, signatures=signatures, in_use=parent)
     await runtime.store.kv_set(TRIAL_KEY, trial.model_dump_json())
     said: str = f"trying “{version.summary}” on half of the runs, for {'; '.join(signatures)}"
-    await tell_owner(runtime.bus, "Dot is trying new habits", said, PAGE)
+    await tell_owner(runtime.bus, "Dot is trying new habits", said, PAGE, "system", "")
     log.info("harness_trial_started", version=version.id, signatures=list(signatures))
     return said
 
@@ -142,7 +142,7 @@ async def _weigh(runtime: Runtime, trial: Trial, now: float) -> str:
         await _keep_better(runtime, trial, candidate, in_use, now)
     else:
         await retire(store, trial.version_id, now)
-    await tell_owner(runtime.bus, "Dot's trial of new habits ended", said, PAGE)
+    await tell_owner(runtime.bus, "Dot's trial of new habits ended", said, PAGE, "system", "")
     log.info("harness_trial_ended", version=trial.version_id, verdict=judgement.verdict)
     return said
 

@@ -309,13 +309,19 @@ answer keeps its words, Ollama's too.
   read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
   and is rounded to `low` where it does not. A model without adaptive thinking (the 4.5 generation and older) runs
-  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes), and
-  from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
+  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes, or an hour:
+  below), and from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
   names the day and the time zone; the time of day, the notes recalled for the message and the skills that fit it go in
   a note under the message, item 404, and so does how the run was started, by the owner, a schedule, a watcher, a
   phone's message or another run, with what that asks of it, item 1219), so the cache holds the instructions and the history up to the message. A
   question Dot asks once (the review model's, a summary, a recap, a consult) is not cached (item 1010): writing the
-  cache costs a quarter more than reading the prompt, and nothing would read it back. A request may use the model's
+  cache costs a quarter more than reading the prompt, and nothing would read it back. A run of a chat whose last call
+  was between five minutes and fifty-five minutes before writes its cache for an hour instead of five minutes
+  (`cache_control` with `"ttl": "1h"`, item 1742): the pace of a schedule or a watcher that fires every few minutes to
+  every hour, or of a chat that is left and come back to, which the five minutes lose every time. The hour's write is
+  billed at twice the price of input (the five minutes' at a quarter more), so a chat that is new, busy or away for
+  longer writes the five minutes. Only Anthropic's own API takes the hour (OpenCode Go's messages route is sent none);
+  the run's page says what was written (`dotx stats --run ID`, [Development](development.md)). A request may use the model's
   whole output limit. The thinking of earlier steps is sent back; a block whose earlier context has
   changed since (a run drops an old screenshot, a compaction folds the history, a new day changes the instructions) is
   dropped by the API instead of failing the request (beta `thinking-binding-controls-2026-08-01`).

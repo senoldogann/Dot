@@ -148,25 +148,40 @@ function worthATell(runId) {
   return notificationsOn() && readPref(PUSH_KEY) !== "on" && (tellEvenWhenLooking() || !lookingAt(runId));
 }
 
+/** Tell the daemon that a notification of the tell that opens `route` was closed unopened (item 1743). Only the tells
+ * Dot counts (`counted`: its own news and the ends of tasks) say so. A failure is a line in the console: counting what
+ * the owner does with a tell never stops one. */
+export function reportDismissed(route, via) {
+  api.post("/tells/dismissed", { route, via }).catch((error) => console.warn("could not report a dismissed tell", error));
+}
+
 /** In the desktop shell the notification is the system's; a click brings Dot to the front, where Waiting for you leads on. */
-function tell({ title, body, tag, route, state }) {
+function tell({ title, body, tag, route, state, counted }) {
   const bridge = shell();
   if (bridge !== null) {
     bridge.sendNotification({ title, body });
     return;
   }
   const note = new Notification(title, { body, tag, icon: faceDataUrl(state) });
+  let opened = false;
   note.addEventListener("click", () => {
+    opened = true;
     window.focus();
     goTo(route);
     note.close();
+  });
+  // A notification closed without a click was dismissed (or timed out): a tell is said so (item 1743).
+  note.addEventListener("close", () => {
+    if (!opened && counted) {
+      reportDismissed(route, "desktop");
+    }
   });
 }
 
 function tellAboutApproval(event) {
   const { approval_id: id, severity, summary, args } = event.data;
   const text = severity === "question" && typeof args.question === "string" ? args.question : summary;
-  tell({ title: ASKING_TITLE[severity] ?? "Dot asks for approval", body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting" });
+  tell({ title: ASKING_TITLE[severity] ?? "Dot asks for approval", body: shorten(text), tag: `approval-${id}`, route: `#/runs/${event.run_id}`, state: "waiting", counted: false });
 }
 
 /** The first line of `text` that is not blank; nothing when there is none. */
@@ -182,6 +197,7 @@ function endNote(runId, status, result) {
     tag: `run-${runId}`,
     route: `#/runs/${runId}`,
     state: FINISHED_FACE[status] ?? "idle",
+    counted: true,
   };
 }
 
@@ -205,6 +221,7 @@ function tellAboutDraft(event) {
     tag: `draft-${id}`,
     route: `#/runs/${event.run_id}`,
     state: "waiting",
+    counted: false,
   });
 }
 
@@ -217,12 +234,13 @@ function tellAboutCampaign(event) {
     tag: `campaign-${id}`,
     route: `#/campaigns/${id}`,
     state: achieved ? "done" : "idle",
+    counted: false,
   });
 }
 
 function tellAboutMissedFiring(event) {
   const { schedule_id: id, name, status } = event.data;
-  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed" });
+  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed", counted: false });
 }
 
 /** The end of a schedule's run that its level tells (item 461), in the words of every run's end. */
@@ -242,17 +260,18 @@ function tellAboutStoppedSchedule(event) {
     tag: `schedule-${id}`,
     route: "#/settings/schedules",
     state: "failed",
+    counted: false,
   });
 }
 
 /** What Dot tells you on its own, the morning brief and the watchers (items 570 and 571): the title, the text and the page it opens, as pushed. */
 function tellAboutOwner(event) {
   const { title, text, url } = event.data;
-  tell({ title, body: shorten(text), tag: `owner-${event.ts}`, route: url, state: "idle" });
+  tell({ title, body: shorten(text), tag: `owner-${event.ts}`, route: url, state: "idle", counted: true });
 }
 
 function tellAboutLearningStalled(event) {
-  tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed" });
+  tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed", counted: false });
 }
 
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */

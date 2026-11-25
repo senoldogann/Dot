@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 
+from dotagent.agent.cache_report import CacheReport
 from dotagent.agent.context_parts import ContextParts, tokens_of
 from dotagent.agent.learning_health import (
     LEARNING_HEALTH_KEY,
@@ -356,6 +357,38 @@ def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "
     return lines
 
 
+_FIRST_CAUSES: dict[str, str] = {
+    "warm": "its first step found the prompt in the cache",
+    "new_chat": "its first step was cold: a chat with no earlier call",
+    "prefix_changed": "its first step was cold: the prompt changed from the chat's last run",
+    "after_pause": "its first step was cold after a pause longer than the provider keeps a cache",
+    "unexplained": "its first step was cold with the same prompt a few minutes after the last call",
+}
+_COLD_CAUSES: dict[str, str] = {
+    "tool_group": "a tool group turned on",
+    "compaction": "a compaction",
+    "other": "no mark",
+}
+
+
+def render_cache(report: CacheReport) -> list[str]:
+    """What the provider's cache did for one run (item 1742): the share of its input read from it, what was written to
+    it, why its first step was cold if it was, and the later steps that met a cold cache."""
+    written: str = f", {_count(report.cache_write_tokens)} written" if report.cache_write_tokens else ""
+    lines: list[str] = [
+        f"Prompt cache: {_share(report.share)} of {_count(report.input_tokens)} input tokens read from it{written}; "
+        f"{_FIRST_CAUSES[report.first_cause]}"
+        + ("" if report.gap_s is None else f" (last call of the chat {report.gap_s / 60:.1f} min before)"),
+    ]
+    if report.changed:
+        lines.append(f"  changed from the chat's last run: {', '.join(report.changed)}")
+    lines.extend(
+        f"  step {step.step}: {_count(step.uncached_tokens)} tokens at full price after {_COLD_CAUSES[step.cause]}"
+        for step in report.cold_steps
+    )
+    return lines
+
+
 def render_run_costs(costs: RunCosts) -> list[str]:
     """What one run cost and where it went: its minutes, its model's numbers, its tools' seconds and its tools."""
     stats: ModelStats = costs.stats
@@ -366,7 +399,8 @@ def render_run_costs(costs: RunCosts) -> list[str]:
         f"  tool calls took {_seconds(costs.tool_seconds)} s, of which {_seconds(costs.waited_s)} s at the gate",
         f"  harness: {costs.harness_version or OWN_TEXT}",
     ]
-    return [*head, *render_model(stats)[3:], "", *render_time([stats]), "", *render_tools(costs.tools)]
+    cache: list[str] = [] if costs.cache is None else ["", *render_cache(costs.cache)]
+    return [*head, *render_model(stats)[3:], "", *render_time([stats]), *cache, "", *render_tools(costs.tools)]
 
 
 async def cmd_stats(command: StatsCommand) -> int:
