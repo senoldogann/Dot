@@ -92,8 +92,11 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(row.label.contains("Working"), row.label)
         XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
+        // A tap opens the helper's own chat, which shows the helper's run (its parent run lives in another chat).
+        row.tap()
+        XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5), "the helper's chat shows its words")
         let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
-        sheet.name = "agents-sheet"
+        sheet.name = "helper-chat"
         sheet.lifetime = .keepAlways
         add(sheet)
     }

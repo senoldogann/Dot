@@ -57,11 +57,13 @@ struct ChatScreen: View {
 
     private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
-    private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
+    /// The chat's own runs (`ownRuns`): a helper's own chat shows the run that is its work.
+    private var ownRuns: [RunRecord] { view.map(DotEngine.ownRuns(of:)) ?? [] }
+    private var activeRun: RunRecord? { ownRuns.last { $0.isActive } }
     private var helpers: [HelperView] { view?.helpers ?? [] }
     /// The helpers the chat's newest run started (item 1880): the pill counts these, never an older run's.
     private var newestRunHelpers: [HelperView] {
-        guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { return [] }
+        guard let run = ownRuns.last else { return [] }
         return helpers.filter { $0.parentRunId == run.id }
     }
     /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
@@ -83,9 +85,9 @@ struct ChatScreen: View {
     }
 
     private var dock: [DockEntry] {
-        let ownRuns: Set<String> = Set((view?.runs ?? []).filter { $0.parentRunId == nil }.map(\.id))
+        let ownRunIds: Set<String> = Set(ownRuns.map(\.id))
         return dockEntries(
-            asks: view?.asks ?? [], chatRuns: ownRuns, outbox: model.outbox, online: model.online, local: model.askPhases,
+            asks: view?.asks ?? [], chatRuns: ownRunIds, outbox: model.outbox, online: model.online, local: model.askPhases,
             shown: shownAsks, decided: decidedAsks, answeredHere: model.answeredHere
         ).filter { !dismissedAsks.contains($0.id) }
     }
@@ -136,7 +138,7 @@ struct ChatScreen: View {
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
             .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
             .task { await model.loadModels() }
-            .modifier(ComposerLists(thread: thread, lastRun: view?.runs.last(where: { $0.parentRunId == nil })?.id, changedFiles: $changedFiles, aside: $aside))
+            .modifier(ComposerLists(thread: thread, lastRun: ownRuns.last?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
             .modifier(FrameMeterHook(running: activeRun != nil))
             .onKeyPress(.escape) {
@@ -403,12 +405,12 @@ struct ChatScreen: View {
                 toast = ToastMessage(id: UUID(), text: String(localized: "Ask again every so often: /loop 30m <message>", comment: "Composer command: what /loop does"), systemImage: "info.circle", actionTitle: nil)
                 return
             case .aside(let question):
-                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                guard let run = ownRuns.last else { break }
                 draft = ""
                 Task { aside = SideAnswer(question: question, answer: await model.aside(run: run.id, question: question)) }
                 return
             case .loop(let every, let text):
-                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                guard let run = ownRuns.last else { break }
                 draft = ""
                 Task {
                     if let problem = await model.loop(run: run.id, every: every, text: text) {
@@ -462,7 +464,7 @@ struct ChatScreen: View {
 
     /// Try again / Resume: the newest run's goal sent again as a message of the chat.
     private func retryLast() {
-        guard let last = view?.runs.last(where: { $0.parentRunId == nil }), !last.goal.isEmpty else { return }
+        guard let last = ownRuns.last, !last.goal.isEmpty else { return }
         Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: [], picks: .none) }
     }
 
@@ -569,7 +571,7 @@ struct ChatScreen: View {
     /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the
     /// plan out of its transcript, and the pill is its only place, so it is read from a transcript of every row.
     private func newestPlan(_ items: [TranscriptItem]) -> [PlanStep]? {
-        guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { return nil }
+        guard let run = ownRuns.last else { return nil }
         return plan(of: run.id, in: mode == .zen ? transcript(in: .showAll) : items)
     }
 

@@ -235,7 +235,7 @@ public func transcript(
     of chat: ChatProjection, pending: [PendingMessage], mode: ToolCallMode, streaming: Bool, context: TranscriptContext
 ) -> [TranscriptItem] {
     var items: [TranscriptItem] = []
-    let listed: [RunRecord] = (chat.view?.runs ?? []).filter { $0.parentRunId == nil }
+    let listed: [RunRecord] = chat.view.map(ownRuns(of:)) ?? []
     // A run the stream told of (its `run_queued`) before the view was read again shows at once (the send's first event).
     let known: Set<String> = Set(listed.map(\.id)).union((chat.view?.helpers ?? []).map(\.runId))
     let told: [RunRecord] = chat.runs.compactMap { id, timeline in

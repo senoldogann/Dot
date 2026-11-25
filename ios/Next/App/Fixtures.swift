@@ -32,6 +32,7 @@
         case inspector = "n2-inspector"
 
         static let thread: String = "thr_fixture"
+        static let helperThread: String = "thr_h1"
 
         var panel: ChatPanel? {
             switch self {
@@ -53,6 +54,10 @@
                 var chat: ChatProjection = ChatProjection.drawn(view: view, events: decode(eventsJSON(now: now)), freshness: freshness)
                 if self == .work { chat = chat.writing("Checking the second **calendar** now", run: "run_b") }
                 snapshot.chats[Self.thread] = chat
+                // The first helper's own chat, which the Agents sheet opens (item 1880): its run names a parent run of
+                // another chat, and the chat shows that run's steps and answer.
+                snapshot.chats[Self.helperThread] = ChatProjection.drawn(
+                    view: decode(helperViewJSON(now: now)), events: decode(helperEventsJSON(now: now)), freshness: freshness)
             } else {
                 snapshot.chats[Self.thread] = ChatProjection(threadId: Self.thread)
             }
@@ -172,6 +177,29 @@
                 break
             }
             return "[" + events.joined(separator: ",") + "]"
+        }
+
+        private func helperViewJSON(now: Double) -> String {
+            """
+            {"revision":3,
+             "thread":{"id":"thr_h1","title":"Check the dentist's free slots on their booking page","source":"agent","created_at":\(now - 2475),"updated_at":\(now - 20),"agent_id":null},
+             "summary":null,
+             "runs":[
+               {"id":"run_h1","thread_id":"thr_h1","goal":"Check the dentist's free slots on their booking page","mode":"task","model":"claude_code:opus","status":"running","created_at":\(now - 2475),"finished_at":null,"result":"","parent_run_id":"run_b","source":"agent","effort":"medium","input_tokens":9000,"output_tokens":400,"approvals":"auto"}
+             ],
+             "older":false,"newest":null,"newest_events":[],"newest_events_cut":false,
+             "queue":{"held":false,"messages":[],"beside_run_id":null,"beside_thread_id":null},
+             "asks":[],"helpers":[],"background":[],"reactions":[],"drafts":[]}
+            """
+        }
+
+        private func helperEventsJSON(now: Double) -> String {
+            let h: Double = now - 2475
+            return "["
+                + #"{"id":1,"run_id":"run_h1","ts":\#(h + 10),"kind":"tool_call","data":{"call_id":"h1","tool":"browser_open","args":{"url":"https://dentist.example/booking"}}},"#
+                + #"{"id":2,"run_id":"run_h1","ts":\#(h + 14),"kind":"tool_result","data":{"call_id":"h1","ok":true,"text":"opened"}},"#
+                + #"{"id":3,"run_id":"run_h1","ts":\#(h + 40),"kind":"assistant","data":{"text":"The booking page lists two free afternoons next week.","step":2}}"#
+                + "]"
         }
 
         private func rowsJSON(now: Double) -> String {
