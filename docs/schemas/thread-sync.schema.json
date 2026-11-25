@@ -1694,6 +1694,11 @@
           "default": null,
           "title": "Harness Version"
         },
+        "hops": {
+          "default": 0,
+          "title": "Hops",
+          "type": "integer"
+        },
         "id": {
           "title": "Id",
           "type": "string"

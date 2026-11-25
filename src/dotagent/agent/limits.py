@@ -96,3 +96,9 @@ def limit_event_data(reached: LimitReached) -> JsonObject:
         "max_minutes": reached.limits.max_minutes,
         "max_tokens": reached.limits.max_tokens,
     }
+
+
+def over_the_hop_limit(hops: int, limit: int) -> bool:
+    """Whether a run ``hops`` hand-offs between agents from the message of a person, a schedule or a watcher that began
+    its chain is past ``[agent] max_hops`` (item 1741); 0 is no limit."""
+    return limit > 0 and hops > limit

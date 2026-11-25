@@ -25,6 +25,7 @@ from dotagent.tools.office import (
     SEND_TO_CHAT_TOOL,
 )
 from dotagent.tools.recall import RECALL_TOOL
+from dotagent.tools.search_chats import SEARCH_CHATS_TOOL
 
 
 def _prompt(agent: AgentBrief | None) -> str:
@@ -123,6 +124,7 @@ def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_react_and_tur
         READ_AGENT_CHAT_TOOL,
         CHATS_TOOL,
         READ_CHAT_TOOL,
+        SEARCH_CHATS_TOOL,
         SEND_TO_CHAT_TOOL,
         RECALL_TOOL,
     }

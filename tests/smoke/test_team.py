@@ -1,9 +1,9 @@
 """The team (item 87) through the real loop and the API: a run of Dot's sends an agent a message with message_agent,
 the agent answers in a run of its own (its voice, its tools, the team source), the reply comes back as the tool's
-result, the Handoffs page and the agent's page show the exchange, and the delegated row in Dot's chat wears the agent's
-face. An agent answers in the stricter of its own approvals and the sender's (item 135). Dot builds a team of its own
-within bounds, and a run in another chat uses it (item 307). No network and no model service: the scripted model plays
-every run.
+result, the Handoffs page and the agent's API show the exchange (its page has no messages since item 1266), and the
+delegated row in Dot's chat wears the agent's face. An agent answers in the stricter of its own approvals and the
+sender's (item 135). Dot builds a team of its own within bounds, and a run in another chat uses it (item 307). No
+network and no model service: the scripted model plays every run.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.manager import RunManager
@@ -39,7 +39,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _RUN_WAIT_S: float = 60.0
-_SETTLE_MS: int = 700
 TOKEN: str = f"MARKER-{secrets.token_hex(8)}"
 
 
@@ -218,9 +217,8 @@ async def test_a_run_messages_an_agent_and_reads_its_reply_and_the_team_page_sho
             )
             page_ui: Page = await context.new_page()
             await page_ui.goto(ui_url(host, port, TOKEN))
-            await page_ui.wait_for_timeout(_SETTLE_MS)
             await page_ui.goto(f"http://{host}:{port}/#/team")
-            await page_ui.wait_for_timeout(_SETTLE_MS)
+            await expect(page_ui.locator(".team-row")).to_have_count(1)
             rows: list[str] = await page_ui.locator(".team-row").all_inner_texts()
             assert len(rows) == 1 and "Dot" in rows[0] and "Scout" in rows[0] and "Two sources: A and B." in rows[0], (
                 rows
@@ -229,13 +227,9 @@ async def test_a_run_messages_an_agent_and_reads_its_reply_and_the_team_page_sho
             # does not read (item 559).
             assert await page_ui.locator(".team-row .team-arrow").text_content() == "to"
             await page_ui.screenshot(path=str(out / "team.png"))
-            await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
-            await page_ui.wait_for_timeout(_SETTLE_MS)
-            assert await page_ui.locator(".team-row").count() == 1
-            await page_ui.screenshot(path=str(out / "agent.png"))
             # Dot's chat shows the message as a delegated row wearing Scout's face.
             await page_ui.goto(f"http://{host}:{port}/#/runs/{run_id}")
-            await page_ui.wait_for_timeout(_SETTLE_MS)
+            await expect(page_ui.locator(".run-main .avatar[data-hue]").first).to_be_attached()
             hues: list[str | None] = [
                 await face.get_attribute("data-hue")
                 for face in await page_ui.locator(".run-main .avatar[data-hue]").all()

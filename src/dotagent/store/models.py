@@ -200,6 +200,26 @@ class ThreadRevision(FrozenModel):
     deleted: bool
 
 
+class ChatHit(FrozenModel):
+    """One find of the chat search (item 1740): the text it is in is a message of the chat's history (``kind`` ``m``,
+    ``ref`` the role that said it, ``seq`` its place) or the answer of a run (``kind`` ``r``, ``ref`` the run's id,
+    ``seq`` -1); ``snippet`` is the words around the match, the matched words in ``[...]`` brackets."""
+
+    thread_id: str
+    seq: int
+    kind: Literal["m", "r"]
+    ref: str
+    snippet: str
+
+
+class ChatMessage(FrozenModel):
+    """A user's or an assistant's message of a chat's history, with its place in it (item 1740)."""
+
+    seq: int
+    role: Literal["user", "assistant"]
+    text: str
+
+
 class RunRecord(FrozenModel):
     """One run. ``effort`` is the reasoning level it was started with (``None`` for runs stored before it was kept);
     ``speed`` is ``fast`` when it was started in fast mode (item 223), which its steps on a model with fast mode use;
@@ -242,6 +262,12 @@ class RunRecord(FrozenModel):
     # Why the run ended, stored beside the result text (which stays the words a person reads). ``None`` for a run that
     # has not ended, and for one stored before the reason was a column of its own.
     end_reason: str | None = None
+    # How many hand-offs between agents lie between this run and the message of a person, a schedule or a watcher that
+    # began the chain of work it belongs to (item 1741): a run another run delegated or messaged, a work order's
+    # attempt, the lead's run woken by its answer and a thing on Dot's list a run put there, each one more than the run
+    # it came from. Set by the manager that launches the run and never by a model, so no run can lower it; 0 for a run
+    # that began a chain.
+    hops: int = 0
 
 
 class RewindCut(FrozenModel):

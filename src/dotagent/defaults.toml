@@ -292,6 +292,11 @@ campaign_failed_sessions = 3
 campaign_browser = "attach"
 # The most questions a run may ask the helper models ([models] helpers) with the consult tool; 0 offers no consult.
 consult_max_per_run = 5
+# The most hand-offs between agents in a row (a run another run delegated or messaged, a work order, the lead's run
+# woken by its answer, a thing a run put on Dot's list) before a run that asks has the next one not made and the owner
+# gets a card; a yolo run, and every run while free mode is on, refuse nothing and the owner is told once (item 1741).
+# Real chains on the owner's Mac went one deep. 0 turns the limit off.
+max_hops = 8
 # How many independent steps of a plan run at once as helpers (item 927): a step of update_plan with a brief (an
 # instruction a run that cannot see the conversation can follow) that waits for no open step is ready, and when two or
 # more are, they go to helpers at the same time, as delegate runs them, and come back marked done or failed with their

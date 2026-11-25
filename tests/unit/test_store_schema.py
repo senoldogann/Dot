@@ -24,6 +24,7 @@ _PINNED: dict[int, str] = {
     1: "e58f68b5c41098388860efc1c0f8813a1d73f665f61d9377d4f54d15a217115c",
     2: "f4541a5d75d0ecad92930e7e8e7927faad4393c2932e327ef693ccd26e02b5e2",
     3: "34e5b2b5ed4e94713a3be3b69d0474f77f1ff58d129517dbf5ab20f0adf8865d",
+    4: "f8bcbbed9f51b999fdb289df5bc3db01d092eaf7e61450bd55d907bccfb3a652",
 }
 
 
@@ -109,6 +110,51 @@ async def test_a_database_from_before_versions_is_copied_then_brought_to_the_ver
     again: Store = await Store.open(database, tmp_path / "images")
     await again.close()
     assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v0").glob("dot-*.sqlite3.gz"))) == 1
+
+
+async def test_a_version_3_database_has_its_chats_and_answers_indexed_in_the_step_to_version_4(tmp_path: Path) -> None:
+    """Version 4 adds the index of what the chats say (item 1740) and writes what the chats say already into it, once,
+    after a copy; the Turkish dotless i is written as i, a tool's output and an empty message are not indexed."""
+    database: Path = tmp_path / "dot.sqlite3"
+    first: Store = await Store.open(database, tmp_path / "images")
+    await first.close()
+    old: sqlite3.Connection = sqlite3.connect(database)
+    try:
+        for trigger in (
+            "chat_index_message_added",
+            "chat_index_message_removed",
+            "chat_index_answer_added",
+            "chat_index_answer_changed",
+            "chat_index_answer_removed",
+        ):
+            old.execute(f"DROP TRIGGER {trigger}")
+        old.execute("DROP TABLE chat_fts")
+        old.execute("DROP TABLE chat_index")
+        old.execute(
+            "INSERT INTO threads (id, title, source, created_at, updated_at) VALUES ('thr_old', 'Old', 'ui', 1.0, 1.0)"
+        )
+        for seq, body in enumerate(
+            (
+                '{"role": "user", "content": "Toplant\u0131 notlar\u0131n\u0131 haz\u0131rla"}',
+                '{"role": "tool", "content": "pagetext zebra"}',
+                '{"role": "assistant", "content": ""}',
+                '{"role": "assistant", "content": "Done: the notes are in notes.md"}',
+            )
+        ):
+            old.execute("INSERT INTO messages (thread_id, seq, body) VALUES ('thr_old', ?, ?)", (seq, body))
+        old.execute("PRAGMA user_version = 3")
+        old.commit()
+    finally:
+        old.close()
+    store: Store = await Store.open(database, tmp_path / "images")
+    try:
+        assert [hit.seq for hit in await store.search_chat_text(("toplanti",), 5)] == [0]
+        assert [hit.seq for hit in await store.search_chat_text(("notes",), 5)] == [3]
+        assert await store.search_chat_text(("zebra",), 5) == []
+    finally:
+        await store.close()
+    assert _version(database) == SCHEMA_VERSION
+    assert len(list((tmp_path / BEFORE_UPGRADE_DIR / "v3").glob("dot-*.sqlite3.gz"))) == 1
 
 
 async def test_a_version_2_database_takes_the_run_ledger_in_the_step_to_version_3_after_a_copy(tmp_path: Path) -> None:

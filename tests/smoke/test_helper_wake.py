@@ -767,12 +767,22 @@ async def test_a_helpers_report_wakes_a_chat_whose_newest_run_a_restart_or_the_p
             data["error"] = error
         assert await runtime.store.end_run(newer.id, status, result, data) is not None
 
-        async def told_or_waiting() -> bool:
-            return len(await _runs_of_chat(runtime, parent.thread_id)) == 3 or bool(
-                manager._untold.get(parent.thread_id)
+        # The report waits in the manager's list on its way to the run that wakes, so a wake is waited for by its run;
+        # a wake at the plan's reset is set after the report is in the list, once the run's end is read.
+        timed: bool = error is not None and error["kind"] == "plan_limit" and not wakes
+
+        async def told() -> bool:
+            return len(await _runs_of_chat(runtime, parent.thread_id)) == 3
+
+        async def waiting() -> bool:
+            return bool(manager._untold.get(parent.thread_id)) and (
+                not timed or parent.thread_id in manager._timed_wakes
             )
 
-        await _until(told_or_waiting, "the helper's report was told or left waiting")
+        if wakes:
+            await _until(told, "the helper's report woke the chat")
+        else:
+            await _until(waiting, "the helper's report was left waiting")
         runs: list[RunRecord] = await _runs_of_chat(runtime, parent.thread_id)
         if wakes:
             assert runs[2].source == HELPER_SOURCE
@@ -781,6 +791,4 @@ async def test_a_helpers_report_wakes_a_chat_whose_newest_run_a_restart_or_the_p
         else:
             assert [run.id for run in runs] == [parent.id, newer.id]
             assert len(manager._untold[parent.thread_id]) == 1
-        assert (parent.thread_id in manager._timed_wakes) == (
-            error is not None and error["kind"] == "plan_limit" and not wakes
-        )
+        assert (parent.thread_id in manager._timed_wakes) == timed

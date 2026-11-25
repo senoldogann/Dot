@@ -349,6 +349,11 @@ class AgentConfig(FrozenModel):
     # that sets it still loads.
     campaign_browser: BrowserMode
     consult_max_per_run: int = Field(ge=0)
+    # The most hand-offs between agents in a row (a delegated or messaged run, a work order, the lead's run woken by its
+    # answer, a thing a run put on Dot's list) that follow no message of a person, a schedule or a watcher (item 1741).
+    # Past it a run that asks has the next one not made and the owner gets a card; a yolo run, and every run while free
+    # mode is on, refuse nothing: the owner is told once. 0: no limit.
+    max_hops: int = Field(ge=0)
     # How many independent steps of a plan run at once as helpers (item 927); 0 or 1: none, the run does them itself.
     fan_out: int = Field(default=3, ge=0, le=6)
     # At least the floor a run's tool output keeps however small the model's window (dotagent.agent.scaffold).

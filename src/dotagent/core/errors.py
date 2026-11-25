@@ -391,6 +391,11 @@ class RunConflict(DotError):
     proposed for a note taken or dropped, in the state it is in."""
 
 
+class HopLimitReached(RunConflict):
+    """A hand-off from one agent to another was not made: it is further from the message of a person, a schedule or a
+    watcher than ``[agent] max_hops`` allows (item 1741). The owner has a card for it; the run it came from goes on."""
+
+
 class UndoError(DotError):
     """The journal of a run's file changes cannot be written or read, or a change cannot be taken back."""
 

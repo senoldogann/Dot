@@ -36,6 +36,7 @@ from playwright.async_api import (
     Locator,
     Page,
     Playwright,
+    Response,
     Route,
     async_playwright,
     expect,
@@ -89,8 +90,9 @@ _CAUGHT_UP_S: float = 2.0
 # soon the missed steps show after it: a reconnect, a proof and a request.
 _SHORT_AWAY_S: float = 6.0
 _BACK_SOON_S: float = 3.0
-# How soon the bar and the composer of the chat stand when Dot is opened again.
-_IN_PLACE_MS: int = 500
+# How soon the bar and the composer of the chat stand when Dot is opened again: from the page's copy, well before the
+# network wakes (`_WAKE_S`).
+_IN_PLACE_S: float = _WAKE_S - 1.5
 # A network always slower than the service worker waits for it, and how long an opening waits for the network after a
 # newer build was noted (NEWER_WAIT_MS in static/sw.js, item 359).
 _SLOW_S: float = 0.6
@@ -581,15 +583,17 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
                 proxy.wake(_WAKE_S)
                 started: float = time.monotonic()
                 await again.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
-                opened_ms: float = (time.monotonic() - started) * 1000
-                assert opened_ms < _IN_PLACE_MS, f"the page took {opened_ms:.0f} ms to open"
-                await again.wait_for_timeout(_IN_PLACE_MS - opened_ms)
-                await again.screenshot(path=str(tmp_path / f"again-{scheme}.png"))
-                await expect(again.locator(".waiting .stage-heading-title")).to_have_text(title, timeout=100)
+                # The page's copy stands while the network still sleeps: `.waiting` is the chat drawn from it, before
+                # Dot answers. A clock of its own would measure how loaded the Mac is (538 ms on a CI runner).
+                in_place_ms: float = _IN_PLACE_S * 1000 - (time.monotonic() - started) * 1000
+                assert in_place_ms > 0, f"the page took {_IN_PLACE_S - in_place_ms / 1000:.1f} s to open"
+                await expect(again.locator(".waiting .stage-heading-title")).to_have_text(title, timeout=in_place_ms)
                 await expect(again.locator(".waiting .stage-name")).to_be_visible(timeout=100)
                 named: str = await again.locator(".waiting .stage-name").inner_text()
                 await expect(again.locator(".waiting .composer textarea")).to_be_visible(timeout=100)
                 waiting: dict[str, list[int]] = await _places(again, ".waiting")
+                await again.screenshot(path=str(tmp_path / f"again-{scheme}.png"))
+                assert time.monotonic() - started < _WAKE_S, "the chat stood only once the network woke"
                 while time.monotonic() - started < _WAKE_S + 4:
                     text: str = await again.evaluate("document.body.innerText")
                     said.extend(word for word in _WORDS if word in text)
@@ -655,10 +659,10 @@ async def test_a_copy_of_an_earlier_build_opened_on_a_slow_network_gives_way_to_
             named.append("later")
             proxy.slow(_SLOW_S)
             first: Page = await context.new_page()
-            started: float = time.monotonic()
-            await first.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
-            opened_ms: float = (time.monotonic() - started) * 1000
-            assert opened_ms < _IN_PLACE_MS, f"the copy did not answer: the page took {opened_ms:.0f} ms to open"
+            opened: Response | None = await first.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            assert opened is not None
+            # The copy answered: the page is of the build it kept, not of the one the slow network names.
+            assert opened.from_service_worker and (await opened.all_headers()).get("x-dot-pages") not in (None, "later")
             # The network's answer, once it comes, is noted, and the copy stays whole, for when the Mac is out of reach.
             await _until_true(first, _NOTED_AND_WHOLE, "later")
             await first.close()

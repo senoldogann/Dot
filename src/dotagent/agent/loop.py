@@ -338,6 +338,7 @@ from dotagent.tools.office import (
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.recall import RECALL_TOOL
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
+from dotagent.tools.search_chats import SEARCH_CHATS_TOOL
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, CREATE_TEAM_TOOL, MESSAGE_AGENT_TOOL
 from dotagent.tools.work_orders import ASSIGN_WORK_TOOL, WORK_ORDER_TOOLS
@@ -368,6 +369,8 @@ AGENT_CORE_TOOLS: tuple[str, ...] = (
     # The chats of this Mac, found and read (item 953), so that an agent knows where a thing was talked about.
     CHATS_TOOL,
     READ_CHAT_TOOL,
+    # What was said in any chat, found by its words (item 1740).
+    SEARCH_CHATS_TOOL,
     # A note to the run at work in another chat (item 957), so that the agents talk across their chats.
     SEND_TO_CHAT_TOOL,
     # The ids a compaction note names are read back with it (item 924), whatever tools the agent's role names.
@@ -533,7 +536,10 @@ class RunOpening(FrozenModel):
     skills, stays in the chat's history, and with grouped tools ``use_tools`` turns a picked server's group on.
     ``tainted`` starts the run untrusted whatever it goes on from: the run a watcher starts (item 571) is set off by
     what a third party wrote. ``follows`` is the reaction of the owner's the run follows up (item 844), which the run
-    keeps (``RunRecord.follows_reaction``)."""
+    keeps (``RunRecord.follows_reaction``). ``hops`` is how many hand-offs between agents the run is from the message of
+    a person, a schedule or a watcher that began its chain of work (item 1741), which the run keeps (``RunRecord.hops``)
+    and the manager checks against ``[agent] max_hops`` as it launches the run; ``from_run_id`` is the run the hand-off
+    came from, which the card to the owner is left on when the limit stops it."""
 
     text: str
     files: tuple[StoredAttachment, ...]
@@ -543,6 +549,8 @@ class RunOpening(FrozenModel):
     picks: RunPicks
     tainted: bool = False
     follows: ReactionName | None = None
+    hops: int = 0
+    from_run_id: str | None = None
 
 
 @dataclass(frozen=True)

@@ -1684,7 +1684,7 @@ function buildModels(isDisposed, asked, head) {
   }
   const REVIEW_REFUSED = "A review is a run of Dot's own tools, which these models do not take.";
   const reviewModel = modelSetting({
-    label: "Review model",
+    label: "Code review model",
     hint: "Reviews each change of Dot's own code before it is pushed, following REVIEW.md, and cannot change it. Its chats are kept under Code reviews.",
     className: "models-review",
     can: (model) => model.tools,
@@ -1703,10 +1703,10 @@ function buildModels(isDisposed, asked, head) {
     can: (model) => model.tools,
     takes: (provider) => runsDotsTools(provider),
     refused: REVIEW_REFUSED,
-    none: "Review model",
+    none: "Code review model",
     choose: async (ref) => {
       await saveReview({ small_model: ref });
-      toast("ok", ref === "" ? "Small changes are reviewed on the review model." : `Small changes are reviewed on ${modelName(ref)} first.`);
+      toast("ok", ref === "" ? "Small changes are reviewed on the code review model." : `Small changes are reviewed on ${modelName(ref)} first.`);
     },
   });
   const smallLines = el("input", { class: "input", type: "number", min: "0", max: "100000", step: "1", inputmode: "numeric", "aria-label": "Lines a small change has at most" });

@@ -331,11 +331,30 @@ as another app's threads do): `chats` lists the chats of this Mac, yours, the ag
 its parent's chat shows), the newest activity first, or those whose titles hold the words given, each with its id,
 whose it is (yours, an agent's by its name, Dot's own work, a schedule's, a watcher's, iMessage's) and where it stands
 (at work, waiting for you, done, failed) and when it last moved; `read_chat` reads one by its id as `read_agent_chat`
-reads an agent's. So "what did we decide about the Gistsmith launch" is a run that finds that chat and reads it. All
-four only read. The secrets Dot holds are masked in what they quote, and what a chat's runs read from pages or mails
+reads an agent's. So "what did we decide about the Gistsmith launch" is a run that finds that chat and reads it. When the
+words of the title are not the words of the thing, `search_chats` (item 1740) finds it by what was said: a full-text
+search (SQLite FTS5, no model call) over every message of the chats that the user or the assistant wrote and every run's
+answer, written into the index by the database itself as the chats change (a trigger on the messages and the runs, so a
+rewind, a rewrite of the history or a deleted chat leaves nothing stale). Three modes: `find` gives the best eight hits
+for some words (Turkish case, accents and the dotless i do not matter, and a word of five letters matches its endings),
+each with its chat's title, when it was said, whose words they are and the text around the match; `around` shows the two
+messages before and after a hit, from the chat's id and the place the hit named; `read` shows one run by its id: its
+goal, how it ended and its answer. A tool's output is not in the index (it is a page's or a file's text), and the text a
+compaction replaced with its note is kept aside only for rewinding the chat and is not searched; the run's answer is.
+Each answer is held to about 7,000 characters. What a chat said is fenced and marks the reader untrusted when one of its
+runs ever read content third parties can author, exactly as `read_chat` does (a watcher's chat always). All five only read. The secrets Dot holds are masked in what they quote, and what a chat's runs read from pages or mails
 comes fenced and marks the reading run untrusted, as that chat was (item 243), so a page cannot steer one agent through
 another's chat; a chat's title made of a goal that came of a page or a mail (a watcher's, a thing a tainted run put on
 the list) is a third party's words, and `chats` lists it in a fence too.
+
+**Hand-offs have a depth limit** (item 1741). Whatever one agent hands to another counts: a delegated run, a message to an
+agent, a work order's attempt, the lead's run woken by its agent's answer (a hand-back keeps the count of what it reads,
+it does not begin again) and a thing on Dot's list that a run put there for its own initiative. Each is one hop further
+than the run it came from (`runs.hops`, set by Dot and never by a model), and a message of yours, a schedule's firing or
+a watcher's alert starts a chain at 0. Past `[agent] max_hops` (8): in yolo and free mode nothing is refused, the hand-off is made and you are told once; for
+a run that asks, the hand-off is not made, the run that asked is told and goes on, a thing on the list is let go with that
+reason and you are told, and otherwise you get one card, **Allow once** (the run's count goes back to 0) or **Stop**, on
+the run it came from. Chains measured on this Mac went one deep; [Limits](limits.md) and [Freedom](freedom.md) say the rest.
 
 A run can also tell another chat something (item 957): `send_to_chat` hands a note to the run at work in a chat `chats`
 lists, which reads it before its next step, fenced under the chat it came from, as Dot's words, not yours; the chat
