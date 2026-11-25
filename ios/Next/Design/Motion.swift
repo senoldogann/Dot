@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Motion tokens (plan §3): adjust 120 ms, enter 200, exit 150, a message's fade 220, a disclosure 180.
+/// Motion tokens (plan §3): adjust 120 ms, enter 200, exit 150, a message's fade 220, a disclosure a 380 ms spring.
 enum MotionToken: Sendable {
     case adjust
     case enter
@@ -19,9 +19,12 @@ enum MotionToken: Sendable {
     }
 }
 
-/// The animation of a token, or none under Reduce Motion: the change still happens, it just does not move.
+/// The animation of a token, or none under Reduce Motion: the change still happens, it just does not move. A disclosure
+/// (a thought, a tool's detail, a fold, a card) opens and closes on a soft spring with no bounce, the same everywhere
+/// (item 1769): the rows below glide with its height, its content fades in, its chevron turns.
 func motionAnimation(_ token: MotionToken, reduceMotion: Bool) -> Animation? {
-    reduceMotion ? nil : .easeOut(duration: token.seconds)
+    if reduceMotion { return nil }
+    return token == .disclosure ? .spring(duration: 0.38, bounce: 0) : .easeOut(duration: token.seconds)
 }
 
 /// The kinds of touch feedback (plan §3): selection for a disclosure, light for copy and list actions, medium for a

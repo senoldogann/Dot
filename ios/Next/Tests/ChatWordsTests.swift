@@ -23,11 +23,47 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s · read 3 files, ran 2 commands")
     }
 
-    func testConsecutiveToolRowsStackAsOneTightBlock() {
+    func testConsecutiveStepsStackAsOneTightBlock() {
         let tool: (String) -> TranscriptItem = { id in
             .tool(ToolEntry(id: id, tool: "shell", kind: .command, target: "ls", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1))
         }
-        let blocks: [TranscriptBlock] = TranscriptBlock.of([tool("t:1"), tool("t:2"), .answer(id: "a:3", text: "x", writing: false, endedAt: nil), tool("t:4")])
-        XCTAssertEqual(blocks.map(\.id), ["tools:t:1", "a:3", "tools:t:4"])
+        let thought: TranscriptItem = .thought(id: "th:1", text: "Look at the diff first.", live: false)
+        let blocks: [TranscriptBlock] = TranscriptBlock.of([thought, tool("t:1"), tool("t:2"), .answer(id: "a:3", text: "x", writing: false, endedAt: nil), tool("t:4")])
+        // Item 1769: a thought is a row of the stretch it opens, with no gap of its own (the owner's shot of the gaps).
+        XCTAssertEqual(blocks.map(\.id), ["steps:th:1", "a:3", "steps:t:4"])
+    }
+
+    func testEveryToolRowStartsWithACapitalAndDotsOwnToolsSayAPhrase() {
+        let entry: (String, String) -> ToolEntry = { tool, target in
+            ToolEntry(id: "t", tool: tool, kind: ToolKind.of(tool), target: target, args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)
+        }
+        XCTAssertEqual(toolLine(entry("finish", "")), "Finish")
+        XCTAssertEqual(toolLine(entry("use_tools", "")), "Turn on more actions")
+        XCTAssertEqual(toolLine(entry("schedule_list", "schedules")), "List schedules · schedules")
+        XCTAssertEqual(toolLine(entry("memory_search", "deploy")), "Search notes · deploy", "a note search is Dot's, not a file search")
+        XCTAssertEqual(toolLine(entry("draft_reply", "")), "Draft reply", "a name with no phrase reads as a sentence")
+        XCTAssertEqual(toolLine(entry("mcp__microsoft-learn__search", "")), "Microsoft Learn · Search")
+        XCTAssertTrue(isDotTool(entry("work_orders", "")))
+        XCTAssertTrue(isDotTool(entry("delegate", "fix it")))
+        XCTAssertFalse(isDotTool(entry("shell", "ls")))
+    }
+
+    func testWordsArriveAtASteadyPaceAndTheNewestFadeIn() {
+        // Item 1769: a bunch of 300 characters from the stream spreads over about a second, never in one frame.
+        var shown: Int = 0
+        var frames: Int = 0
+        while shown < 300 {
+            shown = revealStep(shown: shown, target: 300, seconds: 1.0 / 60)
+            frames += 1
+        }
+        XCTAssertGreaterThan(frames, 20, "spread over frames")
+        XCTAssertLessThan(frames, 90, "caught up within a second and a half")
+        XCTAssertEqual(revealStep(shown: 0, target: 1, seconds: 1.0 / 60), 1, "a short text shows within a frame")
+        XCTAssertEqual(revealStep(shown: 5, target: 5, seconds: 1.0 / 60), 5, "nothing waits: nothing moves")
+        let faded: AttributedString = fadedTail(AttributedString("The words arrive softly"), characters: 8)
+        let colored: Int = faded.runs.filter { $0.foregroundColor != nil }.count
+        XCTAssertEqual(colored, 4, "the newest eight characters in four steps")
+        XCTAssertEqual(String(faded.characters), "The words arrive softly", "the words are kept")
+        XCTAssertEqual(fadedTail(AttributedString("x"), characters: 0), AttributedString("x"))
     }
 }

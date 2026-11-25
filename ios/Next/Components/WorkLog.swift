@@ -5,27 +5,28 @@ import UIKit
 // The work log of a chat (wave N2, plan §4.1): one-line tool rows, the fold of a finished stretch, the plan as a
 // checklist, the helpers as one group, the asks left in place, how a run ended, and Dot's notes.
 
-/// What the transcript stacks: one item, or consecutive tool calls drawn as one tight block (the reference's 28 pt
-/// pitch, §19: no gap between the rows of a stretch of work).
+/// What the transcript stacks: one item, or consecutive steps (tool calls and the model's thinking) drawn as one tight
+/// block (the reference's 28 pt pitch, §19: no gap between the rows of a stretch of work; item 1769: a thought is a row
+/// of the stretch, not a block of its own).
 enum TranscriptBlock: Identifiable {
     case item(TranscriptItem)
-    case tools([ToolEntry])
+    case steps([TranscriptItem])
 
     var id: String {
         switch self {
         case .item(let item): item.id
-        case .tools(let entries): "tools:" + (entries.first?.id ?? "")
+        case .steps(let rows): "steps:" + (rows.first?.id ?? "")
         }
     }
 
     static func of(_ items: [TranscriptItem]) -> [TranscriptBlock] {
         var blocks: [TranscriptBlock] = []
         for item in items {
-            if case .tool(let entry) = item {
-                if case .tools(let run)? = blocks.last {
-                    blocks[blocks.count - 1] = .tools(run + [entry])
+            if isStep(item) {
+                if case .steps(let run)? = blocks.last {
+                    blocks[blocks.count - 1] = .steps(run + [item])
                 } else {
-                    blocks.append(.tools([entry]))
+                    blocks.append(.steps([item]))
                 }
             } else {
                 blocks.append(.item(item))
@@ -33,15 +34,28 @@ enum TranscriptBlock: Identifiable {
         }
         return blocks
     }
+
+    private static func isStep(_ item: TranscriptItem) -> Bool {
+        switch item {
+        case .tool, .thought: true
+        default: false
+        }
+    }
 }
 
-/// A stretch of tool calls, no gap between them.
-struct ToolRun: View {
-    let entries: [ToolEntry]
+/// A stretch of steps, no gap between them.
+struct StepRun: View {
+    let rows: [TranscriptItem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(entries, id: \.id) { entry in WorkToolRow(entry: entry).id(entry.id) }
+            ForEach(rows) { row in
+                switch row {
+                case .tool(let entry): WorkToolRow(entry: entry).id(entry.id)
+                case .thought(let id, let text, let live): ThoughtRow(text: text, live: live).id(id)
+                default: EmptyView()
+                }
+            }
         }
     }
 }
@@ -50,6 +64,7 @@ struct ToolRun: View {
 /// asked and what it said (monospaced, scrolling past 210 pt) with its screenshots; a long press copies both.
 struct WorkToolRow: View {
     let entry: ToolEntry
+    @AppStorage(PrefKey.terminalFontSize) private var terminalSize: Double = 0
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
@@ -93,7 +108,7 @@ struct WorkToolRow: View {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     if !detail.isEmpty {
                         ScrollView {
-                            Text(detail).textRole(.code).foregroundStyle(Tone.secondary).textSelection(.enabled)
+                            Text(detail).textRole(.code).modifier(MonoSize(points: terminalSize)).foregroundStyle(Tone.secondary).textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
                         }
                         .frame(maxHeight: Metric.toolDetailMax)
@@ -112,7 +127,10 @@ struct WorkToolRow: View {
 
     @ViewBuilder private var line: some View {
         let content: some View = HStack(spacing: Space.xs) {
-            Symbol(name: toolSymbol(entry.kind), context: .tool).frame(width: Metric.iconSlot)
+            Group {
+                if isDotTool(entry) { DotMark() } else { Symbol(name: toolSymbol(entry.kind), context: .tool) }
+            }
+            .frame(width: Metric.iconSlot)
             Text(toolLine(entry)).textRole(.footnote).lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 1)
                 // A path keeps its file name at the end; words keep their start.
                 .truncationMode(entry.kind == .read || entry.kind == .edit || entry.kind == .web ? .middle : .tail)
@@ -211,7 +229,7 @@ struct WorkFoldView: View {
                     ForEach(TranscriptBlock.of(fold.items)) { block in
                         switch block {
                         case .item(let item): row(item)
-                        case .tools(let entries): ToolRun(entries: entries)
+                        case .steps(let rows): StepRun(rows: rows)
                         }
                     }
                 }
@@ -464,51 +482,104 @@ struct ReactionsBar: View {
     }
 }
 
-/// The model's thinking of a step (Show all, Hide successful, Hide all; never in Zen): "Thinking" with its last lines
-/// while it is written, "Thought" folded once the step is stored; a tap opens the whole of it.
+/// The model's thinking of a step, a row of the stretch of work (item 1769): while it is written, "Thinking"
+/// shimmering with its newest lines growing under it; once stored, its first sentence in the quiet ink, one line, as
+/// another coding agent shows a thought. A tap opens the whole of it in a box that scrolls in itself past 210 pt, the transcript staying
+/// where it is.
 struct ThoughtRow: View {
     let text: String
     let live: Bool
     @State private var open: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
+        VStack(alignment: .leading, spacing: 0) {
             Button { open.toggle() } label: {
                 HStack(spacing: Space.xs) {
-                    Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary)
+                    Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.iconSlot)
                     if live {
-                        Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.label).modifier(Shimmer())
+                        Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.footnote).modifier(Shimmer())
                     } else {
-                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.label).foregroundStyle(Tone.secondary)
+                        Text(thoughtHeadline(text)).textRole(.footnote).foregroundStyle(Tone.tertiary)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 1)
                     }
-                    Spacer(minLength: 0)
-                    Symbol(name: open ? "chevron.up" : "chevron.down", context: .chevron).foregroundStyle(Tone.tertiary)
+                    Spacer(minLength: Space.xs)
+                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
                 }
                 .frame(minHeight: Metric.toolRow)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .haptic(.selection, trigger: open)
+            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : thoughtHeadline(text))
+            .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
             if open {
-                Text(text)
-                    .textRole(.label)
-                    .foregroundStyle(Tone.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
+                ScrollView {
+                    Text(text).textRole(.footnote).foregroundStyle(Tone.secondary).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
+                }
+                .frame(maxHeight: Metric.toolDetailMax)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(Tone.nested, in: rounded(Radius.inner))
+                .defaultScrollAnchor(live ? .bottom : .top)
+                .padding(.leading, Metric.iconSlot + Space.xs)
+                .padding(.bottom, Space.xs)
+                .transition(.opacity)
             } else if live {
                 // The last three lines, wrapped from the start and clipped from the top (item 1848): a new word never
                 // moves the words before it. Cut at the head, every word slid along its line on each new one.
-                Text(verbatim: "\n\n").textRole(.label).hidden()
+                Text(verbatim: "\n\n").textRole(.footnote).hidden()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .bottomLeading) {
                         Text(text)
-                            .textRole(.label)
+                            .textRole(.footnote)
                             .foregroundStyle(Tone.tertiary)
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .clipped()
+                    .padding(.leading, Metric.iconSlot + Space.xs)
+                    .padding(.bottom, Space.xxs)
+                    .transition(.opacity)
             }
         }
+        .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
+    }
+}
+
+/// A thought's first sentence, its markdown marks taken out: the line a stored thought shows folded ("**Checking the
+/// diff.** Then…" reads "Checking the diff."). The words as they are when they make no sentence.
+func thoughtHeadline(_ text: String) -> String {
+    let plain: String = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "")
+        .replacingOccurrences(of: "`", with: "").replacingOccurrences(of: "#", with: "")
+    let line: String = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
+    // A sentence ends at . ! or ? before a space or the end of the line, so "3.14" or "v2.1" does not cut it.
+    var index: String.Index = line.startIndex
+    while index < line.endIndex {
+        let next: String.Index = line.index(after: index)
+        if ".!?".contains(line[index]), next == line.endIndex || line[next].isWhitespace { return String(line[...index]) }
+        index = next
+    }
+    return line
+}
+
+/// Dot's mark on a row of its own tools (item 1769), as another coding agent marks its own calls with its name: Dot's face in the quiet
+/// ink of the work log, the size of a tool's symbol, scaling with the text.
+struct DotMark: View {
+    @ScaledMetric(relativeTo: .footnote) private var size: CGFloat = 13
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Tone.tertiary)
+            HStack(spacing: size * 0.15) {
+                Capsule().fill(Tone.ground).frame(width: size * 0.12, height: size * 0.24)
+                Capsule().fill(Tone.ground).frame(width: size * 0.12, height: size * 0.24)
+            }
+            .offset(y: -size * 0.02)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 }

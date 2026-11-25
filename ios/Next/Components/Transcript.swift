@@ -73,6 +73,8 @@ struct AnswerText: View {
 struct CodeBlock: View {
     let language: String
     let code: String
+    @AppStorage(PrefKey.codeFontSize) private var codeSize: Double = 0
+    @AppStorage(PrefKey.codeWordBreak) private var wordBreak: Bool = true
     @State private var copied: Int = 0
     @State private var showsCopied: Bool = false
 
@@ -99,16 +101,11 @@ struct CodeBlock: View {
             .padding(.leading, Space.m)
             .padding(.trailing, Space.xxs)
             .frame(minHeight: 32)
-            ScrollView(.horizontal) {
-                Text(code)
-                    .textRole(.code)
-                    .foregroundStyle(Tone.text)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .padding(.horizontal, Space.m)
-                    .padding(.bottom, Space.s)
+            if wordBreak {
+                codeText.fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView(.horizontal) { codeText.fixedSize(horizontal: true, vertical: false) }.scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
         }
         .background(Tone.nested, in: rounded(Radius.inner))
         .task(id: copied) {
@@ -124,6 +121,27 @@ struct CodeBlock: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(String(localized: "Code, \(language)", comment: "VoiceOver: a code block; the argument is its language"))
+    }
+
+    /// The code in the monospaced role, or in the size chosen in Settings › Appearance (item 1769).
+    private var codeText: some View {
+        Text(code)
+            .textRole(.code)
+            .modifier(MonoSize(points: codeSize))
+            .foregroundStyle(Tone.text)
+            .textSelection(.enabled)
+            .padding(.horizontal, Space.m)
+            .padding(.bottom, Space.s)
+    }
+}
+
+/// A monospaced size chosen in Settings › Appearance over the code role's own; 0 keeps the role's, which follows the
+/// text size (item 1769).
+struct MonoSize: ViewModifier {
+    let points: Double
+
+    func body(content: Content) -> some View {
+        if points > 0 { content.font(.system(size: points, design: .monospaced)) } else { content }
     }
 }
 

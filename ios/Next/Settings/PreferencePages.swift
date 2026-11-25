@@ -136,9 +136,12 @@ struct GeneralPage: View {
 struct AppearancePage: View {
     @AppStorage(PrefKey.colorScheme) private var schemeRaw: String = ColorSchemeChoice.system.rawValue
     @AppStorage(PrefKey.textSize) private var sizeRaw: String = TextSizeChoice.system.rawValue
-    @AppStorage(PrefKey.toolCallMode) private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
+    @AppStorage(PrefKey.toolCallMode) private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
     @AppStorage(PrefKey.responseStreaming) private var streaming: Bool = true
     @AppStorage(PrefKey.readingWidth) private var widthRaw: String = ReadingWidth.standard.rawValue
+    @AppStorage(PrefKey.terminalFontSize) private var terminalSize: Double = 0
+    @AppStorage(PrefKey.codeFontSize) private var codeSize: Double = 0
+    @AppStorage(PrefKey.codeWordBreak) private var wordBreak: Bool = true
     @Environment(\.dynamicTypeSize) private var systemSize: DynamicTypeSize
 
     var body: some View {
@@ -150,11 +153,13 @@ struct AppearancePage: View {
                 }
             }
             textSection
+            terminalSection
+            codeSection
             GroupedSection(
                 header: String(localized: "Tool calls in chat", comment: "Settings section: how much of the work log a chat shows"),
                 footer: String(
-                    localized: "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show.",
-                    comment: "Footer of the tool calls setting (UI-STANDARD 14:25)")
+                    localized: "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show. With Hide all and Zen, one line under the last message says what Dot is doing; tap it for the steps.",
+                    comment: "Footer of the tool calls setting (UI-STANDARD 14:25, item 1769)")
             ) {
                 ForEach(DotEngine.ToolCallMode.allCases, id: \.self) { mode in
                     RadioRow(title: mode.title, description: nil, isSelected: toolModeRaw == mode.rawValue) { toolModeRaw = mode.rawValue }
@@ -208,6 +213,52 @@ struct AppearancePage: View {
     }
 
     private var size: TextSizeChoice { TextSizeChoice(rawValue: sizeRaw) ?? .system }
+
+    /// What a command said, as a tool's detail shows it (item 1769, after another coding agent's Appearance): a preview, and a size of its
+    /// own instead of the text size's.
+    private var terminalSection: some View {
+        GroupedSection(header: String(localized: "Terminal", comment: "Appearance section: how a command's output is drawn"), footer: nil) {
+            Text(verbatim: "$ swift test\nBuilding for debugging...\nTest Suite 'All tests' passed\n  Executed 128 tests, with 0 failures (0.42 s)")
+                .textRole(.code).modifier(MonoSize(points: terminalSize)).foregroundStyle(Tone.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
+                .background(Tone.nested, in: rounded(Radius.inner))
+                .padding(Space.groupedGutter)
+                .accessibilityLabel(String(localized: "Preview of a command's output", comment: "VoiceOver: the terminal preview in Appearance"))
+            customSize(systemImage: "apple.terminal", points: $terminalSize)
+        }
+    }
+
+    /// Code and diffs in answers (item 1769): a preview, a size of their own, and whether a long line wraps.
+    private var codeSection: some View {
+        GroupedSection(header: String(localized: "Code and diffs", comment: "Appearance section: how code blocks are drawn"), footer: nil) {
+            CodeBlock(language: "swift", code: "func greet(_ user: User) -> String {\n    \"Hello, \\(user.name) <\\(user.email)>\" // shows how a long line behaves\n}")
+                .padding(Space.groupedGutter)
+            customSize(systemImage: "chevron.left.forwardslash.chevron.right", points: $codeSize)
+            ToggleRow(
+                systemImage: "text.alignleft", title: String(localized: "Word break", comment: "Appearance: long lines of code wrap"),
+                description: String(localized: "On: a long line wraps. Off: it scrolls sideways.", comment: "Appearance: what word break does"), isOn: $wordBreak)
+        }
+    }
+
+    /// A switch for a monospaced size of its own and, when on, its slider in points (10 to 18).
+    @ViewBuilder private func customSize(systemImage: String, points: Binding<Double>) -> some View {
+        ToggleRow(
+            systemImage: systemImage, title: String(localized: "Custom font size", comment: "Appearance: a monospaced size of its own"), description: nil,
+            isOn: Binding(get: { points.wrappedValue > 0 }, set: { points.wrappedValue = $0 ? 13 : 0 }))
+        if points.wrappedValue > 0 {
+            HStack(spacing: Space.s) {
+                Text(verbatim: "A").font(.system(size: 12, design: .monospaced)).foregroundStyle(Tone.secondary).accessibilityHidden(true)
+                Slider(value: points, in: 10...18, step: 1)
+                    .tint(Tone.text)
+                    .accessibilityLabel(String(localized: "Custom font size", comment: "Appearance: a monospaced size of its own"))
+                    .accessibilityValue(String(localized: "\(Int(points.wrappedValue)) pt", comment: "Appearance: the body text's size in points"))
+                Text(verbatim: "A").font(.system(size: 19, design: .monospaced)).foregroundStyle(Tone.secondary).accessibilityHidden(true)
+                Text(String(localized: "\(Int(points.wrappedValue)) pt", comment: "Appearance: the body text's size in points")).textRole(.footnote).foregroundStyle(Tone.secondary).tabularNumbers()
+            }
+            .padding(.horizontal, Space.groupedGutter)
+            .padding(.vertical, Space.s)
+        }
+    }
 
     private var textSection: some View {
         let followsPhone: Binding<Bool> = Binding(get: { size == .system }, set: { sizeRaw = $0 ? TextSizeChoice.system.rawValue : TextSizeChoice.large.rawValue })

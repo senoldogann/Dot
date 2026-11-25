@@ -9,7 +9,7 @@ import Foundation
 /// | the same, still running                | row      | row             | hidden   | hidden |
 /// | a failed tool                          | row      | row             | row      | hidden |
 /// | helper group (each helper's step)      | card     | card            | card     | hidden |
-/// | thinking (live as written, then the step's stored thinking) | row | row       | row      | hidden |
+/// | thinking (live as written, then the step's stored thinking) | row | row       | hidden   | hidden |
 /// | plan                                   | card     | card            | card     | hidden |
 /// | interim prose (not the run's last answer) | shown | shown           | shown    | hidden |
 /// | the run's answer                       | shown    | shown           | shown    | shown  |
@@ -19,6 +19,8 @@ import Foundation
 /// | the owner's words, Dot's notes         | shown    | shown           | shown    | shown  |
 ///
 /// "Response streaming" off: the words and the thinking being written are not drawn; an answer appears once it is whole.
+/// Hide all and Zen draw one live line under the last message instead of the steps (`workNow`, item 1769): what the run
+/// does now ("Thinking", "Running swift test"); a tap on it shows the steps of the chat.
 /// The answer's footer (copy, reaction, time) is on the run's final answer alone, once the run ended (`endedAt`).
 public enum ToolCallMode: String, CaseIterable, Codable, Sendable {
     case showAll
@@ -494,7 +496,7 @@ func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
     case (.showAll, _): true
     case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
-    case (.zen, .thought): false
+    case (.zen, .thought), (.hideAll, .thought): false
     case (_, .thought): true
     case (.hideSuccessful, .tool(let state)): state != .done
     case (.hideAll, .tool(let state)): state == .failed
