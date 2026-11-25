@@ -871,7 +871,10 @@ every mode but `yolo` (item 433).
   pointer. Your first touch while Dot works ends its use of them at the next step, and the run says that you came
   back; your input while Dot is posting a step is hidden by Dot's own, and the next one after it is seen. A wait is
   not a question: a `yolo` or free run waits as any other. `desktop.input_only_when_away = false` lets the steps go
-  at once, as before. `desktop_open_app`, which brings an application to the front, does not wait.
+  at once, as before. `desktop_open_app`, which brings an application to the front, does not wait, nor do keys an
+  `apple_script` or an `osascript` sends through System Events. The wait counts toward the run's own wall-clock cap
+  (`run_max_minutes`), so a run that waits longer than that ends at its next step. A Mac whose idle time cannot be
+  read counts as one the owner is at.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
   and a step the review sees take a credential keeps that reason in its record (item 429, see
