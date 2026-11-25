@@ -7,7 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1756](1756.md) | done | 2026-11-25 | DotNext streams a step's thinking and words, its capsule clock ticks on its own and says what the run does |
-| [1755](1755.md) | done | 2026-11-25 | Three phone tests wait on what they check, not on a clock |
+| [1755](1755.md) | done | 2026-11-25 | Three phone tests and a restart test wait on what they check, not on a clock |
 | [1754](1754.md) | done | 2026-11-25 | Waiting for a run that is still being launched waits for its end |
 | [1753](1753.md) | done | 2026-11-25 | Two browser tests follow the screens they check |
 | [1752](1752.md) | done | 2026-11-25 | On a phone a note's tags stand at the height of the badge beside them again |
