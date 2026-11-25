@@ -6,6 +6,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1759](1759.md) | done | 2026-11-25 | DotNext's Settings, whole: every page of the web app reachable, the hop-by-hop diagnosis, and pairing as a first run |
+| [1758](1758.md) | done | 2026-11-25 | Settings › Phone shows a QR code that opens Dot Next with the address and the code, and one tap pairs it |
+| [1757](1757.md) | done | 2026-11-25 | DotNext's engine reads and writes Settings: the settings routes, the proof of the key, the diagnosis by hop, the search, the pair link |
 | [1756](1756.md) | done | 2026-11-25 | DotNext streams a step's thinking and words, its capsule clock ticks on its own and says what the run does |
 | [1755](1755.md) | done | 2026-11-25 | Three phone tests and a restart test wait on what they check, not on a clock |
 | [1754](1754.md) | done | 2026-11-25 | Waiting for a run that is still being launched waits for its end |

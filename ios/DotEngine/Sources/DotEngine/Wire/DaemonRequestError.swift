@@ -31,15 +31,30 @@ public enum DaemonRequestError: Error, CustomStringConvertible, Equatable {
         return nil
     }
 
-    /// The daemon's own words of a refusal (`{"detail": ...}`), at most 160 characters; empty when it gave none.
+    /// The daemon's own words of a refusal, at most 160 characters; empty when it gave none. Dot's errors carry
+    /// `{"message": ..., "context": ...}` (`server/app.py`); FastAPI's own (an unknown route) carry `{"detail": ...}`.
     public var detail: String {
         guard case .status(_, _, let body) = self, let data: Data = body.data(using: .utf8),
-            let answer: DetailBody = try? JSONDecoder().decode(DetailBody.self, from: data)
+            let answer: ErrorBody = try? JSONDecoder().decode(ErrorBody.self, from: data)
         else { return "" }
-        return String(answer.detail.prefix(160))
+        return String((answer.message ?? answer.detail ?? "").prefix(160))
+    }
+
+    /// Whether the daemon refused this because the caller is a phone (`PhoneRefused`: 403 with `context.phone`).
+    public var refusedToAPhone: Bool {
+        guard case .status(_, 403, let body) = self, let data: Data = body.data(using: .utf8),
+            let answer: ErrorBody = try? JSONDecoder().decode(ErrorBody.self, from: data)
+        else { return false }
+        return answer.context?.phone == true
     }
 }
 
-private struct DetailBody: Decodable {
-    let detail: String
+private struct ErrorBody: Decodable {
+    let message: String?
+    let detail: String?
+    let context: ErrorContext?
+}
+
+private struct ErrorContext: Decodable {
+    let phone: Bool?
 }
