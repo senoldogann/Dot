@@ -49,6 +49,11 @@ extension DaemonAPI {
 
     public func codeReview() async throws(DaemonRequestError) -> CodeReviewConfig { try await get("/api/code-review", query: []) }
 
+    /// `PUT /api/code-review` (item 1770): the whole table, written all or none; a model the daemon cannot review with is a 422.
+    public func changeCodeReview(_ change: CodeReviewChange) async throws(DaemonRequestError) -> CodeReviewConfig {
+        try await send("PUT", "/api/code-review", body: Self.json(change))
+    }
+
     /// `GET /api/budget` (item 1731); a daemon from before it answers 404.
     public func budget() async throws(DaemonRequestError) -> BudgetView { try await get("/api/budget", query: []) }
 

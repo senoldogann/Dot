@@ -1,7 +1,7 @@
 import XCTest
 
 /// Settings on the fixture daemon (wave N3): the search with synonyms, the hop diagnosis, a write the Mac refuses to a
-/// phone, a schedule paused from its menu.
+/// phone, a schedule paused with its switch.
 final class SettingsUITests: XCTestCase {
     private func launch(_ scene: String) -> XCUIApplication {
         let app: XCUIApplication = XCUIApplication()
@@ -15,7 +15,7 @@ final class SettingsUITests: XCTestCase {
         let rules: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Rules")).firstMatch
         XCTAssertTrue(rules.waitForExistence(timeout: 10))
         rules.tap()
-        XCTAssertTrue(app.staticTexts["Ask before sending any mail"].waitForExistence(timeout: 5), "the rules of the fixture daemon")
+        XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")
     }
 
     /// The phone does not engage the emergency stop (item 1766), but while the Mac's holds it says so and releases it.
@@ -42,10 +42,15 @@ final class SettingsUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Copy instructions"].exists)
     }
 
-    func testAScheduleIsPausedFromItsMenu() {
+    func testAScheduleIsPausedWithItsSwitch() {
         let app: XCUIApplication = launch("settings-schedules")
         XCTAssertTrue(app.staticTexts["Morning brief"].waitForExistence(timeout: 10))
+        let toggle: XCUIElement = app.switches["Morning brief on"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        // XCUITest reads a toggle's value as "1"/"0" whatever its `accessibilityValue` says (measured on iOS 26.5: a
+        // check against "On" failed with `Optional("1")`, this one passes; the ink switch keeps the switch trait).
+        XCTAssertEqual(toggle.value as? String, "1", "switched on")
         app.buttons.matching(identifier: "Actions").firstMatch.tap()
-        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Run now"].waitForExistence(timeout: 3), "the row's menu runs it now")
     }
 }

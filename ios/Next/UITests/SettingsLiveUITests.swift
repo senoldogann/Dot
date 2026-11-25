@@ -64,11 +64,10 @@ final class SettingsLiveUITests: XCTestCase {
         sleep(2)
         back(app)
 
-        // Scheduled tasks: pause the seeded one, then rename it.
+        // Scheduled tasks: pause the seeded one with its switch, then rename it.
         open(app, "Scheduled tasks")
         XCTAssertTrue(app.staticTexts["E2E brief"].waitForExistence(timeout: 10))
-        app.buttons.matching(identifier: "Actions").firstMatch.tap()
-        app.buttons["Pause"].tap()
+        app.switches["E2E brief on"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Paused")).firstMatch.waitForExistence(timeout: 10))
         app.staticTexts["E2E brief"].tap()
         let title: XCUIElement = app.textFields["Name"]
@@ -79,11 +78,56 @@ final class SettingsLiveUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["E2E brief edited"].waitForExistence(timeout: 10))
         back(app)
 
-        // Memory: use the run's proposed words.
+        // Models: the code review's reasoning, from the phone (item 1770).
+        open(app, "Models")
+        let review: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Code review model")).firstMatch
+        XCTAssertTrue(review.waitForExistence(timeout: 10))
+        review.tap()
+        let reasoning: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reasoning")).firstMatch
+        for _ in 0..<6 where !reasoning.isHittable { app.swipeUp() }
+        reasoning.tap()
+        app.buttons["High"].tap()
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "High")).firstMatch.waitForExistence(timeout: 10))
+        back(app)
+
+        // Rules: free mode, switched on on the Mac, switched off from the phone (a phone may).
+        open(app, "Rules")
+        let free: XCUIElement = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Free mode")).firstMatch
+        XCTAssertTrue(free.waitForExistence(timeout: 10))
+        free.tap()
+        sleep(2)
+        back(app)
+
+        // Memory: use the run's proposed words, then edit the note.
         open(app, "Memory")
         XCTAssertTrue(app.staticTexts["From outside content"].waitForExistence(timeout: 10))
         app.buttons["Use"].tap()
         XCTAssertTrue(app.staticTexts["None waits. When a task wants to change a note you wrote, it waits here."].waitForExistence(timeout: 10))
+        let note: XCUIElement = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "commands written out")).firstMatch
+        XCTAssertTrue(note.waitForExistence(timeout: 10))
+        note.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Edit")).firstMatch.tap()
+        // The note's field holds its words (its placeholder is not its identifier).
+        let words: XCUIElement = app.textFields.matching(NSPredicate(format: "value BEGINSWITH %@", "The owner prefers")).firstMatch
+        XCTAssertTrue(words.waitForExistence(timeout: 5), "the note's field")
+        words.tap()
+        words.typeText(" Edited.")
+        app.buttons["Save"].tap()
+        sleep(2)
+        back(app)
+
+        // Agents: a chat with the seeded agent, which greets the owner in its first one.
+        open(app, "Agents")
+        let scout: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "E2E Scout")).firstMatch
+        XCTAssertTrue(scout.waitForExistence(timeout: 10))
+        scout.tap()
+        let chat: XCUIElement = app.buttons["Chat with E2E Scout"]
+        XCTAssertTrue(chat.waitForExistence(timeout: 10))
+        chat.tap()
+        sleep(3)
+        back(app)
+        back(app)
         back(app)
 
         // Usage limits and caps: lower the cap of one task (a daemon with item 1731), or say Dot is too old.

@@ -128,7 +128,7 @@ public enum ModelRole: String, Codable, Sendable, CaseIterable {
     case vision
 }
 
-/// `GET /api/code-review` (item 1663): the models of the pre-push review; a phone reads it and cannot change it.
+/// `GET /api/code-review` (item 1663): the models of the pre-push review; a phone changes it too (item 1770).
 public struct CodeReviewConfig: Codable, Sendable, Hashable {
     public let model: String
     public let effort: String
@@ -146,6 +146,36 @@ public struct CodeReviewConfig: Codable, Sendable, Hashable {
         self.smallModel = smallModel
         self.smallMaxLines = smallMaxLines
         self.maxMinutes = maxMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case model, effort, fallback
+        case fallbackEffort = "fallback_effort"
+        case smallModel = "small_model"
+        case smallMaxLines = "small_max_lines"
+        case maxMinutes = "max_minutes"
+    }
+}
+
+/// The body of `PUT /api/code-review` (item 1770): the whole table as it should stand, both efforts included.
+public struct CodeReviewChange: Codable, Sendable, Hashable {
+    public var model: String
+    public var effort: String
+    public var fallback: [String]
+    public var fallbackEffort: String
+    public var smallModel: String
+    public var smallMaxLines: Int
+    public var maxMinutes: Int
+
+    /// The table as it stands, to change one part of.
+    public init(_ config: CodeReviewConfig) {
+        model = config.model
+        effort = config.effort
+        fallback = config.fallback
+        fallbackEffort = config.fallbackEffort
+        smallModel = config.smallModel
+        smallMaxLines = config.smallMaxLines
+        maxMinutes = config.maxMinutes
     }
 
     enum CodingKeys: String, CodingKey {
