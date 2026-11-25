@@ -255,13 +255,13 @@ private struct ChromeGallery: View {
                 ComposerView(text: $long, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
                 Text(String(localized: "Floating control", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpers: 3),
+                    summary: WorkingSummary(status: .working, since: Date(timeIntervalSinceNow: -192), queued: 2, helpers: 3),
                     showsScrollToBottom: true, openStatus: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: nil, queued: 0, helpers: 0),
+                    summary: WorkingSummary(status: .waitingOnYou, since: nil, queued: 0, helpers: 0),
                     showsScrollToBottom: false, openStatus: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: nil, activity: nil, since: nil, queued: 0, helpers: 0),
+                    summary: WorkingSummary(status: nil, since: nil, queued: 0, helpers: 0),
                     showsScrollToBottom: true, openStatus: {}, openQueue: {}, openHelpers: {}, scrollToBottom: {})
             }
             .padding(.horizontal, Space.gutter)
@@ -368,7 +368,7 @@ struct SampleChatScreen: View {
         .safeAreaInset(edge: .bottom) {
             VStack(alignment: .trailing, spacing: Space.xs) {
                 FloatingWorkingControl(
-                    summary: WorkingSummary(status: .waitingOnYou, activity: nil, since: Date(timeIntervalSinceNow: -180), queued: 2, helpers: 2),
+                    summary: WorkingSummary(status: .waitingOnYou, since: Date(timeIntervalSinceNow: -180), queued: 2, helpers: 2),
                     showsScrollToBottom: true, openStatus: { panel = .background }, openQueue: {}, openHelpers: { panel = .agents },
                     scrollToBottom: {})
                     .frame(maxWidth: .infinity, alignment: .center)
