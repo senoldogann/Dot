@@ -38,6 +38,12 @@ note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a c
 version, Usage, Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the
 computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
 with synonyms finds any page in English or
+(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
+only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
+on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
+runs' proposed rewrites with Use and Drop), Health and version, Usage, Maintenance (Dot's and the provider programs'
+versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
+line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
@@ -53,8 +59,10 @@ does and how it connects, who it is connected as, Disconnect with a confirmation
 connected app added on the Mac or from another agent, 1Password's token, an official sign-in). Connect takes the
 daemon's step: a Mac application's, a synced folder's and Dot's browser's sign-in (`POST /api/connections/{id}`) are
 started from the phone and finished on the Mac, where macOS asks or the page opens; adding a connected app, an official
-sign-in and 1Password's token are refused to a phone's key (item 678, `on_this_mac`), so those say "Finish on your
-Mac". No "For you" section: the daemon gives no suggestion for services.
+sign-in and 1Password's token are refused to a phone's key (item 678, `on_this_mac`), so their Connect says "Finish on
+your Mac" on the row and names the Mac's page in the detail. A Disconnect of a sign-in the provider did not end shows
+the daemon's notice of where to end it. While a service waits on the Mac, the sheet reads again every five seconds.
+No "For you" section: the daemon gives no suggestion for services.
 
 ## The engine: `ios/DotEngine`
 

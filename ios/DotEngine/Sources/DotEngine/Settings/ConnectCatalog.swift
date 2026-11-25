@@ -77,7 +77,7 @@ public func connectApps(_ sources: ConnectSources) -> [ConnectApp] {
 }
 
 private func connectApp(_ plugin: PluginView, _ sources: ConnectSources) -> ConnectApp {
-    let signedIn: [(AccountProviderView, SignedInAccount)] = sources.providers.filter { owns(plugin.id, provider: $0.id) }
+    let signedIn: [(AccountProviderView, SignedInAccount)] = sources.providers.filter { owns(plugin.ways, provider: $0.id) }
         .flatMap { provider in provider.accounts.map { (provider, $0) } }
     let vaultWay: Bool = plugin.ways.contains { $0.kind == "vault" }
     let vaultNames: [String] = vaultWay && vaultReady(sources.vault) ? sources.vault.vaults.map(\.name) : []
@@ -89,10 +89,11 @@ private func connectApp(_ plugin: PluginView, _ sources: ConnectSources) -> Conn
         removals: plugin.ways.flatMap { removals($0, sources) } + signedIn.map { ConnectRemoval.account(provider: $0.0.id, address: $0.1.address) })
 }
 
-/// Whether the provider `provider` of the official sign-ins (`google`, `microsoft`) is the listing `listing`'s
-/// (`google`, `microsoft-365`).
-private func owns(_ listing: String, provider: String) -> Bool {
-    listing == provider || listing.hasPrefix(provider + "-")
+/// Whether the provider `provider` of the official sign-ins (`google`, `microsoft`) is the service of `ways`: the one
+/// that reaches it in Dot's browser under the same id (Google's `web:google`, Microsoft 365's `web:microsoft`), never a
+/// service whose id merely begins like it (Microsoft Learn, `mcp:microsoft-learn`).
+private func owns(_ ways: [PluginWayView], provider: String) -> Bool {
+    ways.contains { $0.kind == "web" && $0.ref == provider }
 }
 
 private func vaultReady(_ vault: VaultStateView) -> Bool {

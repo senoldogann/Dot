@@ -27,6 +27,7 @@ final class ConnectCatalogTests: XCTestCase {
                 listing("sentry", "Sentry", "code", [way("mcp", "sentry")]),
                 listing("things", "Things", "mac", [way("mac", "things")]),
                 listing("linear", "Linear", "popular", [way("mcp", "linear")]),
+                listing("microsoft-learn", "Microsoft Learn", "code", [way("mcp", "microsoft-learn")]),
             ].joined(separator: ",") + "]}"
         let app: (String, String, String?, Bool) -> String = { id, state, step, waiting in
             #"{"id":"\#(id)","kind":"mac","name":"\#(id)","does":"x","state":"\#(state)","step":\#(step.map { "\"\($0)\"" } ?? "null"),"waiting":\#(waiting)}"#
@@ -48,7 +49,7 @@ final class ConnectCatalogTests: XCTestCase {
 
     func testWhatAPhoneMayStartAndWhatFinishesOnTheMac() throws {
         let apps: [ConnectApp] = connectApps(try sources(servers: noServers, vault: noVault, accounts: noAccounts))
-        XCTAssertEqual(apps.map(\.id), ["google", "notion", "github", "mail", "microsoft-365", "1password", "sentry", "things", "linear"], "the daemon's order")
+        XCTAssertEqual(apps.map(\.id), ["google", "notion", "github", "mail", "microsoft-365", "1password", "sentry", "things", "linear", "microsoft-learn"], "the daemon's order")
         XCTAssertEqual(try app(apps, "mail").action, .stepOnMac(app: "mail"), "macOS asks on the Mac; the phone starts the question")
         XCTAssertEqual(try app(apps, "google").action, .stepOnMac(app: "google"), "the sign-in page opens in Dot's browser on the Mac")
         XCTAssertEqual(try app(apps, "notion").action, .onMacOnly, "adding a connected app is refused to a phone (item 678), before its web way")
@@ -84,13 +85,24 @@ final class ConnectCatalogTests: XCTestCase {
         XCTAssertEqual(try app(apps, "microsoft-365").action, .stepOnMac(app: "microsoft"), "no account: its web way's step")
     }
 
+    func testAnAccountBelongsToTheServiceOfItsBrowserWayAlone() throws {
+        let accounts: String =
+            #"[{"id":"microsoft","name":"Microsoft","configured":true,"client_names":[],"accounts":[{"address":"owner@example.com","connected_at":1.0}]}]"#
+        let apps: [ConnectApp] = connectApps(try sources(servers: noServers, vault: noVault, accounts: accounts))
+        XCTAssertEqual(try app(apps, "microsoft-365").accounts, ["owner@example.com"])
+        let learn: ConnectApp = try app(apps, "microsoft-learn")
+        XCTAssertEqual(learn.action, .onMacOnly, "Microsoft Learn is a docs server: the Microsoft sign-in is not its")
+        XCTAssertEqual(learn.accounts, [])
+        XCTAssertEqual(learn.removals, [], "its Disconnect must not sign the Microsoft account out")
+    }
+
     func testSectionsFilterAndSearch() throws {
         let apps: [ConnectApp] = connectApps(try sources(servers: noServers, vault: noVault, accounts: noAccounts))
         XCTAssertEqual(connectSections(apps), ["popular", "passwords", "code", "mac"], "in the order they first stand")
-        XCTAssertEqual(filterConnectApps(apps, section: "code", onlyConnected: false, query: "").map(\.id), ["sentry"])
+        XCTAssertEqual(filterConnectApps(apps, section: "code", onlyConnected: false, query: "").map(\.id), ["sentry", "microsoft-learn"])
         XCTAssertEqual(filterConnectApps(apps, section: nil, onlyConnected: true, query: "").map(\.id), ["github"])
         XCTAssertEqual(filterConnectApps(apps, section: nil, onlyConnected: false, query: "GIT").map(\.id), ["github"], "case is folded")
-        XCTAssertEqual(filterConnectApps(apps, section: nil, onlyConnected: false, query: "microsoft does").map(\.id), ["microsoft-365"], "every word, name or words")
+        XCTAssertEqual(filterConnectApps(apps, section: nil, onlyConnected: false, query: "microsoft 365").map(\.id), ["microsoft-365"], "every word, name or words")
         XCTAssertEqual(filterConnectApps(apps, section: "code", onlyConnected: false, query: "git"), [])
         let skills: [PaletteSkill] = try decode([PaletteSkill].self, #"[{"name":"pdf-forms","description":"Fill PDF forms."},{"name":"deploy","description":"Ship the site."}]"#)
         XCTAssertEqual(filterSkills(skills, query: "pdf").map(\.name), ["pdf-forms"])
