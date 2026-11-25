@@ -143,10 +143,13 @@ once, and waits for nothing (item 359).
 
 The gate runs on every pull request and every push to `main` that changes more than prose, and, called by the release,
 on the tagged commit (`.github/workflows/gate.yml`; a change to the Markdown at the root, `docs/` or the issue and pull
-request templates alone skips it). The format check, the lint, mypy, the checks of the interface (`npm run check`)
+request templates alone skips it, but `docs/freedom.md`, which `tests/unit/test_freedom_contract.py` reads). The format check, the lint, mypy, the checks of the interface (`npm run check`)
 and the unit tests but those that need macOS (item 1270, above) run on Linux. PyObjC is a dependency on macOS only
 (`sys_platform == 'darwin'` in `pyproject.toml`), so `uv sync` installs the rest on Linux; the package still runs on
-macOS alone, where every unit test runs again, and `dotx eval check` and the smoke tests stay there. Those tests are every smoke test that needs no service, chosen by its
+macOS alone, where every unit test runs again, and `dotx eval check` and the
+smoke tests stay there. A pull request whose every file is one nothing of the macOS jobs reads (`ios/`, `roadmap/`,
+`changes/`, prose, the iOS and desktop workflows: `scripts/python_ci.py`, item 1871) skips `gate` and `gate (part 2)`;
+`checks` still runs, a file the script does not know runs them, and a push to `main` and the release run them always. Those tests are every smoke test that needs no service, chosen by its
 marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). They run spread over the cores
 with `-n auto` (pytest-xdist), and over two runners at once (item 944): the smoke tests' files are dealt to two parts
 in turn by their sorted paths (`--part k/n`, `tests/smoke/conftest.py`), the first run by the `gate` job after the unit
