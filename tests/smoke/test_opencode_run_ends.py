@@ -196,11 +196,31 @@ async def test_a_step_s_streamed_words_and_their_held_tail_come_under_the_step_t
     assert all(data["says"] == "either" for data in deltas), shown
 
 
+def _seen(call_id: str, message_id: str, tool: str) -> ToolSeen:
+    return ToolSeen(
+        call_id=call_id,
+        message_id=message_id,
+        tool=tool,
+        status="running",
+        input={"command": "echo more"},
+        output="",
+        error="",
+        title="",
+        started_ms=None,
+        ended_ms=None,
+    )
+
+
 async def test_a_call_of_opencodes_own_tool_after_a_finish_drops_it(room: Room, tmp_path: Path) -> None:
     """Item 1695's pre-push review: a finish ends the run as it says only while the agent makes no call after it; its
     own tools (bash, write) do not go through Dot's door, and a call of one drops the finish too."""
     follow: _Follow = _follow(room, _Server(), None, 0.0, tmp_path)
     follow.finished_calls.append(FinishArgs(answer="All done.", success=True))
+    # A call of the finish's own step ran beside it, not after it: the finish stands (the third review of item 1695).
+    follow.finish_step = "m0"
+    follow.assistants["m0"] = _Step(started=time.monotonic())
+    await follow.tool(_seen("c0", "m0", "bash"))
+    assert follow.finished_calls == [FinishArgs(answer="All done.", success=True)]
     await follow.tool(
         ToolSeen(
             call_id="c1",

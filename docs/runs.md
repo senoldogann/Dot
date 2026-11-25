@@ -43,8 +43,10 @@ the column of the steps' marks, its words on the answer's lane (item 1182), and 
 words whether calls follow them, so what they are is known while they stream only where the run's own rules say a
 reply with no call is not the answer. In Dot's own loop, once a task or research run used a tool, short of its
 limit and of the last time it is told to finish, they are an update from the first word and stream folded with the steps (item 1162; 443 of 498 steps with words
-in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on Claude Code or
-OpenCode, whose last reply is the answer when it calls no finish (45 of 68 of the owner's Claude Code tasks in a week),
+in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on
+OpenCode, whose last reply is the answer when it calls no finish, and of a task on Claude Code, whose last reply is the
+answer once it was told to finish as many times as Dot's own loop tells it (item 1694; 45 of 68 of the owner's Claude
+Code tasks in a week ended with no finish before),
 and a first step. Those stream in sight (item 1166), drawn as the message they most often stay (item 1182: drawn as a
 quiet note, they grew half again in height at the step's end), and their step's end makes them the message when
 it calls nothing, or nothing but finish, or folds them with the steps; before item 1162 they streamed as a message and
