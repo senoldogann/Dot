@@ -761,6 +761,23 @@ TR: dict[str, str] = {
     'Your Mac answered with what this app cannot read (%@). Update Dot on the Mac or this app.': "Mac'in bu uygulamanın okuyamadığı bir yanıt verdi (%@). Mac'teki Dot'u ya da bu uygulamayı güncelle.",
     "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi; bu yüzden anahtar gönderilmedi. Biraz sonra yeniden denetle.",
     "Your Mac did not answer the check of this phone's key.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi.",
+    # Helper S3 (items 1790-1791): Maintenance, and Settings' footnote.
+    "Continue after restart": "Yeniden başlatınca devam et",
+    "Does not work with Dot": "Dot ile çalışmıyor",
+    "Dot and provider versions": "Dot ve sağlayıcı sürümleri",
+    "Maintenance": "Bakım",
+    "Measured with Dot": "Dot ile ölçüldü",
+    "More settings are on your Mac.": "Diğer ayarlar Mac'inde.",
+    "New models appear when Models opens: Dot asks each provider then. Dot never updates a provider's program on its own; Claude Code updates itself.": "Yeni modeller Modeller açılınca görünür: Dot o an her sağlayıcıya sorar. Dot bir sağlayıcının programını kendi başına asla güncellemez; Claude Code kendini günceller.",
+    "Not installed": "Kurulu değil",
+    "Not measured": "Ölçülmedi",
+    "Older than measured": "Ölçülenden eski",
+    "Provider programs": "Sağlayıcı programları",
+    "Resume interrupted tasks after an update or restart.": "Bir güncelleme ya da yeniden başlatmadan sonra yarıda kalan işleri sürdür.",
+    "Update Claude Code on the Mac with 'claude update'.": "Claude Code'u Mac'te 'claude update' ile güncelle.",
+    "Update Dot on your Mac to see the provider programs' versions.": "Sağlayıcı programlarının sürümlerini görmek için Mac'indeki Dot'u güncelle.",
+    "Updates": "Güncellemeler",
+    "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).

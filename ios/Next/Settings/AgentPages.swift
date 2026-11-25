@@ -69,9 +69,6 @@ struct ModelsPage: View {
                         ListRow(systemImage: "timer", title: String(localized: "Time limit", comment: "Code review: the time limit"), description: nil, accessory: .detail(String(localized: "\(review.maxMinutes) min", comment: "A number of minutes")))
                     }
                 }
-                GroupedSection(header: nil, footer: nil) {
-                    WebRow(target: WebSettingsPage.Target(tab: "models", title: String(localized: "Context, effort and providers", comment: "Models: the web page's other parts")), systemImage: "slider.horizontal.3", description: nil)
-                }
             }
         }
         .task { await load() }
@@ -494,14 +491,6 @@ struct SchedulesPage: View {
                 }
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(value: SettingsPage.web(WebSettingsPage.Target(tab: "schedules", title: String(localized: "Scheduled tasks", comment: "Settings row")))) {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel(String(localized: "New scheduled task", comment: "Schedules: makes a new one (on the web page)"))
-            }
-        }
         .sheet(item: $editing) { schedule in
             ScheduleEditSheet(schedule: schedule) { edit in
                 switch await model.write({ api throws(DaemonRequestError) in try await api.editSchedule(schedule.id, edit: edit) }) {
@@ -701,9 +690,6 @@ struct RulesPage: View {
                         }
                     }
                 }
-                GroupedSection(header: nil, footer: nil) {
-                    WebRow(target: WebSettingsPage.Target(tab: "rules", title: String(localized: "Rules on the web page", comment: "Rules: the web page row")), systemImage: "lock.shield", description: nil)
-                }
             }
         }
         .task { await load() }
@@ -761,9 +747,6 @@ struct MemoryPage: View {
                 ) {
                     ForEach(notes) { note in proposalCard(note) }
                 }
-            }
-            GroupedSection(header: nil, footer: nil) {
-                WebRow(target: WebSettingsPage.Target(tab: "memory", title: String(localized: "All notes, trash and lessons", comment: "Memory: the web page row")), systemImage: "brain", description: nil)
             }
         }
         .task { await load() }

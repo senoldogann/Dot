@@ -561,17 +561,6 @@
         }
       }
     },
-    "AI services": {
-      "comment": "Settings row: the keys of the AI services",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yapay zekâ hizmetleri"
-          }
-        }
-      }
-    },
     "Accounts": {
       "comment": "Composer picker header: the accounts signed in",
       "localizations": {
@@ -667,17 +656,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tümü"
-          }
-        }
-      }
-    },
-    "All notes, trash and lessons": {
-      "comment": "Memory: the web page row",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tüm notlar, çöp kutusu ve dersler"
           }
         }
       }
@@ -865,17 +843,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seni bekleyen onaylar ve sorular"
-          }
-        }
-      }
-    },
-    "Apps and services": {
-      "comment": "Settings section: connectors, plugins, skills, keys, channels, vault",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uygulamalar ve hizmetler"
           }
         }
       }
@@ -1100,17 +1067,6 @@
         }
       }
     },
-    "Browser": {
-      "comment": "Settings row: Dot's own Chrome",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tarayıcı"
-          }
-        }
-      }
-    },
     "Buttons": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1151,17 +1107,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamera"
-          }
-        }
-      }
-    },
-    "Campaigns": {
-      "comment": "Settings row: goals Dot keeps working on",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kampanyalar"
           }
         }
       }
@@ -1217,17 +1162,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Değişiklikler ve dosyalar"
-          }
-        }
-      }
-    },
-    "Channels": {
-      "comment": "Settings row: iMessage and the other ways to reach Dot",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kanallar"
           }
         }
       }
@@ -1584,17 +1518,6 @@
         }
       }
     },
-    "Connectors": {
-      "comment": "Settings row: the apps and services Dot works with",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bağlayıcılar"
-          }
-        }
-      }
-    },
     "Context used": {
       "comment": "Inspector row: how full the model's context is",
       "localizations": {
@@ -1606,13 +1529,13 @@
         }
       }
     },
-    "Context, effort and providers": {
-      "comment": "Models: the web page's other parts",
+    "Continue after restart": {
+      "comment": "Maintenance: resume interrupted tasks after a restart",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bağlam, çaba ve sağlayıcılar"
+            "value": "Yeniden başlatınca devam et"
           }
         }
       }
@@ -1837,17 +1760,6 @@
         }
       }
     },
-    "Diagnostics": {
-      "comment": "Settings row: the programs Dot runs and its logs",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tanılama"
-          }
-        }
-      }
-    },
     "Diagnostics copied": {
       "comment": "Toast: the diagnosis report is on the pasteboard",
       "localizations": {
@@ -1980,6 +1892,17 @@
         }
       }
     },
+    "Does not work with Dot": {
+      "comment": "Maintenance: Dot refuses runs on this version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot ile çalışmıyor"
+          }
+        }
+      }
+    },
     "Done": {
       "comment": "Status word: the run finished",
       "localizations": {
@@ -2075,6 +1998,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot Next sürümü"
+          }
+        }
+      }
+    },
+    "Dot and provider versions": {
+      "comment": "Maintenance: the Mac row's detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot ve sağlayıcı sürümleri"
           }
         }
       }
@@ -3322,6 +3256,17 @@
         }
       }
     },
+    "Maintenance": {
+      "comment": "Settings row: updates and what happens after a restart",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bakım"
+          }
+        }
+      }
+    },
     "Make a plan first, then do it": {
       "comment": "Composer command: what /plan does",
       "localizations": {
@@ -3329,6 +3274,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Önce bir plan yap, sonra uygula"
+          }
+        }
+      }
+    },
+    "Measured with Dot": {
+      "comment": "Maintenance: Dot was measured on this version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot ile ölçüldü"
           }
         }
       }
@@ -3421,6 +3377,17 @@
         }
       }
     },
+    "More settings are on your Mac.": {
+      "comment": "Settings: the quiet footnote at the end; what is set up at the computer is done on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer ayarlar Mac'inde."
+          }
+        }
+      }
+    },
     "Move down": {
       "comment": "VoiceOver action: moves a queued message one place later",
       "localizations": {
@@ -3509,13 +3476,13 @@
         }
       }
     },
-    "New scheduled task": {
-      "comment": "Schedules: makes a new one (on the web page)",
+    "New models appear when Models opens: Dot asks each provider then. Dot never updates a provider's program on its own; Claude Code updates itself.": {
+      "comment": "Maintenance: why there is no switch to check provider updates",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yeni zamanlanmış görev"
+            "value": "Yeni modeller Modeller açılınca görünür: Dot o an her sağlayıcıya sorar. Dot bir sağlayıcının programını kendi başına asla güncellemez; Claude Code kendini günceller."
           }
         }
       }
@@ -3703,6 +3670,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz denetlenmedi."
+          }
+        }
+      }
+    },
+    "Not installed": {
+      "comment": "Maintenance: the program is not on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kurulu değil"
+          }
+        }
+      }
+    },
+    "Not measured": {
+      "comment": "Maintenance: Dot keeps no measure of this version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçülmedi"
           }
         }
       }
@@ -3982,6 +3971,17 @@
         }
       }
     },
+    "Older than measured": {
+      "comment": "Maintenance: the version is older than Dot was measured on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçülenden eski"
+          }
+        }
+      }
+    },
     "On": {
       "comment": "VoiceOver value of a switch that is on",
       "localizations": {
@@ -4077,17 +4077,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "iOS Ayarları'nı aç"
-          }
-        }
-      }
-    },
-    "Open source licences": {
-      "comment": "Settings row: the software Dot is built from",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Açık kaynak lisansları"
           }
         }
       }
@@ -4290,17 +4279,6 @@
         }
       }
     },
-    "Phones and Tailscale": {
-      "comment": "Settings row: the web page of paired phones and the tailnet",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Telefonlar ve Tailscale"
-          }
-        }
-      }
-    },
     "Photo": {
       "comment": "VoiceOver: a photo added to the message",
       "localizations": {
@@ -4389,17 +4367,6 @@
         }
       }
     },
-    "Plugins": {
-      "comment": "Settings row: plugins Dot can install",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Eklentiler"
-          }
-        }
-      }
-    },
     "Point the camera at the code in Dot › Settings › Phone on your Mac.": {
       "comment": "QR scan: what to point at",
       "localizations": {
@@ -4473,6 +4440,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Önerilen değişiklikler"
+          }
+        }
+      }
+    },
+    "Provider programs": {
+      "comment": "Maintenance section: claude and opencode on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlayıcı programları"
           }
         }
       }
@@ -4829,6 +4807,17 @@
         }
       }
     },
+    "Resume interrupted tasks after an update or restart.": {
+      "comment": "Maintenance: what continue after restart does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir güncelleme ya da yeniden başlatmadan sonra yarıda kalan işleri sürdür."
+          }
+        }
+      }
+    },
     "Resume now": {
       "comment": "Usage limit card: starts the work again now",
       "localizations": {
@@ -4873,17 +4862,6 @@
         }
       }
     },
-    "Rows marked Web open your Mac's own settings page here; each becomes a page of the app in a later version.": {
-      "comment": "Settings: footer that explains the Web mark",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Web işaretli satırlar Mac'inin kendi ayar sayfasını burada açar; her biri sonraki bir sürümde uygulamanın kendi sayfası olur."
-          }
-        }
-      }
-    },
     "Rules": {
       "comment": "Settings row: what Dot may do without asking",
       "localizations": {
@@ -4891,17 +4869,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kurallar"
-          }
-        }
-      }
-    },
-    "Rules on the web page": {
-      "comment": "Rules: the web page row",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Web sayfasındaki kurallar"
           }
         }
       }
@@ -5177,28 +5144,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "İkincil yazı"
-          }
-        }
-      }
-    },
-    "Self-improvement": {
-      "comment": "Settings row: what Dot learns from its tasks",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kendini geliştirme"
-          }
-        }
-      }
-    },
-    "Self-repair": {
-      "comment": "Settings row: Dot mends its own problems",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kendini onarma"
           }
         }
       }
@@ -5578,7 +5523,7 @@
       }
     },
     "Skills": {
-      "comment": "Composer picker header: the skills a run can use\nSettings row: what Dot knows how to do",
+      "comment": "Composer picker header: the skills a run can use",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5650,17 +5595,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Küçük değişiklik modeli"
-          }
-        }
-      }
-    },
-    "Snapshots": {
-      "comment": "Settings row: pictures of the screen for Dot",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ekran görüntüleri"
           }
         }
       }
@@ -6963,6 +6897,17 @@
         }
       }
     },
+    "Update Claude Code on the Mac with 'claude update'.": {
+      "comment": "Maintenance: how to update an old Claude Code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code'u Mac'te 'claude update' ile güncelle."
+          }
+        }
+      }
+    },
     "Update Dot on your Mac": {
       "comment": "Chat subtitle: the Mac runs a Dot too old for this app",
       "localizations": {
@@ -6970,6 +6915,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'indeki Dot'u güncelle"
+          }
+        }
+      }
+    },
+    "Update Dot on your Mac to see the provider programs' versions.": {
+      "comment": "Maintenance: the daemon has no programs route",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlayıcı programlarının sürümlerini görmek için Mac'indeki Dot'u güncelle."
           }
         }
       }
@@ -7003,6 +6959,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'indeki Dot'u güncelle: bu sayfa daha yeni bir Dot gerektiriyor."
+          }
+        }
+      }
+    },
+    "Updates": {
+      "comment": "Maintenance section: updates and restarts",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güncellemeler"
           }
         }
       }
@@ -7069,17 +7036,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir model yanıt vermediğinde bu sırayla kullanılır."
-          }
-        }
-      }
-    },
-    "Vault": {
-      "comment": "Settings row: logins, cards and contacts Dot can use",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kasa"
           }
         }
       }
@@ -7212,17 +7168,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Web"
-          }
-        }
-      }
-    },
-    "Web search": {
-      "comment": "Settings row: how Dot searches the web",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Web araması"
           }
         }
       }
@@ -7487,6 +7432,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sen: %@"
+          }
+        }
+      }
+    },
+    "Your Mac": {
+      "comment": "Maintenance section: the paired Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in"
           }
         }
       }
@@ -8092,6 +8048,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "en çok %lld satır"
+          }
+        }
+      }
+    },
+    "updates versions resume restart continue": {
+      "comment": "Settings search synonyms of Maintenance (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "güncellemeler sürümler sürdür yeniden başlat devam"
           }
         }
       }

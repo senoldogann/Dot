@@ -1,7 +1,7 @@
 import XCTest
 
 /// A walk of the app against a real daemon over the tailnet (the owner allowed it, 2026-11-25): every native Settings
-/// page read (nothing of the owner's settings is changed), a web row, and one short "[test]" chat on the daemon's
+/// page read (nothing of the owner's settings is changed), and one short "[test]" chat on the daemon's
 /// default model, which the calling script deletes afterwards. Skipped unless the script names the daemon
 /// (`DOTNEXT_REAL_HOST`, `DOTNEXT_REAL_KEY`).
 @MainActor
@@ -46,13 +46,6 @@ final class RealDaemonWalkUITests: XCTestCase {
             add(shot)
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
-        open(app, "Vault")
-        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 20))
-        sleep(4)
-        let web: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
-        web.name = "real-web-vault"
-        web.lifetime = .keepAlways
-        add(web)
     }
 
     func testAShortTestChatIsAnswered() throws {

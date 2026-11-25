@@ -8,6 +8,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | ---- | ------ | ---- | ----- |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
+| [1791](1791.md) | done | 2026-11-25 | DotNext's Settings open no web page: the Mac's setup pages have no row, and the list ends with "More settings are on your Mac." |
 | [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
