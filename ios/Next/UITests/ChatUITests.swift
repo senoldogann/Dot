@@ -49,6 +49,7 @@ final class ChatUITests: XCTestCase {
         let line: XCUIElement = app.buttons["work.line"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label, "Waiting for you")
+        XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the line is a button: a 44 pt tap target (the design bar)")
         let step: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Browsed")).firstMatch
         XCTAssertFalse(step.exists, "the steps are hidden")
         line.tap()

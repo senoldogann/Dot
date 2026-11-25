@@ -109,7 +109,8 @@ struct WorkLineView: View {
                         .transition(.opacity)
                     Spacer(minLength: 0)
                 }
-                .frame(minHeight: Metric.toolRow)
+                // A button alone on its line: the 44 pt tap target (the design bar), not a tool row's 28 pt pitch.
+                .frame(minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
