@@ -306,20 +306,21 @@ jobs:
       - name: Eval references
         run: uv run dotx eval check
       - name: Offline smoke tests, part 2
-        # One retry of a failed run. The second result is the job's: a failure that is still there fails this job,
-        # and ci with it. Not continue-on-error.
+        # One retry of the tests that failed (pytest's --last-failed, its cache under the runner's temp): the second
+        # result is the job's, and a failure that is still there fails this job, and ci with it. Not continue-on-error.
+        # A first run that recorded no failure (it broke before) runs every test again.
         run: |
           run_part() {
-            uv run pytest tests/smoke -q -n auto -p no:cacheprovider --part 2/2 --durations=10 \
-              -m "not live and not browser and not internet and not desktop and not hosted"
+            uv run pytest tests/smoke -q -n auto -o cache_dir="$RUNNER_TEMP/pytest-cache" --part 2/2 --durations=10 \
+              -m "not live and not browser and not internet and not desktop and not hosted" "$@"
           }
           if run_part; then
             exit 0
           fi
-          echo "smoke part 2 failed once; running it once more. A second failure fails this job and ci."
+          echo "smoke part 2 failed once; running its failed tests once more. A second failure fails this job and ci."
           rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
-          run_part
+          run_part --last-failed --last-failed-no-failures all
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
@@ -386,22 +387,33 @@ jobs:
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Core browser tests
-        # PART_TESTS is split into its globs on purpose. One retry of a failed run. The second result is the part's:
-        # a failure that is still there fails this part, and ci with it. Not continue-on-error.
+        # PART_TESTS is split into its globs on purpose. One retry of the tests that failed (pytest's --last-failed,
+        # its cache under the runner's temp; a first run that recorded no failure runs every test again): a flaky test
+        # of the pages part had made it run its 149 tests twice, 20 minutes in place of 10, in three runs of six. The
+        # second result is the part's: a failure that is still there fails this part, and ci with it. Not
+        # continue-on-error. Each test's time goes to a JUnit file, kept for the parts' next sharing out.
         run: |
           run_part() {
             # PART_TESTS is split into its globs on purpose.
-            uv run pytest -q -p no:cacheprovider --durations=10 \
+            uv run pytest -q -o cache_dir="$RUNNER_TEMP/pytest-cache" --durations=15 \
               -m "browser and not live and not internet and not hosted and not desktop" \
-              $PART_TESTS
+              $PART_TESTS "$@"
           }
-          if run_part; then
+          if run_part --junitxml="$RUNNER_TEMP/junit/first.xml"; then
             exit 0
           fi
-          echo "browser tests failed once; running them once more. A second failure fails this job and ci."
+          echo "browser tests failed once; running the failed ones once more. A second failure fails this job and ci."
           rm -rf "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
-          run_part
+          run_part --last-failed --last-failed-no-failures all --junitxml="$RUNNER_TEMP/junit/retry.xml"
+      - name: The tests' times
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: browser-times-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/junit
+          retention-days: 14
+          if-no-files-found: ignore
 
   # The desktop shell's checks (desktop.yml) for a pull request that changes desktop/ or their workflow (item 1189).
   # Called from here rather than started by their own path filter, so that `ci`, the check main's protection requires,
