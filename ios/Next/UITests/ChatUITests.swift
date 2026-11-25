@@ -18,7 +18,8 @@ final class ChatUITests: XCTestCase {
     /// all, yet the clock goes on every second; and the capsule says what the run does (here: writing its words).
     func testTheCapsuleClockTicksWithNoEventsAndSaysWhatTheRunDoes() {
         let app: XCUIApplication = launch("n2-chat")
-        let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
+        // Found by its kind (a button): a search of the whole tree is slow to read on a loaded runner.
+        let status: XCUIElement = app.buttons["capsule.status"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
         let first: String = status.label
         // Item 1769: the capsule says Working and its clock; what the run does is the live line's.
@@ -33,11 +34,10 @@ final class ChatUITests: XCTestCase {
     /// once a second, so a tick could be seen a second late, past the wait on a slow runner); the last label read when
     /// nothing changed within `seconds`.
     private func nextLabel(of element: XCUIElement, after label: String, within seconds: TimeInterval) -> String {
-        let deadline: Date = Date().addingTimeInterval(seconds)
         var now: String = element.label
-        while now == label, Date() < deadline {
-            usleep(100_000)
+        _ = holds(within: seconds) {
             now = element.label
+            return now != label
         }
         return now
     }
@@ -100,8 +100,7 @@ final class ChatUITests: XCTestCase {
         atRest.tap()
         // Focused, the composer grows and its field may become a text view: found by its kind, never by a search of the
         // whole tree (`descendants(matching: .any)`), whose every read took seconds on a loaded CI runner (#1105).
-        let field: XCUIElement = composerField(app)
-        field.typeText("/")
+        composerField(app).typeText("/")
         XCTAssertTrue(app.staticTexts["COMMANDS"].waitForExistence(timeout: 3) || app.staticTexts["Commands"].exists)
         let rows: XCUIElementQuery = app.buttons.matching(identifier: "picker.row")
         XCTAssertTrue(holds(within: 5) { rows.count == 6 }, "six commands: \(rows.count)")
