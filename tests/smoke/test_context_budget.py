@@ -123,7 +123,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 250 for the worktree capture tool (item 1658), with 32,048 measured.
 # Raised by 200 for `search_chats` (item 1740): one tool of a line and five short fields, which finds what was said in
 # any chat and reads one run, in the office group; 32,279 measured here.
-BUDGET_TOKENS: int = 32_350
+# Raised by 100 for `memory_save`'s `subject` (item 1729): a fact that changed replaces its older note; 32,367 measured
+# here.
+BUDGET_TOKENS: int = 32_450
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -160,7 +162,9 @@ SYSTEM_BUDGET_TOKENS: int = 9_050
 # The appearance tools add a single portable theme schema and two revision-only calls.
 # Raised by 250 for the worktree, base commit and pull request arguments (item 1658), with 22,960 measured.
 # Raised by 200 for `search_chats` of item 1740 above (23,208 measured, with the growth of main it was made on).
-TOOLS_BUDGET_TOKENS: int = 23_250
+# Raised by 100 for `memory_save`'s `subject` of item 1729, a fact that changed replacing its older note (23,286
+# measured).
+TOOLS_BUDGET_TOKENS: int = 23_350
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
