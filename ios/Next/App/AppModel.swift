@@ -101,7 +101,21 @@ final class AppModel {
     var models: [ProviderModels] = []
     /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
     var palette: PaletteView?
+    /// Dot and the owner's agents (`GET /api/agents`), the home's bots (PLAN §27); read when the home appears, on its pull
+    /// to refresh and after a bot is made, renamed or deleted.
     var agents: [AgentSummary] = []
+    /// Why the last read of the agents failed, for the home's banner; `nil` once one works.
+    var agentsProblem: SettingsFailure?
+    /// Why a new bot's first meeting did not start, by agent id, for its chat's banner (the bot was made).
+    var welcomeProblems: [String: SettingsFailure] = [:]
+    /// The bots the owner pinned to the top of the home, in their order (kept on this phone).
+    var pinnedBots: [String] = UserDefaults.standard.stringArray(forKey: "pinnedBots") ?? [] {
+        didSet { UserDefaults.standard.set(pinnedBots, forKey: "pinnedBots") }
+    }
+    /// The bots the owner muted: their unread chats are not counted (kept on this phone).
+    var mutedBots: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "mutedBots") ?? []) {
+        didSet { UserDefaults.standard.set(Array(mutedBots), forKey: "mutedBots") }
+    }
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
@@ -276,12 +290,13 @@ final class AppModel {
         }
     }
 
-    /// Starts a new chat through the outbox: its key, which the chat list opens at once (item 1849) and swaps for the
-    /// chat's own id once the daemon names it; `nil` when the message could not be kept.
-    func startChat(_ text: String, photos: [Data]) async -> String? {
+    /// Starts a new chat through the outbox, with Dot (`agent` `nil`) or with one of the owner's agents: its key, which
+    /// the chat opens at once (item 1849) and swaps for the chat's own id once the daemon names it; `nil` when the
+    /// message could not be kept.
+    func startChat(_ text: String, photos: [Data], agent: String?) async -> String? {
         guard let engine else { return nil }
         do {
-            let key: String = try await engine.startChat(text, photos: photos)
+            let key: String = try await engine.startChat(text, photos: photos, agent: agent)
             startingChats[key] = text
             return key
         } catch {
@@ -363,7 +378,7 @@ extension AppModel {
         guard let engine, palette == nil else { return }
         do {
             palette = try await engine.api.palette()
-            agents = try await engine.api.agents()
+            if agents.isEmpty { agents = try await engine.api.agents() }
             teams = try await engine.api.teams()
         } catch {
             logger.warning("the composer's lists could not be read error=\(String(describing: error), privacy: .public)")

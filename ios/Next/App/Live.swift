@@ -108,164 +108,6 @@ func engineLine(_ helper: HelperView) -> String {
 
 // MARK: The chat list
 
-struct ChatsTab: View {
-    @Environment(AppModel.self) private var model: AppModel
-    @State private var selection: String?
-    @State private var query: String = ""
-    @State private var renaming: ThreadRow?
-    @State private var newTitle: String = ""
-    @State private var deleting: ThreadRow?
-    @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
-    @State private var composing: Bool = false
-    let opensFirstChat: Bool
-
-    var body: some View {
-        AdaptiveSplit(selection: $selection) {
-            list
-        } detail: { id in
-            if model.startingChats[id] != nil {
-                StartingChat(key: id)
-            } else {
-                ChatScreen(thread: id, initialPanel: nil, editsFirstQueued: false)
-            }
-        } placeholder: {
-            EmptyState(
-                title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",
-                detail: String(localized: "Pick a chat on the left, or start a new one.", comment: "iPad detail column when no chat is selected"), actionTitle: nil, action: {})
-                .background(Tone.ground)
-        }
-        // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it (item 1849).
-        .onChange(of: selection.flatMap { model.startedChats[$0] }) { _, thread in
-            if let thread { selection = thread }
-        }
-        .onChange(of: model.list.rows.count) { _, count in
-            if opensFirstChat, selection == nil, count > 0 { selection = model.list.ordered.first?.summary.id }
-        }
-        .alert(String(localized: "Rename", comment: "Context menu of a chat"), isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
-            TextField(String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), text: $newTitle)
-            Button(String(localized: "Cancel", comment: "Edit sheet toolbar: discards the edits"), role: .cancel) { renaming = nil }
-            Button(String(localized: "Save", comment: "Edit sheet toolbar: keeps the edits")) {
-                if let row = renaming, !newTitle.trimmingCharacters(in: .whitespaces).isEmpty {
-                    model.perform(.rename(thread: row.summary.id, title: newTitle))
-                }
-                renaming = nil
-            }
-        }
-        .confirmationDialog(
-            String(localized: "Delete this chat with everything it holds?", comment: "Confirmation of deleting a chat"),
-            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible
-        ) {
-            Button(String(localized: "Delete", comment: "Confirmation button that deletes a chat"), role: .destructive) {
-                if let row = deleting { model.perform(.delete(thread: row.summary.id)) }
-                deleting = nil
-            }
-        }
-        .sheet(isPresented: $composing) {
-            NewChatSheet(
-                close: { composing = false },
-                opened: { key in
-                    composing = false
-                    selection = key
-                })
-        }
-    }
-
-    /// Deletes at once when the owner turned the confirmation off (Settings › General › Confirmations).
-    private func askOrDelete(_ row: ThreadRow) {
-        if confirmDelete { deleting = row } else { model.perform(.delete(thread: row.summary.id)) }
-    }
-
-    private var rows: [ThreadRow] {
-        let words: String = query.trimmingCharacters(in: .whitespaces)
-        let all: [ThreadRow] = model.list.ordered
-        guard !words.isEmpty else { return all }
-        return all.filter { $0.summary.title.localizedStandardContains(words) || $0.summary.lastMessage.localizedStandardContains(words) }
-    }
-
-    private var list: some View {
-        List(selection: $selection) {
-            if let line = listLine {
-                Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
-            }
-            ForEach(model.pendingChats) { pending in
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text(pending.text).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(2)
-                    Text(deliveryWords(pending.delivery)).textRole(.footnote).foregroundStyle(Tone.secondary)
-                }
-                .listRowBackground(Tone.ground)
-            }
-            section(String(localized: "Needs you", comment: "Chat list section: chats that wait for the owner"), rows.filter { chatStatus(of: $0) == .waitingOnYou })
-            section(String(localized: "Working", comment: "Chat list section: chats with a run at work"), rows.filter { [.working, .starting].contains(chatStatus(of: $0)) })
-            section(String(localized: "Recent", comment: "Chat list section: the other chats, newest first"), rows.filter { ![.waitingOnYou, .working, .starting].contains(chatStatus(of: $0)) })
-        }
-        .listStyle(.plain)
-        .focusEffectDisabled()
-        .pageGround()
-        .overlay {
-            if rows.isEmpty && !query.isEmpty {
-                ContentUnavailableView.search(text: query)
-            } else if rows.isEmpty, model.list.freshness == .live {
-                EmptyState(
-                    title: String(localized: "No chats yet", comment: "Chat list empty state title"), systemImage: "bubble.left.and.bubble.right",
-                    detail: String(localized: "Start one with the pencil above.", comment: "Chat list empty state detail"), actionTitle: nil, action: {})
-            } else if rows.isEmpty, model.list.freshness == .empty, model.transport == .connecting {
-                LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way"))
-            }
-        }
-        .navigationTitle(String(localized: "Chats", comment: "Title of the chat list"))
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $query, prompt: String(localized: "Search chats", comment: "Placeholder of the chat list's search field"))
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), systemImage: "square.and.pencil") { composing = true }
-            }
-        }
-    }
-
-    /// The list's own line when it is not live (transport apart from freshness).
-    private var listLine: String? {
-        freshnessLine(
-            freshness: model.list.freshness, transport: model.transport, savedAt: model.savedAt["list"], workingAt: nil, now: .now)
-    }
-
-    @ViewBuilder private func section(_ title: String, _ rows: [ThreadRow]) -> some View {
-        if !rows.isEmpty {
-            Section {
-                ForEach(rows, id: \.summary.id) { row in
-                    ChatRow(chat: ChatRowModel(row: row, now: .now))
-                        .tag(row.summary.id)
-                        .listRowBackground(selection == row.summary.id ? Tone.nested : Tone.ground)
-                        .focusEffectDisabled()
-                        .listRowSeparatorTint(Tone.separator)
-                        .listRowInsets(EdgeInsets(top: Space.s, leading: Space.gutter, bottom: Space.s, trailing: Space.gutter))
-                        .swipeActions(edge: .leading) {
-                            Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: row.summary.pinnedAt != nil ? "pin.slash" : "pin") {
-                                model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
-                            }
-                            .tint(Tone.glyph)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash") { askOrDelete(row) }
-                                .tint(Tone.failure)
-                        }
-                        .contextMenu {
-                            Button(String(localized: "Rename", comment: "Context menu of a chat"), systemImage: "pencil") {
-                                newTitle = row.summary.title
-                                renaming = row
-                            }
-                            Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: "pin") {
-                                model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
-                            }
-                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash", role: .destructive) { askOrDelete(row) }
-                        }
-                }
-            } header: {
-                Text(title).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary)
-            }
-        }
-    }
-}
-
 /// What a chat row shows.
 struct ChatRowModel: Equatable {
     let title: String
@@ -327,11 +169,13 @@ struct ChatRow: View {
 }
 
 /// A new chat: the composer on an empty sheet (plan §4.2); once sent, the chat opens at once under the outbox's key
-/// (item 1849) and shows in the list from the outbox.
+/// (item 1849) and shows on the home from the outbox. With an
+/// `agent` (a bot's New chat, item 1883) the chat is with that agent, its face above the composer.
 struct NewChatSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
+    let agent: AgentRecord?
     let close: () -> Void
     /// The chat was kept in the outbox under this key: the sheet closes and the chat opens.
     let opened: (String) -> Void
@@ -339,18 +183,24 @@ struct NewChatSheet: View {
     var body: some View {
         VStack {
             Spacer()
-            Text(String(localized: "What should Dot work on?", comment: "New chat sheet: the prompt above the composer"))
-                .textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
+            if let agent {
+                BotFace(id: agent.id, look: agent.look, size: 64)
+                Text(agent.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
+            } else {
+                Text(String(localized: "What should Dot work on?", comment: "New chat sheet: the prompt above the composer"))
+                    .textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
+            }
             Spacer()
             ComposerView(
-                text: $text, attachments: $attachments, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"),
+                text: $text, attachments: $attachments,
+                placeholder: agent.map { askPlaceholder($0.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
                 buttons: composerButtons(hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
                 perform: { _ in
                     let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !words.isEmpty else { return }
                     let photos: [Data] = attachments.map(\.jpeg)
                     Task {
-                        if let key = await model.startChat(words, photos: photos) { opened(key) } else { close() }
+                        if let key = await model.startChat(words, photos: photos, agent: agent?.id) { opened(key) } else { close() }
                     }
                 }, model: nil, models: [:], chooseModel: nil, suggestions: .none)
             .padding(Space.s)
