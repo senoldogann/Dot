@@ -78,8 +78,9 @@ that touches no path REVIEW.md lists under "Always needs a human" (none by defau
 and the **Time limit**, the minutes a push's review may take in all (15). Under it, **Code review fallbacks** are the
 models that review the change in their order, each once, when the one before gave no verdict (it refused the diff, its plan was spent, it failed): by default
 `opencode_go:deepseek-v4.1-flash` at effort high. Any model that runs Dot's tools and can use actions may be one, your
-Claude plan's included; the efforts are `effort` and `fallback_effort` in the file. A change is written whole or not at
-all (`GET` and `PUT /api/code-review`), and holds from the next push; a phone reads it and cannot change it.
+Claude plan's included; the efforts are `effort` and `fallback_effort` in the file, chosen on the same page. A change
+is written whole or not at all (`GET` and `PUT /api/code-review`), and holds from the next push; the phone's Settings ›
+Models › Code review changes it as the Mac does (item 1770).
 
 **Chat size** (the context size). Beside each model's window, Settings › Models sets the chat size of the model's runs
 (item 250): how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's

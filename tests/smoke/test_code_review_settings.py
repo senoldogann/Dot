@@ -1,6 +1,7 @@
 """The models of the pre-push review chosen through the API (item 1663): Settings › Models › Code review reads and
 writes ``[code_review]`` in config.toml, all of it or none, and `dotx review plan` reads the same; a phone's key reads
-them and cannot change them. No model service is asked: the router's answer about a model is a stand-in."""
+and changes them too (item 1770), their efforts included. No model service is asked: the router's answer about a model
+is a stand-in."""
 
 from pathlib import Path
 
@@ -35,7 +36,7 @@ _CHOSEN: dict[str, object] = {
 }
 
 
-async def test_the_owner_chooses_the_review_models_on_the_mac_and_a_phone_reads_them(
+async def test_the_owner_chooses_the_review_models_on_the_mac_or_the_phone(
     own_home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async with _served(own_home) as (client, _, runtime):
@@ -62,12 +63,23 @@ async def test_the_owner_chooses_the_review_models_on_the_mac_and_a_phone_reads_
             "claude_code:opus",
             ["opencode_go:deepseek-v4.1-flash"],
         )
-        refused: httpx.Response = await client.put("/code-review", json=_CHOSEN, headers=phone)
-        assert refused.status_code == 403 and "a phone cannot" in refused.json()["message"], refused.text
+        # From the phone (item 1770): the models and both efforts, which a body without them keeps.
+        phoned: httpx.Response = await client.put(
+            "/code-review", json={**_CHOSEN, "effort": "high", "fallback_effort": "low"}, headers=phone
+        )
+        assert phoned.status_code == 200, phoned.text
+        assert (phoned.json()["effort"], phoned.json()["fallback_effort"]) == ("high", "low")
+        bad: httpx.Response = await client.put("/code-review", json={**_CHOSEN, "effort": "loud"}, headers=phone)
+        assert bad.status_code == 422, bad.text
         chosen: httpx.Response = await client.put("/code-review", json=_CHOSEN, headers=mac)
         assert chosen.status_code == 200, chosen.text
         assert {key: chosen.json()[key] for key in _CHOSEN} == _CHOSEN
         assert "[code_review]" in config_path().read_text(encoding="utf-8")
+        assert (chosen.json()["effort"], chosen.json()["fallback_effort"]) == ("high", "low"), "a body without efforts"
+        back: httpx.Response = await client.put(
+            "/code-review", json={**_CHOSEN, "effort": "medium", "fallback_effort": "high"}, headers=mac
+        )
+        assert back.status_code == 200, back.text
         # What the hook reads through `dotx review plan` is what was chosen: a small change on the small model.
         plan: str = plan_text(review_plan(load_user_config().code_review, 50, False))
         assert plan == "size small\nlimit 600\ntry ollama:gemma4:cloud medium\ntry ollama:qwen3:cloud high\n"
