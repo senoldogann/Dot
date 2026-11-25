@@ -47,7 +47,9 @@ def test_a_run_no_chat_is_told_in_is_offered_no_command_in_the_background() -> N
     offered: dict[str, ToolSpec] = {spec.name: spec for spec in chatless_specs(specs)}
     assert BACKGROUND_HINT in specs[0].description
     assert "background" in str(specs[1].parameters["properties"])
+    assert "background" in specs[1].description
     assert "background" not in str(offered["terminal_open"].parameters)
+    assert "background" not in offered["terminal_open"].description
     assert "terminal_open with background" not in offered["shell"].description
     assert offered["shell"].description.endswith("never with a launchd job of your own.")
     assert offered["terminal_send"] == specs[2]

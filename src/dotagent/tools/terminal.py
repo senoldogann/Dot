@@ -50,6 +50,9 @@ _OPEN_WAIT_S: float = 2.0
 _MAX_WAIT_S: float = 60.0
 _TIMEOUT_S: float = _MAX_WAIT_S + 15.0
 _PREVIEW_CHARS: int = 200
+# The sentence of terminal_open's description that offers ``background``; a run no chat is told in is offered neither
+# (:func:`chatless_specs`, item 1760).
+_OPEN_BACKGROUND_HINT: str = " For one that runs longer than shell may wait, set background."
 
 
 class OpenArgs(ToolArgs):
@@ -76,8 +79,9 @@ def tells_no_chat(run: RunRecord) -> bool:
 
 def chatless_specs(specs: Iterable[ToolSpec]) -> tuple[ToolSpec, ...]:
     """``specs`` as a run that :func:`tells_no_chat` is offered them (item 1760): terminal_open without ``background``
-    and shell without the sentence that sends a long command there. Offered both, delegated runs on claude_code:sonnet
-    set it once each, 22 times on the owner's Mac, and each call was refused."""
+    and the sentence of its description that offers it, and shell without the one that sends a long command there.
+    Offered them, delegated runs on claude_code:sonnet set it once each, 22 times on the owner's Mac, and each call was
+    refused."""
     return tuple(_chatless(spec) for spec in specs)
 
 
@@ -90,7 +94,12 @@ def _chatless(spec: ToolSpec) -> ToolSpec:
     if not isinstance(properties, dict):
         raise TypeError(f"terminal_open's parameters have no properties object: {spec.parameters!r}")
     kept: JsonObject = {name: value for name, value in properties.items() if name != "background"}
-    return spec.model_copy(update={"parameters": {**spec.parameters, "properties": kept}})
+    return spec.model_copy(
+        update={
+            "description": spec.description.replace(_OPEN_BACKGROUND_HINT, ""),
+            "parameters": {**spec.parameters, "properties": kept},
+        }
+    )
 
 
 class SendArgs(ToolArgs):
@@ -254,9 +263,9 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             description=(
                 "Start a program on a terminal of its own and keep it running: one that asks questions (an installer, "
                 "npm create, ssh), a REPL (python3 -i, psql, node), or a server that must stay up while you work. "
-                "Returns the session name and its first output. For a command that just runs to its end use shell; "
-                "for one that runs longer than shell may wait, set background. No terminal emulator runs: full-screen "
-                "programs such as vim or htop show as garbled text."
+                f"Returns the session name and its first output. For a command that just runs to its end use shell."
+                f"{_OPEN_BACKGROUND_HINT} No terminal emulator runs: full-screen programs such as vim or htop show as "
+                "garbled text."
             ),
             args_model=OpenArgs,
             modes=ACTING_MODES,

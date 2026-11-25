@@ -38,6 +38,7 @@ from dotagent.llm.types import ImageData, ToolSpec
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext
+from dotagent.tools.terminal import chatless_specs
 
 log = get_logger(__name__)
 
@@ -310,6 +311,13 @@ def result_of(
     return mark_untrusted(result) if untrusted else result
 
 
+def _offered_specs(nested: NestedCalls) -> dict[str, ToolSpec]:
+    """The specs of the tools code can call, without a command in the background (item 1760): code reaches no
+    terminal session (``deny.NOT_CALLABLE_PREFIXES``), so shell's sentence that sends a long command to one would
+    mislead it in any run."""
+    return {spec.name: spec for spec in chatless_specs(nested.specs().values())}
+
+
 async def _run(args: CodeRunArgs, ctx: ToolContext) -> ToolResult:
     config: CodeConfig = ctx.runtime.config.code
     nested: NestedCalls | None = ctx.nested
@@ -325,7 +333,7 @@ async def _run(args: CodeRunArgs, ctx: ToolContext) -> ToolResult:
     probe = await code_mode_ready(interpreter, (dot_home(), layout.root))
     if not probe.ok:
         return fail(f"code mode needs the macOS sandbox, which did not start: {probe.why}. Nothing ran.")
-    callable_here: dict[str, ToolSpec] = callable_from_code(nested.specs())
+    callable_here: dict[str, ToolSpec] = callable_from_code(_offered_specs(nested))
     package: toolfiles.Package = toolfiles.package_of(callable_here)
     try:
         serial: int = await asyncio.to_thread(_prepare, layout, package)
