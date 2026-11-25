@@ -1,6 +1,6 @@
 """The cases of the memory benchmark (item 1728): owner facts saved over time, some later replaced, and a question each
 whose right answer is the newest fact (LongMemEval's knowledge-update questions and LoCoMo's temporal ones, at the size
-of Dot's own notes: 42 cases, one fresh store each).
+of Dot's own notes: 46 cases, one fresh store each).
 
 A case's facts are saved in order by one run. ``answer`` is the fact the question wants (the newest of a fact that
 changed; the first of two facts that are both true), ``outdated`` the facts it replaces, and ``used`` the facts that a
@@ -12,6 +12,10 @@ order (0, 1), (0, 2), (1, 2), and ``question_cosine`` the cosine of the question
 these exact texts on 2026-11-24 (``tests/smoke/test_eval_memory_live.py`` measures them again). Updates of one value
 lie between 0.80 and 0.97, two facts that are both true between 0.68 and 0.84, so the cosine alone does not tell which
 is which; a note reworded into another sentence (U05, U06, U12) lies lower still.
+
+The E cases (item 1866) are four of these cases again, with the same texts and cosines, whose old fact a second run was
+handed before the newer one was saved and saves again afterwards (``echoed``): a schedule that started before the change
+and writes back what recall gave it.
 """
 
 from typing import Literal
@@ -39,9 +43,12 @@ class MemoryCase(FrozenModel):
     answer: int
     outdated: tuple[int, ...]
     used: tuple[int, ...]
+    # The facts that a second run is handed as they are saved and saves again, word for word, once the newer note is
+    # in (item 1866): recall's own text coming back as a new note. Empty for every case but the E cases.
+    echoed: tuple[int, ...] = ()
 
 
-CASES: tuple[MemoryCase, ...] = (
+_BASE: tuple[MemoryCase, ...] = (
     MemoryCase(
         id="K01",
         kind="update",
@@ -609,3 +616,14 @@ CASES: tuple[MemoryCase, ...] = (
         used=(0,),
     ),
 )
+
+_ECHOES: tuple[tuple[str, str], ...] = (("E01", "K01"), ("E02", "K03"), ("E03", "U03"), ("E04", "U09"))
+
+
+def _echo_case(case_id: str, of: str) -> MemoryCase:
+    """The case ``of`` again as ``case_id``, its old fact handed to a second run that saves it again at the end."""
+    base: MemoryCase = next(case for case in _BASE if case.id == of)
+    return base.model_copy(update={"id": case_id, "used": (), "echoed": base.outdated})
+
+
+CASES: tuple[MemoryCase, ...] = (*_BASE, *(_echo_case(case_id, of) for case_id, of in _ECHOES))

@@ -7232,6 +7232,16 @@ class Store:
         rows = await self._all("SELECT DISTINCT memory_id FROM memory_uses WHERE run_id = ?", (run_id,))
         return {str(row["memory_id"]) for row in rows}
 
+    async def handed_memories(self, run_id: str) -> list[MemoryRecord]:
+        """The notes run ``run_id`` was handed so far that are still kept, however it was handed them, the first handed
+        first: what recall put into its context (item 1866)."""
+        rows = await self._all(
+            "SELECT memories.* FROM memories JOIN (SELECT memory_id, MIN(handed_at) AS first FROM memory_uses"
+            " WHERE run_id = ? GROUP BY memory_id) AS handed ON handed.memory_id = memories.id ORDER BY handed.first",
+            (run_id,),
+        )
+        return [_memory(row) for row in rows]
+
     async def handed_in_thread(self, thread_id: str, run_id: str) -> set[str]:
         """The notes the runs of thread ``thread_id`` other than ``run_id`` were handed, however they were handed them:
         what a chat has recalled before one of its runs (item 335). A run a rewind took out of the chat (item 282) is no

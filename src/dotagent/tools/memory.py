@@ -27,7 +27,7 @@ from dotagent.memory.service import (
     recall_for,
     rewrite_memory_note,
 )
-from dotagent.memory.supersede import Replacing, normalize_subject, save_replacing
+from dotagent.memory.supersede import Replacing, handed_echo, normalize_subject, save_replacing
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import known_secrets
@@ -66,6 +66,11 @@ _HELD_CHANGE: str = (
 )
 _HELD_DAYS: str = (
     " The days you gave are not kept with a proposal: the note keeps the time it has when the owner takes the change."
+)
+# What a save of the words of a note recall handed the run says (item 1866): it is not saved again.
+_ECHO: str = (
+    "Not saved: these are the words of a note you were handed in this task, which is kept as it is. Save only what is "
+    "new; if its fact changed, save the new fact (under its subject) or correct it with memory_update:"
 )
 # What a run's rewrite of a note the owner wrote or approved says: it waits for them (audit 2026-11-24, D1).
 _PROPOSED: str = (
@@ -220,6 +225,9 @@ def _save_tool(max_chars: int) -> RegisteredTool:
         # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94). A run that had read
         # content third parties can author saves a tainted note: yolo removes the approval, not the origin.
         expires_at: float | None = expiry_of(args.valid_days, time.time())
+        echo: MemoryRecord | None = await handed_echo(ctx.runtime.memory, ctx.run_id, args.content)
+        if echo is not None:
+            return ok(f"{_ECHO} {render_note(echo)}")
         if holds_saves(await ctx.runtime.memory.store.origin_of_run(ctx.run_id)):
             held: HeldNote | None = await hold_note(
                 ctx.runtime.bus,
