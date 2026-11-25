@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |
 | [1871](1871.md) | done | 2026-11-25 | A pull request that nothing of the gate's macOS jobs reads skips them |
 | [1866](1866.md) | done | 2026-11-25 | What recall handed a task is never saved back as a new note; the memory benchmark measures it |
 | [1865](1865.md) | done | 2026-11-25 | A scheduled task, a watcher's task and a helper propose what they would remember; the owner decides |
