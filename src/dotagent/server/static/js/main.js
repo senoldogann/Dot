@@ -4,7 +4,7 @@ import { isAway, onAway } from "./infront.js";
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp, unreachable } from "./api.js";
 import { lineOf } from "./linewords.js";
-import { noteRefused, phoneScreen } from "./linkfacts.js";
+import { noteRefused } from "./linkfacts.js";
 import { followSharedAppearance } from "./sharedappearance.js";
 import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
@@ -291,8 +291,10 @@ function renderSignIn(message, keyFailed = false, refused = false) {
   onEnter(code, () => attempt(pair));
   onEnter(input, submit);
   const problem = message === "" ? null : el("div", { class: "note bad", role: "alert" }, icon("alert"), el("span", null, message));
-  // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field.
-  const said = refused && phoneScreen() ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
+  // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field. The
+  // line is a phone's, and the style shows it on a touch screen alone (shell.css): a touch screen can reach the page
+  // after its first frames, when this is drawn, as the phone browser tests saw (item 966).
+  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
   const refusedLine =
     said === null
       ? null
