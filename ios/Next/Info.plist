@@ -44,7 +44,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Dot uses the camera when you take a photo or scan a page to send to it.</string>
+	<string>Dot uses the camera when you take a photo or scan a page to send to it, and to read the code of your Mac when you pair.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Dot listens while you dictate a message, and only then. The words are written on this iPhone; no audio is sent anywhere.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

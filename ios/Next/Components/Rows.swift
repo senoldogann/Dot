@@ -6,6 +6,8 @@ enum RowAccessory: Equatable, Sendable {
     case chevron
     case detail(String)
     case detailAndChevron(String)
+    /// The "Web" mark and a chevron: the row opens the daemon's web page in the app (PLAN §4.4).
+    case web
 }
 
 /// A list row (review S4, R-a §2): 49 pt, 63 with a description, never under the 44 pt hit floor; a leading SF Symbol
@@ -22,8 +24,8 @@ struct ListRow: View {
         HStack(spacing: Space.s) {
             if let systemImage {
                 Symbol(name: systemImage, context: .row)
-                    .foregroundStyle(Tone.secondary)
-                    .frame(width: Metric.iconSlot)
+                    .foregroundStyle(Tone.text)
+                    .frame(minWidth: Metric.iconSlot)
             }
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: Space.xxs) {
@@ -40,6 +42,7 @@ struct ListRow: View {
                         .tabularNumbers()
                 }
             }
+            if accessory == .web { WebMark() }
             if showsChevron {
                 Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
             }
@@ -62,13 +65,13 @@ struct ListRow: View {
     private var detail: String? {
         switch accessory {
         case .detail(let text), .detailAndChevron(let text): text
-        case .none, .chevron: nil
+        case .none, .chevron, .web: nil
         }
     }
 
     private var showsChevron: Bool {
         switch accessory {
-        case .chevron, .detailAndChevron: true
+        case .chevron, .detailAndChevron, .web: true
         case .none, .detail: false
         }
     }
@@ -143,8 +146,8 @@ struct ToggleRow: View {
         Toggle(isOn: $isOn) {
             HStack(spacing: Space.s) {
                 if let systemImage {
-                    Symbol(name: systemImage, context: .row).foregroundStyle(Tone.secondary)
-                        .frame(width: Metric.iconSlot)
+                    Symbol(name: systemImage, context: .row).foregroundStyle(Tone.text)
+                        .frame(minWidth: Metric.iconSlot)
                 }
                 VStack(alignment: .leading, spacing: Space.xxs) {
                     Text(title).textRole(.body).foregroundStyle(Tone.text)

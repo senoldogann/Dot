@@ -20,6 +20,8 @@ struct ChatScreen: View {
     @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
+    @AppStorage(PrefKey.confirmStop) private var confirmStop: Bool = true
+    @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
     @State private var attachments: [ComposerAttachment] = []
     @State private var panel: ChatPanel?
@@ -510,7 +512,7 @@ struct ChatScreen: View {
             Button(String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"), systemImage: "folder") { panel = .inspector }
             Button(String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers"), systemImage: "person.2") { panel = .agents }
             if activeRun != nil {
-                Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), systemImage: "stop.fill") { confirmingStop = true }
+                Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), systemImage: "stop.fill") { if confirmStop { confirmingStop = true } else { stop() } }
             }
         }
     }
@@ -587,7 +589,7 @@ struct ChatScreen: View {
 
     private var proseWidth: CGFloat? {
         guard sizeClass == .regular else { return nil }
-        return ProseColumn.width(charactersPerLine: ProseColumn.target, font: ProseColumn.bodyFont(dynamicTypeSize))
+        return ProseColumn.width(charactersPerLine: ReadingWidth.current(readingWidthRaw).charactersPerLine, font: ProseColumn.bodyFont(dynamicTypeSize))
     }
 }
 

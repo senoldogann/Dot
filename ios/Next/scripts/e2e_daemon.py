@@ -14,11 +14,13 @@ choose the script:
 - "fail: ...": the model fails, so the run fails with one line of cause;
 - anything else: an answer at once, after a few words streamed.
 
-The home's approval mode is ``supervised``, so every acting step asks (reads do not).
+The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop.
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
-    DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome uv run python ios/Next/scripts/e2e_daemon.py 8765
+    DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome \\
+        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed]
 
 It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 ``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
@@ -219,10 +221,28 @@ def prepare_home() -> None:
     )
 
 
-async def serve(port: int) -> None:
+async def seed(runtime: Runtime) -> None:
+    """A note the owner wrote and a tainted run's rewrite of it, which waits for the owner as a proposal."""
+    note = await runtime.store.add_memory(
+        "The owner prefers short answers.", ("owner",), source_run=None, agent_id=None, vector=None, tainted=False
+    )
+    await runtime.store.update_memory(
+        note.id,
+        "The owner prefers short answers, with the commands written out in full.",
+        ("owner",),
+        vector=None,
+        source_run="run_e2e_seed",
+        tainted=True,
+        new_expiry=None,
+    )
+
+
+async def serve(port: int, seeded: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register("ollama", ScriptProvider())
+    if seeded:
+        await seed(runtime)
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", port)
@@ -253,4 +273,4 @@ async def serve(port: int) -> None:
 
 if __name__ == "__main__":
     prepare_home()
-    asyncio.run(serve(int(sys.argv[1])))
+    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:]))

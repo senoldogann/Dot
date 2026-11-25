@@ -45,9 +45,9 @@ enum Haptic: Sendable {
 }
 
 extension View {
-    /// Feedback each time `trigger` changes.
+    /// Feedback each time `trigger` changes, unless the owner turned haptics off (Settings › Chat).
     func haptic<T: Equatable>(_ kind: Haptic, trigger: T) -> some View {
-        sensoryFeedback(kind.feedback, trigger: trigger)
+        modifier(HapticFeedback(kind: kind, trigger: trigger))
     }
 
     /// The animation of a token unless Reduce Motion is on.
@@ -75,5 +75,16 @@ struct StreamTickGate: Equatable, Sendable {
         guard moment.ticksEnabled, moment.visible, moment.following, !moment.isReplay else { return (false, self) }
         if let lastTick, moment.now.timeIntervalSince(lastTick) < Self.interval { return (false, self) }
         return (true, StreamTickGate(lastTick: moment.now))
+    }
+}
+
+/// The feedback of `haptic(_:trigger:)`, read against the owner's switch.
+struct HapticFeedback<T: Equatable>: ViewModifier {
+    let kind: Haptic
+    let trigger: T
+    @AppStorage("haptics") private var enabled: Bool = true
+
+    func body(content: Content) -> some View {
+        content.sensoryFeedback(trigger: trigger) { _, _ in enabled ? kind.feedback : nil }
     }
 }

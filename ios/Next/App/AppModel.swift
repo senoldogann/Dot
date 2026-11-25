@@ -32,7 +32,22 @@ final class AppModel {
     /// The paired Mac's name, for a chat's subtitle ("Dot · <Mac>").
     var macName: String? { host?.name ?? fixtureMac }
 
+    /// The daemon a Settings fixture serves from memory (debug builds; `nil` in the shipped app).
+    private(set) var fixtureAPI: DaemonAPI?
+
     #if DEBUG
+        /// Draws Settings on a fixture daemon (`SettingsFixture`): the pages read it through the real `DaemonAPI`.
+        func showSettingsFixture(_ fixture: SettingsFixture) {
+            var drawn: EngineSnapshot = .empty
+            drawn.transport = fixture.transport
+            drawn.online = fixture.transport != .offline
+            snapshot = drawn
+            fixtureMac = "MacBook Air"
+            fixtureAPI = fixture.api()
+            phase = fixture == .pairing || fixture == .pairingLink ? .unpaired : .ready
+            if fixture == .pairingLink { pairingStartWaiting = .link(host: SettingsFixture.host, code: "7KQ2M9XD") }
+        }
+
         /// Draws a fixture's snapshot with no engine (the screenshot harness and the UI tests).
         func showFixture(_ fixture: EngineSnapshot, mac: String) {
             snapshot = fixture
@@ -112,6 +127,18 @@ final class AppModel {
         Task { await engine.supervisor.start() }
     }
 
+    /// A pairing the owner opened from a `dotnext://pair` link or a scanned code, waiting for their one tap.
+    var pairingStartWaiting: PairingStart?
+
+    /// Takes a link the system opened in the app: a pair link waits for the owner's tap; anything else is ignored.
+    func open(url: URL) {
+        guard let start: PairingStart = pairingStart(url.absoluteString) else {
+            logger.warning("an unknown link was ignored scheme=\(url.scheme ?? "", privacy: .public) host=\(url.host() ?? "", privacy: .public)")
+            return
+        }
+        pairingStartWaiting = start
+    }
+
     /// Pairs with the address and the typed code; `nil` when it worked.
     func pair(address: String, code: String) async -> PairingProblem? {
         let parsed: DaemonHost?
@@ -124,12 +151,20 @@ final class AppModel {
             }
         }
         guard let host: DaemonHost = parsed else { return .address(.malformed) }
+        UserDefaults.standard.set(address.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "lastPairAddress")
         do {
             let key: String = try await DotEngine.pair(host: host, typedCode: code, session: DaemonAPI.makeSession(), keys: keys, hosts: hosts)
+            pairingStartWaiting = nil
             phase = .loading
             start(host: host, key: key)
             return nil
         } catch {
+            guard case .unreachable = error else { return .pairing(error) }
+            // Which hop failed, so the screen says what to do (Tailscale off, the Mac asleep, Dot not running).
+            let probe: DiagnosisProbe = DiagnosisProbe(
+                link: LinkWatcher.system().state, health: await DaemonAPI(host: host, key: "", session: DaemonAPI.makeSession(), streamSession: DaemonAPI.makeSession()).probeHealth(),
+                status: .notRun, proof: .notRun)
+            if let (_, problem) = diagnose(probe).firstFailure, problem != .other(0) { return .reach(problem) }
             return .pairing(error)
         }
     }
@@ -351,4 +386,6 @@ extension AppModel {
 enum PairingProblem: Equatable {
     case address(DaemonHostError)
     case pairing(PairingFailure)
+    /// The Mac could not be reached, and the probe found where.
+    case reach(HopProblem)
 }

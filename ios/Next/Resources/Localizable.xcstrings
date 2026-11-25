@@ -12,6 +12,39 @@
         }
       }
     },
+    "%@ at %@": {
+      "comment": "Schedule rhythm; short weekday names, then clock times",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ saat %@"
+          }
+        }
+      }
+    },
+    "%@ is not a Tailscale address. It ends in .ts.net; Settings › Phone on the Mac shows it.": {
+      "comment": "Pairing error: the address is not under ts.net; the argument is the host",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ bir Tailscale adresi değil. Adres .ts.net ile biter; Mac'te Ayarlar › Telefon gösterir."
+          }
+        }
+      }
+    },
+    "%@ · %lld tasks": {
+      "comment": "Usage: a day's tokens and tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %lld görev"
+          }
+        }
+      }
+    },
     "%@, failed": {
       "comment": "VoiceOver: a tool call that failed; the argument is its line",
       "localizations": {
@@ -30,6 +63,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@, çalışıyor"
+          }
+        }
+      }
+    },
+    "%lld characters a line": {
+      "comment": "Appearance: a reading width's measure",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Satırda %lld karakter"
           }
         }
       }
@@ -103,6 +147,28 @@
         }
       }
     },
+    "%lld min": {
+      "comment": "A number of minutes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dk"
+          }
+        }
+      }
+    },
+    "%lld notes": {
+      "comment": "Memory: the number of search hits",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld not"
+          }
+        }
+      }
+    },
     "%lld of %lld": {
       "comment": "Ask dock: which ask is shown; the arguments are its place and the count",
       "localizations": {
@@ -121,6 +187,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld başka adım"
+          }
+        }
+      }
+    },
+    "%lld pt": {
+      "comment": "Appearance: the body text's size in points",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld pt"
           }
         }
       }
@@ -286,6 +363,28 @@
         }
       }
     },
+    "12-hour": {
+      "comment": "General › Timestamps: 2:05 PM",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 saat"
+          }
+        }
+      }
+    },
+    "24-hour": {
+      "comment": "General › Timestamps: 14:05",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24 saat"
+          }
+        }
+      }
+    },
     "3 matches in 2 files": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -308,13 +407,68 @@
         }
       }
     },
-    "8 letters and digits": {
+    "5-hour window": {
+      "comment": "Usage: the plan's 5-hour window",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 saatlik pencere"
+          }
+        }
+      }
+    },
+    "7KQ2-M9XD": {
       "comment": "Pairing screen: placeholder of the code field",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "8 harf ve rakam"
+            "value": "7KQ2-M9XD"
+          }
+        }
+      }
+    },
+    "8 letters and digits, good for 10 minutes and once.": {
+      "comment": "Pairing screen: what the code is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8 harf ve rakam; 10 dakika ve bir kez geçerli."
+          }
+        }
+      }
+    },
+    "A chat schedule is edited on the web page.": {
+      "comment": "Schedule edit: a chat-mode schedule cannot be edited here",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet zamanlaması web sayfasında düzenlenir."
+          }
+        }
+      }
+    },
+    "A light tap when you copy, swipe or send, and when an answer comes": {
+      "comment": "Chat settings: what haptics do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopyalarken, kaydırırken ya da gönderirken ve bir yanıt geldiğinde hafif bir dokunuş"
+          }
+        }
+      }
+    },
+    "A message Dot wrote for you to send": {
+      "comment": "Push kind description",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un senin göndermen için yazdığı bir mesaj"
           }
         }
       }
@@ -326,6 +480,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot çalışırken yazılan mesaj burada bekler ve çalışma bitince başlar."
+          }
+        }
+      }
+    },
+    "A new model applies from each task's next start; running tasks keep theirs.": {
+      "comment": "Models: footer under the roles",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni model her görevin bir sonraki başlangıcından geçerli olur; çalışan görevler kendi modelini korur."
+          }
+        }
+      }
+    },
+    "A phone reads these; change them on the Mac: Settings › Models › Code review.": {
+      "comment": "Models: the code review is read-only from a phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon bunları okur; değiştirmek için Mac'te: Ayarlar › Modeller › Kod incelemesi."
           }
         }
       }
@@ -352,13 +528,46 @@
         }
       }
     },
-    "About": {
-      "comment": "Settings row",
+    "A task past a cap pauses and asks you to continue or stop, in every mode. From a phone you can lower or set a cap; raising one or taking one off is done on the Mac.": {
+      "comment": "Caps: footer, what a cap does and what a phone may do",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hakkında"
+            "value": "Bir sınırı aşan görev her modda durur ve sürdürmeyi ya da durdurmayı sana sorar. Telefondan bir sınırı düşürebilir ya da koyabilirsin; yükseltmek ya da kaldırmak Mac'te yapılır."
+          }
+        }
+      }
+    },
+    "A task wants to change a note you wrote or approved. Your words stay until you choose.": {
+      "comment": "Memory: what a proposal is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev senin yazdığın ya da onayladığın bir notu değiştirmek istiyor. Sen seçene kadar senin sözlerin kalır."
+          }
+        }
+      }
+    },
+    "A task you started ended": {
+      "comment": "Push kind description",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başlattığın bir görev bitti"
+          }
+        }
+      }
+    },
+    "AI services": {
+      "comment": "Settings row: the keys of the AI services",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yapay zekâ hizmetleri"
           }
         }
       }
@@ -374,6 +583,17 @@
         }
       }
     },
+    "Actions": {
+      "comment": "VoiceOver: a row's menu of actions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eylemler"
+          }
+        }
+      }
+    },
     "Activity": {
       "comment": "Tab bar: what Dot did while the owner was away\nTitle of the activity tab",
       "localizations": {
@@ -381,6 +601,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Etkinlik"
+          }
+        }
+      }
+    },
+    "Address": {
+      "comment": "This Mac: the Mac's tailnet address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adres"
           }
         }
       }
@@ -407,6 +638,17 @@
         }
       }
     },
+    "Agents and teams": {
+      "comment": "Settings row: the web page of agents, teams and handoffs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanlar ve ekipler"
+          }
+        }
+      }
+    },
     "Agents come in a later version": {
       "comment": "Agents tab: empty state until the agents wave",
       "localizations": {
@@ -429,6 +671,50 @@
         }
       }
     },
+    "All notes, trash and lessons": {
+      "comment": "Memory: the web page row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm notlar, çöp kutusu ve dersler"
+          }
+        }
+      }
+    },
+    "All tasks": {
+      "comment": "Caps: today's total",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm görevler"
+          }
+        }
+      }
+    },
+    "All tasks a day": {
+      "comment": "Caps: every run that began today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde tüm görevler"
+          }
+        }
+      }
+    },
+    "Allow it in iOS Settings, or type the Mac's address instead.": {
+      "comment": "QR scan: what to do when denied",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS Ayarları'nda izin ver ya da Mac'in adresini elle yaz."
+          }
+        }
+      }
+    },
     "Allow once": {
       "comment": "Ask dock: allows this step once\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -441,7 +727,7 @@
       }
     },
     "Allowed": {
-      "comment": "Transcript anchor: an approval allowed",
+      "comment": "Rule: Dot does it without asking\nTranscript anchor: an approval allowed",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -506,6 +792,28 @@
         }
       }
     },
+    "Answers": {
+      "comment": "Appearance section: how answers appear\nSystem: the daemon answers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtlar"
+          }
+        }
+      }
+    },
+    "App language": {
+      "comment": "General: the app's language row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulama dili"
+          }
+        }
+      }
+    },
     "Appearance": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row",
       "localizations": {
@@ -539,6 +847,83 @@
         }
       }
     },
+    "Approvals": {
+      "comment": "Schedule edit: the approval mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onaylar"
+          }
+        }
+      }
+    },
+    "Approvals and questions that wait on you": {
+      "comment": "Push kind description",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seni bekleyen onaylar ve sorular"
+          }
+        }
+      }
+    },
+    "Apps and services": {
+      "comment": "Settings section: connectors, plugins, skills, keys, channels, vault",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulamalar ve hizmetler"
+          }
+        }
+      }
+    },
+    "As the default": {
+      "comment": "Schedule edit: the default approval mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan gibi"
+          }
+        }
+      }
+    },
+    "As the iPhone": {
+      "comment": "General › Timestamps: the iPhone's own 12 or 24-hour clock",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone'daki gibi"
+          }
+        }
+      }
+    },
+    "As your plan last reported them.": {
+      "comment": "Caps: footer under the windows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planının en son bildirdiği gibi."
+          }
+        }
+      }
+    },
+    "Ask": {
+      "comment": "Approval mode: risky steps ask",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sor"
+          }
+        }
+      }
+    },
     "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -546,6 +931,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'tan her şeyi isteyebilirsin: bir iş, bir ders, Mac'te bir ayak işi."
+          }
+        }
+      }
+    },
+    "Ask Dot in a chat to do something every morning, or make one with +.": {
+      "comment": "Schedules: how one is made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir sohbette Dot'tan her sabah bir şey yapmasını iste ya da + ile bir tane oluştur."
           }
         }
       }
@@ -572,6 +968,50 @@
         }
       }
     },
+    "Ask before deleting a chat": {
+      "comment": "General: confirm deleting a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbeti silmeden önce sor"
+          }
+        }
+      }
+    },
+    "Ask before stopping a run": {
+      "comment": "General: confirm Stop in a chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir işi durdurmadan önce sor"
+          }
+        }
+      }
+    },
+    "Asking for the camera…": {
+      "comment": "QR scan: the camera permission is being asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera izni isteniyor…"
+          }
+        }
+      }
+    },
+    "Asks first": {
+      "comment": "Rule: Dot asks the owner first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce sorar"
+          }
+        }
+      }
+    },
     "Attach": {
       "comment": "VoiceOver: the composer's button that adds a photo or file",
       "localizations": {
@@ -579,6 +1019,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekle"
+          }
+        }
+      }
+    },
+    "Auto": {
+      "comment": "Approval mode: a review model decides",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otomatik"
           }
         }
       }
@@ -649,6 +1100,17 @@
         }
       }
     },
+    "Browser": {
+      "comment": "Settings row: Dot's own Chrome",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarayıcı"
+          }
+        }
+      }
+    },
     "Buttons": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -693,6 +1155,17 @@
         }
       }
     },
+    "Campaigns": {
+      "comment": "Settings row: goals Dot keeps working on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanyalar"
+          }
+        }
+      }
+    },
     "Can't reach your Mac": {
       "comment": "Empty chat when offline with nothing saved",
       "localizations": {
@@ -711,6 +1184,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vazgeç"
+          }
+        }
+      }
+    },
+    "Caps": {
+      "comment": "Caps section: the caps of what tasks spend",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sınırlar"
           }
         }
       }
@@ -737,6 +1221,17 @@
         }
       }
     },
+    "Channels": {
+      "comment": "Settings row: iMessage and the other ways to reach Dot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanallar"
+          }
+        }
+      }
+    },
     "Chat": {
       "comment": "Settings row: chat preferences",
       "localizations": {
@@ -759,6 +1254,17 @@
         }
       }
     },
+    "Check again": {
+      "comment": "This Mac: runs the diagnosis again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden denetle"
+          }
+        }
+      }
+    },
     "Check the deposit with Finance": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -766,6 +1272,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaporayı Finance ile kontrol et"
+          }
+        }
+      }
+    },
+    "Checked at %@ · trace %@": {
+      "comment": "This Mac: when the diagnosis ran and its trace id",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ saatinde denetlendi · iz %@"
+          }
+        }
+      }
+    },
+    "Checking each hop…": {
+      "comment": "This Mac: the diagnosis is running",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her adım denetleniyor…"
           }
         }
       }
@@ -815,7 +1343,7 @@
       }
     },
     "Close": {
-      "comment": "Sheet toolbar: closes an inspector sheet",
+      "comment": "Sheet toolbar: closes an inspector sheet\nSheet toolbar: closes the sheet",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -832,6 +1360,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kod"
+          }
+        }
+      }
+    },
+    "Code %@-%@": {
+      "comment": "Pairing screen: the code a link carries",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kod %@-%@"
+          }
+        }
+      }
+    },
+    "Code review": {
+      "comment": "Models section: the pre-push review's models (item 1663)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kod incelemesi"
+          }
+        }
+      }
+    },
+    "Code reviews": {
+      "comment": "Usage source: pre-push reviews",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kod incelemeleri"
+          }
+        }
+      }
+    },
+    "Code reviews a day": {
+      "comment": "Caps: pre-push reviews a day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde kod incelemeleri"
           }
         }
       }
@@ -854,6 +1426,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapalı"
+          }
+        }
+      }
+    },
+    "Color scheme": {
+      "comment": "Appearance section: light, dark or system",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renk düzeni"
           }
         }
       }
@@ -946,6 +1529,17 @@
         }
       }
     },
+    "Confirmations": {
+      "comment": "General section: which actions ask first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onay soruları"
+          }
+        }
+      }
+    },
     "Connected": {
       "comment": "Settings: the Mac answers",
       "localizations": {
@@ -968,6 +1562,17 @@
         }
       }
     },
+    "Connection": {
+      "comment": "This Mac section: the hop-by-hop diagnosis",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantı"
+          }
+        }
+      }
+    },
     "Connections": {
       "comment": "Settings section: the Mac, notifications, this phone",
       "localizations": {
@@ -979,6 +1584,17 @@
         }
       }
     },
+    "Connectors": {
+      "comment": "Settings row: the apps and services Dot works with",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlayıcılar"
+          }
+        }
+      }
+    },
     "Context used": {
       "comment": "Inspector row: how full the model's context is",
       "localizations": {
@@ -986,6 +1602,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kullanılan bağlam"
+          }
+        }
+      }
+    },
+    "Context, effort and providers": {
+      "comment": "Models: the web page's other parts",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlam, çaba ve sağlayıcılar"
           }
         }
       }
@@ -1002,7 +1629,7 @@
       }
     },
     "Copy": {
-      "comment": "Code block header button that copies the code\nContext menu of a tool call: copies its line and detail",
+      "comment": "Code block header button that copies the code\nContext menu of a tool call: copies its line and detail\nContext menu: copies the text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1023,6 +1650,28 @@
         }
       }
     },
+    "Copy diagnostics": {
+      "comment": "This Mac: copies the diagnosis report",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanıyı kopyala"
+          }
+        }
+      }
+    },
+    "Copy instructions": {
+      "comment": "Settings: copies where to do a refused thing on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Talimatı kopyala"
+          }
+        }
+      }
+    },
     "Copy the answer": {
       "comment": "VoiceOver: copies Dot's answer",
       "localizations": {
@@ -1035,7 +1684,7 @@
       }
     },
     "Dark": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Appearance: the dark look\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1177,6 +1826,39 @@
         }
       }
     },
+    "Diagnose": {
+      "comment": "Settings: opens the connection's diagnosis",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanıla"
+          }
+        }
+      }
+    },
+    "Diagnostics": {
+      "comment": "Settings row: the programs Dot runs and its logs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanılama"
+          }
+        }
+      }
+    },
+    "Diagnostics copied": {
+      "comment": "Toast: the diagnosis report is on the pasteboard",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tanı kopyalandı"
+          }
+        }
+      }
+    },
     "Dictate": {
       "comment": "VoiceOver: the composer's microphone button",
       "localizations": {
@@ -1221,6 +1903,17 @@
         }
       }
     },
+    "Dictation writes your words on this iPhone; no audio leaves it.": {
+      "comment": "General: footer under dictation",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte sözlerini bu iPhone'da yazar; hiçbir ses dışarı çıkmaz."
+          }
+        }
+      }
+    },
     "Disabled": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1228,6 +1921,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Devre dışı"
+          }
+        }
+      }
+    },
+    "Discard": {
+      "comment": "Edit sheet: throws the changes away",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vazgeç"
+          }
+        }
+      }
+    },
+    "Discard your changes?": {
+      "comment": "Edit sheet: cancel with unsaved changes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişikliklerinden vazgeçilsin mi?"
           }
         }
       }
@@ -1287,6 +2002,17 @@
         }
       }
     },
+    "Done or failed": {
+      "comment": "Push kind: a task ended",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti ya da başarısız oldu"
+          }
+        }
+      }
+    },
     "Dot": {
       "comment": "The assistant's name in a chat's subtitle",
       "localizations": {
@@ -1294,6 +2020,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot"
+          }
+        }
+      }
+    },
+    "Dot Next gets notifications once it replaces the old Dot app on this iPhone; until then the old app keeps them. These switches are kept on your Mac for this phone.": {
+      "comment": "Notifications footer: no push before the swap (owner's decision)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next bildirimleri bu iPhone'daki eski Dot uygulamasının yerini aldığında alır; o zamana kadar bildirimler eski uygulamada kalır. Bu anahtarlar Mac'inde bu telefon için saklanır."
+          }
+        }
+      }
+    },
+    "Dot Next may not use the camera": {
+      "comment": "QR scan: camera denied",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next kamerayı kullanamıyor"
+          }
+        }
+      }
+    },
+    "Dot Next speaks the language iOS Settings sets for it.": {
+      "comment": "General: footer under the language",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next, iOS Ayarları'nın onun için seçtiği dili konuşur."
+          }
+        }
+      }
+    },
+    "Dot Next talks to Dot on your Mac over Tailscale. On the Mac, open Dot › Settings › Phone and show a code.": {
+      "comment": "Pairing screen: the one line under the title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next, Mac'indeki Dot ile Tailscale üzerinden konuşur. Mac'te Dot › Ayarlar › Telefon'u aç ve bir kod göster."
+          }
+        }
+      }
+    },
+    "Dot Next version": {
+      "comment": "System: the app's version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next sürümü"
+          }
+        }
+      }
+    },
+    "Dot answered with an error (HTTP %lld). Look at Dot on the Mac.": {
+      "comment": "Diagnosis: the daemon answered with an error",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir hatayla yanıt verdi (HTTP %lld). Mac'teki Dot'a bak."
           }
         }
       }
@@ -1331,6 +2123,17 @@
         }
       }
     },
+    "Dot follows its approval mode alone.": {
+      "comment": "Rules: what holds without rules",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot yalnızca onay moduna göre davranır."
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -1342,6 +2145,17 @@
         }
       }
     },
+    "Dot needs you": {
+      "comment": "Push kind: an approval or a question waits",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot seni bekliyor"
+          }
+        }
+      }
+    },
     "Dot needs you to take over this step": {
       "comment": "Ask dock title: a hand-off",
       "localizations": {
@@ -1349,6 +2163,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bu adımı senin yapmanı istiyor"
+          }
+        }
+      }
+    },
+    "Dot on the Mac": {
+      "comment": "Diagnosis hop: Dot's daemon answers\nSystem section: the daemon",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'teki Dot"
+          }
+        }
+      }
+    },
+    "Dot thinks with": {
+      "comment": "Models section: the main model and the roles",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un düşündüğü modeller"
+          }
+        }
+      }
+    },
+    "Dot uses these names in chats, on the Mac and in messages it sends for you.": {
+      "comment": "General: footer under the names",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bu adları sohbetlerde, Mac'te ve senin için gönderdiği mesajlarda kullanır."
+          }
+        }
+      }
+    },
+    "Dot version": {
+      "comment": "This Mac: the daemon's version",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sürümü"
           }
         }
       }
@@ -1386,6 +2244,17 @@
         }
       }
     },
+    "Dot's name": {
+      "comment": "General: the assistant's shown name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un adı"
+          }
+        }
+      }
+    },
     "Dot's note: %@": {
       "comment": "VoiceOver: a note of Dot's in the chat; the argument is its words",
       "localizations": {
@@ -1397,13 +2266,79 @@
         }
       }
     },
+    "Dot's own initiative": {
+      "comment": "Usage source: Dot's own runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kendi girişimi"
+          }
+        }
+      }
+    },
+    "Dot's own initiative a day": {
+      "comment": "Caps: Dot's own runs a day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde Dot'un kendi girişimi"
+          }
+        }
+      }
+    },
+    "Down": {
+      "comment": "System: a service is down",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışmıyor"
+          }
+        }
+      }
+    },
+    "Drafts ready": {
+      "comment": "Push kind: a draft waits to be sent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taslaklar hazır"
+          }
+        }
+      }
+    },
+    "Drop": {
+      "comment": "Memory proposal: keep the owner's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bırak"
+          }
+        }
+      }
+    },
     "Edit": {
-      "comment": "Under a refused message: puts its words back in the composer",
+      "comment": "Schedule menu: edit\nUnder a refused message: puts its words back in the composer",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Düzenle"
+          }
+        }
+      }
+    },
+    "Edit scheduled task": {
+      "comment": "Title of the schedule edit sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlanmış görevi düzenle"
           }
         }
       }
@@ -1485,6 +2420,61 @@
         }
       }
     },
+    "English": {
+      "comment": "A language's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İngilizce"
+          }
+        }
+      }
+    },
+    "Enter the code": {
+      "comment": "Pairing screen: the second way, typing the address and the code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kodu gir"
+          }
+        }
+      }
+    },
+    "Every %@ at %@": {
+      "comment": "Schedule rhythm; a weekday's name, then clock times",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her %@ saat %@"
+          }
+        }
+      }
+    },
+    "Every %lld hours": {
+      "comment": "Schedule rhythm",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her %lld saatte bir"
+          }
+        }
+      }
+    },
+    "Every %lld minutes": {
+      "comment": "Schedule rhythm",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her %lld dakikada bir"
+          }
+        }
+      }
+    },
     "Every 10 min: watch the clinic's calendar": {
       "comment": "Sample loop title (wave N0)",
       "localizations": {
@@ -1496,24 +2486,46 @@
         }
       }
     },
-    "Every run stops, desktop control is blocked and schedules wait until you release the stop on your Mac.": {
+    "Every day at %@": {
+      "comment": "Schedule rhythm; the argument is one or more clock times",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her gün saat %@"
+          }
+        }
+      }
+    },
+    "Every hour": {
+      "comment": "Schedule rhythm",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her saat"
+          }
+        }
+      }
+    },
+    "Every run stops, desktop control is blocked and schedules wait until you release the stop.": {
       "comment": "Emergency stop confirmation: what it does",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tüm çalışmalar durur, masaüstü denetimi kapanır ve zamanlanmış görevler, durdurmayı Mac'inde kaldırana kadar bekler."
+            "value": "Her iş durur, masaüstü denetimi engellenir ve zamanlamalar sen durdurmayı kaldırana kadar bekler."
           }
         }
       }
     },
-    "Everything stopped. Release the stop on your Mac to let Dot work again.": {
-      "comment": "Settings: the emergency stop worked",
+    "Everything is stopped: no run starts and schedules wait until you release the stop.": {
+      "comment": "Settings: the emergency stop holds",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Her şey durdu. Dot'un yeniden çalışması için durdurmayı Mac'inde kaldır."
+            "value": "Her şey durduruldu: sen durdurmayı kaldırana kadar hiçbir iş başlamaz, zamanlamalar bekler."
           }
         }
       }
@@ -1547,6 +2559,61 @@
           "stringUnit": {
             "state": "translated",
             "value": "Başarısız"
+          }
+        }
+      }
+    },
+    "Failed %lld times in a row": {
+      "comment": "Schedule: its last runs failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üst üste %lld kez başarısız oldu"
+          }
+        }
+      }
+    },
+    "Failed with code %lld.": {
+      "comment": "Diagnosis: an unclassified failure; the argument is the code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld koduyla başarısız oldu."
+          }
+        }
+      }
+    },
+    "Fallback %lld": {
+      "comment": "Code review: a fallback model's place",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedek %lld"
+          }
+        }
+      }
+    },
+    "Fast model": {
+      "comment": "Models: the role for quick small steps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı model"
+          }
+        }
+      }
+    },
+    "Feel": {
+      "comment": "Chat settings section: haptics",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "His"
           }
         }
       }
@@ -1683,6 +2750,17 @@
         }
       }
     },
+    "From outside content": {
+      "comment": "Memory proposal: the run had read outside content",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dış içerikten"
+          }
+        }
+      }
+    },
     "Gallery": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row of debug builds: the component gallery",
       "localizations": {
@@ -1701,6 +2779,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Genel"
+          }
+        }
+      }
+    },
+    "Goal mode": {
+      "comment": "Schedule edit: keep working until the goal is met",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedef modu"
           }
         }
       }
@@ -1738,6 +2827,28 @@
         }
       }
     },
+    "Hands to you": {
+      "comment": "Rule: the owner does it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sana bırakır"
+          }
+        }
+      }
+    },
+    "Haptics": {
+      "comment": "Chat settings: touch feedback",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dokunsal geri bildirim"
+          }
+        }
+      }
+    },
     "Haptics while text streams": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1750,7 +2861,7 @@
       }
     },
     "Health": {
-      "comment": "Settings row: the daemon's health",
+      "comment": "System: whether the daemon is well",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1760,8 +2871,30 @@
         }
       }
     },
+    "Health and version": {
+      "comment": "Settings row: the daemon's health, version, emergency stop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlık ve sürüm"
+          }
+        }
+      }
+    },
+    "Held": {
+      "comment": "System: the scheduler is held (emergency stop)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekletiliyor"
+          }
+        }
+      }
+    },
     "Helpers": {
-      "comment": "Inspector section: the chat's helpers",
+      "comment": "Inspector section: the chat's helpers\nUsage source: delegated helpers",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1778,6 +2911,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un bu sohbet için başlattığı yardımcılar burada görünür."
+          }
+        }
+      }
+    },
+    "Helpers a day": {
+      "comment": "Caps: delegated helpers a day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde yardımcılar"
           }
         }
       }
@@ -1815,13 +2959,13 @@
         }
       }
     },
-    "Hide successful keeps failures. Zen shows only final answers. Approvals, questions and errors always show.": {
-      "comment": "Footer of the tool calls setting",
+    "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show.": {
+      "comment": "Footer of the tool calls setting (UI-STANDARD 14:25)",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Başarılıları gizle hataları gösterir. Zen yalnızca son yanıtları gösterir. Onaylar, sorular ve hatalar her zaman görünür."
+            "value": "Ajanların çalıştırdığı komutları, düzenlemeleri ve aramaları gizle. Başarılıları gizle, hataları gösterir. Zen yalnızca son yanıtları gösterir. Onaylar, sorular ve hatalar her zaman görünür."
           }
         }
       }
@@ -1855,6 +2999,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yaptım"
+          }
+        }
+      }
+    },
+    "In millions of tokens, as the Usage page counts them.": {
+      "comment": "Cap edit: the unit",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Milyon token olarak, Kullanım sayfasının saydığı gibi."
+          }
+        }
+      }
+    },
+    "In order, the first that matches decides": {
+      "comment": "Rules: header above the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sırayla; eşleşen ilk kural karar verir"
           }
         }
       }
@@ -1947,6 +3113,50 @@
         }
       }
     },
+    "Its agent is paused": {
+      "comment": "Schedule: the agent it runs as is paused",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanı duraklatıldı"
+          }
+        }
+      }
+    },
+    "Keeping the Mac awake": {
+      "comment": "System: the keep-awake state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'i uyanık tutma"
+          }
+        }
+      }
+    },
+    "Keeps the Mac awake": {
+      "comment": "This Mac: keep-awake while Dot works",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'i uyanık tutar"
+          }
+        }
+      }
+    },
+    "Keeps working until the goal is met": {
+      "comment": "Schedule edit: what goal mode does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedefe ulaşılana kadar çalışmayı sürdürür"
+          }
+        }
+      }
+    },
     "Kept for you": {
       "comment": "Ask dock title: a step kept after nobody answered in time",
       "localizations": {
@@ -1969,6 +3179,50 @@
         }
       }
     },
+    "Language": {
+      "comment": "General section: the app's language",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dil"
+          }
+        }
+      }
+    },
+    "Last 7 days": {
+      "comment": "Usage: the days shown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son 7 gün"
+          }
+        }
+      }
+    },
+    "Last run %@": {
+      "comment": "Schedule: when it ran last (relative)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son çalışma %@"
+          }
+        }
+      }
+    },
+    "Last run failed": {
+      "comment": "Schedule: its last run failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son çalışma başarısız oldu"
+          }
+        }
+      }
+    },
     "Lesson 2 of 5: proposals go down, sizes come up.": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1981,7 +3235,7 @@
       }
     },
     "Light": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Appearance: the light look\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2057,6 +3311,17 @@
         }
       }
     },
+    "Main model": {
+      "comment": "Models: the main model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ana model"
+          }
+        }
+      }
+    },
     "Make a plan first, then do it": {
       "comment": "Composer command: what /plan does",
       "localizations": {
@@ -2086,6 +3351,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'a yaz"
+          }
+        }
+      }
+    },
+    "Messages, labels, and headings scale with this size.": {
+      "comment": "Appearance: under the preview sentence",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlar, etiketler ve başlıklar bu boyuta göre ölçeklenir."
+          }
+        }
+      }
+    },
+    "Millions of tokens": {
+      "comment": "Cap edit: the field's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Milyon token"
           }
         }
       }
@@ -2157,12 +3444,34 @@
       }
     },
     "Name": {
-      "comment": "Rename alert: the field of the chat's new name",
+      "comment": "Rename alert: the field of the chat's new name\nSchedule edit: the name\nThis Mac: the Mac's name",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Ad"
+          }
+        }
+      }
+    },
+    "Names": {
+      "comment": "General section: Dot's and the owner's names",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adlar"
+          }
+        }
+      }
+    },
+    "Narrow": {
+      "comment": "Appearance › Reading width: 60 characters a line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dar"
           }
         }
       }
@@ -2200,6 +3509,17 @@
         }
       }
     },
+    "New scheduled task": {
+      "comment": "Schedules: makes a new one (on the web page)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni zamanlanmış görev"
+          }
+        }
+      }
+    },
     "Next ask": {
       "comment": "Ask dock: shows the ask after",
       "localizations": {
@@ -2207,6 +3527,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sonraki soru"
+          }
+        }
+      }
+    },
+    "Next run %@": {
+      "comment": "Schedule: when it runs next (relative)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki çalışma %@"
+          }
+        }
+      }
+    },
+    "No": {
+      "comment": "A no value",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hayır"
+          }
+        }
+      }
+    },
+    "No camera here": {
+      "comment": "QR scan: the device has no camera (the simulator)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada kamera yok"
+          }
+        }
+      }
+    },
+    "No cap": {
+      "comment": "Caps: a cap of 0",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sınır yok"
           }
         }
       }
@@ -2266,6 +3630,39 @@
         }
       }
     },
+    "No network. Turn off Airplane Mode or join Wi-Fi.": {
+      "comment": "Diagnosis: the phone has no link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ağ yok. Uçak Modu'nu kapat ya da bir Wi-Fi'ye bağlan."
+          }
+        }
+      }
+    },
+    "No rules of your own": {
+      "comment": "Rules: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendi kuralın yok"
+          }
+        }
+      }
+    },
+    "No scheduled tasks": {
+      "comment": "Schedules: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlanmış görev yok"
+          }
+        }
+      }
+    },
     "Nobody answered in time": {
       "comment": "Ask dock: the ask expired",
       "localizations": {
@@ -2277,6 +3674,39 @@
         }
       }
     },
+    "None": {
+      "comment": "No value set",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yok"
+          }
+        }
+      }
+    },
+    "None waits. When a task wants to change a note you wrote, it waits here.": {
+      "comment": "Memory: no proposals",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekleyen yok. Bir görev senin yazdığın bir notu değiştirmek istediğinde burada bekler."
+          }
+        }
+      }
+    },
+    "Not checked yet.": {
+      "comment": "This Mac: the proof was not asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz denetlenmedi."
+          }
+        }
+      }
+    },
     "Not paired with a Mac": {
       "comment": "Emergency stop: no Mac to stop",
       "localizations": {
@@ -2284,6 +3714,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir Mac ile eşleşmedi"
+          }
+        }
+      }
+    },
+    "Not reached": {
+      "comment": "Diagnosis: a hop after the failing one",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ulaşılmadı"
           }
         }
       }
@@ -2354,6 +3795,39 @@
         }
       }
     },
+    "Not set": {
+      "comment": "Models: a role with no model of its own",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlanmadı"
+          }
+        }
+      }
+    },
+    "Not well": {
+      "comment": "System: the daemon reports a problem",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sorunlu"
+          }
+        }
+      }
+    },
+    "Nothing answers. The Mac may sleep, be off, or have Tailscale off.": {
+      "comment": "Diagnosis: the Mac does not answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıt veren yok. Mac uykuda ya da kapalı olabilir veya Tailscale'i kapalı olabilir."
+          }
+        }
+      }
+    },
     "Nothing new since you were away": {
       "comment": "Activity tab empty state title",
       "localizations": {
@@ -2409,13 +3883,68 @@
         }
       }
     },
+    "Notifications are off for Dot Next in iOS Settings.": {
+      "comment": "Notifications: the OS permission is denied",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS Ayarları'nda Dot Next için bildirimler kapalı."
+          }
+        }
+      }
+    },
+    "Notifications service": {
+      "comment": "System: the push service's state",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bildirim hizmeti"
+          }
+        }
+      }
+    },
+    "Now": {
+      "comment": "Memory proposal: the note's words as they stand\nSystem section: what Dot does now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi"
+          }
+        }
+      }
+    },
+    "Now, while Dot works": {
+      "comment": "System: the Mac is kept awake now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şu an, Dot çalışırken"
+          }
+        }
+      }
+    },
     "Off": {
-      "comment": "VoiceOver value of a switch that is off",
+      "comment": "This Mac: Tailscale is off\nVoiceOver value of a switch that is off",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Kapalı"
+          }
+        }
+      }
+    },
+    "Off: a reaction is only feedback Dot learns from": {
+      "comment": "Chat settings: what the switch off means",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı: tepki yalnızca Dot'un öğrendiği bir geri bildirimdir"
           }
         }
       }
@@ -2464,13 +3993,13 @@
         }
       }
     },
-    "On your Mac, open Dot › Settings › Phone and make a sign-in code.": {
-      "comment": "Pairing screen: what to do on the Mac first",
+    "On iPad and other wide windows; a phone uses its whole width.": {
+      "comment": "Appearance: footer of the reading width",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac'inde Dot › Ayarlar › Telefon'u aç ve bir giriş kodu oluştur."
+            "value": "iPad'de ve diğer geniş pencerelerde; telefon tüm genişliği kullanır."
           }
         }
       }
@@ -2486,6 +4015,28 @@
         }
       }
     },
+    "Once, %@": {
+      "comment": "Schedule rhythm: runs once at a date and time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir kez, %@"
+          }
+        }
+      }
+    },
+    "One task": {
+      "comment": "Caps: a run and the runs it delegated to",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tek görev"
+          }
+        }
+      }
+    },
     "Only the checkmark marks the chosen row.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2493,6 +4044,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seçili satırı yalnızca onay işareti gösterir."
+          }
+        }
+      }
+    },
+    "Open Tailscale": {
+      "comment": "Pairing screen: opens the Tailscale app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale'i aç"
+          }
+        }
+      }
+    },
+    "Open agents and teams": {
+      "comment": "Agents tab: opens the web page of agents",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanları ve ekipleri aç"
+          }
+        }
+      }
+    },
+    "Open iOS Settings": {
+      "comment": "Opens the app's page in iOS Settings",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS Ayarları'nı aç"
+          }
+        }
+      }
+    },
+    "Open source licences": {
+      "comment": "Settings row: the software Dot is built from",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık kaynak lisansları"
           }
         }
       }
@@ -2541,6 +4136,17 @@
         }
       }
     },
+    "Opens the web page": {
+      "comment": "VoiceOver: the Web mark of a settings row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web sayfasını açar"
+          }
+        }
+      }
+    },
     "Or write your own answer": {
       "comment": "Ask dock: the field beside a question's options",
       "localizations": {
@@ -2563,6 +4169,17 @@
         }
       }
     },
+    "Pair again": {
+      "comment": "Settings: forgets the refused key and opens pairing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden eşleştir"
+          }
+        }
+      }
+    },
     "Pair this phone again in Settings.": {
       "comment": "Empty chat when the key was refused",
       "localizations": {
@@ -2570,6 +4187,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonu Ayarlar'dan yeniden eşleştir."
+          }
+        }
+      }
+    },
+    "Pair this phone first.": {
+      "comment": "Web settings page: no Mac to open",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce bu telefonu eşleştir."
+          }
+        }
+      }
+    },
+    "Pair this phone with another Mac?": {
+      "comment": "Alert: a pair link opened while the phone is paired",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefon başka bir Mac ile eşleştirilsin mi?"
+          }
+        }
+      }
+    },
+    "Pair with this Mac": {
+      "comment": "Pairing screen: one tap pairs with a link's Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu Mac ile eşleştir"
           }
         }
       }
@@ -2585,6 +4235,17 @@
         }
       }
     },
+    "Pairing…": {
+      "comment": "Pairing screen: the pairing is under way",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşleştiriliyor…"
+          }
+        }
+      }
+    },
     "Paste image": {
       "comment": "Composer + menu: adds the image on the clipboard",
       "localizations": {
@@ -2596,6 +4257,28 @@
         }
       }
     },
+    "Pause": {
+      "comment": "Schedule menu: switch off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklat"
+          }
+        }
+      }
+    },
+    "Paused": {
+      "comment": "Schedule: switched off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duraklatıldı"
+          }
+        }
+      }
+    },
     "Pay the 20 € deposit on the clinic's page?": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -2603,6 +4286,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kliniğin sayfasında 20 € kapora ödensin mi?"
+          }
+        }
+      }
+    },
+    "Phones and Tailscale": {
+      "comment": "Settings row: the web page of paired phones and the tailnet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefonlar ve Tailscale"
           }
         }
       }
@@ -2673,6 +4367,17 @@
         }
       }
     },
+    "Plan limits": {
+      "comment": "Caps section: the plan's usage windows",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan sınırları"
+          }
+        }
+      }
+    },
     "Plan · %lld of %lld done": {
       "comment": "Plan card header; the arguments are the steps done and all steps",
       "localizations": {
@@ -2680,6 +4385,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan · %lld / %lld bitti"
+          }
+        }
+      }
+    },
+    "Plugins": {
+      "comment": "Settings row: plugins Dot can install",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklentiler"
+          }
+        }
+      }
+    },
+    "Point the camera at the code in Dot › Settings › Phone on your Mac.": {
+      "comment": "QR scan: what to point at",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamerayı Mac'indeki Dot › Ayarlar › Telefon'daki koda tut."
+          }
+        }
+      }
+    },
+    "Pre-approved": {
+      "comment": "Rule: allowed ahead even in a tainted run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önceden onaylı"
           }
         }
       }
@@ -2702,6 +4440,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Birincil yazı"
+          }
+        }
+      }
+    },
+    "Proof of key": {
+      "comment": "This Mac: whether the Mac proved it holds the phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anahtar kanıtı"
+          }
+        }
+      }
+    },
+    "Proposed": {
+      "comment": "Memory proposal: the run's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önerilen"
+          }
+        }
+      }
+    },
+    "Proposed changes": {
+      "comment": "Memory: runs' rewrites of the owner's notes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önerilen değişiklikler"
           }
         }
       }
@@ -2827,6 +4598,28 @@
         }
       }
     },
+    "Reactions": {
+      "comment": "Chat settings section: what reactions do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tepkiler"
+          }
+        }
+      }
+    },
+    "Reactions start a follow-up": {
+      "comment": "Chat settings: reactions make Dot act",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tepkiler bir devam başlatır"
+          }
+        }
+      }
+    },
     "Read %@": {
       "comment": "Tool row: a file read; the argument is its path",
       "localizations": {
@@ -2871,6 +4664,28 @@
         }
       }
     },
+    "Reading width": {
+      "comment": "Appearance section: how wide prose runs on iPad",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Okuma genişliği"
+          }
+        }
+      }
+    },
+    "Reading your Mac…": {
+      "comment": "Settings: a page waits for its first read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in okunuyor…"
+          }
+        }
+      }
+    },
     "Reading your chats…": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2911,6 +4726,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeniden bağlanıyor…"
+          }
+        }
+      }
+    },
+    "Release the stop": {
+      "comment": "Settings: lets Dot work again after the emergency stop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durdurmayı kaldır"
           }
         }
       }
@@ -2970,6 +4796,17 @@
         }
       }
     },
+    "Resets %@": {
+      "comment": "Usage: when a plan window resets",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ sıfırlanır"
+          }
+        }
+      }
+    },
     "Response streaming": {
       "comment": "Settings switch: answers appear word by word as written",
       "localizations": {
@@ -2977,6 +4814,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıt akışı"
+          }
+        }
+      }
+    },
+    "Resume": {
+      "comment": "Schedule menu: switch on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürdür"
           }
         }
       }
@@ -3003,6 +4851,17 @@
         }
       }
     },
+    "Review model": {
+      "comment": "Code review: the first model\nModels: the role that reviews in auto mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İnceleme modeli"
+          }
+        }
+      }
+    },
     "Rows and sections": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -3010,6 +4869,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Satırlar ve bölümler"
+          }
+        }
+      }
+    },
+    "Rows marked Web open your Mac's own settings page here; each becomes a page of the app in a later version.": {
+      "comment": "Settings: footer that explains the Web mark",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web işaretli satırlar Mac'inin kendi ayar sayfasını burada açar; her biri sonraki bir sürümde uygulamanın kendi sayfası olur."
           }
         }
       }
@@ -3025,6 +4895,17 @@
         }
       }
     },
+    "Rules on the web page": {
+      "comment": "Rules: the web page row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web sayfasındaki kurallar"
+          }
+        }
+      }
+    },
     "Run": {
       "comment": "Inspector section: the newest run",
       "localizations": {
@@ -3036,6 +4917,17 @@
         }
       }
     },
+    "Running": {
+      "comment": "This Mac: Tailscale runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışıyor"
+          }
+        }
+      }
+    },
     "Running %@": {
       "comment": "Tool row: a command at work; the argument is the command",
       "localizations": {
@@ -3043,6 +4935,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışıyor: %@"
+          }
+        }
+      }
+    },
+    "Running for": {
+      "comment": "System: the daemon's uptime",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma süresi"
           }
         }
       }
@@ -3124,6 +5027,28 @@
         }
       }
     },
+    "Scan the Mac's code": {
+      "comment": "Title of the QR scan sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in kodunu tara"
+          }
+        }
+      }
+    },
+    "Scan the code on your Mac": {
+      "comment": "Pairing screen: the primary way, the camera on the Mac's code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki kodu tara"
+          }
+        }
+      }
+    },
     "Scheduled tasks": {
       "comment": "Settings row",
       "localizations": {
@@ -3131,6 +5056,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zamanlanmış görevler"
+          }
+        }
+      }
+    },
+    "Scheduled tasks a day": {
+      "comment": "Caps: schedules a day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde zamanlanmış görevler"
+          }
+        }
+      }
+    },
+    "Scheduler": {
+      "comment": "System: whether schedules fire",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zamanlayıcı"
           }
         }
       }
@@ -3157,6 +5104,17 @@
         }
       }
     },
+    "Search": {
+      "comment": "Memory: the search section",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ara"
+          }
+        }
+      }
+    },
     "Search chats": {
       "comment": "Placeholder of the chat list's search field",
       "localizations": {
@@ -3164,6 +5122,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbetlerde ara"
+          }
+        }
+      }
+    },
+    "Search settings": {
+      "comment": "Settings: the search field's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlarda ara"
+          }
+        }
+      }
+    },
+    "Search what Dot remembers": {
+      "comment": "Memory: the search field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un hatırladıklarında ara"
           }
         }
       }
@@ -3197,6 +5177,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "İkincil yazı"
+          }
+        }
+      }
+    },
+    "Self-improvement": {
+      "comment": "Settings row: what Dot learns from its tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendini geliştirme"
+          }
+        }
+      }
+    },
+    "Self-repair": {
+      "comment": "Settings row: Dot mends its own problems",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendini onarma"
           }
         }
       }
@@ -3322,6 +5324,17 @@
         }
       }
     },
+    "Served over HTTPS": {
+      "comment": "This Mac: Dot is served on the tailnet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HTTPS üzerinden sunuluyor"
+          }
+        }
+      }
+    },
     "Settings": {
       "comment": "Tab bar: the settings tab\nTitle of the settings tab",
       "localizations": {
@@ -3329,6 +5342,116 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayarlar"
+          }
+        }
+      }
+    },
+    "Settings › General": {
+      "comment": "Where on the Mac: the General page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Genel"
+          }
+        }
+      }
+    },
+    "Settings › General › Reactions": {
+      "comment": "Where on the Mac: the reactions settings",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Genel › Tepkiler"
+          }
+        }
+      }
+    },
+    "Settings › Memory": {
+      "comment": "Where on the Mac: the Memory page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Bellek"
+          }
+        }
+      }
+    },
+    "Settings › Models": {
+      "comment": "Where on the Mac: the Models page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Modeller"
+          }
+        }
+      }
+    },
+    "Settings › Models › Caps": {
+      "comment": "Where on the Mac: the caps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Modeller › Sınırlar"
+          }
+        }
+      }
+    },
+    "Settings › Models › Usage": {
+      "comment": "Where on the Mac: the usage",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Modeller › Kullanım"
+          }
+        }
+      }
+    },
+    "Settings › Phone on the Mac shows it; it ends in .ts.net.": {
+      "comment": "Pairing screen: where the address is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'te Ayarlar › Telefon gösterir; .ts.net ile biter."
+          }
+        }
+      }
+    },
+    "Settings › Rules": {
+      "comment": "Where on the Mac: the Rules page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Kurallar"
+          }
+        }
+      }
+    },
+    "Settings › Scheduled tasks": {
+      "comment": "Where on the Mac: the schedules",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Zamanlanmış görevler"
+          }
+        }
+      }
+    },
+    "Settings › System": {
+      "comment": "Where on the Mac: the System page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Sistem"
           }
         }
       }
@@ -3455,7 +5578,7 @@
       }
     },
     "Skills": {
-      "comment": "Composer picker header: the skills a run can use",
+      "comment": "Composer picker header: the skills a run can use\nSettings row: what Dot knows how to do",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3509,6 +5632,39 @@
         }
       }
     },
+    "Small change": {
+      "comment": "Code review: the size of a small change",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Küçük değişiklik"
+          }
+        }
+      }
+    },
+    "Small change model": {
+      "comment": "Code review: the model of a small change",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Küçük değişiklik modeli"
+          }
+        }
+      }
+    },
+    "Snapshots": {
+      "comment": "Settings row: pictures of the screen for Dot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekran görüntüleri"
+          }
+        }
+      }
+    },
     "Speech recognition is off for Dot. Turn it on in Settings › Dot Next › Speech Recognition.": {
       "comment": "Composer: dictation cannot start, speech permission denied",
       "localizations": {
@@ -3516,6 +5672,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot için konuşma tanıma kapalı. Ayarlar › Dot Next › Konuşma Tanıma'dan aç."
+          }
+        }
+      }
+    },
+    "Standard": {
+      "comment": "Appearance › Reading width: 68 characters a line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standart"
+          }
+        }
+      }
+    },
+    "Standby": {
+      "comment": "Models section: the models used when the main one fails",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedekte"
           }
         }
       }
@@ -3577,6 +5755,17 @@
     },
     "State": {
       "comment": "Inspector row: the run's status",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durum"
+          }
+        }
+      }
+    },
+    "Status": {
+      "comment": "This Mac: the link's state",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3762,6 +5951,17 @@
         }
       }
     },
+    "Supervised": {
+      "comment": "Approval mode: everything asks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denetimli"
+          }
+        }
+      }
+    },
     "Surfaces (no strokes)": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -3807,7 +6007,7 @@
       }
     },
     "System": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nSettings section: health, version",
+      "comment": "Appearance: follow the iPhone's light or dark look\nComponent gallery (debug builds): a heading or sample text\nSettings section: health, version",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3839,6 +6039,50 @@
         }
       }
     },
+    "Tailscale": {
+      "comment": "This Mac: Tailscale on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale"
+          }
+        }
+      }
+    },
+    "Tailscale on the Mac": {
+      "comment": "This Mac section: the Mac's tailnet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'teki Tailscale"
+          }
+        }
+      }
+    },
+    "Tailscale on this iPhone": {
+      "comment": "Diagnosis hop: the tailnet name resolves",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu iPhone'daki Tailscale"
+          }
+        }
+      }
+    },
+    "Tasks at work": {
+      "comment": "System: the number of active runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan görevler"
+          }
+        }
+      }
+    },
     "Teach me how SwiftUI lays out a stack": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -3857,6 +6101,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekipler"
+          }
+        }
+      }
+    },
+    "Tell me when": {
+      "comment": "Notifications section: the kinds of push",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şu durumlarda haber ver"
           }
         }
       }
@@ -3883,13 +6138,57 @@
         }
       }
     },
-    "That code is wrong, used or out of date. Make a new one on your Mac.": {
+    "Text": {
+      "comment": "Appearance section: the text size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metin"
+          }
+        }
+      }
+    },
+    "Text size": {
+      "comment": "Appearance: the text size slider",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metin boyutu"
+          }
+        }
+      }
+    },
+    "That code is not your Mac's address. Scan the code under Settings › Phone on the Mac.": {
+      "comment": "QR scan: a code that is not a Dot address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kod Mac'inin adresi değil. Mac'te Ayarlar › Telefon altındaki kodu tara."
+          }
+        }
+      }
+    },
+    "That code is wrong, used or out of date. Show a new one on your Mac: Settings › Phone.": {
       "comment": "Pairing error: the Mac refused the code",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Bu kod yanlış, kullanılmış ya da süresi geçmiş. Mac'inde yeni bir tane oluştur."
+            "value": "Bu kod yanlış, kullanılmış ya da süresi geçmiş. Mac'inde yenisini göster: Ayarlar › Telefon."
+          }
+        }
+      }
+    },
+    "That did not work: %@": {
+      "comment": "Settings: a read or write failed; the argument is the daemon's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu olmadı: %@"
           }
         }
       }
@@ -3916,6 +6215,28 @@
         }
       }
     },
+    "The Mac": {
+      "comment": "Diagnosis hop: the Mac answers on the tailnet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac"
+          }
+        }
+      }
+    },
+    "The Mac answers but Dot does not. Start Dot on the Mac.": {
+      "comment": "Diagnosis: nothing listens on Dot's port",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac yanıt veriyor ama Dot vermiyor. Mac'te Dot'u başlat."
+          }
+        }
+      }
+    },
     "The Mac refused the answer": {
       "comment": "Ask dock: the answer was refused without a reason",
       "localizations": {
@@ -3934,6 +6255,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac yanıtı reddetti: %@"
+          }
+        }
+      }
+    },
+    "The Mac refused this phone's key. Pair again with a new code.": {
+      "comment": "Diagnosis: the key was refused",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac bu telefonun anahtarını reddetti. Yeni bir kodla yeniden eşleştir."
           }
         }
       }
@@ -3971,6 +6303,28 @@
         }
       }
     },
+    "The Mac's tailnet name does not resolve. Open Tailscale on this iPhone and connect.": {
+      "comment": "Diagnosis: the ts.net name is unknown: Tailscale is off on the phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in tailnet adı çözümlenmiyor. Bu iPhone'da Tailscale'i aç ve bağlan."
+          }
+        }
+      }
+    },
+    "The address must start with https://, or have no prefix at all.": {
+      "comment": "Pairing error: not https",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adres https:// ile başlamalı ya da hiç önek olmamalı."
+          }
+        }
+      }
+    },
     "The answer could not be sent": {
       "comment": "Ask dock: sending failed; Try again follows",
       "localizations": {
@@ -3978,6 +6332,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıt gönderilemedi"
+          }
+        }
+      }
+    },
+    "The app's language": {
+      "comment": "General › Voice › Dictation language: follow the app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uygulamanın dili"
           }
         }
       }
@@ -4000,6 +6365,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disk dolu."
+          }
+        }
+      }
+    },
+    "The emergency stop always asks first.": {
+      "comment": "General: footer under the confirmations",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acil durdurma her zaman önce sorar."
           }
         }
       }
@@ -4070,6 +6446,17 @@
         }
       }
     },
+    "The page did not open": {
+      "comment": "Web settings page: the load failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfa açılmadı"
+          }
+        }
+      }
+    },
     "The queue is held: nothing starts until you resume it.": {
       "comment": "Queue sheet: the queue is held",
       "localizations": {
@@ -4077,6 +6464,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sıra bekletiliyor: sen sürdürene kadar hiçbir şey başlamaz."
+          }
+        }
+      }
+    },
+    "The quick brown fox jumps over the lazy dog.": {
+      "comment": "Appearance: the text size's live preview sentence",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pijamalı hasta yağız şoföre çabucak güvendi."
           }
         }
       }
@@ -4114,6 +6512,17 @@
         }
       }
     },
+    "The secure connection failed. Check the Mac's Tailscale HTTPS certificate.": {
+      "comment": "Diagnosis: TLS failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güvenli bağlantı kurulamadı. Mac'in Tailscale HTTPS sertifikasını denetle."
+          }
+        }
+      }
+    },
     "The side question could not be asked: %@": {
       "comment": "Composer: /btw failed; the argument is why",
       "localizations": {
@@ -4121,17 +6530,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yan soru sorulamadı: %@"
-          }
-        }
-      }
-    },
-    "The stop did not reach your Mac: %@": {
-      "comment": "Settings: the emergency stop failed; the argument is why",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Durdurma Mac'ine ulaşmadı: %@"
           }
         }
       }
@@ -4169,6 +6567,17 @@
         }
       }
     },
+    "This Dot cannot prove it holds the key; update Dot on your Mac.": {
+      "comment": "This Mac: the daemon has no proof route",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu Dot anahtarı tuttuğunu kanıtlayamıyor; Mac'indeki Dot'u güncelle."
+          }
+        }
+      }
+    },
     "This Mac": {
       "comment": "Component gallery (debug builds): a heading or sample text\nSettings row: the paired Mac",
       "localizations": {
@@ -4176,6 +6585,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu Mac"
+          }
+        }
+      }
+    },
+    "This address did not prove it holds this phone's key, so the key was not sent. Pair again.": {
+      "comment": "Diagnosis: the proof did not match",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu adres, bu telefonun anahtarını tuttuğunu kanıtlamadı; bu yüzden anahtar gönderilmedi. Yeniden eşleştir."
+          }
+        }
+      }
+    },
+    "This address did not prove it holds this phone's key; the key was not sent.": {
+      "comment": "This Mac: the proof did not match",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu adres, bu telefonun anahtarını tuttuğunu kanıtlamadı; anahtar gönderilmedi."
+          }
+        }
+      }
+    },
+    "This app": {
+      "comment": "System section: DotNext itself",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu uygulama"
           }
         }
       }
@@ -4213,6 +6655,39 @@
         }
       }
     },
+    "This iPhone's network": {
+      "comment": "Diagnosis hop: the phone's own Wi-Fi or cellular link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu iPhone'un ağı"
+          }
+        }
+      }
+    },
+    "This phone forgets its key for the Mac it is paired with; then one tap pairs it with the Mac of the link.": {
+      "comment": "Alert: what pairing again does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefon eşleştiği Mac'in anahtarını unutur; sonra tek dokunuş onu bağlantıdaki Mac ile eşleştirir."
+          }
+        }
+      }
+    },
+    "This phone's key": {
+      "comment": "Diagnosis hop: the daemon takes the phone's key\nThis Mac section: the phone's own key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonun anahtarı"
+          }
+        }
+      }
+    },
     "This phone's key was refused": {
       "comment": "Chat subtitle: the Mac no longer takes this phone's key",
       "localizations": {
@@ -4246,6 +6721,50 @@
         }
       }
     },
+    "Time limit": {
+      "comment": "Code review: the time limit",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Süre sınırı"
+          }
+        }
+      }
+    },
+    "Timestamps": {
+      "comment": "General section: how clocks read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saat biçimi"
+          }
+        }
+      }
+    },
+    "To add a rule that allows, move or switch rules: open on the Mac Settings › Rules. A phone may add a rule that asks or hands to you on the web page.": {
+      "comment": "Rules: footer: what a phone may not do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzin veren bir kural eklemek, kuralları taşımak ya da açıp kapatmak için Mac'te Ayarlar › Kurallar'ı aç. Telefon, soran ya da sana bırakan bir kuralı web sayfasında ekleyebilir."
+          }
+        }
+      }
+    },
+    "To make a new code or remove a phone: open on the Mac Settings › Phone. A phone's key cannot do either.": {
+      "comment": "This Mac: footer under the key: the Mac's continuation",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni kod oluşturmak ya da bir telefonu kaldırmak için Mac'te Ayarlar › Telefon'u aç. Bir telefonun anahtarı ikisini de yapamaz."
+          }
+        }
+      }
+    },
     "Toast and notice · medium": {
       "comment": "Symbol sample sheet: a context and the symbol weight used there",
       "localizations": {
@@ -4253,6 +6772,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bildirim ve uyarı · orta"
+          }
+        }
+      }
+    },
+    "Today": {
+      "comment": "Caps section: today's tokens",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün"
           }
         }
       }
@@ -4275,6 +6805,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Token"
+          }
+        }
+      }
+    },
+    "Tokens read and written by every model call, as the Mac counts them.": {
+      "comment": "Usage: what is counted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her model çağrısının okuduğu ve yazdığı tokenlar, Mac'in saydığı gibi."
           }
         }
       }
@@ -4324,12 +6865,23 @@
       }
     },
     "Try again": {
-      "comment": "Under a refused message: sends it again",
+      "comment": "Settings: repeats a read or write that failed\nUnder a refused message: sends it again",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Yeniden dene"
+          }
+        }
+      }
+    },
+    "Turkish": {
+      "comment": "A language's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Türkçe"
           }
         }
       }
@@ -4341,6 +6893,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yazı rolleri"
+          }
+        }
+      }
+    },
+    "Type the Mac's address instead.": {
+      "comment": "QR scan: the typed route",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunun yerine Mac'in adresini yaz."
           }
         }
       }
@@ -4389,6 +6952,17 @@
         }
       }
     },
+    "Until then your agents and teams open from your Mac's own page.": {
+      "comment": "Agents tab: empty state detail with the web page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O zamana kadar ajanların ve ekiplerin Mac'inin kendi sayfasından açılır."
+          }
+        }
+      }
+    },
     "Update Dot on your Mac": {
       "comment": "Chat subtitle: the Mac runs a Dot too old for this app",
       "localizations": {
@@ -4396,6 +6970,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'indeki Dot'u güncelle"
+          }
+        }
+      }
+    },
+    "Update Dot on your Mac.": {
+      "comment": "Diagnosis: the Mac's Dot is too old",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot'u güncelle."
           }
         }
       }
@@ -4411,6 +6996,94 @@
         }
       }
     },
+    "Update Dot on your Mac: this page needs a newer Dot.": {
+      "comment": "Settings: the Mac's Dot lacks this page's route",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot'u güncelle: bu sayfa daha yeni bir Dot gerektiriyor."
+          }
+        }
+      }
+    },
+    "Updating or restarting Dot is done on the Mac: Settings › System.": {
+      "comment": "System: update and restart are the Mac's",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'u güncellemek ya da yeniden başlatmak Mac'te yapılır: Ayarlar › Sistem."
+          }
+        }
+      }
+    },
+    "Usage": {
+      "comment": "Settings row: the tokens of the last days",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanım"
+          }
+        }
+      }
+    },
+    "Usage limits and caps": {
+      "comment": "Settings row: the plan's windows and the caps of what tasks spend",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanım sınırları ve tavanlar"
+          }
+        }
+      }
+    },
+    "Use": {
+      "comment": "Memory proposal: take the run's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullan"
+          }
+        }
+      }
+    },
+    "Use the iPhone's text size": {
+      "comment": "Appearance: follow Dynamic Type",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone'un metin boyutunu kullan"
+          }
+        }
+      }
+    },
+    "Used in this order when a model does not answer.": {
+      "comment": "Models: footer under the standby list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir model yanıt vermediğinde bu sırayla kullanılır."
+          }
+        }
+      }
+    },
+    "Vault": {
+      "comment": "Settings row: logins, cards and contacts Dot can use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kasa"
+          }
+        }
+      }
+    },
     "Version": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -4418,6 +7091,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sürüm"
+          }
+        }
+      }
+    },
+    "Vision model": {
+      "comment": "Models: the role that reads pictures",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görme modeli"
+          }
+        }
+      }
+    },
+    "Voice": {
+      "comment": "General section: dictation",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ses"
           }
         }
       }
@@ -4510,6 +7205,50 @@
         }
       }
     },
+    "Web": {
+      "comment": "Settings: the mark of a row that opens the web page in the app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web"
+          }
+        }
+      }
+    },
+    "Web search": {
+      "comment": "Settings row: how Dot searches the web",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web araması"
+          }
+        }
+      }
+    },
+    "Weekdays at %@": {
+      "comment": "Schedule rhythm; the argument is one or more clock times",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hafta içi saat %@"
+          }
+        }
+      }
+    },
+    "Weekends at %@": {
+      "comment": "Schedule rhythm; the argument is one or more clock times",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hafta sonu saat %@"
+          }
+        }
+      }
+    },
     "Weekly client mail": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -4517,6 +7256,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Haftalık müşteri e-postası"
+          }
+        }
+      }
+    },
+    "Weekly window": {
+      "comment": "Usage: the plan's 7-day window",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haftalık pencere"
+          }
+        }
+      }
+    },
+    "What Dot does": {
+      "comment": "Schedule edit: the goal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un yapacağı"
           }
         }
       }
@@ -4554,6 +7315,17 @@
         }
       }
     },
+    "When Dot works": {
+      "comment": "System: keep-awake is on, nothing works now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot çalışırken"
+          }
+        }
+      }
+    },
     "Which invoices are overdue": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -4572,6 +7344,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayrıştırıcı testi neden yalnızca CI'da başarısız oluyor?"
+          }
+        }
+      }
+    },
+    "Wide": {
+      "comment": "Appearance › Reading width: 75 characters a line",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geniş"
           }
         }
       }
@@ -4632,7 +7415,7 @@
       }
     },
     "Working": {
-      "comment": "Chat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work",
+      "comment": "Chat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4664,6 +7447,28 @@
         }
       }
     },
+    "YOLO": {
+      "comment": "Approval mode: nothing asks but payments, mail and posts",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YOLO"
+          }
+        }
+      }
+    },
+    "Yes": {
+      "comment": "A yes value",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Evet"
+          }
+        }
+      }
+    },
     "Yesterday": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -4686,13 +7491,13 @@
         }
       }
     },
-    "Your Mac": {
-      "comment": "Pairing screen section: the Mac's address",
+    "Your Mac could not be reached.": {
+      "comment": "Settings: a read or write got no answer from the Mac",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mac'in"
+            "value": "Mac'ine ulaşılamadı."
           }
         }
       }
@@ -4708,13 +7513,57 @@
         }
       }
     },
-    "Your agents and teams, their chats and schedules will show here.": {
-      "comment": "Agents tab: empty state detail",
+    "Your Mac does not take this from a phone (%@). Open on the Mac: %@.": {
+      "comment": "Settings: the daemon refused a phone's key; first argument its words, second where on the Mac",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajanların ve ekiplerin, sohbetleri ve zamanlamaları burada görünecek."
+            "value": "Mac'in bunu telefondan kabul etmiyor (%@). Mac'te aç: %@."
+          }
+        }
+      }
+    },
+    "Your Mac pairs no more phones. Remove one on the Mac in Settings › Phone, then try again.": {
+      "comment": "Pairing error: the Mac holds keys for as many phones as it takes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in daha fazla telefon eşleştirmiyor. Mac'te Ayarlar › Telefon'dan birini kaldır, sonra yeniden dene."
+          }
+        }
+      }
+    },
+    "Your Mac proved it holds this phone's key before the key was sent.": {
+      "comment": "This Mac: the proof matched",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in, anahtar gönderilmeden önce bu telefonun anahtarını tuttuğunu kanıtladı."
+          }
+        }
+      }
+    },
+    "Your Mac refused this phone's key. Pair again.": {
+      "comment": "Settings: 401, the phone's key is no longer taken",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in bu telefonun anahtarını reddetti. Yeniden eşleştir."
+          }
+        }
+      }
+    },
+    "Your Mac's address": {
+      "comment": "Pairing screen section: the Mac's address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inin adresi"
           }
         }
       }
@@ -4763,6 +7612,39 @@
         }
       }
     },
+    "Your name": {
+      "comment": "General: the owner's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senin adın"
+          }
+        }
+      }
+    },
+    "Your tasks": {
+      "comment": "Usage source: the owner's own",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senin görevlerin"
+          }
+        }
+      }
+    },
+    "Your tasks a day": {
+      "comment": "Caps: the owner's own chats and tasks a day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günde senin görevlerin"
+          }
+        }
+      }
+    },
     "Zen": {
       "comment": "Tool calls setting: only final answers show",
       "localizations": {
@@ -4770,6 +7652,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zen"
+          }
+        }
+      }
+    },
+    "budget cost spend tokens limit": {
+      "comment": "Settings search synonyms of the caps (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bütçe maliyet harcama token sınır tavan"
           }
         }
       }
@@ -4814,6 +7707,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "kart"
+          }
+        }
+      }
+    },
+    "connection tailscale address key pair diagnose network": {
+      "comment": "Settings search synonyms of This Mac (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bağlantı tailscale adres anahtar eşleştir tanıla ağ"
           }
         }
       }
@@ -4895,6 +7799,28 @@
         }
       }
     },
+    "haptics vibration reactions": {
+      "comment": "Settings search synonyms of Chat (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dokunsal titreşim tepkiler"
+          }
+        }
+      }
+    },
+    "health emergency stop version": {
+      "comment": "Settings search synonyms of System (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sağlık acil durdur sürüm"
+          }
+        }
+      }
+    },
     "in progress": {
       "comment": "VoiceOver: a plan step's state",
       "localizations": {
@@ -4917,6 +7843,28 @@
         }
       }
     },
+    "model main review vision code review": {
+      "comment": "Settings search synonyms of Models (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "model ana inceleme görme kod incelemesi"
+          }
+        }
+      }
+    },
+    "name language timestamps clock queue steer confirmations voice dictation": {
+      "comment": "Settings search synonyms of General (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ad dil saat biçimi kuyruk yönlendir onay ses dikte"
+          }
+        }
+      }
+    },
     "nested": {
       "comment": "Component gallery (debug builds): the name of a surface colour token",
       "localizations": {
@@ -4924,6 +7872,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "iç içe"
+          }
+        }
+      }
+    },
+    "notes remember lessons proposals": {
+      "comment": "Settings search synonyms of Memory (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "notlar hatırla dersler öneriler"
+          }
+        }
+      }
+    },
+    "permissions approvals policy ask safety": {
+      "comment": "Settings search synonyms of Rules (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "izinler onaylar politika sor güvenlik"
+          }
+        }
+      }
+    },
+    "push alerts banner": {
+      "comment": "Settings search synonyms of Notifications (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "anlık bildirim uyarı afiş"
           }
         }
       }
@@ -4968,6 +7949,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "1 dosya okudu"
+          }
+        }
+      }
+    },
+    "schedules repeat morning brief": {
+      "comment": "Settings search synonyms of Scheduled tasks (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "zamanlamalar tekrar sabah özeti"
           }
         }
       }
@@ -5038,6 +8030,17 @@
         }
       }
     },
+    "theme dark light mode text size font tool calls zen streaming": {
+      "comment": "Settings search synonyms of Appearance (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tema karanlık açık mod metin boyutu yazı tipi araç çağrıları zen akış"
+          }
+        }
+      }
+    },
     "to do": {
       "comment": "VoiceOver: a plan step's state",
       "localizations": {
@@ -5045,6 +8048,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "yapılacak"
+          }
+        }
+      }
+    },
+    "up to %lld lines": {
+      "comment": "Code review: the small change's lines",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en çok %lld satır"
+          }
+        }
+      }
+    },
+    "usage tokens days": {
+      "comment": "Settings search synonyms of Usage (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "kullanım token günler"
           }
         }
       }
@@ -5111,6 +8136,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "· bir yardımcı soruyor"
+          }
+        }
+      }
+    },
+    "👎 on a working task reaches it, ✋ holds it until you write, 📌 keeps a note. Which reaction does what is set on the Mac.": {
+      "comment": "Chat settings: footer about reactions' meaning",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan bir göreve 👎 ona ulaşır, ✋ sen yazana kadar bekletir, 📌 bir not tutar. Hangi tepkinin ne yaptığı Mac'te ayarlanır."
           }
         }
       }

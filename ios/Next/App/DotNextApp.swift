@@ -26,6 +26,7 @@ struct DotNextApp: App {
         WindowGroup {
             RootView(launch: LaunchOptions.read(UserDefaults.standard))
                 .environment(model)
+                .onOpenURL { url in model.open(url: url) }
                 .onAppear {
                     // A fixture scene draws its own snapshot: no engine starts beneath it to replace it (debug only).
                     if !LaunchOptions.read(UserDefaults.standard).drawsFixture { model.load() }
@@ -53,6 +54,8 @@ enum LaunchScene: Equatable, Sendable {
         case sampleChat(ChatPanel?)
         /// The real chat screen drawn from a fixture (wave N2).
         case chatFixture(ChatFixture)
+        /// Settings on a fixture daemon (wave N3).
+        case settingsFixture(SettingsFixture)
     #endif
     case tab(AppTab)
     /// The live chat list with its first chat open.
@@ -62,7 +65,7 @@ enum LaunchScene: Equatable, Sendable {
     static var names: [String] {
         #if DEBUG
             GalleryPage.allCases.map(\.rawValue) + AppTab.allCases.map(\.rawValue) + ["chat", "chat-agents", "chat-background", "live-chat"]
-                + ChatFixture.allCases.map(\.rawValue)
+                + ChatFixture.allCases.map(\.rawValue) + SettingsFixture.allCases.map(\.rawValue)
         #else
             AppTab.allCases.map(\.rawValue) + ["live-chat"]
         #endif
@@ -73,6 +76,7 @@ enum LaunchScene: Equatable, Sendable {
         #if DEBUG
             if let page = GalleryPage(rawValue: name) { return .gallery(page) }
             if let fixture = ChatFixture(rawValue: name) { return .chatFixture(fixture) }
+            if let fixture = SettingsFixture(rawValue: name) { return .settingsFixture(fixture) }
             switch name {
             case "chat": return .sampleChat(nil)
             case "chat-agents": return .sampleChat(.agents)
@@ -94,6 +98,7 @@ struct LaunchOptions: Equatable, Sendable {
     var drawsFixture: Bool {
         #if DEBUG
             if case .chatFixture = scene { return true }
+            if case .settingsFixture = scene { return true }
         #endif
         return false
     }
@@ -123,13 +128,26 @@ struct RootView: View {
                         ChatScreen(thread: ChatFixture.thread, initialPanel: fixture.panel, editsFirstQueued: fixture == .editing)
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
+                case .settingsFixture(let fixture):
+                    paired(AppShell(initialTab: .settings, opensFirstChat: false, settings: fixture.start))
+                        .onAppear { model.showSettingsFixture(fixture) }
             #endif
-            case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false))
-            case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true))
-            case nil: paired(AppShell(initialTab: .chats, opensFirstChat: false))
+            case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
+            case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
+            case nil: paired(AppShell(initialTab: .chats, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
             }
         }
         .tint(Tone.text)
+        .appearancePreferences()
+        .alert(
+            String(localized: "Pair this phone with another Mac?", comment: "Alert: a pair link opened while the phone is paired"),
+            isPresented: Binding(get: { model.phase == .ready && model.pairingStartWaiting != nil }, set: { if !$0 { model.pairingStartWaiting = nil } })
+        ) {
+            Button(String(localized: "Pair again", comment: "Settings: forgets the refused key and opens pairing")) { Task { await model.forget() } }
+            Button(String(localized: "Cancel", comment: "Edit sheet toolbar: discards the edits"), role: .cancel) { model.pairingStartWaiting = nil }
+        } message: {
+            Text(String(localized: "This phone forgets its key for the Mac it is paired with; then one tap pairs it with the Mac of the link.", comment: "Alert: what pairing again does"))
+        }
         .task {
             #if DEBUG
                 if let name = launch.sceneName { await SceneReady.signal(name) }
@@ -183,11 +201,13 @@ extension RootView {
 struct AppShell: View {
     @State private var tab: AppTab
     let opensFirstChat: Bool
+    let settings: SettingsStart
     @Environment(AppModel.self) private var model: AppModel
 
-    init(initialTab: AppTab, opensFirstChat: Bool) {
+    init(initialTab: AppTab, opensFirstChat: Bool, settings: SettingsStart) {
         _tab = State(initialValue: initialTab)
         self.opensFirstChat = opensFirstChat
+        self.settings = settings
     }
 
     var body: some View {
@@ -198,7 +218,7 @@ struct AppShell: View {
             .badge(model.snapshot.list.needsYou)
             Tab(String(localized: "Agents", comment: "Tab bar: the agents and teams tab"), systemImage: "person.2", value: AppTab.agents) { AgentsTab() }
             Tab(String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"), systemImage: "clock.arrow.circlepath", value: AppTab.activity) { ActivityTab() }
-            Tab(String(localized: "Settings", comment: "Tab bar: the settings tab"), systemImage: "gearshape", value: AppTab.settings) { SettingsTab() }
+            Tab(String(localized: "Settings", comment: "Tab bar: the settings tab"), systemImage: "gearshape", value: AppTab.settings) { SettingsTab(start: settings) }
         }
         .tabBarMinimizeBehavior(.never)
     }
