@@ -2,15 +2,24 @@
 (item 283, :mod:`dotagent.opencode.run`) and Claude Code on the owner's plan (item 1013,
 :mod:`dotagent.claude_code.run`). Each keeps the program's session of a chat from run to run (:class:`ChatSession`),
 gives the agent Dot's own tools at the chat's door of the bridge, a call of one run as a call of Dot's own loop
-(:func:`bridged_call`, in the context :func:`tool_context` makes), and lets go of the questions a run that ends still
-waits for (:func:`let_go`)."""
+(:func:`bridged_call`, in the context :func:`tool_context` makes), the same tools to both as Dot's own loop gives them
+(:func:`door_tool`, :func:`withheld_out`), and lets go of the questions a run that ends still waits for
+(:func:`let_go`)."""
 
 import asyncio
 from pathlib import Path
 
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
-from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, browser_of
+from dotagent.agent.loop import (
+    AGENT_CORE_TOOLS,
+    NOT_FOR_DELEGATED_RUNS,
+    AgentRun,
+    browser_of,
+    run_helpers,
+    run_skills,
+    withheld_tools,
+)
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.verify import RunFacts, new_facts
@@ -19,15 +28,54 @@ from dotagent.core.types import FrozenModel
 from dotagent.llm.router import ModelRef
 from dotagent.llm.types import ModelInfo, ToolCall
 from dotagent.runtime import Runtime
-from dotagent.store.models import AgentRecord
+from dotagent.skills.types import SkillCatalog
+from dotagent.store.models import AgentRecord, RunRecord
 from dotagent.tools.base import ToolResult
+from dotagent.tools.campaign import CAMPAIGN_TOOLS
+from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import OwnerWords, ToolContext
+from dotagent.tools.delegate import DELEGATE_TOOL
+from dotagent.tools.meta import MARK_PLAN_STEP_TOOL, REACT_TOOL, UPDATE_PLAN_TOOL, USE_TOOLS_TOOL
+from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry
 
 log = get_logger(__name__)
 
 # How long a run that ends lets the questions it still decides finish (:func:`let_go`).
 ASK_GRACE_S: float = 10.0
+# The tools of Dot's own loop, which a program's agent does not get: it runs its own loop, so it plans and finds its
+# tools in its own way (use_tools is Claude Code's search of the door, item 1053), and a reaction is on a message of the
+# owner's in Dot's own chat. Every other tool of Dot's is the agent's, as a run of Dot's own loop has it (item 1063: a
+# run on the plan had no tool to message an agent, give it work or delegate, nor the mail, the drafts, the vault or
+# Dot's own list).
+LOOP_OWN: frozenset[str] = frozenset({UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, REACT_TOOL})
+
+
+def door_tool(name: str, delegated: bool) -> bool:
+    """Whether Dot's tool ``name`` is one a program's agent gets, as Dot's own loop gives it (item 1063): any but the
+    loop's own (:data:`LOOP_OWN`) and a campaign's, and for a run another run handed its work to (``delegated``) none
+    of those it may not use (:data:`dotagent.agent.loop.NOT_FOR_DELEGATED_RUNS`: it asks the owner nothing and hands
+    nothing on). A campaign's tools stay Dot's own loop's: whether a session reached the goal is judged by the facts
+    and the plan of its steps (``tools/campaign.py``), which that loop keeps and a program's run does not."""
+    return (
+        name not in LOOP_OWN
+        and name not in CAMPAIGN_TOOLS | POST_TOOLS
+        and not (delegated and name in NOT_FOR_DELEGATED_RUNS)
+    )
+
+
+async def withheld_out(runtime: Runtime, run: RunRecord, tools: ToolRegistry, label: str) -> ToolRegistry:
+    """``tools`` without those Dot's own loop withholds from ``run`` as it starts, by the same rules and what they read
+    (items 1063 and 1068: :func:`withheld_tools`, :func:`run_skills`, :func:`run_helpers`); ``label`` is the run's
+    model's, whose helpers are the run's."""
+    team: list[AgentRecord] = [member for member in await runtime.store.list_agents() if member.id != run.agent_id]
+    offered: frozenset[str] = frozenset(tools.tools)
+    skills: SkillCatalog = await run_skills(runtime, run)
+    helpers: tuple[str, ...] = await run_helpers(runtime, label) if offered & {CONSULT_TOOL, DELEGATE_TOOL} else ()
+    withheld: frozenset[str] = await withheld_tools(
+        runtime, run, team, offered, bool(await runtime.accounts.accounts()), bool(skills.skills), helpers
+    )
+    return ToolRegistry(tools={name: tool for name, tool in tools.tools.items() if name not in withheld})
 
 
 class ChatSession(FrozenModel):

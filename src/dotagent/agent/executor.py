@@ -29,6 +29,7 @@ from dotagent.core.errors import (
     PolicyDenied,
     RunCancelled,
     ToolInputError,
+    ToolSteer,
     WebError,
     WebTransportError,
 )
@@ -156,6 +157,11 @@ def batch_steps(arguments: JsonObject) -> int:
     """How many steps a batched call (``browser_act``, ``desktop_act``) carried; 0 for a call without a step list."""
     steps: object = arguments.get("steps")
     return len(steps) if isinstance(steps, list) else 0
+
+
+def failed_call(result: ToolResult) -> bool:
+    """Whether ``result`` is a failed call: an error that is not Dot's rule turning the call another way (item 1722)."""
+    return result.is_error and not result.steered
 
 
 def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
@@ -445,6 +451,8 @@ async def _run_checked(
             gate.taint()
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
+        if isinstance(exc, ToolSteer):
+            failed = failed.model_copy(update={"steered": True})
         failed = await _record_yolo(ctx, tool.spec.name, action, failed)
         return _Checked(
             result=failed,
@@ -559,7 +567,7 @@ async def _execute_one(
         # A run that is tainted now, in a context that shows them, is handed the lessons saved while reading outside
         # content too (item 1192): fenced, next to the result in its own requests, stored nowhere.
         outside_lessons: bool = gate.tainted and ctx.shows_outside_lessons
-        if result.is_error and lessons_on:
+        if failed_call(result) and lessons_on:
             # What earlier runs learned about the tool, at the moment it is of use (item 1111); added after the error
             # is cut to the run's room, so that no lesson is cut in the middle.
             learned = await hand_failure_lessons(
@@ -606,7 +614,10 @@ async def _execute_one(
         {
             "call_id": call.id,
             "tool": call.name,
+            # Whether the call did its job; ``steered`` marks one Dot's rule turned another way (item 1722), which
+            # did not, and which the counts of failed calls leave out (``store/failed.py``).
             "ok": not clipped.is_error,
+            "steered": clipped.steered,
             "text": truncate_middle(redact_known(clipped.text, known), _EVENT_TEXT_CHARS),
             "images": list(files),
             "seconds": round(seconds, 2),

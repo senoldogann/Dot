@@ -545,7 +545,13 @@ median call, and the finished runs that acted there with the share of them that 
 follows: per day, the finished runs that acted on a site and the share done, which shows whether the browser and the
 desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them, and
 `--by tool` prints only the tool health table: every tool by failure rate, calls, failed calls, fail % and median call,
-so one tool at 40 % is not hidden by the 5 % of all calls. Acts and steps recorded before
+so one tool at 40 % is not hidden by the 5 % of all calls. A call Dot's own rule turned another way is not counted as
+failed (item 1722): a background `terminal_open` in a delegated run or a campaign's session, and a `delegate` or
+`create_agent` with a team but no `agents_considered`. The model reads it as an error, since nothing was done, and its
+`tool_result` event is `"ok": false` (the call did not do its job, as the timeline and the record of acts show it) with
+`"steered": true`, which this table, the run ledger, the self-improvement loop's tool outcomes, the nightly reflection,
+the repair night's problems and an eval run's scorecard leave out of the failed calls (`store/failed.py`); an audit of the store does the same
+by counting `"ok": false` and not `"steered": true`. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of

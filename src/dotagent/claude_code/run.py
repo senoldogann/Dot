@@ -64,9 +64,11 @@ from dotagent.agent.handover import (
     ChatSession,
     agent_tools,
     bridged_call,
+    door_tool,
     let_go,
     read_chat,
     tool_context,
+    withheld_out,
     write_chat,
 )
 from dotagent.agent.limits import (
@@ -80,7 +82,6 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.loop import (
-    NOT_FOR_DELEGATED_RUNS,
     AgentRun,
     HandedNotes,
     RunEnd,
@@ -89,12 +90,10 @@ from dotagent.agent.loop import (
     goal_query,
     notes_to_hand,
     opening_text,
-    run_helpers,
     run_skills,
     start_notes,
     team_brief,
     team_name,
-    withheld_tools,
 )
 from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picks_event_data
 from dotagent.agent.prompt import CHARACTER, THOROUGH_AND_BOLD, AgentBrief, TeamBrief, team_sections, turn_note
@@ -182,38 +181,23 @@ from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
-from dotagent.skills.types import Skill, SkillCatalog
+from dotagent.skills.types import Skill
 from dotagent.store.endings import PREFIX_CUT_SHORT
 from dotagent.store.models import NO_PICKS, AgentRecord, EventRecord, RunMode, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
-from dotagent.tools.campaign import CAMPAIGN_TOOLS
-from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import ToolContext
-from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.groups import group_of
 from dotagent.tools.meta import (
     FINISH_TOOL,
-    MARK_PLAN_STEP_TOOL,
     NOTIFY_TOOL,
-    REACT_TOOL,
-    UPDATE_PLAN_TOOL,
-    USE_TOOLS_TOOL,
     FinishArgs,
 )
-from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.tools.shell import kill_group
 from dotagent.tools.terminal import chatless_specs, tells_no_chat
 
 log = get_logger(__name__)
 
-# The tools of Dot's own loop, which the program does not get: it runs its own loop, so it plans, ends and finds its
-# tools in its own way (use_tools is its search of the door, item 1053; finish is the door's since item 1076, where its
-# mode has it), and a reaction is on a
-# message of the owner's in Dot's own chat. Every other tool of Dot's is the model's, as a run of Dot's own loop has it
-# (item 1063: a run on the plan had no tool to message an agent, give it work or delegate, nor the mail, the drafts,
-# the vault or Dot's own list).
-_LOOP_OWN: frozenset[str] = frozenset({UPDATE_PLAN_TOOL, MARK_PLAN_STEP_TOOL, USE_TOOLS_TOOL, REACT_TOOL})
 # A line of the stream may be long (a step that read a big page): the reader takes lines up to this size.
 _LINE_LIMIT: int = 32 * 1024 * 1024
 _STDERR_KEPT: int = 4000
@@ -281,21 +265,9 @@ def forget_chat(thread_id: str) -> None:
     chat_path(thread_id).unlink(missing_ok=True)
 
 
-def door_tool(name: str, delegated: bool) -> bool:
-    """Whether Dot's tool ``name`` is one the model gets, as Dot's own loop gives it (item 1063): any but the loop's own
-    (:data:`_LOOP_OWN`) and a campaign's, and for a run another run handed its work to (``delegated``) none of those it
-    may not use (:data:`dotagent.agent.loop.NOT_FOR_DELEGATED_RUNS`: it asks the owner nothing and hands nothing on).
-    A campaign's tools stay Dot's own loop's: whether a session reached the goal is judged by the facts and the plan of
-    its steps (``tools/campaign.py``), which that loop keeps and this program's run does not."""
-    return (
-        name not in _LOOP_OWN
-        and name not in CAMPAIGN_TOOLS | POST_TOOLS
-        and not (delegated and name in NOT_FOR_DELEGATED_RUNS)
-    )
-
-
 def door_tools(registry: ToolRegistry, run: RunRecord, bounded: frozenset[str] | None) -> ToolRegistry:
-    """The tools of Dot's ``run`` gives the model: the :func:`door_tool` ones of its mode, of those only the ones
+    """The tools of Dot's ``run`` gives the model: the :func:`door_tool` ones of its mode (finish among them since item
+    1076, where its mode has it), of those only the ones
     ``bounded`` names when the run is an agent's whose tools are bounded (item 86)."""
     delegated: bool = run.parent_run_id is not None
     return ToolRegistry(
@@ -1173,19 +1145,6 @@ async def _prompt_of(agent: AgentRun, door: Door) -> str:
     )
 
 
-async def _withheld_out(runtime: Runtime, run: RunRecord, tools: ToolRegistry, ref: ModelRef) -> ToolRegistry:
-    """``tools`` without those Dot's own loop withholds from ``run`` as it starts, by the same rules and what they read
-    (items 1063 and 1068: :func:`withheld_tools`, :func:`run_skills`, :func:`run_helpers`)."""
-    team: list[AgentRecord] = [member for member in await runtime.store.list_agents() if member.id != run.agent_id]
-    offered: frozenset[str] = frozenset(tools.tools)
-    skills: SkillCatalog = await run_skills(runtime, run)
-    helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if offered & {CONSULT_TOOL, DELEGATE_TOOL} else ()
-    withheld: frozenset[str] = await withheld_tools(
-        runtime, run, team, offered, bool(await runtime.accounts.accounts()), bool(skills.skills), helpers
-    )
-    return ToolRegistry(tools={name: tool for name, tool in tools.tools.items() if name not in withheld})
-
-
 def _brief(agent: AgentRecord) -> AgentBrief:
     """An agent as Dot's own prompt names it among the team: its name, role and ready team."""
     return AgentBrief(
@@ -1668,7 +1627,7 @@ async def run_in_claude_code(agent: AgentRun) -> RunEnd:
     if agent.opening.picks != NO_PICKS:
         await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(agent.opening.picks), True)
     bounds: frozenset[str] | None = await _bounds_of(agent)
-    tools: ToolRegistry = await _withheld_out(runtime, run, door_tools(runtime.registry, run, bounds), ref)
+    tools: ToolRegistry = await withheld_out(runtime, run, door_tools(runtime.registry, run, bounds), ref.label)
     needed: tuple[str, ...] = tools_needed(
         (tool.spec.name for tool in tools_for_mode(runtime.registry, run.mode)), run.goal, run.source
     )

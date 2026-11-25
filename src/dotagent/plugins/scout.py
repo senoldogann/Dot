@@ -86,7 +86,7 @@ from dotagent.plugins.scout_types import (
     looked_key,
 )
 from dotagent.plugins.types import SKILLS_DIR
-from dotagent.skills.parse import parse_skill
+from dotagent.skills.parse import parse_others_skill
 
 log = get_logger(__name__)
 
@@ -195,7 +195,7 @@ def loadable_skills(archive: Path, folders: Sequence[str]) -> tuple[tuple[str, .
                 if handle is None:
                     continue
                 try:
-                    parse_skill(Path(folder, "SKILL.md"), handle.read().decode("utf-8"), "plugin")
+                    parse_others_skill(Path(folder, "SKILL.md"), handle.read().decode("utf-8"), "plugin")
                 except UnicodeDecodeError:
                     problems[folder] = "SKILL.md cannot be read as UTF-8 text"
                 except SkillError as error:

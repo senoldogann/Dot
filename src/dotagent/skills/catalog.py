@@ -11,7 +11,7 @@ from dotagent.core.paths import playbooks_dir, skills_dir
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.plugins.types import Plugin
 from dotagent.skills.discover import find_skill_files
-from dotagent.skills.parse import parse_skill
+from dotagent.skills.parse import parse_others_skill, parse_skill
 from dotagent.skills.types import SKILL_NAME_PATTERN, Skill, SkillCatalog, SkillProblem
 
 
@@ -88,22 +88,27 @@ def plugin_skill_name(plugin: str, skill: str) -> str | None:
     return derived
 
 
-def read_skill(file: Path, source: str) -> Skill:
-    """The skill ``file`` holds; one that cannot be read as UTF-8 text, or is no skill the loader reads, raises
-    :class:`SkillError`."""
+def _text(file: Path) -> str:
     try:
-        text: str = file.read_text(encoding="utf-8")
+        return file.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise SkillError("SKILL.md cannot be read as UTF-8 text", {"path": str(file), "error": str(exc)}) from exc
-    return parse_skill(file, text, source)
+
+
+def read_skill(file: Path, source: str) -> Skill:
+    """The skill ``file`` holds, one the owner or a plugin brought, read as Claude Code reads it (item 1723: one without
+    a frontmatter loads, :func:`parse_others_skill`); one that cannot be read as UTF-8 text, or is no skill the loader
+    reads, raises :class:`SkillError`."""
+    return parse_others_skill(file, _text(file), source)
 
 
 def read_playbook(file: Path) -> Skill:
-    """The skill ``file`` holds, one of Dot's own playbooks (learned or taught): as :func:`read_skill`, and named as its
-    folder is. A skill of another folder may go by a name its folder does not carry (item 948), but a playbook is kept,
-    dated, listed and dropped by its folder's name (items 557 and 585): one named otherwise would be found under another
-    playbook's record, so it raises :class:`SkillError`, for the catalog and the playbooks' list alike."""
-    skill: Skill = read_skill(file, PLAYBOOK_SOURCE)
+    """The skill ``file`` holds, one of Dot's own playbooks (learned or taught), with its frontmatter
+    (:func:`parse_skill`), and named as its folder is. A skill of another folder may go by a name its folder does not
+    carry (item 948), but a playbook is kept, dated, listed and dropped by its folder's name (items 557 and 585): one
+    named otherwise would be found under another playbook's record, so it raises :class:`SkillError`, for the catalog
+    and the playbooks' list alike."""
+    skill: Skill = parse_skill(file, _text(file), PLAYBOOK_SOURCE)
     if skill.name != file.parent.name:
         raise SkillError(
             "the name in SKILL.md is not the name of its folder, which a skill Dot learned or was taught must carry",

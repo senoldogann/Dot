@@ -20,6 +20,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.endings import ENDING_LABELS, Ending, classify_ending
+from dotagent.store.failed import failed_result_sql
 from dotagent.store.models import WORKING_STATUSES, RunStatus
 from dotagent.tools.channels import CHANNELS, Channel, channel_of, is_gui
 
@@ -96,11 +97,13 @@ SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds'
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = 'assistant'
 """
+# A failed call (item 1722): ``"ok": false`` and not a call Dot's own rule turned another way.
+_FAILED: str = failed_result_sql("e.data")
 # One row per tool call of the runs that came back: the model of its run, the tool, whether it worked (``"ok": false``
 # is a failed call), its seconds, the part of them it spent at the gate (NULL for a call recorded before that was
 # measured) and the start of its text, where the cause of a failure is.
 _TOOLS_SQL: str = f"""
-SELECT r.model, json_extract(e.data, '$.tool'), json_extract(e.data, '$.ok'), json_extract(e.data, '$.seconds'),
+SELECT r.model, json_extract(e.data, '$.tool'), NOT {_FAILED}, json_extract(e.data, '$.seconds'),
        json_extract(e.data, '$.waited_s'), substr(json_extract(e.data, '$.text'), 1, {_FAILURE_CHARS})
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {{scope}} AND e.kind = 'tool_result'
@@ -142,35 +145,35 @@ WHERE {scope} AND e.kind = 'tool_call' AND json_extract(e.data, '$.tool') = 'ski
        OR json_extract(e.data, '$.args.name') LIKE 'playbook-%')
 """
 # One row per model: the events of its runs, counted, with the counts the ledger kept of the runs of deleted chats
-# (item 1323). A tool result with ``"ok": false`` is a failed call.
-_EVENTS_SQL: str = """
+# (item 1323). A tool result with ``"ok": false`` that is not ``steered`` is a failed call (item 1722).
+_EVENTS_SQL: str = f"""
 SELECT model, SUM(calls), SUM(errors), SUM(invalid), SUM(stalls), SUM(compactions) FROM (
     SELECT r.model AS model,
            COALESCE(SUM(e.kind = 'tool_call'), 0) AS calls,
-           COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0) AS errors,
+           COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}), 0) AS errors,
            COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0) AS invalid,
            COALESCE(SUM(e.kind = 'stall'), 0) AS stalls,
            COALESCE(SUM(e.kind = 'compacted'), 0) AS compactions
     FROM runs r JOIN events e ON e.run_id = r.id
-    WHERE {scope}
+    WHERE {{scope}}
     GROUP BY r.model
     UNION ALL
     SELECT r.model, r.tool_calls, r.tool_errors, r.invalid_arguments, r.stalls, r.compactions FROM run_ledger r
-    WHERE {scope}
+    WHERE {{scope}}
 )
 GROUP BY model
 """
 # One row: the newest finished runs of one model and the counts of their events. A failed tool result without a risk was
 # refused before anything ran (an unknown tool, a tool of another mode, arguments that were not JSON or did not fit).
-_PROFILE_SQL: str = """
+_PROFILE_SQL: str = f"""
 WITH recent AS (
     SELECT id, steps FROM runs WHERE model = ? AND finished_at IS NOT NULL ORDER BY created_at DESC LIMIT ?
 )
 SELECT (SELECT COUNT(*) FROM recent),
        (SELECT COALESCE(SUM(steps), 0) FROM recent),
        COALESCE(SUM(e.kind = 'tool_call'), 0),
-       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0),
-       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0
+       COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}), 0),
+       COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}
                     AND json_extract(e.data, '$.risk') = ''), 0),
        COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0),
        COALESCE(SUM(e.kind = 'assistant' AND trim(json_extract(e.data, '$.text')) = ''

@@ -1,5 +1,7 @@
-"""Reading one SKILL.md: the YAML frontmatter between two ``---`` lines and the Markdown instructions after it."""
+"""Reading one SKILL.md: the YAML frontmatter between two ``---`` lines and the Markdown instructions after it. A skill
+another agent's maker wrote may have none (:func:`parse_others_skill`, item 1723)."""
 
+import re
 from pathlib import Path
 
 import yaml
@@ -7,9 +9,21 @@ from pydantic import ValidationError
 
 from dotagent.core.errors import SkillError
 from dotagent.skills.icons import skill_icon
-from dotagent.skills.types import DESCRIPTION_CHARS, Skill, SkillFrontmatter
+from dotagent.skills.types import DESCRIPTION_CHARS, SKILL_NAME_PATTERN, Skill, SkillFrontmatter
 
 _DELIMITER: str = "---"
+
+
+_HEADING: re.Pattern[str] = re.compile(r"^#{1,6}(\s+|$)")
+_FENCES: tuple[str, ...] = ("```", "~~~")
+# The starts of a line that is a table row, a list item, a quote or a rule, not a sentence that says what a skill is.
+_NOT_WORDS: tuple[str, ...] = ("|", "- ", "* ", "+ ", ">", "<", "---", "***")
+
+
+def _opens_frontmatter(text: str) -> bool:
+    """Whether ``text``'s first line that is not blank is the ``---`` that opens a frontmatter."""
+    first: str = next((line for line in text.lstrip("\ufeff").splitlines() if line.strip() != ""), "")
+    return first.strip() == _DELIMITER
 
 
 def split_frontmatter(path: Path, text: str) -> tuple[str, str]:
@@ -78,4 +92,55 @@ def parse_skill(path: Path, text: str, source: str) -> Skill:
         body=instructions,
         source=source,
         icon=skill_icon(front.icon if isinstance(front.icon, str) else None, (front.name, description)),
+    )
+
+
+def _first_words(body: str, name: str) -> str:
+    """The line of ``body`` that says what the skill is: its first line of words outside a fenced block that is no
+    heading, table row, list item or quote, else its first heading's words, else ``name`` (the skill's folder): a file
+    of code blocks, lists and tables alone has no line of words, and its first line (a fence) says nothing."""
+    lines: list[str] = [line.strip() for line in body.splitlines() if line.strip() != ""]
+    fenced: bool = False
+    heading: str | None = None
+    for line in lines:
+        if line.startswith(_FENCES):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        if _HEADING.match(line) is not None:
+            # A heading of no words (a lone ``#``) names nothing.
+            heading = heading if heading is not None else (_HEADING.sub("", line) or None)
+        elif not line.startswith(_NOT_WORDS):
+            return line
+    return heading if heading is not None else name
+
+
+def parse_others_skill(path: Path, text: str, source: str) -> Skill:
+    """The skill written in ``path`` by someone other than Dot (the owner's folders, a plugin): as :func:`parse_skill`
+    when it opens with a frontmatter, else as Claude Code reads such a file (code.claude.com/docs/en/skills: every key
+    is optional, the name defaults to the folder's, the frontmatter is read only when ``---`` is the first line): the
+    folder's name is its name, the whole file its instructions, and :func:`_first_words` its description (item
+    1723: Twilio's ``twilio-agent-connect`` opens with ``# Twilio Agent Connect``, loads in Claude Code and was left
+    out here, logged at every start). Dot's own skills keep to :func:`parse_skill`."""
+    if _opens_frontmatter(text):
+        return parse_skill(path, text, source)
+    instructions: str = text.lstrip("\ufeff").strip()
+    if instructions == "":
+        raise SkillError("SKILL.md is empty", {"path": str(path)})
+    name: str = path.parent.name
+    if len(name) > 64 or re.fullmatch(SKILL_NAME_PATTERN, name) is None:
+        raise SkillError(
+            "SKILL.md has no frontmatter, and its folder's name is no skill name (lowercase letters, digits and "
+            "hyphens, at most 64): add a frontmatter with a name and a description, or rename the folder",
+            {"path": str(path), "folder": name},
+        )
+    description: str = cut_description(_first_words(instructions, name), DESCRIPTION_CHARS)
+    return Skill(
+        name=name,
+        description=description,
+        root=path.parent,
+        body=instructions,
+        source=source,
+        icon=skill_icon(None, (name, description)),
     )
