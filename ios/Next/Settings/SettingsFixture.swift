@@ -21,6 +21,7 @@
         case scheduleEdit = "settings-schedule-edit"
         case rules = "settings-rules"
         case memory = "settings-memory"
+        case agents = "settings-agents"
         case system = "settings-system"
         case stopped = "settings-stopped"
         case offline = "settings-offline"
@@ -58,6 +59,7 @@
             case .schedules, .scheduleEdit: .schedules
             case .rules: .rules
             case .memory: .memory
+            case .agents: .agents
             case .system: .system
             case .web: .web(WebSettingsPage.Target(tab: "vault", title: String(localized: "Vault", comment: "Settings row: logins, cards and contacts Dot can use")))
             case .pairing, .pairingLink: nil
@@ -148,6 +150,16 @@
                     200,
                     #"{"model":"claude_code:opus","effort":"medium","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
                 )
+            case ("PUT", "/api/code-review"):
+                return (
+                    200,
+                    #"{"model":"claude_code:opus","effort":"high","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
+                )
+            case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
+            case ("GET", "/api/memories"): return (200, memories(now: now))
+            case ("GET", "/api/agents"): return (200, agents(now: now))
+            case ("GET", _) where path.hasPrefix("/api/agents/"):
+                return (200, #"{"record":\#(agent("ag_scout", "Scout", "Finds leads and checks them", now: now)),"runs":[],"messages":[],"learned":{"lessons":[],"scores":{},"skills":[]},"usage":null,"work":null,"home":null}"#)
             case ("GET", "/api/budget"): return (200, budget)
             case ("PUT", "/api/budget") where behaviour != .phoneRefused: return (200, budget)
             case ("PUT", "/api/budget"):
@@ -177,8 +189,36 @@
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#
-                + #"{"provider":"opencode_go","models":[\#(option("opencode_go:deepseek-v4.1-flash", "DeepSeek V4.1 Flash"))],"error":null}"#
+                + #"{"provider":"opencode_go","models":[\#(option("opencode_go:deepseek-v4.1-flash", "DeepSeek V4.1 Flash")),\#(option("opencode_go:kimi-k3", "Kimi K3"))],"error":null},"#
+                + #"{"provider":"ollama","models":[\#(option("ollama:gemma4:cloud", "Gemma 4 Cloud")),\#(option("ollama:qwen3:cloud", "Qwen 3 Cloud"))],"error":null}"#
                 + "]"
+        }
+
+        private func note(_ id: String, _ content: String, _ tags: String, now: Double, used: Int) -> String {
+            #"{"id":"\#(id)","content":"\#(content)","tags":\#(tags),"created_at":\#(now - 900000),"updated_at":\#(now - 90000),"source_run":null,"agent_id":null,"used_count":\#(used),"last_used_at":\#(now - 7200),"expires_at":null,"replaced_by":null,"tainted":false,"merged_into":null,"merged_from":[],"pinned_at":null,"rested_at":null,"edited_by":"owner","proposed":null}"#
+        }
+
+        private func memories(now: Double) -> String {
+            let items: [String] = [
+                note("mem_1", "Şenol prefers short answers in Turkish.", "[\"owner\",\"preference\"]", now: now, used: 40),
+                note("mem_2", "Invoices live in ~/Documents/Invoices.", "[\"work\"]", now: now, used: 12),
+                note("mem_3", "Oulu cafés list their hours on Facebook, not a site.", "[\"lesson\"]", now: now, used: 4),
+                note("mem_4", "The CI gate runs with -n 4 on this Mac.", "[\"lesson\",\"dot\"]", now: now, used: 9),
+            ]
+            return #"{"total":4,"items":[\#(items.joined(separator: ","))],"resting":[],"rested":{},"scores":{},"agents":{}}"#
+        }
+
+
+        private func agent(_ id: String, _ name: String, _ role: String, now: Double) -> String {
+            #"{"id":"\#(id)","name":"\#(name)","role":"\#(role)","instructions":"Work carefully and say what you checked.","model":"","effort":null,"approvals":null,"tools":[],"created_at":\#(now - 864000),"updated_at":\#(now - 86400),"made_by":null,"look":null,"paused_at":null,"refuses":""}"#
+        }
+
+
+        private func agents(now: Double) -> String {
+            let one: (String, String, String) -> String = { id, name, role in
+                #"{"record":\#(self.agent(id, name, role, now: now)),"latest":null,"latest_title":null,"home":null}"#
+            }
+            return "[" + [one("dot", "Dot", ""), one("ag_scout", "Scout", "Finds leads and checks them"), one("ag_writer", "Writer", "Drafts the mails")].joined(separator: ",") + "]"
         }
 
         private var budget: String {

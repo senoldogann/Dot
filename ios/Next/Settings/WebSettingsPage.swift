@@ -70,7 +70,6 @@ struct WebSettingsPage: View {
 
         static var agentPages: [Target] {
             [
-                Target(tab: "agents", title: String(localized: "Agents and teams", comment: "Settings row: the web page of agents, teams and handoffs")),
                 Target(tab: "browser", title: String(localized: "Browser", comment: "Settings row: Dot's own Chrome")),
                 Target(tab: "websearch", title: String(localized: "Web search", comment: "Settings row: how Dot searches the web")),
                 Target(tab: "campaigns", title: String(localized: "Campaigns", comment: "Settings row: goals Dot keeps working on")),

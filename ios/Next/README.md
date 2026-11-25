@@ -23,10 +23,12 @@ iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnost
 Forget this phone's key), Notifications (the three kinds of `/api/phone/push-settings`), General (Dot's and the owner's
 names, the language, the clock, Queue or Steer, confirmations, dictation's language), Appearance (light, dark or
 system, the text size with a live preview, the tool calls in chat, response streaming, the reading width), Chat
-(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
-only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
-on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
-runs' proposed rewrites with Use and Drop), Health and version, Usage; every other page of the web app's settings is
+(haptics, reactions' follow-ups), Models (the main and fast models from the daemon's list, and the code review's
+model with its reasoning, changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's
+windows, today's tokens, the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last
+run, paused, failed; a switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks
+in it; free mode, switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every
+note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and version, Usage; every other page of the web app's settings is
 a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`: the key never in the address, a
 script on the Mac's origin alone writes it where the page keeps it; only the Mac's origin loads). A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
