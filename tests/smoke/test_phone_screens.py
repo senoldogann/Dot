@@ -559,28 +559,43 @@ async def test_the_pages_that_were_mended_do_not_slide_sideways_at_any_phones_wi
     browser: Browser, served: tuple[str, str]
 ) -> None:
     address, run_id = served
-    slid: list[str] = []
-    for width in _WIDTHS:
-        for route in (
-            "/settings/general",
-            "/settings/appearance",
-            "/settings/memory",
-            "/settings/harness",
-            "/customize/plugins",
-            "/customize/skills",
-            "/licences",
-            "/controls",
-            f"/runs/{run_id}",
-        ):
+    # Three pages at once, each with its own wait, as on the runner's three cores (one by one they took 68 s there).
+    gate: asyncio.Semaphore = asyncio.Semaphore(3)
+
+    async def one(width: int, route: str) -> list[str]:
+        async with gate:
             page: Page = await _phone(browser, address, route)
             try:
                 await page.set_viewport_size({"width": width, "height": _PHONE["height"]})
                 await page.wait_for_timeout(300)
                 over: float = await page.evaluate(_OVERFLOW)
-                if over > 1:
-                    slid.append(f"{route} at {width}: {over} px past the screen's edge")
+                return [f"{route} at {width}: {over} px past the screen's edge"] if over > 1 else []
             finally:
                 await page.context.close()
+
+    # Every look ends, and closes its page, before a failure of one is raised: the browser is the next test's too.
+    looks: list[list[str] | BaseException] = await asyncio.gather(
+        *(
+            one(width, route)
+            for width in _WIDTHS
+            for route in (
+                "/settings/general",
+                "/settings/appearance",
+                "/settings/memory",
+                "/settings/harness",
+                "/customize/plugins",
+                "/customize/skills",
+                "/licences",
+                "/controls",
+                f"/runs/{run_id}",
+            )
+        ),
+        return_exceptions=True,
+    )
+    for look in looks:
+        if isinstance(look, BaseException):
+            raise look
+    slid: list[str] = [line for look in looks if not isinstance(look, BaseException) for line in look]
     assert slid == [], "\n".join(slid)
 
 
