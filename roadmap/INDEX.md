@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
