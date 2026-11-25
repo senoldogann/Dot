@@ -89,6 +89,41 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 (cd DotEngine && swift test)
 ```
 
+## CI
+
+`.github/workflows/ios.yml` runs the above on GitHub's macOS runners, so the Mac does not have to: `engine`
+(`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), `tests (chat)`,
+`tests (controls)` and `tests (rows)` (the unit and UI tests from that build; each test of `SettingsControlsUITests`
+takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
+throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
+
+- A pull request that changes `ios/**` runs `engine`, `build` and `tests (chat)` (about 20 minutes).
+- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs on a push to `main`, every night,
+  when asked (`gh workflow run ios.yml --ref <branch>`), and on a pull request with the label `ios-full`
+  (`gh pr edit <pr> --add-label ios-full`; adding it starts the run).
+- A run holds two macOS runners at most, so that three of the account's five stay free for the gate.
+- A test that fails, unit or UI, runs once more (`-retry-tests-on-failure`; `e2e` runs its whole script once more): a
+  fresh runner's simulator sometimes fails to launch the app or start the test runner. A test that fails twice fails
+  the part; one that passed only on its retry is named in the job's summary as "passed on retry: <test>" and as a
+  warning, so the retry hides no flaky test.
+
+Run a test on the Mac only to reproduce a failure CI showed, and the screenshots for the owner.
+
+```bash
+gh pr checks <pr>                                   # the ios jobs among the others
+gh run list --workflow ios.yml --branch <branch>    # the runs, newest first
+gh run view <run id> --log-failed                   # the lines of the step that failed
+gh run download <run id> -n ios-tests-chat -D /tmp/ios-chat   # also ios-tests-controls, ios-tests-rows, ios-e2e
+open /tmp/ios-chat/tests.xcresult                   # the whole result in Xcode; shots/ holds every screenshot as PNG
+```
+
+The artifacts are kept 7 days: `tests.xcresult` (or `e2e.xcresult`, with `e2e-logs/`: the daemon's and xcodebuild's
+logs of each try, and the first try's result when it was retried) and `shots/`, its attachments exported with
+`xcrun xcresulttool export attachments` (`shots/manifest.json` names the test of each file): the screenshot and
+description XCTest keeps of a failure, and whatever a test attaches with `XCTAttachment` and `lifetime = .keepAlways`.
+A passing test keeps no screenshot of its own; the owner's screenshots of every scene stay `scripts/shots.sh` on the
+Mac.
+
 ## End to end against a throwaway daemon
 
 ```bash
