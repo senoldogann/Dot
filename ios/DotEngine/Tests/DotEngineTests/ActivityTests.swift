@@ -27,12 +27,16 @@ final class ActivityTests: XCTestCase {
         XCTAssertEqual(activity.recent.map(\.status), ["failed", "done"])
         XCTAssertEqual(activity.due.first?.kind, "schedule")
         XCTAssertNil(activity.due.first?.runId)
+        XCTAssertEqual(activity.due.first?.actorId, "sch_mwvofvpd_52ba77", "the face a row wears, for an agent's profile")
+        XCTAssertNil(activity.recent.first?.actorId)
         XCTAssertFalse(activity.isEmpty)
         let away: AwayView = try await api().away(since: 1000)
         XCTAssertEqual([away.done, away.failed, away.drafts], [1, 1, 1])
         XCTAssertEqual(away.decisions.yoloApproved, 2)
         XCTAssertEqual(away.decisionRuns.first?.reviewer, 1)
         XCTAssertEqual(away.runs.first?.title, "Nightly backup")
+        XCTAssertEqual(away.runs.first?.campaign, false)
+        XCTAssertNil(away.runs.first?.agentId)
         XCTAssertEqual(ActivityDaemon.seen.last?.query, "since=1000.0")
     }
 
