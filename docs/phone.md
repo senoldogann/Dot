@@ -51,7 +51,10 @@ the phone or, once Dot answers to its name, to its address (also there to type, 
 own generator (`GET /api/phone/qr/tailscale` and `/dot`); the step marked is the one whose code is shown, and the last
 once a pairing code is. **Sign-in code** keeps a row of dots in the code's place until **Show code** makes one (`POST
 /api/phone/pairing`): good for ten minutes and for one use, it signs in the app on one phone's home screen, and **New
-code** takes its place. The same by hand:
+code** takes its place. Beside a shown code stands a QR code for the iPhone app Dot Next, of
+`dotnext://pair?host=https://<Dot's name>&code=<the code>` (`GET /api/phone/pair-qr`: only the code that is good now,
+never words of the caller's, and only for the Mac's own key, as a phone makes no code): the iPhone's camera opens Dot
+Next with the address and the code filled, and one tap pairs it. The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.

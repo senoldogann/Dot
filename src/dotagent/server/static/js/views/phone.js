@@ -149,6 +149,31 @@ export function mount(root, ctx) {
     ),
   );
   const pairButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(pair) }, "Show code");
+  // The QR code of the code on screen for Dot Next (`dotnext://pair?host=…&code=…`, `GET /phone/pair-qr`): the iPhone's
+  // camera opens the app with both filled, and one tap pairs it. Drawn again for each new code.
+  const pairQr = el("div", { class: "phone-pair-qr", hidden: true });
+
+  async function paintPairQr() {
+    let url;
+    try {
+      url = await blobUrl("/phone/pair-qr");
+    } catch (error) {
+      // No address on a tailnet yet: the code is typed, and the guide above says how to get one.
+      pairQr.replaceChildren(el("p", { class: "hint" }, `No QR code for the iPhone app: ${error.message}`));
+      pairQr.hidden = false;
+      return;
+    }
+    if (disposed) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    made.push(url);
+    pairQr.replaceChildren(
+      el("img", { class: "phone-qr", src: url, alt: "A QR code that opens Dot Next on the iPhone with this code", width: "152", height: "152" }),
+      el("p", { class: "hint" }, "Dot Next on the iPhone: scan it with the camera, and the app opens with the address and the code filled."),
+    );
+    pairQr.hidden = false;
+  }
 
   async function pair() {
     pairButton.disabled = true;
@@ -169,6 +194,7 @@ export function mount(root, ctx) {
     pairButton.className = "btn";
     pairButton.textContent = "New code";
     codeShown = true;
+    await paintPairQr();
     repaintSetup();
   }
 
@@ -438,7 +464,7 @@ export function mount(root, ctx) {
   // This row does not depend on what Tailscale says, so it is drawn once and stays through every drawing of the cards.
   const signIn = setSection({
     title: "Sign-in code",
-    body: setCard(setRow({ title: "A code signs in the app on one phone", lead: codeLead, control: [dots, code, pairButton] })),
+    body: setCard(el("div", null, setRow({ title: "A code signs in the app on one phone", lead: codeLead, control: [dots, code, pairButton] }), pairQr)),
   });
   // The phones that hold a key of their own (item 670), each with Remove. A page signed in with a phone's key can neither
   // pair nor remove a phone: the daemon answers those to the Mac's own key alone, and the page says where to do it.
