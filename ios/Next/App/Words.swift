@@ -108,9 +108,11 @@ func toolLine(_ entry: ToolEntry) -> String {
             ? String(localized: "Waiting for a condition", comment: "Tool row: a wait_until step at work")
             : String(localized: "Waited for a condition", comment: "Tool row: a wait_until step")
     case .helper where !target.isEmpty:
-        return entry.state == .running
-            ? String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
-            : String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
+        switch entry.state {
+        case .running: return String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
+        case .done: return String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
+        case .failed: return String(localized: "Delegated task “\(target)” failed", comment: "Tool row: a task handed to a helper that failed; the argument is its goal")
+        }
     default: return target.isEmpty ? toolName(entry.tool) : "\(toolName(entry.tool)) · \(target)"
     }
 }
