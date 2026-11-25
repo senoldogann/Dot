@@ -33,7 +33,7 @@ func chatStatus(of row: ThreadRow) -> ChatStatus? {
 /// A row's time: the clock today, the day otherwise.
 func rowTime(_ seconds: Double, now: Date) -> String {
     let date: Date = Date(timeIntervalSince1970: seconds)
-    if Calendar.current.isDate(date, inSameDayAs: now) { return date.formatted(date: .omitted, time: .shortened) }
+    if Calendar.current.isDate(date, inSameDayAs: now) { return clockWords(date, format: TimestampFormat.current(.standard), locale: .current) }
     return date.formatted(.dateTime.day().month(.abbreviated))
 }
 
@@ -54,7 +54,7 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
         case .daemonTooOld: return String(localized: "Update Dot on your Mac", comment: "Chat subtitle: the Mac runs a Dot too old for this app")
         case .connecting, .up:
             if let workingAt {
-                let clock: String = Date(timeIntervalSince1970: workingAt).formatted(date: .omitted, time: .shortened)
+                let clock: String = clockWords(Date(timeIntervalSince1970: workingAt), format: TimestampFormat.current(.standard), locale: .current)
                 return String(localized: "Was working at \(clock) · syncing…", comment: "Chat subtitle: a cached copy saved while a run worked; the argument is the clock time")
             }
             return String(localized: "Syncing…", comment: "Chat subtitle: the chat is being brought up to date")
@@ -106,73 +106,6 @@ func engineLine(_ helper: HelperView) -> String {
     [helper.provider, helper.model, helper.effort].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
 }
 
-// MARK: Pairing
-
-struct PairingView: View {
-    @Environment(AppModel.self) private var model: AppModel
-    @State private var address: String = ""
-    @State private var code: String = ""
-    @State private var working: Bool = false
-    @State private var problem: PairingProblem?
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Space.groupedGutter) {
-                    DotFace(size: 56).frame(maxWidth: .infinity)
-                    Text(String(localized: "On your Mac, open Dot › Settings › Phone and make a sign-in code.", comment: "Pairing screen: what to do on the Mac first"))
-                        .textRole(.body).foregroundStyle(Tone.secondary)
-                    GroupedSection(header: String(localized: "Your Mac", comment: "Pairing screen section: the Mac's address"), footer: nil) {
-                        TextField(String(localized: "mac.your-tailnet.ts.net", comment: "Pairing screen: placeholder of the Mac's address field"), text: $address)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                            .textRole(.body).padding(.vertical, Space.s)
-                            .accessibilityLabel(String(localized: "The Mac's address", comment: "VoiceOver: the pairing screen's address field"))
-                    }
-                    GroupedSection(header: String(localized: "Sign-in code", comment: "Pairing screen section: the 8-character code"), footer: nil) {
-                        TextField(String(localized: "8 letters and digits", comment: "Pairing screen: placeholder of the code field"), text: $code)
-                            .textInputAutocapitalization(.characters).autocorrectionDisabled()
-                            .textRole(.body).padding(.vertical, Space.s)
-                            .accessibilityLabel(String(localized: "Sign-in code", comment: "Pairing screen section: the 8-character code"))
-                    }
-                    if let problem { Notice(tone: .failure, message: words(problem), dismiss: nil) }
-                    Button(String(localized: "Pair", comment: "Pairing screen: the button that pairs the phone"), systemImage: "link") {
-                        Task {
-                            working = true
-                            problem = await model.pair(address: address, code: code)
-                            working = false
-                        }
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(working || address.isEmpty || code.isEmpty)
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(Space.gutter)
-                .readableColumn()
-            }
-            .background(Tone.ground)
-            .navigationTitle(String(localized: "Pair with your Mac", comment: "Title of the pairing screen"))
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-
-    private func words(_ problem: PairingProblem) -> String {
-        switch problem {
-        case .address(.notTailnet), .address(.notHTTPS), .address(.hasPort), .address(.hasPath), .address(.hasCredentials), .address(.malformed),
-            .address(.empty), .address(.notBuildHost):
-            String(localized: "Type your Mac's tailnet address, like mac.your-tailnet.ts.net.", comment: "Pairing error: the address is not a tailnet address")
-        case .pairing(.malformedCode): String(localized: "The code is 8 letters and digits.", comment: "Pairing error: the code has the wrong length")
-        case .pairing(.codeRefused):
-            String(localized: "That code is wrong, used or out of date. Make a new one on your Mac.", comment: "Pairing error: the Mac refused the code")
-        case .pairing(.daemonTooOld):
-            String(localized: "Update Dot on your Mac: it is too old for this app.", comment: "Pairing error: the Mac's Dot lacks the sync calls")
-        case .pairing(.unreachable):
-            String(localized: "Your Mac could not be reached. Check that it is on and on your tailnet.", comment: "Pairing error: no answer from the Mac")
-        case .pairing(.keychain):
-            String(localized: "The key could not be kept on this phone.", comment: "Pairing error: the Keychain refused to keep the key")
-        }
-    }
-}
-
 // MARK: The chat list
 
 struct ChatsTab: View {
@@ -182,6 +115,7 @@ struct ChatsTab: View {
     @State private var renaming: ThreadRow?
     @State private var newTitle: String = ""
     @State private var deleting: ThreadRow?
+    @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
     @State private var composing: Bool = false
     let opensFirstChat: Bool
 
@@ -219,6 +153,11 @@ struct ChatsTab: View {
             }
         }
         .sheet(isPresented: $composing) { NewChatSheet(close: { composing = false }) }
+    }
+
+    /// Deletes at once when the owner turned the confirmation off (Settings › General › Confirmations).
+    private func askOrDelete(_ row: ThreadRow) {
+        if confirmDelete { deleting = row } else { model.perform(.delete(thread: row.summary.id)) }
     }
 
     private var rows: [ThreadRow] {
@@ -291,7 +230,7 @@ struct ChatsTab: View {
                             .tint(Tone.glyph)
                         }
                         .swipeActions(edge: .trailing) {
-                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash") { deleting = row }
+                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash") { askOrDelete(row) }
                                 .tint(Tone.failure)
                         }
                         .contextMenu {
@@ -302,7 +241,7 @@ struct ChatsTab: View {
                             Button(row.summary.pinnedAt != nil ? String(localized: "Unpin", comment: "Swipe and context action on a pinned chat") : String(localized: "Pin", comment: "Swipe and context action: keeps a chat at the top"), systemImage: "pin") {
                                 model.perform(.pin(thread: row.summary.id, pinned: row.summary.pinnedAt == nil))
                             }
-                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash", role: .destructive) { deleting = row }
+                            Button(String(localized: "Delete…", comment: "Context menu of a chat: asks before deleting"), systemImage: "trash", role: .destructive) { askOrDelete(row) }
                         }
                 }
             } header: {

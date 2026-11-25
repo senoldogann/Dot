@@ -51,7 +51,7 @@ final class Dictation {
     // MARK: Starting
 
     private func begin() async {
-        let recognizer: SFSpeechRecognizer? = SFSpeechRecognizer(locale: Locale.current)
+        let recognizer: SFSpeechRecognizer? = SFSpeechRecognizer(locale: DictationLanguage.current(.standard).locale(app: Locale.current))
         self.recognizer = recognizer
         var gate: DictationGate = currentGate(recognizer)
         if gate == .needsSpeechPermission {

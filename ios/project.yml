@@ -250,7 +250,7 @@ targets:
         # reached over the tailnet's HTTPS otherwise.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSCameraUsageDescription: Dot uses the camera when you take a photo or scan a page to send to it.
+        NSCameraUsageDescription: Dot uses the camera when you take a photo or scan a page to send to it, and to read the code of your Mac when you pair.
         NSMicrophoneUsageDescription: Dot listens while you dictate a message, and only then. The words are written on this iPhone; no audio is sent anywhere.
         NSPhotoLibraryUsageDescription: Dot opens your photos when you choose one to send to it.
         NSSpeechRecognitionUsageDescription: Dot turns your voice into the words of a message on this iPhone when you press the microphone.

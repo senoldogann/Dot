@@ -364,7 +364,7 @@ struct UsageLimitCard: View {
 
     private var line: String {
         guard let resetsAt else { return String(localized: "It resets within a few hours.", comment: "Usage limit card when the plan did not say when") }
-        let clock: String = Date(timeIntervalSince1970: resetsAt).formatted(date: .omitted, time: .shortened)
+        let clock: String = clockWords(Date(timeIntervalSince1970: resetsAt), format: TimestampFormat.current(.standard), locale: .current)
         return String(localized: "It resets at \(clock).", comment: "Usage limit card; the argument is the clock time")
     }
 }

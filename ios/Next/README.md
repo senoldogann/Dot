@@ -17,6 +17,23 @@ and the floating capsule says what the run does now (thinking, writing, the comm
 every second whether events come or not. The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
+Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
+daemon's proof that it holds this phone's key, `GET /api/proof`, before the key is sent; the diagnosis hop by hop,
+iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
+Forget this phone's key), Notifications (the three kinds of `/api/phone/push-settings`), General (Dot's and the owner's
+names, the language, the clock, Queue or Steer, confirmations, dictation's language), Appearance (light, dark or
+system, the text size with a live preview, the tool calls in chat, response streaming, the reading width), Chat
+(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
+only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
+on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
+runs' proposed rewrites with Use and Drop), Health and version, Usage; every other page of the web app's settings is
+a row with a "Web" mark that opens the Mac's own page in the app (`WebSettingsPage`, the phone's key in the address's
+fragment as `dotx url` does, only the Mac's origin loads). A search with synonyms finds any page in English or
+Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
+with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
+Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
+or enter the code; a pair link opened from elsewhere waits for the same tap; a failure says which hop failed.
+
 ## The engine: `ios/DotEngine`
 
 A Swift package (iOS 26 and macOS 26; Foundation, Network, Security only: no UIKit, so the Mac app can use it):
@@ -93,6 +110,19 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 `n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`. The UI tests (`UITests/ChatUITests.swift`, target
 `DotNextUITests`) run on them. The e2e daemon's script words for the chat: `approve:`, `question:`, `secret:`, `tools:`,
 `fail:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
+
+## Settings' fixtures and end to end
+
+Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
+the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
+`settings-general`, `settings-appearance`, `settings-chat`, `settings-models`, `settings-caps`, `settings-caps-refused`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
+`settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`, `pairing`,
+`pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
+Settings and every control of each native page and fails on one after which nothing changed.
+`scripts/e2e_settings.sh <simulator udid> <derived data> [daemon checkout]` starts a throwaway daemon with a seeded
+proposal, pairs a phone, makes a schedule, runs `SettingsLiveUITests` (every page that writes) and reads on the
+daemon's side what each tap wrote.
 
 ## Screenshots
 

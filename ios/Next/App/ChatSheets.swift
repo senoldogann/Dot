@@ -256,7 +256,7 @@ struct InspectorRow: View {
             switch accessory {
             case .detail(let text), .detailAndChevron(let text):
                 Text(text).textRole(.body).foregroundStyle(Tone.secondary).tabularNumbers()
-            case .none, .chevron:
+            case .none, .chevron, .web:
                 EmptyView()
             }
             if accessory == .chevron || { if case .detailAndChevron = accessory { true } else { false } }() {
