@@ -35,7 +35,7 @@ curl -fsS -X POST -H "$main" -H "Content-Type: application/json" \
 
 TEST_RUNNER_DOTNEXT_E2E_HOST="$base" TEST_RUNNER_DOTNEXT_E2E_KEY="$key" xcodebuild test -project "$ios/Dot.xcodeproj" -scheme DotNext \
     -destination "id=$udid" -configuration Debug CODE_SIGN_IDENTITY=- -derivedDataPath "$derived" \
-    -only-testing:DotNextUITests/SettingsLiveUITests 2>&1 | grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" | sort -u
+    -only-testing:DotNextUITests/SettingsLiveUITests -only-testing:DotNextUITests/SettingsMaintenanceLiveUITests 2>&1 | grep -E "error:|Executed|TEST (SUCCEEDED|FAILED)|skipped" | sort -u
 
 fail=0
 check() {
@@ -55,5 +55,6 @@ if curl -fsS -H "$main" "$base/api/budget" >"$t/budget.json" 2>/dev/null; then
 else
     echo "skip  Caps: this daemon has no /api/budget (item 1731 not merged): the page said Update Dot"
 fi
+curl -fsS -H "$main" "$base/api/status" | check "Maintenance: interrupted tasks are not resumed" 'd["resume"]["resume"] == "off"'
 grep -c "PhoneRefused\|a phone cannot" "$log" | sed 's/^/      refusals to the phone in the daemon log: /'
 exit $fail

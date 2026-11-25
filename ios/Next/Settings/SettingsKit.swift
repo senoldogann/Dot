@@ -16,7 +16,7 @@ enum SettingsPage: Hashable, Sendable {
     case memory
     case system
     case usage
-    case web(WebSettingsPage.Target)
+    case maintenance
 }
 
 /// What a page read from the Mac: still on its way, there, or why not.
@@ -168,7 +168,7 @@ struct LoadedPage<Value: Sendable, Content: View>: View {
     }
 }
 
-/// The "Web" mark of a row that opens the web page (PLAN §4.4): a quiet word in a nested capsule.
+/// The "Web" mark of a row that opens a page of the Mac's web app (Watch the Mac): a quiet word in a nested capsule.
 struct WebMark: View {
     var body: some View {
         Text(String(localized: "Web", comment: "Settings: the mark of a row that opens the web page in the app"))
@@ -190,20 +190,6 @@ struct PageRow: View {
     var body: some View {
         NavigationLink(value: page) {
             ListRow(systemImage: systemImage, title: title, description: description, accessory: detail.map { RowAccessory.detailAndChevron($0) } ?? .chevron)
-        }
-        .buttonStyle(RowPressStyle())
-    }
-}
-
-/// A row that opens a web page of the daemon in the app, with the "Web" mark.
-struct WebRow: View {
-    let target: WebSettingsPage.Target
-    let systemImage: String
-    let description: String?
-
-    var body: some View {
-        NavigationLink(value: SettingsPage.web(target)) {
-            ListRow(systemImage: systemImage, title: target.title, description: description, accessory: .web)
         }
         .buttonStyle(RowPressStyle())
     }

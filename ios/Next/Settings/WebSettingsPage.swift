@@ -4,13 +4,13 @@ import UIKit
 import WebKit
 import os
 
-/// A page that is not native yet, opened from the daemon's web app inside DotNext (PLAN §4.4, PARITY
-/// "Web row mechanism"): the page `#/settings/<tab>` of the paired Mac, signed in with this phone's key, which a script
-/// puts where the page keeps its key (`localStorage["dot.token"]`, api.js) before the page's own scripts run, on the
+/// A page of the daemon's web app opened inside DotNext, for what has no native page yet outside Settings (the Mac's
+/// live screen of Activity, the Agents tab until its wave; Settings opens none, PLAN §26): the page `#<route>` of the
+/// paired Mac, signed in with this phone's key, which a script puts where the page keeps its key (`localStorage["dot.token"]`, api.js) before the page's own scripts run, on the
 /// Mac's origin only; the page proves the daemon holds it (`/api/proof`) before it sends it. The store is in memory
 /// alone, so the key leaves with the page. Only the Mac's own origin loads here; any other address opens in Safari.
 struct WebSettingsPage: View {
-    /// A page of the web app's settings (`settingstabs.js` TABS).
+    /// A page of the web app.
     struct Target: Hashable, Sendable {
         let tab: String
         let title: String
@@ -22,84 +22,6 @@ struct WebSettingsPage: View {
 
         /// The page's hash route: a settings tab (`vault` → `/settings/vault`) or a page of its own (`/watch`, `/agents`).
         var route: String { tab.hasPrefix("/") ? tab : "/settings/\(tab)" }
-
-        /// The web's own search words of the page (settingstabs.js), so the phone's search finds it by them too.
-        var words: String {
-            switch tab {
-            case "agents": "agent team handoffs helpers"
-            case "browser": "chrome profile headless sign in"
-            case "websearch": "engines searxng brave"
-            case "campaigns": "goals sessions long running"
-            case "harness": "harness learning lessons proposals self-improvement"
-            case "connectors": "connect apps services mcp accounts google github slack notion"
-            case "plugins": "gallery install extensions"
-            case "skills": "learned built-in versions teach"
-            case "keys": "keys api providers openai anthropic"
-            case "channels": "imessage telegram whatsapp messaging"
-            case "vault": "logins passwords cards contacts"
-            case "snapshots": "screen capture command key pictures"
-            case "phone": "tailscale pair devices iphone phones"
-            case "repair": "problems fixes claude code sessions self-repair"
-            case "diagnostics": "processes logs disk usage"
-            case "licences": "about notices licences software open source"
-            default: ""
-            }
-        }
-
-        var symbol: String {
-            switch tab {
-            case "agents": "person.2"
-            case "browser": "globe"
-            case "websearch": "magnifyingglass"
-            case "campaigns": "target"
-            case "harness": "sparkles"
-            case "connectors": "powerplug"
-            case "plugins": "puzzlepiece.extension"
-            case "skills": "wand.and.stars"
-            case "keys": "key"
-            case "channels": "message"
-            case "vault": "lock"
-            case "snapshots": "photo"
-            case "phone": "iphone"
-            case "repair": "wrench.adjustable"
-            case "diagnostics": "terminal"
-            case "licences": "doc.text"
-            default: "globe"
-            }
-        }
-
-        static var agentPages: [Target] {
-            [
-                Target(tab: "agents", title: String(localized: "Agents and teams", comment: "Settings row: the web page of agents, teams and handoffs")),
-                Target(tab: "browser", title: String(localized: "Browser", comment: "Settings row: Dot's own Chrome")),
-                Target(tab: "websearch", title: String(localized: "Web search", comment: "Settings row: how Dot searches the web")),
-                Target(tab: "campaigns", title: String(localized: "Campaigns", comment: "Settings row: goals Dot keeps working on")),
-                Target(tab: "harness", title: String(localized: "Self-improvement", comment: "Settings row: what Dot learns from its tasks")),
-            ]
-        }
-
-        static var servicePages: [Target] {
-            [
-                Target(tab: "connectors", title: String(localized: "Connectors", comment: "Settings row: the apps and services Dot works with")),
-                Target(tab: "plugins", title: String(localized: "Plugins", comment: "Settings row: plugins Dot can install")),
-                Target(tab: "skills", title: String(localized: "Skills", comment: "Settings row: what Dot knows how to do")),
-                Target(tab: "keys", title: String(localized: "AI services", comment: "Settings row: the keys of the AI services")),
-                Target(tab: "channels", title: String(localized: "Channels", comment: "Settings row: iMessage and the other ways to reach Dot")),
-                Target(tab: "vault", title: String(localized: "Vault", comment: "Settings row: logins, cards and contacts Dot can use")),
-                Target(tab: "snapshots", title: String(localized: "Snapshots", comment: "Settings row: pictures of the screen for Dot")),
-            ]
-        }
-
-        static var systemPages: [Target] {
-            [
-                Target(tab: "phone", title: String(localized: "Phones and Tailscale", comment: "Settings row: the web page of paired phones and the tailnet")),
-                Target(tab: "repair", title: String(localized: "Self-repair", comment: "Settings row: Dot mends its own problems")),
-                Target(tab: "diagnostics", title: String(localized: "Diagnostics", comment: "Settings row: the programs Dot runs and its logs")),
-                Target(tab: "licences", title: String(localized: "Open source licences", comment: "Settings row: the software Dot is built from")),
-            ]
-        }
-
-        static var allPages: [Target] { agentPages + servicePages + systemPages }
     }
 
     let target: Target
