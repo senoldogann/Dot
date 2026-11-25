@@ -20,7 +20,12 @@ from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import ensure_layout, log_dir
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort
 from dotagent.policy.types import ApprovalMode
-from dotagent.store.models import BrowserMode, MemoryOrder
+from dotagent.store.models import (
+    DEFAULT_PROOF_TIMEOUT_S,
+    MAX_PROOF_CHECKS,
+    BrowserMode,
+    MemoryOrder,
+)
 
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
@@ -173,6 +178,25 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")
+    run.add_argument(
+        "--proof",
+        action="append",
+        default=[],
+        metavar="COMMAND",
+        help=(
+            "a command that must exit 0 before the run (with --standing, the campaign) is done, such as a test run; "
+            f"Dot runs it at the finish and sends the run back with its output while it fails (repeat, at most "
+            f"{MAX_PROOF_CHECKS})"
+        ),
+    )
+    run.add_argument(
+        "--proof-timeout",
+        dest="proof_timeout_s",
+        type=int,
+        default=DEFAULT_PROOF_TIMEOUT_S,
+        metavar="SECONDS",
+        help=f"seconds each --proof command may run, at most [shell] max_timeout_s (default {DEFAULT_PROOF_TIMEOUT_S})",
+    )
     run.add_argument(
         "--review",
         action="store_true",

@@ -345,7 +345,7 @@ async def test_a_takeover_brings_up_the_tab_in_the_browser_the_run_works_in_and_
     monkeypatch.setattr("dotagent.agent.manager.read_debug_endpoint", chrome_is_open)
     MODEL.script = ScriptedProvider(_PROVIDER, [_shell("sleep 5"), _FINISH, _FINISH])
     session: RunRecord = await manager.start_campaign(
-        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, "standard", None, "yolo", None, (), "attach"
+        "Echo once", "task", SCRIPTED_MODEL, None, "test", None, "standard", None, "yolo", None, (), "attach", ()
     )
     assert await manager.take_over(session.id, "test") == "https://example.test/"
     assert asked == ["attach"]

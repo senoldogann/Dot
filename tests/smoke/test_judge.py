@@ -448,7 +448,7 @@ async def test_a_campaign_claim_the_judge_finds_unlikely_is_refused_before_the_g
 ) -> None:
     thread: ThreadRecord = await runtime.store.create_thread("leads", "test")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Leads", GOAL, thread.id, "ollama:none", "medium", "standard", None, "ask", (), "own"
+        "Leads", GOAL, thread.id, "ollama:none", "medium", "standard", None, "ask", (), "own", ()
     )
     await runtime.store.set_campaign_targets(campaign.id, "50 leads in leads.csv", "wc -l leads.csv counts 51 lines")
     ctx: ToolContext = await _context(runtime, campaign.id)
@@ -573,6 +573,7 @@ async def _campaign_context(runtime: Runtime) -> tuple[ToolContext, CampaignReco
         "ask",
         (),
         "own",
+        (),
     )
     return await _context(runtime, campaign.id), campaign
 

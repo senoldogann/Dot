@@ -360,7 +360,7 @@ async def test_the_error_of_a_failed_campaign_start_stays_when_its_cleanup_fails
         try:
             with pytest.raises(StoreError, match="the gate of the run could not be made"):
                 await manager.start_campaign(
-                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "yolo", None, (), None
+                    GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "yolo", None, (), None, ()
                 )
             assert await runtime.store.list_campaigns() == []
         finally:

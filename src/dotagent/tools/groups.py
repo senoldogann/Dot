@@ -85,6 +85,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "skill_save": "skills",
     # A video of the Mac or of a link, seen and heard (item 1212).
     "watch_video": "video",
+    # A check that must pass before the run counts as done (item 1853): asked for, so out of core.
+    "add_proof": "proof",
 }
 _PURPOSES: dict[str, str] = {
     "appearance": "read or change Dot’s theme when the owner asks",
@@ -110,6 +112,7 @@ _PURPOSES: dict[str, str] = {
     "waits": "waiting in code until a file is there, an address answers or a check passes",
     "skills": "saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way",
     "video": "watching a video file or a video link: frames of what it shows and a transcript of what is said",
+    "proof": "a check (a test run, a command) that must exit 0 before the run counts as done, when the owner names one",
     "recon": "a site or host you own: addresses, TLS, headers, technology, open ports, and a form's payload check",
     "pipeline": (
         "the ledger of a continuing piece of work (clients, leads) in its record file: each one's status and next "

@@ -106,6 +106,7 @@ from dotagent.store.models import (
     ObjectiveRecord,
     ObjectiveStatus,
     ObjectiveWorkflow,
+    ProofCheck,
     ProposedChange,
     PushSubscription,
     QueuedMessage,
@@ -321,7 +322,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, goal TEXT NOT NULL, targets TEXT NOT NULL, verification TEXT NOT NULL,
     status TEXT NOT NULL, thread_id TEXT NOT NULL, model TEXT NOT NULL, effort TEXT NOT NULL, approvals TEXT NOT NULL,
     files TEXT NOT NULL, cron TEXT, next_session_at REAL, created_at REAL NOT NULL, updated_at REAL NOT NULL,
-    evidence TEXT NOT NULL, browser TEXT
+    evidence TEXT NOT NULL, browser TEXT, proofs TEXT NOT NULL DEFAULT '[]'
 );
 CREATE TABLE IF NOT EXISTS agents (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, instructions TEXT NOT NULL, model TEXT NOT NULL,
@@ -915,6 +916,7 @@ def _campaign(row: aiosqlite.Row) -> CampaignRecord:
             "updated_at": row["updated_at"],
             "evidence": row["evidence"],
             "browser": row["browser"],
+            "proofs": parse_json_value(row["proofs"], "campaign proofs"),
         }
     )
 
@@ -1431,6 +1433,8 @@ _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("browser", "TEXT"),
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
+    # The proof checks of its claim (item 1853), a JSON list of ``ProofCheck``: an older campaign had none.
+    ("proofs", "TEXT NOT NULL DEFAULT '[]'"),
 )
 # Columns of ``queued_messages`` added later: an older message was sent at the standard speed, without a choice for one
 # message and without picks (item 318; a ``RunPicks`` as JSON, NULL for none).
@@ -7671,9 +7675,10 @@ class Store:
         approvals: ApprovalMode,
         files: Sequence[str],
         browser: BrowserMode | None,
+        proofs: Sequence[ProofCheck],
     ) -> CampaignRecord:
         """Store a new campaign: active, without targets, with no session planned yet, on the Chrome ``browser``
-        names (``None``: the daemon's browser mode)."""
+        names (``None``: the daemon's browser mode), its claim held to the checks ``proofs`` (item 1853)."""
         now: float = time.time()
         record: CampaignRecord = CampaignRecord(
             id=new_id("cmp"),
@@ -7695,11 +7700,12 @@ class Store:
             updated_at=now,
             evidence="",
             browser=browser,
+            proofs=tuple(proofs),
         )
         await self._db.execute(
             "INSERT INTO campaigns(id, title, goal, targets, verification, status, thread_id, model, effort, speed,"
-            " once, approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " once, approvals, files, cron, next_session_at, created_at, updated_at, evidence, browser, proofs)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.title,
@@ -7720,6 +7726,7 @@ class Store:
                 record.updated_at,
                 record.evidence,
                 record.browser,
+                dumps_compact([proof.model_dump(mode="json") for proof in record.proofs]),
             ),
         )
         await self._db.commit()
@@ -7747,6 +7754,14 @@ class Store:
 
     async def set_campaign_targets(self, campaign_id: str, targets: str, verification: str) -> None:
         await self._update_campaign(campaign_id, "targets = ?, verification = ?", (targets, verification))
+
+    async def add_campaign_proof(self, campaign_id: str, proof: ProofCheck) -> None:
+        """Add ``proof`` at the end of the campaign's proof checks (item 1853), which are only ever added to."""
+        await self._update_campaign(
+            campaign_id,
+            "proofs = json_insert(proofs, '$[#]', json(?))",
+            (dumps_compact(proof.model_dump(mode="json")),),
+        )
 
     async def _update_campaign_in(
         self, campaign_id: str, assignments: str, params: Sequence[object], statuses: Sequence[CampaignStatus]

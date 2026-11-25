@@ -20,6 +20,7 @@ from collections.abc import AsyncIterator
 import httpx
 from pydantic import TypeAdapter, ValidationError
 
+from dotagent.agent.proof import ProofSpec
 from dotagent.cli_campaign import render_first_session_end
 from dotagent.cli_commands import RunCommand
 from dotagent.cli_daemon import probe_daemon, prove_daemon
@@ -98,6 +99,7 @@ def handed_request(command: RunCommand, goal: str) -> StartRunRequest:
             standing=command.standing,
             browser=command.browser if command.standing else None,
             source=REVIEW_SOURCE if command.review else CLI_SOURCE,
+            proof=[ProofSpec(command=line, timeout_s=command.proof_timeout_s) for line in command.proof],
         )
     except ValidationError as exc:
         raise ConfigError(

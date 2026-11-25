@@ -21,6 +21,7 @@ from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import save_playbook
+from dotagent.agent.proof import added, checks_of
 from dotagent.agent.recap import RecapView, recap_view, write_recap
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
@@ -102,6 +103,7 @@ from dotagent.store.models import (
     CampaignRecord,
     ChatChoices,
     EventRecord,
+    ProofCheck,
     RewindCut,
     RunMode,
     RunPicks,
@@ -248,6 +250,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             "task" if request.standing and request.mode == "auto" else resolved_mode(request.mode, request.goal)
         )
 
+        # The owner's proof checks (item 1853), each command once.
+        proof: tuple[ProofCheck, ...] = added((), checks_of(request.proof, "owner"))
+
         async def start() -> str:
             if request.loop is not None:
                 # The loop's schedule is asked of the scheduler before the run starts: what it would refuse (a rhythm a
@@ -269,6 +274,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     request.browser,
+                    proof,
                 )
             elif request.team_id is not None:
                 team: TeamRecord = await store.get_team(request.team_id)
@@ -318,6 +324,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     picks,
+                    proof=proof,
                 )
             if request.mode == "auto":
                 await keep_auto(run)

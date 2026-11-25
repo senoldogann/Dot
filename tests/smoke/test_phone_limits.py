@@ -214,7 +214,7 @@ async def test_a_phone_key_cannot_loosen_the_rules_but_keeps_yolo_in_reach(own_h
         assert (await client.post(f"/schedules/{schedule_id}/enable", headers=phone)).status_code == 200
         thread = await runtime.store.create_thread("campaign", "test")
         campaign = await runtime.store.create_campaign(
-            "c", "goal", thread.id, "ollama:x", "medium", "standard", None, "yolo", (), None
+            "c", "goal", thread.id, "ollama:x", "medium", "standard", None, "yolo", (), None, ()
         )
         assert await runtime.store.stop_active_campaign(campaign.id)
         assert (await client.post(f"/campaigns/{campaign.id}/resume", headers=phone)).status_code == 200

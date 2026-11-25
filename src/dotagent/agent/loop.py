@@ -145,6 +145,26 @@ from dotagent.agent.prompt import (
     turn_note,
     with_phone,
 )
+from dotagent.agent.proof import (
+    PROOF_CHECKED_EVENT,
+    PROOF_EVENT,
+    PROOF_TOOL,
+    ProofOutcome,
+    call_arguments,
+    checked_event_data,
+    failed_note,
+    failed_text,
+    never_ran,
+    not_run,
+    not_run_text,
+    over_limit,
+    over_limit_text,
+    proof_end,
+    proof_event_data,
+    run_checks,
+    unproven,
+    with_proof_note,
+)
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
 from dotagent.agent.restating import restates
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT, Resumption, resumed_event_data
@@ -288,6 +308,7 @@ from dotagent.store.models import (
     CampaignRecord,
     EventRecord,
     MemoryRecord,
+    ProofCheck,
     ReactionName,
     RunMode,
     RunPicks,
@@ -555,6 +576,8 @@ class RunOpening(FrozenModel):
     follows: ReactionName | None = None
     hops: int = 0
     from_run_id: str | None = None
+    # The proof checks the owner set as the run started (item 1853); a resumed run's come with ``resumed``.
+    proof: tuple[ProofCheck, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1542,6 +1565,93 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
         result=_with_check_note(ended.result, f"the goal is not reached, and the run's limit is reached. {reason}"),
         needs=ended.needs,
     )
+
+
+def _after_proof(
+    outcomes: Sequence[ProofOutcome], ended: RunOutcome, sent_back: int, patience: int
+) -> RunOutcome | SendBack | None:
+    """What the run's proof checks (item 1853) make of a finish with success: ``None`` when every one passed, so the
+    goal check, when on, decides; the run sent back with what the failing ones printed; or, when one could not run or
+    they still fail after ``patience`` rounds, the run ended failed, its answer kept, with the reason."""
+    if never_ran(outcomes):
+        return RunOutcome(
+            status="failed", result=with_proof_note(ended.result, not_run_text(outcomes)), needs=ended.needs
+        )
+    if not unproven(outcomes):
+        return None
+    if sent_back >= patience:
+        return RunOutcome(
+            status="failed", result=with_proof_note(ended.result, failed_text(outcomes, patience)), needs=ended.needs
+        )
+    return SendBack(note=failed_note(outcomes))
+
+
+def _after_proof_at_limit(outcomes: Sequence[ProofOutcome], ended: RunOutcome) -> RunOutcome | None:
+    """What the run's proof checks make of a finish with success past the run's limit, which cannot be sent back:
+    ``None`` when every one passed, else the run ended failed with the reason."""
+    if never_ran(outcomes):
+        return RunOutcome(
+            status="failed", result=with_proof_note(ended.result, not_run_text(outcomes)), needs=ended.needs
+        )
+    if unproven(outcomes):
+        return RunOutcome(
+            status="failed", result=with_proof_note(ended.result, failed_text(outcomes, 0)), needs=ended.needs
+        )
+    return None
+
+
+_NO_SHELL: str = (
+    "the run has no shell tool (its mode or its agent leaves it out), and a proof check runs as a shell call"
+)
+
+
+async def _run_proof(
+    agent: AgentRun,
+    history: list[Message],
+    registry: ToolRegistry,
+    context: ToolContext,
+    can_see: bool,
+    checks: Sequence[ProofCheck],
+    look: int,
+) -> tuple[list[ToolOutcome], tuple[ProofOutcome, ...]]:
+    """Run the run's proof checks (item 1853) as one step of ``shell`` calls of the run, made by Dot instead of the
+    model, as item 1118's skill read is: the same tool, gate, sandbox, events, masking and time limit (each check's
+    own) as a call of the model's, so the gate asks what it asks for that command in the run's mode and no more. Their
+    calls and results go into ``history`` and the thread, so the run reads what they printed. ``look`` tells the
+    calls of one look from another's. Returns the calls' outcomes and what each check came to."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    ran: list[ToolOutcome] = []
+    max_timeout_s: int = runtime.config.shell.max_timeout_s
+    over: tuple[ProofCheck, ...] = over_limit(checks, max_timeout_s)
+    if PROOF_TOOL not in registry.tools:
+        outcomes: tuple[ProofOutcome, ...] = not_run(checks, _NO_SHELL)
+    elif over:
+        # The shell would cut such a check to its own limit: run as set, it cannot be (the setting changed since).
+        outcomes = not_run(over, over_limit_text(max_timeout_s))
+    else:
+        calls: tuple[ToolCall, ...] = tuple(
+            ToolCall(id=f"call_proof_{look}_{index}_{run.id}", name=PROOF_TOOL, arguments=call_arguments(check))
+            for index, check in enumerate(checks)
+        )
+        asked: Message = assistant_message("", None, calls)
+        history.append(asked)
+        await runtime.store.append_messages(run.thread_id, [asked])
+        ran = await execute_calls(calls, registry, {}, context, agent.gate, 1, lambda _: None)
+        results: list[Message] = await _tool_messages(agent, ran, can_see)
+        history.extend(results)
+        await runtime.store.append_messages(run.thread_id, results)
+        outcomes = tuple(
+            ProofOutcome(
+                check=check,
+                end=proof_end(outcome.result.is_error, outcome.refused, outcome.action is not None),
+                text=outcome.result.text,
+            )
+            for check, outcome in zip(checks, ran, strict=True)
+        )
+    log.info("proof_checked", run_id=run.id, look=look, ends=[outcome.end for outcome in outcomes])
+    await runtime.bus.emit(run.id, PROOF_CHECKED_EVENT, checked_event_data(outcomes), True)
+    return ran, outcomes
 
 
 async def browser_of(runtime: Runtime, run: RunRecord) -> BrowserSession:
@@ -2669,6 +2779,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         # The plan of the run it resumes becomes this run's plan: the plan tools and the plan reminder go on with it.
         if opening.resumed.plan.steps:
             await runtime.bus.emit(run.id, PLAN_EVENT, plan_event_data(opening.resumed.plan), True)
+    # The proof checks it carries (item 1853), before its first step: the owner's, and those of a run it goes on from.
+    for check in (*opening.proof, *(() if opening.resumed is None else opening.resumed.proof)):
+        await runtime.bus.emit(run.id, PROOF_EVENT, proof_event_data(check), True)
     # What the message came with stands under it at once (item 967): the run's start (the notes recalled, the skills
     # matched, the browser, a vision model describing the pictures) takes seconds, and the page waited for it.
     if opening.files:
@@ -2943,6 +3056,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # does not end the run while steps are open, until stall_limit reminders, and then the goal check or the progress
     # stop does.
     plan_reminders: int = 0 if restored is None else restored.plan_reminders
+    # How many looks at the run's proof checks it took (item 1853), which tell their calls apart.
+    proof_looks: int = 0
     plan_handed: bool = False if restored is None else restored.plan_handed
     failure_reminded: bool = False
     targets_reminded: bool = False
@@ -3567,6 +3682,18 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         # on it is final, and what the user sent during the step comes too late for it (the manager keeps an answer in
         # the thread for the next run).
         if past_limit is not None:
+            limit_checks: tuple[ProofCheck, ...] = (
+                await run_checks(runtime.store, run.id) if ended.status == "done" and run.mode == "task" else ()
+            )
+            if limit_checks:
+                proof_looks += 1
+                limit_ran, limit_proof = await _run_proof(
+                    agent, history, callable_tools, context, info.vision, limit_checks, proof_looks
+                )
+                facts = with_outcomes(facts, with_nested(limit_ran))
+                unproved: RunOutcome | None = _after_proof_at_limit(limit_proof, ended)
+                if unproved is not None:
+                    return run_end(agent, history, goal, _with_restated(restating, unproved), facts)
             at_limit: RunOutcome = (
                 ended
                 if checker is None
@@ -3595,6 +3722,27 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 history.append(await _stored_note(agent, plan_note(unclosed)))
                 await runtime.bus.emit(run.id, "plan_reminder", {"open_steps": list(unclosed)}, True)
                 continue
+            # The proof checks (item 1853) hold a finish with success before the goal check, with goal mode or not.
+            proof_checks: tuple[ProofCheck, ...] = (
+                await run_checks(runtime.store, run.id) if ended.status == "done" and run.mode == "task" else ()
+            )
+            if proof_checks:
+                proof_looks += 1
+                proof_ran, proof = await _run_proof(
+                    agent, history, callable_tools, context, info.vision, proof_checks, proof_looks
+                )
+                facts = with_outcomes(facts, with_nested(proof_ran))
+                proved: RunOutcome | SendBack | None = _after_proof(proof, ended, sent_back, config.goal_patience)
+                if isinstance(proved, RunOutcome):
+                    if not agent.inbox.asks():
+                        return run_end(agent, history, goal, _with_restated(restating, proved), facts)
+                    continue
+                if isinstance(proved, SendBack):
+                    sent_back += 1
+                    nudges = 0
+                    watch = clear_window(watch)
+                    history.append(await _stored_note(agent, proved.note))
+                    continue
             if unclosed and checker is not None and not plan_handed:
                 # The reminder bound is spent. Goal mode's checker takes the finish; an open plan still blocks a
                 # finish the checker does not accept, and one more finish with steps open reaches the progress stop.
