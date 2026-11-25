@@ -1,5 +1,31 @@
 [
   {
+    "description": "Add a proof check: a command that must exit 0 before the run (or, in a campaign's session, the campaign) counts as done, such as the tests of what you changed. Dot runs every check when you finish with success and sends you back with the output of one that fails. At most 5; a check cannot be changed or removed. Add one when the owner names a check that must pass, or when the goal has a command that proves it.",
+    "name": "add_proof",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "A command line that exits 0 only when the work is really done, for example 'uv run pytest tests/x -q' or 'test -s ~/report.pdf'. Use absolute paths or the workspace.",
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_s": {
+          "default": 300,
+          "description": "Seconds the check may run before it is killed, which counts as failing.",
+          "maximum": 3600,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "description": "Dot and the agents: role, teams and what each does now.",
     "name": "agents_now",
     "parameters": {

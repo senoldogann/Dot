@@ -489,14 +489,25 @@ struct ThoughtRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
-            if open || live {
+            if open {
                 Text(text)
                     .textRole(.label)
                     .foregroundStyle(Tone.tertiary)
-                    .lineLimit(open ? nil : 3)
-                    .truncationMode(.head)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
+            } else if live {
+                // The last three lines, wrapped from the start and clipped from the top (item 1848): a new word never
+                // moves the words before it. Cut at the head, every word slid along its line on each new one.
+                Text(verbatim: "\n\n").textRole(.label).hidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .bottomLeading) {
+                        Text(text)
+                            .textRole(.label)
+                            .foregroundStyle(Tone.tertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .clipped()
             }
         }
     }

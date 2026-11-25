@@ -113,11 +113,11 @@ struct MacPage: View {
 
     var body: some View {
         SettingsScroll(title: String(localized: "This Mac", comment: "Settings row: the paired Mac")) {
-            if model.snapshot.transport == .keyRefused || run?.diagnosis.firstFailure?.1.refusesTheKey == true {
+            if model.transport == .keyRefused || run?.diagnosis.firstFailure?.1.refusesTheKey == true {
                 FailureBanner(failure: .keyRefused, macPlace: "", retry: nil)
             }
             GroupedSection(header: nil, footer: nil) {
-                ListRow(systemImage: "dot.radiowaves.left.and.right", title: String(localized: "Status", comment: "This Mac: the link's state"), description: nil, accessory: .detail(transportWord(model.snapshot.transport)))
+                ListRow(systemImage: "dot.radiowaves.left.and.right", title: String(localized: "Status", comment: "This Mac: the link's state"), description: nil, accessory: .detail(transportWord(model.transport)))
                 ListRow(systemImage: "network", title: String(localized: "Address", comment: "This Mac: the Mac's tailnet address"), description: nil, accessory: .detail(host))
                     .contextMenu {
                         Button(String(localized: "Copy", comment: "Context menu: copies the text"), systemImage: "doc.on.doc") { UIPasteboard.general.string = host }

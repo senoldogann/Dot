@@ -96,6 +96,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "drafts",
         "accounts",
         "schedule",
+        "proof",
         "team",
         "office",
         "replies",
@@ -193,6 +194,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "appearance",
         "worktree",
         "pipeline",
+        "proof",
         "recon",
         "replies",
         "skills",
@@ -269,6 +271,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "(mail_search, mail_read, calendar_events)",
         "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, "
         "schedule_delete)",
+        "- proof: a check (a test run, a command) that must exit 0 before the run counts as done, when the owner "
+        "names one (add_proof)",
         "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent, "
         "create_team)",
         "- office: what the other agents do now, reading one's chat to help it, finding and reading any chat or what "

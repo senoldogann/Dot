@@ -90,7 +90,7 @@ async def _served(home: Path) -> AsyncIterator[tuple[Runtime, int]]:
 async def _campaign(runtime: Runtime, title: str) -> CampaignRecord:
     thread: ThreadRecord = await runtime.store.create_thread(title, "test")
     return await runtime.store.create_campaign(
-        title, GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own"
+        title, GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own", ()
     )
 
 

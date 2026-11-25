@@ -7,8 +7,11 @@ import signal
 import sys
 from collections.abc import Awaitable, Callable
 
+from pydantic import ValidationError
+
 from dotagent.agent.lessons import RunLessons, run_lessons
 from dotagent.agent.manager import RunManager
+from dotagent.agent.proof import ProofSpec, added, checks_of
 from dotagent.cli_campaign import (
     render_first_session_end,
 )
@@ -28,7 +31,7 @@ from dotagent.llm.types import Effort
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server import CLI_SOURCE, REVIEW_SOURCE
-from dotagent.store.models import RunMode, RunRecord
+from dotagent.store.models import NO_PICKS, ProofCheck, RunMode, RunRecord
 
 log = get_logger(__name__)
 
@@ -58,16 +61,45 @@ async def execute_run(
     goal_mode: bool | None,
     thread_id: str | None,
     source: str,
+    proof: tuple[ProofCheck, ...],
 ) -> RunRecord:
-    """Start one run, show its events live and return the finished record. Ctrl-C stops the run."""
+    """Start one run, held to the owner's ``proof`` checks (item 1853), show its events live and return the finished
+    record. Ctrl-C stops the run."""
     return await follow_run(
         runtime,
         manager,
         ui,
-        lambda: manager.start(
-            goal, mode, model, thread_id, source, None, effort, "standard", None, approvals, goal_mode, ()
+        lambda: manager.start_picked(
+            goal,
+            mode,
+            model,
+            thread_id,
+            source,
+            None,
+            effort,
+            "standard",
+            None,
+            approvals,
+            goal_mode,
+            (),
+            NO_PICKS,
+            proof=proof,
         ),
     )
+
+
+def command_proof(command: RunCommand) -> tuple[ProofCheck, ...]:
+    """The owner's proof checks of ``dotx run --proof`` (item 1853), each command once, with ``--proof-timeout``. A
+    command or a limit out of bounds is refused here, with why."""
+    try:
+        return added(
+            (),
+            checks_of([ProofSpec(command=line, timeout_s=command.proof_timeout_s) for line in command.proof], "owner"),
+        )
+    except (ValidationError, ValueError) as exc:
+        raise ConfigError(
+            "the --proof checks cannot be taken", {"error": str(exc), "proof": " | ".join(command.proof)}
+        ) from exc
 
 
 async def follow_run(
@@ -195,6 +227,7 @@ async def cmd_run(command: RunCommand) -> int:
 async def run_here(config: AppConfig, command: RunCommand, goal: str, options: UiOptions) -> int:
     """Carry out the goal of ``command`` in this process, its runtime and its run its own (no daemon of this home runs);
     0 when the run ended done."""
+    proof: tuple[ProofCheck, ...] = command_proof(command)
     runtime: Runtime = await build_runtime(config)
     manager: RunManager = RunManager(runtime)
     try:
@@ -219,6 +252,7 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
                     command.goal_mode,
                     (),
                     command.browser,
+                    proof,
                 ),
             )
             if command.standing
@@ -234,6 +268,7 @@ async def run_here(config: AppConfig, command: RunCommand, goal: str, options: U
                 command.goal_mode,
                 command.thread,
                 REVIEW_SOURCE if command.review else CLI_SOURCE,
+                proof,
             )
         )
         # The answer comes first: the lessons are drawn after the run's end.
@@ -307,6 +342,7 @@ async def cmd_chat(command: ChatCommand) -> int:
                 None,
                 thread_id,
                 CLI_SOURCE,
+                (),
             )
             thread_id = run.thread_id
             if not ui.streamed(run.result):

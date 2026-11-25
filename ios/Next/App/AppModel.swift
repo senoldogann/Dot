@@ -21,7 +21,17 @@ final class AppModel {
     }
 
     private(set) var phase: Phase = .loading
-    private(set) var snapshot: EngineSnapshot = .empty
+    // The store's snapshot by part (item 1848): a screen is drawn again only when a part it reads changed, so a streamed word
+    // redraws the open chat and not the chat list beneath it, the tab bar or Settings.
+    private(set) var list: ListProjection = ListProjection()
+    private(set) var chats: [String: ChatProjection] = [:]
+    private(set) var outbox: [OutboxItem] = []
+    private(set) var accepted: [String: AcceptedMessage] = [:]
+    private(set) var transport: Transport = .connecting
+    private(set) var online: Bool = true
+    private(set) var savedAt: [String: Double] = [:]
+    private(set) var workingAt: [String: Double] = [:]
+    private(set) var startedChats: [String: String] = [:]
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -41,7 +51,7 @@ final class AppModel {
             var drawn: EngineSnapshot = .empty
             drawn.transport = fixture.transport
             drawn.online = fixture.transport != .offline
-            snapshot = drawn
+            show(drawn)
             fixtureMac = "MacBook Air"
             fixtureAPI = fixture.api()
             phase = fixture == .pairing || fixture == .pairingLink ? .unpaired : .ready
@@ -50,11 +60,42 @@ final class AppModel {
 
         /// Draws a fixture's snapshot with no engine (the screenshot harness and the UI tests).
         func showFixture(_ fixture: EngineSnapshot, mac: String) {
-            snapshot = fixture
+            show(fixture)
             fixtureMac = mac
             phase = .ready
         }
     #endif
+
+    /// Takes the store's newest snapshot: each part is set only when it changed, so its readers alone are drawn again.
+    private func show(_ next: EngineSnapshot) {
+        if next.list != list { list = next.list }
+        if next.chats != chats { chats = next.chats }
+        if next.outbox != outbox { outbox = next.outbox }
+        if next.accepted != accepted { accepted = next.accepted }
+        if next.transport != transport { transport = next.transport }
+        if next.online != online { online = next.online }
+        if next.savedAt != savedAt { savedAt = next.savedAt }
+        if next.workingAt != workingAt { workingAt = next.workingAt }
+        if next.startedChats != startedChats { startedChats = next.startedChats }
+    }
+
+    /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
+    func pending(in thread: String) -> [PendingMessage] {
+        var parts: EngineSnapshot = .empty
+        parts.chats = chats[thread].map { [thread: $0] } ?? [:]
+        parts.outbox = outbox
+        parts.accepted = accepted
+        parts.online = online
+        return parts.pending(in: thread)
+    }
+
+    /// New chats not yet in the list, from the outbox and the link.
+    var pendingChats: [PendingMessage] {
+        var parts: EngineSnapshot = .empty
+        parts.outbox = outbox
+        parts.online = online
+        return parts.pendingChats
+    }
 
     /// The models the daemon offers (`GET /api/models`), for the composer's chip.
     var models: [ProviderModels] = []
@@ -64,6 +105,14 @@ final class AppModel {
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    var startingChats: [String: String] = [:]
+
+    /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
+    /// is read (item 1849).
+    func firstWords(of thread: String) -> String? {
+        startedChats.first { $0.value == thread }.flatMap { startingChats[$0.key] }
+    }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
@@ -121,7 +170,10 @@ final class AppModel {
         watching = Task { [weak self] in
             for await next in await engine.store.updates() {
                 guard let self else { return }
-                if next != self.snapshot { self.snapshot = next }
+                self.show(next)
+                // At most one picture a display frame at 30 Hz: the store's stream keeps only the newest, so the words
+                // that came meanwhile are drawn together, never dropped (item 1848).
+                try? await Task.sleep(for: .milliseconds(33))
             }
         }
         Task { await engine.supervisor.start() }
@@ -183,7 +235,7 @@ final class AppModel {
         }
         hosts.forget()
         self.engine = nil
-        snapshot = .empty
+        show(.empty)
         phase = .unpaired
     }
 
@@ -224,12 +276,17 @@ final class AppModel {
         }
     }
 
-    func startChat(_ text: String, photos: [Data]) async {
-        guard let engine else { return }
+    /// Starts a new chat through the outbox: its key, which the chat list opens at once (item 1849) and swaps for the
+    /// chat's own id once the daemon names it; `nil` when the message could not be kept.
+    func startChat(_ text: String, photos: [Data]) async -> String? {
+        guard let engine else { return nil }
         do {
-            _ = try await engine.startChat(text, photos: photos)
+            let key: String = try await engine.startChat(text, photos: photos)
+            startingChats[key] = text
+            return key
         } catch {
             logger.error("a new chat could not be kept error=\(String(describing: error), privacy: .public)")
+            return nil
         }
     }
 

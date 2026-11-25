@@ -180,7 +180,7 @@ async def test_the_decisions_and_the_drafts_of_the_new_runs_and_their_helpers_ar
         await store.add_draft(mine.id, "mail", ["b@example.com"], [], "Mine", "x")
         goal_chat: ThreadRecord = await store.create_thread("Ship 2.0", "ui")
         campaign = await store.create_campaign(
-            "Ship 2.0", "Ship it.", goal_chat.id, "m:m", "high", "standard", None, "yolo", [], "own"
+            "Ship 2.0", "Ship it.", goal_chat.id, "m:m", "high", "standard", None, "yolo", [], "own", ()
         )
         session: RunRecord = await store.create_run(
             goal_chat.id, "Ship it.", "task", "m:m", None, "schedule", "high", "standard", None, "yolo", False,

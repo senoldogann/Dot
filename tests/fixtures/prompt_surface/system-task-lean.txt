@@ -82,6 +82,7 @@ Your tool list starts with the core tools. The other tools come in the groups be
 - drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)
 - accounts: the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only (mail_search, mail_read, calendar_events)
 - schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, schedule_delete)
+- proof: a check (a test run, a command) that must exit 0 before the run counts as done, when the owner names one (add_proof)
 - team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent, create_team)
 - office: what the other agents do now, reading one's chat to help it, finding and reading any chat or what was said in it, and a note to the run at work in one (agents_now, read_agent_chat, chats, read_chat, send_to_chat, search_chats)
 - replies: handing a reply to a mail Dot sent to the chat that sent it, where that work goes on (pass_reply)

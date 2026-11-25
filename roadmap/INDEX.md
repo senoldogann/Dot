@@ -10,9 +10,14 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1857](1857.md) | done | 2026-11-25 | A maturity scorecard: when each feature was last proven on the real Mac, and a daily check of stale proofs |
 | [1856](1856.md) | done | 2026-11-25 | What a run and a task cost in dollars, estimated from a public price list, beside their tokens |
 | [1855](1855.md) | done | 2026-11-25 | A schedule or a watcher may run a check first, without a model, and wake one only when it says so |
+| [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
+| [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
 | [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
 | [1851](1851.md) | done | 2026-11-25 | The orphan-groups test keeps a Dot home of its own, which no other pytest worker writes into |
 | [1850](1850.md) | done | 2026-11-25 | The iPhone app is tested on GitHub's macOS runners |
+| [1849](1849.md) | done | 2026-11-25 | DotNext opens a new chat as soon as its first message is sent |
+| [1848](1848.md) | done | 2026-11-25 | DotNext streams a run smoothly: the end is followed after layout and only at the end, a word redraws the open chat alone, the live thinking no longer reflows |
+| [1847](1847.md) | done | 2026-11-25 | DotNext drops the "Dot · <Mac> · <date>" line at the top of a chat |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
 | [1791](1791.md) | done | 2026-11-25 | DotNext's Settings open no web page: the Mac's setup pages have no row, and the list ends with "More settings are on your Mac." |

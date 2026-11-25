@@ -779,7 +779,7 @@ async def test_dotx_stats_counts_what_waits_and_will_not_move_on_by_itself(
     await record_firing_failure(runtime.store, failing.id, time.time(), "failed to start: the model is gone")
     leads: ThreadRecord = await runtime.store.create_thread("Leads", "campaign")
     campaign: CampaignRecord = await runtime.store.create_campaign(
-        "Leads", "Find fifty leads.", leads.id, f"ollama:{MODEL}", "medium", "standard", None, "ask", (), "own"
+        "Leads", "Find fifty leads.", leads.id, f"ollama:{MODEL}", "medium", "standard", None, "ask", (), "own", ()
     )
     stalled: ThreadRecord = await runtime.store.create_thread("Stalled", "test")
     held: ThreadRecord = await runtime.store.create_thread("Held", "test")

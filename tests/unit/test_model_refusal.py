@@ -135,7 +135,7 @@ async def test_an_agent_a_campaign_and_a_queued_message_are_judged_by_the_model_
                 )
             with pytest.raises(ModelUnavailableError) as campaign:
                 await manager.start_campaign(
-                    "Do it", "task", _KEYLESS, None, "ui", None, "standard", None, None, None, (), None
+                    "Do it", "task", _KEYLESS, None, "ui", None, "standard", None, None, None, (), None, ()
                 )
             with pytest.raises(ModelUnavailableError) as queued:
                 await manager.queue(
