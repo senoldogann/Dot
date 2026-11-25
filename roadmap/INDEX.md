@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |
 | [1871](1871.md) | done | 2026-11-25 | A pull request that nothing of the gate's macOS jobs reads skips them |
 | [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
 | [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
