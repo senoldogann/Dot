@@ -95,21 +95,41 @@ final class ChatUITests: XCTestCase {
 
     func testSlashOpensTheCommandsPanelFilteredAsTheOwnerTypes() {
         let app: XCUIApplication = launch("n2-chat")
-        // The field is a text field at rest and a text view once it grows: found by its identifier, whatever its kind.
-        let field: XCUIElement = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap()
+        let atRest: XCUIElement = app.textFields["composer.field"]
+        XCTAssertTrue(atRest.waitForExistence(timeout: 10))
+        atRest.tap()
+        // Focused, the composer grows and its field may become a text view: found by its kind, never by a search of the
+        // whole tree (`descendants(matching: .any)`), whose every read took seconds on a loaded CI runner (#1105).
+        let field: XCUIElement = composerField(app)
         field.typeText("/")
         XCTAssertTrue(app.staticTexts["COMMANDS"].waitForExistence(timeout: 3) || app.staticTexts["Commands"].exists)
-        XCTAssertEqual(app.buttons.matching(identifier: "picker.row").count, 6)
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "picker.row")
+        XCTAssertTrue(holds(within: 5) { rows.count == 6 }, "six commands: \(rows.count)")
         // A row puts its token in the text (tapped on the bare "/": XCUITest's typed letters stay as the keyboard's
         // candidate, which a tap does not replace; a hand-typed word is replaced, seen on the simulator).
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "/loop")).firstMatch.tap()
-        let completed: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "/loop"), object: field)
-        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 3), .completed, "the row puts its token in the text: \(String(describing: field.value))")
-        let cleared: XCUIElement = field
-        cleared.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
-        XCTAssertEqual(app.buttons.matching(identifier: "picker.row").count, 1, "\"/lo\" leaves only /loop")
+        // Read every 100 ms: the predicate expectation read the value about once a second, and on the runner of #1105
+        // the token was in the text ("/loop ") when the 3 s wait had already given up.
+        XCTAssertTrue(holds(within: 5) { (composerField(app).value as? String)?.hasPrefix("/loop") == true }, "the row puts its token in the text: \(String(describing: composerField(app).value))")
+        composerField(app).typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
+        // The panel filters once the deletions are in the text: waited for, not read at once.
+        XCTAssertTrue(holds(within: 5) { rows.count == 1 }, "\"/lo\" leaves only /loop: \(rows.count)")
+    }
+
+    /// The composer's field, a text view while the composer is grown and a text field at rest.
+    private func composerField(_ app: XCUIApplication) -> XCUIElement {
+        let grown: XCUIElement = app.textViews["composer.field"]
+        return grown.exists ? grown : app.textFields["composer.field"]
+    }
+
+    /// Whether `condition` holds within `seconds`, read every 100 ms: as soon as it holds, not on a fixed pause.
+    private func holds(within seconds: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline: Date = Date().addingTimeInterval(seconds)
+        while !condition() {
+            if Date() >= deadline { return false }
+            usleep(100_000)
+        }
+        return true
     }
 
     func testEditingAQueuedMessageKeepsTheLiveDraftForCancel() {
