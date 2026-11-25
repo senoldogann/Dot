@@ -57,6 +57,11 @@ struct ChatScreen: View {
     private var view: ThreadView? { chat?.view }
     private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
     private var helpers: [HelperView] { view?.helpers ?? [] }
+    /// The helpers the chat's newest run started (item 1880): the pill counts these, never an older run's.
+    private var newestRunHelpers: [HelperView] {
+        guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { return [] }
+        return helpers.filter { $0.parentRunId == run.id }
+    }
     private var mode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .showAll }
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
@@ -166,7 +171,7 @@ struct ChatScreen: View {
                 if let unreadable = chat?.unreadable, unreadable > 0 {
                     Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
                 }
-                ForEach(TranscriptBlock.of(items)) { block in
+                ForEach(TranscriptBlock.of(streamItems(items))) { block in
                     Group {
                         switch block {
                         case .item(let item): row(item)
@@ -223,7 +228,7 @@ struct ChatScreen: View {
                 position.scrollTo(edge: .bottom)
             }
         }
-        .safeAreaInset(edge: .bottom) { bottom() }
+        .safeAreaInset(edge: .bottom) { bottom(items) }
     }
 
     @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
@@ -258,10 +263,12 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
-        case .helpers(_, _, let list):
-            HelperGroupCard(helpers: list, open: { panel = .agents })
-        case .plan(_, let steps):
-            PlanCard(steps: steps)
+        case .helpers:
+            // The helpers are the capsule's people segment and its Agents sheet (item 1880), never a card here.
+            EmptyView()
+        case .plan:
+            // The plan is the chip beside the capsule (item 1880), never a card in the stream.
+            EmptyView()
         case .decision(let anchor):
             AskAnchorRow(anchor: anchor)
         case .work(let fold):
@@ -294,15 +301,18 @@ struct ChatScreen: View {
 
     // MARK: The bottom: capsule, dock or composer
 
-    @ViewBuilder private func bottom() -> some View {
+    @ViewBuilder private func bottom(_ items: [TranscriptItem]) -> some View {
         let entries: [DockEntry] = dock
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
                     status: capsuleStatus, activity: activityWords,
-                    since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
-                    helpers: helpers.filter { helperState($0.status).isLive }.count),
-                showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } : nil, queued: view?.queue.messages.count ?? 0,
+                    helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
+                showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
+                stop: { if confirmStop { confirmingStop = true } else { stop() } },
+                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
                 scrollToBottom: {
                     pinned = true
                     withAnimation { position.scrollTo(edge: .bottom) }
@@ -535,22 +545,31 @@ struct ChatScreen: View {
         }
     }
 
-    /// What the run at work does now, for the capsule (thinking, writing, the tool that runs); `nil` between steps.
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" while the
+    /// main run's own step only waits for its helpers (N still working); `nil` while it takes a step of its own, which
+    /// the capsule says as "Working" with the turn's clock.
     private var activityWords: String? {
-        guard capsuleStatus == .working, let run = activeRun, let chat, let now = activity(of: chat, run: run.id) else { return nil }
-        switch now {
-        case .thinking: return String(localized: "Thinking", comment: "Capsule: the run's model is thinking")
-        case .writing: return String(localized: "Writing", comment: "Capsule: the run's model is writing its words")
-        case .tool(let step):
-            return toolLine(
-                ToolEntry(
-                    id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [],
-                    startedAt: step.at, endedAt: nil))
-        }
+        guard capsuleStatus == .working, let run = activeRun, let chat, case .tool(let step)? = activity(of: chat, run: run.id) else { return nil }
+        let working: Int = newestRunHelpers.filter { helperState($0.status).isLive }.count
+        guard working > 0, isHelperStep(step.tool) else { return nil }
+        return String(localized: "Waiting on \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+    }
+
+    /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none.
+    private func newestPlan(_ items: [TranscriptItem]) -> [PlanStep]? {
+        guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { return nil }
+        return plan(of: run.id, in: items)
     }
 
     @ViewBuilder private func sheet(_ panel: ChatPanel) -> some View {
         switch panel {
+        case .plan:
+            ScrollView {
+                PlanSteps(steps: newestPlan(builtItems) ?? [])
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.vertical, Space.m)
+            }
+            .inspectorSheet(title: String(localized: "Plan", comment: "Inspector section: the run's plan"), close: { self.panel = nil })
         case .agents:
             LiveAgentsSheet(thread: thread, close: { self.panel = nil })
         case .background:
@@ -590,6 +609,32 @@ struct ChatScreen: View {
         guard sizeClass == .regular else { return nil }
         return ProseColumn.width(charactersPerLine: ReadingWidth.current(readingWidthRaw).charactersPerLine, font: ProseColumn.bodyFont(dynamicTypeSize))
     }
+}
+
+/// A transcript as the stream draws it, at its top and inside each folded run: no plan (the chip beside the capsule)
+/// and no helper group (the capsule's people segment and its Agents sheet), item 1880. Pure.
+func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
+    items.compactMap { item in
+        switch item {
+        case .plan, .helpers: return nil
+        case .work(let fold):
+            return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
+        default: return item
+        }
+    }
+}
+
+/// The plan a run keeps, from the transcript, a folded run's included; `nil` when it keeps none. Pure.
+func plan(of run: String, in items: [TranscriptItem]) -> [PlanStep]? {
+    for item in items.reversed() {
+        switch item {
+        case .plan(let id, let steps) where id == "plan:\(run)": return steps
+        case .work(let fold):
+            if let steps = plan(of: run, in: fold.items) { return steps }
+        default: continue
+        }
+    }
+    return nil
 }
 
 /// A side question and the run's answer (`/btw`).
