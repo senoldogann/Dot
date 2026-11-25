@@ -83,6 +83,17 @@ class _Seen:
         self.restarts: int = 0
 
 
+async def _flag_naming(database: Path, run_id: str) -> RestartFlag | None:
+    """The restart flag once the waiter wrote ``run_id`` into it, up to 10 s; the flag as it stands after that (or
+    None, gone) when it never did, for the caller's assertion to name."""
+    for _ in range(1000):
+        flag: RestartFlag | None = read_flag(database)
+        if flag is not None and flag.waiting_for == run_id:
+            return flag
+        await asyncio.sleep(0.01)
+    return read_flag(database)
+
+
 @pytest.fixture
 def seen(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _Seen:
     monkeypatch.setenv("HOME", str(tmp_path / "user"))
@@ -117,11 +128,13 @@ async def test_a_restart_that_gave_up_keeps_its_flag_and_restarts_once_when_dot_
         # The run that holds it is blocked on the owner: that is work, not idleness.
         holder: RunRecord = await _run_in(store, "blocked", 1)
         program: asyncio.Task[int] = asyncio.create_task(restart_when_idle.wait_and_restart(database, UID, ASKER))
-        await asyncio.sleep(0.05)
-        waiting: RestartFlag | None = read_flag(database)
+        waiting: RestartFlag | None = await _flag_naming(database, holder.id)
         assert waiting is not None and waiting.asked_by == ASKER and waiting.waiting_for == holder.id
         assert not waiting.gave_up and seen.banners == []
-        await asyncio.sleep(0.4)
+        for _ in range(1000):
+            if seen.banners:
+                break
+            await asyncio.sleep(0.01)
         # The two hours (here a tenth of a second) are over: one banner, the flag says so, nothing was restarted.
         assert not program.done() and seen.restarts == 0
         assert [title for title, _ in seen.banners] == ["Dot was not restarted yet"]
@@ -132,12 +145,9 @@ async def test_a_restart_that_gave_up_keeps_its_flag_and_restarts_once_when_dot_
         other: RunRecord = await _run_in(store, "running", 2)
         await store.set_run_status(holder.id, "done")
         # The waiter's next look names the other run; waited for, not timed, as a loaded runner looks late.
-        for _ in range(1000):
-            if (read_flag(database) or gave_up).waiting_for == other.id:
-                break
-            await asyncio.sleep(0.01)
+        moved: RestartFlag | None = await _flag_naming(database, other.id)
         assert not program.done() and seen.restarts == 0
-        assert (read_flag(database) or gave_up).waiting_for == other.id
+        assert moved is not None and moved.gave_up and moved.waiting_for == other.id
         await store.set_run_status(other.id, "done")
         assert await asyncio.wait_for(program, 10.0) == 0
         assert seen.restarts == 1 and len(seen.banners) == 1
