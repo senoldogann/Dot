@@ -400,9 +400,20 @@ final class RefusedDeleteTests: XCTestCase {
         let stale: ListProjection = ListReducer.loaded(
             ListReducer.asked(after), view: ThreadsView(revision: 5, threads: [row("thr_a"), row("thr_b"), row("thr_c")]), connection: after.marks.connection).0
         XCTAssertEqual(stale.rows.map(\.summary.id), ["thr_c"], "a read from before the deletion does not bring them back")
-        await store.outcome(.done(OutboxItem(id: "k1", action: .deleteChats(threads: ["thr_a"]), createdAt: 1)))
-        let told: [String: Int] = await store.snapshot.list.deleted
-        XCTAssertNotNil(told["thr_a"], "the store holds it deleted as soon as the Mac answered")
+        // The store's own list: the delete seen in the outbox, the outbox emptied before the outcome is handled.
+        let (connection, _): (Int, [ListEffect]) = await store.listOpening()
+        await store.listOpened(connection)
+        _ = await store.listAsked()
+        _ = await store.listLoaded(ThreadsView(revision: 5, threads: [row("thr_a"), row("thr_b"), row("thr_c")]), connection: connection)
+        let item: OutboxItem = OutboxItem(id: "k1", action: .deleteChats(threads: ["thr_a", "thr_b"]), createdAt: 1)
+        await store.outbox([item])
+        await store.outbox([])
+        let between: EngineSnapshot = await store.snapshot
+        XCTAssertEqual(between.shownList.rows.map(\.summary.id), ["thr_c"], "dropped from the outbox, not yet handled: still hidden")
+        await store.outcome(.done(item))
+        let answered: EngineSnapshot = await store.snapshot
+        XCTAssertEqual(answered.list.rows.map(\.summary.id), ["thr_c"], "the store's list holds them deleted")
+        XCTAssertTrue(answered.deletesAwaiting.isEmpty)
     }
 
     func testARefusedDeleteIsKeptUntilTheListToldIt() async throws {
