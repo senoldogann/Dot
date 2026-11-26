@@ -55,10 +55,14 @@ public struct DaemonAPI: Sendable {
     }
 
     func data(_ request: URLRequest, path: String) async throws(DaemonRequestError) -> Data {
+        try await data(request, path: path, delegate: nil)
+    }
+
+    func data(_ request: URLRequest, path: String, delegate: (any URLSessionTaskDelegate)?) async throws(DaemonRequestError) -> Data {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await session.data(for: request, delegate: delegate)
         } catch let error as URLError {
             throw .transport(path: path, underlying: error)
         } catch {
@@ -96,7 +100,10 @@ public struct DaemonAPI: Sendable {
 
     static func json(_ value: some Encodable) -> Data {
         do {
-            return try JSONEncoder().encode(value)
+            let encoder: JSONEncoder = JSONEncoder()
+            // In particular, base64 attachment bodies must fit the daemon's request limit without slash escapes.
+            encoder.outputFormatting = .withoutEscapingSlashes
+            return try encoder.encode(value)
         } catch {
             preconditionFailure("a request body of the engine's own types does not encode: \(error)")
         }
@@ -279,8 +286,15 @@ extension DaemonAPI {
     public func status() async throws(DaemonRequestError) -> DaemonStatus { try await get("/api/status", query: []) }
 
     public func uploadAttachment(name: String, jpeg: Data) async throws(DaemonRequestError) -> String {
-        let body: Data = Self.json(AttachmentUpload(name: name, mediaType: "image/jpeg", dataB64: jpeg.base64EncodedString()))
-        let stored: StoredAttachmentId = try await send("POST", "/api/attachments", body: body)
+        try await uploadAttachment(OutgoingAttachment(name: name, mediaType: "image/jpeg", data: jpeg)) { _ in }
+    }
+
+    public func uploadAttachment(_ attachment: OutgoingAttachment, progress: @escaping @Sendable (Int) -> Void) async throws(DaemonRequestError) -> String {
+        let path: String = "/api/attachments"
+        let body: Data = Self.json(AttachmentUpload(name: attachment.name, mediaType: attachment.mediaType, dataB64: attachment.data.base64EncodedString()))
+        let request: URLRequest = request(method: "POST", path: path, query: [], body: body)
+        let reply: Data = try await data(request, path: path, delegate: AttachmentProgressDelegate(progress))
+        let stored: StoredAttachmentId = try decode(reply, path: path)
         return stored.id
     }
 
@@ -408,5 +422,21 @@ extension DaemonAPI {
         built.setValue(nil, forHTTPHeaderField: "Authorization")
         let paired: PairedKey = try api.decode(try await api.data(built, path: "/api/phone/pair"), path: "/api/phone/pair")
         return paired.token
+    }
+}
+
+private final class AttachmentProgressDelegate: NSObject, URLSessionTaskDelegate {
+    private let report: @Sendable (Int) -> Void
+
+    init(_ report: @escaping @Sendable (Int) -> Void) {
+        self.report = report
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64,
+        totalBytesSent: Int64, totalBytesExpectedToSend: Int64
+    ) {
+        guard totalBytesExpectedToSend > 0 else { return }
+        report(min(100, Int(Double(totalBytesSent) / Double(totalBytesExpectedToSend) * 100)))
     }
 }

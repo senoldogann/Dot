@@ -34,6 +34,17 @@
         }
       }
     },
+    "%@ is %@. The limit is 20 MiB per attachment.": {
+      "comment": "Composer attachment error; arguments are file name and size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ boyutu %@. Ek başına sınır 20 MiB."
+          }
+        }
+      }
+    },
     "%@ is not a Tailscale address. It ends in .ts.net; Settings › Phone on the Mac shows it.": {
       "comment": "Pairing error: the address is not under ts.net; the argument is the host",
       "localizations": {
@@ -1724,6 +1735,17 @@
         }
       }
     },
+    "At most 10 attachments can go with a message.": {
+      "comment": "Composer attachment count limit",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir mesajla en fazla 10 ek gönderebilirsiniz."
+          }
+        }
+      }
+    },
     "At this moment in your time.": {
       "comment": "New schedule footer: a single run is read in the phone's zone",
       "localizations": {
@@ -1742,6 +1764,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekle"
+          }
+        }
+      }
+    },
+    "Attachments of unsent messages were not kept.": {
+      "comment": "Chat list notice after a reset: the attachments of the messages that were not sent are gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmemiş mesajların ekleri saklanmadı."
           }
         }
       }
@@ -2051,7 +2084,7 @@
       }
     },
     "Camera": {
-      "comment": "Composer + menu: takes a photo",
+      "comment": "Composer + menu: takes a photo or records a video",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2112,6 +2145,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaydı iptal et"
+          }
+        }
+      }
+    },
+    "Cancel upload": {
+      "comment": "Stops the current attachment upload and keeps the message available for retry",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yüklemeyi iptal et"
           }
         }
       }
@@ -2949,6 +2993,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Maliyet"
+          }
+        }
+      }
+    },
+    "Could not add attachment": {
+      "comment": "Composer attachment error title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ek eklenemedi"
+          }
+        }
+      }
+    },
+    "Could not prepare %@ as a video.": {
+      "comment": "Composer attachment error; argument is the file name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ video olarak hazırlanamadı."
+          }
+        }
+      }
+    },
+    "Could not read %@. Choose a file.": {
+      "comment": "Composer attachment error; argument is the file name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ okunamadı. Bir dosya seçin."
           }
         }
       }
@@ -4788,7 +4865,7 @@
       }
     },
     "Files": {
-      "comment": "Composer + menu: picks image files",
+      "comment": "Composer + menu: picks documents or other files",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7365,6 +7442,17 @@
         }
       }
     },
+    "Not sent: an attachment could not be read on this phone": {
+      "comment": "Under a message whose attachment is gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: eklerden biri bu telefonda okunamadı"
+          }
+        }
+      }
+    },
     "Not sent: it waited more than a day": {
       "comment": "Under an owner's message too old to send again safely",
       "localizations": {
@@ -7680,6 +7768,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Şu an, Dot çalışırken"
+          }
+        }
+      }
+    },
+    "OK": {
+      "comment": "Button that dismisses an alert",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamam"
           }
         }
       }
@@ -8234,6 +8333,17 @@
         }
       }
     },
+    "Over the 20 MiB limit": {
+      "comment": "On a video chip when the exported video is still too big",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "20 MiB sınırını aşıyor"
+          }
+        }
+      }
+    },
     "Own work model": {
       "comment": "Models: the model that looks for Dot's own work",
       "localizations": {
@@ -8411,35 +8521,13 @@
         }
       }
     },
-    "Photo": {
-      "comment": "VoiceOver: a photo added to the message",
+    "Photos and videos": {
+      "comment": "Composer + menu: opens the photo library",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fotoğraf"
-          }
-        }
-      }
-    },
-    "Photos": {
-      "comment": "Composer + menu: picks photos",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fotoğraflar"
-          }
-        }
-      }
-    },
-    "Photos of unsent messages were not kept.": {
-      "comment": "Chat list notice after a reset: the photos of the messages that were not sent are gone",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gönderilemeyen mesajların fotoğrafları saklanmadı."
+            "value": "Fotoğraflar ve videolar"
           }
         }
       }
@@ -8583,6 +8671,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tercih sırası"
+          }
+        }
+      }
+    },
+    "Preparing attachments…": {
+      "comment": "Composer status while opening or exporting selected files",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekler hazırlanıyor…"
           }
         }
       }
@@ -9270,7 +9369,7 @@
       }
     },
     "Remove %@": {
-      "comment": "VoiceOver: removes a fallback model; the argument is its name",
+      "comment": "VoiceOver: removes a fallback model; the argument is its name\nVoiceOver: removes an attachment from the message",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9298,17 +9397,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tepkiyi kaldır: %@"
-          }
-        }
-      }
-    },
-    "Remove the photo": {
-      "comment": "VoiceOver: removes a photo from the message",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fotoğrafı kaldır"
           }
         }
       }
@@ -9980,6 +10068,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Güvenlik araştırması modeli"
+          }
+        }
+      }
+    },
+    "See the attachments.": {
+      "comment": "Message text for a send with only attached files",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklere bak."
           }
         }
       }
@@ -11873,6 +11972,17 @@
         }
       }
     },
+    "The image could not be read.": {
+      "comment": "Composer attachment error",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görüntü okunamadı."
+          }
+        }
+      }
+    },
     "The journal": {
       "comment": "Activity: the journal note Dot wrote today",
       "localizations": {
@@ -11940,7 +12050,7 @@
       }
     },
     "The message could not be saved on this phone. Try again.": {
-      "comment": "New chat: the outbox could not keep the first message",
+      "comment": "Shown when the outbox could not keep a message or attachment",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12687,6 +12797,17 @@
         }
       }
     },
+    "Trim video": {
+      "comment": "Composer button: opens the video trimmer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videoyu kırp"
+          }
+        }
+      }
+    },
     "Try again": {
       "comment": "Live picture: reads the stream again (web watch.retry)\nSettings: repeats a read or write that failed\nUnder a refused message: sends it again",
       "localizations": {
@@ -13013,6 +13134,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'u güncellemek ya da yeniden başlatmak Mac'te yapılır: Ayarlar › Sistem."
+          }
+        }
+      }
+    },
+    "Upload cancelled": {
+      "comment": "Under a message after the owner stops its attachment upload",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükleme iptal edildi"
+          }
+        }
+      }
+    },
+    "Uploading attachment %lld of %lld": {
+      "comment": "Message status during an attachment upload; arguments are the ordinal and file count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ek yükleniyor (%1$lld / %2$lld)"
           }
         }
       }

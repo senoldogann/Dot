@@ -85,6 +85,52 @@ final class OutboxTests: XCTestCase {
         XCTAssertTrue(onDisk().isEmpty, "what was sent leaves the file")
     }
 
+    func testVideoAndDocumentKeepTheirNamesTypesAndBytesAcrossAnOfflineRestart() async throws {
+        let link: LinkWatcher = LinkWatcher(initial: .down)
+        let first: Outbox = box(link, mayStartChat: { true })
+        let files: [OutgoingAttachment] = [
+            OutgoingAttachment(name: "Walk.mp4", mediaType: "video/mp4", data: Data([0, 0, 0, 20, 102, 116, 121, 112])),
+            OutgoingAttachment(name: "Notes.txt", mediaType: "text/plain", data: Data("walk notes".utf8)),
+        ]
+        try await first.enqueue(message("Two attachments"), id: newMessageKey(), attachments: files)
+        await first.suspend()
+        let next: Outbox = box(link, mayStartChat: { true })
+        link.report(.up)
+        await next.start()
+        try await items(next, "message delivered") { $0.isEmpty }
+
+        let uploads: [FakeDaemon.Seen] = daemon.requests.filter { $0.path == "/api/attachments" && $0.method == "POST" }
+        XCTAssertEqual(uploads.count, files.count)
+        for (request, file) in zip(uploads, files) {
+            let body: [String: String] = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(request.body))
+            XCTAssertEqual(body, ["name": file.name, "media_type": file.mediaType, "data_b64": file.data.base64EncodedString()])
+        }
+        let sent: FakeDaemon.Seen = try XCTUnwrap(daemon.requests.first { $0.path == "/api/threads/thr_1/queue" && $0.method == "POST" })
+        let message: QueueMessage = try JSONDecoder().decode(QueueMessage.self, from: XCTUnwrap(sent.body))
+        XCTAssertEqual(message.attachments, ["att_1", "att_2"])
+    }
+
+    func testCancellingAnAttachmentStopsTheMessageAndKeepsItForRetry() async throws {
+        daemon.holdUploads = true
+        let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
+        let key: String = newMessageKey()
+        let file: OutgoingAttachment = OutgoingAttachment(name: "Notes.txt", mediaType: "text/plain", data: Data("notes".utf8))
+        try await outbox.enqueue(message("Read these notes"), id: key, attachments: [file])
+        try await items(outbox, "uploading") { $0.first?.attachmentUpload?.count == 1 }
+        await outbox.cancelUpload(key)
+        try await items(outbox, "cancelled") { $0.first?.phase == .failed && $0.first?.attachmentUpload == nil }
+        XCTAssertEqual(onDisk().first?.failure, .uploadCancelled)
+        XCTAssertEqual(daemon.count("POST", "/queue"), 0)
+
+        daemon.holdUploads = false
+        await outbox.retry(key)
+        try await items(outbox, "delivered on retry") { $0.isEmpty }
+        XCTAssertEqual(daemon.acceptedTexts, ["Read these notes"])
+        let sent: FakeDaemon.Seen = try XCTUnwrap(daemon.requests.first { $0.path.hasSuffix("/queue") && $0.method == "POST" })
+        let queued: QueueMessage = try JSONDecoder().decode(QueueMessage.self, from: XCTUnwrap(sent.body))
+        XCTAssertEqual(queued.attachments.count, 1)
+    }
+
     func testAnAnswerLostAfterTheDaemonTookTheMessageDoesNotSendItTwice() async throws {
         daemon.loseNextAnswers(2)
         let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
