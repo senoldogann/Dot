@@ -1190,7 +1190,7 @@
       }
     },
     "Agents": {
-      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
+      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nSettings section: models, schedules, rules, memory\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1564,7 +1564,7 @@
       }
     },
     "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Dot's empty chat (and the component gallery): what to ask Dot",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3548,7 +3548,7 @@
       }
     },
     "Done": {
-      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nStatus word: the run finished",
+      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nFind in chat: closes the bar\nStatus word: the run finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6534,7 +6534,7 @@
       }
     },
     "Model, %@": {
-      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort\nVoiceOver: the new chat's model button; the argument is the model",
+      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10699,17 +10699,6 @@
         }
       }
     },
-    "Start a chat": {
-      "comment": "A bot with no chat yet: starts one",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sohbet başlat"
-          }
-        }
-      }
-    },
     "Start again on the Mac": {
       "comment": "Connect apps detail: takes the Mac's step once more",
       "localizations": {
@@ -10920,7 +10909,7 @@
       }
     },
     "Stopped": {
-      "comment": "Campaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
+      "comment": "Activity: a run of Dot's own that was stopped\nCampaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11719,6 +11708,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Döngü kurulamadı: %@"
+          }
+        }
+      }
+    },
+    "The message could not be saved on this phone. Try again.": {
+      "comment": "New chat: the outbox could not keep the first message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj bu telefona kaydedilemedi. Tekrar dene."
           }
         }
       }
@@ -13810,7 +13810,7 @@
       }
     },
     "You": {
-      "comment": "Mini player: the owner holds the run's page",
+      "comment": "Mini player: the owner holds the run's page\nSettings: the owner's card before their name is read",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13865,7 +13865,7 @@
       }
     },
     "Your Mac": {
-      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name",
+      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name\nWatch: title when the Mac's name is not known",
       "localizations": {
         "tr": {
           "stringUnit": {

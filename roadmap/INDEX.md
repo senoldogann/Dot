@@ -9,6 +9,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1919](1919.md) | done | 2026-11-26 | DotNext's chat moves the moment a message is sent, not 10-15 s later when the run's first event comes |
 | [1918](1918.md) | done | 2026-11-26 | A run reads what it starts with at once, before its first model call |
 | [1917](1917.md) | done | 2026-11-26 | A pull request that changes ios/ builds the iPhone app once, on macOS |
+| [1916](1916.md) | done | 2026-11-26 | DotNext's New chat with a bot opens as a chat, with the bot's face centred |
 | [1914](1914.md) | done | 2026-11-26 | DotNext keeps a new chat's half-written words per bot |
 | [1913](1913.md) | done | 2026-11-26 | Several chats under Dot or one agent: the audit, and a chat shown twice stays open |
 | [1912](1912.md) | done | 2026-11-26 | DotNext's Dot no longer wears an unread mark for its own work |

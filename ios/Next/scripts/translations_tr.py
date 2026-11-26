@@ -1474,3 +1474,6 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
+
+# New chat as a pushed chat (item 1916).
+TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})
