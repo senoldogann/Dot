@@ -29,7 +29,7 @@ final class SettingsLiveUITests: XCTestCase {
 
     func testEveryPageThatWritesWritesToTheMac() throws {
         let app: XCUIApplication = try launch()
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
 
         // This Mac: every hop passes and the daemon proved it holds the key.
         open(app, "This Mac")
@@ -157,14 +157,5 @@ final class SettingsLiveUITests: XCTestCase {
             app.buttons["Cancel"].tap()
         }
         back(app)
-
-        // The emergency stop, then its release.
-        app.swipeDown()
-        app.buttons["Emergency stop"].tap()
-        app.buttons["Stop everything"].tap()
-        let release: XCUIElement = app.buttons["Release the stop"]
-        XCTAssertTrue(release.waitForExistence(timeout: 10))
-        release.tap()
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 10))
     }
 }

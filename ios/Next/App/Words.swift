@@ -253,8 +253,24 @@ func composerActionWords(_ action: ComposerAction) -> String {
     case .send: String(localized: "Send", comment: "VoiceOver: the composer's send button")
     case .queue: String(localized: "Queue: starts after this run", comment: "Composer: queues the message after the run at work")
     case .steer: String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue")
-    case .stop: String(localized: "Stop", comment: "Chat toolbar: stops the run at work")
+    case .stop: String(localized: "Stop", comment: "Composer and ask dock: stops the run at work")
     case .confirmEdit: String(localized: "Save the queued message", comment: "Composer: confirms the edit of a queued message")
+    }
+}
+
+/// The title of a way to send a follow-up while a run works, in the composer's long-press menu.
+func followUpTitle(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Steer now", comment: "Composer long-press menu: sends the draft into the run at work")
+    case .queue: String(localized: "Queue", comment: "Follow-up setting: queued after the run")
+    }
+}
+
+/// What a way to send a follow-up does, under its title in the composer's long-press menu.
+func followUpDetail(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Interrupt what the agent is doing", comment: "Composer long-press menu: what Steer now does")
+    case .queue: String(localized: "Run after the current turn", comment: "Composer long-press menu: what Queue does")
     }
 }
 

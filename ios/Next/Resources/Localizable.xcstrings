@@ -1056,17 +1056,6 @@
         }
       }
     },
-    "Ask before stopping a run": {
-      "comment": "General: confirm Stop in a chat",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir işi durdurmadan önce sor"
-          }
-        }
-      }
-    },
     "Ask you": {
       "comment": "Tool row of Dot's own tool: a question to the owner",
       "localizations": {
@@ -2808,7 +2797,7 @@
       }
     },
     "Emergency stop": {
-      "comment": "Settings: stops every run of Dot at once",
+      "comment": "System: whether the Mac's emergency stop holds",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2924,17 +2913,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Her saat"
-          }
-        }
-      }
-    },
-    "Every run stops, desktop control is blocked and schedules wait until you release the stop.": {
-      "comment": "Emergency stop confirmation: what it does",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Her iş durur, masaüstü denetimi engellenir ve zamanlamalar sen durdurmayı kaldırana kadar bekler."
           }
         }
       }
@@ -3650,6 +3628,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Talimatlar"
+          }
+        }
+      }
+    },
+    "Interrupt what the agent is doing": {
+      "comment": "Composer long-press menu: what Steer now does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanın yaptığı işin arasına gir"
           }
         }
       }
@@ -4547,7 +4536,7 @@
       }
     },
     "Not paired with a Mac": {
-      "comment": "Emergency stop: no Mac to stop",
+      "comment": "A call that needs the Mac when this phone is not paired",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6017,6 +6006,17 @@
         }
       }
     },
+    "Run after the current turn": {
+      "comment": "Composer long-press menu: what Queue does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu tur bitince çalışır"
+          }
+        }
+      }
+    },
     "Run now": {
       "comment": "Schedule menu: runs it at once",
       "localizations": {
@@ -6996,8 +6996,19 @@
         }
       }
     },
+    "Steer now": {
+      "comment": "Composer long-press menu: sends the draft into the run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi yönlendir"
+          }
+        }
+      }
+    },
     "Stop": {
-      "comment": "Chat toolbar: stops the run at work",
+      "comment": "Composer and ask dock: stops the run at work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7029,28 +7040,6 @@
         }
       }
     },
-    "Stop everything": {
-      "comment": "Confirmation button of the emergency stop",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Her şeyi durdur"
-          }
-        }
-      }
-    },
-    "Stop everything Dot is doing?": {
-      "comment": "Confirmation of the emergency stop",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un yaptığı her şey durdurulsun mu?"
-          }
-        }
-      }
-    },
     "Stop the run at work": {
       "comment": "Composer command: what /stop does",
       "localizations": {
@@ -7058,17 +7047,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan işi durdur"
-          }
-        }
-      }
-    },
-    "Stop this run?": {
-      "comment": "Confirmation of Stop from the chat header",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bu çalışma durdurulsun mu?"
           }
         }
       }
@@ -7631,17 +7609,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disk dolu."
-          }
-        }
-      }
-    },
-    "The emergency stop always asks first.": {
-      "comment": "General: footer under the confirmations",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acil durdurma her zaman önce sorar."
           }
         }
       }

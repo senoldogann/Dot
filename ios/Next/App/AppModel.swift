@@ -372,7 +372,7 @@ extension AppModel {
 
     /// A side question (`/btw`): the run's answer, or why there is none.
     func aside(run: String, question: String) async -> String {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired") }
         do {
             return try await engine.api.aside(run: run, question: question).answer
         } catch {
@@ -382,7 +382,7 @@ extension AppModel {
 
     /// A loop of the chat (`/loop`); `nil` when it was made, else why not.
     func loop(run: String, every: String, text: String) async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired") }
         do {
             try await engine.api.loop(run: run, every: every, text: text)
             return nil
@@ -403,17 +403,6 @@ extension AppModel {
         } catch {
             logger.warning("a screenshot could not be read name=\(name, privacy: .public) error=\(String(describing: error), privacy: .public)")
             return nil
-        }
-    }
-
-    /// The emergency stop (Settings, the daemon's failsafe): every run stops. `nil` when it worked, else why not.
-    func emergencyStop() async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
-        do {
-            _ = try await engine.api.emergencyStop()
-            return nil
-        } catch {
-            return String(describing: error)
         }
     }
 
