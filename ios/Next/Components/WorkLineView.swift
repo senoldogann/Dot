@@ -177,3 +177,19 @@ struct WaitingLine: View {
         .frame(minHeight: Metric.hit)
     }
 }
+
+/// The line under the owner's message from the moment it is sent until its run's first event (item 1919): the typing
+/// dots and "Starting…", shimmering, as the work line draws; it is replaced in place by the run's own line.
+struct StartingLine: View {
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            TypingDots().frame(width: Metric.iconSlot)
+            Text(ChatStatus.starting.word + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Metric.hit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ChatStatus.starting.word)
+        .accessibilityIdentifier("work.starting")
+    }
+}
