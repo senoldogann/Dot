@@ -85,7 +85,7 @@ MODEL: _Recorder = _Recorder()
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"'
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\nfast = "{SCRIPTED_MODEL}"'
         "\n\n[memory]\nembed_enabled = false\n\n[agent]"
         "\ngoal_mode = false",
         encoding="utf-8",
@@ -643,7 +643,8 @@ async def test_an_agent_just_made_meets_the_owner_in_its_first_chat_once(
     run = met.json()
     assert (run["agent_id"], run["source"], run["mode"]) == (agent_id, "welcome", "chat")
     assert "Scout, Finds and checks sources" in run["goal"] and "in Turkish" in run["goal"]
-    assert "ask_user" in run["goal"]
+    assert "ask_user" not in run["goal"] and "Call no tool" in run["goal"]
+    assert run["model"] == runtime.roles.fast()
     # Dot's words around a name and a role a run may have written are no instruction of the owner's (the pre-push
     # review), and the chat is named after the agent.
     assert run["goal"] not in manager.instructions_of(run["id"])

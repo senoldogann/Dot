@@ -522,8 +522,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/agents/{agent_id}/welcome", status_code=201)
     async def welcome_agent(agent_id: str, request: AgentWelcomeRequest) -> RunRecord:
-        """Start the first meeting of an agent the owner has just made (item 993): it greets them in its role, in their
-        language, and asks what they want from it. An agent that has had a chat already has met them (409), and Dot
+        """Start the first meeting of an agent the owner has just made (item 993): its first message, on the fast model
+        with no tool (item 1962), says who it is and what it does and asks the one question that starts it, in their
+        language. An agent that has had a chat already has met them (409), and Dot
         has its own first conversation (item 420)."""
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot has a first conversation of its own", {"agent_id": agent_id})
@@ -538,7 +539,8 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 agent,
                 welcome_goal(agent, request.language),
                 "chat",
-                None,
+                # One answer on the fast model (item 1962): the owner waits at the chat for it.
+                ctx.runtime.roles.fast(),
                 thread.id,
                 WELCOME_SOURCE,
                 None,

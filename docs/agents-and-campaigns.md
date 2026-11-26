@@ -40,9 +40,10 @@ browser has chosen for the home's box; the mode starts on Auto, as the home's do
 there go with that message, in place of the agent's own for that run, and leave the home's choices as they were. Fast
 mode and goal mode are the home's own, shared with it in this browser: the agent has no bounds for them, and turning one
 on there turns it on in the home's box too. The home composer offers an Agent menu once an agent exists, Dot by default. An agent made with **Create agent** meets
-you at once (item 993, `POST /api/agents/<id>/welcome` with the language your browser reads): its first chat opens,
-where it greets you in one sentence in its role and in your language and asks you, with a few choices and room for
-your own words, what you want from it most; the goal Dot gives that meeting (a run of source `welcome`, in a chat named
+you at once (item 993, `POST /api/agents/<id>/welcome` with the language your browser reads): its first chat opens
+with a message of the agent's own, in your language (item 1962): who it is, what it will do for you from its role and
+instructions, and the one question whose answer it needs most to start. It is one answer on the fast model with no tool,
+so it is there within seconds, on the web page and on the phone; the goal Dot gives that meeting (a run of source `welcome`, in a chat named
 after the agent) is not drawn as a message of yours, nor taken as your instruction by a reviewer, in that run or a later
 one of its chat, since it holds the agent's name and role, which a run may have written. An agent that has had a chat has met you already (409), and Dot has its own first conversation
 (item 420).
