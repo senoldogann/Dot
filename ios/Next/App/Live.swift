@@ -86,6 +86,8 @@ func failureWords(_ failure: OutboxItem.Failure) -> String {
     case .runEnded: String(localized: "Not sent: the run had ended", comment: "Under a message meant for a run that ended before it arrived")
     case .tooOld: String(localized: "Not sent: it waited more than a day", comment: "Under an owner's message too old to send again safely")
     case .unreadable: String(localized: "Not sent: the Mac's answer could not be read", comment: "Under an owner's message whose answer was unreadable")
+    case .attachmentMissing: String(localized: "Not sent: an attachment could not be read on this phone", comment: "Under a message whose attachment is gone")
+    case .uploadCancelled: String(localized: "Upload cancelled", comment: "Under a message after the owner stops its attachment upload")
     case .photoMissing: String(localized: "Not sent: a photo of it could not be read on this phone", comment: "Under an owner's message whose photo file is gone")
     }
 }
@@ -345,7 +347,7 @@ struct ChatListView: View {
             lines.append(String(localized: "Your unsent words wait in New chat.", comment: "Chat list notice after a reset: the words that were not sent are the new chat's draft"))
         }
         if model.reset?.photosLeft == true {
-            lines.append(String(localized: "Photos of unsent messages were not kept.", comment: "Chat list notice after a reset: the photos of the messages that were not sent are gone"))
+            lines.append(String(localized: "Attachments of unsent messages were not kept.", comment: "Chat list notice after a reset: the attachments of the messages that were not sent are gone"))
         }
         return lines.joined(separator: " ")
     }
@@ -539,6 +541,7 @@ struct BotNewChat: View {
     @Environment(\.botChat) private var botChat: BotChat?
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
+    @State private var keepingMessage: Bool = false
     @State private var settings: ChatSettingsDraft = ChatSettingsDraft(choices: .daemons, planFirst: false)
     @State private var choosing: Bool = false
     /// The words could not be kept in the outbox (the disk): said above the composer, the words stay.
@@ -566,7 +569,7 @@ struct BotNewChat: View {
             Spacer(minLength: 0)
             if notKept {
                 Notice(
-                    tone: .failure, message: String(localized: "The message could not be saved on this phone. Try again.", comment: "New chat: the outbox could not keep the first message"),
+                    tone: .failure, message: messageStorageFailure(),
                     dismiss: { notKept = false }
                 )
                 .padding(.horizontal, Space.s)
@@ -576,9 +579,9 @@ struct BotNewChat: View {
                 placeholder: bot.map { $0.isDot ? String(localized: "Message Dot", comment: "Placeholder of the composer") : askPlaceholder($0.record.name) }
                     ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
                 buttons: composerButtons(
-                    // A new chat needs words (the daemon's goal is never empty): photos alone do not start one.
-                    hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
+                    hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty, runActive: false, followUp: .queue, editing: false),
                 perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+            .disabled(keepingMessage)
             .padding(.horizontal, Space.s)
             .padding(.bottom, Space.xs)
         }
@@ -621,12 +624,15 @@ struct BotNewChat: View {
     }
 
     private func send() {
-        let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { return }
-        let photos: [Data] = attachments.map(\.jpeg)
+        let typed: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files: [OutgoingAttachment] = attachments.compactMap(\.outgoing)
+        guard !keepingMessage, files.count == attachments.count, !typed.isEmpty || !files.isEmpty else { return }
+        let words: String = typed.isEmpty ? attachmentMessage() : typed
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
+        keepingMessage = true
         Task {
-            if let key = await model.startChat(words, photos: photos, start: start, agent: agent) {
+            defer { keepingMessage = false }
+            if let key = await model.startChat(words, files: files, start: start, agent: agent) {
                 notKept = false
                 model.keep(draft: "", of: AppModel.newChatDraft(agent: agent))
                 opened(key)
@@ -688,7 +694,14 @@ struct StartingChat: View {
         ScrollView {
             VStack(alignment: .trailing, spacing: Space.xxs) {
                 OwnerMessage(text: text)
-                Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
+                if let progress = model.outbox.first(where: { $0.id == key })?.attachmentUpload {
+                    AttachmentTransferLine(key: key, progress: progress)
+                } else {
+                    Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
+                    if case .rejected = delivery {
+                        Button(String(localized: "Try again", comment: "Under a refused message: sends it again")) { model.retry(key) }.textRole(.label)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.horizontal, Space.gutter)
@@ -774,7 +787,7 @@ enum LatencyProbe {
                 }
                 let text: String = "probe \(number) \(UUID().uuidString.prefix(6))"
                 model.probeSent[text] = Date()
-                await model.send(text, thread: thread, steerInto: nil, photos: [], picks: .none)
+                await model.send(text, thread: thread, steerInto: nil, files: [], picks: .none)
                 for _ in 0..<200 where model.probeSent[text] != nil { try? await Task.sleep(for: .milliseconds(100)) }
                 try? await Task.sleep(for: .milliseconds(300))
             }

@@ -19,25 +19,36 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import ClassVar
 
+import httpx
 import pytest
 import pytest_asyncio
 
+from dotagent.agent.attachments import ATTACHMENTS_EVENT, StoredAttachment
 from dotagent.agent.gate import RunGate
+from dotagent.agent.manager import RunManager
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.errors import ToolExecutionError, ToolInputError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
+from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import RunRecord, ThreadRecord
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
 from dotagent.tools import video
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.video import WATCH_VIDEO_TOOL
 from dotagent.video import media
 from dotagent.video.watch import VideoInfo
 from dotagent.web import client
+
+_VIDEO_SAMPLE: Path = Path(__file__).resolve().parents[2] / "ios/Next/UITests/attachment-sample.mp4"
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 # The checks that start ffmpeg need it; the refusals, which start nothing, run everywhere (the gate has no ffmpeg).
@@ -156,6 +167,74 @@ def _video(path: Path, seconds: int, sound: bool) -> Path:
         check=True,
     )
     return path
+
+
+@needs_ffmpeg
+async def test_a_video_uploaded_by_a_client_reaches_a_scripted_run_and_plays(runtime: Runtime) -> None:
+    data: bytes = await asyncio.to_thread(_VIDEO_SAMPLE.read_bytes)
+    manager: RunManager = RunManager(runtime)
+    context: ServerContext = ServerContext(
+        runtime=runtime,
+        manager=manager,
+        scheduler=None,
+        token="video-test-token",
+        host="127.0.0.1",
+        port=18765,
+        started_at=0,
+        stopping=asyncio.Event(),
+    )
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(context)),
+            base_url="http://127.0.0.1:18765",
+            headers={"Authorization": "Bearer video-test-token"},
+        ) as api:
+            uploaded: httpx.Response = await api.post(
+                "/api/attachments",
+                json={"name": "Walk.mp4", "media_type": "video/mp4", "data_b64": base64.b64encode(data).decode()},
+            )
+            assert uploaded.status_code == 201, uploaded.text
+            stored: StoredAttachment = StoredAttachment.model_validate(uploaded.json())
+            assert stored.kind == "video"
+            assert await asyncio.to_thread(Path(stored.path).read_bytes) == data
+            await runtime.router.register(
+                "ollama",
+                ScriptedProvider(
+                    "ollama",
+                    [
+                        ScriptedTurn(
+                            text="",
+                            calls=(
+                                ScriptedCall(tool=WATCH_VIDEO_TOOL, arguments={"source": stored.path, "frames": 1}),
+                            ),
+                        ),
+                        ScriptedTurn(
+                            text="",
+                            calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Watched.", "success": True}),),
+                        ),
+                    ],
+                ),
+            )
+            sent: httpx.Response = await api.post(
+                "/api/runs", json={"goal": GOAL, "model": SCRIPTED_MODEL, "mode": "task", "attachments": [stored.id]}
+            )
+            assert sent.status_code == 201, sent.text
+            run: RunRecord = RunRecord.model_validate(sent.json())
+            async with asyncio.timeout(15):
+                while True:
+                    response: httpx.Response = await api.get(f"/api/runs/{run.id}")
+                    assert response.status_code == 200, response.text
+                    if not response.json()["active"]:
+                        break
+                    await asyncio.sleep(0.05)
+            files: list[EventRecord] = await runtime.store.events_of_kind(run.id, ATTACHMENTS_EVENT, 5)
+            assert files[0].data["files"] == [{"id": stored.id, "name": "Walk.mp4", "kind": "video", "size": len(data)}]
+            results: list[EventRecord] = await runtime.store.events_of_kind(run.id, "tool_result", 10)
+            watched: EventRecord = next(event for event in results if event.data["tool"] == WATCH_VIDEO_TOOL)
+            assert watched.data["ok"] is True, watched.data
+            assert "00:01 long" in str(watched.data)
+    finally:
+        await manager.shutdown()
 
 
 @needs_ffmpeg

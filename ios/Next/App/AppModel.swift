@@ -327,13 +327,13 @@ final class AppModel {
 
     /// The owner's words for a chat: queued behind the run at work (D10 default) or, with `steer`, into it.
     @discardableResult
-    func send(_ text: String, thread: String, steerInto run: String?, photos: [Data], picks: MessagePicks) async -> String? {
+    func send(_ text: String, thread: String, steerInto run: String?, files: [OutgoingAttachment], picks: MessagePicks) async -> String? {
         guard let engine else { return nil }
         do {
-            if let run { return try await engine.steer(text, run: run, thread: thread, photos: photos) }
-            return try await engine.send(text, thread: thread, photos: photos, picks: picks)
+            if let run { return try await engine.steer(text, run: run, thread: thread, attachments: files) }
+            return try await engine.send(text, thread: thread, attachments: files, picks: picks)
         } catch {
-            // Only writing the message's photos beside the outbox can fail here.
+            // The message or its attachments could not be written to the outbox.
             logger.error("a message could not be kept thread=\(thread, privacy: .public) error=\(String(describing: error), privacy: .public)")
             return nil
         }
@@ -342,10 +342,10 @@ final class AppModel {
     /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24) and with Dot (`agent` `nil`) or
     /// one of the owner's agents: its key, which the chat opens at once (item 1849) and swaps for the chat's own id once
     /// the daemon names it; `nil` when the message could not be kept.
-    func startChat(_ text: String, photos: [Data], start: ChatStart, agent: String?) async -> String? {
+    func startChat(_ text: String, files: [OutgoingAttachment], start: ChatStart, agent: String?) async -> String? {
         guard let engine else { return nil }
         do {
-            let key: String = try await engine.startChat(text, photos: photos, start: start, agent: agent)
+            let key: String = try await engine.startChat(text, attachments: files, start: start, agent: agent)
             startingChats[key] = text
             return key
         } catch {
@@ -363,6 +363,11 @@ final class AppModel {
                 logger.error("a doing could not be kept error=\(String(describing: error), privacy: .public)")
             }
         }
+    }
+
+    func cancelUpload(_ key: String) {
+        guard let engine else { return }
+        Task { await engine.outbox.cancelUpload(key) }
     }
 
     func retry(_ key: String) {

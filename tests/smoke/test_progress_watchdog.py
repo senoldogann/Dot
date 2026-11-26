@@ -5,7 +5,7 @@ No network and no model service is used: the scripted model plays the run and an
 """
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import pytest
 import pytest_asyncio
@@ -13,13 +13,14 @@ import pytest_asyncio
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import CHECKPOINT_TOOL, PROGRESS_TOOL
 from dotagent.config import AppConfig, load_default_config
+from dotagent.core.errors import MissingSecretError
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home, seed_workspace
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.endings import PREFIX_STALLED, classify_ending
 from dotagent.store.models import EventRecord, RunRecord
@@ -90,11 +91,20 @@ def _config(escalation: bool, checkpoint_steps: int = 0) -> AppConfig:
 
 async def _play(config: AppConfig, login_env: dict[str, str], turns: Sequence[ScriptedTurn]) -> Played:
     """``GOAL`` as an unattended run of a model that plays ``turns``, in a throw-away home."""
+    return await _play_beside(config, login_env, turns, {})
+
+
+async def _play_beside(
+    config: AppConfig, login_env: dict[str, str], turns: Sequence[ScriptedTurn], others: Mapping[str, ChatProvider]
+) -> Played:
+    """:func:`_play` with the providers ``others`` registered beside the scripted model (by their names)."""
     model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, turns))
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)
         try:
             await runtime.router.register(_PROVIDER, model)
+            for name, other in others.items():
+                await runtime.router.register(name, other)
             await asyncio.to_thread(seed_workspace, runtime.workspace, [NOTES])
             manager: RunManager = RunManager(runtime)
             try:
@@ -276,3 +286,62 @@ async def test_a_run_judged_off_track_at_every_checkpoint_is_stopped_with_what_i
     # The stop says the judge's last diagnosis, in the result and on the timeline.
     assert "drop what notes.txt says" in played.record.result
     assert played.stalls[-1]["diagnosis"].startswith("It keeps rewriting summary.md")
+
+
+# A review model whose key is gone (item 1939): its provider raises what a missing key raises.
+_KEYLESS: str = "openai"
+_KEYLESS_MODEL: str = f"{_KEYLESS}:judge"
+
+
+class KeylessProvider:
+    """A provider whose key is missing: every call raises :class:`MissingSecretError`, as a removed key does."""
+
+    def __init__(self, script: ScriptedProvider) -> None:
+        self._script: ScriptedProvider = script
+
+    @property
+    def name(self) -> str:
+        return _KEYLESS
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        raise MissingSecretError("no API key for openai", {"provider": _KEYLESS, "model": request.model})
+
+    async def model_info(self, model: str) -> ModelInfo:
+        return await self._script.model_info(model)
+
+    async def list_models(self) -> tuple[ModelInfo, ...]:
+        return await self._script.list_models()
+
+    async def aclose(self) -> None:
+        await self._script.aclose()
+
+
+def _keyless_review(config: AppConfig) -> AppConfig:
+    return config.model_copy(update={"models": config.models.model_copy(update={"review": _KEYLESS_MODEL})})
+
+
+async def test_a_checkpoint_whose_review_model_has_no_key_changes_nothing(login_env: dict[str, str]) -> None:
+    """Item 1939 (A1-01): a checkpoint is a second look; a review model whose key is missing leaves the run as it was,
+    rather than ending it at its checkpoint."""
+    drafts: list[ScriptedTurn] = [_turn(_write("summary.md", f"draft {number}\n")) for number in range(6)]
+    config: AppConfig = _keyless_review(_config(False, checkpoint_steps=3))
+    keyless: KeylessProvider = KeylessProvider(ScriptedProvider(_KEYLESS, ()))
+    played: Played = await _play_beside(config, login_env, [*drafts, DONE], {_KEYLESS: keyless})
+    assert played.record.status == "done", played.record.result
+    assert played.stalls == ()
+
+
+async def test_a_consult_whose_review_model_has_no_key_stops_the_run_saying_so(login_env: dict[str, str]) -> None:
+    """Item 1939: the consult rung with a review model whose key is missing ends the run as stalled with the problem
+    stated, as one that could not answer does, not with a crash."""
+    plan: ScriptedCall = ScriptedCall(
+        tool=UPDATE_PLAN_TOOL,
+        arguments={"steps": [{"text": "Write summary.md", "status": "pending"}]},
+    )
+    turns: list[ScriptedTurn] = [*[_turn(READ)] * 8, _turn(plan, READ), *[_turn(READ)] * 8]
+    keyless: KeylessProvider = KeylessProvider(ScriptedProvider(_KEYLESS, ()))
+    played: Played = await _play_beside(_keyless_review(_config(True)), login_env, turns, {_KEYLESS: keyless})
+    assert played.record.status == "failed"
+    assert classify_ending(played.record.status, played.record.result) == "stalled", played.record.result
+    assert "could not give a second opinion: no API key for openai" in played.record.result
+    assert [stall["action"] for stall in played.stalls] == ["nudge", "replan", "consult"]

@@ -14,6 +14,32 @@ final class ChatUITests: XCTestCase {
         return app
     }
 
+    @MainActor
+    func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
+        let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-failed", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge",
+        ]
+        app.launchEnvironment["DotNextTestVideo"] = try Data(contentsOf: clip).base64EncodedString()
+        app.launch()
+
+        let attach: XCUIElement = app.buttons["composer.attach"]
+        XCTAssertTrue(attach.waitForExistence(timeout: 10))
+        attach.tap()
+        let library: XCUIElement = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "Photos and videos")
+        ).firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 10), app.debugDescription)
+        library.tap()
+        let duration: XCUIElement = app.staticTexts["composer.videoDuration"]
+        XCTAssertTrue(duration.waitForExistence(timeout: 15))
+        XCTAssertTrue(duration.label.hasPrefix("0:01"), duration.label)
+        app.buttons["Remove Sample.mp4"].tap()
+        XCTAssertFalse(duration.exists)
+    }
+
     /// The owner's report of 2026-11-25: the capsule's clock froze between events. The fixture's run gets no event at
     /// all, yet the clock goes on every second; and the capsule says what the run does (here: writing its words).
     func testTheCapsuleClockTicksWithNoEventsAndSaysWhatTheRunDoes() {

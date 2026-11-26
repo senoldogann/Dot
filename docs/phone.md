@@ -609,6 +609,17 @@ for a lost link would hold what the owner sends.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
+## Attachments on Dot Next and the web
+
+In a new or existing Dot Next chat, tap **+** to open the photo library for photos and videos, take a photo or record a
+video with Camera, or choose a document with Files. The phone exports video as 720p MP4 with sound, and shows its
+thumbnail, duration and upload size. If it exceeds 20 MiB, tap **Trim video** on the chip and choose a shorter part.
+Files show their name, type and size. Up to 10 attachments go with a message.
+
+After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
+After cancellation, tap **Try again** to retry the message. On the Mac, choose **+ › Add files** in the web composer
+or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
+
 ## The iPhone app's calls
 
 What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every path is under
