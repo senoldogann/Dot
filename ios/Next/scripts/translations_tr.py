@@ -1152,11 +1152,25 @@ TR: dict[str, str] = {
     "Written %@ after %lld steps": "%@ yazıldı, %lld adımdan sonra",
     "Your message waits in the box: %@": "Mesajın kutuda bekliyor: %@",
     "the chat on the web": "web'deki sohbet",
+    # D2: the work log's group line, waiting line (item 1909).
+    "ran %lld commands": "%lld komut çalıştırdı",
+    "read %lld files": "%lld dosya okudu",
+    "edited %lld files": "%lld dosya düzenledi",
+    "searched the web %lld times": "web'de %lld kez aradı",
+    "searched %lld times": "%lld kez aradı",
+    "opened %lld pages": "%lld sayfa açtı",
+    "took %lld steps on the Mac": "Mac'te %lld adım attı",
+    "waited %lld times": "%lld kez bekledi",
+    "started %lld helpers": "%lld yardımcı başlattı",
+    "used %lld tools": "%lld araç kullandı",
+    "%@ and %@": "%@ ve %@",
+    "Waiting · %@": "Bekliyor · %@",
+    "Details": "Ayrıntılar",
+
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
-    "Ran %lld commands": ("Ran %lld command", "Ran %lld commands"),
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
@@ -1164,6 +1178,17 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "Waiting on %lld helpers": ("Waiting on %lld helper", "Waiting on %lld helpers"),
     "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),
     "Folded, %lld models": ("Folded, %lld model", "Folded, %lld models"),
+    "ran %lld commands": ("ran %lld command", "ran %lld commands"),
+    "read %lld files": ("read %lld file", "read %lld files"),
+    "edited %lld files": ("edited %lld file", "edited %lld files"),
+    "searched the web %lld times": ("searched the web %lld time", "searched the web %lld times"),
+    "searched %lld times": ("searched %lld time", "searched %lld times"),
+    "opened %lld pages": ("opened %lld page", "opened %lld pages"),
+    "took %lld steps on the Mac": ("took %lld step on the Mac", "took %lld steps on the Mac"),
+    "waited %lld times": ("waited %lld time", "waited %lld times"),
+    "started %lld helpers": ("started %lld helper", "started %lld helpers"),
+    "used %lld tools": ("used %lld tool", "used %lld tools"),
+
 }
 
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
