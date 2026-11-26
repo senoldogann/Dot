@@ -22,8 +22,8 @@ final class ChatUITests: XCTestCase {
         let status: XCUIElement = app.buttons["capsule.status"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
         let first: String = status.label
-        // Item 1769: the capsule says Working and its clock; what the run does is the live line's.
-        XCTAssertTrue(first.hasPrefix("Working, "), "the capsule says Working: \(first)")
+        // Items 1769 and 1880: the capsule says Working and its clock; what the run does is the live line's.
+        XCTAssertTrue(first.hasPrefix("Working, "), "the capsule says the main run works, with its clock: \(first)")
         let second: String = nextLabel(of: status, after: first, within: 2.5)
         XCTAssertNotEqual(second, first, "the clock moved on its own: \(first) -> \(second)")
         let third: String = nextLabel(of: status, after: second, within: 2.5)
@@ -55,12 +55,12 @@ final class ChatUITests: XCTestCase {
             let send: XCUIElement = app.buttons["composer.send"]
             XCTAssertEqual(send.label, "Queue: starts after this run", "a tap queues, as the setting says")
             send.press(forDuration: 1.2)
-            // The menu's subtitles are not in the tree XCUITest reads; the shots show them.
+            // The menu's subtitles join the title in the label on some iOS versions; the shots show them.
             let steer: XCUIElement = app.buttons["composer.followUp.steer"]
             let queue: XCUIElement = app.buttons["composer.followUp.queue"]
             XCTAssertTrue(steer.waitForExistence(timeout: 3), "the menu opened")
-            XCTAssertEqual(steer.label, "Steer now")
-            XCTAssertEqual(queue.label, "Queue")
+            XCTAssertTrue(steer.label.hasPrefix("Steer now"), "the title, with its subtitle where the tree has it: \(steer.label)")
+            XCTAssertTrue(queue.label.hasPrefix("Queue"), "the title, with its subtitle where the tree has it: \(queue.label)")
             let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
             shot.name = "composer-follow-up-menu"
             shot.lifetime = .keepAlways
@@ -71,6 +71,65 @@ final class ChatUITests: XCTestCase {
             let sent: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "NOT (value CONTAINS %@)", words), object: field)
             XCTAssertEqual(XCTWaiter.wait(for: [sent], timeout: 3), .completed, "\(way) sent the draft: \(String(describing: field.value))")
         }
+    }
+
+    /// Item 1880: the plan is a segment of the one working pill, never a card in the stream; a tap opens its checklist.
+    /// The design bar: the pill's segments stand on one line, as tall as each other, centred on the same y, 44 pt tall.
+    func testThePlanIsAChipBesideTheCapsuleThatOpensItsChecklist() {
+        let app: XCUIApplication = launch("n2-chat")
+        let chip: XCUIElement = app.buttons["capsule.plan"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10))
+        XCTAssertEqual(chip.label, "Plan, 1 of 3 steps done")
+        XCTAssertFalse(app.staticTexts["Plan · 1 of 3 done"].exists, "no plan card in the stream")
+        let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
+        let stop: XCUIElement = app.buttons["capsule.stop"]
+        let people: XCUIElement = app.buttons["capsule.helpers"]
+        XCTAssertTrue(status.exists && stop.exists && people.exists)
+        let segments: [XCUIElement] = [status, stop, chip, people]
+        let measured: String = segments.map { "\($0.identifier) \($0.frame)" }.joined(separator: "; ") + "; window \(app.windows.firstMatch.frame)"
+        add(XCTAttachment(string: measured))
+        for segment in segments {
+            XCTAssertEqual(segment.frame.midY, status.frame.midY, accuracy: 1, measured)
+            XCTAssertEqual(segment.frame.height, status.frame.height, accuracy: 1, measured)
+            XCTAssertGreaterThanOrEqual(segment.frame.height, 44, measured)
+        }
+        XCTAssertLessThan(status.frame.maxX, stop.frame.minX + 1, "one line, in order: \(measured)")
+        XCTAssertLessThan(chip.frame.maxX, people.frame.minX + 1, "one line, in order: \(measured)")
+        XCTAssertLessThanOrEqual(people.frame.maxX, app.windows.firstMatch.frame.maxX, "inside the screen: \(measured)")
+        let bar: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        bar.name = "plan-chip"
+        bar.lifetime = .keepAlways
+        add(bar)
+        chip.tap()
+        XCTAssertTrue(app.staticTexts["Plan · 1 of 3 done"].waitForExistence(timeout: 5), "the checklist in a sheet")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Find free afternoon slots at the dentist")).firstMatch.exists)
+        let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheet.name = "plan-sheet"
+        sheet.lifetime = .keepAlways
+        add(sheet)
+    }
+
+    /// Item 1880: the helpers are no card in the stream; the capsule's people segment opens the Agents sheet, where a
+    /// working helper's row says what it does in plain words beside its state, clock and model.
+    func testTheHelpersLiveBehindTheCapsuleNotInTheStream() {
+        let app: XCUIApplication = launch("n2-chat")
+        XCTAssertTrue(app.buttons["capsule.plan"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "helpers ·")).firstMatch.exists, "no helper card in the stream")
+        let people: XCUIElement = app.buttons["capsule.helpers"]
+        XCTAssertEqual(people.label, "Helpers, 1 of 2 done")
+        people.tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.label.contains("Working"), row.label)
+        XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
+        // A tap opens the helper's own chat, which shows the helper's run (its parent run lives in another chat).
+        row.tap()
+        XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5), "the helper's chat shows its words")
+        let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheet.name = "helper-chat"
+        sheet.lifetime = .keepAlways
+        add(sheet)
     }
 
     /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run

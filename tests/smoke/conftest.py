@@ -92,6 +92,8 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["DOT_OPEN"] = MISSING_OPEN
     os.environ["DOT_SWIFTC"] = MISSING_SWIFTC
     os.environ["DOT_KEYCHAIN"] = MISSING_KEYCHAIN
+    # No daemon of a test fetches the public price list (item 1856): a test reaches nothing outside this Mac.
+    os.environ["DOT_PRICES_URL"] = ""
 
 
 KEYCHAIN_PASSWORD: str = "dot-test"

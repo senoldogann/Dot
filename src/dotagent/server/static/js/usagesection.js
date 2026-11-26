@@ -1,8 +1,8 @@
 // What the tasks used in the last week, as a section of Settings › Models (item 1403): the windows of the Claude plan the
 // tasks last saw, the whole week in a line and a row for each day with a bar of its tokens, from `GET /api/usage`; the
 // tasks that used the most, and the caps of what they spend with today's tokens against them (item 1731,
-// `GET`/`PUT /api/budget`). Dot holds no price per model, so it shows time, the words the models read and wrote, and how
-// full the plan is: no money. Words in usagewords.js.
+// `GET`/`PUT /api/budget`). It shows time, the words the models read and wrote, how full the plan is, and an estimate
+// in dollars from a public price list (item 1856). Words in usagewords.js.
 
 import { api, query } from "./api.js";
 import { compact, el } from "./dom.js";
@@ -26,7 +26,7 @@ import {
 } from "./usagewords.js";
 
 const DAYS = 7;
-const LEAD = `What your tasks used in the last ${DAYS} days: their time, the words the models read (in) and wrote (out), and how full your Claude plan is. Dot keeps no price for a model, so there is no money here.`;
+const LEAD = `What your tasks used in the last ${DAYS} days: their time, the words the models read (in) and wrote (out), and how full your Claude plan is. The dollars are an estimate from the public price list of models.dev; a subscription such as your Claude plan has none.`;
 
 /** A thin bar `share` percent full. */
 function bar(share) {

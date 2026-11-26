@@ -112,7 +112,6 @@ TR: dict[str, str] = {
     "Nothing of this chat is saved on this phone yet. It loads once the phone reaches your Mac.": "Bu sohbetten bu telefonda henüz bir şey kayıtlı değil. Telefon Mac'ine ulaşınca yüklenir.",
     "Nothing queued": "Sırada bir şey yok",
     "Nothing was heard. Try again.": "Hiçbir şey duyulmadı. Yeniden dene.",
-    "Opens the helpers": "Yardımcıları açar",
     "Or write your own answer": "Ya da kendi yanıtını yaz",
     "Pair this phone again in Settings.": "Bu telefonu Ayarlar'dan yeniden eşleştir.",
     "Paste image": "Görseli yapıştır",
@@ -283,7 +282,6 @@ TR: dict[str, str] = {
     "%@, failed": "%@, başarısız",
     "%@, running": "%@, çalışıyor",
     "%lld helpers": "%lld yardımcı",
-    "%lld helpers working": "%lld yardımcı çalışıyor",
     "%lld queued": "%lld sırada",
     "%lld working": "%lld çalışıyor",
     "3 matches in 2 files": "2 dosyada 3 eşleşme",
@@ -768,6 +766,13 @@ TR: dict[str, str] = {
     "Update Dot on your Mac to see the provider programs' versions.": "Sağlayıcı programlarının sürümlerini görmek için Mac'indeki Dot'u güncelle.",
     "Updates": "Güncellemeler",
     "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
+    # D2: the plan chip beside the working capsule (item 1880).
+    "Plan %lld/%lld": "Plan %lld/%lld",
+    "Plan, %lld of %lld steps done": "Plan, %lld / %lld adım bitti",
+    "Waiting for a helper": "Bir yardımcıyı bekliyor",
+    "Waiting on %lld helpers": "%lld yardımcıyı bekliyor",
+    "Helpers, %lld of %lld done": "Yardımcılar, %lld / %lld bitti",
+    "Browsed dentist.example/booking": "dentist.example/booking sayfasına bakıldı",
     # C2 (items 1768-1769): Dot's own tools' phrases (the web's tr.js), the live work line, Appearance's code and terminal.
     'Finish': 'Bitir',
     'Turn on more actions': 'Daha fazla eylemi aç',
@@ -888,7 +893,7 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "Ran %lld commands": ("Ran %lld command", "Ran %lld commands"),
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
-    "%lld helpers working": ("%lld helper working", "%lld helpers working"),
+    "Waiting on %lld helpers": ("Waiting on %lld helper", "Waiting on %lld helpers"),
 }
 
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).

@@ -106,7 +106,11 @@ watcher has:
 - a **kind**: **New mail** in a Google or Microsoft account you signed in (see [Mail and
   calendars](runs.md#mail-and-calendars)); **Calendar**, an event about to start in one of those accounts; or
   **GitHub**, your own notifications: a review asked of you, a mention (yours or your team's), an assignment, and a
-  check or workflow run of yours that failed;
+  check or workflow run of yours that failed; or **Check** (item 1855), your own script in Dot's `checks` folder, run
+  without a model at each look by the contract of a schedule's check ([Schedules](memory-and-schedules.md#schedules)):
+  `{"wake": true}` makes what it printed the one thing told (judged by the fast model only when you gave words),
+  `{"wake": false}` tells nothing, and a check that fails is said on the watcher's row as a failed look, never taken as
+  quiet. A check watcher's first look is a real one;
 - **what you want to hear of**, in your own words ("my bank, my landlord, anything about the visa"): needed for mail,
   optional for GitHub (then the notifications above are told as they are) and for the calendar (then every timed event
   is told);
@@ -431,10 +435,10 @@ it.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/brief` | the brief as its card shows it: whether it is on (its schedule exists and is switched on), `time` and `days` (read from the schedule's cron; `custom` when that was changed in the list to a time the card cannot show), your `lines`, the `zone`, its `schedule_id`, when it fires next and last fired, how the last firing went, the run to open (`last_run_id`) and how many mail and calendar accounts are signed in |
-| `GET /api/watchers` | the watchers, in the order they were made, each with its choices (`kind`, `account`, `words`, `minutes`, `action`, `goal`, `enabled`) and how its looks go: `primed` (its first look is made), `looked_at`, `next_look_at`, `last` (what the last look came to), `error` and `error_at` (why the last one failed), `told` (tells in the last hour); never the keys of what it handled |
+| `GET /api/watchers` | the watchers, in the order they were made, each with its choices (`kind`, `account`, `words`, `minutes`, `action`, `goal`, `check`, `enabled`) and how its looks go: `primed` (its first look is made), `looked_at`, `next_look_at`, `last` (what the last look came to), `error` and `error_at` (why the last one failed), `told` (tells in the last hour); never the keys of what it handled |
 | `GET /api/watchers/options` | what the form offers: the `accounts` signed in, whether GitHub's token is kept (`github`, never the token), the `minutes` each kind starts with, `tells_per_hour` and `runs_per_hour`, and whether the watchers look at all (`looking`) |
-| `POST /api/watchers` | make one, 201: `{"name", "kind": "mail" \| "calendar" \| "github", "enabled", "account", "words", "minutes", "action": "tell" \| "run", "goal"}`; 422 for what its kind lacks (mail needs an account and words, the calendar an account, GitHub takes none, a run needs its goal), for `minutes` outside 1 to 1440, and past 20 watchers |
-| `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind or its account changed, and one switched on again looks at once (404 for none) |
+| `POST /api/watchers` | make one, 201: `{"name", "kind": "mail" \| "calendar" \| "github" \| "check", "enabled", "account", "words", "minutes", "action": "tell" \| "run", "goal", "check"}`; 422 for what its kind lacks (mail needs an account and words, the calendar an account, GitHub takes none, a check takes no account and needs `check`, the file name of an executable script in Dot's checks folder, which no other kind takes; a run needs its goal), for `minutes` outside 1 to 1440, and past 20 watchers |
+| `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind, its account or its check changed, and one switched on again looks at once (404 for none) |
 | `DELETE /api/watchers/{id}` | delete it; answers what was deleted; the chats of the runs it started stay (404 for none) |
 | `POST /api/watchers/{id}/try` | Check now: one look at once, whatever its time: `{"outcome": {"first", "found", "told", "summary", "error"}, "watcher": …}`; a look that fails answers 200 with the failure in `outcome.error`, and `found` and `told` say how far it came (404 for none; 409 for a watcher switched off, while `[watchers] enabled` is false and while the emergency stop is engaged) |
 | `GET /api/tells` | what you did with the tells of the last 30 days (item 1743): `days`, `window_s` (1800), and `rows`, one per kind (`brief`, `checkin`, `watcher`, `initiative`, `run_end`, `schedule_end`, `system`) and subject (a watcher's id, else empty), each with `counts`: `sent`, `acted`, `opened`, `dismissed`, `ignored`, `pending`, `unmeasured` and `precision` (`null` with no tell answered) |

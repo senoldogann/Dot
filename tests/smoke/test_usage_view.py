@@ -3,7 +3,7 @@ owner sets no ceiling on a task, so what is spent is what there is to read: ``GE
 last days, a row for each day with the tokens in and out, the steps and the minutes, and the last window of the Claude
 plan each kind of window was seen in; Settings › Models draws it as a Usage section, readable on a phone 390 px wide
 and wide; and the Cost card of a task that is still at work says first what it has used so far, with the plan's window
-its newest step saw. Dot keeps no price for a model, so no money is shown. The caps of what the runs spend (item
+its newest step saw, with an estimate in dollars beside the tokens (item 1856). The caps of what the runs spend (item
 1731): ``GET``/``PUT /api/budget``, the costliest tasks and the caps in Settings, the task against its cap on the
 Cost card, and a task past a cap that waits on a card, Continue or Stop, in yolo, until Stop ends it."""
 
@@ -226,7 +226,7 @@ async def test_settings_models_draws_the_usage_wide_and_on_a_phone_with_the_plan
                 await expect(window.locator(".set-row-lead")).to_contain_text(
                     re.compile(r"^62% used · resets in 1h (?:19|20)m · seen ")
                 )
-                # The section stands before the long list of every model, and never says a price.
+                # The section stands before the long list of every model; tasks on the Claude plan have no price.
                 titles: list[str] = await page.locator(".set-section-title").all_inner_texts()
                 assert titles.index("Usage") < titles.index("Every model, by service"), titles
                 assert "$" not in await usage.inner_text()

@@ -383,6 +383,16 @@ class ElsewhereError(DotError):
     asked: it is not there, Dot has it already, its name is taken, or Dot cannot use it as it is written."""
 
 
+class PrecheckError(DotError):
+    """A schedule's or watcher's check (item 1855) could not say whether to wake: it is not there or not executable,
+    it failed, ran past its time, or its last line is not the contract's. Never taken as "nothing to wake for"."""
+
+
+class PricingError(DotError):
+    """The price list of the models (item 1856) could not be fetched or read: its address, the status and the start of
+    the answer are in the context."""
+
+
 class StoreError(DotError):
     """The persistent store rejected an operation."""
 

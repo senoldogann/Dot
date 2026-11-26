@@ -55,8 +55,15 @@ struct ChatScreen: View {
 
     private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
-    private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
+    /// The chat's own runs (`ownRuns`): a helper's own chat shows the run that is its work.
+    private var ownRuns: [RunRecord] { view.map(DotEngine.ownRuns(of:)) ?? [] }
+    private var activeRun: RunRecord? { ownRuns.last { $0.isActive } }
     private var helpers: [HelperView] { view?.helpers ?? [] }
+    /// The helpers the chat's newest run started (item 1880): the pill counts these, never an older run's.
+    private var newestRunHelpers: [HelperView] {
+        guard let run = ownRuns.last else { return [] }
+        return helpers.filter { $0.parentRunId == run.id }
+    }
     /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
     private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
     /// Whether the chosen mode hides the steps, so that the live line says the work (item 1769).
@@ -66,17 +73,19 @@ struct ChatScreen: View {
     private var phase: ChatPhase { chatPhase(of: view) }
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
-    private var builtItems: [TranscriptItem] {
+    private var builtItems: [TranscriptItem] { transcript(in: mode) }
+
+    private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
         // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
-        transcript(
+        DotEngine.transcript(
             of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), mode: mode, streaming: streaming,
             context: TranscriptContext(answeredHere: model.answeredHere))
     }
 
     private var dock: [DockEntry] {
-        let ownRuns: Set<String> = Set((view?.runs ?? []).filter { $0.parentRunId == nil }.map(\.id))
+        let ownRunIds: Set<String> = Set(ownRuns.map(\.id))
         return dockEntries(
-            asks: view?.asks ?? [], chatRuns: ownRuns, outbox: model.outbox, online: model.online, local: model.askPhases,
+            asks: view?.asks ?? [], chatRuns: ownRunIds, outbox: model.outbox, online: model.online, local: model.askPhases,
             shown: shownAsks, decided: decidedAsks, answeredHere: model.answeredHere
         ).filter { !dismissedAsks.contains($0.id) }
     }
@@ -122,7 +131,7 @@ struct ChatScreen: View {
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
             .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
             .task { await model.loadModels() }
-            .modifier(ComposerLists(thread: thread, lastRun: view?.runs.last(where: { $0.parentRunId == nil })?.id, changedFiles: $changedFiles, aside: $aside))
+            .modifier(ComposerLists(thread: thread, lastRun: ownRuns.last?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
             .modifier(FrameMeterHook(running: activeRun != nil))
             .onKeyPress(.escape) {
@@ -165,7 +174,7 @@ struct ChatScreen: View {
                 if let unreadable = chat?.unreadable, unreadable > 0 {
                     Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
                 }
-                ForEach(TranscriptBlock.of(items)) { block in
+                ForEach(TranscriptBlock.of(streamItems(items))) { block in
                     Group {
                         switch block {
                         case .item(let item): row(item)
@@ -225,7 +234,7 @@ struct ChatScreen: View {
                 position.scrollTo(edge: .bottom)
             }
         }
-        .safeAreaInset(edge: .bottom) { bottom() }
+        .safeAreaInset(edge: .bottom) { bottom(items) }
     }
 
     @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
@@ -260,10 +269,12 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
-        case .helpers(_, _, let list):
-            HelperGroupCard(helpers: list, open: { panel = .agents })
-        case .plan(_, let steps):
-            PlanCard(steps: steps)
+        case .helpers:
+            // The helpers are the capsule's people segment and its Agents sheet (item 1880), never a card here.
+            EmptyView()
+        case .plan:
+            // The plan is the chip beside the capsule (item 1880), never a card in the stream.
+            EmptyView()
         case .decision(let anchor):
             AskAnchorRow(anchor: anchor)
         case .work(let fold):
@@ -296,15 +307,18 @@ struct ChatScreen: View {
 
     // MARK: The bottom: capsule, dock or composer
 
-    @ViewBuilder private func bottom() -> some View {
+    @ViewBuilder private func bottom(_ items: [TranscriptItem]) -> some View {
         let entries: [DockEntry] = dock
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: capsuleStatus,
-                    since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
-                    helpers: helpers.filter { helperState($0.status).isLive }.count),
-                showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
+                    status: capsuleStatus, activity: activityWords,
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } : nil, queued: view?.queue.messages.count ?? 0,
+                    helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
+                showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
+                stop: { stop() },
+                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
                 scrollToBottom: {
                     pinned = true
                     withAnimation { position.scrollTo(edge: .bottom) }
@@ -384,12 +398,12 @@ struct ChatScreen: View {
                 toast = ToastMessage(id: UUID(), text: String(localized: "Ask again every so often: /loop 30m <message>", comment: "Composer command: what /loop does"), systemImage: "info.circle", actionTitle: nil)
                 return
             case .aside(let question):
-                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                guard let run = ownRuns.last else { break }
                 draft = ""
                 Task { aside = SideAnswer(question: question, answer: await model.aside(run: run.id, question: question)) }
                 return
             case .loop(let every, let text):
-                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                guard let run = ownRuns.last else { break }
                 draft = ""
                 Task {
                     if let problem = await model.loop(run: run.id, every: every, text: text) {
@@ -443,7 +457,7 @@ struct ChatScreen: View {
 
     /// Try again / Resume: the newest run's goal sent again as a message of the chat.
     private func retryLast() {
-        guard let last = view?.runs.last(where: { $0.parentRunId == nil }), !last.goal.isEmpty else { return }
+        guard let last = ownRuns.last, !last.goal.isEmpty else { return }
         Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: [], picks: .none) }
     }
 
@@ -534,8 +548,32 @@ struct ChatScreen: View {
         }
     }
 
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" while the
+    /// main run's own step only waits for its helpers (N still working); `nil` while it takes a step of its own, which
+    /// the capsule says as "Working" with the turn's clock.
+    private var activityWords: String? {
+        guard capsuleStatus == .working, let run = activeRun, let chat, case .tool(let step)? = activity(of: chat, run: run.id) else { return nil }
+        let working: Int = newestRunHelpers.filter { helperState($0.status).isLive }.count
+        guard working > 0, isHelperStep(step.tool) else { return nil }
+        return String(localized: "Waiting on \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+    }
+
+    /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the
+    /// plan out of its transcript, and the pill is its only place, so it is read from a transcript of every row.
+    private func newestPlan(_ items: [TranscriptItem]) -> [PlanStep]? {
+        guard let run = ownRuns.last else { return nil }
+        return plan(of: run.id, in: mode == .zen ? transcript(in: .showAll) : items)
+    }
+
     @ViewBuilder private func sheet(_ panel: ChatPanel) -> some View {
         switch panel {
+        case .plan:
+            ScrollView {
+                PlanSteps(steps: newestPlan(builtItems) ?? [])
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.vertical, Space.m)
+            }
+            .inspectorSheet(title: String(localized: "Plan", comment: "Inspector section: the run's plan"), close: { self.panel = nil })
         case .agents:
             LiveAgentsSheet(thread: thread, close: { self.panel = nil })
         case .background:
@@ -575,6 +613,32 @@ struct ChatScreen: View {
         guard sizeClass == .regular else { return nil }
         return ProseColumn.width(charactersPerLine: ReadingWidth.current(readingWidthRaw).charactersPerLine, font: ProseColumn.bodyFont(dynamicTypeSize))
     }
+}
+
+/// A transcript as the stream draws it, at its top and inside each folded run: no plan (the chip beside the capsule)
+/// and no helper group (the capsule's people segment and its Agents sheet), item 1880. Pure.
+func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
+    items.compactMap { item in
+        switch item {
+        case .plan, .helpers: return nil
+        case .work(let fold):
+            return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
+        default: return item
+        }
+    }
+}
+
+/// The plan a run keeps, from the transcript, a folded run's included; `nil` when it keeps none. Pure.
+func plan(of run: String, in items: [TranscriptItem]) -> [PlanStep]? {
+    for item in items.reversed() {
+        switch item {
+        case .plan(let id, let steps) where id == "plan:\(run)": return steps
+        case .work(let fold):
+            if let steps = plan(of: run, in: fold.items) { return steps }
+        default: continue
+        }
+    }
+    return nil
 }
 
 /// A side question and the run's answer (`/btw`).

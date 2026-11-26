@@ -13,6 +13,7 @@ from pydantic import Field, ValidationError
 from dotagent.core.errors import InvalidValueError, NotFoundError, StoreError
 from dotagent.core.ids import new_id
 from dotagent.core.types import FrozenModel
+from dotagent.scheduler.precheck import ready_check
 from dotagent.store.db import Store
 
 # The key of the kv table that holds the book of watchers, a :class:`Book` as JSON.
@@ -26,14 +27,17 @@ WORDS_CHARS: int = 1000
 GOAL_CHARS: int = 4000
 ADDRESS_CHARS: int = 320
 MOST_MINUTES: int = 1440
+CHECK_CHARS: int = 80
 # What a watcher keeps of what it handled: the keys of the newest items, so that one seen is not told twice. A mailbox
 # gets far fewer in the days a look can still reach (:data:`dotagent.proactive.looks.MAX_AGE_S`).
 SEEN_KEPT: int = 400
 # The minutes a watcher is given when its kind says nothing else: mail and GitHub are looked at every five minutes, and
 # the calendar tells an event a quarter of an hour before it starts.
-DEFAULT_MINUTES: dict[str, int] = {"mail": 5, "github": 5, "calendar": 15}
+DEFAULT_MINUTES: dict[str, int] = {"mail": 5, "github": 5, "calendar": 15, "check": 15}
 
-type WatcherKind = Literal["mail", "calendar", "github"]
+# ``check`` (item 1855): the owner's check, an executable file in Dot's checks folder run without a model, is the look;
+# what it printed when it said to wake is the one item.
+type WatcherKind = Literal["mail", "calendar", "github", "check"]
 type WatcherAction = Literal["tell", "run"]
 
 
@@ -62,7 +66,8 @@ class WatcherRecord(FrozenModel):
     """A watcher. ``account`` is the address of the Google or Microsoft account it looks in (mail and calendar; empty
     for GitHub, whose token Dot keeps with the connector). ``words`` are what the owner wants to hear of, in their own;
     ``minutes`` how often a mail or GitHub watcher looks, and how long before an event a calendar watcher tells.
-    ``goal`` is what its run does for the owner when ``action`` is ``run`` (empty for ``tell``)."""
+    ``goal`` is what its run does for the owner when ``action`` is ``run`` (empty for ``tell``). ``check`` is the file
+    name of the check a ``check`` watcher runs (item 1855), empty for the other kinds."""
 
     id: str
     name: str
@@ -75,6 +80,7 @@ class WatcherRecord(FrozenModel):
     goal: str
     created_at: float
     state: WatcherState
+    check: str = ""
 
 
 class WatcherRequest(FrozenModel):
@@ -88,6 +94,7 @@ class WatcherRequest(FrozenModel):
     minutes: int = Field(ge=1, le=MOST_MINUTES)
     action: WatcherAction = "tell"
     goal: str = Field(default="", max_length=GOAL_CHARS)
+    check: str = Field(default="", max_length=CHECK_CHARS)
 
 
 class WatcherView(FrozenModel):
@@ -103,6 +110,7 @@ class WatcherView(FrozenModel):
     minutes: int
     action: WatcherAction
     goal: str
+    check: str
     created_at: float
     primed: bool
     looked_at: float | None
@@ -132,6 +140,7 @@ def watcher_view(record: WatcherRecord, now: float) -> WatcherView:
         minutes=record.minutes,
         action=record.action,
         goal=record.goal,
+        check=record.check,
         created_at=record.created_at,
         primed=state.primed,
         looked_at=state.looked_at,
@@ -145,10 +154,12 @@ def watcher_view(record: WatcherRecord, now: float) -> WatcherView:
 
 def checked(request: WatcherRequest) -> WatcherRequest:
     """``request`` with its words trimmed, or an :class:`InvalidValueError` that says what is missing for its kind: mail
-    needs an account and words, the calendar an account, GitHub neither an account nor anything but a token Dot keeps;
-    a watcher that starts a run needs the goal of that run, and one that only tells keeps none."""
+    needs an account and words, the calendar an account, GitHub neither an account nor anything but a token Dot keeps,
+    a check the file name of a check in Dot's checks folder and no account (item 1855); a watcher that starts a run
+    needs the goal of that run, and one that only tells keeps none."""
     name: str = request.name.strip()
     account: str = request.account.strip()
+    check: str = request.check.strip()
     words: str = request.words.strip()
     goal: str = request.goal.strip()
     if name == "":
@@ -157,12 +168,24 @@ def checked(request: WatcherRequest) -> WatcherRequest:
         raise InvalidValueError("a mail or calendar watcher needs the account it looks in", {"kind": request.kind})
     if request.kind == "github" and account != "":
         raise InvalidValueError("a GitHub watcher looks at your own notifications: it takes no account", {})
+    if request.kind == "check":
+        if account != "":
+            raise InvalidValueError("a check watcher runs your check: it takes no account", {})
+        ready_check(check)
+    elif check != "":
+        raise InvalidValueError("only a check watcher runs a check", {"kind": request.kind})
     if request.kind == "mail" and words == "":
         raise InvalidValueError("a mail watcher needs your words: what you want to hear of", {})
     if request.action == "run" and goal == "":
         raise InvalidValueError("a watcher that starts a run needs the goal of the run", {})
     return request.model_copy(
-        update={"name": name, "account": account, "words": words, "goal": goal if request.action == "run" else ""}
+        update={
+            "name": name,
+            "account": account,
+            "words": words,
+            "goal": goal if request.action == "run" else "",
+            "check": check,
+        }
     )
 
 
@@ -207,7 +230,9 @@ async def add_watcher(store: Store, request: WatcherRequest, now: float) -> Watc
         action=wanted.action,
         goal=wanted.goal,
         created_at=now,
-        state=WatcherState(),
+        # A check's first look is a real one: there is nothing already there to take as handled.
+        state=WatcherState(primed=wanted.kind == "check"),
+        check=wanted.check,
     )
 
     def add(book: Book) -> Book:
@@ -233,9 +258,13 @@ async def change_watcher(store: Store, watcher_id: str, request: WatcherRequest)
             if item.id != watcher_id:
                 items.append(item)
                 continue
-            elsewhere: bool = item.kind != wanted.kind or item.account.casefold() != wanted.account.casefold()
+            elsewhere: bool = (
+                item.kind != wanted.kind
+                or item.account.casefold() != wanted.account.casefold()
+                or item.check != wanted.check
+            )
             state: WatcherState = (
-                WatcherState()
+                WatcherState(primed=wanted.kind == "check")
                 if elsewhere
                 else item.state.model_copy(update={"next_look_at": 0.0})
                 if wanted.enabled and not item.enabled
@@ -251,6 +280,7 @@ async def change_watcher(store: Store, watcher_id: str, request: WatcherRequest)
                     "minutes": wanted.minutes,
                     "action": wanted.action,
                     "goal": wanted.goal,
+                    "check": wanted.check,
                     "state": state,
                 }
             )

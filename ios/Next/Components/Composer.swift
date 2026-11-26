@@ -432,20 +432,36 @@ struct WorkingSummary: Equatable, Sendable {
     /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
     /// transcript's live line says).
     let status: ChatStatus?
-    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not.
+    /// "Waiting on 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
+    /// a step of its own ("Working" and the turn's clock).
+    let activity: String?
+    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not; `nil`
+    /// while it waits on its helpers.
     let since: Date?
     let queued: Int
-    let helpers: Int
+    /// The helpers the run started that ended, and all of them ("2/3" in the people segment).
+    let helpersDone: Int
+    let helpersTotal: Int
+    /// The plan of the chat's newest run (item 1880); `nil` when that run keeps none.
+    let plan: PlanProgress?
+    /// The run can be stopped from the capsule.
+    let canStop: Bool
 
-    var isEmpty: Bool { status == nil && queued == 0 && helpers == 0 }
+    var isEmpty: Bool { status == nil && queued == 0 && helpersTotal == 0 && plan == nil }
 }
 
-/// The floating working capsule and the scroll-to-bottom circle in one glass container, so the two merge
-/// (plan §4.1, R-a §3). Each segment is its own 44 pt button; at the accessibility sizes the segments stack.
+/// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
+/// The capsule is one pill for everything about the chat's work, thin dividers between its segments (item 1880, the
+/// owner's reference app): "Working 1m 50s" or "Waiting on 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
+/// Each segment is its own button, at least 44 pt each way. It stays one line at the default text size: in words where
+/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its spinner before the
+/// clock (the smallest iPhone with every segment shown). At the accessibility sizes the segments stack, as glyphs.
 struct FloatingWorkingControl: View {
     let summary: WorkingSummary
     let showsScrollToBottom: Bool
     let openStatus: () -> Void
+    let stop: () -> Void
+    let openPlan: () -> Void
     let openQueue: () -> Void
     let openHelpers: () -> Void
     let scrollToBottom: () -> Void
@@ -454,7 +470,18 @@ struct FloatingWorkingControl: View {
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: Space.xs) {
-                if !summary.isEmpty { capsule }
+                if !summary.isEmpty {
+                    if compact {
+                        capsule(glyphs: true)
+                    } else {
+                        // One line always: in words where they fit, else Stop, the plan and the queue as their glyphs and
+                        // the status as its spinner and clock (the smallest iPhone with every segment shown).
+                        ViewThatFits(in: .horizontal) {
+                            capsule(glyphs: false)
+                            capsule(glyphs: true)
+                        }
+                    }
+                }
                 if showsScrollToBottom {
                     Button(action: scrollToBottom) {
                         Symbol(name: "chevron.down", context: .toolbar)
@@ -470,11 +497,13 @@ struct FloatingWorkingControl: View {
         }
     }
 
-    private var capsule: some View {
-        let layout: AnyLayout =
-            dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-            : AnyLayout(HStackLayout(spacing: 0))
+    private var compact: Bool { dynamicTypeSize.isAccessibilitySize }
+
+    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its spinner
+    /// before the clock, and the segments sit closer.
+    private func capsule(glyphs: Bool) -> some View {
+        let inset: CGFloat = glyphs ? Space.xs : Space.s
+        let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let status = summary.status {
                 // The status and its clock are drawn every second, whether events come or not: a clock drawn with
@@ -483,9 +512,15 @@ struct FloatingWorkingControl: View {
                 // every drawing of the screen, so words streaming faster than once a second held the clock still.
                 TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
-                    segment(action: openStatus, label: [status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
+                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", "), inset: inset) {
                         HStack(spacing: Space.xxs + 1) {
-                            StatusWord(status: status)
+                            if let activity = summary.activity {
+                                ActivityWord(text: activity)
+                            } else if glyphs, clock != nil, status == .working {
+                                ProgressView().controlSize(.mini).tint(Tone.secondary)
+                            } else {
+                                StatusWord(status: status)
+                            }
                             if let clock {
                                 Text(clock).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers().lineLimit(1).fixedSize()
                             }
@@ -494,39 +529,74 @@ struct FloatingWorkingControl: View {
                     .accessibilityIdentifier("capsule.status")
                 }
             }
-            if summary.queued > 0 {
+            if summary.canStop {
                 if summary.status != nil { divider }
-                segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")) {
-                    Label { Text(String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")).lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
-                        .foregroundStyle(Tone.secondary)
+                segment(action: stop, label: String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), inset: inset) {
+                    if glyphs {
+                        Image(systemName: "stop.fill").textRole(.label).foregroundStyle(Tone.text)
+                    } else {
+                        Text(String(localized: "Stop", comment: "Chat toolbar: stops the run at work")).textRole(.label).fontWeight(.medium)
+                            .foregroundStyle(Tone.text).lineLimit(1).fixedSize()
+                    }
+                }
+                .accessibilityIdentifier("capsule.stop")
+            }
+            if let plan = summary.plan {
+                if summary.status != nil || summary.canStop { divider }
+                segment(
+                    action: openPlan,
+                    label: String(localized: "Plan, \(plan.done) of \(plan.total) steps done", comment: "VoiceOver: the plan chip beside the working capsule; the arguments are the steps done and all steps"),
+                    inset: inset
+                ) {
+                    Label {
+                        Text(verbatim: glyphs ? "\(plan.done)/\(plan.total)" : String(localized: "Plan \(plan.done)/\(plan.total)", comment: "The plan chip beside the working capsule; the arguments are the steps done and all steps"))
+                            .lineLimit(1).fixedSize()
+                    } icon: {
+                        Image(systemName: plan.done == plan.total ? "checklist.checked" : "checklist")
+                    }
+                    .textRole(.label).fontWeight(.medium).tabularNumbers()
+                    .foregroundStyle(Tone.secondary)
+                }
+                .accessibilityIdentifier("capsule.plan")
+            }
+            if summary.queued > 0 {
+                if summary.status != nil || summary.canStop || summary.plan != nil { divider }
+                segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count"), inset: inset) {
+                    Label { Text(verbatim: "\(summary.queued)").lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
+                        .tabularNumbers().foregroundStyle(Tone.secondary)
                 }
                 .accessibilityIdentifier("capsule.queue")
             }
-            if summary.helpers > 0 {
-                if summary.status != nil || summary.queued > 0 { divider }
-                segment(action: openHelpers, label: String(localized: "\(summary.helpers) helpers working", comment: "VoiceOver: the capsule segment of helpers at work; the argument is their count")) {
-                    Label { Text(verbatim: "\(summary.helpers)") } icon: { Image(systemName: "person.2") }.textRole(.label).fontWeight(.medium)
-                        .foregroundStyle(Tone.secondary)
+            if summary.helpersTotal > 0 {
+                if summary.status != nil || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
+                segment(
+                    action: openHelpers,
+                    label: String(localized: "Helpers, \(summary.helpersDone) of \(summary.helpersTotal) done", comment: "VoiceOver: the capsule segment of the run's helpers; the arguments are the helpers that ended and all of them"),
+                    inset: inset
+                ) {
+                    Label { Text(verbatim: "\(summary.helpersDone)/\(summary.helpersTotal)").lineLimit(1).fixedSize() } icon: { Image(systemName: "person.2") }
+                        .textRole(.label).fontWeight(.medium).tabularNumbers().foregroundStyle(Tone.secondary)
                 }
+                .accessibilityIdentifier("capsule.helpers")
             }
         }
         .padding(.horizontal, Space.xxs)
-        .interactiveGlass(in: dynamicTypeSize.isAccessibilitySize ? AnyShape(rounded(Radius.bubble)) : AnyShape(Capsule()))
+        .interactiveGlass(in: compact ? AnyShape(rounded(Radius.bubble)) : AnyShape(Capsule()))
     }
 
     @ViewBuilder private var divider: some View {
-        if !dynamicTypeSize.isAccessibilitySize {
+        if !compact {
             Rectangle().fill(Tone.separator).frame(width: 1, height: 14).accessibilityHidden(true)
         }
     }
 
-    private func segment<Label: View>(action: @escaping () -> Void, label: String, @ViewBuilder content: () -> Label)
+    private func segment<Label: View>(action: @escaping () -> Void, label: String, inset: CGFloat, @ViewBuilder content: () -> Label)
         -> some View
     {
         Button(action: action) {
             content()
-                .padding(.horizontal, Space.s)
-                .frame(minHeight: Metric.hit)
+                .padding(.horizontal, inset)
+                .frame(minWidth: Metric.hit, minHeight: Metric.hit)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -536,3 +606,17 @@ struct FloatingWorkingControl: View {
     }
 }
 
+/// What a run does now, as the capsule's status word: the working spinner and one short line.
+struct ActivityWord: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: Space.xxs + 1) {
+            ProgressView().controlSize(.mini).tint(Tone.secondary)
+            Text(text).textRole(.label).fontWeight(.medium).lineLimit(1).truncationMode(.tail).frame(maxWidth: 200, alignment: .leading)
+        }
+        .foregroundStyle(ChatStatus.working.tone.color)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+}
