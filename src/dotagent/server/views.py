@@ -852,6 +852,12 @@ class KindModelRequest(FrozenModel):
     model: Literal[""] | ModelReference
 
 
+class AlternateCheckRequest(FrozenModel):
+    """The alternate check model, or an empty string to disable it."""
+
+    model: Literal[""] | ModelReference
+
+
 class RestartRequest(FrozenModel):
     """The model the owner picked to start a run's task again on (item 1889)."""
 
@@ -1715,6 +1721,7 @@ class ModelOption(FrozenModel):
     ``fast_mode``: it has fast mode (item 223); ``label``: its name as people know it, which the pages show ("Opus 5.5"
     for the Claude plan's ``opus``, item 1054), else its id."""
 
+    family: str | None = None
     ref: str
     label: str
     vision: bool

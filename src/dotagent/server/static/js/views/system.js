@@ -1178,7 +1178,7 @@ function providersInUse(status) {
     return [];
   }
   const { models } = status;
-  const refs = [...MODEL_ROLES.map((role) => models[role]), ...Object.values(models.kinds ?? {})];
+  const refs = [...MODEL_ROLES.map((role) => models[role]), ...Object.values(models.kinds ?? {}), models.check_other_family ?? ""];
   return [...new Set(refs.filter((ref) => ref !== "").map(providerOf))];
 }
 
@@ -1580,6 +1580,19 @@ function buildModels(isDisposed, asked, head) {
       },
     }),
   }));
+  const alternateCheck = modelSetting({
+    label: "Other-family check model",
+    hint: "Checks task goals and completed helper results when the worker belongs to a different model family.",
+    className: "models-role",
+    can: (model) => model.tools && model.family != null,
+    takes: (provider) => answersRole("review", provider),
+    refused: "This service’s models cannot answer review questions.",
+    none: "Off",
+    choose: async (ref) => {
+      await api.put("/models/check-other-family", { model: ref });
+      toast("ok", ref === "" ? "Other-family checks turned off." : `Other-family checks use ${modelName(ref)}.`);
+    },
+  });
   const roles = ROLE_SETTINGS.map((setting) => ({
     role: setting.role,
     control: modelSetting({
@@ -1777,7 +1790,7 @@ function buildModels(isDisposed, asked, head) {
   const element = el(
     "div",
     { class: "set-sections" },
-    setSection({ title: "Roles", body: setCard(planRow, main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, usage) }),
+    setSection({ title: "Roles", body: setCard(planRow, main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, alternateCheck.element, usage) }),
     setSection({ title: "Task models", lead: "Used when you haven’t chosen a model for the task. Helpers otherwise use their parent’s model.", body: setCard(...kinds.map(({ control }) => control.element)) }),
     setSection({ title: "Night's learning and self-repair", body: setCard(...learning.map(({ control }) => control.element), learningFailed, repairRow) }),
     standby.element,
@@ -1804,7 +1817,8 @@ function buildModels(isDisposed, asked, head) {
     const status = getSnapshot().status;
     const mainModel = status === null ? "" : status.models.main;
     const kindModels = kinds.map(({ kind }) => status?.models.kinds?.[kind] ?? "");
-    const chosen = JSON.stringify([...roles.map(({ role }) => status?.models[role] ?? ""), ...kindModels]);
+    const checkModel = status?.models.check_other_family ?? "";
+    const chosen = JSON.stringify([...roles.map(({ role }) => status?.models[role] ?? ""), ...kindModels, checkModel]);
     const standbyModels = status === null ? [] : status.models.standby;
     const standbyKey = standbyModels.join(" ");
     const inUse = providersInUse(status);
@@ -1823,6 +1837,7 @@ function buildModels(isDisposed, asked, head) {
     head.setMeta(...modelsSummary(providers, inUse));
     search.placeholder = `Search ${plural(providers.reduce((count, provider) => count + provider.models.length, 0), "model", "models")}`;
     main.paint(providers, mainModel, null);
+    alternateCheck.paint(providers, checkModel, null);
     for (const [index, { control }] of kinds.entries()) {
       control.paint(providers, kindModels[index], null);
     }

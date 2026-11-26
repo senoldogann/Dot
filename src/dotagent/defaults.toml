@@ -110,6 +110,8 @@ context = {}
 # of a scope, and speaks of security work), quick lookups, deep investigations, writing and repository changes.
 # Settings › Models sets it: kinds = { code = "anthropic:claude-opus-5-5" }.
 kinds = {}
+# An optional model for goal and helper result checks when its family differs from the worker's.
+check_other_family = ""
 
 [providers.ollama]
 base_url = "http://localhost:11434"

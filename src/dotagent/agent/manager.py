@@ -39,6 +39,7 @@ from dotagent.agent.campaign import (
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.held_notes import dismiss_held_note, save_held_note
+from dotagent.agent.helper_check import check_helper_result
 from dotagent.agent.helper_reports import (
     HELPER_RELEASED_EVENT,
     HELPER_RESUMED_EVENT,
@@ -71,7 +72,7 @@ from dotagent.agent.lessons import (
     undo_lesson,
 )
 from dotagent.agent.limits import over_the_hop_limit
-from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
+from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, RunOutcome, browser_of, run_agent
 from dotagent.agent.loop_state import LOOP_STATE_EVENT
 from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.orders import WorkDesk
@@ -4458,14 +4459,12 @@ class RunManager:
                 runtime.peers.begin(run.id, run.thread_id, run.goal)
                 # A run nobody watches does not wait for an Allow of Chrome nobody clicked (item 699).
                 runtime.browsers.unattended(run.thread_id, await self._nobody_watches(run))
+                alternate: str = runtime.roles.alternate_check()
                 ended: RunEnd = await run_way(parse_model_ref(run.model).provider)(agent)
-                status, result, needs, lessons = (
-                    ended.outcome.status,
-                    ended.outcome.result,
-                    ended.outcome.needs,
-                    ended.lessons,
-                )
-                restated = ended.outcome.restated
+                outcome: RunOutcome = await check_helper_result(agent, alternate, ended.outcome)
+                status, result, needs = outcome.status, outcome.result, outcome.needs
+                lessons = ended.lessons
+                restated = outcome.restated
         except RunHoldLapsed as exc:
             status, result = "cancelled", exc.message
         except (RunCancelled, asyncio.CancelledError):

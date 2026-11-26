@@ -14,12 +14,21 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `standby`           | models a run moves to when its own model cannot answer (see below); Settings › Models sets it | `[]`                    |
 | `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
 | `context`           | a model's context size where it is not `[agent] context_tokens` (see below); Settings › Models sets it | `{}`         |
+| `check_other_family` | optional model for independent goal and helper checks, when its family differs from the worker | `""` (off) |
 | `kinds`             | models for kinds of work: `security`, `quick`, `deep`, `writing`, `code`; Settings › Models sets them | `{}` |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
 With `[agent] lessons = "auto"` the warning also says that lessons are approved by the run's own model, and that an
 independent check needs another `[models] review` model.
+**Other-family check model** in Settings › Models (`PUT /api/models/check-other-family`) chooses a specific model
+for the goal check and for a final check of a successful delegated result before its parent sees the report. Dot
+compares model lineages across providers, for example Claude on the API and on the Claude plan. It compares with
+the current worker after a standby switch. If the two known families differ, the check goes to the selected model
+alone. A refused or unavailable check is reported with the result. A helper’s scheduled follow-up can satisfy the
+check when it is scheduled to run in the parent’s chat. If either family is unknown or both are the same,
+the run uses its usual goal check and the helper reports normally. Off is the default.
+
 What `review` is asked has the secrets Dot holds and the ones it recognises masked, as it may be another provider's.
 
 Settings › Models chooses `fast`, `review` and `vision` under the default model (item 232), each from the models that
