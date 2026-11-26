@@ -49,4 +49,7 @@ curl -fsS -H "$main" "$base/api/threads?limit=20" | check "Scout's first meeting
 # The new chat of the bot's menu carries the bot: its first message is a run of Scout's own.
 curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the new chat's first message went to Scout" \
     'any(r["goal"] == "Hello from a new chat" and r["agent_id"] is not None for r in d)'
+# The swiped message went out with its quote in front, the words the model reads (item 1972).
+curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the quote rides on the message" \
+    'any(r["goal"] == "> Hello from a new chat\n\nSay it again" for r in d)'
 exit $fail

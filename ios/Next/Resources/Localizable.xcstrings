@@ -4293,7 +4293,7 @@
       }
     },
     "Dot's own work": {
-      "comment": "Models section: the model that decides Dot's own work",
+      "comment": "Chat list section: the chats of Dot's schedules, initiative and code reviews\nModels section: the model that decides Dot's own work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6827,7 +6827,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nInspector cost row: the seconds the model took\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nInspector row: the model and reasoning level of this chat\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7014,7 +7014,7 @@
       }
     },
     "Needs you": {
-      "comment": "Chat list section: chats that wait for the owner\nComponent gallery (debug builds): a heading or sample text",
+      "comment": "Chat list section: chats that wait for the owner\nChat row: an approval, a question or a secret waits for the owner\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9181,6 +9181,28 @@
         }
       }
     },
+    "Quote": {
+      "comment": "Message menu and VoiceOver action: puts the message in the composer as a quote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntıla"
+          }
+        }
+      }
+    },
+    "Quote: %@": {
+      "comment": "VoiceOver: a quoted message above a message; the argument is the quote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntı: %@"
+          }
+        }
+      }
+    },
     "Ran %@": {
       "comment": "Tool row: a command that ran; the argument is the command",
       "localizations": {
@@ -9628,6 +9650,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tepkiyi kaldır: %@"
+          }
+        }
+      }
+    },
+    "Remove the quote": {
+      "comment": "VoiceOver: the cross on the composer's quote chip",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntıyı kaldır"
           }
         }
       }
@@ -13700,7 +13733,7 @@
       }
     },
     "Waiting on %lld helpers": {
-      "comment": "Capsule: the run waits for its helpers; the argument is how many still work",
+      "comment": "Capsule: the run waits for its helpers; the argument is how many still work\nChat row: the run waits on helpers; the argument is how many",
       "localizations": {
         "en": {
           "variations": {
@@ -13751,7 +13784,7 @@
       }
     },
     "Waiting · %@": {
-      "comment": "Waiting line: the run waits on something; the argument says on what",
+      "comment": "Chat row: something works for the chat in the background; the argument names it\nWaiting line: the run waits on something; the argument says on what",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14257,7 +14290,7 @@
       }
     },
     "Working": {
-      "comment": "Campaign session: at work\nChat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
+      "comment": "Campaign session: at work\nChat list section: chats with a run at work\nChat row: a run of the chat is at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
       "localizations": {
         "tr": {
           "stringUnit": {

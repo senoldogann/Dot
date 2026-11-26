@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
 | [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
 | [1960](1960.md) | done | 2026-11-26 | Fewer turns on the desktop path: a batch's result is the look, and Safari's pages go to the Safari tools |
 | [1959](1959.md) | done | 2026-11-26 | The owner's own Safari, driven like Dot's Chrome: a page's elements with refs, batches of steps, the same policy |

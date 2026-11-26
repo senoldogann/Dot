@@ -1562,3 +1562,6 @@ EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
 
 # "This chat" sheet, plain (item 1922)
 TR.update({"Provider": "Sağlayıcı"})
+
+# Swipe to quote (item 1972)
+TR.update({"Quote": "Alıntıla", "Quote: %@": "Alıntı: %@", "Remove the quote": "Alıntıyı kaldır"})

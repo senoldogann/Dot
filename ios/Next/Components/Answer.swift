@@ -165,9 +165,11 @@ struct OwnerMessage: View {
     static let foldedLines: Int = 12
 
     var body: some View {
-        let long: Bool = text.split(whereSeparator: \.isNewline).count > Self.foldedLines * 2 || text.count > Self.foldedLines * 2 * 42
+        let (quote, words): (String?, String) = splitQuote(text)
+        let long: Bool = words.split(whereSeparator: \.isNewline).count > Self.foldedLines * 2 || words.count > Self.foldedLines * 2 * 42
         VStack(alignment: .trailing, spacing: Space.xxs) {
-            UserBubble(text: text, lineLimit: long && !unfolded ? Self.foldedLines : nil)
+            if let quote { QuoteBlock(quote: quote) }
+            if !words.isEmpty { UserBubble(text: words, lineLimit: long && !unfolded ? Self.foldedLines : nil) }
             if long {
                 Button(
                     unfolded

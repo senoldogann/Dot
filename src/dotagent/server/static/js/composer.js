@@ -25,6 +25,7 @@ import { markdownMirror } from "./mirror.js";
 import { loadPalette } from "./palette.js";
 import { arePicks, createPicks } from "./picks.js";
 import { readPref, removePref, writePref } from "./prefs.js";
+import { QUOTE_EVENT, quoteInto } from "./quotebutton.js";
 import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuSections, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 import { openTeachPanel } from "./teach.js";
@@ -461,6 +462,15 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
   textarea.addEventListener("input", onInput);
   textarea.addEventListener("focus", onFocus);
   textarea.addEventListener("blur", onBlur);
+  // A Quote button of a message (item 1972) starts the text with that message as a "> quote".
+  const onQuote = (/** @type {CustomEvent<string>} */ event) => {
+    textarea.value = quoteInto(textarea.value, event.detail);
+    wired.autosize();
+    edited();
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  };
+  document.addEventListener(QUOTE_EVENT, onQuote);
 
   const draft = draftKey === null ? null : readDraft(draftKey);
   if (draft !== null) {
@@ -541,6 +551,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands: o
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);
       textarea.removeEventListener("blur", onBlur);
+      document.removeEventListener(QUOTE_EVENT, onQuote);
     },
   };
 }

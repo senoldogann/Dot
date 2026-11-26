@@ -138,8 +138,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    `PATCH /api/threads/{id}`, and sent with each message together with the chat's mode and its agent); older messages
    (reaching the top of a chat reads a page of older runs, `GET /api/runs?before=`, and keeps the reader's place); a
    tap on a step's line opens its arguments and result (clipped, and it says how much was left out); a hold on a
-   message offers Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message
-   (`POST /api/runs/{id}/rewind`, the files kept as they are; not while a run works); what is typed and not sent is kept
+   message offers Quote, Copy, Select text, the seven reactions on what Dot said, and Edit from here on your own message
+   (`POST /api/runs/{id}/rewind`, the files kept as they are; not while a run works); a swipe to the right on any message (from away from the screen's edge, which is the back gesture's) quotes it: a chip with its first line stands above the text, and the message sent starts with the quote as `> lines`, which Dot reads and the chat shows as a quote (item 1972; the web's Quote button in a message's foot does the same); what is typed and not sent is kept
    for each chat, and for a new chat, across launches; the composer's microphone dictates on the iPhone (Apple's Speech
    framework, `requiresOnDeviceRecognition`: no audio leaves the phone; it asks for the speech and the microphone
    permissions when first pressed, and ends in a line, with a way to the app's page in Settings when a permission is

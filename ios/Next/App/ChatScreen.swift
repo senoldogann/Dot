@@ -57,6 +57,8 @@ struct ChatScreen: View {
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
+    /// A message the owner quoted by a swipe or the menu (item 1972): its words ride on the next message as a "> quote".
+    @State private var quoted: String?
     @State private var attachments: [ComposerAttachment] = []
     @State private var keepingMessage: Bool = false
     @State private var panel: ChatPanel?
@@ -356,11 +358,12 @@ struct ChatScreen: View {
         switch item {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
+                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, quote: quoteMessage, tell: { toast = $0 }))
                 // "Pending" (or why it was refused) until the Mac took the message; nothing once it did (item 1927).
                 if let delivery, delivery != .delivered { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
+            .swipeToQuote(text, quote: quoteMessage)
         case .note(_, let text):
             DotNoteRow(text: text)
         case .answer(let id, let text, let writing, let endedAt):
@@ -378,7 +381,9 @@ struct ChatScreen: View {
                         })
                 }
             }
+            .swipeToQuote(text, quote: quoteMessage)
             .contextMenu {
+                Button(String(localized: "Quote", comment: "Message menu and VoiceOver action: puts the message in the composer as a quote"), systemImage: "arrowshape.turn.up.left") { quoteMessage(text) }
                 Button(String(localized: "Copy", comment: "Code block header button that copies the code"), systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
             }
         case .thought(_, let text, let live):
@@ -467,6 +472,7 @@ struct ChatScreen: View {
                 ComposerView(
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
+                    quote: $quoted,
                     placeholder: activeRun == nil
                         ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
@@ -512,6 +518,11 @@ struct ChatScreen: View {
     }
 
     // MARK: Doings
+
+    /// Puts a message's words in the composer as the quote of the next message.
+    private func quoteMessage(_ words: String) {
+        quoted = quoteOf(words)
+    }
 
     private func perform(_ action: ComposerAction) {
         switch action {
@@ -563,7 +574,7 @@ struct ChatScreen: View {
             keepingMessage = true
             Task {
                 defer { keepingMessage = false }
-                let text: String = words.isEmpty && !files.isEmpty ? attachmentMessage() : words
+                let text: String = quotedWords(words.isEmpty && !files.isEmpty ? attachmentMessage() : words, quote: quoted)
                 guard await model.send(text, thread: thread, steerInto: run, files: files, picks: picks) != nil else {
                     toast = ToastMessage(id: UUID(), text: messageStorageFailure(), systemImage: "exclamationmark.triangle", actionTitle: nil)
                     return
@@ -571,6 +582,7 @@ struct ChatScreen: View {
                 // A steer carries no picks, so plan first waits for a subsequent message.
                 if run == nil { planFirst = false }
                 draft = ""
+                quoted = nil
                 attachments = []
                 model.keep(draft: "", of: thread)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
