@@ -1152,11 +1152,25 @@ TR: dict[str, str] = {
     "Written %@ after %lld steps": "%@ yazıldı, %lld adımdan sonra",
     "Your message waits in the box: %@": "Mesajın kutuda bekliyor: %@",
     "the chat on the web": "web'deki sohbet",
+    # D2: the work log's group line, waiting line (item 1909).
+    "ran %lld commands": "%lld komut çalıştırdı",
+    "read %lld files": "%lld dosya okudu",
+    "edited %lld files": "%lld dosya düzenledi",
+    "searched the web %lld times": "web'de %lld kez aradı",
+    "searched %lld times": "%lld kez aradı",
+    "opened %lld pages": "%lld sayfa açtı",
+    "took %lld steps on the Mac": "Mac'te %lld adım attı",
+    "waited %lld times": "%lld kez bekledi",
+    "started %lld helpers": "%lld yardımcı başlattı",
+    "used %lld tools": "%lld araç kullandı",
+    "%@ and %@": "%@ ve %@",
+    "Waiting · %@": "Bekliyor · %@",
+    "Details": "Ayrıntılar",
+
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
 EN_PLURALS: dict[str, tuple[str, str]] = {
-    "Ran %lld commands": ("Ran %lld command", "Ran %lld commands"),
     "%lld steps could not be shown": ("%lld step could not be shown", "%lld steps could not be shown"),
     "%lld helpers": ("%lld helper", "%lld helpers"),
     "%lld helpers working": ("%lld helper working", "%lld helpers working"),
@@ -1164,6 +1178,17 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
     "Waiting on %lld helpers": ("Waiting on %lld helper", "Waiting on %lld helpers"),
     "Delete %lld chats with everything they hold?": ("Delete %lld chat with everything it holds?", "Delete %lld chats with everything they hold?"),
     "Folded, %lld models": ("Folded, %lld model", "Folded, %lld models"),
+    "ran %lld commands": ("ran %lld command", "ran %lld commands"),
+    "read %lld files": ("read %lld file", "read %lld files"),
+    "edited %lld files": ("edited %lld file", "edited %lld files"),
+    "searched the web %lld times": ("searched the web %lld time", "searched the web %lld times"),
+    "searched %lld times": ("searched %lld time", "searched %lld times"),
+    "opened %lld pages": ("opened %lld page", "opened %lld pages"),
+    "took %lld steps on the Mac": ("took %lld step on the Mac", "took %lld steps on the Mac"),
+    "waited %lld times": ("waited %lld time", "waited %lld times"),
+    "started %lld helpers": ("started %lld helper", "started %lld helpers"),
+    "used %lld tools": ("used %lld tool", "used %lld tools"),
+
 }
 
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
@@ -1377,6 +1402,37 @@ EN_PLURALS.update(
         "%lld minutes before an event": ("%lld minute before an event", "%lld minutes before an event"),
         "%lld decisions made for you (%@)": ("%lld decision made for you (%@)", "%lld decisions made for you (%@)"),
         "%lld actions": ("%lld action", "%lld actions"),
+    }
+)
+# G1(a): a new scheduled task and its history.
+TR.update(
+    {
+        "Every day": "Her gün",
+        "Weekly report": "Haftalık rapor",
+        "Weekdays": "Hafta içi",
+        "Every week": "Her hafta",
+        "Once": "Bir kez",
+        "Custom (cron)": "Özel (cron)",
+        "Read my mail and tell me what needs me": "Postamı oku, bana ne gerektiğini söyle",
+        "When": "Ne zaman",
+        "Repeat": "Tekrar",
+        "Day": "Gün",
+        "Date and time": "Tarih ve saat",
+        "Cron form": "Cron biçimi",
+        "Time of day": "Saat",
+        "At this moment in your time.": "Senin saatinle bu anda.",
+        "%@, in your Mac's time zone.": "%@, Mac'inin saat diliminde.",
+        "Five parts separated by spaces: minute, hour, day of the month, month, day of the week, in your Mac's time zone. Very frequent schedules are refused.": "Boşlukla ayrılmış beş parça: dakika, saat, ayın günü, ay, haftanın günü; Mac'inin saat diliminde. Çok sık zamanlamalar reddedilir.",
+        "Runs as": "Kim olarak çalışır",
+        "What is left on Default takes your Mac's setting, or the agent's, when it runs.": "Varsayılan'da bırakılan, çalıştığında Mac'inin ya da ajanın ayarını alır.",
+        "Task": "Görev",
+        "Does the job": "İşi yapar",
+        "Looks things up, changes nothing": "Araştırır, hiçbir şeyi değiştirmez",
+        "History": "Geçmiş",
+        "Not run yet": "Henüz çalışmadı",
+        "Its runs show here once it has run.": "Çalıştıkça çalışmaları burada görünür.",
+        "Opens its chat": "Sohbetini açar",
+        "Dot does a task by itself, every morning or once at a time you pick.": "Dot bir işi kendi başına yapar: her sabah ya da seçtiğin bir zamanda bir kez.",
     }
 )
 # Settings › Campaigns (item 1895; S2's work of item 1780 carried onto main).

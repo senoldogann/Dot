@@ -45,6 +45,8 @@ struct ChatScreen: View {
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
     @State private var stepsShown: Bool = false
+    /// The helper whose chat a row of the stream opened (item 1909).
+    @State private var openedHelper: String?
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
@@ -115,6 +117,9 @@ struct ChatScreen: View {
             .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
             .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(item: $openedHelper) { helperThread in
+                ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
+            }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
             .liveFollow(thread: thread)
@@ -193,8 +198,14 @@ struct ChatScreen: View {
                     // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
                     .onAppear { reading.topVisible = block.id }
                 }
-                if linesTheWork, let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
-                    WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
+                if let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
+                    if !stopping, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
+                        // While the run waits on something, one quiet line says on what in every mode (item 1909); Stop
+                        // is the pill's, so the line offers only Details.
+                        WaitingLine(words: waiting, details: { panel = .inspector })
+                    } else if linesTheWork {
+                        WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
+                    }
                 }
                 ChatDrafts(thread: thread)
             }
@@ -299,9 +310,12 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
-        case .helpers:
-            // The helpers are the capsule's people segment and its Agents sheet (item 1880), never a card here.
-            EmptyView()
+        case .helpers(_, _, let list):
+            // Each helper its own row, where the run started it (item 1909, after another coding agent's work log); the
+            // capsule's people segment keeps them all a tap away too.
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(list, id: \.runId) { helper in HelperStreamRow(helper: helper, open: { openedHelper = helper.threadId }) }
+            }
         case .plan:
             // The plan is the chip beside the capsule (item 1880), never a card in the stream.
             EmptyView()
@@ -652,12 +666,12 @@ struct ChatScreen: View {
     }
 }
 
-/// A transcript as the stream draws it, at its top and inside each folded run: no plan (the chip beside the capsule)
-/// and no helper group (the capsule's people segment and its Agents sheet), item 1880. Pure.
+/// A transcript as the stream draws it, at its top and inside each folded run: no plan (the chip beside the capsule,
+/// item 1880). The helpers are rows of the stream again (item 1909). Pure.
 func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
     items.compactMap { item in
         switch item {
-        case .plan, .helpers: return nil
+        case .plan: return nil
         case .work(let fold):
             return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
         default: return item

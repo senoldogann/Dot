@@ -7,13 +7,18 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1917](1917.md) | done | 2026-11-26 | A pull request that changes ios/ builds the iPhone app once, on macOS |
+| [1911](1911.md) | done | 2026-11-26 | DotNext makes a scheduled task, and shows each schedule's history |
+| [1910](1910.md) | done | 2026-11-26 | DotNext's home opens the settings from an avatar icon, not from the owner's initials |
+| [1909](1909.md) | done | 2026-11-26 | DotNext's work log reads like a coding agent's: tool calls grouped in plain words, each helper its own row, and one quiet line while the run waits |
 | [1908](1908.md) | done | 2026-11-26 | The reset test of item 1893 waits on what it reads |
 | [1907](1907.md) | done | 2026-11-26 | DotNext's Settings › Models holds every model setting of the Mac's page |
 | [1906](1906.md) | done | 2026-11-26 | DotNext's chat settings show recent models and options as plain rows |
 | [1905](1905.md) | done | 2026-11-26 | DotNext marks an opened chat seen, so it leaves "unread" in the list |
 | [1904](1904.md) | done | 2026-11-26 | DotNext shows a screenshot whole and zoomable, a failed run as one plain row, a fold without counts, a stored thought as its word alone, and its waiting states centred |
 | [1903](1903.md) | done | 2026-11-26 | DotNext's long-press test reads the field afresh: on GitHub's runner its draft was empty while the wait still saw the words |
+| [1902](1902.md) | done | 2026-11-26 | `write_file` reads its content by the name `file_text` too |
 | [1899](1899.md) | done | 2026-11-26 | A red main on macOS opens an issue, and the owner's Dot is updated only from a green commit |
+| [1898](1898.md) | done | 2026-11-26 | Google's error in an array is read, so a run with a model Google does not have says which |
 | [1895](1895.md) | done | 2026-11-26 | DotNext: the owner's campaigns on the phone, native |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
 | [1893](1893.md) | done | 2026-11-26 | DotNext lets go of a reset Dot's chats instead of syncing them for ever |
@@ -76,6 +81,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1767](1767.md) | done | 2026-11-25 | DotNext: a long press on Send offers Steer now and Queue |
 | [1766](1766.md) | done | 2026-11-25 | DotNext: the phone does not engage the emergency stop |
 | [1765](1765.md) | done | 2026-11-25 | DotNext: no Stop in the chat's header |
+| [1762](1762.md) | done | 2026-11-25 | A run the Claude plan's usage limit ended is no error in the daemon's log |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
 | [1759](1759.md) | done | 2026-11-25 | DotNext's Settings, whole: every page of the web app reachable, the hop-by-hop diagnosis, and pairing as a first run |

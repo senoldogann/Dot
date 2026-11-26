@@ -145,3 +145,35 @@ struct TypingDots: View {
         .accessibilityHidden(true)
     }
 }
+
+/// The waiting line's words, "Waiting · <on what>", while the run's step waits on something (a wait or a watch); `nil`
+/// for any other step (item 1909, after another coding agent's work log). A wait on helpers is the pill's "Waiting on 2
+/// helpers".
+func waitingWords(_ step: HelperStep) -> String? {
+    guard ToolKind.of(step.tool) == .wait else { return nil }
+    let line: String = step.line.trimmingCharacters(in: .whitespacesAndNewlines)
+    let what: String = line.isEmpty ? callPhrase(step) : middleCut(line, 90)
+    return String(localized: "Waiting · \(what)", comment: "Waiting line: the run waits on something; the argument says on what")
+}
+
+/// One quiet line under the stream while the run waits on something: the terminal's prompt, "Waiting · Watching pull
+/// request #554" and Details, a plain text button that opens the run inspector. Stop is the pill's: one Stop on the
+/// screen, where the run's state already is (item 1909).
+struct WaitingLine: View {
+    let words: String
+    let details: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+            Symbol(name: "apple.terminal", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.iconSlot)
+                .accessibilityHidden(true)
+            Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(2)
+                .accessibilityIdentifier("waiting.line")
+            Button(String(localized: "Details", comment: "Waiting line: opens the run inspector"), action: details)
+                .buttonStyle(PlainRowButtonStyle())
+                .accessibilityIdentifier("waiting.details")
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Metric.hit)
+    }
+}

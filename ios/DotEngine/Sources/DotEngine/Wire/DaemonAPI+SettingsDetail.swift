@@ -17,6 +17,16 @@ extension DaemonAPI {
         try await send("POST", "/api/schedules/\(id)/run", body: nil)
     }
 
+    /// `POST /api/schedules`: a new schedule, switched on.
+    public func createSchedule(_ schedule: ScheduleCreate) async throws(DaemonRequestError) -> ScheduleView {
+        try await send("POST", "/api/schedules", body: Self.json(schedule))
+    }
+
+    /// `GET /api/schedules/{id}/firings`: its last runs, newest first (the daemon keeps at most 50 in a page).
+    public func scheduleFirings(_ id: String, limit: Int) async throws(DaemonRequestError) -> [ScheduleFiring] {
+        try await get("/api/schedules/\(id)/firings", query: [URLQueryItem(name: "limit", value: String(limit))])
+    }
+
     // MARK: Rules (item 1772)
 
     public func freeMode() async throws(DaemonRequestError) -> FreeModeView { try await get("/api/policy/free", query: []) }
