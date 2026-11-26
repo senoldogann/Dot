@@ -1,8 +1,8 @@
 import DotEngine
 import SwiftUI
 
-// The home (PLAN §27, item 1881): bots, not tabs. Dot large and centred, then one row per agent; the owner's initials
-// open the one settings sheet, "+" makes a bot; at the bottom the apps button and the search of bots, chats and words.
+// The home (PLAN §27, item 1881): bots, not tabs. Dot large and centred, then one row per agent; the owner's avatar icon
+// opens the one settings sheet, "+" makes a bot; at the bottom the apps button and the search of bots, chats and words.
 
 /// The app's shell: the home, a bot's chat pushed from it (the iPad: the home as the sidebar, the chat as the detail),
 /// and the sheets the home opens.
@@ -71,7 +71,6 @@ struct HomeList: View {
     @State private var query: String = ""
     @State private var searching: Bool = false
     @State private var hits: Loadable<[ChatHit]> = .loaded([])
-    @State private var owner: String = ""
     @State private var deleting: Bot?
     @State private var problem: SettingsFailure?
     @State private var nextUnread: Int = 0
@@ -80,15 +79,6 @@ struct HomeList: View {
 
     private var bots: [Bot] { model.bots }
 
-    /// The owner's name for the initials; a failed read is said on the home's banner, not hidden behind the symbol.
-    private func readOwner() async {
-        switch await model.read({ api throws(DaemonRequestError) in try await api.assistant() }) {
-        case .loaded(let assistant): owner = assistant.owner
-        case .failed(let failure): problem = failure
-        case .loading: break
-        }
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -96,10 +86,7 @@ struct HomeList: View {
                     if let problem = problem ?? model.agentsProblem {
                         FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: {
                             self.problem = nil
-                            Task {
-                                await model.loadAgents()
-                                await readOwner()
-                            }
+                            Task { await model.loadAgents() }
                         })
                             .padding(.horizontal, Space.gutter)
                     }
@@ -131,18 +118,8 @@ struct HomeList: View {
         .toolbarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button(action: openSettings) {
-                    Group {
-                        if let letters = initials(owner) {
-                            Text(verbatim: letters).textRole(.body).fontWeight(.medium)
-                        } else {
-                            Image(systemName: "person")
-                        }
-                    }
-                    .foregroundStyle(Tone.text)
-                }
-                .accessibilityLabel(String(localized: "Settings", comment: "Title of the settings tab"))
-                .accessibilityIdentifier("home.settings")
+                Button(String(localized: "Settings", comment: "Title of the settings tab"), systemImage: "person.crop.circle", action: openSettings)
+                    .accessibilityIdentifier("home.settings")
             }
             ToolbarItem(placement: .principal) { Color.clear.frame(width: 1, height: 1).accessibilityHidden(true) }
             ToolbarItem(placement: .topBarTrailing) {
@@ -150,7 +127,6 @@ struct HomeList: View {
                     .accessibilityIdentifier("home.newBot")
             }
         }
-        .task { await readOwner() }
         .task(id: query) {
             let words: String = query.trimmingCharacters(in: .whitespaces)
             guard !words.isEmpty else {
@@ -392,16 +368,6 @@ func botLabel(_ bot: Bot) -> String {
     if bot.unread > 0 { parts.append(String(localized: "Unread", comment: "VoiceOver: a bot has unread chats")) }
     if let latest = bot.latest, !latest.summary.lastMessage.isEmpty { parts.append(latest.summary.lastMessage) }
     return parts.joined(separator: ", ")
-}
-
-/// Two letters for a name: the first of its first two words ("Şenol Doğan" is ŞD), else its first two letters; `nil`
-/// for no name (a person's symbol stands in).
-func initials(_ name: String) -> String? {
-    let words: [Substring] = name.split(whereSeparator: \.isWhitespace)
-    let letters: String =
-        words.count >= 2
-        ? String(words[0].prefix(1)) + String(words[1].prefix(1)) : String(words.first?.prefix(2) ?? "")
-    return letters.isEmpty ? nil : letters.uppercased(with: Locale(identifier: "tr"))
 }
 
 /// The finds of the home's search: bots, chats, and what the chats say.

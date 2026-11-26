@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1911](1911.md) | done | 2026-11-26 | DotNext makes a scheduled task, and shows each schedule's history |
+| [1910](1910.md) | done | 2026-11-26 | DotNext's home opens the settings from an avatar icon, not from the owner's initials |
 | [1909](1909.md) | done | 2026-11-26 | DotNext's work log reads like a coding agent's: tool calls grouped in plain words, each helper its own row, and one quiet line while the run waits |
 | [1908](1908.md) | done | 2026-11-26 | The reset test of item 1893 waits on what it reads |
 | [1907](1907.md) | done | 2026-11-26 | DotNext's Settings › Models holds every model setting of the Mac's page |
