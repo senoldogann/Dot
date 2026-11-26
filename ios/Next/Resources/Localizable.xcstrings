@@ -622,35 +622,6 @@
         }
       }
     },
-    "%lld sources": {
-      "comment": "Under an answer: how many web links it names; tap unfolds them",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld source"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld sources"
-                }
-              }
-            }
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld kaynak"
-          }
-        }
-      }
-    },
     "%lld steps": {
       "comment": "Activity: how many steps a task took",
       "localizations": {
@@ -3151,17 +3122,6 @@
         }
       }
     },
-    "Copy link": {
-      "comment": "Long press on a link under an answer: copies its address",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bağlantıyı kopyala"
-          }
-        }
-      }
-    },
     "Copy the answer": {
       "comment": "VoiceOver: copies Dot's answer",
       "localizations": {
@@ -5128,17 +5088,6 @@
         }
       }
     },
-    "File": {
-      "comment": "A file chip's second line while its size is being asked",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dosya"
-          }
-        }
-      }
-    },
     "Files": {
       "comment": "Composer + menu: picks documents or other files",
       "localizations": {
@@ -5333,17 +5282,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un sorduklarını katla"
-          }
-        }
-      }
-    },
-    "Folded": {
-      "comment": "VoiceOver: the sources row shows only the count",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kapalı"
           }
         }
       }
@@ -8443,17 +8381,6 @@
         }
       }
     },
-    "Open in Safari": {
-      "comment": "Long press on a link under an answer: opens it in the Safari app",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Safari'de aç"
-          }
-        }
-      }
-    },
     "Open its chat": {
       "comment": "Draft: opens the chat of the run that wrote it",
       "localizations": {
@@ -8604,17 +8531,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcının sohbetini açar"
-          }
-        }
-      }
-    },
-    "Opens the page": {
-      "comment": "VoiceOver hint of a link under an answer",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sayfayı açar"
           }
         }
       }
@@ -11289,17 +11205,6 @@
         }
       }
     },
-    "Shows the file": {
-      "comment": "VoiceOver hint of a file chip under an answer",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dosyayı gösterir"
-          }
-        }
-      }
-    },
     "Shows the steps": {
       "comment": "VoiceOver hint of a closed work-log group",
       "localizations": {
@@ -13497,17 +13402,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geri alındı"
-          }
-        }
-      }
-    },
-    "Unfolded": {
-      "comment": "VoiceOver: the sources row shows each link",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Açık"
           }
         }
       }

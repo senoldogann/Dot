@@ -1533,14 +1533,7 @@ TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu
 # Links and files under an answer (backlog LF1).
 TR.update(
     {
-        "%lld sources": "%lld kaynak",
-        "Unfolded": "Açık",
-        "Opens the page": "Sayfayı açar",
-        "Copy link": "Bağlantıyı kopyala",
-        "Open in Safari": "Safari'de aç",
         "Share": "Paylaş",
-        "Shows the file": "Dosyayı gösterir",
-        "File": "Dosya",
         "Loading the file": "Dosya yükleniyor",
         "The file cannot be shown": "Dosya gösterilemiyor",
         "Only the start of the file shows here; open it on the Mac for the rest.": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç.",
@@ -1558,7 +1551,6 @@ TR.update(
         "the chat's file panel": "sohbetin dosya paneli",
     }
 )
-EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
 
 # "This chat" sheet, plain (item 1922)
 TR.update({"Provider": "Sağlayıcı"})
