@@ -1,6 +1,8 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
+# "This chat" sheet, plain (item 1922)
+TR.update({"Provider": "Sağlayıcı"})
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
 extracts them (`%@` a text argument, `%lld` a count).

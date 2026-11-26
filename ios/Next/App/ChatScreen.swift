@@ -152,6 +152,7 @@ struct ChatScreen: View {
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
             .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
             .task { await model.loadModels() }
+            .task { OutputBox.warmUp() }
             .modifier(ComposerLists(thread: thread, lastRun: ownRuns.last?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
             .modifier(FrameMeterHook(running: activeRun != nil))
@@ -239,6 +240,8 @@ struct ChatScreen: View {
         // where the owner left it.
         .defaultScrollAnchor(.top, for: .alignment)
         .scrollPosition($position)
+        // A row opened or closed by the owner stays where it is: the follow stops (see `disclosureToggled`).
+        .environment(\.disclosureToggled, { pinned = false })
         .scrollDismissesKeyboard(.interactively)
         .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
         // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
