@@ -104,7 +104,7 @@ final class SettingsControlsUITests: XCTestCase {
         let pages: [(String, String)] = [
             ("Dot's computer", "This Mac"), ("Notifications", "Notifications"), ("General", "General"), ("Appearance", "Appearance"), ("Chat", "Chat"),
             ("Models", "Models"), ("Usage limits and caps", "Usage limits and caps"), ("Scheduled tasks", "Scheduled tasks"), ("Permissions", "Rules"),
-            ("Memory", "Memory"), ("Agents", "Agents"), ("Health and version", "Health and version"), ("Usage", "Usage"),
+            ("Memory", "Memory"), ("Agents", "Agents"), ("Campaigns", "Campaigns"), ("Health and version", "Health and version"), ("Usage", "Usage"),
         ]
         var dead: [String] = []
         for (label, page) in pages {

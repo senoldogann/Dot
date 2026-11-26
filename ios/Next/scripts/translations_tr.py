@@ -1379,3 +1379,42 @@ EN_PLURALS.update(
         "%lld actions": ("%lld action", "%lld actions"),
     }
 )
+# Settings › Campaigns (item 1895; S2's work of item 1780 carried onto main).
+TR.update(
+    {
+        '%lld sessions': '%lld oturum',
+        'A session is working': 'Bir oturum çalışıyor',
+        'Achieved': 'Ulaşıldı',
+        'Active': 'Etkin',
+        "Answer in the campaign's chat.": 'Kampanyanın sohbetinde yanıtla.',
+        'Campaign': 'Kampanya',
+        'Empty: the sessions write what they did here.': 'Boş: oturumlar yaptıklarını buraya yazar.',
+        'Evidence': 'Kanıt',
+        'Goal': 'Hedef',
+        'Goals that Dot keeps working on, one session at a time, until a check confirms they are done.': "Dot'un, bir denetim bittiğini doğrulayana kadar oturum oturum üzerinde çalıştığı hedefler.",
+        'Mark achieved': 'Ulaşıldı olarak işaretle',
+        'Mark this campaign achieved?': 'Bu kampanya ulaşıldı olarak işaretlensin mi?',
+        'Next session %@': 'Sonraki oturum %@',
+        'No campaigns yet': 'Henüz kampanya yok',
+        'No progress recorded yet': 'Henüz ilerleme kaydedilmedi',
+        'No session planned': 'Planlanmış oturum yok',
+        'No session starts after this, and a session that is working now is stopped. You can resume it later.': 'Bundan sonra oturum başlamaz; şu an çalışan oturum da durdurulur. Sonra sürdürebilirsin.',
+        'None yet.': 'Henüz yok.',
+        'Not set yet: the first session records them.': 'Henüz belirlenmedi: ilk oturum kaydeder.',
+        'Nothing checks it: your word closes the campaign, and a session that is working now is stopped.': 'Bunu hiçbir şey denetlemez: kampanyayı senin sözün kapatır; şu an çalışan oturum durdurulur.',
+        'Progress': 'İlerleme',
+        'Progress notes': 'İlerleme notları',
+        'Recent sessions': 'Son oturumlar',
+        'Session %lld': 'Oturum %lld',
+        'Sessions': 'Oturumlar',
+        'Setback': 'Aksilik',
+        'Stop this campaign?': 'Bu kampanya durdurulsun mu?',
+        'Strategy': 'Strateji',
+        'Switch on Keep going when you start a task, and Dot works on it until the result is checked.': 'Bir görev başlatırken Devam et seçeneğini aç; Dot sonuç doğrulanana kadar üzerinde çalışır.',
+        'Targets': 'Ölçütler',
+        'Verified by': 'Doğrulama',
+        'Settings › Campaigns': 'Ayarlar › Kampanyalar',
+        'goals sessions keep going stop': 'hedefler oturumlar devam durdur',
+    }
+)
+EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
