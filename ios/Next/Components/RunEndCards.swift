@@ -34,32 +34,25 @@ struct RunEndCard: View {
 
     var body: some View {
         let offer: EndOffer = offer
-        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
-            Symbol(name: glyph(offer), context: .feedback).foregroundStyle(failed && offer.cutOff == nil ? Tone.failure : Tone.secondary)
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(title(offer)).textRole(.footnote).fontWeight(.medium).foregroundStyle(failed && offer.cutOff == nil ? Tone.failure : Tone.text)
-                if let line = line(offer) { Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(4) }
+        // Drawn as plainly as the work log's rows (item 1904, the owner): a small muted symbol, one line "The run failed ·
+        // <reason>", the actions as plain text buttons on the row; no card, no red title. At the accessibility sizes
+        // the actions stand under the line, one under the other.
+        HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+            Symbol(name: glyph(offer), context: .tool)
+                .foregroundStyle(failed && offer.cutOff == nil ? Tone.failure.opacity(0.75) : Tone.glyph)
+                .frame(width: Metric.iconSlot)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text([title(offer), line(offer)].compactMap { $0 }.joined(separator: " · "))
+                    .textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(4)
+                    .accessibilityIdentifier("end.line")
                 if let failure { Text(failure).textRole(.footnote).foregroundStyle(Tone.failure) }
-                if offer.resume || offer.retry {
-                    // At the accessibility sizes the buttons stand one under the other, none cut.
-                    buttonsLayout {
-                        if offer.resume {
-                            Button(resumeTitle, action: resume).buttonStyle(SecondaryButtonStyle()).accessibilityIdentifier("end.resume")
-                        }
-                        if offer.retry {
-                            Button(String(localized: "Retry", comment: "Run end card: takes the chat back to before the message and sends it again")) { confirmingRetry = true }
-                                .buttonStyle(SecondaryButtonStyle()).accessibilityIdentifier("end.retry")
-                        }
-                        if busy { ProgressView().controlSize(.small) }
-                    }
-                    .disabled(busy)
-                }
+                if dynamicTypeSize.isAccessibilitySize { actions(offer) }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if !dynamicTypeSize.isAccessibilitySize { actions(offer) }
         }
-        .padding(Space.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Tone.nested, in: rounded(Radius.bubble))
+        .frame(minHeight: Metric.toolRow)
         .accessibilityElement(children: .contain)
         .confirmationDialog(
             String(localized: "Retry this message?", comment: "Title of the confirmation of Retry"), isPresented: $confirmingRetry, titleVisibility: .visible
@@ -74,9 +67,26 @@ struct RunEndCard: View {
         }
     }
 
+    /// Continue and Retry as plain text buttons, 44 pt each way.
+    @ViewBuilder private func actions(_ offer: EndOffer) -> some View {
+        if offer.resume || offer.retry {
+            buttonsLayout {
+                if offer.resume {
+                    Button(resumeTitle, action: resume).buttonStyle(PlainRowButtonStyle()).accessibilityIdentifier("end.resume")
+                }
+                if offer.retry {
+                    Button(String(localized: "Retry", comment: "Run end card: takes the chat back to before the message and sends it again")) { confirmingRetry = true }
+                        .buttonStyle(PlainRowButtonStyle()).accessibilityIdentifier("end.retry")
+                }
+                if busy { ProgressView().controlSize(.small) }
+            }
+            .disabled(busy)
+        }
+    }
+
     private var buttonsLayout: AnyLayout {
         dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xs)) : AnyLayout(HStackLayout(spacing: Space.xs))
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: Space.xs))
     }
 
     private var failed: Bool {
@@ -170,5 +180,16 @@ struct RunEndCard: View {
                 failure = failureWords(box.failure, macPlace: macPlace)
             }
         }
+    }
+}
+
+/// A text button on a row (item 1904): the footnote in the ink, medium weight, a 44 pt target, no fill.
+struct PlainRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
+            .opacity(configuration.isPressed ? 0.5 : 1)
+            .frame(minWidth: Metric.hit, minHeight: Metric.hit)
+            .contentShape(Rectangle())
     }
 }

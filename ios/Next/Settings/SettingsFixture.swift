@@ -32,6 +32,8 @@
         case connectApps = "settings-connect-apps"
         case connectAppsDetail = "settings-connect-apps-detail"
         case connectAppsOffline = "settings-connect-apps-offline"
+        /// Usage on a Mac that never answers: the page's loading state, measured to stand centred (item 1904).
+        case loading = "settings-loading"
         case pairing = "pairing"
         case pairingLink = "pairing-link"
 
@@ -45,6 +47,7 @@
             case .oldDaemon: .old
             case .stopped: .stopped
             case .capsRefused: .phoneRefused
+            case .loading: .silent
             default: .normal
             }
         }
@@ -67,6 +70,7 @@
             case .agents: .agents
             case .system: .system
             case .maintenance: .maintenance
+            case .loading: .usage
             case .pairing, .pairingLink, .connectApps, .connectAppsDetail, .connectAppsOffline: nil
             }
         }
@@ -109,6 +113,9 @@
         case stopped
         /// Every write is refused as a phone's (403 `PhoneRefused`).
         case phoneRefused
+        /// A read of a page never ends: its answer trickles a space every two seconds, so it never times out either (the
+        /// health and proof checks are answered).
+        case silent
     }
 
     /// Serves the fixture daemon. Every answer is the JSON the daemon's routes give (`server/views.py`).
@@ -117,7 +124,13 @@
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-        override func stopLoading() {}
+        /// The `silent` behaviour's keep-alive: a space every two seconds, so the request never times out and never ends.
+        private var trickle: DispatchSourceTimer?
+
+        override func stopLoading() {
+            trickle?.cancel()
+            trickle = nil
+        }
 
         override func startLoading() {
             let path: String = request.url?.path() ?? ""
@@ -125,6 +138,19 @@
             let behaviour: FixtureBehaviour = Self.behaviour
             if behaviour == .unreachable {
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
+                return
+            }
+            if behaviour == .silent, path != "/api/health", path != "/api/proof" {
+                let response: HTTPURLResponse = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                let timer: DispatchSourceTimer = DispatchSource.makeTimerSource(queue: .global())
+                timer.schedule(deadline: .now() + 2, repeating: 2)
+                timer.setEventHandler { [weak self] in
+                    guard let self else { return }
+                    self.client?.urlProtocol(self, didLoad: Data(" ".utf8))
+                }
+                timer.resume()
+                trickle = timer
                 return
             }
             let (code, body): (Int, String) = answer(method: method, path: path, behaviour: behaviour)

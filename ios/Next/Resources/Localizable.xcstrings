@@ -406,17 +406,6 @@
         }
       }
     },
-    "%lld other steps": {
-      "comment": "Work fold tally: steps of other kinds; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld başka adım"
-          }
-        }
-      }
-    },
     "%lld pt": {
       "comment": "Appearance: the body text's size in points",
       "localizations": {
@@ -435,17 +424,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld sırada"
-          }
-        }
-      }
-    },
-    "%lld screen steps": {
-      "comment": "Work fold tally: steps on the Mac's screen; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld ekran adımı"
           }
         }
       }
@@ -621,17 +599,6 @@
         }
       }
     },
-    "%lld web steps": {
-      "comment": "Work fold tally: browser or web steps; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld web adımı"
-          }
-        }
-      }
-    },
     "%lld without asking": {
       "comment": "Away card: decisions the mode that asks only to pay or send let through",
       "localizations": {
@@ -694,39 +661,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld sn"
-          }
-        }
-      }
-    },
-    "1 other step": {
-      "comment": "Work fold tally: one step of another kind",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 başka adım"
-          }
-        }
-      }
-    },
-    "1 screen step": {
-      "comment": "Work fold tally: one step on the Mac's screen",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 ekran adımı"
-          }
-        }
-      }
-    },
-    "1 web step": {
-      "comment": "Work fold tally: one browser or web step",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 web adımı"
           }
         }
       }
@@ -11041,6 +10975,17 @@
         }
       }
     },
+    "Thought": {
+      "comment": "Work log: a step's thinking, folded",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşünce"
+          }
+        }
+      }
+    },
     "Thursday at 15:30 is free at the clinic on Main Street. The clinic asks for a **20 € deposit**, so I stopped before paying; the slot is held for ten minutes on [the booking page](https://clinic.example.invalid/book).": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -12896,28 +12841,6 @@
         }
       }
     },
-    "edited %lld files": {
-      "comment": "Work fold tally: files edited; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld dosya düzenledi"
-          }
-        }
-      }
-    },
-    "edited 1 file": {
-      "comment": "Work fold tally: one file edited",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 dosya düzenledi"
-          }
-        }
-      }
-    },
     "failed": {
       "comment": "VoiceOver: a plan step's state",
       "localizations": {
@@ -13083,50 +13006,6 @@
         }
       }
     },
-    "ran %lld commands": {
-      "comment": "Work fold tally: commands run; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld komut çalıştırdı"
-          }
-        }
-      }
-    },
-    "ran 1 command": {
-      "comment": "Work fold tally: one command run",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 komut çalıştırdı"
-          }
-        }
-      }
-    },
-    "read %lld files": {
-      "comment": "Work fold tally: files read; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld dosya okudu"
-          }
-        }
-      }
-    },
-    "read 1 file": {
-      "comment": "Work fold tally: one file read",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 dosya okudu"
-          }
-        }
-      }
-    },
     "schedules repeat morning brief": {
       "comment": "Settings search synonyms of Scheduled tasks (space separated)",
       "localizations": {
@@ -13134,28 +13013,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "zamanlamalar tekrar sabah özeti"
-          }
-        }
-      }
-    },
-    "searched %lld times": {
-      "comment": "Work fold tally: searches; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld kez arama yaptı"
-          }
-        }
-      }
-    },
-    "searched once": {
-      "comment": "Work fold tally: one search",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 kez arama yaptı"
           }
         }
       }
@@ -13178,28 +13035,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "atlandı"
-          }
-        }
-      }
-    },
-    "started %lld helpers": {
-      "comment": "Work fold tally: helpers started; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yardımcı başlattı"
-          }
-        }
-      }
-    },
-    "started 1 helper": {
-      "comment": "Work fold tally: one helper started",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 yardımcı başlattı"
           }
         }
       }
@@ -13310,28 +13145,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "ses dikte mikrofon yazıya dökme konuşma"
-          }
-        }
-      }
-    },
-    "waited %lld times": {
-      "comment": "Work fold tally: waits; the argument is how many",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld kez bekledi"
-          }
-        }
-      }
-    },
-    "waited once": {
-      "comment": "Work fold tally: one wait",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1 kez bekledi"
           }
         }
       }
