@@ -9,7 +9,7 @@ import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
   needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
-import { chatCards } from "./chatcards.js";
+import { chatCardRenderer } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -190,6 +190,7 @@ function steerMessage(block, reaction) {
  * `asked`, the turn's message, and a message that steered the run stands where it came (item 403), as on the run's
  * own page. What the run said stands with the button and the chips of the reactions (item 586) when `reactions` is given. */
 function drawFlow(past, flow, asked, events, reactions) {
+  const richCards = chatCardRenderer();
   const answer = (past.result ?? "").trim();
   const blocks = [];
   let batch = null;
@@ -265,9 +266,11 @@ function drawFlow(past, flow, asked, events, reactions) {
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
+    } else if (event.kind === "post_draft_settled") {
+      richCards.settle(event);
     } else if (event.kind === "cards_shown") {
       batch = null;
-      const node = chatCards(event.data);
+      const node = richCards.show(event);
       if (node !== null) {
         blocks.push({ cards: node });
       }

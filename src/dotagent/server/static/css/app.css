@@ -12501,3 +12501,37 @@ dialog.teach {
 .chat-card-media figcaption {
   color: var(--muted);
 }
+
+.chat-draft-cancelled {
+  color: var(--muted);
+  background: var(--surface-2);
+}
+
+.chat-draft:has(> .chat-draft-shared) {
+  align-self: start;
+  grid-template-rows: auto;
+}
+
+.chat-draft-shared summary {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  cursor: pointer;
+}
+
+.chat-draft-shared summary::after {
+  content: "";
+  width: 0.45em;
+  aspect-ratio: 1;
+  border-inline-end: 1px solid currentColor;
+  border-block-end: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.chat-draft-shared[open] summary::after {
+  transform: rotate(225deg);
+}
+
+.chat-draft-shared summary strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

@@ -589,9 +589,11 @@ at most and counts the rest; a fetch that failed and a search read none.
 Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
 tables, image galleries and choices, whose tap writes the chosen words into the message box for you to send, as a page's
 choice does. Post drafts show the platform, account and text together, and related drafts scroll sideways. You can copy,
-edit or cancel a draft in the current view. **Prepare to publish** puts a text-only draft in the composer for you to
-review and send as a request. The resulting run goes through the existing post policy. Mail and iMessage drafts are sent
-through their own cards.
+edit or cancel a draft in the current view. Cancelled drafts stay visible in muted colours. **Prepare to publish** puts
+a text-only draft in the composer for you to review and send as a request. The resulting run goes through the existing
+post policy. The renderer can show a confirmed X result as a collapsed **Shared** row that opens to the post text and
+its **Open on X** link. Recording that result from a card's Share action requires the planned publisher. Mail and
+iMessage drafts are sent through their own cards.
 
 A delegated run
 is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning

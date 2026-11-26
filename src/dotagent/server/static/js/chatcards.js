@@ -12,6 +12,9 @@ import { attempt, toast } from "./ui.js";
 /** @typedef {{kind: "choice", prompt: string, options: string[]}} Choice */
 /** @typedef {import("./chatcardchart.js").Chart} Chart */
 /** @typedef {PostDraft | Gallery | Table | Choice | Chart} Card */
+/** @typedef {{status: "cancelled"} | {status: "published", text: string, url: string}} DraftOutcome */
+/** @typedef {{id: number, run_id: string, data: {version: number, cards: Card[]}}} CardsEvent */
+/** @typedef {{run_id: string, data: {cards_event_id: number, card_index: number, status: string, text?: string, url?: string}}} DraftOutcomeEvent */
 
 /** @param {string} label @param {() => void} action */
 function button(label, action) {
@@ -60,20 +63,21 @@ function draft(card) {
   const { platform, account, media } = card;
   const initial = Array.from(account.replace(/^@/, ""))[0]?.toUpperCase() ?? "@";
   const body = el("p", { class: "chat-draft-text" }, card.text);
+  const title = el("strong", null, "Post");
+  const avatar = el("span", { class: "chat-draft-avatar", "aria-hidden": "true" }, initial);
+  const copy = button("Copy", () => attempt(async () => {
+    await copyText(body.textContent);
+    toast("ok", "Post text copied.");
+  }));
   const editor = /** @type {HTMLTextAreaElement} */ (el("textarea", { class: "textarea", rows: "5", maxlength: "5000", "aria-label": "Post text", hidden: true }));
   const header = el(
     "div",
     { class: "chat-draft-head" },
-    el("span", { class: "chat-draft-avatar", "aria-hidden": "true" }, initial),
-    el("div", null, el("strong", null, platform), el("div", { class: "muted" }, account)),
-    button("Copy", () => attempt(async () => {
-      await copyText(body.textContent);
-      toast("ok", "Post text copied.");
-    })),
+    avatar,
+    el("div", null, title, el("div", { class: "muted" }, `${platform} · ${account}`)),
+    copy,
   );
-  const cancel = button("Cancel draft", () => {
-    node.replaceChildren(el("p", { class: "muted" }, "Draft cancelled in this view."));
-  });
+  const cancel = button("Cancel", () => paintCancelled());
   const edit = button("Edit", () => {
     editor.value = body.textContent;
     body.hidden = true;
@@ -111,7 +115,52 @@ function draft(card) {
   const actions = el("div", { class: "chat-card-actions" }, cancel, edit, prepare);
   const node = el("article", { class: "chat-card chat-draft", "aria-label": `${platform} draft for ${account}` }, header, body, editor,
     media.length > 0 ? mediaRow(media) : null, actions, editing);
-  return node;
+  let settled = false;
+
+  function paintCancelled() {
+    node.classList.add("chat-draft-cancelled");
+    node.setAttribute("aria-label", `Cancelled post for ${account}`);
+    title.textContent = "Cancelled";
+    copy.remove();
+    actions.remove();
+    editing.remove();
+    editor.remove();
+    body.hidden = false;
+  }
+
+  /** @param {DraftOutcome} outcome */
+  function settle(outcome) {
+    if (settled) {
+      return;
+    }
+    if (outcome.status === "cancelled") {
+      paintCancelled();
+    } else {
+      if (platform.toLowerCase() !== "x" || !URL.canParse(outcome.url)) {
+        return;
+      }
+      const url = new URL(outcome.url);
+      if (url.origin !== "https://x.com" || url.username !== "" || url.password !== "" ||
+          !/^\/[a-z0-9_]{1,15}\/status\/\d+$/i.test(url.pathname) || url.search !== "" || url.hash !== "") {
+        return;
+      }
+      const flat = outcome.text.split(/\s+/).filter(Boolean).join(" ");
+      const characters = Array.from(flat);
+      const preview = characters.length > 52 ? `${characters.slice(0, 51).join("")}…` : flat;
+      node.classList.remove("chat-draft-cancelled");
+      node.setAttribute("aria-label", `Shared post for ${account}`);
+      node.replaceChildren(el(
+        "details",
+        { class: "chat-draft-shared" },
+        el("summary", { class: "chat-draft-head" }, avatar, el("strong", null, `Shared: ${preview}`)),
+        el("p", { class: "chat-draft-text" }, outcome.text),
+        el("a", { class: "btn", href: url.href, target: "_blank", rel: "noopener noreferrer" }, "Open on X"),
+      ));
+    }
+    settled = true;
+  }
+
+  return { node, settle };
 }
 
 /** @param {Choice} card */
@@ -135,25 +184,26 @@ function block(card) {
       return choice(card);
     case "image_gallery":
       return el("section", { class: "chat-card" }, el("h3", null, card.title), mediaRow(card.images));
-    case "post_draft":
-      return draft(card);
   }
 }
 
-/** @param {{version: number, cards: Card[]}} data */
-export function chatCards(data) {
+/** @param {CardsEvent} record @param {(index: number, settle: (outcome: DraftOutcome) => void) => void} register */
+function chatCards(record, register) {
+  const { data } = record;
   if (data.version !== 1 || !Array.isArray(data.cards)) {
     return null;
   }
   const nodes = el("div", { class: "chat-cards" });
   let drafts = /** @type {HTMLElement | null} */ (null);
-  for (const card of data.cards) {
+  for (const [index, card] of data.cards.entries()) {
     if (card.kind === "post_draft") {
       if (drafts === null) {
         drafts = el("div", { class: "chat-draft-carousel", role: "group", "aria-label": "Post drafts" });
         nodes.append(drafts);
       }
-      drafts.append(draft(card));
+      const rendered = draft(card);
+      register(index, rendered.settle);
+      drafts.append(rendered.node);
     } else {
       drafts = null;
       const node = block(card);
@@ -163,4 +213,28 @@ export function chatCards(data) {
     }
   }
   return nodes;
+}
+
+export function chatCardRenderer() {
+  /** @type {Map<string, (outcome: DraftOutcome) => void>} */
+  const drafts = new Map();
+  return {
+    /** @param {CardsEvent} record */
+    show(record) {
+      return chatCards(record, (index, settle) => drafts.set(`${record.run_id}:${record.id}:${index}`, settle));
+    },
+    /** @param {DraftOutcomeEvent} record */
+    settle(record) {
+      const { cards_event_id: id, card_index: index, status, text, url } = record.data;
+      if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(index) || index < 0) {
+        return;
+      }
+      const paint = drafts.get(`${record.run_id}:${id}:${index}`);
+      if (status === "cancelled") {
+        paint?.({ status });
+      } else if (status === "published" && typeof text === "string" && text.trim() !== "" && typeof url === "string") {
+        paint?.({ status, text, url });
+      }
+    },
+  };
 }

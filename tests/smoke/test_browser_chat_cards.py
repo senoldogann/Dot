@@ -25,6 +25,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 TITLE: str = "Visits by month"
 UNTRUSTED_TEXT: str = '<img src="/missing" onerror="window.cardCodeRan = true">\nLiteral post text'
 CHOICE: str = "Show the monthly totals"
+POST_URL: str = "https://x.com/example/status/123456"
+POSTED_TEXT: str = "A published post with enough text to show how the card collapses."
 CARDS: JsonArray = [
     {
         "kind": "chart",
@@ -72,6 +74,18 @@ async def _check_cards(page: Page, width: int, shots: Path) -> None:
     assert await first.locator(".chat-draft-text").text_content() == UNTRUSTED_TEXT
     await expect(first.locator("img")).to_have_count(0)
     assert not await page.evaluate("() => window.cardCodeRan === true")
+    await expect(first.get_by_text("Post", exact=True)).to_be_visible()
+    await expect(first.get_by_role("link", name="Open on X")).to_have_count(0)
+    shared: Locator = carousel.get_by_role("article", name="Shared post for @example")
+    await expect(shared.locator("summary")).to_contain_text("Shared: A published post")
+    link: Locator = shared.get_by_role("link", name="Open on X", include_hidden=True)
+    await expect(link).not_to_be_visible()
+    await shared.locator("summary").click()
+    await expect(link).to_be_visible()
+    await expect(link).to_have_attribute("href", POST_URL)
+    await expect(shared.locator(".chat-draft-text")).to_have_text(POSTED_TEXT)
+    await expect(shared.get_by_role("button")).to_have_count(0)
+    await expect(carousel.locator(".chat-draft-cancelled").get_by_text("Cancelled", exact=True)).to_be_visible()
     await carousel.scroll_into_view_if_needed()
     await carousel.screenshot(path=shots / f"chat-draft-carousel-{width}.png")
     await expect(page.get_by_role("img", name="Blue sample")).to_be_visible()
@@ -84,8 +98,10 @@ async def _check_cards(page: Page, width: int, shots: Path) -> None:
     composer: Locator = page.locator('textarea[aria-label^="Message for"]').last
     value: str = await composer.input_value()
     assert json.loads(value.split("\n", 1)[1]) == {"platform": "X", "account": "@example", "text": "Edited\npost."}
-    await first.get_by_role("button", name="Cancel draft").click()
-    await expect(first.get_by_text("Draft cancelled in this view.")).to_be_visible()
+    await first.get_by_role("button", name="Cancel", exact=True).click()
+    await expect(first.get_by_text("Cancelled", exact=True)).to_be_visible()
+    await expect(first.locator(".chat-draft-text")).to_have_text("Edited post.")
+    await expect(first.get_by_role("button")).to_have_count(0)
     await composer.fill("")
 
 
@@ -113,6 +129,34 @@ async def test_the_daemon_shows_cards_at_desktop_and_phone_widths_and_replays_th
         assert len(events) == 1
         assert events[0].data["version"] == 1
         assert not await runtime.store.events_of_kind(run_id, "approval_requested", 10)
+        cards_event_id: int = events[0].id
+        await runtime.store.add_event(
+            run_id,
+            "post_draft_settled",
+            {
+                "cards_event_id": cards_event_id,
+                "card_index": 2,
+                "status": "published",
+                "text": "Unverified destination",
+                "url": "https://example.test/example/status/123456",
+            },
+        )
+        await runtime.store.add_event(
+            run_id,
+            "post_draft_settled",
+            {"cards_event_id": cards_event_id, "card_index": 3, "status": "cancelled"},
+        )
+        await runtime.store.add_event(
+            run_id,
+            "post_draft_settled",
+            {
+                "cards_event_id": cards_event_id,
+                "card_index": 2,
+                "status": "published",
+                "text": POSTED_TEXT,
+                "url": POST_URL,
+            },
+        )
 
         async with async_playwright() as playwright:
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
@@ -145,6 +189,9 @@ async def test_the_daemon_shows_cards_at_desktop_and_phone_widths_and_replays_th
                 assert (await _done(runtime, next_id)).goal == CHOICE
                 await expect(page.get_by_role("img", name=f"{TITLE}, bar chart")).to_be_visible()
                 await expect(page.get_by_role("group", name="Post drafts").locator("article")).to_have_count(3)
+                await expect(
+                    page.get_by_role("article", name="Shared post for @example").locator("summary")
+                ).to_be_visible()
                 assert not errors, errors
             finally:
                 await browser.close()
