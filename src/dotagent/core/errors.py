@@ -49,6 +49,11 @@ class ProviderFilterError(ProviderError):
     with the same conversation it is stopped again."""
 
 
+class ProviderEmptyError(ProviderError):
+    """The model kept replying with neither words nor a tool call after the run's nudges (item 1889): a technical block,
+    which moves the run to a standby model as a content filter's stop does."""
+
+
 class ProviderHttpError(ProviderError):
     """The provider answered with a non-success HTTP status."""
 
@@ -245,6 +250,11 @@ class PhoneUnreachableError(PhoneError):
 class DesktopStepNotSent(DesktopError):
     """A step of a desktop batch was refused before any input went to an application (item 1146): its target was no
     longer what was reviewed, the pointer was not where the step before left it."""
+
+
+class OwnerAtTheMac(DesktopStepNotSent):
+    """A step that would move the Mac's own pointer or send keys was not sent while the owner is at the Mac (item
+    1890): it waits for them to step away."""
 
 
 class ValueNotKept(DesktopError):

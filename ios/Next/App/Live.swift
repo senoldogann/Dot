@@ -108,49 +108,28 @@ func engineLine(_ helper: HelperView) -> String {
 
 // MARK: The chat list
 
-/// The chats tab: the chat list beside the open chat (a stack on a phone, a split view on a wide screen).
-struct ChatsTab: View {
-    @Environment(AppModel.self) private var model: AppModel
-    @State private var selection: String?
-    let opensFirstChat: Bool
-
-    var body: some View {
-        AdaptiveSplit(selection: $selection) {
-            ChatListView(scope: .all, selection: $selection)
-        } detail: { id in
-            if model.startingChats[id] != nil {
-                StartingChat(key: id)
-            } else {
-                // A chat of its own each time: on a wide screen the split keeps the detail, and a chat's draft, plan
-                // first and panels would otherwise follow the owner into the next chat.
-                ChatScreen(thread: id, initialPanel: nil, editsFirstQueued: false).id(id)
-            }
-        } placeholder: {
-            EmptyState(
-                title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",
-                detail: String(localized: "Pick a chat on the left, or start a new one.", comment: "iPad detail column when no chat is selected"), actionTitle: nil, action: {})
-                .background(Tone.ground)
-        }
-        // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it (item 1849).
-        .onChange(of: selection.flatMap { model.startedChats[$0] }) { _, thread in
-            if let thread { selection = thread }
-        }
-        .onChange(of: model.list.rows.count) { _, count in
-            if opensFirstChat, selection == nil, count > 0 { selection = model.list.ordered.first?.summary.id }
-        }
-    }
-}
-
 /// Which chats a list shows: all of them, or one bot's (Dot's own, `agent` nil, or an agent's), as a bot's profile will
 /// (PLAN §27).
 enum ChatListScope: Equatable, Sendable {
     case all
     case bot(agent: String?)
+    /// A bot's chats as the home counts them (`bots(...)`: Dot's are every chat no known agent wears, a campaign's and a
+    /// team's among them), by id; `agent` is whose chat the pencil starts (`nil`: Dot's).
+    case chats(of: Set<String>, agent: String?)
 
     func holds(_ row: ThreadRow) -> Bool {
         switch self {
         case .all: true
         case .bot(let agent): row.summary.actorId == agent
+        case .chats(let ids, _): ids.contains(row.summary.id)
+        }
+    }
+
+    /// The agent whose chat the list's pencil starts.
+    var agent: String? {
+        switch self {
+        case .all: nil
+        case .bot(let agent), .chats(_, let agent): agent
         }
     }
 }
@@ -208,7 +187,7 @@ struct ChatListView: View {
         }
         .sheet(isPresented: $composing) {
             NewChatSheet(
-                close: { composing = false },
+                agent: scopedAgent, close: { composing = false },
                 opened: { key in
                     composing = false
                     selection = key
@@ -222,6 +201,12 @@ struct ChatListView: View {
                 systemImage: "exclamationmark.triangle", actionTitle: nil)
             model.forgetRefusedDeletes()
         }
+    }
+
+    /// The agent a bot's list belongs to, whose chat the pencil starts (Dot's and the whole list's: none).
+    private var scopedAgent: AgentRecord? {
+        guard let agent = scope.agent else { return nil }
+        return model.agents.first { $0.record.id == agent }?.record
     }
 
     /// The checked chats the list shows now: a check hidden by the search or gone from the list is not acted on.
@@ -277,6 +262,13 @@ struct ChatListView: View {
     private var list: some View {
         // In select mode a tap checks a row and opens nothing.
         List(selection: selecting ? .constant(nil) : $selection) {
+            if model.reset != nil {
+                Notice(tone: .info, message: resetWords, dismiss: { model.resetSeen() })
+                    .listRowBackground(Tone.ground)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: Space.s, leading: Space.gutter, bottom: Space.s, trailing: Space.gutter))
+                    .accessibilityIdentifier("reset-notice")
+            }
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
             }
@@ -354,6 +346,18 @@ struct ChatListView: View {
                     .accessibilityIdentifier("chats.new")
             }
         }
+    }
+
+    /// What the reset's notice says; where the unsent words went while the new chat's draft holds them.
+    private var resetWords: String {
+        var lines: [String] = [String(localized: "Your Mac's Dot was reset; the old chats are gone from this phone.", comment: "Chat list notice: the Mac's Dot was reset and its old chats left the phone")]
+        if !model.draft(of: AppModel.newChatDraft).isEmpty {
+            lines.append(String(localized: "Your unsent words wait in New chat.", comment: "Chat list notice after a reset: the words that were not sent are the new chat's draft"))
+        }
+        if model.reset?.photosLeft == true {
+            lines.append(String(localized: "Photos of unsent messages were not kept.", comment: "Chat list notice after a reset: the photos of the messages that were not sent are gone"))
+        }
+        return lines.joined(separator: " ")
     }
 
     /// A row, with its check in select mode (a tap checks it there and opens nothing).
@@ -527,11 +531,12 @@ struct ChatRow: View {
 /// A new chat (PLAN §24): a clean canvas, the composer, the model chip in the bar and in the composer. The chat's
 /// settings are chosen before the first message (model, level, fast mode, approvals, plan first) and go with it
 /// (`POST /runs`); once sent, the chat opens at once under the outbox's key (item 1849) and shows in the list from the
-/// outbox.
+/// outbox. With an `agent` (a bot's New chat, item 1883) the chat is with that agent, its face above the composer.
 struct NewChatSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
+    let agent: AgentRecord?
     @State private var settings: ChatSettingsDraft = ChatSettingsDraft(choices: .daemons, planFirst: false)
     @State private var choosing: Bool = false
     let close: () -> Void
@@ -547,8 +552,14 @@ struct NewChatSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
+                if let agent {
+                    BotFace(id: agent.id, look: agent.look, size: 64)
+                    Text(agent.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
+                    Spacer(minLength: 0)
+                }
                 ComposerView(
-                    text: $text, attachments: $attachments, placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"),
+                    text: $text, attachments: $attachments,
+                    placeholder: agent.map { askPlaceholder($0.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
                     buttons: composerButtons(
                         // A new chat needs words (the daemon's goal is never empty): photos alone do not start one.
                         hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
@@ -586,6 +597,9 @@ struct NewChatSheet: View {
         .presentationBackground(Tone.ground)
         .tint(Tone.text)
         .task { await model.loadModels() }
+        // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
+        .onAppear { text = model.draft(of: AppModel.newChatDraft) }
+        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft) }
         .sheet(isPresented: $choosing) {
             ChatSettingsSheet(
                 initial: settings, providers: model.models, defaults: model.chatDefaults, problem: model.modelsProblem,
@@ -603,7 +617,12 @@ struct NewChatSheet: View {
         let photos: [Data] = attachments.map(\.jpeg)
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
         Task {
-            if let key = await model.startChat(words, photos: photos, start: start) { opened(key) } else { close() }
+            if let key = await model.startChat(words, photos: photos, start: start, agent: agent?.id) {
+                model.keep(draft: "", of: AppModel.newChatDraft)
+                opened(key)
+            } else {
+                close()
+            }
         }
     }
 }

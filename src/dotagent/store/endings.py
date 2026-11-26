@@ -27,9 +27,13 @@ PREFIX_STALLED: str = "Stopped: the agent was not making progress"
 PREFIX_LIMIT: str = "Stopped: the run reached its limit"
 RESULT_EMPTY_REPLIES: str = "The model returned empty replies and did not finish."
 # A run whose replies the model service kept ending before they were complete (its output limit, or another abnormal
-# reason it gave; a content filter's stop ends a run with its own words, agent.loop.filtered_stop), followed by the
-# reason the last one ended with.
+# reason it gave; a content filter's stop moves the run to a standby model or ends it with its own words,
+# agent.loop.filtered_stop), followed by the reason the last one ended with.
 PREFIX_CUT_SHORT: str = "The model's replies were cut short"
+# A run whose model declined its task and held to it after the one note with the task's grounds (item 1889), or whose
+# message the Claude plan's safeguards flagged (item 1761): the model's own words follow. Its page offers a restart on
+# a model the owner picks; no schedule tries it again on the same model.
+PREFIX_MODEL_REFUSED: str = "The model declined this task"
 PREFIX_EMERGENCY_STOP: str = "Emergency stop: "
 # The result of a run the emergency stop of the web UI or the API ended (``RunManager.emergency_stop``).
 RESULT_EMERGENCY_STOPPED: str = f"{PREFIX_EMERGENCY_STOP}every active run was stopped."
@@ -50,6 +54,7 @@ type Ending = Literal[
     "limit",
     "empty_replies",
     "cut_short",
+    "model_refused",
     "internal_error",
     "daemon_restarted",
     "stopped",
@@ -70,6 +75,7 @@ ENDING_LABELS: dict[Ending, str] = {
     "limit": "stopped at its limit of minutes or tokens",
     "empty_replies": "empty replies from the model",
     "cut_short": "replies from the model cut short",
+    "model_refused": "the model declined the task",
     "internal_error": "internal error",
     "daemon_restarted": "cut off when the daemon died",
     "stopped": "stopped (by the user; older runs may be restarts, which were not told apart)",
@@ -89,6 +95,8 @@ def _failed_ending(result: str) -> Ending:
         return "empty_replies"
     if result.startswith(PREFIX_CUT_SHORT):
         return "cut_short"
+    if result.startswith(PREFIX_MODEL_REFUSED):
+        return "model_refused"
     if result == RESULT_RESTARTED:
         return "daemon_restarted"
     if result == RESULT_COMMAND_DIED:

@@ -101,8 +101,11 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    the phone is removed, as its APNs device does; one made with the Mac's token belongs to none and stays. Settings ›
    General › Notifications off drops the subscription.
 
-4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now) is a native SwiftUI app over the daemon's own
-   API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
+4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
+   Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
+   per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
+   own header and menu, its profile, and one settings sheet from the owner's initials) is a native SwiftUI app over the
+   daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
@@ -626,6 +629,7 @@ paired`) and nothing is kept for it.
 | `GET /api/away?since=<seconds>` | any token | 1424 | 200, what Dot did on its own |
 | `GET /api/away/read` | any token | 1356 | 200, `{read_at}` |
 | `POST /api/away/read` | any token | 1356 | 200, `{read_at}` |
+| `GET /api/drafts?limit=` | any token | 1825 | 200, the drafts that wait for you, newest first |
 | `GET /api/threads/view?limit=` | any token | 1686 | 200, the chats with their revisions |
 | `GET /api/threads/stream` | any token | 1686 | the list's event stream |
 | `GET /api/threads/{id}/view?tail=&before=` | any token | 1686 | 200, the chat at its revision |
@@ -635,6 +639,7 @@ paired`) and nothing is kept for it.
 | `POST /api/runs/{id}/takeover/screen` | any token | 470, 1840 | 202, the run held for this screen |
 | `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
 | `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
+| `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
 
 What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
 wait on you (item 1422; [below](#what-the-daemon-pushes-to-the-app)); `GET /api/away` lists more runs and says each run's
@@ -959,6 +964,36 @@ approvals Dot answered for you. Putting the card away marks the `until` of the c
 get through (no link, no answer) is kept in `awareness.json` and sent first by the next read, so a card put away stays away.
 The card is drawn from the last read, kept in the same file, before the network answers.
 
+### The Activity tab of Dot Next (item 1826)
+
+The iPhone app's Activity tab shows what the owner needs away from the Mac to watch, answer or direct Dot's own work;
+the setup of it (the brief's time, a watcher's choices, the model that looks for work) stays on the Mac. The tab shows all of Dot's. The screen can also be limited to one agent (`ActivityScreen(agent:)`), for the agents'
+profiles the app is to get (no screen opens it so limited yet): it then lists that agent's runs and rows alone (by the
+row's `actor_id` and the run's `agent_id`), leaves out what belongs to Dot as a whole and Mark as read, never marks the
+moment, and counts that agent's runs among the fifty newest the daemon lists, so in a busy week the counts can be lower
+than what it did. Each part is
+read from its own route, so one that fails leaves the others on screen with one notice over the page; the tab reads
+again every 30 seconds while it is on screen and when it is pulled down.
+
+- **While you were away**: the card of `GET /api/away` against the moment of `GET /api/away/read` (the first visit from
+  any device marks it and shows nothing), its two newest runs and the two runs with the most decisions until Show more,
+  each opening its chat; Mark as read posts the card's `until`.
+- **Ready**: the drafts that wait (`GET /api/drafts`, a failed send among them, in red with the application's words). A
+  draft opens as its card: to whom, the subject and the words, which may be changed; Send (with Mail or Messages) and
+  Discard each ask first (`POST /api/drafts/{id}/send` and `/discard`); one answered on another screen (409) leaves the
+  list.
+- **Dot's proposals**: the versions of Self-improvement that wait (`GET /api/harness`, state `candidate` or `probed`),
+  each with its habits and tips; Use puts one in use (asking first when a line may come from content others can write;
+  one the checks refuse offers no Use) and Set aside keeps it for the record (`POST /api/harness/{id}/adopt` and
+  `/retire`).
+- **Needs you, Working, Later today, Earlier today, Learned today**: the sections of `GET /api/activity`; a row of a run
+  opens its chat (a delegated run the chat at the top of its chain), where an ask is answered with its whole card.
+- **Dot comes to you**: the morning brief and the evening check-in with their switches (`PUT /api/brief`, `PUT
+  /api/checkin` with their time and days as they are), the brief's Write one now (`POST /api/schedules/{id}/run`) and
+  the last one's chat; **On its own** (`/api/initiative`: the switch, the list with Remove and Again, a thing added);
+  **Watchers** (`GET /api/watchers`, each with how its looks go and its switch, sent whole with `PATCH
+  /api/watchers/{id}`).
+
 ### A chat kept in sync: views, revisions and streams (item 1686)
 
 Four calls keep a client's picture of the chats the same as the daemon's, after any break, on any link. They are new
@@ -1030,7 +1065,7 @@ daemon tells a moved revision within half a second of the write (it reads the mo
 Dot Next shows the Mac's screen and a run's browser live, and lets the owner take a run's page over, with the routes the
 web uses:
 
-- **Watch the Mac** (Activity): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
+- **Watch the Mac** (Activity, and Dot's profile): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
   `dotagent/desktop/live.py`, decoded by the phone's own H.264 decoder. `hd` is the page's (1920 pixels on the longest
   side, 60 frames a second, a key frame every 4 s); `light` (item 1837) is a capture of its own at 1280 pixels, 30
   frames a second, a fifth of the bit rate and a key frame every 2 s, for a weak link. The viewer's Automatic quality
@@ -1052,6 +1087,27 @@ web uses:
   409 is said as the daemon means it: `remote_input` off (with where to switch it on), a step still going ("Dot is
   finishing a step; try again in a moment."), or a hold that ended elsewhere (the controls go back to Take over). A
   run held from the Mac or the web shows Hand back on the phone too.
+
+### GET /api/threads/search
+
+The home's search of the iPhone app (item 1882) looks in what the chats say: `q` (1 to 200 characters) and `limit` (1 to
+50, 20 when left out). The answer is a list, best first, of `{"thread_id", "seq", "kind", "ref", "snippet"}`: `kind`
+`m` is a message of the chat's history (`ref` the role that said it, `seq` its place), `r` the answer of a run (`ref`
+the run's id, `seq` -1); `snippet` holds the words around the match with the matched words in `[...]`, and a secret
+Dot holds is masked in it where the snippet holds it whole (a match inside a value, or a snippet cut through one, can
+leave a part unmasked, as the chat's own view shows the words unmasked to the same key). Words are folded as the index folds them (case, accents, the Turkish dotted and dotless i);
+words that fold to nothing find nothing, and an empty `q` is a 422. A tool's output is not in the index.
+
+**Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
+`store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and
+a reset of Dot (a new, empty home) changes. Revisions are the database's, so a reset one starts them again below what a
+kept copy holds: a client that hears another `store_id` drops its copies, and what it had not sent yet for the old
+chats can reach nothing. DotNext then keeps the unsent messages for the owner, drops its outbox's doings for those chats
+(their photos too), keeps a new chat's first message to send to the new daemon, puts the unsent words (and the old
+chats' drafts) into the new chat's draft, and says once, on the chat list, "Your Mac's Dot was reset; the old chats are
+gone from this phone.", with where the words wait and whether photos were let go. Its outbox sends nothing before it has
+heard the daemon's status in the session, whatever starts the sending; a reset while the app runs is found at the next
+connection, and what was sent to the new daemon meanwhile is refused there, its words kept the same way.
 
 ### What the daemon pushes to the app
 

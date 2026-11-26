@@ -23,8 +23,10 @@ public actor Outbox {
     private let clock: any EngineClock
     private let policy: RetryPolicy
     private let jitter: @Sendable () -> Double
-    /// Whether a new chat may be sent now: only while the list is live (R-b §8 #8), so it never lands on a stale list.
-    private let mayStartChat: @Sendable () async -> Bool
+    /// Whether a doing may be sent now: nothing before the daemon was heard in the session (a doing for a reset daemon's
+    /// old chats must never reach the new one, whichever path started the sending), and a new chat only while the list
+    /// is live (R-b §8 #8), so it never lands on a stale list. A doing held is looked at again after 5 s or a nudge.
+    private let maySend: @Sendable (OutboxItem.Action) async -> Bool
     private let waker: Waker = Waker()
     private var items: [OutboxItem]
     private var draining: Task<Void, Never>?
@@ -36,7 +38,7 @@ public actor Outbox {
     /// What the disk holds is read here; an item that was being sent when the app ended is waiting again.
     public init(
         directory: URL, api: DaemonAPI, link: LinkWatcher, clock: any EngineClock, policy: RetryPolicy,
-        jitter: @escaping @Sendable () -> Double, mayStartChat: @escaping @Sendable () async -> Bool
+        jitter: @escaping @Sendable () -> Double, maySend: @escaping @Sendable (OutboxItem.Action) async -> Bool
     ) {
         self.directory = directory
         self.file = directory.appending(path: "outbox.json")
@@ -46,7 +48,7 @@ public actor Outbox {
         self.clock = clock
         self.policy = policy
         self.jitter = jitter
-        self.mayStartChat = mayStartChat
+        self.maySend = maySend
         var loaded: [OutboxItem] = Self.read(file)
         for at in loaded.indices where loaded[at].phase == .sending { loaded[at].phase = .waiting }
         self.items = loaded
@@ -109,7 +111,7 @@ public actor Outbox {
             case .message(let thread, let text, _, _, let picks): names.isEmpty ? action : .message(thread: thread, text: text, images: names, uploaded: [], picks: picks)
             case .steer(let run, let thread, let text, _, _):
                 names.isEmpty ? action : .steer(run: run, thread: thread, text: text, images: names, uploaded: [])
-            case .newChat(let text, _, _, let start): names.isEmpty ? action : .newChat(text: text, images: names, uploaded: [], start: start)
+            case .newChat(let text, _, _, let start, let agent): names.isEmpty ? action : .newChat(text: text, images: names, uploaded: [], start: start, agent: agent)
             default: action
             }
         items.append(OutboxItem(id: id, action: kept, createdAt: clock.now()))
@@ -125,6 +127,21 @@ public actor Outbox {
         removePhotos(of: removed)
         save()
         return (removed, photos)
+    }
+
+    /// The messages a reset would leave unsent (`DaemonRules.afterReset`), read without dropping them: they are kept
+    /// for the owner before the outbox lets them go.
+    public func unsentForReset() -> [UnsentWords] { DaemonRules.afterReset(items).unsent }
+
+    /// The Mac's Dot was reset (`DaemonRules.afterReset`): drops every doing for a chat or a run of the old daemon, with
+    /// its photos. An answer to one already on its way finds nothing to finish.
+    public func dropForReset() {
+        let (kept, dropped, _): ([OutboxItem], [OutboxItem], [UnsentWords]) = DaemonRules.afterReset(items)
+        guard !dropped.isEmpty || kept != items else { return }
+        for item in dropped { removePhotos(of: item) }
+        items = kept
+        save()
+        logger.notice("outbox dropped for a reset count=\(dropped.count) kept=\(kept.count)")
     }
 
     /// Tries now: the wait is cut short, and a doing that failed for good is tried again (a message too old to be sent as
@@ -172,7 +189,7 @@ public actor Outbox {
             switch action {
             case .message(let thread, let text, _, _, let picks): .message(thread: thread, text: text, images: renamed, uploaded: [], picks: picks)
             case .steer(let run, let thread, let text, _, _): .steer(run: run, thread: thread, text: text, images: renamed, uploaded: [])
-            case .newChat(let text, _, _, let start): .newChat(text: text, images: renamed, uploaded: [], start: start)
+            case .newChat(let text, _, _, let start, let agent): .newChat(text: text, images: renamed, uploaded: [], start: start, agent: agent)
             default: action
             }
         return OutboxItem(id: key, action: next, createdAt: clock.now())
@@ -218,7 +235,7 @@ public actor Outbox {
                 await waker.wait(seconds: 30, clock: clock, seen: seen)
                 continue
             }
-            if case .newChat = items[at].action, !(await mayStartChat()) {
+            if !(await maySend(items[at].action)) {
                 await waker.wait(seconds: 5, clock: clock, seen: seen)
                 continue
             }
@@ -302,9 +319,10 @@ public actor Outbox {
             let ids: [String] = try await upload(item)
             try await api.steer(SteerMessage(text: text, key: item.id, attachments: ids), run: run)
             return .steered(item)
-        case .newChat(let text, _, _, let start):
+        case .newChat(let text, _, _, let start, let agent):
             let ids: [String] = try await upload(item)
-            return .started(item, run: try await api.startChat(NewChatMessage(goal: text, key: item.id, attachments: ids, start: start ?? .daemons)))
+            return .started(
+                item, run: try await api.startChat(NewChatMessage(goal: text, key: item.id, attachments: ids, start: start ?? .daemons, agentId: agent)))
         case .decision(let approval, _, _, let approve, let note, let remember):
             do {
                 return .answered(item, status: try await api.decide(approval: approval, approve: approve, note: note, remember: remember).status)
@@ -371,7 +389,7 @@ public actor Outbox {
     private func upload(_ item: OutboxItem) async throws(DaemonRequestError) -> [String] {
         var uploaded: [String] =
             switch item.action {
-            case .message(_, _, _, let ids, _), .steer(_, _, _, _, let ids), .newChat(_, _, let ids, _): ids
+            case .message(_, _, _, let ids, _), .steer(_, _, _, _, let ids), .newChat(_, _, let ids, _, _): ids
             default: []
             }
         for (number, name) in item.images.enumerated() where number >= uploaded.count {

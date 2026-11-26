@@ -80,6 +80,13 @@ the daemon's notice of where to end it. While the daemon says a service waits, o
 reads again every five seconds, so "Finish on your Mac" turns into Connected with no pull to refresh; it stops with the
 sheet.
 No "For you" section: the daemon gives no suggestion for services.
+The Activity tab (`Activity/`, item 1826) reads what Dot did on its own: "while you were away" with Mark as read for
+every device, the drafts that wait (Send and Discard, each asked first), the proposals of Self-improvement (Use, Set
+aside), what waits, works, is due, ended or was learned today (a row opens its chat), and the morning brief, the evening
+check-in, Dot's own initiative and the watchers with their switches; their setup stays on the Mac (PLAN §26).
+`scripts/e2e_activity.sh <simulator udid> <derived data> <shots dir>` runs `ActivityLiveUITests` against a throwaway
+daemon seeded with `e2e_daemon.py --seed-activity`, exports its light and dark shots and reads on the daemon's side what
+each tap wrote; it never sends a draft (a send goes through the Mac's own Mail or Messages).
 
 ## The engine: `ios/DotEngine`
 
@@ -87,7 +94,9 @@ A Swift package (iOS 26 and macOS 26; Foundation, Network, Security only: no UIK
 `Contract/` (the daemon's sync contract, `docs/phone.md` "A chat kept in sync"), `Wire/` (HTTP, SSE parser, host,
 retry policy), `Sync/` (the pure reducers of a chat and the list, frames, delivery states, the transcript filter, the
 clock, the link), `Store/` (`SyncStore`, `Supervisor`, `Engine`), `Outbox/` (moved from the old app), `Cache/`
-(`v2/` of the app group), `Pairing/` (typed code, Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
+(`v2/` of the app group, kept with the daemon it came from: a reset Dot, another `store_id`, drops it and the outbox's doings
+for the old chats, their words kept in the new chat's draft; `docs/phone.md` "Which daemon"), `Pairing/` (typed code,
+Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
 the DotNext scheme runs them on the simulator too. The tests never sleep: `ManualClock` is moved by hand, and
 `FakeDaemon` (a `URLProtocol`) speaks the contract and misbehaves as a test says.
 
@@ -102,17 +111,19 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
   empty and loading states, notices, the toast with Undo, sheets (inspector: ✕ only; edit: ✕ and ✓), the composer shell,
   the floating working capsule with the scroll-to-bottom circle, the transcript pieces (bubble, answer, code block, tool
   call row and group, helper group, speaker line), helper and background-work rows and their sheets.
-- `App/`: the shell (four tabs), the placeholder screens, the gallery, sample content.
+- `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
+  `BotProfile.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
+  on a throwaway daemon.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
 
 ## Decisions taken in N0
 
-- **No hue.** The ink is the only accent (send, switches, tab tint, links underlined, selection); amber only for what
-  waits on the owner (also the Chats badge), red only for a failure. No surface has a stroke.
+- **No hue.** The ink is the only accent (send, switches, links underlined, selection, the unread dot); amber only for
+  what waits on the owner, red only for a failure. No surface has a stroke.
 - **The switch** is drawn (`InkSwitchStyle`): the system's white thumb disappears on a light ink track in the dark look.
-- **iPad**: the tab bar stays the top level on every width; inside Chats and Agents a compact width is a stack and a
-  regular width a split view with the same selection, so collapsing keeps the open item. Grouped pages are at most
+- **iPad**: no tab bar (PLAN §27); a compact width is the home with a bot's chat pushed, a regular width a split view
+  (the home as the sidebar, the chat as the detail) with the same selection, so collapsing keeps the open chat. Grouped pages are at most
   700 pt wide; prose in a chat is measured to 68 characters of the body font (`ProseColumn`, tested to stay in 60-75).
 - **Density**: tool calls are 28 pt rows under a 44 pt group disclosure; a row is a full-width target 28 pt tall (an
   open question for the owner's review on the phone).
@@ -220,7 +231,7 @@ and approvals picked in its settings (a real model, `claude_code:haiku` by defau
 ## Screenshots
 
 `scripts/shots.sh <DotNext.app> <out dir> "tr en" <booted simulator udid>...` captures every scene (the gallery pages,
-the tabs, the chat and its sheets) in light and dark, at Large and AX3. The debug build opens a scene with
+the home, the chat and its sheets) in light and dark, at Large and AX3. The debug build opens a scene with
 `-DotNextScene <name>` (`LaunchScene.names`) and writes `Library/Caches/dotnext-ready.txt` once it is drawn; the script
 waits for that file before each capture.
 

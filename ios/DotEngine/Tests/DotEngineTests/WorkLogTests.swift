@@ -184,6 +184,12 @@ final class WorkLogTests: XCTestCase {
             id: "run_f", threadId: "thr_1", goal: "The owner reacted 👎", mode: "task", model: "m", status: "done", createdAt: 5, finishedAt: 6,
             result: "Sorry, fixed", parentRunId: nil, source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: "wrong")
         XCTAssertEqual(transcript(of: chat([follow], []), pending: [], mode: .showAll, streaming: true, context: .none).map(\.id), ["r:run_f"])
+        let welcome: RunRecord = RunRecord(
+            id: "run_w", threadId: "thr_1", goal: "The owner has just made you (Scout)", mode: "chat", model: "m", status: "done", createdAt: 5, finishedAt: 6,
+            result: "Hi, I am Scout", parentRunId: nil, source: "welcome", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+        XCTAssertEqual(
+            transcript(of: chat([welcome], []), pending: [], mode: .showAll, streaming: true, context: .none).map(\.id), ["r:run_w"],
+            "a new agent speaks first: Dot's words to it are not the owner's message")
     }
 
     func testAToolRowKeepsItsArgumentsOutputAndScreenshots() {

@@ -33,6 +33,34 @@ def test_a_scope_written_by_one_command_is_read_back_with_its_rules(tmp_path: Pa
     assert held[0].url == "https://bugcrowd.com/engagements/klaviyo-og"
 
 
+def test_rules_of_several_lines_and_control_characters_are_read_back_as_written(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(scopes, "scopes_path", lambda: tmp_path / "scopes.toml")
+    note: str = 'No scanners.\nAt most 5 req/s.\r\n\tNo "DoS" \\ no social engineering\x07.'
+    entry, _ = scopes.add_scope("HackerOne · Acme", ("acme.com",), url="", note=note)
+    [held] = scopes.load_scopes()
+    assert held == entry and held.note == note
+
+
+def test_a_scope_that_would_not_read_back_leaves_the_file_as_it_was(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(scopes, "scopes_path", lambda: tmp_path / "scopes.toml")
+    scopes.add_scope("HackerOne · Acme", ("acme.com",), url="", note="kept")
+    kept: str = (tmp_path / "scopes.toml").read_text(encoding="utf-8")
+    monkeypatch.setattr(scopes, "_quoted", lambda text: f'"{text}" x')
+    with pytest.raises(scopes.ScopesFileError):
+        scopes.add_scope("Bugcrowd · Other", ("other.org",), url="", note="")
+    assert (tmp_path / "scopes.toml").read_text(encoding="utf-8") == kept
+
+
+def test_an_unreadable_store_covers_no_host_where_a_scope_only_adds_context(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(scopes, "scopes_path", lambda: tmp_path / "scopes.toml")
+    (tmp_path / "scopes.toml").write_text("[[scopes]\n", encoding="utf-8")
+    recon: ReconConfig = ReconConfig(owned_hosts=("mine.dev",), scopes=())
+    assert scopes.authorising_if_readable("acme.com", recon) is None
+    assert scopes.authorising_if_readable("mine.dev", recon) == ReconAuthority(program=None, note="")
+    with pytest.raises(scopes.ScopesFileError):
+        scopes.authorising("acme.com", recon)
+
+
 def test_a_second_add_of_the_same_program_replaces_it_and_keeps_the_others(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(scopes, "scopes_path", lambda: tmp_path / "scopes.toml")
     scopes.add_scope("Bugcrowd · Klaviyo", ("klaviyo.com",))

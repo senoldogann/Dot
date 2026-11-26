@@ -45,7 +45,7 @@ enum Samples {
             status: .failed, agent: "Dot", isPinned: false),
     ]
 
-    /// The agents strip and the Agents tab.
+    /// The agents of the gallery's samples.
     static let agents: [SampleAgent] = [
         SampleAgent(id: "dot", name: "Dot", role: String(localized: "Your assistant · runs everything", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: .working),
         SampleAgent(id: "research", name: "Research", role: String(localized: "Reads and summarises sources", comment: "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send"), status: nil),

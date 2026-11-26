@@ -23,6 +23,7 @@ from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import save_playbook
 from dotagent.agent.proof import added, checks_of
 from dotagent.agent.recap import RecapView, recap_view, write_recap
+from dotagent.agent.refusal import RESTARTED_ON_MODEL_EVENT
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
     NOTHING_TO_TAKE_BACK,
@@ -40,7 +41,9 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path, workspace_dir
 from dotagent.llm.pricing import PriceBook, TokenUse, estimate, tier_sizes
-from dotagent.llm.router import parse_model_ref
+from dotagent.llm.router import offers_fast_mode, parse_model_ref
+from dotagent.llm.traits import effective_effort
+from dotagent.llm.types import Effort, ModelInfo
 from dotagent.notify.needs_you import NeedsYou, read_needs_you
 from dotagent.notify.owner import tell_owner
 from dotagent.policy.chat_permits import key_of_record, may_remember
@@ -81,6 +84,7 @@ from dotagent.server.views import (
     EventsQuery,
     LoopRequest,
     RecapRequest,
+    RestartRequest,
     RewindRequest,
     RewindView,
     RunActions,
@@ -98,7 +102,9 @@ from dotagent.server.views import (
     picks_of,
 )
 from dotagent.store.db import Store
+from dotagent.store.endings import classify_ending
 from dotagent.store.models import (
+    NO_PICKS,
     AgentRecord,
     ApprovalRecord,
     CampaignRecord,
@@ -579,6 +585,51 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """A loop of the chat of the run (:func:`make_loop`), from ``/loop`` in the box of a run; the page sends the
         message itself as a follow-up at once."""
         return await make_loop(run_id, request.every, request.text)
+
+    @router.post("/runs/{run_id}/restart", status_code=201)
+    async def restart_run(run_id: str, request: RestartRequest) -> RunRecord:
+        """Start the task of a run that ended again, in its chat, on the model the owner picked (item 1889): the offer
+        on the page of a run whose model declined it. The old run's ``restarted_on_model`` event records the pick as
+        the owner's choice. A run still at work is refused."""
+        parse_model_ref(request.model)
+        old: RunRecord = await store.get_run(run_id)
+        if old.finished_at is None:
+            raise InvalidValueError("the run is still at work; stop it before restarting it", {"run_id": run_id})
+        if classify_ending(old.status, old.result, old.end_reason) != "model_refused":
+            raise InvalidValueError(
+                "only a run whose model declined its task is restarted on another model; send a message instead",
+                {"run_id": run_id, "status": old.status},
+            )
+        if request.model == old.model:
+            raise InvalidValueError(
+                f"{old.model} declined this task; pick another model to restart it on",
+                {"run_id": run_id, "model": request.model},
+            )
+        # The task starts again as the old run was set: its approvals (a yolo run stays yolo and asks nothing new), its
+        # goal mode, and its reasoning level and speed as near as the new model offers them.
+        ref = parse_model_ref(request.model)
+        info: ModelInfo = await ctx.runtime.router.model_info(ref)
+        effort: Effort | None = None if old.effort is None else effective_effort(info.efforts, old.effort)
+        run: RunRecord = await ctx.manager.start_picked(
+            old.goal,
+            old.mode,
+            request.model,
+            old.thread_id,
+            UI_SOURCE,
+            None,
+            effort,
+            old.speed if offers_fast_mode(ref) else "standard",
+            None,
+            old.approvals,
+            None if old.mode == "chat" else old.goal_mode,
+            (),
+            NO_PICKS,
+        )
+        await ctx.runtime.bus.emit(
+            run_id, RESTARTED_ON_MODEL_EVENT, {"model": request.model, "run_id": run.id, "chosen_by": "owner"}, True
+        )
+        log.info("run_restarted_on_model", run_id=run_id, new_run_id=run.id, model=request.model)
+        return run
 
     @router.post("/runs/{run_id}/resume", status_code=201)
     async def resume_run(run_id: str) -> RunRecord:

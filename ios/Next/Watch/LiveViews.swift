@@ -323,6 +323,24 @@ struct FeedPlaceholder: View {
 
 // MARK: Watch the Mac
 
+/// The row that opens the Mac's live screen full screen (item 1838): in Activity and in Dot's profile.
+struct WatchMacRow: View {
+    @State private var watching: Bool = false
+
+    var body: some View {
+        Button {
+            watching = true
+        } label: {
+            ListRow(
+                systemImage: "play.display", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen"), description: nil,
+                accessory: .chevron)
+        }
+        .buttonStyle(RowPressStyle())
+        .accessibilityIdentifier("activity.watchMac")
+        .fullScreenCover(isPresented: $watching) { WatchMacScreen(close: { watching = false }) }
+    }
+}
+
 /// The Mac's screen, full screen, whether a task works or not (item 1838; web `views/watch.js`). Nothing is read while
 /// it is closed or the app is away.
 struct WatchMacScreen: View {

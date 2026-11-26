@@ -60,8 +60,11 @@ sandbox Dot's home is closed to a run's commands ([Safety](safety.md)), so there
 `dotx scope add` line to run, never a toml block.
 
 A host in a scope is treated as an owned host: the port scan and `security_scan` run on it, and every report ends with
-`Scope: <program> — <rules>`. Writing the scope down is your statement that the program's rules allow the test, so the
-`note` is where its rate limit, its exclusions and what it bans belong. A scope may also be written in the config file
+`Scope: <program> — <rules>`. A scope stands for your word that you are in the program and that its rules allow the
+test: you write it, or a run you asked to test that program writes it from the program's own scope page, and `dotx
+scope list` shows what each holds, so remove one you did not mean. The `note` is where its rate limit, its exclusions
+and what it bans belong. When a model declines the work, those rules are quoted to it as recorded, never as Dot's own
+words ([Models](models.md), item 1889). A scope may also be written in the config file
 as `[[recon.scopes]]`; the store is the place `dotx scope` keeps, and both are read.
 
 A port whose service should stay behind the firewall (a database, SMB, RDP, VNC, Redis, memcached, Elasticsearch) is a
