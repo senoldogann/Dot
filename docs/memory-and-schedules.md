@@ -390,7 +390,11 @@ dated final answers of the schedule's last ended runs (`[scheduler] history_runs
 so the run builds on them instead of doing the same work again (item 257). The chat shows the goal alone, and the run's
 reviewer takes only the goal as your words; a one-time schedule that fires late says when it was due in that first
 message too. With `same_chat` a firing goes on in the chat of the one before (a new one when you deleted it), where the
-run reads their conversation instead of the digest. Either way it reads earlier runs' words without a message of yours,
+run reads what was said in it instead of the digest: your messages and the final answers of the earlier runs, newest first
+up to `history_chars` characters in one message (the newest answer up to half of them, an older line 600), and not the
+tool calls, their results, the thinking or the screenshots of those runs, which the chat keeps and the run no longer reads
+(item 1950: a client-mail check every two hours carried some 70 k tokens of them into each firing, for answers of a few
+hundred characters). The goal a chat repeats is said once, by the firing's own message. Either way it reads earlier runs' words without a message of yours,
 so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest counts
 the firings since item 257: a firing from before names no schedule. The agent can create schedules too
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows

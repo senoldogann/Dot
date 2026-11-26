@@ -307,6 +307,7 @@ from dotagent.oauth.tokens import Account
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.scheduler.history import condensed_chat
 from dotagent.scheduler.plans import schedule_timing
 from dotagent.scheduler.timing import format_local
 from dotagent.scopes import authorising_if_readable
@@ -3082,6 +3083,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     if grouped:
         await runtime.bus.emit(run.id, GROUPS_EVENT, groups_event(0, groups, on, (), surface_reason), True)
+    if run.source == SCHEDULE_SOURCE:
+        # A firing that goes on in its schedule's chat reads what was said in it, not every step of every earlier run
+        # (item 1950); the chat itself keeps them. A firing in a chat of its own has nothing yet to condense.
+        history = condensed_chat(history, runtime.config.scheduler.history_chars)
     goal: Message = await message_with_attachments(
         runtime,
         run.thread_id,
