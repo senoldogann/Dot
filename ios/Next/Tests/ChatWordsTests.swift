@@ -19,8 +19,8 @@ final class ChatWordsTests: XCTestCase {
 
     func testTheFoldSaysHowLongAndWhatInTheOwnersLanguage() {
         let fold: WorkFold = WorkFold(id: "f", seconds: 134, tally: WorkTally(counts: [.read: 3, .command: 2], failed: 0), items: [])
-        XCTAssertEqual(foldWords(fold, locale: turkish), "2 dk 14 sn çalıştı · 3 dosya okudu, 2 komut çalıştırdı")
-        XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s · read 3 files, ran 2 commands")
+        XCTAssertEqual(foldWords(fold, locale: turkish), "2 dk 14 sn çalıştı")
+        XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s", "how long only, no counts (item 1904)")
     }
 
     func testConsecutiveStepsStackAsOneTightBlock() {

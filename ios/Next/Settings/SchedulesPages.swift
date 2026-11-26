@@ -95,7 +95,7 @@ struct SchedulesPage: View {
                 if schedules.isEmpty {
                     EmptyState(
                         title: String(localized: "No scheduled tasks", comment: "Schedules: empty"), systemImage: "clock",
-                        detail: String(localized: "Ask Dot in a chat to do something every morning.", comment: "Schedules: how one is made"), actionTitle: nil, action: {})
+                        detail: String(localized: "Ask Dot in a chat to do something every morning.", comment: "Schedules: how one is made"), actionTitle: nil, action: {}).fillsScrollPage()
                 } else {
                     VStack(alignment: .leading, spacing: Space.xs) {
                         if let mac = model.macName {

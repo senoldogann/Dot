@@ -282,7 +282,7 @@ struct ChatScreen: View {
         case .work(let fold):
             WorkFoldView(fold: fold, row: { AnyView(self.row($0)) })
         case .ended(_, let status, let detail):
-            RunEndedCard(status: status, detail: detail, retry: status == "failed" && activeRun == nil ? { retryLast() } : nil)
+            RunEndedRow(status: status, detail: detail, retry: status == "failed" && activeRun == nil ? { retryLast() } : nil)
         case .limit(_, let resetsAt):
             UsageLimitCard(resetsAt: resetsAt, resume: { retryLast() })
         }

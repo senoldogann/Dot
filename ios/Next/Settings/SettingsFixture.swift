@@ -32,6 +32,8 @@
         case connectApps = "settings-connect-apps"
         case connectAppsDetail = "settings-connect-apps-detail"
         case connectAppsOffline = "settings-connect-apps-offline"
+        /// Usage on a Mac that never answers: the page's loading state, measured to stand centred (item 1904).
+        case loading = "settings-loading"
         case pairing = "pairing"
         case pairingLink = "pairing-link"
 
@@ -45,6 +47,7 @@
             case .oldDaemon: .old
             case .stopped: .stopped
             case .capsRefused: .phoneRefused
+            case .loading: .silent
             default: .normal
             }
         }
@@ -67,6 +70,7 @@
             case .agents: .agents
             case .system: .system
             case .maintenance: .maintenance
+            case .loading: .usage
             case .pairing, .pairingLink, .connectApps, .connectAppsDetail, .connectAppsOffline: nil
             }
         }
@@ -109,6 +113,8 @@
         case stopped
         /// Every write is refused as a phone's (403 `PhoneRefused`).
         case phoneRefused
+        /// A read of a page never gets an answer (the health and proof checks do).
+        case silent
     }
 
     /// Serves the fixture daemon. Every answer is the JSON the daemon's routes give (`server/views.py`).
@@ -127,6 +133,7 @@
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
                 return
             }
+            if behaviour == .silent, path != "/api/health", path != "/api/proof" { return }
             let (code, body): (Int, String) = answer(method: method, path: path, behaviour: behaviour)
             let response: HTTPURLResponse = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

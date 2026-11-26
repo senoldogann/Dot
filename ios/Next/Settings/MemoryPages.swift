@@ -73,7 +73,7 @@ struct MemoryPage: View {
                     if state.items.isEmpty {
                         EmptyState(
                             title: String(localized: "Nothing remembered yet", comment: "Memory: no notes"), systemImage: "brain",
-                            detail: String(localized: "Ask Dot to remember something during a task.", comment: "Memory: how a note is made"), actionTitle: nil, action: {})
+                            detail: String(localized: "Ask Dot to remember something during a task.", comment: "Memory: how a note is made"), actionTitle: nil, action: {}).fillsScrollPage()
                     } else {
                         GroupedSection(header: String(localized: "\(state.total) notes", comment: "Memory: the number of notes"), footer: nil) {
                             ForEach(state.items) { note in noteRow(note) }

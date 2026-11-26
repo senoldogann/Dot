@@ -255,7 +255,8 @@ struct DaemonImageThumb: View {
         .task(id: name) { image = await model.image(named: name) }
         .sheet(isPresented: $whole) {
             if let image {
-                ScrollView([.horizontal, .vertical]) { Image(uiImage: image).resizable().scaledToFit().frame(minWidth: 320) }
+                ZoomableImage(image: image, label: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"))
+                    .ignoresSafeArea(edges: .bottom)
                     .inspectorSheet(title: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"), close: { whole = false })
             }
         }
@@ -426,29 +427,34 @@ struct DotNoteRow: View {
     }
 }
 
-/// How a run ended other than done: the cause in one line and Try again (plan §4.1 States).
-struct RunEndedCard: View {
+/// How a run ended other than done, drawn as plainly as the work log's rows (item 1904): a small muted symbol, one
+/// line "The run failed · <reason>", and Try again as a plain text button on the row; no card, no red fill.
+struct RunEndedRow: View {
     let status: String
     let detail: String
     let retry: (() -> Void)?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+        HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
             Image(systemName: status == "failed" ? "exclamationmark.triangle" : "stop.circle")
-                .foregroundStyle(status == "failed" ? Tone.failure : Tone.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(title).textRole(.footnote).fontWeight(.medium).foregroundStyle(status == "failed" ? Tone.failure : Tone.text)
-                if !detail.isEmpty { Text(detail).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(3) }
-                if let retry {
-                    Button(String(localized: "Try again", comment: "Under a refused message: sends it again"), action: retry)
-                        .buttonStyle(SecondaryButtonStyle())
-                }
+                .font(.system(.footnote, weight: .regular))
+                .foregroundStyle(status == "failed" ? Tone.failure.opacity(0.75) : Tone.glyph)
+                .frame(width: Metric.iconSlot)
+                .accessibilityHidden(true)
+            Text(detail.isEmpty ? title : title + " · " + detail)
+                .textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if let retry {
+                Button(String(localized: "Try again", comment: "Under a refused message: sends it again"), action: retry)
+                    .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
+                    .buttonStyle(.plain)
+                    .frame(minWidth: Metric.hit, minHeight: Metric.hit)
+                    .contentShape(Rectangle())
+                    .accessibilityIdentifier("runEnded.retry")
             }
-            Spacer(minLength: 0)
         }
-        .padding(Space.m)
-        .background(Tone.nested, in: rounded(Radius.bubble))
-        .accessibilityElement(children: .combine)
+        .frame(minHeight: Metric.toolRow)
+        .accessibilityElement(children: .contain)
     }
 
     private var title: String {
