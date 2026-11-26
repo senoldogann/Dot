@@ -204,7 +204,8 @@ struct ChatScreen: View {
                     StartingLine()
                 }
                 if let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
-                    if !stopping, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
+                    // An ask that waits on the owner is the dock's, never this line's.
+                    if now != .waitingForYou, !stopping, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
                         // While the run waits on something, one quiet line says on what in every mode (item 1909); Stop
                         // is the pill's, so the line offers only Details.
                         WaitingLine(words: waiting, details: { panel = .inspector })
