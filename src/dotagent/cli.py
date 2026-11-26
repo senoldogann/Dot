@@ -118,6 +118,10 @@ _FAMILIES: dict[str, str] = {
     "prune": "dotagent.cli_prune",
     "backup-now": "dotagent.cli_backup",
     "backup-list": "dotagent.cli_backup",
+    "scope-list": "dotagent.cli_scope",
+    "scope-add": "dotagent.cli_scope",
+    "scope-remove": "dotagent.cli_scope",
+    "scope-check": "dotagent.cli_scope",
     "undo": "dotagent.cli_undo",
     "eval-list": "dotagent.cli_eval",
     "eval-check": "dotagent.cli_eval",
@@ -566,6 +570,24 @@ def build_parser() -> argparse.ArgumentParser:
     backup_commands.add_parser("now", help="copy the database now into [store] backup_dir and thin the older copies")
     backup_commands.add_parser("list", help="list the copies kept, newest first")
 
+    scope = commands.add_parser(
+        "scope",
+        help="the bug bounty programs you may test: one command writes a scope, check asks who covers a host",
+    )
+    scope_commands = scope.add_subparsers(dest="scope_action", required=True)
+    scope_commands.add_parser("list", help="the scopes kept, with their hosts and rules")
+    scope_add = scope_commands.add_parser("add", help="add a program's scope, or replace the one kept for it")
+    scope_add.add_argument("--program", required=True, help='the program as you name it, e.g. "Bugcrowd · Klaviyo"')
+    scope_add.add_argument(
+        "--hosts", nargs="*", default=[], help="the hosts its published scope lists, comma or space separated"
+    )
+    scope_add.add_argument("--url", default="", help="the program's page, where its scope and rules are written")
+    scope_add.add_argument("--note", default="", help="the rules that came with it: rate, exclusions, what is banned")
+    scope_remove = scope_commands.add_parser("remove", help="drop the scope kept for a program")
+    scope_remove.add_argument("program", help="the program as it is kept")
+    scope_check = scope_commands.add_parser("check", help="which program covers a host or a URL, and its rules")
+    scope_check.add_argument("target", help="a host or a URL")
+
     undo = commands.add_parser(
         "undo",
         help="take back the file changes that write_file and edit_file made in a run and in the runs it delegated to",
@@ -736,6 +758,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     eval_action: object = raw.pop("eval_action", None)
     backup_action: object = raw.pop("backup_action", None)
     review_action: object = raw.pop("review_action", None)
+    scope_action: object = raw.pop("scope_action", None)
     models_action: object = raw.pop("models_action", None)
     if raw["name"] == "models" and models_action == "profile":
         raw["name"] = "models-profile"
@@ -765,6 +788,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"service-{service_action}"
     if raw["name"] == "eval":
         raw["name"] = f"eval-{eval_action}"
+    if raw["name"] == "scope":
+        raw["name"] = f"scope-{scope_action}"
     if raw["name"] == "backup":
         raw["name"] = f"backup-{backup_action}"
     if raw["name"] == "review":
