@@ -25,3 +25,10 @@ test("a command and what is typed are read after the quote, and a quote alone sa
   assert.deepEqual(splitQuote("/loop 5m go"), { quote: null, words: "/loop 5m go" });
   assert.equal(splitQuote(quoteInto("", "Hello")).words.trim(), "");
 });
+
+test("words that only start with > are words, and a quote is the block with a blank line after it", () => {
+  assert.deepEqual(splitQuote(">3 files please"), { quote: null, words: ">3 files please" });
+  assert.deepEqual(splitQuote(">= 5\nand more"), { quote: null, words: ">= 5\nand more" });
+  assert.deepEqual(splitQuote("> a\n> b"), { quote: null, words: "> a\n> b" });
+  assert.deepEqual(splitQuote("> a\n\nmy words"), { quote: "a", words: "my words" });
+});

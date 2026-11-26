@@ -39,8 +39,8 @@ export function quoteInto(draft, words) {
 }
 
 /**
- * `text` split into the quote it begins with (its lines without their "> ", `null` when there is none) and the words
- * after it. A command ("/btw", "/loop") and "is anything typed" are read from the words, not from the quote.
+ * `text` split into the quote it begins with (its lines without their "> ", `null` when there is none, and there is none
+ * unless a blank line follows them) and the words after it. A command ("/btw", "/loop") and "is anything typed" are read from the words, not from the quote.
  * @param {string} text
  * @returns {{ quote: string | null, words: string }}
  */
@@ -50,12 +50,12 @@ export function splitQuote(text) {
   while (lines.length > 0 && lines[0].startsWith(">")) {
     quoted.push(lines.shift().replace(/^> ?/, ""));
   }
-  if (quoted.length === 0) {
+  // A quote is the block this module writes: its lines, then a blank one. Words that merely start with ">" (">3 files",
+  // ">= 5") are words.
+  if (quoted.length === 0 || lines.length === 0 || lines[0] !== "") {
     return { quote: null, words: text };
   }
-  if (lines.length > 0 && lines[0] === "") {
-    lines.shift();
-  }
+  lines.shift();
   return { quote: quoted.join("\n"), words: lines.join("\n") };
 }
 

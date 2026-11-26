@@ -39,8 +39,9 @@ func splitQuote(_ text: String) -> (quote: String?, rest: String) {
         quoted.append(String(line.dropFirst().drop { $0 == " " }))
         lines = lines.dropFirst()
     }
-    guard !quoted.isEmpty else { return (nil, text) }
-    if lines.first?.isEmpty == true { lines = lines.dropFirst() }
+    // A quote is the block this file writes: its lines, then a blank one; words that only start with ">" are words.
+    guard !quoted.isEmpty, lines.first?.isEmpty == true else { return (nil, text) }
+    lines = lines.dropFirst()
     return (quoted.joined(separator: "\n"), lines.joined(separator: "\n"))
 }
 

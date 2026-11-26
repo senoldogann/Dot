@@ -17,6 +17,9 @@ final class QuoteTests: XCTestCase {
         let (none, whole): (String?, String) = splitQuote("no quote > here")
         XCTAssertNil(none)
         XCTAssertEqual(whole, "no quote > here")
+        let (angle, words): (String?, String) = splitQuote(">3 files please")
+        XCTAssertNil(angle, "words that only start with > are words")
+        XCTAssertEqual(words, ">3 files please")
     }
 
     func testAQuoteKeepsTheFirstWordsFoldsBlankRunsAndIsCutWithAnEllipsis() {
