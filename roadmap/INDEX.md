@@ -23,6 +23,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1929](1929.md) | done | 2026-11-26 | Check goals and helper results on a model of another family |
 | [1928](1928.md) | done | 2026-11-26 | Route new runs and helpers by task kind |
 | [1927](1927.md) | done | 2026-11-26 | DotNext says "Pending" under the owner's message until the Mac took it |
+| [1926](1926.md) | done | 2026-11-26 | DotNext's live streaming is light on the iPhone's battery and data, measured before and after, and the app's own performance record goes to the owner's Mac |
 | [1924](1924.md) | done | 2026-11-26 | DotNext's composer is one capsule with the model as its provider's mark |
 | [1923](1923.md) | done | 2026-11-26 | DotNext's open chat never changes by itself when a newer chat of the bot comes |
 | [1922](1922.md) | done | 2026-11-26 | DotNext's "This chat" sheet is plain and compact |

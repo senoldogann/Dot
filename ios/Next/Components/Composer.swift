@@ -289,7 +289,8 @@ extension ComposerView {
             guard let movie = try await item.loadTransferable(type: MovieFile.self) else { throw ComposerMediaError.invalidVideo("Video") }
             return try await ComposerAttachment.video(movie, name: movie.originalName)
         }
-        guard let data = try await item.loadTransferable(type: Data.self), let image = UIImage(data: data) else {
+        // Decoded at the upload size, never at a camera's 12 MP (item 1926).
+        guard let data = try await item.loadTransferable(type: Data.self), let image = ImageSizing.decoded(data, longest: ImageSizing.upload) else {
             throw ComposerMediaError.invalidImage
         }
         return try ComposerAttachment.photo(image)

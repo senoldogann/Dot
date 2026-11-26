@@ -58,7 +58,8 @@ struct HomeShell: View {
         // Back on the home: the agents' home chats (outside the list's window) are read again, so a chat read stops
         // counting as unread.
         .onChange(of: selection == nil) { _, home in if home { Task { await model.loadAgents() } } }
-        .onChange(of: model.list.rows.count) { _, count in
+        // `initial`: the rows may be read before the home is first drawn, and the first chat opens then too.
+        .onChange(of: model.list.rows.count, initial: true) { _, count in
             if opensFirstChat, selection == nil, count > 0 { selection = BotRoute(bot: dotAgentId, thread: model.list.ordered.first?.summary.id) }
         }
     }

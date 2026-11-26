@@ -48,9 +48,14 @@ struct ComposerAttachment: Identifiable, Equatable {
     }
 
     static func photo(_ image: UIImage) throws -> ComposerAttachment {
-        guard let data: Data = image.jpegData(compressionQuality: 0.8) else { throw ComposerMediaError.invalidImage }
+        // A picture goes at the upload size (a camera's 12 MP photo as about 1,600 px, not as itself), with a preview of the
+        // composer's size (item 1926).
+        let sized: UIImage = ImageSizing.fitted(image, longest: ImageSizing.upload)
+        guard let data: Data = sized.jpegData(compressionQuality: ImageSizing.quality) else { throw ComposerMediaError.invalidImage }
         try ComposerMediaError.checkSize(data.count, name: "Photo.jpg")
-        return ComposerAttachment(id: UUID(), content: .ready(OutgoingAttachment(name: "Photo.jpg", mediaType: "image/jpeg", data: data)), preview: image, duration: nil, icon: "photo")
+        return ComposerAttachment(
+            id: UUID(), content: .ready(OutgoingAttachment(name: "Photo.jpg", mediaType: "image/jpeg", data: data)), preview: ImageSizing.fitted(sized, longest: ImageSizing.preview),
+            duration: nil, icon: "photo")
     }
 
     static func document(_ url: URL) async throws -> ComposerAttachment {
