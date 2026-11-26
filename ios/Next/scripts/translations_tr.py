@@ -1379,3 +1379,34 @@ EN_PLURALS.update(
         "%lld actions": ("%lld action", "%lld actions"),
     }
 )
+# G1(a): a new scheduled task and its history.
+TR.update(
+    {
+        "Every day": "Her gün",
+        "Weekly report": "Haftalık rapor",
+        "Weekdays": "Hafta içi",
+        "Every week": "Her hafta",
+        "Once": "Bir kez",
+        "Custom (cron)": "Özel (cron)",
+        "Read my mail and tell me what needs me": "Postamı oku, bana ne gerektiğini söyle",
+        "When": "Ne zaman",
+        "Repeat": "Tekrar",
+        "Day": "Gün",
+        "Date and time": "Tarih ve saat",
+        "Cron form": "Cron biçimi",
+        "Time of day": "Saat",
+        "At this moment in your time.": "Senin saatinle bu anda.",
+        "%@, in your Mac's time zone.": "%@, Mac'inin saat diliminde.",
+        "Five parts separated by spaces: minute, hour, day of the month, month, day of the week, in your Mac's time zone. Very frequent schedules are refused.": "Boşlukla ayrılmış beş parça: dakika, saat, ayın günü, ay, haftanın günü; Mac'inin saat diliminde. Çok sık zamanlamalar reddedilir.",
+        "Runs as": "Kim olarak çalışır",
+        "What is left on Default takes your Mac's setting, or the agent's, when it runs.": "Varsayılan'da bırakılan, çalıştığında Mac'inin ya da ajanın ayarını alır.",
+        "Task": "Görev",
+        "Does the job": "İşi yapar",
+        "Looks things up, changes nothing": "Araştırır, hiçbir şeyi değiştirmez",
+        "History": "Geçmiş",
+        "Not run yet": "Henüz çalışmadı",
+        "Its runs show here once it has run.": "Çalıştıkça çalışmaları burada görünür.",
+        "Opens its chat": "Sohbetini açar",
+        "Dot does a task by itself, every morning or once at a time you pick.": "Dot bir işi kendi başına yapar: her sabah ya da seçtiğin bir zamanda bir kez.",
+    }
+)

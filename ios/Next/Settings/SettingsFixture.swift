@@ -212,6 +212,13 @@
                 return (403, #"{"message":"a phone cannot raise or take off a cap of what the tasks spend: do it on your Mac","context":{"phone":true}}"#)
             case ("GET", "/api/usage"): return (200, usage(now: now))
             case ("GET", "/api/schedules"): return (200, schedules(now: now))
+            case ("POST", "/api/schedules"):
+                return (201, schedule("sch_plants", "Water the plants", "0 9 * * *", true, now + 7200, nil, "never", 0, "Every day at 09:00", now: now))
+            case ("GET", let route) where route.hasPrefix("/api/schedules/") && route.hasSuffix("/firings"):
+                let run: (String, String, Double, String) -> String = { id, status, at, result in
+                    #"{"run":{"id":"\#(id)","thread_id":"thr_brief","goal":"Morning brief","mode":"task","model":"claude_code:sonnet","status":"\#(status)","created_at":\#(at),"finished_at":\#(at + 240),"result":"\#(result)","parent_run_id":null,"source":"schedule","effort":null},"chat_title":"Morning brief"}"#
+                }
+                return (200, "[" + run("run_f2", "done", now - 83160, "Three mails need you.\\nThe rest are filed.") + "," + run("run_f1", "failed", now - 169560, "") + "]")
             case ("GET", "/api/rules"): return (200, rules)
             case ("GET", "/api/memories/proposed"): return (200, proposed(now: now))
             case ("GET", "/api/memories/search"): return (200, "[]")
@@ -356,11 +363,15 @@
             return #"{"days":[\#(days.joined(separator: ","))],"windows":[{"kind":"five_hour","status":"allowed","utilization":0.62,"resets_at":\#(now + 5400),"seen_at":\#(now - 60)},{"kind":"seven_day","status":"allowed","utilization":0.41,"resets_at":\#(now + 3 * 86400),"seen_at":\#(now - 60)}]}"#
         }
 
+        private func schedule(_ id: String, _ name: String, _ cron: String?, _ enabled: Bool, _ next: Double?, _ last: Double?, _ status: String, _ failed: Int, _ when: String, now: Double) -> String {
+            let record: String =
+                #"{"id":"\#(id)","name":"\#(name)","cron":\#(cron.map { "\"\($0)\"" } ?? "null"),"run_at":null,"goal":"\#(name): look and tell me what changed.","mode":"task","enabled":\#(enabled),"created_at":\#(now - 864000),"last_run_at":\#(last.map { String($0) } ?? "null"),"next_run_at":\#(next.map { String($0) } ?? "null"),"thread_id":null,"last_status":"\#(status)","options":{"model":null,"effort":null,"speed":null,"approvals":null,"goal_mode":null,"timezone":null,"history_runs":null,"same_chat":null,"stop_after_failures":null,"notify":null,"agent_id":null,"skills":[],"from_outside":false},"runs_failed_in_row":\#(failed),"skipped_in_row":0}"#
+            return #"{"record":\#(record),"when":"\#(when)","next_local":null,"last_local":null,"run_at_input":null,"zone":"Europe/Helsinki","agent":null,"brief":false,"ran_once":false}"#
+        }
+
         private func schedules(now: Double) -> String {
             let one: (String, String, String?, Bool, Double?, Double?, String, Int, String) -> String = { id, name, cron, enabled, next, last, status, failed, when in
-                let record: String =
-                    #"{"id":"\#(id)","name":"\#(name)","cron":\#(cron.map { "\"\($0)\"" } ?? "null"),"run_at":null,"goal":"\#(name): look and tell me what changed.","mode":"task","enabled":\#(enabled),"created_at":\#(now - 864000),"last_run_at":\#(last.map { String($0) } ?? "null"),"next_run_at":\#(next.map { String($0) } ?? "null"),"thread_id":null,"last_status":"\#(status)","options":{"model":null,"effort":null,"speed":null,"approvals":null,"goal_mode":null,"timezone":null,"history_runs":null,"same_chat":null,"stop_after_failures":null,"notify":null,"agent_id":null,"skills":[],"from_outside":false},"runs_failed_in_row":\#(failed),"skipped_in_row":0}"#
-                return #"{"record":\#(record),"when":"\#(when)","next_local":null,"last_local":null,"run_at_input":null,"zone":"Europe/Helsinki","agent":null,"brief":false,"ran_once":false}"#
+                schedule(id, name, cron, enabled, next, last, status, failed, when, now: now)
             }
             return "["
                 + [

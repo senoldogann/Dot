@@ -79,4 +79,38 @@ final class SettingsUITests: XCTestCase {
         app.buttons.matching(identifier: "Actions").firstMatch.tap()
         XCTAssertTrue(app.buttons["Run now"].waitForExistence(timeout: 3), "the row's menu runs it now")
     }
+    /// G1(a): a new schedule is made from the phone (+, its name and goal, Add) and lands in the list; a schedule's menu
+    /// opens its history, whose run opens its chat.
+    func testAScheduleIsMadeAndItsHistoryOpensARunsChat() {
+        let app: XCUIApplication = launch("settings-schedules")
+        XCTAssertTrue(app.staticTexts["Morning brief"].waitForExistence(timeout: 10))
+        app.buttons["schedules.new"].tap()
+        let addButton: XCUIElement = app.buttons["scheduleNew.add"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(addButton.isEnabled, "nothing to add before a name and a goal")
+        let name: XCUIElement = app.textFields["scheduleNew.name"]
+        name.tap()
+        name.typeText("Water the plants")
+        let goal: XCUIElement = app.descendants(matching: .any)["scheduleNew.goal"].firstMatch
+        goal.tap()
+        goal.typeText("Remind me to water the plants")
+        XCTAssertTrue(app.staticTexts["Every day at 09:00, in your Mac's time zone."].exists, "the rhythm in words")
+        XCTAssertTrue(addButton.isEnabled)
+        addButton.tap()
+        XCTAssertTrue(app.staticTexts["Water the plants"].waitForExistence(timeout: 5), "the new schedule is in the list")
+
+        app.buttons.matching(identifier: "Actions").firstMatch.tap()
+        app.buttons["History"].tap()
+        let run: XCUIElement = app.buttons["scheduleHistory.run"].firstMatch
+        XCTAssertTrue(run.waitForExistence(timeout: 5))
+        XCTAssertTrue(run.label.contains("Done · Three mails need you."), "how it went and the first line of its answer: \(run.label)")
+        XCTAssertEqual(app.buttons.matching(identifier: "scheduleHistory.run").count, 2)
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "schedule-history"
+        shot.lifetime = .keepAlways
+        add(shot)
+        run.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: run)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "the run's chat is pushed over the history")
+    }
 }
