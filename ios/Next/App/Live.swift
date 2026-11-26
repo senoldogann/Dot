@@ -115,15 +115,17 @@ func engineLine(_ helper: HelperView) -> String {
 enum ChatListScope: Equatable, Sendable {
     case all
     case bot(agent: String?)
-    /// A bot's chats as the home counts them (`bots(...)`: Dot's are every chat no known agent wears, a campaign's and a
-    /// team's among them), by id; `agent` is whose chat the pencil starts (`nil`: Dot's).
-    case chats(of: Set<String>, agent: String?)
+    /// A bot's chats as the home counts them now (`bots(...)`: Dot's are every chat no known agent wears, a campaign's
+    /// and a team's among them), read from the bots each time, so a chat made or deleted meanwhile is there or gone
+    /// (item 1965: the ids taken when the page opened went stale); `agent` is whose chat the pencil starts (`nil`: Dot's).
+    case botChats(bot: String, agent: String?)
 
-    func holds(_ row: ThreadRow) -> Bool {
+    /// Whether the scope holds `row`, with the bots as they stand (pure).
+    func holds(_ row: ThreadRow, bots: [Bot]) -> Bool {
         switch self {
         case .all: true
         case .bot(let agent): row.summary.actorId == agent
-        case .chats(let ids, _): ids.contains(row.summary.id)
+        case .botChats(let bot, _): bots.first { $0.id == bot }?.chats.contains { $0.summary.id == row.summary.id } ?? false
         }
     }
 
@@ -131,7 +133,7 @@ enum ChatListScope: Equatable, Sendable {
     var agent: String? {
         switch self {
         case .all: nil
-        case .bot(let agent), .chats(_, let agent): agent
+        case .bot(let agent), .botChats(_, let agent): agent
         }
     }
 }
@@ -193,8 +195,13 @@ struct ChatListView: View {
         .toastHost($toast, seconds: 5) { _ in }
         .onChange(of: model.refusedDeletes) { _, refused in
             guard let detail = refused.values.first else { return }
+            // The Mac deletes the chats sent together all or none (item 1964): one at work keeps them all.
+            let words: String =
+                refused.count == 1
+                ? String(localized: "The chat was not deleted: \(detail)", comment: "Toast: the Mac refused to delete a chat; the argument is its words")
+                : String(localized: "None of the \(refused.count) chats was deleted: \(detail)", comment: "Toast: the Mac refused to delete chats sent together; the arguments are how many and its words")
             toast = ToastMessage(
-                id: UUID(), text: String(localized: "Some chats were not deleted: \(detail)", comment: "Toast: the Mac refused to delete chats; the argument is its words"),
+                id: UUID(), text: words,
                 systemImage: "exclamationmark.triangle", actionTitle: nil)
             model.forgetRefusedDeletes()
         }
@@ -215,7 +222,9 @@ struct ChatListView: View {
     }
 
     private func deletePicked() {
-        for row in pickedRows where !isWorking(row) { model.perform(.delete(thread: row.summary.id)) }
+        // One request for every chat, which the list hides at once and shows again if the Mac refuses (item 1964).
+        let threads: [String] = pickedRows.filter { !isWorking($0) }.map(\.summary.id)
+        if !threads.isEmpty { model.perform(.deleteChats(threads: threads)) }
         if let open = selection, picked.contains(open) { selection = nil }
         endSelecting()
     }
@@ -245,7 +254,8 @@ struct ChatListView: View {
 
     private var rows: [ThreadRow] {
         let words: String = query.trimmingCharacters(in: .whitespaces)
-        let all: [ThreadRow] = model.list.ordered.filter(scope.holds)
+        let bots: [Bot] = model.bots
+        let all: [ThreadRow] = model.list.ordered.filter { scope.holds($0, bots: bots) }
         guard !words.isEmpty else { return all }
         return all.filter { $0.summary.title.localizedStandardContains(words) || $0.summary.lastMessage.localizedStandardContains(words) }
     }
@@ -607,7 +617,7 @@ struct BotNewChat: View {
             BotFace(id: bot.id, look: bot.record.look, size: 72)
             Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
             if !bot.record.role.isEmpty {
-                Text(bot.record.role).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+                Text(shownRole(bot.record)).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
             } else if bot.isDot {
                 Text(String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Dot's empty chat (and the component gallery): what to ask Dot"))
                     .textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)

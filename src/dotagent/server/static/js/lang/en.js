@@ -402,6 +402,8 @@ export const EN = {
   "tools.showAll": "Show all ({count} characters)",
   "tools.screenshot": "Screenshot",
   "tools.screenshotFull": "Show the screenshot at full size",
+  "tools.pictureMade": "A picture Dot made",
+  "tools.pictureFull": "Show the picture at full size",
   "tools.imageUnavailable": "Image unavailable: {problem}",
   "tools.rules": "Rules",
   "tools.sent": "What Dot sent",

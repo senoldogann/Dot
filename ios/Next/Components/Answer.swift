@@ -33,6 +33,9 @@ struct AnswerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
+        // A site's icon is asked for only once the answer is whole: never for the half-written address of
+        // words still coming (`https://gi…` would name another site).
+        .environment(\.fetchesSiteIcons, !writing && shown >= markdown.count)
         .task(id: markdown) { await reveal() }
     }
 
@@ -59,17 +62,17 @@ struct AnswerView: View {
     @ViewBuilder private func view(of block: MarkdownBlock, fading: Int) -> some View {
         switch block {
         case .heading(let level, let text):
-            Text(fadedTail(inline(text), characters: fading)).textRole(level <= 1 ? .title : level == 2 ? .headline : .body).fontWeight(.semibold)
-                .foregroundStyle(Tone.text).accessibilityAddTraits(.isHeader)
+            ReferenceText(text: fadedTail(inline(text), characters: fading), role: level <= 1 ? .title : level == 2 ? .headline : .body).fontWeight(.semibold)
+                .foregroundStyle(Tone.text).tint(Tone.text).accessibilityAddTraits(.isHeader)
                 .padding(.top, level <= 2 ? Space.xs : 0)
         case .paragraph(let text):
-            AnswerText(text: fadedTail(inline(text), characters: fading))
+            AnswerWords(text: fadedTail(inline(text), characters: fading))
         case .listItem(let depth, let number, let text):
             HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                 Text(verbatim: number.map { "\($0)." } ?? "•").textRole(.body).foregroundStyle(Tone.secondary).tabularNumbers()
                     .frame(minWidth: 16, alignment: .trailing)
                     .accessibilityHidden(number == nil)
-                AnswerText(text: fadedTail(inline(text), characters: fading))
+                AnswerWords(text: fadedTail(inline(text), characters: fading))
             }
             .padding(.leading, CGFloat(depth) * Space.l)
         case .code(let language, let text):
@@ -79,7 +82,7 @@ struct AnswerView: View {
         case .quote(let text):
             HStack(spacing: Space.s) {
                 Rectangle().fill(Tone.separator).frame(width: 3).accessibilityHidden(true)
-                AnswerText(text: inline(text)).foregroundStyle(Tone.secondary)
+                AnswerWords(text: inline(text)).foregroundStyle(Tone.secondary)
             }
             .fixedSize(horizontal: false, vertical: true)
         case .rule:
@@ -88,7 +91,7 @@ struct AnswerView: View {
     }
 
     private func inline(_ text: String) -> AttributedString {
-        (try? answerText(markdown: text)) ?? AttributedString(text)
+        (try? answerInline(markdown: text)) ?? AttributedString(text)
     }
 }
 
@@ -124,35 +127,117 @@ func fadedTail(_ text: AttributedString, characters: Int) -> AttributedString {
     return faded
 }
 
-/// A table of an answer: its own width, scrolling sideways inside the reading column; the header row in the medium
-/// weight on the nested fill.
+/// An answer's words with their references inline (`ReferenceText`): full width plain text in the body role,
+/// selectable; links in the ink.
+struct AnswerWords: View {
+    let text: AttributedString
+
+    var body: some View {
+        ReferenceText(text: text, role: .body)
+            .foregroundStyle(Tone.text)
+            .tint(Tone.text)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A table of an answer: its columns fit the reading column where they can, a long cell wrapping onto lines of its own
+/// so its row grows to fit it (`TableGrid`); a table too wide for that scrolls sideways. The header row in the medium
+/// weight over a rule, on the nested fill.
 struct TableBlock: View {
     let header: [AttributedString]
     let rows: [[AttributedString]]
+    @State private var width: CGFloat = 0
 
     var body: some View {
         ScrollView(.horizontal) {
-            Grid(alignment: .leading, horizontalSpacing: Space.m, verticalSpacing: Space.xs) {
-                GridRow {
-                    ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
-                        Text(cell).textRole(.footnote).fontWeight(.semibold).foregroundStyle(Tone.text)
-                    }
+            TableGrid(columns: header.count, fit: max(0, width - Space.s * 2), spacing: Space.m, rowSpacing: Space.xs) {
+                ForEach(Array(header.enumerated()), id: \.offset) { _, cell in
+                    ReferenceText(text: cell, role: .footnote).fontWeight(.semibold).foregroundStyle(Tone.text)
                 }
-                Divider().overlay(Tone.separator)
+                Rectangle().fill(Tone.separator)
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    GridRow {
-                        ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
-                            Text(cell).textRole(.footnote).foregroundStyle(Tone.text).tint(Tone.text).fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: 260, alignment: .leading)
-                        }
+                    ForEach(0..<header.count, id: \.self) { column in
+                        ReferenceText(text: column < row.count ? row[column] : AttributedString(), role: .footnote).foregroundStyle(Tone.text).tint(Tone.text)
                     }
                 }
             }
             .padding(Space.s)
         }
         .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(Tone.nested, in: rounded(Radius.inner))
         .textSelection(.enabled)
+        .accessibilityIdentifier("answer.table")
+    }
+}
+
+/// The grid of an answer's table: the header's cells, a rule, then the rows' cells, `columns` to a row. The columns'
+/// widths come from `tableColumnWidths` (their widest cell on one line, the widest wrapping first to fit `fit`); each
+/// row is as tall as its tallest cell at those widths, so a wrapped cell never draws over the next row.
+struct TableGrid: Layout {
+    let columns: Int
+    let fit: CGFloat
+    let spacing: CGFloat
+    let rowSpacing: CGFloat
+
+    /// The narrowest a column wraps to, and the widest a column's ideal is taken as before the table knows its width.
+    static let minimumColumn: Double = 96
+    static let unmeasuredColumn: CGFloat = 260
+
+    struct Plan {
+        var widths: [CGFloat]
+        var heights: [CGFloat]
+        var size: CGSize
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        plan(subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let plan: Plan = plan(subviews)
+        var y: CGFloat = bounds.minY
+        for (row, cells) in rowsOf(subviews).enumerated() {
+            var x: CGFloat = bounds.minX
+            for (column, cell) in cells.enumerated() {
+                cell.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: plan.widths[column], height: plan.heights[row]))
+                x += plan.widths[column] + spacing
+            }
+            y += plan.heights[row] + rowSpacing
+            if row == 0, let rule: LayoutSubview = ruleOf(subviews) {
+                rule.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: plan.size.width, height: 1))
+                y += 1 + rowSpacing
+            }
+        }
+    }
+
+    private func plan(_ subviews: Subviews) -> Plan {
+        let rows: [[LayoutSubview]] = rowsOf(subviews)
+        guard columns > 0, !rows.isEmpty else { return Plan(widths: [], heights: [], size: .zero) }
+        let ideal: [Double] = (0..<columns).map { column in
+            Double(rows.compactMap { $0.count > column ? $0[column].sizeThatFits(.unspecified).width.rounded(.up) : nil }.max() ?? 0)
+        }
+        let room: Double = fit > 0 ? Double(fit - spacing * CGFloat(columns - 1)) : Double(Self.unmeasuredColumn) * Double(columns)
+        let widths: [CGFloat] = tableColumnWidths(ideal: ideal, fit: room, minimum: Self.minimumColumn).map { CGFloat($0) }
+        let heights: [CGFloat] = rows.map { cells in
+            cells.enumerated().map { column, cell in cell.sizeThatFits(ProposedViewSize(width: widths[column], height: nil)).height }.max() ?? 0
+        }
+        let width: CGFloat = widths.reduce(0, +) + spacing * CGFloat(columns - 1)
+        let height: CGFloat = heights.reduce(0, +) + rowSpacing * CGFloat(rows.count - 1) + 1 + rowSpacing
+        return Plan(widths: widths, heights: heights, size: CGSize(width: width, height: height))
+    }
+
+    /// The cells by row: the header's first, then each row's; the rule after the header is not a cell.
+    private func rowsOf(_ subviews: Subviews) -> [[LayoutSubview]] {
+        guard columns > 0, subviews.count > columns else { return [] }
+        let cells: [LayoutSubview] = Array(subviews.prefix(columns)) + Array(subviews.dropFirst(columns + 1))
+        return stride(from: 0, to: cells.count, by: columns).map { Array(cells[$0..<min($0 + columns, cells.count)]) }
+    }
+
+    private func ruleOf(_ subviews: Subviews) -> LayoutSubview? {
+        subviews.count > columns ? subviews[columns] : nil
     }
 }
 

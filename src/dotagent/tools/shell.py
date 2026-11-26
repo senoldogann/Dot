@@ -30,9 +30,9 @@ _DRAIN_GRACE_S: float = 0.4
 # The sentence of the description that sends a long command to terminal_open's background; a run no chat is told of its
 # end in is offered neither (``dotagent.tools.terminal.chatless_specs``, item 1760).
 BACKGROUND_HINT: str = (
-    " A command that ends by itself but takes minutes (an eval, a long build or install) goes to terminal_open with "
-    "background when it would run past timeout_s, or when there is other work to do meanwhile: this chat is told when "
-    "it ends, and you read its output then."
+    " A command that ends by itself but takes minutes (an eval, a long build or install, a pull request's checks: gh "
+    "pr checks <number> --watch) goes to terminal_open with background when it would run past timeout_s, or when "
+    "there is other work to do meanwhile: this chat is told when it ends, and you read its output then."
 )
 _FIXED_ENV: dict[str, str] = {
     # Tells dotx that a run started the command, so that it does not restart the daemon under the run (item 441).

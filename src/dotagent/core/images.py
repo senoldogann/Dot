@@ -127,6 +127,27 @@ def crop_scaled(
     return render_jpeg(crop, max(1, round(crop.width * scale)), max(1, round(crop.height * scale)), quality)
 
 
+def png_of(data: bytes) -> tuple[bytes, int, int]:
+    """``data`` (any picture Pillow reads) as a PNG, with its width and height in pixels: the form a generated picture
+    is saved in whatever its source sent."""
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            buffer: io.BytesIO = io.BytesIO()
+            opened.save(buffer, format="PNG")
+            return buffer.getvalue(), opened.width, opened.height
+    except UNREADABLE_IMAGE as exc:
+        raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
+
+
+def png_size(data: bytes) -> tuple[int, int]:
+    """The width and height in pixels of the picture ``data`` holds."""
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            return opened.width, opened.height
+    except UNREADABLE_IMAGE as exc:
+        raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
+
+
 def jpeg_of_size(data: bytes, width: int, height: int, quality: int) -> bytes:
     """The JPEG ``data`` at ``width`` by ``height``: as it is when it has that size, else redrawn at it (a page Chrome
     draws larger or smaller than its CSS pixels, item 358, so that a pixel of the picture is one for ``click_at``)."""

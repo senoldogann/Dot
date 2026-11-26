@@ -81,8 +81,10 @@ async def test_the_owner_chooses_the_review_models_on_the_mac_or_the_phone(
         )
         assert back.status_code == 200, back.text
         # What the hook reads through `dotx review plan` is what was chosen: a small change on the small model.
-        plan: str = plan_text(review_plan(load_user_config().code_review, 50, False))
-        assert plan == "size small\nlimit 600\ntry ollama:gemma4:cloud medium\ntry ollama:qwen3:cloud high\n"
+        plan: str = plan_text(review_plan(load_user_config().code_review, 50, False, False))
+        assert (
+            plan == "size small\nlimit 600\nroute small\ntry ollama:gemma4:cloud medium\ntry ollama:qwen3:cloud high\n"
+        )
         twice: httpx.Response = await client.put(
             "/code-review", json={**_CHOSEN, "fallback": [_CHOSEN["model"]]}, headers=mac
         )

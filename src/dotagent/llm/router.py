@@ -27,6 +27,7 @@ from dotagent.llm.antigravity import AntigravityProvider
 from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER, ClaudeCodeProvider
 from dotagent.llm.google import GoogleProvider
+from dotagent.llm.google_image import GeneratedImage, ImageRequest
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode import OpenCodeProvider
@@ -170,6 +171,24 @@ def _failed(
         first_token_seconds=first,
         input_tokens=0,
         output_tokens=0,
+        cached_tokens=0,
+        error=error,
+    )
+
+
+def _image_call(
+    ref: ModelRef, origin: CallOrigin, seconds: float, picture: GeneratedImage | None, error: str | None
+) -> ModelCall:
+    """A picture call as it was measured: the tokens Google reported for it, none for one that gave no picture."""
+    return ModelCall(
+        run_id=origin.run_id,
+        purpose=origin.purpose,
+        model=ref.label,
+        session_key="image",
+        seconds=seconds,
+        first_token_seconds=None,
+        input_tokens=0 if picture is None else picture.usage.input_tokens,
+        output_tokens=0 if picture is None else picture.usage.output_tokens,
         cached_tokens=0,
         error=error,
     )
@@ -398,6 +417,28 @@ class ModelRouter:
         self._pauses.pop(ref.label, None)
         await self._recorder(_answered(ref, request, origin, time.monotonic() - started, _first(first), reply))
         return reply
+
+    async def generate_image(self, request: ImageRequest, origin: CallOrigin) -> GeneratedImage:
+        """One picture from Google's picture model on the Google key (``generate_image``'s photo path), measured and
+        recorded like a chat call: its seconds, and the tokens Google reported, or the type of the error that ended it.
+        Raises :class:`MissingSecretError` when there is no key, and the connector's own error otherwise."""
+        started: float = time.monotonic()
+        ref: ModelRef = ModelRef(provider="google", model=request.model)
+        try:
+            async with self._leased(ref.provider) as provider:
+                if not isinstance(provider, GoogleProvider):
+                    raise ConfigError("the google provider is not Google's connector", {"provider": provider.name})
+                picture: GeneratedImage = await provider.generate_image(request)
+        except asyncio.CancelledError:
+            await self._record_failure(_image_call(ref, origin, time.monotonic() - started, None, CANCELLED))
+            raise
+        except Exception as error:
+            self._pause(ref, error)
+            await self._record_failure(_image_call(ref, origin, time.monotonic() - started, None, type(error).__name__))
+            raise
+        self._pauses.pop(ref.label, None)
+        await self._recorder(_image_call(ref, origin, time.monotonic() - started, picture, None))
+        return picture
 
     def _pause(self, ref: ModelRef, error: Exception) -> Pause | None:
         """Pause the model of ``ref`` after ``error``; the newest error decides how long, as the provider's latest

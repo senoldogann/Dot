@@ -360,7 +360,7 @@ struct BotRowView: View {
 
     private var preview: String {
         if let latest = bot.latest, !latest.summary.lastMessage.isEmpty { return latest.summary.lastMessage }
-        if !bot.record.role.isEmpty { return bot.record.role }
+        if !bot.record.role.isEmpty { return shownRole(bot.record) }
         return String(localized: "No chat yet", comment: "Home: a bot that has no chat")
     }
 }

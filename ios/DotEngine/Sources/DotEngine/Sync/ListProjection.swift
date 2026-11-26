@@ -27,6 +27,14 @@ public struct ListProjection: Codable, Sendable, Equatable {
         return list
     }
 
+    /// The list without the chats `gone` names (pure): what a delete on its way hides.
+    public func hiding(_ gone: Set<String>) -> ListProjection {
+        guard !gone.isEmpty else { return self }
+        var next: ListProjection = self
+        next.rows.removeAll { gone.contains($0.summary.id) }
+        return next
+    }
+
     /// The rows in the list's order: pinned first, then by the newest run.
     public var ordered: [ThreadRow] {
         rows.sorted { left, right in
@@ -103,6 +111,19 @@ public enum ListReducer {
         return settle(next)
     }
 
+    /// Chats this phone deleted, as the Mac answered (pure): out of the list, and kept out of a read of the list whose
+    /// row is no newer than the one held, as a deletion the stream told is (item 1964).
+    public static func deletedHere(_ state: ListProjection, threads: [String]) -> ListProjection {
+        var next: ListProjection = state
+        for thread in threads {
+            let held: Int = next.rows.first { $0.summary.id == thread }?.revision ?? 0
+            next.deleted[thread] = max(next.deleted[thread] ?? 0, held)
+        }
+        let gone: Set<String> = Set(threads)
+        next.rows.removeAll { gone.contains($0.summary.id) }
+        return next
+    }
+
     public static func failed(_ state: ListProjection) -> ListProjection {
         var next: ListProjection = state
         next.marks.viewInFlight = false
@@ -117,7 +138,10 @@ public enum ListReducer {
             if change.deleted {
                 next.rows.removeAll { $0.summary.id == change.threadId }
                 next.deleted[change.threadId] = change.revision
-                return (next, [])
+                // The list holds the daemon's newest chats only: one that went leaves room for an older one, which a read
+                // brings in (item 1965: after deleting every chat it saw, the list said "No chats yet" while the Mac held
+                // older ones).
+                return ask(next)
             }
             if let row: ThreadRow = next.rows.first(where: { $0.summary.id == change.threadId }), row.revision == change.revision {
                 return (next, [])

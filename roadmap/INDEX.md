@@ -6,11 +6,26 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
 | [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
+| [1971](1971.md) | done | 2026-11-26 | The pre-push hook checks the prompt surface before it asks a model |
+| [1969](1969.md) | done | 2026-11-26 | Dot makes pictures: `generate_image` draws a logo, diagram or card in its own browser, or asks Google's picture model for a photo, with no key of its own |
 | [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
+| [1966](1966.md) | done | 2026-11-26 | DotNext speaks the language chosen in it, whatever the iPhone's |
+| [1965](1965.md) | done | 2026-11-26 | DotNext's screens agree on which chats are left |
+| [1964](1964.md) | done | 2026-11-26 | DotNext deletes many chats in one request, gone from the list at once |
+| [1963](1963.md) | done | 2026-11-26 | DotNext's bot profile is Grok's: avatar, name and Edit, Library and Computer, Configure the bot, Notifications |
+| [1962](1962.md) | done | 2026-11-26 | A new bot opens its first chat with a message of its own, within seconds |
+| [1961](1961.md) | done | 2026-11-26 | DotNext shows an answer's links and files in its words, and a table's long cells inside their rows |
 | [1960](1960.md) | done | 2026-11-26 | Fewer turns on the desktop path: a batch's result is the look, and Safari's pages go to the Safari tools |
 | [1959](1959.md) | done | 2026-11-26 | The owner's own Safari, driven like Dot's Chrome: a page's elements with refs, batches of steps, the same policy |
 | [1958](1958.md) | done | 2026-11-26 | A login refused on another host says the one step the owner takes for it to fill there |
+| [1956](1956.md) | done | 2026-11-26 | `search_files` and `find_files` read ripgrep's output up to a cap, as it comes |
+| [1954](1954.md) | done | 2026-11-26 | The pre-push review leaves the Claude plan when it is spent or the diff is a security one, reads only what is new, and gives DeepSeek a budget |
+| [1953](1953.md) | done | 2026-11-26 | A helper ends at its open pull request, and the checks are watched in the background |
+| [1952](1952.md) | done | 2026-11-26 | A schedule's run that only the owner can unblock ends done and waiting, and its next firings skip that part |
+| [1951](1951.md) | done | 2026-11-26 | A schedule whose chat is busy waits for it, due, instead of skipping the firing |
+| [1950](1950.md) | done | 2026-11-26 | A schedule that goes on in its chat reads what was said there, not every step of its earlier runs |
 | [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
 | [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
 | [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |
