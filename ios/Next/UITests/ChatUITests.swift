@@ -68,8 +68,11 @@ final class ChatUITests: XCTestCase {
             XCTAssertTrue(queue.isSelected, "the setting's way is checked")
             XCTAssertFalse(steer.isSelected)
             (way == "Steer now" ? steer : queue).tap()
-            let sent: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "NOT (value CONTAINS %@)", words), object: field)
-            XCTAssertEqual(XCTWaiter.wait(for: [sent], timeout: 3), .completed, "\(way) sent the draft: \(String(describing: field.value))")
+            // Polled, the field read afresh each time: on GitHub's runner a predicate expectation on the field kept
+            // seeing the draft long after the field was empty (item 1903).
+            let deadline: Date = Date().addingTimeInterval(15)
+            while ((field.value as? String) ?? "").contains(words), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+            XCTAssertFalse(((field.value as? String) ?? "").contains(words), "\(way) sent the draft: \(String(describing: field.value))")
         }
     }
 
