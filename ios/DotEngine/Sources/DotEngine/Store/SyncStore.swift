@@ -51,19 +51,22 @@ public struct EngineSnapshot: Sendable, Equatable {
     /// How many lifecycle events (a run queued, started or ended, an ask, a draft, a queue changed...) the list's stream
     /// told in this session: a screen that shows them reads again when it moves, instead of on a timer.
     public var heard: Int
+    /// The chats of the deletes the store saw in the outbox whose outcome it has not handled yet: the outbox drops a
+    /// doing on its own stream, so between the two they would show again (the review of item 1964).
+    public var deletesAwaiting: Set<String>
 
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
-        workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil, heard: 0)
+        workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil, heard: 0, deletesAwaiting: [])
 
     /// The list as the screens draw it: the chats a delete of this phone is on its way for are hidden at once (item 1964),
-    /// and come back if the daemon refuses it.
-    public var shownList: ListProjection { list.hiding(deletesUnderWay(outbox)) }
+    /// until the Mac's answer is handled, and come back if it refuses.
+    public var shownList: ListProjection { list.hiding(deletesUnderWay(outbox).union(deletesAwaiting)) }
 
     /// The chats gone or going: those the list was told were deleted (here, on the Mac or on another phone) and those a
     /// delete of this phone is on its way for. A screen that holds a chat read elsewhere (a bot's home chat, read with the
     /// agents) drops it by this (item 1965).
-    public var goneChats: Set<String> { Set(list.deleted.keys).union(deletesUnderWay(outbox)) }
+    public var goneChats: Set<String> { Set(list.deleted.keys).union(deletesUnderWay(outbox)).union(deletesAwaiting) }
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -393,17 +396,20 @@ public actor SyncStore {
             runsAtSend[item.id] = item.thread.flatMap { state.chats[$0]?.knownRunIds } ?? []
         }
         state.outbox = items
+        state.deletesAwaiting.formUnion(deletesUnderWay(items))
         publish()
     }
 
     public func outcome(_ outcome: OutboxOutcome) {
         if case .refused(let item, let failure) = outcome, case .delete(let thread) = item.action {
+            state.deletesAwaiting.remove(thread)
             state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" }
             publish()
             return
         }
         if case .refused(let item, let failure) = outcome, case .deleteChats(let threads) = item.action {
             // Nothing went (the daemon deletes all or none): every chat shows again, each with the daemon's words.
+            state.deletesAwaiting.subtract(threads)
             for thread in threads { state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" } }
             publish()
             return
@@ -419,6 +425,7 @@ public actor SyncStore {
                 // The Mac deleted them: they stay out of the list from now, not only once its notice comes on the stream
                 // (the review of item 1964: between the answer and the notice they came back).
                 state.list = ListReducer.deletedHere(state.list, threads: went)
+                state.deletesAwaiting.subtract(went)
                 publish()
                 return
             }
