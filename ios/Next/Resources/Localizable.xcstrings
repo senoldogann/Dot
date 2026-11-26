@@ -1564,7 +1564,7 @@
       }
     },
     "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Dot's empty chat (and the component gallery): what to ask Dot",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6556,7 +6556,7 @@
       }
     },
     "Model, %@": {
-      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort\nVoiceOver: the new chat's model button; the argument is the model",
+      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10743,17 +10743,6 @@
         }
       }
     },
-    "Start a chat": {
-      "comment": "A bot with no chat yet: starts one",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sohbet başlat"
-          }
-        }
-      }
-    },
     "Start again on the Mac": {
       "comment": "Connect apps detail: takes the Mac's step once more",
       "localizations": {
@@ -11763,6 +11752,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Döngü kurulamadı: %@"
+          }
+        }
+      }
+    },
+    "The message could not be saved on this phone. Try again.": {
+      "comment": "New chat: the outbox could not keep the first message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj bu telefona kaydedilemedi. Tekrar dene."
           }
         }
       }
