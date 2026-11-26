@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
 | [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |
 | [1944](1944.md) | done | 2026-11-26 | The daemon no longer freezes on a path's classification or a log line |
 | [1911](1911.md) | done | 2026-11-26 | DotNext makes a scheduled task, and shows each schedule's history |

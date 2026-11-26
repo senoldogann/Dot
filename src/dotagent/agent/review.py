@@ -194,6 +194,8 @@ _GOAL_SYSTEM: str = (
     "- continue: the goal can still be reached but is not reached yet: something that was asked for is missing, was "
     "never checked, or the answer only describes what could be done. Say precisely what is missing, as an instruction "
     "to the agent.\n"
+    "- improve: the goal is reached and the digest shows it, as for achieved, and there is a clear path to a superior "
+    "result. Say precisely how the result can be made better, as an instruction to the agent.\n"
     "- blocked: the goal cannot be reached from here (it needs the user, a credential or something that does not "
     "exist) and the agent has tried the sensible ways. Say what blocks it.\n"
     "- scheduled: the agent has done every part of the goal it can do now, the digest shows it, and what is left "
@@ -223,7 +225,9 @@ _GOAL_SYSTEM: str = (
     "targets that ask for less than the goal's words do not make the goal reached.\n"
     "- Outcome Maximization: if the goal is reached but there is a clear path to a superior result (e.g., finding a "
     "better price, adding a missing but valuable detail, or improving the quality of the answer based on additional "
-    "research), say continue and precisely describe how the result can be maximized.\n"
+    "research), say improve, never continue, and precisely describe how the result can be maximized. A goal that is "
+    "reached is never continue: the agent's rounds are counted, and a run whose last verdict is continue ends as "
+    "failed.\n"
     "- The evidence of a plan step is the agent's claim about that step, not a fact: it holds when the digest or the "
     "facts show what it names (the call that read the file, the output with the count, the page that was opened). A "
     "step marked done whose evidence nothing in the digest or the facts bears out is not done: list its number in "
@@ -611,16 +615,20 @@ class GoalRequest(FrozenModel):
 
 
 class GoalVerdict(FrozenModel):
-    decision: Literal["achieved", "continue", "blocked", "scheduled", "inspect"] = Field(
+    decision: Literal["achieved", "improve", "continue", "blocked", "scheduled", "inspect"] = Field(
         description=(
-            "achieved: the goal is reached. continue: it is not reached yet. blocked: it cannot be reached. "
+            "achieved: the goal is reached. improve: it is reached, and a clearly better result is in reach. "
+            "continue: it is not reached yet. blocked: it cannot be reached. "
             "scheduled: all that can be done now is done, and what is left waits on time and a listed follow-up. "
             "inspect: you cannot tell yet, and the lines of a file the run wrote would decide it; name them in reads "
             "and you are asked again with them, once."
         )
     )
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = Field(
-        description="One or two sentences. For continue: what is missing, as an instruction to the agent."
+        description=(
+            "One or two sentences. For continue: what is missing, as an instruction to the agent. For improve: how the "
+            "result can be made better, as an instruction to the agent."
+        )
     )
     unproven_steps: tuple[int, ...] = Field(
         description=(

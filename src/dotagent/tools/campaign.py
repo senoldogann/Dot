@@ -406,6 +406,8 @@ def _achieved_tool() -> RegisteredTool:
             )
         if verdict.decision in ("continue", "scheduled"):
             return fail(f"Not accepted: {reason} The campaign goes on: work on what is missing.")
+        # Achieved, or improve (item 1946): the targets are reached, and a better result in reach is no reason to keep
+        # a campaign going whose targets the owner set.
         accepted: str = f"The goal checker accepted the outcome: {reason}"
         # The owner may have stopped the campaign while the check ran: their stop stands (item 724).
         if not await ctx.runtime.store.achieve_campaign(campaign.id, args.evidence, only_active=True):
