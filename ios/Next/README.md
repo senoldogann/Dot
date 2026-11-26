@@ -156,7 +156,8 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
 throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
 
-- A pull request runs none of it (item 1886: the five macOS runners were what pull requests waited on). The push to
+- A pull request that changes `ios/` runs `build` alone (about ten minutes: the app and its tests compile, the String
+  Catalog is checked; item 1886 left pull requests no macOS job, and a compile error reached `main`). The push to
   `main` that merges one, when it changes `ios/**`, runs `engine`, `build` and `tests (chat)` (about 20 minutes); a
   failure there opens the issue "main is red on macOS" (`scripts/main_macos_green.py`).
 - The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs every night and when asked:
