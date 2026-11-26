@@ -143,6 +143,7 @@ func watcherKindWords(_ kind: String) -> (word: String, symbol: String) {
     switch kind {
     case "calendar": (String(localized: "Calendar", comment: "Watcher kind: an event about to start"), "calendar")
     case "github": (String(localized: "GitHub", comment: "Watcher kind: GitHub notifications"), "arrow.triangle.branch")
+    case "check": (String(localized: "Your check", comment: "Watcher kind: a check file of the owner's, run without a model"), "checkmark.seal")
     default: (String(localized: "New mail", comment: "Watcher kind: new mail in a signed-in account"), "envelope")
     }
 }
