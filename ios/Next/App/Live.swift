@@ -585,7 +585,7 @@ struct BotNewChat: View {
                 .padding(.horizontal, Space.s)
             }
             ComposerView(
-                text: $text, attachments: $attachments,
+                text: $text, attachments: $attachments, quote: .constant(nil),
                 placeholder: bot.map { $0.isDot ? String(localized: "Message Dot", comment: "Placeholder of the composer") : askPlaceholder($0.record.name) }
                     ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
                 buttons: composerButtons(

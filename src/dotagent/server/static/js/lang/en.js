@@ -681,6 +681,7 @@ export const EN = {
   "messages.noteFromChat": "Note from another chat:",
   "messages.editFromHere": "Edit from here",
   "messages.copyMessage": "Copy the message",
+  "messages.quote": "Quote the message",
   "messages.reacted": "Reacted {reaction}: {words}",
   "messages.reactionUnderstood": "understood",
   "messages.reactionLooking": "looking into it",

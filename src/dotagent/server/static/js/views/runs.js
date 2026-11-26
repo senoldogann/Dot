@@ -19,6 +19,7 @@ import { icon } from "../icons.js";
 import { PHONE, touchFirst, trackHeight } from "../layout.js";
 import { LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { anchoredPopover } from "../popover.js";
+import { splitQuote } from "../quotebutton.js";
 import { readPref, removePref, writePref } from "../prefs.js";
 import { HOME_DAY, settingValue } from "../appearance/settings.js";
 import { buildAway } from "../away.js";
@@ -302,8 +303,10 @@ function buildComposer(ctx, listener) {
     }
     // "/loop 30m <message>" (item 400): the message starts the chat, and a schedule of the chat asks it again on that
     // rhythm, as "/loop" in the box of a run makes one (item 281).
-    const loop = loopOf(text);
-    if (loop === null && LOOP_WORD.test(text)) {
+    // A command is read from the words typed, not from a quote at the start of the box (item 1972).
+    const typed = splitQuote(text).words.trim();
+    const loop = loopOf(typed);
+    if (loop === null && LOOP_WORD.test(typed)) {
       toast("error", LOOP_HOW);
       goal.focus();
       return;

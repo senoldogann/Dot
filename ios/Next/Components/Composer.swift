@@ -118,6 +118,8 @@ struct ComposerSuggestions: Sendable {
 struct ComposerView: View {
     @Binding var text: String
     @Binding var attachments: [ComposerAttachment]
+    /// A message the owner quotes (item 1972), shown as a chip above the text; `nil` when none.
+    @Binding var quote: String?
     let placeholder: String
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
@@ -171,6 +173,7 @@ struct ComposerView: View {
             }
         }
         .haptic(.medium, trigger: voice.phase == .recording)
+        .onChange(of: quote) { _, now in if now != nil { isFocused = true } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { voice.leftTheScreen() } }
         .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
         .photosPicker(isPresented: shown(.photos), selection: $photoItems, maxSelectionCount: OutgoingAttachment.maximumCount, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
@@ -239,6 +242,7 @@ struct ComposerView: View {
     private func fieldPill(compact: Bool) -> some View {
             VStack(alignment: .leading, spacing: 0) {
                 if buttons.primary != .confirmEdit {
+                    if let quoted = quote { QuoteChip(quote: quoted, remove: { quote = nil }) }
                     if !attachments.isEmpty { attachmentStrip }
                     if preparing != nil {
                         ProgressView(String(localized: "Preparing attachments…", comment: "Composer status while opening or exporting selected files"))

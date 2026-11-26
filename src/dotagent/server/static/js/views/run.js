@@ -45,6 +45,7 @@ import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
+import { splitQuote } from "../quotebutton.js";
 import { createQueue } from "../queue.js";
 import { recapSection } from "../recap.js";
 import { showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
@@ -1126,7 +1127,9 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       }
       return;
     }
-    const aside = BTW_PATTERN.exec(text);
+    // A command is read from the words typed, not from a quote at the start of the box (item 1972).
+    const typed = splitQuote(text).words.trim();
+    const aside = BTW_PATTERN.exec(typed);
     if (aside !== null) {
       const question = (aside[1] ?? "").trim();
       if (question === "") {
@@ -1136,8 +1139,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       askAside(question);
       return;
     }
-    if (LOOP_WORD.test(text)) {
-      await startLoop(text, other);
+    if (LOOP_WORD.test(typed)) {
+      await startLoop(typed, other);
       return;
     }
     if (!readyToSend(attachments)) {

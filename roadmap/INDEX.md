@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1973](1973.md) | done | 2026-11-26 | The first step's system prompt fits its budget again after the Safari tools |
+| [1972](1972.md) | done | 2026-11-26 | Swipe a message to quote it |
 | [1971](1971.md) | done | 2026-11-26 | The pre-push hook checks the prompt surface before it asks a model |
 | [1969](1969.md) | done | 2026-11-26 | Dot makes pictures: `generate_image` draws a logo, diagram or card in its own browser, or asks Google's picture model for a photo, with no key of its own |
 | [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |

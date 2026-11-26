@@ -564,7 +564,7 @@ over the message, each the picture itself with its name where the pointer rests 
 bubble, so its files stand where the run starts, pictures first). A picture that cannot be read shows the mark of a
 fault and why. A command or a script of a call's row shows as itself, cut in the middle past 4000 characters; only a
 blob without words, a picture's base64, is shown as its length, and so is a long text with next to no spaces (one line
-of minified code). Under a message that opened a turn stands **Edit from
+of minified code). Under your message and under an answer stands **Quote** (item 1972): it starts the box's text with the message as a `> quote` of up to 280 characters, which the run reads and the chat shows as a quote; no daemon field carries it. Under a message that opened a turn stands **Edit from
 here** too (item 282), which asks whether to "rewind chat to before this message". **Keep the file changes** takes
 that turn and the ones after it out of the chat (they still count in what Dot spent, and a question they left for you
 waits no more) and ends the history the model reads where it ended before the message, a summary made since included;

@@ -1559,6 +1559,8 @@ TR.update(
 # "This chat" sheet, plain (item 1922)
 TR.update({"Provider": "Sağlayıcı"})
 
+# Swipe to quote (item 1972)
+TR.update({"Quote": "Alıntıla", "Quote: %@": "Alıntı: %@", "Remove the quote": "Alıntıyı kaldır"})
 # Bot profile like Grok's and its edit pages (item 1963).
 TR.update(
     {

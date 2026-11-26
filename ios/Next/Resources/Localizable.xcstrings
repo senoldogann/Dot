@@ -9339,6 +9339,28 @@
         }
       }
     },
+    "Quote": {
+      "comment": "Message menu and VoiceOver action: puts the message in the composer as a quote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntıla"
+          }
+        }
+      }
+    },
+    "Quote: %@": {
+      "comment": "VoiceOver: a quoted message above a message; the argument is the quote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntı: %@"
+          }
+        }
+      }
+    },
     "Ran %@": {
       "comment": "Tool row: a command that ran; the argument is the command",
       "localizations": {
@@ -9797,6 +9819,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tepkiyi kaldır: %@"
+          }
+        }
+      }
+    },
+    "Remove the quote": {
+      "comment": "VoiceOver: the cross on the composer's quote chip",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıntıyı kaldır"
           }
         }
       }

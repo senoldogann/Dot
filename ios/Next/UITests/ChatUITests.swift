@@ -14,6 +14,42 @@ final class ChatUITests: XCTestCase {
         return app
     }
 
+    /// Swipe to quote (item 1972), on the fixtures: the owner's message pulled to the right puts its first line in the
+    /// composer as a chip with a cross; a short pull, or one that starts at the screen's edge, quotes nothing; the cross drops
+    /// the chip. At the largest accessibility size too.
+    @MainActor
+    func testASwipeOnAMessageQuotesItAndTheCrossDropsTheQuote() {
+        for extra in [[String](), ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge"]] {
+            // A scene with nothing writing: a chat whose rows move under the finger is no place to measure a swipe.
+            let app: XCUIApplication = launch("n2-failed", defaults: extra)
+            let message: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "You: Book me the dentist")).firstMatch
+            XCTAssertTrue(message.waitForExistence(timeout: 10))
+            let origin: XCUICoordinate = app.coordinate(withNormalizedOffset: .zero)
+            func drag(from x: CGFloat, by dx: CGFloat) {
+                let start: CGVector = CGVector(dx: x, dy: message.frame.midY)
+                origin.withOffset(start).press(forDuration: 0.1, thenDragTo: origin.withOffset(CGVector(dx: x + dx, dy: start.dy)))
+            }
+            let chip: XCUIElement = app.descendants(matching: .any)["composer.quote"]
+            drag(from: message.frame.midX, by: 30)
+            XCTAssertFalse(chip.exists, "a short pull is no quote")
+            drag(from: 10, by: 160)
+            XCTAssertFalse(chip.exists, "a pull from the screen's edge is the back gesture's")
+            drag(from: message.frame.midX - 40, by: 160)
+            XCTAssertTrue(chip.waitForExistence(timeout: 10), "the swipe put the message in the composer as a quote")
+            XCTAssertTrue(chip.label.contains("Book me the dentist"), chip.label)
+            let remove: XCUIElement = app.buttons["composer.quote.remove"]
+            XCTAssertGreaterThanOrEqual(remove.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(remove.frame.width, 44)
+            let attachment: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            attachment.name = extra.isEmpty ? "quote-chip" : "quote-chip-ax3"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            remove.tap()
+            XCTAssertFalse(chip.exists, "the cross drops the quote")
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testThePlusMenuAttachesAVideoWithItsDurationAndCanRemoveIt() throws {
         let clip: URL = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "attachment-sample", withExtension: "mp4"))

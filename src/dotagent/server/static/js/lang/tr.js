@@ -670,6 +670,7 @@ export const TR = {
   "messages.noteFromChat": "Başka bir sohbetten not:",
   "messages.editFromHere": "Buradan düzenle",
   "messages.copyMessage": "Mesajı kopyala",
+  "messages.quote": "Mesajı alıntıla",
   "messages.reacted": "{reaction} tepkisi: {words}",
   "messages.reactionUnderstood": "anlaşıldı",
   "messages.reactionLooking": "bakılıyor",
