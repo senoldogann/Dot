@@ -28,7 +28,8 @@ import httpx
 import pytest
 import pytest_asyncio
 from PIL import Image
-from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Request, Route, async_playwright, expect
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import BaseModel, TypeAdapter
 from structlog.testing import capture_logs
 
@@ -1005,6 +1006,38 @@ async def _served(home: Path) -> AsyncIterator[str]:
         await close_runtime(runtime)
 
 
+class _OpenRequests:
+    """The requests of a page that have not ended, in the order they went out, for what a shot that waited on the
+    page's fonts (a runner's "waiting for fonts to load", 30 s, the gate of 2026-11-25) had in flight."""
+
+    def __init__(self, page: Page) -> None:
+        self.open: dict[Request, str] = {}
+        page.on("request", self._went)
+        page.on("requestfinished", self._ended)
+        page.on("requestfailed", self._ended)
+
+    def _went(self, request: Request) -> None:
+        self.open[request] = request.url
+
+    def _ended(self, request: Request) -> None:
+        self.open.pop(request, None)
+
+
+_FONTS: str = "() => [...document.fonts].map((face) => `${face.family} ${face.style} ${face.status}`)"
+
+
+async def _shot(page: Page, path: Path, requests: _OpenRequests) -> None:
+    """A screenshot of ``page``; one that times out says what the page's fonts were doing and which requests were
+    open, so that a runner's failure names its cause."""
+    try:
+        await page.screenshot(path=path)
+    except PlaywrightTimeoutError as error:
+        fonts: list[str] = await page.evaluate(_FONTS)
+        raise AssertionError(
+            f"the shot timed out: fonts {fonts}, open requests {list(requests.open.values())}"
+        ) from error
+
+
 async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_stands_after_it(
     data_dir: Path, own_home: Path, site: str, tmp_path: Path
 ) -> None:
@@ -1027,6 +1060,7 @@ async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_sta
                     reduced_motion="reduce",
                     service_workers="block",
                 )
+                requests: _OpenRequests = _OpenRequests(page)
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{address}/#/settings/browser")
                 card: Locator = page.locator(".settings-pane")
@@ -1044,7 +1078,7 @@ async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_sta
                 await expect(waiting).to_contain_text("Dot opens it when it is closed")
                 await expect(waiting).to_contain_text("choose Allow")
                 await card.scroll_into_view_if_needed()
-                await page.screenshot(path=tmp_path / f"waiting-{width}-{scheme}.png")
+                await _shot(page, tmp_path / f"waiting-{width}-{scheme}.png", requests)
                 if not opened:
                     # What the switch's click on Chrome's icon starts here: a Chrome whose remote debugging is off.
                     opened.append(await spawn_chrome_without_debugging(data_dir, f"{site}/mine"))
@@ -1054,7 +1088,7 @@ async def test_the_settings_card_says_what_a_switch_waits_for_and_how_chrome_sta
                 await expect(waiting).to_be_hidden()
                 await expect(chrome_fact).to_have_text("running")
                 await expect(card.get_by_role("button", name="Own Chrome")).to_have_attribute("aria-pressed", "true")
-                await page.screenshot(path=tmp_path / f"after-{width}-{scheme}.png")
+                await _shot(page, tmp_path / f"after-{width}-{scheme}.png", requests)
                 await page.close()
         finally:
             await browser.close()

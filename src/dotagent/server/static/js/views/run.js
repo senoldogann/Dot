@@ -461,7 +461,17 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   const codingWork = panelSection({ id: "coding-work", title: "Coding worktree", actions: null, body: codingWorkBody });
   codingWork.element.hidden = true;
   async function refreshCodingWork() {
-    const work = await sharedGet(`/runs/${encodeURIComponent(runId)}/coding-work`, signal);
+    let work;
+    try {
+      work = await sharedGet(`/runs/${encodeURIComponent(runId)}/coding-work`, signal);
+    } catch (error) {
+      // A run deleted meanwhile (its chat deleted on another page or on the phone) says nothing here: the page's own
+      // read of the run says Task not found, and a toast of the 404 stood over the page the reader went to.
+      if (error.status === 404) {
+        return;
+      }
+      throw error;
+    }
     if (signal.aborted || work === null) {
       return;
     }

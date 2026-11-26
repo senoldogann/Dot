@@ -4,8 +4,10 @@
 other open one back to run its checks again. What that costs is two pull requests that each pass alone and break
 `main` together. Most such breaks are in a file both changed; this script merges at once when `main` has moved since
 the pull request's checks began under none of its files, and otherwise brings the branch up to `main`
-(`gh pr update-branch`) and stops, so that the checks run again on what the merge would make. A break across files
-that neither shares is what `main`'s own run of the gate, on every push, shows after the merge.
+(`gh pr update-branch`) and stops, so that the checks run again on what the merge would make. A pull request's checks
+are its Linux jobs alone (item 1886): what only macOS shows, and a break across files that neither shares, shows after
+the merge, in `main`'s own runs of the gate and of ios.yml, which run the macOS jobs the push's files can affect; the
+issue "main is red on macOS" says so (item 1899).
 
 Markdown no test reads does not count as a shared file (item 1863). Nearly every pull request writes
 `roadmap/INDEX.md` and a page under `docs/`, so each merge sent every other pull request back to run its 20 to 30
