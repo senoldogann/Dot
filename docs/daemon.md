@@ -1355,7 +1355,9 @@ of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)),
 phones' routes do not take (403). A request's body is read whole only within its limit, after the guard let it
 through: 4 KB on what it lets through without a token (those three routes, the pages and the files), 32 MB on every
 route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
-or streamed, is answered 413 and read no further (item 942). A page a run showed
+or streamed, is answered 413 and read no further (item 942). The one route that takes a file as its raw body,
+`PUT /api/attachments/stream`, is not read whole: a declared length over 200 MiB is answered 413 at once, and the route
+counts the rest as it writes it (item 1933). A page a run showed
 (`/pages/<id>`) needs none: its id cannot be guessed, and it is served sandboxed (see [Tools](runs.md#tools)). `dotx url` puts
 the token in the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the
 browser's local storage and removes it from the address bar. A page that cannot sign in says why: a token the daemon
@@ -1560,6 +1562,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message, its files too when `attachments` names them (item 376; left out, they stay); send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue, each message's `files` named |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
+| `PUT /attachments/stream?name=…&media_type=…` (the file as the raw body)         | the same for a video, a sound or a large file (item 1933): the body is written to disk in chunks as it arrives, never held whole in memory, up to 200 MiB for a video or a sound and 20 MiB for any other file (422 past it); a body that is cut or refused leaves no file. Answers as `POST /attachments` does |
 | `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`), the team it is with (`team`, item 610), its last line (`last_message`, `last_role`) and its loop (`loop_cron`, `loop_next_at`, item 580); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |

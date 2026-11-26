@@ -119,13 +119,23 @@ public actor Outbox {
             }
             for (number, attachment) in attachments.enumerated() {
                 let name: String = "\(id)-\(number).attachment"
-                let data: Data = try PropertyListEncoder().encode(attachment)
+                var stored: OutgoingAttachment = attachment
+                if case .file(let source) = attachment.content {
+                    // A video is kept as a file of its own beside its record (a copy on the same volume is a clone, not
+                    // a second set of bytes): the record names it, and holds none of it.
+                    let kept: String = Self.mediaName(of: name)
+                    try FileManager.default.copyItem(at: source, to: imageFolder.appending(path: kept))
+                    stored = attachment.kept(as: kept)
+                }
+                let data: Data = try PropertyListEncoder().encode(stored)
                 try data.write(to: imageFolder.appending(path: name), options: [.atomic])
                 names.append(name)
             }
             try enqueue(action, id: id, names: names)
         } catch {
-            for name in names { try? FileManager.default.removeItem(at: imageFolder.appending(path: name)) }
+            for name in names { removeImage(named: name) }
+            // The copy that was being made when the failure came has no record yet.
+            for number in attachments.indices { try? FileManager.default.removeItem(at: imageFolder.appending(path: Self.mediaName(of: "\(id)-\(number).attachment"))) }
             throw error
         }
     }
@@ -449,6 +459,9 @@ public actor Outbox {
                 } catch {
                     throw .undecodable(path: name, detail: String(describing: error))
                 }
+                if case .kept(let kept) = attachment.content, !FileManager.default.isReadableFile(atPath: imageFolder.appending(path: kept).path) {
+                    throw .undecodable(path: kept, detail: "the attachment file could not be read")
+                }
                 id = try await upload(attachment, item: item, number: number + 1)
             } else {
                 id = try await api.uploadAttachment(name: name, jpeg: data)
@@ -464,9 +477,10 @@ public actor Outbox {
 
     private func upload(_ attachment: OutgoingAttachment, item: OutboxItem, number: Int) async throws(DaemonRequestError) -> String {
         let token: UUID = UUID()
+        let folder: URL = imageFolder
         let task: Task<Result<String, DaemonRequestError>, Never> = Task { [api, weak self] in
             do throws(DaemonRequestError) {
-                let id: String = try await api.uploadAttachment(attachment) { [weak self] percent in
+                let id: String = try await api.uploadAttachment(attachment, folder: folder) { [weak self] percent in
                     Task { [weak self] in await self?.reportUpload(item.id, token: token, number: number, count: item.images.count, percent: percent) }
                 }
                 return .success(id)
@@ -513,8 +527,19 @@ public actor Outbox {
     }
 
     private func removePhotos(of item: OutboxItem) {
-        for name in item.images { try? FileManager.default.removeItem(at: imageFolder.appending(path: name)) }
+        for name in item.images { removeImage(named: name) }
     }
+
+    /// A kept image or attachment record, and the media file its record names.
+    private func removeImage(named name: String) {
+        try? FileManager.default.removeItem(at: imageFolder.appending(path: name))
+        if name.hasSuffix(Self.recordSuffix) { try? FileManager.default.removeItem(at: imageFolder.appending(path: Self.mediaName(of: name))) }
+    }
+
+    private static let recordSuffix: String = ".attachment"
+
+    /// The name of the media file a record ``<id>-<n>.attachment`` names.
+    private static func mediaName(of record: String) -> String { String(record.dropLast(recordSuffix.count)) + ".media" }
 
     /// Forgets everything (the phone's key was forgotten).
     public func clear() {

@@ -205,7 +205,7 @@ struct ComposerView: View {
         }
         .fullScreenCover(item: $trimming) { attachment in
             if case .needsTrim(let video, let name, let bytes) = attachment.content, let duration = attachment.duration {
-                let limit: Double = max(0.1, min(600, duration * Double(OutgoingAttachment.maximumBytes) / Double(bytes) * 0.9))
+                let limit: Double = max(0.1, min(3600, duration * Double(OutgoingAttachment.maximumMediaBytes) / Double(bytes) * 0.9))
                 VideoTrimmer(file: video, maximumDuration: limit) { result in
                     trimming = nil
                     switch result {

@@ -626,6 +626,14 @@ class AttachmentUpload(FrozenModel):
     data_b64: str = Field(min_length=1, max_length=_UPLOAD_B64_CHARS)
 
 
+class AttachmentStreamQuery(FrozenModel):
+    """What names a file sent as the raw body of ``PUT /attachments/stream`` (item 1933): its name and its declared type
+    (empty when the sender has none)."""
+
+    name: str = Field(min_length=1, max_length=255)
+    media_type: str = Field(default="", max_length=200)
+
+
 class VoiceStreamOpen(FrozenModel):
     """A stream of what the owner says, for this Mac to write down as it comes (item 969), in ``language``."""
 

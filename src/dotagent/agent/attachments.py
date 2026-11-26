@@ -12,12 +12,14 @@ that cannot see, as the vision model's description.
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import re
 import secrets
 from collections import deque
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from io import BufferedWriter
 from pathlib import Path
 from typing import Literal
 
@@ -26,7 +28,7 @@ from pydantic import JsonValue
 from dotagent.agent.vision import text_for_blind_images
 from dotagent.browser.safety import safe_download_name
 from dotagent.core.errors import InvalidValueError, NotFoundError, WebError
-from dotagent.core.held import workspace_folder, write_new
+from dotagent.core.held import open_new, open_regular, workspace_folder, write_new
 from dotagent.core.ids import new_id
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle, unclosing
@@ -263,26 +265,55 @@ def _upload_name(name: str) -> str:
     return f"_{safe}" if safe.lower() in (_META, _TEXT) else safe
 
 
+def _media_of(name: str, media_type: str, head: bytes) -> AttachmentKind | None:
+    """``video`` or ``audio`` for an upload that is one, as its name or declared type says and its first bytes allow: a
+    declared type is not taken on its word (a browser calls a TypeScript file ``video/mp2t``), and a file whose first
+    bytes read as text, a PDF or a page is no video or sound."""
+    return media_kind(name, media_type) if document_kind("", head[:_SNIFF_BYTES]) == "binary" else None
+
+
+def _read_kind(name: str, media_type: str, data: bytes) -> tuple[AttachmentKind, str, str]:
+    """What an upload that is no video or sound is: its kind, its media type and the text read out of it (none for an
+    image, which is decoded once so that a broken one is refused here)."""
+    kind, declared = _kind_of(name, media_type, data)
+    if kind == "image":
+        encode_image(data, _IMAGE_EDGE, _IMAGE_QUALITY)
+        return kind, declared, ""
+    return kind, declared, _text_of(name, kind, data)
+
+
+def _write_meta(
+    folder: int, path: Path, attachment_id: str, kind: AttachmentKind, declared: str, size: int, text: str
+) -> StoredAttachment:
+    """Write what is kept beside an upload's file (its text, its record) and answer the record."""
+    if kind not in ("image", "video", "audio"):
+        write_new(folder, _TEXT, text.encode("utf-8"))
+    stored: StoredAttachment = StoredAttachment(
+        id=attachment_id,
+        name=path.name,
+        media_type=declared,
+        kind=kind,
+        size=size,
+        chars=len(text),
+        path=str(path),
+    )
+    write_new(folder, _META, stored.model_dump_json().encode("utf-8"))
+    return stored
+
+
 def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -> StoredAttachment:
     """Check an upload and keep it in the workspace. Blocking file work: call it off the event loop."""
     if not data:
         raise InvalidValueError("the file is empty", {"name": name})
-    # A declared type is not taken on its word: a browser calls a TypeScript file ``video/mp2t``. A file whose first
-    # bytes read as text, a PDF or a page is no video or sound.
-    media: AttachmentKind | None = (
-        media_kind(name, media_type) if document_kind("", data[:_SNIFF_BYTES]) == "binary" else None
-    )
+    media: AttachmentKind | None = _media_of(name, media_type, data)
     limit: int = MAX_ATTACHMENT_BYTES if media is None else MAX_MEDIA_BYTES
     if len(data) > limit:
         raise InvalidValueError("the file is too large to attach", {"name": name, "bytes": len(data), "limit": limit})
-    kind, declared = (
-        (media, media_type or "application/octet-stream") if media is not None else _kind_of(name, media_type, data)
+    kind, declared, text = (
+        (media, media_type or "application/octet-stream", "")
+        if media is not None
+        else _read_kind(name, media_type, data)
     )
-    text: str = ""
-    if kind == "image":
-        encode_image(data, _IMAGE_EDGE, _IMAGE_QUALITY)
-    elif media is None:
-        text = _text_of(name, kind, data)
     attachment_id: str = new_id("att")
     path: Path = attachments_root(workspace) / attachment_id / _upload_name(name)
     # Made with no link followed on the way (item 681): a link a command of a run put in the folder's place does not
@@ -290,21 +321,92 @@ def store_attachment(workspace: Path, name: str, media_type: str, data: bytes) -
     folder: int = workspace_folder(workspace, (ATTACHMENTS_DIR, attachment_id), make=True)
     try:
         write_new(folder, path.name, data)
-        if kind not in ("image", "video", "audio"):
-            write_new(folder, _TEXT, text.encode("utf-8"))
-        stored: StoredAttachment = StoredAttachment(
-            id=attachment_id,
-            name=path.name,
-            media_type=declared,
-            kind=kind,
-            size=len(data),
-            chars=len(text),
-            path=str(path),
-        )
-        write_new(folder, _META, stored.model_dump_json().encode("utf-8"))
+        return _write_meta(folder, path, attachment_id, kind, declared, len(data), text)
     finally:
         os.close(folder)
-    return stored
+
+
+def upload_limit(name: str, media_type: str) -> int:
+    """The most bytes of an upload named ``name`` and declared ``media_type``: :data:`MAX_MEDIA_BYTES` for a name or a
+    type that says video or sound, :data:`MAX_ATTACHMENT_BYTES` for any other."""
+    return MAX_ATTACHMENT_BYTES if media_kind(name, media_type) is None else MAX_MEDIA_BYTES
+
+
+async def store_attachment_stream(
+    workspace: Path, name: str, media_type: str, chunks: AsyncIterator[bytes]
+) -> StoredAttachment:
+    """Keep an upload that arrives as chunks of a body (item 1933), written to its file as they come, never held whole
+    in memory: a video of a phone is tens of megabytes, and base64 in a JSON body is a third more, twice over. Its
+    limit is :data:`MAX_MEDIA_BYTES` for a name or a type that says video or sound, :data:`MAX_ATTACHMENT_BYTES` for
+    any other, and a body that passes it is read no further. What is kept is what :func:`store_attachment` keeps; an
+    upload that fails, is refused or is cut (the sender gave up, the link dropped) leaves no file and no folder."""
+    limit: int = upload_limit(name, media_type)
+    attachment_id: str = new_id("att")
+    path: Path = attachments_root(workspace) / attachment_id / _upload_name(name)
+    folder: int = await asyncio.to_thread(workspace_folder, workspace, (ATTACHMENTS_DIR, attachment_id), True)
+    try:
+        try:
+            size, head = await _write_chunks(folder, path.name, chunks, limit, name)
+            return await asyncio.to_thread(_keep_streamed, folder, path, attachment_id, media_type, size, head)
+        except BaseException:
+            # Not awaited: a task that was cancelled still removes its file.
+            _remove_upload(workspace, attachment_id, path.name, folder)
+            raise
+    finally:
+        os.close(folder)
+
+
+async def _write_chunks(
+    folder: int, file_name: str, chunks: AsyncIterator[bytes], limit: int, name: str
+) -> tuple[int, bytes]:
+    """Write ``chunks`` to ``file_name`` in ``folder``: how many bytes, and the first :data:`_SNIFF_BYTES` of them."""
+    size: int = 0
+    head: bytearray = bytearray()
+    handle: BufferedWriter = await asyncio.to_thread(open_new, folder, file_name)
+    with handle:
+        async for chunk in chunks:
+            size += len(chunk)
+            if size > limit:
+                raise InvalidValueError("the file is too large to attach", {"name": name, "limit": limit})
+            if len(head) < _SNIFF_BYTES:
+                head.extend(chunk[: _SNIFF_BYTES - len(head)])
+            await asyncio.to_thread(handle.write, chunk)
+    if size == 0:
+        raise InvalidValueError("the file is empty", {"name": name})
+    return size, bytes(head)
+
+
+def _keep_streamed(
+    folder: int, path: Path, attachment_id: str, media_type: str, size: int, head: bytes
+) -> StoredAttachment:
+    """The record of an upload written to ``path``. A video or a sound is kept as it came; any other file is held to
+    :data:`MAX_ATTACHMENT_BYTES`, read back and read as :func:`store_attachment` reads one."""
+    media: AttachmentKind | None = _media_of(path.name, media_type, head)
+    if media is not None:
+        return _write_meta(folder, path, attachment_id, media, media_type or "application/octet-stream", size, "")
+    if size > MAX_ATTACHMENT_BYTES:
+        raise InvalidValueError(
+            "the file is too large to attach", {"name": path.name, "bytes": size, "limit": MAX_ATTACHMENT_BYTES}
+        )
+    descriptor: int = open_regular(folder, path.name)
+    with os.fdopen(descriptor, "rb") as handle:
+        data: bytes = handle.read()
+    kind, declared, text = _read_kind(path.name, media_type, data)
+    return _write_meta(folder, path, attachment_id, kind, declared, size, text)
+
+
+def _remove_upload(workspace: Path, attachment_id: str, file_name: str, folder: int) -> None:
+    """Remove what an upload that failed left: its file, its text and its record in its folder (held open as
+    ``folder``, which cannot be listed), and the folder."""
+    for left in (file_name, _TEXT, _META):
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(left, dir_fd=folder)
+    root: int = workspace_folder(workspace, (ATTACHMENTS_DIR,), make=False)
+    try:
+        with contextlib.suppress(FileNotFoundError):
+            os.rmdir(attachment_id, dir_fd=root)
+    finally:
+        os.close(root)
 
 
 def load_attachment(workspace: Path, attachment_id: str) -> StoredAttachment:

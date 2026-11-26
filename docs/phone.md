@@ -612,12 +612,17 @@ Dot keeping a link to the phone from the Mac is another thing: see [Dot and your
 ## Attachments on Dot Next and the web
 
 In a new or existing Dot Next chat, tap **+** to open the photo library for photos and videos, take a photo or record a
-video with Camera, or choose a document with Files. The phone exports video as 720p MP4 with sound, and shows its
-thumbnail, duration and upload size. If it exceeds 20 MiB, tap **Trim video** on the chip and choose a shorter part.
-Files show their name, type and size. Up to 10 attachments go with a message.
+video with Camera, or choose a document with Files. The phone re-encodes video for a target size, not a preset
+(item 1933): H.264 at 1.8 Mbps with 80 kbps AAC sound, its longest side at most 1280 pixels, at most 30 frames a
+second, so a minute is about 14 MB and a quarter of an hour fits the limit. It shows the video's thumbnail, duration and
+upload size. A video or a sound goes to the daemon as the raw body of `PUT /api/attachments/stream` with the phone's
+key, read from a file as it is sent and written to the Mac's disk as it arrives, up to 200 MiB; a photo or a document
+goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video over 200 MiB (about 15 minutes) gets
+**Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
+with a message.
 
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
-After cancellation, tap **Try again** to retry the message. On the Mac, choose **+ › Add files** in the web composer
+The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
 or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
 
 ## The iPhone app's calls
