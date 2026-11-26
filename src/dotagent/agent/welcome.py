@@ -1,8 +1,8 @@
 """An agent's first meeting with the owner (item 993, docs/agents-and-campaigns.md): an agent the owner has just made
 opens its first chat with a message of its own, in their language: who it is, what it does for them (from its role and
-instructions) and the one question that gets it started (item 1962). The run is one answer on the fast model with no
-tool, so the message is there within seconds. The run's goal is Dot's words for that meeting, which the conversation
-does not draw as the owner's message (``WELCOME_SOURCE``)."""
+instructions) and the one question that gets it started (item 1962). The run is one answer on the fast model whose
+goal asks it to call no tool, so the message is there within seconds. The goal is Dot's words for that meeting, which
+the conversation does not draw as the owner's message (``WELCOME_SOURCE``)."""
 
 from dotagent.store.models import AgentRecord
 

@@ -523,7 +523,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.post("/agents/{agent_id}/welcome", status_code=201)
     async def welcome_agent(agent_id: str, request: AgentWelcomeRequest) -> RunRecord:
         """Start the first meeting of an agent the owner has just made (item 993): its first message, on the fast model
-        with no tool (item 1962), says who it is and what it does and asks the one question that starts it, in their
+        whose goal asks it to call no tool (item 1962), says who it is and what it does and asks the one question that starts it, in their
         language. An agent that has had a chat already has met them (409), and Dot
         has its own first conversation (item 420)."""
         if agent_id == DOT_AGENT_ID:
