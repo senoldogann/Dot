@@ -141,6 +141,8 @@ struct ChatListView: View {
     let scope: ChatListScope
     @Binding var selection: String?
     @Environment(AppModel.self) private var model: AppModel
+    /// The bot's header, handed on to the new chat the pencil pushes.
+    @Environment(\.botChat) private var botChat: BotChat?
     @State private var query: String = ""
     @State private var renaming: ThreadRow?
     @State private var newTitle: String = ""
@@ -185,14 +187,7 @@ struct ChatListView: View {
                 Text(String(localized: "Chats with a run at work or waiting on you are kept; stop or answer them first.", comment: "Bulk delete confirmation: chats at work or waiting on the owner are not deleted"))
             }
         }
-        .sheet(isPresented: $composing) {
-            NewChatSheet(
-                agent: scopedAgent, close: { composing = false },
-                opened: { key in
-                    composing = false
-                    selection = key
-                })
-        }
+        .navigationDestination(isPresented: $composing) { PushedNewChat(botId: scope.agent ?? dotAgentId, header: botChat) }
         .toastHost($toast, seconds: 5) { _ in }
         .onChange(of: model.refusedDeletes) { _, refused in
             guard let detail = refused.values.first else { return }
@@ -201,12 +196,6 @@ struct ChatListView: View {
                 systemImage: "exclamationmark.triangle", actionTitle: nil)
             model.forgetRefusedDeletes()
         }
-    }
-
-    /// The agent a bot's list belongs to, whose chat the pencil starts (Dot's and the whole list's: none).
-    private var scopedAgent: AgentRecord? {
-        guard let agent = scope.agent else { return nil }
-        return model.agents.first { $0.record.id == agent }?.record
     }
 
     /// The checked chats the list shows now: a check hidden by the search or gone from the list is not acted on.
@@ -528,20 +517,26 @@ struct ChatRow: View {
     }
 }
 
-/// A new chat (PLAN §24): a clean canvas, the composer, the model chip in the bar and in the composer. The chat's
-/// settings are chosen before the first message (model, level, fast mode, approvals, plan first) and go with it
-/// (`POST /runs`); once sent, the chat opens at once under the outbox's key (item 1849) and shows in the list from the
-/// outbox. With an `agent` (a bot's New chat, item 1883) the chat is with that agent, its face above the composer.
-struct NewChatSheet: View {
+/// A new chat (PLAN §24) on the chat screen's own ground: the bot's face and name (its role, or for Dot a line of what to
+/// ask) centred above the composer, which carries the model chip. The chat's settings are chosen before the first message
+/// (model, level, fast mode, approvals, plan first) and go with it (`POST /runs`); once sent, the chat opens at once under
+/// the outbox's key (item 1849). The one view of a bot's empty chat: a bot with no chat yet shows it in place, and every
+/// New chat (the bot's ⋯ menu, its profile, its chat list) pushes it as a chat (`PushedNewChat`, item 1916).
+struct BotNewChat: View {
+    /// The bot the chat is with (`dotAgentId` for Dot).
+    let botId: String
+    /// The chat was kept in the outbox under this key.
+    let opened: (String) -> Void
     @Environment(AppModel.self) private var model: AppModel
+    @Environment(\.botChat) private var botChat: BotChat?
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
-    let agent: AgentRecord?
     @State private var settings: ChatSettingsDraft = ChatSettingsDraft(choices: .daemons, planFirst: false)
     @State private var choosing: Bool = false
-    let close: () -> Void
-    /// The chat was kept in the outbox under this key: the sheet closes and the chat opens.
-    let opened: (String) -> Void
+    /// The words could not be kept in the outbox (the disk): said above the composer, the words stay.
+    @State private var notKept: Bool = false
+
+    private var bot: Bot? { model.bots.first { $0.id == botId } }
 
     private var chip: ModelChoice? {
         guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
@@ -549,53 +544,38 @@ struct NewChatSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                if let agent {
-                    BotFace(id: agent.id, look: agent.look, size: 64)
-                    Text(agent.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
-                    Spacer(minLength: 0)
-                }
-                ComposerView(
-                    text: $text, attachments: $attachments,
-                    placeholder: agent.map { askPlaceholder($0.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
-                    buttons: composerButtons(
-                        // A new chat needs words (the daemon's goal is never empty): photos alone do not start one.
-                        hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
-                    perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+        VStack(spacing: 0) {
+            // The bot was made, but its first meeting did not start: why, so that a first message is the owner's informed next step.
+            if let problem = model.welcomeProblems[botId] {
+                FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil)
+                    .padding(.horizontal, Space.gutter)
+            }
+            Spacer(minLength: 0)
+            if let bot { greeting(bot) }
+            Spacer(minLength: 0)
+            if notKept {
+                Notice(
+                    tone: .failure, message: String(localized: "The message could not be saved on this phone. Try again.", comment: "New chat: the outbox could not keep the first message"),
+                    dismiss: { notKept = false }
+                )
                 .padding(.horizontal, Space.s)
-                .padding(.bottom, Space.xs)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Tone.ground)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
-                }
-                ToolbarItem(placement: .principal) {
-                    Button { choosing = true } label: {
-                        HStack(spacing: Space.xxs) {
-                            Text(chip?.label ?? String(localized: "New chat", comment: "Chat list toolbar: starts a new chat")).textRole(.body).fontWeight(.semibold)
-                                .foregroundStyle(Tone.text).lineLimit(1)
-                            Symbol(name: "chevron.down", context: .chevron).foregroundStyle(Tone.glyph)
-                        }
-                        .frame(minHeight: Metric.hit)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        chip.map { String(localized: "Model, \($0.label)", comment: "VoiceOver: the new chat's model button; the argument is the model") }
-                            ?? String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"))
-                    .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
-                    .accessibilityIdentifier("newChat.model")
-                }
-            }
+            ComposerView(
+                text: $text, attachments: $attachments,
+                placeholder: bot.map { $0.isDot ? String(localized: "Message Dot", comment: "Placeholder of the composer") : askPlaceholder($0.record.name) }
+                    ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
+                buttons: composerButtons(
+                    // A new chat needs words (the daemon's goal is never empty): photos alone do not start one.
+                    hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
+                perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+            .padding(.horizontal, Space.s)
+            .padding(.bottom, Space.xs)
         }
-        .presentationDetents([.large])
-        .presentationBackground(Tone.ground)
-        .tint(Tone.text)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Tone.ground)
+        .navigationTitle(botChat == nil ? bot?.record.name ?? "" : "")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, find: nil, library: nil) } }
         .task { await model.loadModels() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
         .onAppear { text = model.draft(of: AppModel.newChatDraft) }
@@ -611,18 +591,76 @@ struct NewChatSheet: View {
         }
     }
 
+    /// The bot's face and name, with its role under them, centred.
+    private func greeting(_ bot: Bot) -> some View {
+        VStack(spacing: Space.s) {
+            BotFace(id: bot.id, look: bot.record.look, size: 72)
+            Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
+            if !bot.record.role.isEmpty {
+                Text(bot.record.role).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+            } else if bot.isDot {
+                Text(String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Dot's empty chat (and the component gallery): what to ask Dot"))
+                    .textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, Space.gutter)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("newChat.greeting")
+    }
+
     private func send() {
         let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !words.isEmpty else { return }
         let photos: [Data] = attachments.map(\.jpeg)
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
+        let agent: String? = botId == dotAgentId ? nil : botId
         Task {
-            if let key = await model.startChat(words, photos: photos, start: start, agent: agent?.id) {
+            if let key = await model.startChat(words, photos: photos, start: start, agent: agent) {
+                notKept = false
                 model.keep(draft: "", of: AppModel.newChatDraft)
                 opened(key)
             } else {
-                close()
+                notKept = true
             }
+        }
+    }
+}
+
+/// A new chat with a bot, pushed like any chat (item 1916): the empty chat until the first message, then, in the same
+/// screen, the chat that message starts (the starting chat, then the chat once the daemon names it). Back goes to where
+/// the owner came from.
+struct PushedNewChat: View {
+    let botId: String
+    /// The bot's header of the chat it is pushed from (a destination does not inherit it).
+    let header: BotChat?
+    @Environment(AppModel.self) private var model: AppModel
+    /// The outbox's key of the chat the first message started.
+    @State private var started: String?
+
+    var body: some View {
+        screen
+            // New chat in the menu of a chat started here is a fresh empty one, here: the bot's screen already pushed this one.
+            .environment(
+                \.botChat,
+                header.map { outer in
+                    outer.with(menu: { action in
+                        if case .newChat = action { started = nil } else { outer.menu(action) }
+                    })
+                })
+    }
+
+    @ViewBuilder private var screen: some View {
+        if let key = started {
+            // Named by the daemon: its own id; before that the key (the starting chat).
+            let thread: String = model.startedChats[key] ?? key
+            if model.startingChats[thread] != nil {
+                StartingChat(key: thread)
+            } else {
+                ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(thread)
+            }
+        } else {
+            BotNewChat(botId: botId, opened: { started = $0 })
         }
     }
 }

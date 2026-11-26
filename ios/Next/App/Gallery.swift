@@ -217,7 +217,7 @@ private struct FeedbackGallery: View {
         GroupedSection(header: String(localized: "Empty", comment: "Component gallery (debug builds): a heading or sample text"), footer: nil) {
             EmptyState(
                 title: String(localized: "No chats yet", comment: "Component gallery (debug builds): a heading or sample text"), systemImage: "bubble.left.and.bubble.right",
-                detail: String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Component gallery (debug builds): a heading or sample text"), actionTitle: String(localized: "New chat", comment: "Component gallery (debug builds): a heading or sample text"),
+                detail: String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Dot's empty chat (and the component gallery): what to ask Dot"), actionTitle: String(localized: "New chat", comment: "Component gallery (debug builds): a heading or sample text"),
                 action: {})
         }
         GroupedSection(header: String(localized: "Loading", comment: "Component gallery (debug builds): a heading or sample text"), footer: nil) {

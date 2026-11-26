@@ -20,6 +20,11 @@ struct BotChat: Sendable {
     let menu: @MainActor @Sendable (BotMenuAction) -> Void
 
     var isDot: Bool { record.id == dotAgentId }
+
+    /// The same header with another doing for its menu (a pushed new chat answers its own New chat).
+    func with(menu: @escaping @MainActor @Sendable (BotMenuAction) -> Void) -> BotChat {
+        BotChat(record: record, unreadOthers: unreadOthers, drawsBack: drawsBack, back: back, openProfile: openProfile, menu: menu)
+    }
 }
 
 /// The doings of a bot's "⋯" menu that the bot's screen carries out (Find in chat and Library are the chat's own).
@@ -50,6 +55,7 @@ struct BotChatScreen: View {
     @State private var renaming: Bool = false
     @State private var newName: String = ""
     @State private var deleting: Bool = false
+    /// A new chat with the bot, pushed above its chat (item 1916).
     @State private var composing: Bool = false
     @State private var sharing: SharedFile?
     @State private var problem: SettingsFailure?
@@ -62,25 +68,15 @@ struct BotChatScreen: View {
         Group {
             if let bot {
                 content(bot)
-                    .environment(
-                        \.botChat,
-                        BotChat(
-                            record: bot.record, unreadOthers: unreadBots(model.bots, except: bot.id, muted: model.mutedBots), drawsBack: drawsBack,
-                            back: { back() }, openProfile: { showsProfile = true }, menu: { perform($0, bot: bot) }))
+                    .environment(\.botChat, header(bot))
+                    // A destination takes the environment of the stack, not of the view that declares it: the header goes in by hand.
                     .navigationDestination(isPresented: $showsProfile) { BotProfile(
                             botId: bot.id,
                             open: { thread in
                                 chosen = thread
                                 showsProfile = false
-                            }) }
-                    .sheet(isPresented: $composing) {
-                        NewChatSheet(
-                            agent: bot.isDot ? nil : bot.record, close: { composing = false },
-                            opened: { key in
-                                composing = false
-                                chosen = key
-                            })
-                    }
+                            }).environment(\.botChat, header(bot)) }
+                    .navigationDestination(isPresented: $composing) { PushedNewChat(botId: bot.id, header: header(bot)) }
                     // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it.
                     .onChange(of: chosen.flatMap { model.startedChats[$0] }) { _, thread in if let thread { chosen = thread } }
                     .sheet(item: $sharing) { file in ShareSheet(items: [file.url]).presentationDetents([.medium, .large]) }
@@ -131,8 +127,16 @@ struct BotChatScreen: View {
             ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
                 .id(thread)
         } else {
-            BotFirstChat(bot: bot, newChat: { composing = true })
+            // A bot with no chat yet: the new chat in place; its first message opens the chat, as a pushed one does.
+            BotNewChat(botId: bot.id, opened: { chosen = $0 })
         }
+    }
+
+    /// What the chat shows of the bot and what its header's menu does.
+    private func header(_ bot: Bot) -> BotChat {
+        BotChat(
+            record: bot.record, unreadOthers: unreadBots(model.bots, except: bot.id, muted: model.mutedBots), drawsBack: drawsBack,
+            back: { back() }, openProfile: { showsProfile = true }, menu: { perform($0, bot: bot) })
     }
 
     private func perform(_ action: BotMenuAction, bot: Bot) {
@@ -165,38 +169,6 @@ struct BotChatScreen: View {
             problem = await model.deleteBot(bot.id)
             if problem == nil { back() }
         }
-    }
-}
-
-/// A bot with no chat yet (made on the Mac, or its first meeting still starting): its face and a way to begin.
-struct BotFirstChat: View {
-    let bot: Bot
-    let newChat: () -> Void
-    @Environment(\.botChat) private var botChat: BotChat?
-    @Environment(AppModel.self) private var model: AppModel
-
-    var body: some View {
-        VStack(spacing: Space.m) {
-            // The bot was made, but its first meeting did not start: why, so "Start a chat" is the owner's informed next step.
-            if let problem = model.welcomeProblems[bot.id] {
-                FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil)
-            }
-            Spacer()
-            BotFace(id: bot.id, look: bot.record.look, size: 72)
-            Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text)
-            if !bot.record.role.isEmpty {
-                Text(bot.record.role).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
-            }
-            Button(String(localized: "Start a chat", comment: "A bot with no chat yet: starts one"), systemImage: "square.and.pencil", action: newChat)
-                .buttonStyle(PrimaryButtonStyle())
-                .padding(.top, Space.s)
-            Spacer()
-        }
-        .padding(Space.gutter)
-        .frame(maxWidth: .infinity)
-        .background(Tone.ground)
-        .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, find: nil, library: nil) } }
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
