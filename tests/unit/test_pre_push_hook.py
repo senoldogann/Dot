@@ -375,3 +375,18 @@ def test_a_model_off_the_claude_plan_is_told_its_budget_and_one_on_it_is_not(rep
     assert "at most 40 tool calls and 12 minutes" in deepseek and "VERDICT line" in deepseek
     assert "Your budget" not in _goal_of(tmp_path, "claude_code:opus")
     assert "route security" in done.stdout
+
+
+def test_a_block_that_counts_no_important_finding_is_not_taken_as_read(repo: Path, tmp_path: Path) -> None:
+    """The review of item 1954: the prompt asks for BLOCK when the review could not read the change (or ran out of its
+    budget), which says nothing of the code: its commit is read again, and only a BLOCK that counts findings stands."""
+    remote_tip: str = _git(repo, "rev-parse", "HEAD")
+    unread: str = _commit(repo, "unread.txt", "unread\n", "could not review")
+    (_review_dir(repo) / f"{unread}.md").write_text(
+        "I could not read the change.\n\nVERDICT: BLOCK\n", encoding="utf-8"
+    )
+    tip: str = _commit(repo, "later.txt", "later\n", "later")
+    done, _ = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert done.returncode == 0, done.stdout + done.stderr
+    diff: str = (_review_dir(repo) / f"{tip}.diff").read_text(encoding="utf-8")
+    assert "later.txt" in diff and "unread.txt" in diff

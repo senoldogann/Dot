@@ -44,14 +44,20 @@ review_dir="$(git rev-parse --path-format=absolute --git-common-dir)/claude-revi
 mkdir -p "$review_dir"
 cd "$repo_root"
 
+# Whether the review in file $1 BLOCKed with findings: its verdict is BLOCK and it counts at least one Important finding
+# ("2 Important, 1 Nit"). A BLOCK that counts none (the review could not read the change, or ran out of its budget: the
+# prompt asks for BLOCK then) read nothing for good, as a review with no verdict did.
+blocked_with_findings() {
+  [[ -f "$1" ]] && grep -q '^VERDICT: BLOCK$' "$1" && grep -qE '(^|[^0-9])[1-9][0-9]* Important' "$1"
+}
+
 # The newest commit of $1..$2, other than $2 itself, that was reviewed here: it passed, or its review BLOCKed with
-# findings (a review that gave no verdict read nothing for good). Nothing is printed when there is none.
+# findings. Nothing is printed when there is none.
 reviewed_since() {
   local commit
   for commit in $(git rev-list "$1..$2"); do
     [[ "$commit" == "$2" ]] && continue
-    if [[ -f "$review_dir/$commit.pass" ]] ||
-      { [[ -f "$review_dir/$commit.md" ]] && grep -q '^VERDICT: BLOCK$' "$review_dir/$commit.md"; }; then
+    if [[ -f "$review_dir/$commit.pass" ]] || blocked_with_findings "$review_dir/$commit.md"; then
       echo "$commit"
       return 0
     fi
@@ -111,7 +117,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   previous=""
   if [[ -n "$earlier" && "$(git merge-base origin/main "$earlier" 2>/dev/null || true)" == "$fork" ]]; then
     base=$earlier
-    if [[ -f "$review_dir/$earlier.md" ]] && grep -q '^VERDICT: BLOCK$' "$review_dir/$earlier.md"; then
+    if blocked_with_findings "$review_dir/$earlier.md"; then
       previous="$review_dir/$earlier.md"
     fi
   fi

@@ -617,7 +617,8 @@ class RgOutput(FrozenModel):
 # to the call, which the tool then decoded and split into 1.8 M lines to show 300 of them: 1.8 GB of the daemon's
 # memory. At about 70 bytes a line this is some 30 000 matches, a hundred times what is shown.
 _RG_STDOUT_BYTES: int = 2 * 1024 * 1024
-# What it says of the paths it did not read is a line each, and only the first few are listed.
+# What it says of the paths it did not read is a line each, and only the first few are listed; the rest is read and let
+# go, as ripgrep blocks on a stderr nobody reads.
 _RG_STDERR_BYTES: int = 256 * 1024
 _RG_CHUNK_BYTES: int = 64 * 1024
 
@@ -634,6 +635,20 @@ async def _read_up_to(stream: asyncio.StreamReader, limit: int) -> tuple[bytes, 
         size += len(chunk)
         if size > limit:
             return b"".join(chunks)[:limit], True
+
+
+async def _drain_keeping(stream: asyncio.StreamReader, limit: int) -> bytes:
+    """What ``stream`` gives, the first ``limit`` bytes of it kept; the rest is read and let go, so that the process
+    that writes to it never blocks on a full pipe."""
+    kept: list[bytes] = []
+    size: int = 0
+    while True:
+        chunk: bytes = await stream.read(_RG_CHUNK_BYTES)
+        if chunk == b"":
+            return b"".join(kept)
+        if size < limit:
+            kept.append(chunk[: limit - size])
+        size += len(chunk)
 
 
 async def run_rg(arguments: list[str], confinement: tuple[str, ...], workspace: Path, env: dict[str, str]) -> RgOutput:
@@ -654,7 +669,7 @@ async def run_rg(arguments: list[str], confinement: tuple[str, ...], workspace: 
     )
     if process.stdout is None or process.stderr is None:
         raise ToolExecutionError("ripgrep was started without its output pipes", {"arguments": " ".join(arguments)})
-    errors: asyncio.Task[tuple[bytes, bool]] = asyncio.create_task(_read_up_to(process.stderr, _RG_STDERR_BYTES))
+    errors: asyncio.Task[bytes] = asyncio.create_task(_drain_keeping(process.stderr, _RG_STDERR_BYTES))
     try:
         out, capped = await _read_up_to(process.stdout, _RG_STDOUT_BYTES)
         if capped:
@@ -662,7 +677,7 @@ async def run_rg(arguments: list[str], confinement: tuple[str, ...], workspace: 
             # output no longer read.
             with contextlib.suppress(ProcessLookupError):
                 process.kill()
-        err, _ = await errors
+        err: bytes = await errors
         await process.wait()
     finally:
         errors.cancel()
@@ -674,12 +689,11 @@ async def run_rg(arguments: list[str], confinement: tuple[str, ...], workspace: 
     if capped:
         # Whole lines only: the last one was cut where the cap fell.
         text = text[: text.rfind("\n") + 1]
-    return RgOutput(
-        code=0 if capped else process.returncode,
-        stdout=text,
-        stderr=err.decode("utf-8", errors="replace"),
-        capped=capped,
-    )
+    said: str = err.decode("utf-8", errors="replace")
+    # A search ended at the cap has the exit code of one that found matches, 0, or 2 when it had said something of its
+    # paths by then (the ones it did not read), as ripgrep's own would be.
+    code: int | None = (_RG_ERROR if said.strip() != "" else 0) if capped else process.returncode
+    return RgOutput(code=code, stdout=text, stderr=said, capped=capped)
 
 
 def _cut_note(noun: str) -> str:

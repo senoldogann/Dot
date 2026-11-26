@@ -154,3 +154,31 @@ async def test_the_wait_is_read_from_the_runs_and_ends_with_an_answer_or_a_week(
         assert await owner_wait_of(store, schedule.id, ended + 180.0) is None
     finally:
         await store.close()
+
+
+async def test_the_wait_holds_for_seven_days_however_many_firings_come_after_it(tmp_path: Path) -> None:
+    """The review of item 1952: looking at the newest ten runs forgot the wait after ten firings, so a schedule that
+    fires every two hours met the wall again in a day. A resumption of a run is no answer of the owner's either."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        schedule: ScheduleRecord = await store.add_schedule(
+            "Fiverr", "0 */2 * * *", None, "Check Fiverr.", "task", 100.0, UNSET_OPTIONS, None, True
+        )
+        thread: ThreadRecord = await store.create_thread("Fiverr", SCHEDULE_SOURCE)
+        blocked: RunRecord = await _blocked_run(store, schedule, thread)
+        for number in range(40):
+            later: RunRecord = await store.create_run(
+                thread.id, "Check Fiverr.", "task", "ollama:a", None, SCHEDULE_SOURCE, "medium", "standard", None,
+                "ask", True, None, None, None,
+            )  # fmt: skip
+            await store.finish_run(later.id, "done", f"Still waiting on you ({number}).")
+        resumed: RunRecord = await store.create_run(
+            thread.id, "Check Fiverr.", "task", "ollama:a", None, "resume", "medium", "standard", None, "ask", True,
+            None, None, None,
+        )  # fmt: skip
+        await store.finish_run(resumed.id, "done", "Went on.")
+        ended: float = blocked.finished_at or blocked.created_at
+        found: OwnerWait | None = await owner_wait_of(store, schedule.id, ended + 3600.0)
+        assert found is not None and found.run_id == blocked.id
+    finally:
+        await store.close()

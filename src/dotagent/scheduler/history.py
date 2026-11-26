@@ -125,10 +125,22 @@ CHAT_LEAD: str = (
 )
 
 
+# What Dot's own messages in a chat start with: a note of Dot's (``dotagent.agent.prompt.SYSTEM_NOTE``, which a test
+# holds this equal to; its notes are stored as the user's messages, one at the start of every run among them), and what
+# a firing's opening carries in front of its goal, which no one said in the chat.
+_SYSTEM_NOTE: str = "[system note]"
+_OPENING_MARKS: tuple[str, ...] = (HISTORY_OPEN, OWNER_WAIT_OPEN, CHAT_OPEN)
+
+
 def _spoken(message: Message) -> bool:
     """Whether ``message`` is something said in a chat: the owner's or the model's own words, not a tool call, a tool's
-    answer or a system note."""
-    return message.role in ("user", "assistant") and not message.tool_calls and message.content.strip() != ""
+    answer, a note of Dot's (a command's end, a helper's report: words of third parties may be in them, and each firing
+    writes its own, so they would fill the budget) or a firing's opening with its digest."""
+    if message.role not in ("user", "assistant") or message.tool_calls or message.content.strip() == "":
+        return False
+    if message.content.startswith(_SYSTEM_NOTE):
+        return False
+    return not (message.role == "user" and any(mark in message.content for mark in _OPENING_MARKS))
 
 
 def _said(message: Message, limit: int) -> str:

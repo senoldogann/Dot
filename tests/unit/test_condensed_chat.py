@@ -2,8 +2,16 @@
 answers, not the steps between; the goal the chat repeats once; at most the budget; and nothing a message says closes
 the block."""
 
+from dotagent.agent.prompt import SYSTEM_NOTE
 from dotagent.llm.types import Message, ToolCall
-from dotagent.scheduler.history import CHAT_CLOSE, CHAT_OPEN, condensed_chat
+from dotagent.scheduler.history import (
+    _SYSTEM_NOTE,
+    CHAT_CLOSE,
+    CHAT_OPEN,
+    HISTORY_OPEN,
+    OWNER_WAIT_OPEN,
+    condensed_chat,
+)
 
 GOAL: str = "Check the owner's mail and tell what needs an answer."
 
@@ -83,3 +91,21 @@ def test_an_answer_cannot_close_the_block() -> None:
     assert digest.content.count(CHAT_CLOSE) == 1
     assert digest.content.count(CHAT_OPEN) == 1
     assert digest.content.rstrip().endswith(CHAT_CLOSE)
+
+
+def test_dots_own_notes_and_the_openings_of_earlier_firings_are_not_the_owners_words() -> None:
+    """The review of item 1950: every run stores a `[system note]` as a user message (a command's end, a helper's
+    report, each with its own time), which read as "owner:" lines and pushed the real answers out of the budget."""
+    assert _SYSTEM_NOTE == SYSTEM_NOTE
+    chat: list[Message] = [
+        _say("user", f"{SYSTEM_NOTE} How this run was started at 10:14 ..."),
+        _say("user", f"{HISTORY_OPEN}\n- an earlier answer\n\n{GOAL}"),
+        _say("user", f'{OWNER_WAIT_OPEN}\n"a login"\n\n{GOAL}'),
+        _say("assistant", "Two mails, none urgent."),
+        _say("user", f"{SYSTEM_NOTE} A command you started ended: exit 0"),
+        _say("user", "Skip the newsletters."),
+    ]
+    [digest] = condensed_chat(chat, 4000)
+    lines: list[str] = [line for line in digest.content.splitlines() if line.startswith("- ")]
+    assert [line.split(":")[0] for line in lines] == ["- you", "- owner"]
+    assert "system note" not in digest.content and "an earlier answer" not in digest.content
