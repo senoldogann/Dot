@@ -50,6 +50,7 @@ struct SettingsTab: View {
                 PageRow(page: .general, systemImage: "gearshape", title: String(localized: "General", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .appearance, systemImage: "paintbrush", title: String(localized: "Appearance", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .chat, systemImage: "bubble.left.and.bubble.right", title: String(localized: "Chat", comment: "Settings row: chat preferences"), description: nil, detail: nil)
+                PageRow(page: .voice, systemImage: "waveform", title: String(localized: "Voice", comment: "Settings row: voice typing"), description: nil, detail: nil)
             }
             GroupedSection(header: String(localized: "Agents", comment: "Settings section: models, schedules, rules, memory"), footer: nil) {
                 PageRow(page: .models, systemImage: "cpu", title: String(localized: "Models", comment: "Settings row"), description: nil, detail: nil)
@@ -151,6 +152,7 @@ struct SettingsTab: View {
         case .general: GeneralPage()
         case .appearance: AppearancePage()
         case .chat: ChatSettingsPage()
+        case .voice: VoicePage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
         case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
@@ -223,6 +225,9 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
         entry(
             "chat", String(localized: "Chat", comment: "Settings row: chat preferences"), "", "haptics vibration reactions follow ups",
             String(localized: "haptics vibration reactions", comment: "Settings search synonyms of Chat (space separated)"), .chat),
+        entry(
+            "voice", String(localized: "Voice", comment: "Settings row: voice typing"), "", "voice dictation microphone transcribe speech bluetooth airpods carplay",
+            String(localized: "voice dictation microphone transcribe speech", comment: "Settings search synonyms of Voice (space separated)"), .voice),
         entry(
             "models", String(localized: "Models", comment: "Settings row"), agents, "model llm main review vision fast code review fallback provider",
             String(localized: "model main review vision code review", comment: "Settings search synonyms of Models (space separated)"), .models),

@@ -36,7 +36,7 @@ final class SyncTests: XCTestCase {
     func testANewChatsThreadAndWordsAreKeptWhenTheListHasItsRowFirst() async throws {
         await rig.supervisor.start()
         _ = try await snapshot(of: rig.store, "the list is live") { $0.list.freshness == .live && $0.list.rows.contains { $0.summary.id == "thr_1" } }
-        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: []), createdAt: 1)
+        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: [], start: nil), createdAt: 1)
         let run: RunRecord = RunRecord(
             id: "run_1", threadId: "thr_1", goal: "Book the dentist", mode: "task", model: "m", status: "running", createdAt: 1, finishedAt: nil,
             result: "", parentRunId: nil, source: "phone", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)

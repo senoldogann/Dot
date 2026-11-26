@@ -2,7 +2,7 @@ import Foundation
 
 // Voice dictation on the composer's microphone: Apple's Speech framework, on this phone only (no audio leaves it). These are
 // its rules, pure: what each permission and the recognizer allow, the words of each way it can fail, and how the words
-// heard join what the owner had already typed. `Dictation` (Data/) does the listening. Moved from the old app (`ios/Dot/Core/DictationRules.swift`) with its words in the catalog.
+// heard join what the owner had already typed. `VoiceInput` (Data/) does the listening. Moved from the old app (`ios/Dot/Core/DictationRules.swift`) with its words in the catalog.
 
 /// A permission as dictation needs to know it.
 enum PermissionState: Equatable, Sendable {
@@ -51,16 +51,6 @@ enum DictationGate: Equatable, Sendable {
     var opensSettings: Bool { self == .speechDenied || self == .microphoneDenied }
 }
 
-/// Where dictation stands, for the button and the line over the box.
-enum DictationState: Equatable, Sendable {
-    case idle
-    case starting
-    case listening
-    case failed(String)
-
-    var isActive: Bool { self == .starting || self == .listening }
-}
-
 enum DictationText {
     /// What the box holds while the owner speaks: what they had typed, then the words heard so far, one space apart.
     static func merged(base: String, heard: String) -> String {
@@ -72,16 +62,4 @@ enum DictationText {
         let separator: String = base.hasSuffix("\n") ? "" : " "
         return base.trimmingCharacters(in: CharacterSet(charactersIn: " ")) + separator + spoken
     }
-
-    /// What the box should hold now, or `nil` when the owner changed it since dictation last wrote to it (what it wrote, or
-    /// what the box held when it began): dictation then stops and keeps the owner's typing, it never writes over it.
-    static func update(current: String, lastWritten: String?, base: String, heard: String) -> String? {
-        guard current == (lastWritten ?? base) else { return nil }
-        return merged(base: base, heard: heard)
-    }
-}
-
-/// What a go of dictation last wrote to the box.
-final class DictationWritten {
-    var text: String?
 }

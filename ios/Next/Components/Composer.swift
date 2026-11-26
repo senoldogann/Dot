@@ -23,7 +23,7 @@ struct ComposerAttachment: Identifiable, Equatable {
     let preview: UIImage
 }
 
-/// A model and effort the chip offers.
+/// What the model chip shows: the chat's model and level.
 struct ModelChoice: Hashable, Identifiable {
     let ref: String
     let label: String
@@ -117,6 +117,8 @@ struct ComposerSuggestions: Sendable {
 /// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
 /// button on one row; expanded with the field above and +, the model · effort chip, the microphone and the button
 /// beneath. Photos, the camera, files and a document scan go on the + menu; `/` offers commands and skills, `@` agents.
+/// The chip opens the chat's settings (PLAN §24); the microphone turns the pill into the recorder (`VoiceRecorderBar`),
+/// whose ✓ puts the words in the field.
 struct ComposerView: View {
     @Binding var text: String
     @Binding var attachments: [ComposerAttachment]
@@ -124,12 +126,13 @@ struct ComposerView: View {
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
     let model: ModelChoice?
-    let models: [String: [ModelChoice]]
-    let chooseModel: ((ModelChoice) -> Void)?
+    /// Opens the chat's settings sheet from the chip; `nil` shows no chip.
+    let openSettings: (() -> Void)?
     let suggestions: ComposerSuggestions
     @FocusState private var isFocused: Bool
-    @State private var dictation: Dictation = Dictation()
-    @State private var dictationBase: String = ""
+    @State private var voice: VoiceInput = VoiceInput()
+    @Environment(AppModel.self) private var app: AppModel
+    @Environment(\.scenePhase) private var scenePhase: ScenePhase
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var picking: Picker?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
@@ -147,10 +150,35 @@ struct ComposerView: View {
         let compact: Bool = layout == .compact
         VStack(alignment: .leading, spacing: Space.xs) {
             suggestionList
-            if case .failed(let words) = dictation.state {
+            if let words = voiceLine {
                 Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.m)
-                    .onTapGesture { dictation.clearFailure() }
+                    .onTapGesture { voice.clearFailure() }
+                    .accessibilityIdentifier("composer.voiceLine")
             }
+            if voice.phase.isActive {
+                VoiceRecorderBar(
+                    levels: voice.levels, startedAt: voice.startedAt, heard: voice.heard, transcribing: voice.phase == .transcribing,
+                    cancel: { voice.cancel() }, confirm: { voice.confirm() }
+                )
+                .padding(.horizontal, Space.xxs)
+                .interactiveGlass(in: rounded(Radius.composer))
+            } else {
+                fieldPill(compact: compact)
+            }
+        }
+        .haptic(.medium, trigger: voice.phase == .recording)
+        .onChange(of: scenePhase) { _, phase in if phase == .background { voice.leftTheScreen() } }
+        .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
+        .modifier(ComposerPickers(picking: $picking, photoItems: $photoItems, add: add))
+    }
+
+    /// The line over the pill: why dictation cannot start, or why the last recording ended early.
+    private var voiceLine: String? {
+        if case .failed(let words) = voice.phase { return words }
+        return voice.notice
+    }
+
+    private func fieldPill(compact: Bool) -> some View {
             VStack(alignment: .leading, spacing: 0) {
                 if !attachments.isEmpty { attachmentStrip }
                 // One field in one place whatever the layout: a field made anew when the composer grows on focus would
@@ -182,8 +210,17 @@ struct ComposerView: View {
             }
             .padding(.horizontal, Space.xxs)
             .interactiveGlass(in: rounded(Radius.composer))
-        }
-        .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
+    }
+}
+
+/// The + menu's pickers: photos, files, the camera and the scanner.
+private struct ComposerPickers: ViewModifier {
+    @Binding var picking: ComposerView.Picker?
+    @Binding var photoItems: [PhotosPickerItem]
+    let add: (UIImage) -> Void
+
+    func body(content: Content) -> some View {
+        content
         .photosPicker(isPresented: Binding(get: { picking == .photos }, set: { if !$0 { picking = nil } }), selection: $photoItems, maxSelectionCount: 6, matching: .images)
         .onChange(of: photoItems) { _, items in
             Task {
@@ -217,8 +254,10 @@ struct ComposerView: View {
             }
         }
     }
+}
 
-    private func add(_ image: UIImage) {
+extension ComposerView {
+    fileprivate func add(_ image: UIImage) {
         guard let jpeg: Data = image.jpegData(compressionQuality: 0.8) else { return }
         attachments.append(ComposerAttachment(id: UUID(), jpeg: jpeg, preview: image))
     }
@@ -244,56 +283,41 @@ struct ComposerView: View {
         .accessibilityLabel(String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"))
     }
 
-    @ViewBuilder private var modelChip: some View {
-        if let model, let chooseModel {
-            Menu {
-                ForEach(models.keys.sorted(), id: \.self) { provider in
-                    Section(provider) {
-                        ForEach(models[provider] ?? []) { choice in
-                            Button {
-                                chooseModel(choice)
-                            } label: {
-                                if choice == model { Label(chipWords(choice), systemImage: "checkmark") } else { Text(chipWords(choice)) }
-                            }
-                        }
-                    }
-                }
-            } label: {
+    @ViewBuilder fileprivate var modelChip: some View {
+        if let model, let openSettings {
+            Button(action: openSettings) {
                 HStack(spacing: Space.xxs) {
                     Text(model.label).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                    if let effort = model.effort { Text(effort.capitalized).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
+                    if let effort = model.effort { Text(effortTitle(effort)).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
                 }
                 .padding(.horizontal, Space.xs)
                 .frame(minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(String(localized: "Model, \(chipWords(model))", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+            .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
+            .accessibilityIdentifier("composer.model")
         }
     }
 
     private func chipWords(_ choice: ModelChoice) -> String {
-        [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · ")
+        [choice.label, choice.effort.map(effortTitle)].compactMap { $0 }.joined(separator: " · ")
     }
 
-    private var micButton: some View {
-        ComposerIconButton(
-            systemImage: dictation.state.isActive ? "waveform" : "mic",
-            label: dictation.state.isActive
-                ? String(localized: "Stop dictating", comment: "VoiceOver: the microphone while it listens")
-                : String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button")
-        ) {
-            if !dictation.state.isActive { dictationBase = text }
-            let written: DictationWritten = DictationWritten()
-            dictation.toggle { heard in
-                guard let next = DictationText.update(current: text, lastWritten: written.text, base: dictationBase, heard: heard) else {
-                    dictation.stop()
-                    return
-                }
-                text = next
-                written.text = next
-            }
+    /// The microphone: the pill becomes the recorder; ✓ adds the words after what was typed.
+    fileprivate var micButton: some View {
+        ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button")) {
+            let defaults: UserDefaults = .standard
+            voice.start(
+                VoiceInput.Start(
+                    on: TranscribeOn.current(defaults), mac: app.engine?.api, locale: DictationLanguage.current(defaults).locale(app: Locale.current),
+                    order: MicSlot.read(defaults),
+                    deliver: { words in text = DictationText.merged(base: text, heard: words) },
+                    learned: { port in MicSlot.write(learning(port, into: MicSlot.read(defaults)), defaults) }))
         }
+        .accessibilityIdentifier("composer.mic")
     }
 
     private var attachmentStrip: some View {

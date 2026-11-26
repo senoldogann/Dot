@@ -44,6 +44,8 @@ final class FakeDaemon: @unchecked Sendable {
     private(set) var acceptedTexts: [String] = []
     private var uploads: Int = 0
     private var decided: [String: String] = [:]
+    private var voiceBytes: [String: Int] = [:]
+    private var voicePieces: [String: Int] = [:]
 
     var uploadCount: Int { lock.withLock { uploads } }
 
@@ -417,6 +419,7 @@ final class FakeDaemon: @unchecked Sendable {
             let status: String = lock.withLock { decided[approval] ?? "pending" }
             return Reply(status: 200, body: Self.json(approvalRecord(approval, status: status)), stream: false, lost: false)
         }
+        if let voice: Reply = voiceReply(method: method, parts: parts, body: body) { return voice }
         if method == "DELETE", let found: [String] = Self.match(parts, ["api", "threads"]) {
             _ = found
             if let fields: [String: [String]] = try? JSONDecoder().decode([String: [String]].self, from: body ?? Data()) {
@@ -426,6 +429,49 @@ final class FakeDaemon: @unchecked Sendable {
         }
         return Self.refused(404, "Not Found")
     }
+
+    /// The Mac's dictation (`routes_voice.py`): a stream takes its pieces in order; its end says how many bytes came.
+    private func voiceReply(method: String, parts: [String], body: Data?) -> Reply? {
+        if method == "GET", Self.match(parts, ["api", "voice"]) != nil {
+            return Reply(status: 200, body: Data(#"{"transcribe":true,"why":null}"#.utf8), stream: false, lost: false)
+        }
+        if method == "POST", Self.match(parts, ["api", "voice", "streams"]) != nil {
+            let id: String = lock.withLock {
+                nextId += 1
+                voiceBytes["vs_\(nextId)"] = 0
+                return "vs_\(nextId)"
+            }
+            return Reply(status: 200, body: Data(#"{"id":"\#(id)"}"#.utf8), stream: false, lost: false)
+        }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*", "audio"]) {
+            guard let fields = try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data()),
+                let piece: Int = fields["piece"]?.int, let b64: String = fields["data_b64"]?.string, let data = Data(base64Encoded: b64)
+            else { return Self.refused(422, "bad piece") }
+            let inTurn: Bool = lock.withLock {
+                guard voiceBytes[found[0]] != nil, voicePieces[found[0], default: 0] == piece else { return false }
+                voicePieces[found[0], default: 0] += 1
+                voiceBytes[found[0], default: 0] += data.count
+                return true
+            }
+            return inTurn ? Reply(status: 204, body: Data(), stream: false, lost: false) : Self.refused(422, "piece out of turn")
+        }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*", "end"]) {
+            guard let bytes: Int = lock.withLock({ voiceBytes.removeValue(forKey: found[0]) }) else { return Self.refused(404, "no such stream") }
+            return Reply(status: 200, body: Data(#"{"text":"heard \#(bytes) bytes"}"#.utf8), stream: false, lost: false)
+        }
+        if method == "DELETE", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*"]) {
+            lock.withLock { voiceBytes[found[0]] = nil }
+            return Reply(status: 204, body: Data(), stream: false, lost: false)
+        }
+        return nil
+    }
+
+    /// The bodies the phone sent to a path that holds `part`, in order.
+    func bodies(_ method: String, _ part: String) -> [Data] {
+        requests.filter { $0.method == method && $0.path.contains(part) }.compactMap(\.body)
+    }
+
+    var openVoiceStreams: Int { lock.withLock { voiceBytes.count } }
 
     private func queue(thread: String, body: Data?) -> Reply {
         guard let message: QueueMessage = try? JSONDecoder().decode(QueueMessage.self, from: body ?? Data()) else {

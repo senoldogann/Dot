@@ -250,9 +250,9 @@ private struct ChromeGallery: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.groupedGutter) {
                 Text(String(localized: "Composer at rest", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerView(text: $empty, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !empty.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
+                ComposerView(text: $empty, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !empty.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
                 Text(String(localized: "Composer expanded", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
-                ComposerView(text: $long, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
+                ComposerView(text: $long, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Component gallery (debug builds): a heading or sample text"), buttons: composerButtons(hasContent: !long.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
                 Text(String(localized: "Floating control", comment: "Component gallery (debug builds): a heading or sample text")).textRole(.footnote).foregroundStyle(Tone.secondary)
                 FloatingWorkingControl(
                     summary: WorkingSummary(status: .working, activity: nil, since: Date(timeIntervalSinceNow: -192), queued: 2, helpersDone: 1, helpersTotal: 3, plan: PlanProgress(done: 1, total: 5), canStop: true),
@@ -372,7 +372,7 @@ struct SampleChatScreen: View {
                     showsScrollToBottom: true, openStatus: { panel = .background }, stop: {}, openPlan: {}, openQueue: {}, openHelpers: { panel = .agents },
                     scrollToBottom: {})
                     .frame(maxWidth: .infinity, alignment: .center)
-                ComposerView(text: $draft, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), models: [:], chooseModel: { _ in }, suggestions: .none)
+                ComposerView(text: $draft, attachments: .constant([]), placeholder: String(localized: "Message Dot", comment: "Placeholder of the composer"), buttons: composerButtons(hasContent: !draft.isEmpty, runActive: false, followUp: .queue, editing: false), perform: { _ in }, model: ModelChoice(ref: "default", label: "Opus 5.5", effort: "medium"), openSettings: {}, suggestions: .none)
             }
             .frame(maxWidth: proseWidth)
             .padding(.horizontal, Space.s)
