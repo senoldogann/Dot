@@ -98,6 +98,7 @@ _BY_NAME: dict[str, LiveNow] = {
 # The tools named by what they start with, after the names above.
 _BY_PREFIX: tuple[tuple[str, LiveNow], ...] = (
     ("browser_", LiveNow(kind="browsing", line="Browsing the web")),
+    ("safari_", LiveNow(kind="browsing", line="Browsing the web")),
     ("desktop_", LiveNow(kind="mac", line="Using your Mac")),
     ("memory_", LiveNow(kind="memory", line="Using its memory")),
 )
