@@ -393,3 +393,32 @@ async def test_pages_that_load_while_a_slow_mac_is_asked_share_one_question_and_
             assert (await client.get("/api/voice")).json() == {"transcribe": False, "why": NO_COMPILER}
     assert len(asked) == 1
     await manager.shutdown()
+
+
+async def test_voice_transport_with_fifty_millisecond_batches(client: httpx.AsyncClient, mac_can: StandIn) -> None:
+    """Measure the existing authenticated HTTP upload at the prototype's target batch size on loopback."""
+    mac_can.says(text="Okay.")
+    name = await _open(client, "en-US")
+    pcm = pcm_of(SAMPLES)
+    frames_per_batch = RECORDING_RATE // 20
+    batch_bytes = frames_per_batch * 2
+    request_ms: list[float] = []
+    clock = asyncio.get_running_loop().time
+    started = clock()
+    for number, offset in enumerate(range(0, len(pcm), batch_bytes)):
+        sent = clock()
+        response = await client.post(
+            f"/api/voice/streams/{name}/audio", json=_piece(number, pcm[offset : offset + batch_bytes])
+        )
+        request_ms.append((clock() - sent) * 1_000)
+        assert response.status_code == 204, response.text
+        await asyncio.sleep(max(0, started + (number + 1) * 0.05 - clock()))
+    sent = clock()
+    response = await client.post(f"/api/voice/streams/{name}/end")
+    final_ms = (clock() - sent) * 1_000
+    assert response.status_code == 200, response.text
+    assert response.json() == {"text": "Okay."}
+    given = mac_can.runs_made()[-1]
+    assert given["samples"] == len(SAMPLES) + _TAIL_SAMPLES
+    assert given["crossings"] == len(SAMPLES) // 40
+    print(f"loopback HTTP 20 x 50 ms: {[round(ms, 2) for ms in request_ms]}, finalize with stand-in: {final_ms:.2f} ms")
