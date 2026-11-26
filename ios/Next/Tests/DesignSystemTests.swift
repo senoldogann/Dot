@@ -20,7 +20,7 @@ final class PaletteContrastTests: XCTestCase {
         let inks: Set<String> = Set(pairs.map(\.ink))
         let surfaces: Set<String> = Set(pairs.map(\.surface))
         XCTAssertEqual(
-            inks, ["text", "secondary", "tertiary", "warn", "failure", "glyph", "action", "onAction", "ground"])
+            inks, ["text", "secondary", "tertiary", "warn", "failure", "live", "glyph", "action", "onAction", "ground"])
         XCTAssertEqual(surfaces, ["ground", "card", "nested", "sheet", "glassFallback", "action", "warnFill", "warn"])
     }
 
