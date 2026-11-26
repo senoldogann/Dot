@@ -319,7 +319,7 @@ struct BotComputerRow: View {
         Button(action: open) {
             ListRow(
                 systemImage: "desktopcomputer", title: String(localized: "Computer", comment: "Bot profile: what the bot does on the Mac"), description: nil,
-                accessory: .detail(
+                accessory: .detailAndChevron(
                     botIsWorking(bot)
                         ? String(localized: "Working", comment: "Bot profile: the bot has a run at work")
                         : String(localized: "Idle", comment: "Bot profile: the bot has no run at work")))
