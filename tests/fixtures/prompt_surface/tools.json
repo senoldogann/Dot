@@ -1032,7 +1032,7 @@
     }
   },
   {
-    "description": "Run one self-contained part of the work in a separate agent with a clean context and get its final report back. The run starts with your plan, the files you wrote, the newest result of each check you ran and the failures you hit or fixed, so it does not read the same files again; the goal carries the rest. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research question) and to do independent parts at the same time: call it several times in one turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) and its report closes that step, unless the part goes on in the background; a step the plan does not have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or check and its answer; a report without one is marked as a claim.",
+    "description": "Run one self-contained part of the work in a separate agent with a clean context and get its final report back. The run starts with your plan, the files you wrote, the newest result of each check you ran and the failures you hit or fixed, so it does not read the same files again; the goal carries the rest. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research question) and to do independent parts at the same time: call it several times in one turn, with your tools (the Delegation section says the rest). A part an agent's role fits is that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) and its report closes that step, unless the part goes on in the background; a step the plan does not have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or check and its answer; a report without one is marked as a claim.",
     "name": "delegate",
     "parameters": {
       "additionalProperties": false,
@@ -1048,7 +1048,7 @@
           "type": "string"
         },
         "model": {
-          "description": "One of the helper models named in your instructions, for a part that suits a stronger or a cheaper model; leave it out to use your own model.",
+          "description": "One of the helper models named in your instructions, for a part that suits a stronger or a cheaper model; leave it out to use the owner's task-kind mapping or your own model.",
           "type": "string"
         },
         "step": {
