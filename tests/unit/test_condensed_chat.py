@@ -2,6 +2,8 @@
 answers, not the steps between; the goal the chat repeats once; at most the budget; and nothing a message says closes
 the block."""
 
+import json
+
 from dotagent.agent.prompt import SYSTEM_NOTE
 from dotagent.llm.types import Message, ToolCall
 from dotagent.scheduler.history import (
@@ -109,3 +111,25 @@ def test_dots_own_notes_and_the_openings_of_earlier_firings_are_not_the_owners_w
     lines: list[str] = [line for line in digest.content.splitlines() if line.startswith("- ")]
     assert [line.split(":")[0] for line in lines] == ["- you", "- owner"]
     assert "system note" not in digest.content and "an earlier answer" not in digest.content
+
+
+def test_a_runs_final_answer_is_the_answer_of_its_finish_call() -> None:
+    """A run keeps its final answer as the arguments of its `finish` call, on a message with no words of its own: the
+    block that left every message with a tool call out held only the owner's goal (main's macOS gate, 2026-11-26)."""
+    finish: ToolCall = ToolCall(
+        id="c2",
+        name="finish",
+        arguments={"answer": "Found 1 new listing.", "success": True},
+        extra=None,
+        extra_origin=None,
+    )
+    chat: list[Message] = [
+        _say("user", GOAL),
+        _calling("Reading the inbox."),
+        _tool("x" * 100),
+        _say("assistant", "").model_copy(update={"tool_calls": (finish,)}),
+        _tool("Run finished."),
+    ]
+    [digest] = condensed_chat(chat, 4000)
+    lines: list[str] = [line for line in digest.content.splitlines() if line.startswith("- ")]
+    assert lines == [f"- owner: {json.dumps(GOAL)}", '- you: "Found 1 new listing."']
