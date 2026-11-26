@@ -78,7 +78,14 @@ async def check_helper_result(agent: AgentRun, alternate: str, outcome: RunOutco
         },
         True,
     )
-    if decision == "achieved":
+    return checked_end(decision, reason, outcome)
+
+
+def checked_end(decision: str, reason: str, outcome: RunOutcome) -> RunOutcome:
+    """What the check's ``decision`` makes of a helper's ``outcome``: a goal reached stands as done, ``improve`` too
+    (item 1946: reached, with a better result in reach, which a final check cannot send it back for); one whose rest
+    waits on a scheduled run is done with the check's words; anything else fails it, the answer kept."""
+    if decision in ("achieved", "improve"):
         return outcome
     if decision == "scheduled":
         return scheduled_goal_end(reason, outcome)
