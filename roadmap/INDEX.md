@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1917](1917.md) | done | 2026-11-26 | A pull request that changes ios/ builds the iPhone app once, on macOS |
+| [1913](1913.md) | done | 2026-11-26 | Several chats under Dot or one agent: the audit, and a chat shown twice stays open |
 | [1912](1912.md) | done | 2026-11-26 | DotNext's Dot no longer wears an unread mark for its own work |
 | [1911](1911.md) | done | 2026-11-26 | DotNext makes a scheduled task, and shows each schedule's history |
 | [1910](1910.md) | done | 2026-11-26 | DotNext's home opens the settings from an avatar icon, not from the owner's initials |
