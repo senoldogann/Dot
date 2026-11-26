@@ -65,8 +65,11 @@ from dotagent.repair.claude import (
     worker_env,
 )
 from dotagent.repair.github import (
+    COMMAND_TIMEOUT_S,
+    PUSH_TIMEOUT_S,
     REPAIR_BRANCH_PREFIX,
     Check,
+    MacOnMain,
     UnreviewedPush,
     all_passed,
     along_main,
@@ -86,6 +89,7 @@ from dotagent.repair.github import (
     is_ancestor,
     items_on_main,
     main_on_github,
+    main_on_macos,
     make_checkout,
     merge_pr,
     merged_since,
@@ -193,8 +197,14 @@ PROTECTED: tuple[str, ...] = (
 _KEPT_ENDS: frozenset[str] = frozenset({"needs_owner", "review_blocked", "out_of_time"})
 # A night's whole time (the fourth review of item 921): a restart asked meanwhile waits three hours for the night's work
 # (``launchd.RESTART_NIGHT_LIMIT_S``) before it gives up, so the rounds of a session and its waits for the checks are
-# cut to this, and a push through the review hook (``github.PUSH_TIMEOUT_S``, half an hour) still ends inside the three.
+# cut to this, and a push through the review hook (``github.PUSH_TIMEOUT_S``, half an hour) still ends inside the three;
+# a night that merged waits for main's macOS runs within that same half hour (:func:`macos_wait_s`, item 1899).
 NIGHT_LIMIT_S: float = 2 * 3600.0
+# How long a night that merged waits for main's macOS runs before it pulls the owner's checkout, and how often it asks
+# (item 1899): a pull request runs no macOS job, and main's run of the gate takes 10 to 20 minutes, more in a queue. The
+# wait ends with the night's time and the half hour a push may add (:func:`macos_wait_s`), within the three hours.
+MACOS_WAIT_S: float = 90 * 60.0
+MACOS_POLL_S: float = 5 * 60.0
 # No session starts with less than this left of the night: it could do nothing worth its start.
 SESSION_LEAST_S: float = 15 * 60.0
 # A round is not started with less than this left of the night.
@@ -1182,17 +1192,83 @@ async def repair_night(
         # What the night merged reaches the owner's checkout once it is over (item 1110), however it ended (the
         # emergency stop's cancel, a defect): a merge ended the night before, one problem a night, so that Dot would
         # not go on in a process whose modules on disk had changed; now the night goes on, each session on a checkout of
-        # its own of the new main, and the pull and the restart come once. Shielded: a cancel does not cut them short.
+        # its own of the new main, and the pull and the restart come once, after main passed on macOS (item 1899); the
+        # pull and the restart are shielded: a cancel does not cut them short.
         if any(session.end == "merged" for session in done):
-            await asyncio.shield(_pull_and_restart(runtime, night, restart))
+            await _pull_when_green(runtime, night, restart, clock, sleep, deadline)
     return tuple(done)
 
 
-async def _pull_and_restart(runtime: Runtime, night: Night, restart: Restart) -> None:
-    """Bring the owner's checkout up to the main the night merged into and restart Dot once idle; a checkout off main
-    or a pull that failed is told to the owner, whose Dot then runs the code it ran (item 1110)."""
+type MacCheck = Callable[[], Awaitable[MacOnMain]]
+
+
+async def wait_for_macos(check: MacCheck, clock: Clock, sleep: Sleep, wait_s: float, poll_s: float) -> MacOnMain:
+    """main's macOS verdict once it is green or red, or the last pending one once ``wait_s`` has passed: a pull request
+    runs the Linux checks alone (item 1886), so a merged fix is tested on macOS by main's own run, after the merge."""
+    until: float = clock() + wait_s
+    while True:
+        said: MacOnMain = await check()
+        if said.verdict != "pending" or clock() >= until:
+            return said
+        await sleep(poll_s)
+
+
+def macos_wait_s(deadline: float, now: float) -> float:
+    """How long a night that merged may wait for main's macOS runs: :data:`MACOS_WAIT_S`, but never past the night's
+    own deadline plus the half hour a push may add, less one check's time, so the night still ends within the two and
+    a half hours a restart asked meanwhile waits on (``launchd.RESTART_NIGHT_LIMIT_S`` is three)."""
+    return max(0.0, min(MACOS_WAIT_S, deadline + PUSH_TIMEOUT_S - COMMAND_TIMEOUT_S - now))
+
+
+async def _pull_when_green(
+    runtime: Runtime, night: Night, restart: Restart, clock: Clock, sleep: Sleep, deadline: float
+) -> None:
+    """Pull the owner's checkout up to main and restart Dot only once main's macOS runs passed (item 1899): waits for
+    them as long as :func:`macos_wait_s` allows, unless the night is stopped; a red main, one still going after that,
+    a check that gives no answer or a stop is told to the owner, whose Dot then runs the code it ran."""
+    stopped: str = (
+        "Tonight's fixes are merged, but the night was stopped before main passed its macOS tests, so your checkout "
+        "was not pulled."
+    )
+    task: asyncio.Task[object] | None = asyncio.current_task()
+    if task is not None and task.cancelling() > 0:
+        await tell_owner(runtime.bus, RESTART_TITLE, stopped, _PAGE, "system", "")
+        return
+
+    async def check() -> MacOnMain:
+        return await main_on_macos(night.repo, night.env, sys.executable)
+
+    wait_s: float = macos_wait_s(deadline, clock())
     try:
-        pulled: bool = await pull_main(night.repo, night.env)
+        said: MacOnMain = await wait_for_macos(check, clock, sleep, wait_s, MACOS_POLL_S)
+    except asyncio.CancelledError:
+        await asyncio.shield(tell_owner(runtime.bus, RESTART_TITLE, stopped, _PAGE, "system", ""))
+        raise
+    except RepairError as error:
+        log.warning("repair_macos_check_failed", error=error.message, context=error.context)
+        untold: str = (
+            f"Tonight's fixes are merged, but whether main passed its macOS tests could not be told ({error.message}), "
+            "so your checkout was not pulled."
+        )
+        await tell_owner(runtime.bus, RESTART_TITLE, untold, _PAGE, "system", "")
+        return
+    if said.verdict != "green":
+        why: str = (
+            "main failed its macOS tests (the issue “main is red on macOS” says where)"
+            if said.verdict == "red"
+            else f"main's macOS tests had not finished after {int(wait_s // 60)} minutes"
+        )
+        text: str = f"Tonight's fixes are merged, but {why}, so your checkout was not pulled: Dot runs the code it ran."
+        await tell_owner(runtime.bus, RESTART_TITLE, text, _PAGE, "system", "")
+        return
+    await asyncio.shield(_pull_and_restart(runtime, night, restart, said.sha))
+
+
+async def _pull_and_restart(runtime: Runtime, night: Night, restart: Restart, sha: str) -> None:
+    """Bring the owner's checkout up to main's commit ``sha``, which passed on macOS, and restart Dot once idle; a
+    checkout off main or a pull that failed is told to the owner, whose Dot then runs the code it ran (item 1110)."""
+    try:
+        pulled: bool = await pull_main(night.repo, night.env, sha)
     except RepairError as error:
         log.warning("repair_pull_failed", error=error.message, context=error.context)
         text: str = (

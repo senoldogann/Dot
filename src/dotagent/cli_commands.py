@@ -532,6 +532,28 @@ class BackupListCommand(FrozenModel):
     name: Literal["backup-list"]
 
 
+class ScopeListCommand(FrozenModel):
+    name: Literal["scope-list"]
+
+
+class ScopeAddCommand(FrozenModel):
+    name: Literal["scope-add"]
+    program: str
+    hosts: tuple[str, ...] = ()
+    url: str = ""
+    note: str = ""
+
+
+class ScopeRemoveCommand(FrozenModel):
+    name: Literal["scope-remove"]
+    program: str
+
+
+class ScopeCheckCommand(FrozenModel):
+    name: Literal["scope-check"]
+    target: str
+
+
 type Command = Annotated[
     RunCommand
     | ResumeCommand
@@ -603,6 +625,10 @@ type Command = Annotated[
     | PruneCommand
     | BackupNowCommand
     | BackupListCommand
+    | ScopeListCommand
+    | ScopeAddCommand
+    | ScopeRemoveCommand
+    | ScopeCheckCommand
     | UndoCommand
     | EvalListCommand
     | EvalCheckCommand

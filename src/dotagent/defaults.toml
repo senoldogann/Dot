@@ -875,6 +875,15 @@ give_front_back = true
 # pointer. It is drawn by a helper process, kept out of what Dot's screenshots show, and fades once the run ends; a
 # helper that fails only costs the arrow.
 show_pointer = true
+# The Mac's own pointer and keyboard are yours while you are at the Mac (item 1890): a step of desktop_act that moves
+# the pointer or sends keys (a real click, a drag, a scroll, typing, a key, bringing an application to the front) runs
+# only once nobody but Dot has touched the keyboard, the mouse or the trackpad for away_after_s, and waits for that
+# meanwhile, at most away_wait_s; press, focus, set_value and menu go on through accessibility without the pointer.
+# Your first touch while Dot works ends its use of them at the next step, and the batch waits again. false: the steps
+# go at once, as before.
+input_only_when_away = true
+away_after_s = 600
+away_wait_s = 14400
 launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
@@ -1319,6 +1328,15 @@ review_timeout_s = 120.0
 # common ports answer, and runs only on a host listed here: one you own or may test. A name covers its subdomains
 # ("example.com" covers "www.example.com"); an address is listed as it is. Empty: no active scan anywhere.
 owned_hosts = []
+# A bug bounty program or an engagement you are in (item 1887, docs/recon.md). A host in a scope is treated as an owned
+# host: the port scan and security_scan run on it, and every report names the program that authorised it. Writing the
+# scope down is your statement that the program's rules allow the test.
+#   [[recon.scopes]]
+#   program = "HackerOne · Acme"
+#   hosts = ["acme.com"]
+#   url = "https://hackerone.com/acme"
+#   note = "no automated scanning; 5 req/s"
+scopes = []
 
 
 [meetings]

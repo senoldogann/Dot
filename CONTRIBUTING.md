@@ -25,8 +25,9 @@ later; nothing of Dot needs Node to run.
 
 ## The checks every change passes
 
-The gate (`.github/workflows/gate.yml`) runs these on every pull request that changes more than prose; one whose
-files nothing of the macOS jobs reads (`ios/`, the item records: `scripts/python_ci.py`) runs the Linux checks alone.
+The gate (`.github/workflows/gate.yml`) runs the Linux ones on every pull request that changes more than prose, and
+the macOS ones (the unit tests Linux leaves out, `dotx eval check`, the smoke and browser tests) on the push to `main`
+that merges it, so run those here (docs/development.md).
 Run them once before you push; while you work, the tests of what you changed are enough. `-n auto` (pytest-xdist)
 spreads the tests over your Mac's cores:
 

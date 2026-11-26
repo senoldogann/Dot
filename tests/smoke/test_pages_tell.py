@@ -18,6 +18,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
+from dock_scenario import is_phone, open_sheet
 from playwright.async_api import APIResponse, Browser, Locator, Page, Response, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -209,6 +210,9 @@ async def test_a_queue_that_could_not_be_read_says_so_and_is_read_again(
                     unread: Locator = page.locator(".queue-unread")
                     await expect(unread).to_contain_text("The queue could not be read: the store is busy")
                     assert refused, "the page did not read the queue"
+                    # A phone shows the queue in the sheet its segment of the capsule opens, which says it is unread.
+                    if is_phone(page):
+                        await open_sheet(page, "queue")
                     await _shot(page, tmp_path / f"queue-unread-{width}-{scheme}.png")
                     await page.unroute(f"**/api/threads/{thread_id}/queue")
                     await unread.get_by_role("button", name="Read again").click()

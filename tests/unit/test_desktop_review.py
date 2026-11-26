@@ -40,6 +40,7 @@ def _env(tmp_path: Path, app: AppInfo = _CHROME) -> StepEnv:
         expected_pointer=None,
         preferred=frozenset(),
         secure_field=lambda inspection, what: None,
+        owner_here=False,
     )
 
 

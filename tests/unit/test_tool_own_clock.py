@@ -162,6 +162,20 @@ async def test_the_time_a_running_tool_waits_for_the_owner_is_not_its_own() -> N
     assert overran == []
 
 
+async def test_a_wait_a_tool_makes_off_its_clock_is_not_its_own() -> None:
+    """A batch of desktop steps that waits for the owner to step away (item 1890) is not cut at the tool's limit."""
+
+    async def waits_for_the_owner(ctx: ToolContext) -> ToolResult:
+        await ctx.off_clock(asyncio.sleep(LIMIT_S + GRACE_S + 0.3))
+        return ok("went on")
+
+    checked, overran = await _call(waits_for_the_owner, _Gate())
+    assert checked.result.text == "went on"
+    assert checked.waited_s >= LIMIT_S + GRACE_S + 0.3
+    assert checked.ran_s < GRACE_S
+    assert overran == []
+
+
 class _Context:
     """The context of a Chrome that started: it is told what a session tells one and records its closing."""
 

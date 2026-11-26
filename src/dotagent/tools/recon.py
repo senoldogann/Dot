@@ -3,7 +3,8 @@
 A passive audit reads what any browser's visit reads: the addresses the name has, the TLS certificate, the HTTP answer
 and its headers, and the technology the page and its headers name; from those it writes what a site's owner should fix.
 An active audit also asks which of the common ports answer, and reads the banner a service gives without a word sent to
-it. It runs only on a host the owner listed in ``[recon] owned_hosts``: scanning a host is not reading a page, and the
+it. It runs only on a host the owner listed in ``[recon] owned_hosts`` or in a scope of a bug bounty program they are in
+(``[[recon.scopes]]``, ``dotx scope``, items 1887 and 1888): scanning a host is not reading a page, and the
 one who runs it must be the one who may.
 
 Nothing here sends a payload, guesses a password or tries to exploit what it finds: the tool writes findings, and what
@@ -25,6 +26,8 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from pydantic import Field
 
+from dotagent import scopes
+from dotagent.config import ReconAuthority
 from dotagent.core.errors import DotError, ToolInputError, WebError
 from dotagent.core.text import truncate_tail
 from dotagent.policy.types import ActionInfo
@@ -137,8 +140,9 @@ class ReconArgs(ToolArgs):
         default="passive",
         description=(
             "`passive` reads the addresses, the TLS certificate, the HTTP answer and its headers, as a browser's visit "
-            "does. `ports` also asks which common ports answer, and reads their banners: only on a host listed in "
-            "[recon] owned_hosts, one you own or may test."
+            "does. `ports` also asks which common ports answer, and reads their banners: only on a host you own or "
+            "that a registered scope allows — `dotx scope add` writes a program's scope in one command, and "
+            "`dotx scope check <host>` says who covers a host."
         ),
     )
 
@@ -220,6 +224,18 @@ def owned(host: str, owned_hosts: Sequence[str]) -> bool:
     nothing that only ends in the same letters (``notexample.com``)."""
     wanted: str = host.strip().lower().rstrip(".")
     return any(wanted == entry or wanted.endswith(f".{entry}") for entry in owned_hosts)
+
+
+def _refusal(host: str) -> str:
+    """What a call to a host no scope allows is answered with (item 1888): the one command that writes the scope, so a
+    run registers the program itself instead of handing the owner a toml block."""
+    return (
+        f"{host} is in neither [recon] owned_hosts nor a scope of any bug bounty program, and the active audit runs "
+        "only on a host you own or one a scope allows. If a program you are in lists it, register the program in one "
+        'command — dotx scope add --program "Bugcrowd · Acme" --url <its page> --hosts '
+        f'{host} --note "<its rules>" — and run it again; `dotx scope check {host}` says who covers it. The '
+        "passive audit reads any public site."
+    )
 
 
 def _header(headers: Mapping[str, str], name: str) -> str:
@@ -607,11 +623,15 @@ async def _run(args: ReconArgs, ctx: ToolContext) -> ToolResult:
     if isinstance(parsed, str):
         return fail(parsed)
     target: Target = parsed
-    if args.depth == "ports" and not owned(target.host, ctx.runtime.config.recon.owned_hosts):
-        return fail(
-            f"{target.host} is not in [recon] owned_hosts, and ports are scanned only on a host you own or may test. "
-            "Add the domain there (it covers its subdomains), or run the passive audit instead."
-        )
+    if args.depth == "ports":
+        try:
+            allowed: ReconAuthority | None = scopes.authorising(target.host, ctx.runtime.config.recon)
+        except scopes.ScopesFileError as exc:
+            return fail(
+                f"{exc.message} The port scan waits for a scope that can be read; the passive audit still runs."
+            )
+        if allowed is None:
+            return fail(_refusal(target.host))
     allow_private: bool = ctx.runtime.config.web.allow_private_hosts
     try:
         resolved: tuple[str, ...] = await checked_addresses(target.host, target.port, allow_private_hosts=allow_private)
@@ -654,6 +674,14 @@ async def _run(args: ReconArgs, ctx: ToolContext) -> ToolResult:
         findings.extend(_port_findings(ports))
     unique: tuple[str, ...] = tuple(dict.fromkeys(findings))[:_MAX_FINDINGS]
     report: str = _render(target, http_result, tls_result, addresses, tech, title, unique, ports, now)
+    try:
+        authority: ReconAuthority | None = scopes.authorising(target.host, ctx.runtime.config.recon)
+    except scopes.ScopesFileError as exc:
+        # The passive audit reads any public site; a broken scope file costs only the report's Scope line.
+        report = f"{report}\n\nScope: unknown — {exc.message}"
+    else:
+        if authority is not None and authority.program is not None:
+            report = f"{report}\n\nScope: {authority.program}{f' — {authority.note}' if authority.note else ''}"
     return mark_untrusted(ok(truncate_tail(report, ctx.output_chars)))
 
 
@@ -664,8 +692,8 @@ def build_recon_tool() -> RegisteredTool:
         description=(
             "Look at a site or a host the way a security engineer starts: its addresses, its TLS certificate, its HTTP "
             "answer and headers, and the technology it names, with what its owner should fix. With depth `ports` on a "
-            "host in [recon] owned_hosts, which ports answer and what their services say. It only reads: it sends no "
-            "payload and tries no exploit."
+            "host you own or a registered scope allows (see `dotx scope check`), which ports answer and what their "
+            "services say. It only reads: it sends no payload and tries no exploit."
         ),
         args_model=ReconArgs,
         modes=ALL_MODES,

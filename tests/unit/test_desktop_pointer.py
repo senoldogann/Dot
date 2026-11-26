@@ -78,6 +78,7 @@ def _env(config: DesktopConfig, tmp_path: Path) -> StepEnv:
         expected_pointer=None,
         preferred=frozenset(),
         secure_field=None,  # type: ignore[arg-type]
+        owner_here=False,
     )
 
 
