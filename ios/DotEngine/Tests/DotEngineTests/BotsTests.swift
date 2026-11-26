@@ -141,13 +141,13 @@ final class BotsTests: XCTestCase {
 
     func testANewChatWithAnAgentNamesItAndOneWithDotLeavesItOut() throws {
         let withAgent: [String: Any] = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: JSONEncoder().encode(NewChatMessage(goal: "Hi", key: "k", attachments: [], agentId: "a1"))) as? [String: Any])
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(NewChatMessage(goal: "Hi", key: "k", attachments: [], start: .daemons, agentId: "a1"))) as? [String: Any])
         XCTAssertEqual(withAgent["agent_id"] as? String, "a1")
         let withDot: [String: Any] = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: JSONEncoder().encode(NewChatMessage(goal: "Hi", key: "k", attachments: [], agentId: nil))) as? [String: Any])
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(NewChatMessage(goal: "Hi", key: "k", attachments: [], start: .daemons, agentId: nil))) as? [String: Any])
         XCTAssertNil(withDot["agent_id"])
         // A new chat kept on disk before the agent was added reads back as Dot's.
         let old: Data = Data(#"{"newChat":{"text":"Hi","images":[],"uploaded":[]}}"#.utf8)
-        XCTAssertEqual(try JSONDecoder().decode(OutboxItem.Action.self, from: old), .newChat(text: "Hi", images: [], uploaded: [], agent: nil))
+        XCTAssertEqual(try JSONDecoder().decode(OutboxItem.Action.self, from: old), .newChat(text: "Hi", images: [], uploaded: [], start: nil, agent: nil))
     }
 }

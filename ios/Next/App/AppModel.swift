@@ -32,6 +32,8 @@ final class AppModel {
     private(set) var savedAt: [String: Double] = [:]
     private(set) var workingAt: [String: Double] = [:]
     private(set) var startedChats: [String: String] = [:]
+    /// The chats whose delete the daemon refused, with its words (item 1800).
+    private(set) var refusedDeletes: [String: String] = [:]
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -62,6 +64,8 @@ final class AppModel {
         func showFixture(_ fixture: EngineSnapshot, mac: String) {
             show(fixture)
             fixtureMac = mac
+            // The models and defaults the chip and the chat's settings read, from the Settings fixture's daemon.
+            fixtureAPI = SettingsFixture.root.api()
             phase = .ready
         }
     #endif
@@ -77,6 +81,7 @@ final class AppModel {
         if next.savedAt != savedAt { savedAt = next.savedAt }
         if next.workingAt != workingAt { workingAt = next.workingAt }
         if next.startedChats != startedChats { startedChats = next.startedChats }
+        if next.refusedDeletes != refusedDeletes { refusedDeletes = next.refusedDeletes }
     }
 
     /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
@@ -99,6 +104,10 @@ final class AppModel {
 
     /// The models the daemon offers (`GET /api/models`), for the composer's chip.
     var models: [ProviderModels] = []
+    /// The daemon's main model and approval mode (`GET /api/status`), what "Default" means in the chat's settings.
+    var chatDefaults: ChatDefaults?
+    /// Why the models could not be read, for the model picker to say with a retry; `nil` once they are.
+    var modelsProblem: String?
     /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
     var palette: PaletteView?
     /// Dot and the owner's agents (`GET /api/agents`), the home's bots (PLAN §27); read when the home appears, on its pull
@@ -290,13 +299,13 @@ final class AppModel {
         }
     }
 
-    /// Starts a new chat through the outbox, with Dot (`agent` `nil`) or with one of the owner's agents: its key, which
-    /// the chat opens at once (item 1849) and swaps for the chat's own id once the daemon names it; `nil` when the
-    /// message could not be kept.
-    func startChat(_ text: String, photos: [Data], agent: String?) async -> String? {
+    /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24) and with Dot (`agent` `nil`) or
+    /// one of the owner's agents: its key, which the chat opens at once (item 1849) and swaps for the chat's own id once
+    /// the daemon names it; `nil` when the message could not be kept.
+    func startChat(_ text: String, photos: [Data], start: ChatStart, agent: String?) async -> String? {
         guard let engine else { return nil }
         do {
-            let key: String = try await engine.startChat(text, photos: photos, agent: agent)
+            let key: String = try await engine.startChat(text, photos: photos, start: start, agent: agent)
             startingChats[key] = text
             return key
         } catch {
@@ -363,14 +372,37 @@ extension AppModel {
         }
     }
 
-    /// The models the daemon offers, read once per launch for the composer's chip.
+    /// The models the daemon offers and its defaults, read once per launch for the composer's chip and the chat's
+    /// settings (each again on the next ask while it could not be read).
+    /// A read that fails says why (`modelsProblem`), for the picker to show with its retry: the defaults' too, without
+    /// which no row is marked chosen or Default.
     func loadModels() async {
-        guard let engine, models.isEmpty else { return }
-        do {
-            models = try await engine.api.models()
-        } catch {
-            logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+        guard let api: DaemonAPI = settingsAPI else { return }
+        let place: String = String(localized: "Settings › Models", comment: "Where on the Mac: the Models page")
+        var problem: String?
+        if models.isEmpty {
+            do {
+                models = try await api.models()
+            } catch {
+                logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+                problem = failureWords(settingsFailure(error), macPlace: place)
+            }
         }
+        if chatDefaults == nil {
+            do {
+                let status: StatusView = try await api.fullStatus()
+                chatDefaults = ChatDefaults(model: status.models.main, approvals: status.approvals)
+            } catch {
+                logger.warning("the daemon's defaults could not be read error=\(String(describing: error), privacy: .public)")
+                problem = problem ?? failureWords(settingsFailure(error), macPlace: place)
+            }
+        }
+        modelsProblem = problem
+    }
+
+    /// A model's name as the daemon gives it, else the reference's last part ("claude_code:opus" → "opus").
+    func modelLabel(_ ref: String) -> String {
+        models.flatMap(\.models).first { $0.ref == ref }?.label ?? String(ref.split(separator: ":").last ?? Substring(ref))
     }
 
     /// The pickers' lists, read once per launch; a list that cannot be read stays empty and says so in the log.
@@ -387,7 +419,7 @@ extension AppModel {
 
     /// A side question (`/btw`): the run's answer, or why there is none.
     func aside(run: String, question: String) async -> String {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired") }
         do {
             return try await engine.api.aside(run: run, question: question).answer
         } catch {
@@ -397,7 +429,7 @@ extension AppModel {
 
     /// A loop of the chat (`/loop`); `nil` when it was made, else why not.
     func loop(run: String, every: String, text: String) async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired") }
         do {
             try await engine.api.loop(run: run, every: every, text: text)
             return nil
@@ -418,17 +450,6 @@ extension AppModel {
         } catch {
             logger.warning("a screenshot could not be read name=\(name, privacy: .public) error=\(String(describing: error), privacy: .public)")
             return nil
-        }
-    }
-
-    /// The emergency stop (Settings, the daemon's failsafe): every run stops. `nil` when it worked, else why not.
-    func emergencyStop() async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
-        do {
-            _ = try await engine.api.emergencyStop()
-            return nil
-        } catch {
-            return String(describing: error)
         }
     }
 

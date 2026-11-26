@@ -182,22 +182,52 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
     public let attachments: [String]
     public let mode: String
     public let standing: Bool
+    /// What the owner chose in the chat's settings before the first message (PLAN §24); left out, the daemon's.
+    public let model: String?
+    public let effort: String?
+    public let speed: String
+    public let approvals: String?
+    /// Goal mode as the chat's choices hold it; `nil` takes `[agent] goal_mode`.
+    public let goalMode: Bool?
+    public let planFirst: Bool
+
     /// The agent the chat is with; `nil` (left out of the body) for Dot.
     public let agentId: String?
 
-    enum CodingKeys: String, CodingKey {
-        case goal, key, attachments, mode, standing
-        case agentId = "agent_id"
-    }
-
-    public init(goal: String, key: String, attachments: [String], agentId: String?) {
+    public init(goal: String, key: String, attachments: [String], start: ChatStart, agentId: String?) {
         self.goal = goal
         self.key = key
         self.attachments = attachments
-        self.mode = "auto"
+        self.mode = start.choices.mode
         self.standing = false
+        self.model = start.choices.model
+        self.effort = start.choices.effort
+        self.speed = start.choices.speed
+        self.approvals = start.choices.approvals
+        self.goalMode = start.choices.goalMode
+        self.planFirst = start.planFirst
         self.agentId = agentId
     }
+
+    enum CodingKeys: String, CodingKey {
+        case goal, key, attachments, mode, standing, model, effort, speed, approvals
+        case agentId = "agent_id"
+        case goalMode = "goal_mode"
+        case planFirst = "plan_first"
+    }
+}
+
+/// What a new chat starts with (PLAN §24): the choices picked before its first message, and "plan first".
+public struct ChatStart: Codable, Sendable, Hashable {
+    public let choices: ChatChoices
+    public let planFirst: Bool
+
+    public init(choices: ChatChoices, planFirst: Bool) {
+        self.choices = choices
+        self.planFirst = planFirst
+    }
+
+    public static let daemons: ChatStart = ChatStart(choices: .daemons, planFirst: false)
 }
 
 struct AttachmentUpload: Encodable, Sendable {
@@ -288,10 +318,7 @@ extension DaemonAPI {
     /// The models of every provider the daemon knows (`GET /api/models`).
     public func models() async throws(DaemonRequestError) -> [ProviderModels] { try await get("/api/models", query: []) }
 
-    /// The emergency stop (`POST /api/failsafe`): every run stops, desktop control is blocked and the scheduler held
-    /// until it is released on the Mac.
-    public func emergencyStop() async throws(DaemonRequestError) -> FailsafeState { try await send("POST", "/api/failsafe", body: nil) }
-
+    /// Whether the Mac's emergency stop holds (`GET /api/failsafe`).
     public func failsafe() async throws(DaemonRequestError) -> FailsafeState { try await get("/api/failsafe", query: []) }
 
     /// A screenshot a tool returned (`GET /api/images/{name}`).

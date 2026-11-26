@@ -235,6 +235,17 @@
         }
       }
     },
+    "%lld selected": {
+      "comment": "Chat list select mode: how many chats are checked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seçili"
+          }
+        }
+      }
+    },
     "%lld steps could not be shown": {
       "comment": "Notice in a chat: frames the app could not read; the argument is how many",
       "localizations": {
@@ -539,6 +550,17 @@
         }
       }
     },
+    "A second AI answers for you; you are asked only what it is unsure about": {
+      "comment": "Approval mode auto, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İkinci bir yapay zekâ senin yerine yanıtlar; yalnızca emin olmadığı şeyler sana sorulur"
+          }
+        }
+      }
+    },
     "A second AI answers for you; you are asked only what it is unsure about.": {
       "comment": "Rules: what asks in auto mode",
       "localizations": {
@@ -638,6 +660,17 @@
         }
       }
     },
+    "Add %@ to favourites": {
+      "comment": "VoiceOver: stars a model; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini favorilere ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -715,6 +748,17 @@
         }
       }
     },
+    "AirPods, headsets and cars not listed here": {
+      "comment": "Settings › Voice: what Other Bluetooth covers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada adı geçmeyen AirPods, kulaklıklar ve arabalar"
+          }
+        }
+      }
+    },
     "All": {
       "comment": "Component gallery (debug builds): a heading or sample text\nConnect apps: the chip of every section",
       "localizations": {
@@ -733,6 +777,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tüm eylemler"
+          }
+        }
+      }
+    },
+    "All models": {
+      "comment": "Chat settings filter: every model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm modeller"
           }
         }
       }
@@ -914,7 +969,7 @@
       }
     },
     "Approvals": {
-      "comment": "Schedule edit: the approval mode",
+      "comment": "Chat settings row: the approval mode the run works under\nSchedule edit: the approval mode",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1089,17 +1144,6 @@
         }
       }
     },
-    "Ask before stopping a run": {
-      "comment": "General: confirm Stop in a chat",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir işi durdurmadan önce sor"
-          }
-        }
-      }
-    },
     "Ask it in a chat to do something on a rhythm.": {
       "comment": "Bot profile: how a routine is made",
       "localizations": {
@@ -1107,6 +1151,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir sohbette ondan bir işi belli aralıklarla yapmasını iste."
+          }
+        }
+      }
+    },
+    "Ask only to pay or send": {
+      "comment": "Approval mode yolo: asks only before a payment, a message or a public post",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yalnızca ödeme ve gönderimde sor"
           }
         }
       }
@@ -1155,13 +1210,35 @@
         }
       }
     },
+    "Audio stays on this device and is transcribed here.": {
+      "comment": "Settings › Voice: what transcribing on the phone means",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ses bu cihazda kalır ve burada yazıya dökülür."
+          }
+        }
+      }
+    },
     "Auto": {
-      "comment": "Approval mode: a review model decides",
+      "comment": "Approval mode: a review model decides\nApproval mode: a second AI answers for the owner",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Otomatik"
+          }
+        }
+      }
+    },
+    "Auto-accept edits": {
+      "comment": "Approval mode: edits go ahead, the rest is asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenlemeleri kabul et"
           }
         }
       }
@@ -1213,6 +1290,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Arka plan işi"
+          }
+        }
+      }
+    },
+    "Bluetooth": {
+      "comment": "Settings › Voice: a named Bluetooth microphone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth"
           }
         }
       }
@@ -1294,6 +1382,17 @@
         }
       }
     },
+    "Built-in microphone": {
+      "comment": "Settings › Voice: the phone's own microphone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dahili mikrofon"
+          }
+        }
+      }
+    },
     "Business": {
       "comment": "Connect apps: a section of services",
       "localizations": {
@@ -1371,6 +1470,17 @@
         }
       }
     },
+    "Cancel the recording": {
+      "comment": "VoiceOver: the recorder's cross, nothing is written down",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydı iptal et"
+          }
+        }
+      }
+    },
     "Caps": {
       "comment": "Caps section: the caps of what tasks spend",
       "localizations": {
@@ -1378,6 +1488,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sınırlar"
+          }
+        }
+      }
+    },
+    "CarPlay": {
+      "comment": "Settings › Voice: the car's microphone through CarPlay",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CarPlay"
+          }
+        }
+      }
+    },
+    "Catalog": {
+      "comment": "Chat settings section: hidden models",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Katalog"
           }
         }
       }
@@ -1437,6 +1569,17 @@
         }
       }
     },
+    "Chat settings": {
+      "comment": "Title of the chat's settings sheet: model, reasoning, approvals",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet ayarları"
+          }
+        }
+      }
+    },
     "Chat with %@": {
       "comment": "Agents: opens a chat with the agent; the argument is its name",
       "localizations": {
@@ -1455,6 +1598,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbetler"
+          }
+        }
+      }
+    },
+    "Chats with a run at work or waiting on you are kept; stop or answer them first.": {
+      "comment": "Bulk delete confirmation: chats at work or waiting on the owner are not deleted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışan ya da seni bekleyen sohbetler silinmez; önce durdur ya da yanıtla."
           }
         }
       }
@@ -1536,19 +1690,19 @@
         }
       }
     },
-    "Clear": {
-      "comment": "Clears a search field",
+    "Clear search": {
+      "comment": "Connect apps: clears the search and the filters",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Temizle"
+            "value": "Aramayı temizle"
           }
         }
       }
     },
-    "Clear search": {
-      "comment": "Connect apps: clears the search and the filters",
+    "Clear the search": {
+      "comment": "VoiceOver: empties the model search",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2077,12 +2231,23 @@
       }
     },
     "Default": {
-      "comment": "Model picker: the mark of Dot's default model",
+      "comment": "Chat settings: the badge of the daemon's main model",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Varsayılan"
+          }
+        }
+      }
+    },
+    "Default level": {
+      "comment": "Chat settings: the reasoning segment that leaves the level to the model's default",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan düzey"
           }
         }
       }
@@ -2175,6 +2340,35 @@
         }
       }
     },
+    "Delete %lld chats with everything they hold?": {
+      "comment": "Confirmation of deleting the selected chats; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld chat with everything it holds?"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Delete %lld chats with everything they hold?"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sohbet içindeki her şeyle birlikte silinsin mi?"
+          }
+        }
+      }
+    },
     "Delete chat": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2263,6 +2457,17 @@
         }
       }
     },
+    "Deselect all": {
+      "comment": "Chat list select mode: clears the checks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçimi kaldır"
+          }
+        }
+      }
+    },
     "Design": {
       "comment": "Connect apps: a section of services\nSettings section of debug builds",
       "localizations": {
@@ -2336,6 +2541,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonda dilin için cihaz içi dikte yok. Mesajı yazarak gönder."
+          }
+        }
+      }
+    },
+    "Dictation stopped: %@. What was heard is in the box.": {
+      "comment": "Composer: the phone's recognizer failed; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte durdu: %@. Duyulanlar kutuda."
+          }
+        }
+      }
+    },
+    "Dictation stopped: nothing more was heard. What was heard is in the box.": {
+      "comment": "Composer: voice typing ended after several silences",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikte durdu: başka bir şey duyulmadı. Duyulanlar kutuda."
           }
         }
       }
@@ -2451,7 +2678,7 @@
       }
     },
     "Done": {
-      "comment": "Find in chat: closes the bar\nStatus word: the run finished",
+      "comment": "Chat settings toolbar: keeps the picks\nFind in chat: closes the bar\nStatus word: the run finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2479,6 +2706,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bitti ya da başarısız oldu"
+          }
+        }
+      }
+    },
+    "Done, write it down": {
+      "comment": "VoiceOver: the recorder's tick, the words go into the message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bitti, yazıya dök"
           }
         }
       }
@@ -2604,6 +2842,17 @@
         }
       }
     },
+    "Dot asks only before a payment, a message or mail sent for you, or a public post": {
+      "comment": "Approval mode yolo, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot yalnızca ödemeden, senin adına gönderilen mesaj ya da e-postadan veya herkese açık paylaşımdan önce sorar"
+          }
+        }
+      }
+    },
     "Dot asks only before a payment, a message or mail sent for you, or a public post.": {
       "comment": "Rules: what asks in yolo mode",
       "localizations": {
@@ -2622,6 +2871,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot sana soruyor"
+          }
+        }
+      }
+    },
+    "Dot is not paired with a Mac. Choose This device in Settings › Voice.": {
+      "comment": "Composer: voice set to the Mac without a paired Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir Mac ile eşleşmemiş. Ayarlar › Ses'te Bu cihaz'ı seç."
           }
         }
       }
@@ -2792,6 +3052,28 @@
         }
       }
     },
+    "Dot's setting": {
+      "comment": "Chat settings: the approval mode configured on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un ayarı"
+          }
+        }
+      }
+    },
+    "Dot's setting (%@)": {
+      "comment": "Chat settings: the approval mode configured on the Mac; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un ayarı (%@)"
+          }
+        }
+      }
+    },
     "Down": {
       "comment": "System: a service is down",
       "localizations": {
@@ -2913,6 +3195,17 @@
         }
       }
     },
+    "Edits and everyday work go ahead; Dot asks you about the rest": {
+      "comment": "Approval mode ask, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düzenlemeler ve gündelik işler yapılır; geri kalanını Dot sana sorar"
+          }
+        }
+      }
+    },
     "Edits and everyday work go ahead; Dot asks you about the rest.": {
       "comment": "Rules: what asks in ask mode",
       "localizations": {
@@ -2936,7 +3229,7 @@
       }
     },
     "Emergency stop": {
-      "comment": "Settings: stops every run of Dot at once",
+      "comment": "System: whether the Mac's emergency stop holds",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3056,17 +3349,6 @@
         }
       }
     },
-    "Every run stops, desktop control is blocked and schedules wait until you release the stop.": {
-      "comment": "Emergency stop confirmation: what it does",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Her iş durur, masaüstü denetimi engellenir ve zamanlamalar sen durdurmayı kaldırana kadar bekler."
-          }
-        }
-      }
-    },
     "Everything is stopped: no run starts and schedules wait until you release the stop.": {
       "comment": "Settings: the emergency stop holds",
       "localizations": {
@@ -3144,6 +3426,17 @@
         }
       }
     },
+    "Fast mode": {
+      "comment": "Chat settings row: the model's fast mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hızlı mod"
+          }
+        }
+      }
+    },
     "Fast model": {
       "comment": "Models: the role for quick small steps",
       "localizations": {
@@ -3151,6 +3444,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hızlı model"
+          }
+        }
+      }
+    },
+    "Favourites": {
+      "comment": "Chat settings filter: the starred models",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoriler"
           }
         }
       }
@@ -3232,6 +3536,17 @@
         }
       }
     },
+    "Filter the models": {
+      "comment": "VoiceOver: the filter button beside the model search",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelleri süz"
+          }
+        }
+      }
+    },
     "Find a free afternoon slot": {
       "comment": "Sample helper title (wave N0)",
       "localizations": {
@@ -3244,7 +3559,7 @@
       }
     },
     "Find a model": {
-      "comment": "Model picker: the search field",
+      "comment": "Chat settings: the search field's placeholder",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3364,13 +3679,31 @@
         }
       }
     },
-    "Folded": {
-      "comment": "VoiceOver: a folded group",
+    "Folded, %lld models": {
+      "comment": "VoiceOver: a folded provider group; the argument is its model count",
       "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Folded, %lld model"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Folded, %lld models"
+                }
+              }
+            }
+          }
+        },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kapalı"
+            "value": "Kapalı, %lld model"
           }
         }
       }
@@ -3387,7 +3720,7 @@
       }
     },
     "Forget": {
-      "comment": "Memory: sends a note to the trash",
+      "comment": "Memory: sends a note to the trash\nSettings › Voice: removes a named microphone from the list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3452,6 +3785,17 @@
         }
       }
     },
+    "Free": {
+      "comment": "Chat settings filter: the models served at no cost",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ücretsiz"
+          }
+        }
+      }
+    },
     "Free mode is on: no task asks you anything.": {
       "comment": "Rules: free mode holds",
       "localizations": {
@@ -3459,6 +3803,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Serbest mod açık: hiçbir görev sana bir şey sormaz."
+          }
+        }
+      }
+    },
+    "Free mode, which asks nothing, is switched for all of Dot on the Mac.": {
+      "comment": "Chat settings: free mode is not a chat's choice",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiçbir şey sormayan serbest mod, Mac'te Dot'un tamamı için açılıp kapanır."
           }
         }
       }
@@ -3584,6 +3939,17 @@
         }
       }
     },
+    "Headsets and USB microphones not listed here": {
+      "comment": "Settings › Voice: what Other wired covers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada adı geçmeyen kulaklıklar ve USB mikrofonlar"
+          }
+        }
+      }
+    },
     "Health": {
       "comment": "System: whether the daemon is well",
       "localizations": {
@@ -3668,6 +4034,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcılar, %lld / %lld bitti"
+          }
+        }
+      }
+    },
+    "Hide %@": {
+      "comment": "VoiceOver: hides a model from the list; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini gizle"
           }
         }
       }
@@ -3800,6 +4177,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Talimatlar"
+          }
+        }
+      }
+    },
+    "Interrupt what the agent is doing": {
+      "comment": "Composer long-press menu: what Steer now does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanın yaptığı işin arasına gir"
           }
         }
       }
@@ -3992,7 +4380,7 @@
       }
     },
     "Language": {
-      "comment": "General section: the app's language",
+      "comment": "General section: the app's language\nSettings › Voice section: the dictation language",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4108,6 +4496,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Zamanlamaları listele"
+          }
+        }
+      }
+    },
+    "Listening…": {
+      "comment": "Composer recorder: nothing heard yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dinleniyor…"
           }
         }
       }
@@ -4252,6 +4651,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekip oluştur"
+          }
+        }
+      }
+    },
+    "Manage hidden models": {
+      "comment": "Chat settings row: shows every model with a switch to hide it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gizli modelleri yönet"
           }
         }
       }
@@ -4422,7 +4832,7 @@
       }
     },
     "Model, %@": {
-      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
+      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort\nVoiceOver: the new chat's model button; the argument is the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4543,7 +4953,7 @@
       }
     },
     "Needs you": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Chat list section: chats that wait for the owner\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4719,7 +5129,7 @@
       }
     },
     "No chats yet": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Chat list empty state title\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4747,6 +5157,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcı yok"
+          }
+        }
+      }
+    },
+    "No model matches.": {
+      "comment": "Chat settings: the search or filter left no model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşleşen model yok."
           }
         }
       }
@@ -4872,8 +5293,19 @@
         }
       }
     },
+    "Not paired": {
+      "comment": "Settings › Voice: no Mac is paired",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eşleşmedi"
+          }
+        }
+      }
+    },
     "Not paired with a Mac": {
-      "comment": "Emergency stop: no Mac to stop",
+      "comment": "A call that needs the Mac when this phone is not paired",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5148,7 +5580,7 @@
       }
     },
     "Off": {
-      "comment": "Reasoning level\nThis Mac: Tailscale is off\nVoiceOver value of a switch that is off",
+      "comment": "Reasoning level: none\nThis Mac: Tailscale is off\nVoiceOver value of a switch that is off",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5214,7 +5646,7 @@
       }
     },
     "On": {
-      "comment": "Reasoning level\nVoiceOver value of a switch that is on",
+      "comment": "Reasoning level: on, no levels\nVoiceOver value of a switch that is on",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5302,7 +5734,7 @@
       }
     },
     "Open": {
-      "comment": "VoiceOver: an open group",
+      "comment": "VoiceOver: an open provider group",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5356,6 +5788,17 @@
         }
       }
     },
+    "Opens the chat's settings": {
+      "comment": "VoiceOver hint of the composer's model chip",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetin ayarlarını açar"
+          }
+        }
+      }
+    },
     "Opens the edit": {
       "comment": "VoiceOver: a schedule's name opens its edit sheet",
       "localizations": {
@@ -5401,7 +5844,7 @@
       }
     },
     "Options": {
-      "comment": "Model picker: the options under the models",
+      "comment": "Chat settings section: reasoning, fast mode, approvals, plan first\nModel picker: the options under the models",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5418,6 +5861,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ya da kendi yanıtını yaz"
+          }
+        }
+      }
+    },
+    "Other Bluetooth": {
+      "comment": "Settings › Voice: Bluetooth microphones not named in the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer Bluetooth"
+          }
+        }
+      }
+    },
+    "Other wired": {
+      "comment": "Settings › Voice: wired microphones not named in the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer kablolu"
           }
         }
       }
@@ -5644,7 +6109,7 @@
       }
     },
     "Pinned": {
-      "comment": "Memory: a pinned note",
+      "comment": "Chat list section: the chats the owner pinned, on top\nMemory: a pinned note",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5672,6 +6137,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan %lld/%lld"
+          }
+        }
+      }
+    },
+    "Plan first": {
+      "comment": "Chat settings row: the next message writes its plan and asks before it changes anything",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önce plan"
           }
         }
       }
@@ -5716,6 +6192,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamerayı Mac'indeki Dot › Ayarlar › Telefon'daki koda tut."
+          }
+        }
+      }
+    },
+    "Preferred order": {
+      "comment": "Settings › Voice section: the order the microphones are taken in",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tercih sırası"
           }
         }
       }
@@ -6090,6 +6577,17 @@
         }
       }
     },
+    "Reading the models…": {
+      "comment": "Chat settings: the daemon's models are being read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modeller okunuyor…"
+          }
+        }
+      }
+    },
     "Reading width": {
       "comment": "Appearance section: how wide prose runs on iPad",
       "localizations": {
@@ -6135,12 +6633,34 @@
       }
     },
     "Reasoning": {
-      "comment": "Model picker: the level of reasoning",
+      "comment": "Chat settings row: the model's reasoning level\nModel picker: the level of reasoning",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Düşünme"
+          }
+        }
+      }
+    },
+    "Recent": {
+      "comment": "Chat list section: the other chats, newest first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son"
+          }
+        }
+      }
+    },
+    "Recently used": {
+      "comment": "Model picker section: the chosen model and the ones picked last",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son kullanılanlar"
           }
         }
       }
@@ -6152,6 +6672,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeniden bağlanıyor…"
+          }
+        }
+      }
+    },
+    "Recording stopped when Dot left the screen; what was heard is in the box.": {
+      "comment": "Composer: voice stopped as the app went to the background",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot ekrandan çıkınca kayıt durdu; duyulanlar kutuda."
+          }
+        }
+      }
+    },
+    "Recording stopped: something else took the microphone (a call, Siri). What was heard is in the box.": {
+      "comment": "Composer: an interruption ended voice typing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıt durdu: mikrofonu başka bir şey aldı (bir arama, Siri). Duyulanlar kutuda."
+          }
+        }
+      }
+    },
+    "Recording, %lld seconds": {
+      "comment": "VoiceOver: the recorder's clock; the argument is the seconds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıt, %lld saniye"
           }
         }
       }
@@ -6174,6 +6727,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaldır"
+          }
+        }
+      }
+    },
+    "Remove %@ from favourites": {
+      "comment": "VoiceOver: unstars a model; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini favorilerden çıkar"
           }
         }
       }
@@ -6361,6 +6925,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışma"
+          }
+        }
+      }
+    },
+    "Run after the current turn": {
+      "comment": "Composer long-press menu: what Queue does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu tur bitince çalışır"
           }
         }
       }
@@ -6607,6 +7182,17 @@
         }
       }
     },
+    "Search chats": {
+      "comment": "Placeholder of the chat list's search field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetlerde ara"
+          }
+        }
+      }
+    },
     "Search notes": {
       "comment": "Tool row of Dot's own tool: the notes searched",
       "localizations": {
@@ -6713,6 +7299,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "İkincil yazı"
+          }
+        }
+      }
+    },
+    "Select": {
+      "comment": "Chat list toolbar: checks chats to act on several",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seç"
+          }
+        }
+      }
+    },
+    "Select all": {
+      "comment": "Chat list select mode: checks every chat shown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tümünü seç"
           }
         }
       }
@@ -7036,6 +7644,17 @@
         }
       }
     },
+    "Show %@": {
+      "comment": "VoiceOver: shows a hidden model again; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ modelini göster"
+          }
+        }
+      }
+    },
     "Show all": {
       "comment": "Tool calls setting: every tool call shows",
       "localizations": {
@@ -7234,6 +7853,17 @@
         }
       }
     },
+    "Some chats were not deleted: %@": {
+      "comment": "Toast: the Mac refused to delete chats; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bazı sohbetler silinmedi: %@"
+          }
+        }
+      }
+    },
     "Speech recognition is off for Dot. Turn it on in Settings › Dot Next › Speech Recognition.": {
       "comment": "Composer: dictation cannot start, speech permission denied",
       "localizations": {
@@ -7274,6 +7904,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'te yeniden başlat"
+          }
+        }
+      }
+    },
+    "Start one with the pencil above.": {
+      "comment": "Chat list empty state detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yukarıdaki kalemle bir tane başlat."
           }
         }
       }
@@ -7366,8 +8007,19 @@
         }
       }
     },
+    "Steer now": {
+      "comment": "Composer long-press menu: sends the draft into the run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi yönlendir"
+          }
+        }
+      }
+    },
     "Stop": {
-      "comment": "Chat toolbar: stops the run at work",
+      "comment": "Chat toolbar: stops the run at work\nComposer and ask dock: stops the run at work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7388,39 +8040,6 @@
         }
       }
     },
-    "Stop dictating": {
-      "comment": "VoiceOver: the microphone while it listens",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dikteyi durdur"
-          }
-        }
-      }
-    },
-    "Stop everything": {
-      "comment": "Confirmation button of the emergency stop",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Her şeyi durdur"
-          }
-        }
-      }
-    },
-    "Stop everything Dot is doing?": {
-      "comment": "Confirmation of the emergency stop",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'un yaptığı her şey durdurulsun mu?"
-          }
-        }
-      }
-    },
     "Stop the run at work": {
       "comment": "Composer command: what /stop does",
       "localizations": {
@@ -7428,17 +8047,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan işi durdur"
-          }
-        }
-      }
-    },
-    "Stop this run?": {
-      "comment": "Confirmation of Stop from the chat header",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bu çalışma durdurulsun mu?"
           }
         }
       }
@@ -7521,7 +8129,7 @@
       }
     },
     "Supervised": {
-      "comment": "Approval mode: everything asks",
+      "comment": "Approval mode: everything asks\nApproval mode: the owner approves every change",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7671,6 +8279,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu iPhone'daki Tailscale"
+          }
+        }
+      }
+    },
+    "Tap the eye of a model to hide it from this list or show it again.": {
+      "comment": "Chat settings: how hiding a model works",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir modeli bu listeden gizlemek ya da yeniden göstermek için gözüne dokun."
           }
         }
       }
@@ -7906,6 +8525,17 @@
         }
       }
     },
+    "The Mac writes down five minutes at most; what was said is in the box.": {
+      "comment": "Composer: the Mac's recording limit was reached",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac en fazla beş dakikayı yazıya döker; söylenenler kutuda."
+          }
+        }
+      }
+    },
     "The Mac's address": {
       "comment": "VoiceOver: the pairing screen's address field",
       "localizations": {
@@ -7983,6 +8613,17 @@
         }
       }
     },
+    "The car's microphone": {
+      "comment": "Settings › Voice: what CarPlay's microphone is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arabanın mikrofonu"
+          }
+        }
+      }
+    },
     "The code is 8 letters and digits.": {
       "comment": "Pairing error: the code has the wrong length",
       "localizations": {
@@ -8001,17 +8642,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disk dolu."
-          }
-        }
-      }
-    },
-    "The emergency stop always asks first.": {
-      "comment": "General: footer under the confirmations",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Acil durdurma her zaman önce sorar."
           }
         }
       }
@@ -8056,6 +8686,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot için mikrofon kapalı. Ayarlar › Dot Next › Mikrofon'dan aç."
+          }
+        }
+      }
+    },
+    "The microphone on this device": {
+      "comment": "Settings › Voice: what the built-in microphone is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu cihazdaki mikrofon"
+          }
+        }
+      }
+    },
+    "The microphone went away; what was heard is in the box.": {
+      "comment": "Composer: the microphone was disconnected while recording",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mikrofon gitti; duyulanlar kutuda."
+          }
+        }
+      }
+    },
+    "The models could not be read: %@": {
+      "comment": "Model picker: the daemon's models could not be read; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modeller okunamadı: %@"
+          }
+        }
+      }
+    },
+    "The next message writes its plan and asks before it changes anything.": {
+      "comment": "Chat settings: what plan first does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki mesaj önce planını yazar ve bir şeyi değiştirmeden önce sorar."
           }
         }
       }
@@ -8302,6 +8976,17 @@
         }
       }
     },
+    "This device": {
+      "comment": "Settings › Voice: transcribe on this phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu cihaz"
+          }
+        }
+      }
+    },
     "This iPhone's network": {
       "comment": "Diagnosis hop: the phone's own Wi-Fi or cellular link",
       "localizations": {
@@ -8309,6 +8994,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu iPhone'un ağı"
+          }
+        }
+      }
+    },
+    "This model has no fast mode.": {
+      "comment": "Chat settings: fast mode is off for a model without it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu modelin hızlı modu yok."
           }
         }
       }
@@ -8463,6 +9159,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Araç çubuğu ve yazma alanı · orta"
+          }
+        }
+      }
+    },
+    "Transcribe on": {
+      "comment": "Settings › Voice section: where a recording is written down",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıya dökme yeri"
           }
         }
       }
@@ -8809,12 +9516,23 @@
       }
     },
     "Voice": {
-      "comment": "General section: dictation",
+      "comment": "General section: dictation\nSettings row: voice typing",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Ses"
+          }
+        }
+      }
+    },
+    "Voice input uses the first connected microphone in this list; hold and drag to reorder. A wired or Bluetooth microphone is added by name the first time you dictate with it connected; until then it falls under Other. Swipe left on a named microphone to forget it.": {
+      "comment": "Settings › Voice: how the preferred order works",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesli giriş bu listedeki ilk bağlı mikrofonu kullanır; sırayı değiştirmek için basılı tutup sürükle. Kablolu ya da Bluetooth bir mikrofon, bağlıyken ilk kez dikte ettiğinde adıyla eklenir; o zamana dek Diğer altında sayılır. Adı olan bir mikrofonu unutmak için sola kaydır."
           }
         }
       }
@@ -9123,17 +9841,6 @@
         }
       }
     },
-    "What should Dot work on?": {
-      "comment": "New chat sheet: the prompt above the composer",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot ne üzerinde çalışsın?"
-          }
-        }
-      }
-    },
     "What should it do?": {
       "comment": "New bot: the field of the bot's job",
       "localizations": {
@@ -9185,6 +9892,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geniş"
+          }
+        }
+      }
+    },
+    "Wired": {
+      "comment": "Settings › Voice: a named wired microphone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kablolu"
           }
         }
       }
@@ -9267,7 +9985,7 @@
       }
     },
     "Working": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
+      "comment": "Chat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9343,6 +10061,17 @@
         }
       }
     },
+    "Writing it down…": {
+      "comment": "VoiceOver: the recorder while the words are written down",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıya dökülüyor…"
+          }
+        }
+      }
+    },
     "Wrong: reaches a working run at its next step": {
       "comment": "Reaction menu: what 👎 does",
       "localizations": {
@@ -9398,6 +10127,17 @@
         }
       }
     },
+    "You approve every change: files, commands, clicks, messages": {
+      "comment": "Approval mode supervised, its hint",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her değişikliği sen onaylarsın: dosyalar, komutlar, tıklamalar, mesajlar"
+          }
+        }
+      }
+    },
     "You approve every change: files, commands, clicks, messages.": {
       "comment": "Rules: what asks in supervised mode",
       "localizations": {
@@ -9421,7 +10161,7 @@
       }
     },
     "Your Mac": {
-      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac",
+      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9460,6 +10200,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'ine ulaşılamadı. Açık ve tailnet'inde olduğunu kontrol et."
+          }
+        }
+      }
+    },
+    "Your Mac could not write it down: %@": {
+      "comment": "Composer: the Mac's dictation failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in yazıya dökemedi: %@"
           }
         }
       }
@@ -10109,6 +10860,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "uv run pytest tests/unit/test_parser.py -q"
+          }
+        }
+      }
+    },
+    "voice dictation microphone transcribe speech": {
+      "comment": "Settings search synonyms of Voice (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ses dikte mikrofon yazıya dökme konuşma"
           }
         }
       }

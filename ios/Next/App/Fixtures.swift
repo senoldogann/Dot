@@ -30,6 +30,8 @@
         case agents = "n2-agents"
         /// The run inspector.
         case inspector = "n2-inspector"
+        /// The chat's settings sheet: models, options, catalog (PLAN §24).
+        case model = "n2-model"
 
         static let thread: String = "thr_fixture"
         static let helperThread: String = "thr_h1"
@@ -39,6 +41,7 @@
             case .queue: .queue
             case .agents: .agents
             case .inspector: .inspector
+            case .model: .model
             default: nil
             }
         }

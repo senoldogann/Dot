@@ -9,7 +9,6 @@ struct SettingsSheet: View {
     @State private var path: [SettingsPage]
     @State private var query: String
     @State private var failsafe: Loadable<FailsafeState> = .loading
-    @State private var stopAsked: Bool = false
     @State private var stopProblem: SettingsFailure?
     @State private var releasing: Bool = false
     @State private var owner: String = ""
@@ -93,6 +92,7 @@ struct SettingsSheet: View {
                 PageRow(page: .notifications, systemImage: "bell", title: String(localized: "Notifications", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .appearance, systemImage: "paintbrush", title: String(localized: "Appearance", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .chat, systemImage: "bubble.left.and.bubble.right", title: String(localized: "Chat", comment: "Settings row: chat preferences"), description: nil, detail: nil)
+                PageRow(page: .voice, systemImage: "waveform", title: String(localized: "Voice", comment: "Settings row: voice typing"), description: nil, detail: nil)
                 PageRow(page: .general, systemImage: "gearshape", title: String(localized: "General", comment: "Settings row"), description: nil, detail: nil)
             }
             GroupedSection(header: String(localized: "System", comment: "Settings section: health, version"), footer: nil) {
@@ -113,8 +113,8 @@ struct SettingsSheet: View {
         }
     }
 
-    /// The emergency stop, at the end of the sheet until §25's removal lands (PLAN §27), and while it holds, what holds
-    /// and how to release it.
+    /// While the Mac's emergency stop holds, what holds and how to release it. The phone does not engage it (owner's
+    /// decision 2026-11-25): the Mac's own failsafe does.
     @ViewBuilder private var stopBlock: some View {
         if failsafe.value?.engaged == true {
             VStack(alignment: .leading, spacing: Space.s) {
@@ -132,24 +132,6 @@ struct SettingsSheet: View {
                 .buttonStyle(SecondaryButtonStyle())
                 .disabled(releasing)
             }
-        } else {
-            Button(String(localized: "Emergency stop", comment: "Settings: stops every run of Dot at once"), systemImage: "stop.circle", role: .destructive) { stopAsked = true }
-                .buttonStyle(DestructiveButtonStyle())
-                .frame(maxWidth: .infinity)
-                .confirmationDialog(String(localized: "Stop everything Dot is doing?", comment: "Confirmation of the emergency stop"), isPresented: $stopAsked, titleVisibility: .visible) {
-                    Button(String(localized: "Stop everything", comment: "Confirmation button of the emergency stop"), role: .destructive) {
-                        Task {
-                            switch await model.write({ api throws(DaemonRequestError) in try await api.emergencyStop() }) {
-                            case .success(let state):
-                                failsafe = .loaded(state)
-                                stopProblem = nil
-                            case .failure(let box): stopProblem = box.failure
-                            }
-                        }
-                    }
-                } message: {
-                    Text(String(localized: "Every run stops, desktop control is blocked and schedules wait until you release the stop.", comment: "Emergency stop confirmation: what it does"))
-                }
         }
         if let stopProblem {
             FailureBanner(failure: stopProblem, macPlace: String(localized: "Settings › System", comment: "Where on the Mac: the System page"), retry: nil)
@@ -202,6 +184,7 @@ struct SettingsDestination: View {
         case .general: GeneralPage()
         case .appearance: AppearancePage()
         case .chat: ChatSettingsPage()
+        case .voice: VoicePage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
         case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
@@ -274,6 +257,9 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
         entry(
             "chat", String(localized: "Chat", comment: "Settings row: chat preferences"), "", "haptics vibration reactions follow ups",
             String(localized: "haptics vibration reactions", comment: "Settings search synonyms of Chat (space separated)"), .chat),
+        entry(
+            "voice", String(localized: "Voice", comment: "Settings row: voice typing"), "", "voice dictation microphone transcribe speech bluetooth airpods carplay",
+            String(localized: "voice dictation microphone transcribe speech", comment: "Settings search synonyms of Voice (space separated)"), .voice),
         entry(
             "models", String(localized: "Models", comment: "Settings row"), "", "model llm main review vision fast code review fallback provider",
             String(localized: "model main review vision code review", comment: "Settings search synonyms of Models (space separated)"), .models),

@@ -26,7 +26,7 @@ final class RealDaemonWalkUITests: XCTestCase {
 
     func testEverySettingsPageReadsTheRealMac() throws {
         let app: XCUIApplication = try launch(scene: "settings")
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 20), "the emergency stop at the top (never pressed here)")
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 20), "the settings sheet")
         open(app, "Dot's computer")
         XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 30))
         app.navigationBars.buttons.element(boundBy: 0).tap()

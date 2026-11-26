@@ -12,7 +12,7 @@ final class SettingsControlsUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-DotNextScene", "settings-home", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
     }
 
     /// The labels of the buttons and switches of the page's scroll view that stand on screen, top to bottom, the page
@@ -83,7 +83,7 @@ final class SettingsControlsUITests: XCTestCase {
 
     func testEveryRowOfSettingsOpensItsPage() {
         // Connect apps opens a sheet of its own over the settings (checked below), not a page of the stack.
-        let rows: [String] = controls(skipping: ["Emergency stop", "Connect apps, Search plugins"])
+        let rows: [String] = controls(skipping: ["Connect apps, Search plugins"])
         XCTAssertGreaterThan(rows.count, 14, "the rows of Settings: \(rows)")
         for row in rows {
             let target: XCUIElement = element(row)
@@ -93,7 +93,6 @@ final class SettingsControlsUITests: XCTestCase {
             restore(to: "Settings")
             XCTAssertEqual(title, "Settings", "back from \(row)")
         }
-        XCTAssertTrue(tapChanges("Emergency stop", on: "Settings"), "Emergency stop asks first")
         element("Connect apps, Search plugins").tap()
         XCTAssertTrue(app.navigationBars["Connect apps"].waitForExistence(timeout: 5), "Connect apps opens its sheet")
         app.navigationBars["Connect apps"].buttons["Close"].tap()

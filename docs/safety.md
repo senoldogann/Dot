@@ -134,7 +134,9 @@ run needs, sent where the configuration points:
   send.
 - **To your own Mac, from the page, if you use the microphone where the Mac can write down: your voice as you speak,
   which stays on your devices.** On every device whose Mac can write down (a Mac's browser, the desktop app, an iPhone,
-  an iPad, a browser with no speech recognition; items 626, 969), the page records the microphone itself
+  an iPad, a browser with no speech recognition; items 626, 969), and in the iPhone app Dot Next when its Settings ›
+  Voice says to write down on the Mac (item 1802; else Dot Next writes down on the iPhone and the sound leaves nothing),
+  the page (or the app) records the microphone itself
   (`getUserMedia`) and streams the sound to the daemon on this Mac while you speak, in pieces, at the address the page
   reaches Dot at (this Mac's own, or over your tailnet, as the rest of the page), behind the access token like every
   request. The Mac writes it down as it comes with macOS 26's own dictation, on the device, with a small program the
