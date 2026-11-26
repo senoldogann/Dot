@@ -284,6 +284,7 @@ struct ChatListView: View {
             section(String(localized: "Needs you", comment: "Chat list section: chats that wait for the owner"), grouped.needsYou)
             section(String(localized: "Working", comment: "Chat list section: chats with a run at work"), grouped.working)
             section(String(localized: "Recent", comment: "Chat list section: the other chats, newest first"), grouped.recent)
+            section(String(localized: "Dot's own work", comment: "Chat list section: the chats of Dot's schedules, initiative and code reviews"), grouped.dotsWork)
         }
         .listStyle(.plain)
         .focusEffectDisabled()
@@ -457,15 +458,22 @@ struct ChatListSections: Equatable {
     let needsYou: [ThreadRow]
     let working: [ThreadRow]
     let recent: [ThreadRow]
+    /// The chats of Dot's own work (its schedules', its initiative's, what it sends the agents, the code reviews), last
+    /// and apart from the owner's conversations, as the web folds them (item 1923); one that waits on the owner stands
+    /// under Needs you.
+    let dotsWork: [ThreadRow]
 }
 
 func chatListSections(_ rows: [ThreadRow]) -> ChatListSections {
     let pinned: [ThreadRow] = rows.filter { $0.summary.pinnedAt != nil }
     let rest: [ThreadRow] = rows.filter { $0.summary.pinnedAt == nil }
+    let needsYou: [ThreadRow] = rest.filter { chatStatus(of: $0) == .waitingOnYou }
+    let talk: [ThreadRow] = rest.filter { isConversation($0.summary) && chatStatus(of: $0) != .waitingOnYou }
     return ChatListSections(
-        pinned: pinned, needsYou: rest.filter { chatStatus(of: $0) == .waitingOnYou },
-        working: rest.filter { [.working, .starting].contains(chatStatus(of: $0)) },
-        recent: rest.filter { ![.waitingOnYou, .working, .starting].contains(chatStatus(of: $0)) })
+        pinned: pinned, needsYou: needsYou,
+        working: talk.filter { [.working, .starting].contains(chatStatus(of: $0)) },
+        recent: talk.filter { ![.working, .starting].contains(chatStatus(of: $0)) },
+        dotsWork: rest.filter { !isConversation($0.summary) && chatStatus(of: $0) != .waitingOnYou })
 }
 
 /// What a chat row shows.

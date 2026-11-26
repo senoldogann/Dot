@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1923](1923.md) | done | 2026-11-26 | DotNext's open chat never changes by itself when a newer chat of the bot comes |
 | [1919](1919.md) | done | 2026-11-26 | DotNext's chat moves the moment a message is sent, not 10-15 s later when the run's first event comes |
 | [1917](1917.md) | done | 2026-11-26 | A pull request that changes ios/ builds the iPhone app once, on macOS |
 | [1914](1914.md) | done | 2026-11-26 | DotNext keeps a new chat's half-written words per bot |
