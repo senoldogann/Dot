@@ -20,6 +20,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1960](1960.md) | done | 2026-11-26 | Fewer turns on the desktop path: a batch's result is the look, and Safari's pages go to the Safari tools |
 | [1959](1959.md) | done | 2026-11-26 | The owner's own Safari, driven like Dot's Chrome: a page's elements with refs, batches of steps, the same policy |
 | [1958](1958.md) | done | 2026-11-26 | A login refused on another host says the one step the owner takes for it to fill there |
+| [1957](1957.md) | done | 2026-11-26 | DotNext shows a run's helpers as one group row, a tap away from a card of each |
 | [1956](1956.md) | done | 2026-11-26 | `search_files` and `find_files` read ripgrep's output up to a cap, as it comes |
 | [1954](1954.md) | done | 2026-11-26 | The pre-push review leaves the Claude plan when it is spent or the diff is a security one, reads only what is new, and gives DeepSeek a budget |
 | [1953](1953.md) | done | 2026-11-26 | A helper ends at its open pull request, and the checks are watched in the background |

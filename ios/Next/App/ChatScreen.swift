@@ -391,11 +391,11 @@ struct ChatScreen: View {
         case .tool(let entry):
             WorkToolRow(entry: entry)
         case .helpers(_, _, let list):
-            // Each helper its own row, where the run started it (item 1909, after another coding agent's work log); the
-            // capsule's people segment keeps them all a tap away too.
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(list, id: \.runId) { helper in HelperStreamRow(helper: helper, open: { openedHelper = helper.threadId }) }
-            }
+            // The run's helpers as one row where it started them, a tap away from a card of each (item 1957); the
+            // capsule's people segment keeps them a tap away too.
+            HelperGroupRow(
+                lines: list.map { HelperEntry(helper: $0, engine: engineLine($0, models: model.models)) },
+                open: { openedHelper = $0 })
         case .plan:
             // The plan is the chip beside the capsule (item 1880), never a card in the stream.
             EmptyView()

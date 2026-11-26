@@ -139,4 +139,21 @@ final class StreamingLiveUITests: XCTestCase {
         app.navigationBars.buttons.element(boundBy: 0).tap()
         sleep(1)
     }
+
+    /// Item 1957, on the real engine: a run that starts a helper (`delegate`) shows it as one group row, folded, whose
+    /// tap opens a card with the helper's row.
+    func testAHelperIsOneGroupRowWithACard() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "helper: group")
+        let group: XCUIElement = app.buttons["helpers.group"]
+        XCTAssertTrue(group.waitForExistence(timeout: 60), "the helpers group in the stream")
+        XCTAssertTrue(group.label.hasPrefix("1 helper, "), group.label)
+        XCTAssertEqual(group.value as? String, "Collapsed")
+        shot(app, "helpers-live-collapsed")
+        group.tap()
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH[c] %@", "helper.row", "wait for the test")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "the card lists the helper")
+        XCTAssertEqual(group.value as? String, "Expanded")
+        shot(app, "helpers-live-expanded")
+    }
 }

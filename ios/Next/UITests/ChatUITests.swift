@@ -245,7 +245,7 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
         // The sheet's row (it names the helper's model), not the helper's row in the work log under the sheet (item
         // 1909), which no tap reaches.
-        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "Check the dentist", "Opus")).firstMatch
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS[c] %@", "Check the dentist", "Opus")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(row.label.contains("Working"), row.label)
         XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
@@ -316,9 +316,13 @@ final class ChatUITests: XCTestCase {
         // closed first, so the taps reach the chat.
         let app: XCUIApplication = launch("n2-queue")
         if app.navigationBars["Queued"].waitForExistence(timeout: 5) { app.buttons["Close"].firstMatch.tap() }
+        // The helpers are one row (item 1957): its card lists each.
+        let helpers: XCUIElement = app.buttons["helpers.group"]
+        XCTAssertTrue(helpers.waitForExistence(timeout: 10), "the helpers are one row")
+        helpers.tap()
         let helper: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "helper.row", "Check the dentist")).firstMatch
-        XCTAssertTrue(helper.waitForExistence(timeout: 10), "a helper is its own row")
-        XCTAssertGreaterThanOrEqual(helper.frame.height, 44)
+        XCTAssertTrue(helper.waitForExistence(timeout: 5), "each helper a row of the card")
+        XCTAssertGreaterThanOrEqual(helper.frame.height.rounded(), 44)
         // The line stands at the end of the stream: scroll to it (the stream draws only what is near the screen).
         let waiting: XCUIElement = app.staticTexts["waiting.line"]
         for _ in 0..<4 where !waiting.exists { app.swipeUp() }
@@ -339,6 +343,60 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(group.label, "Read 2 files and ran 2 commands")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         shot.name = "work-log"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1957: the run's helpers are one row, "2 helpers" over "1 working · 1 done", with their time and a chevron; a
+    /// tap opens a card with a row per helper (its state and its engine in words), whose tap opens the helper's chat.
+    func testTheHelpersAreOneRowThatOpensACardOfEach() {
+        let app: XCUIApplication = launch("n2-chat")
+        let group: XCUIElement = app.buttons["helpers.group"]
+        for _ in 0..<4 where !group.exists { app.swipeUp() }
+        XCTAssertTrue(group.waitForExistence(timeout: 10))
+        XCTAssertEqual(group.label, "2 helpers, 1 working, 1 done")
+        XCTAssertEqual(group.value as? String, "Collapsed")
+        XCTAssertGreaterThanOrEqual(group.frame.height.rounded(), 44)
+        XCTAssertFalse(app.buttons["helper.row"].exists, "no row per helper while folded")
+        let folded: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        folded.name = "helpers-collapsed"
+        folded.lifetime = .keepAlways
+        add(folded)
+        group.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "helper.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertEqual(rows.count, 2)
+        let working: XCUIElement = rows.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        XCTAssertTrue(working.label.contains("Working"), working.label)
+        XCTAssertTrue(working.label.contains("Claude Code"), "the engine in words: \(working.label)")
+        let open: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        open.name = "helpers-expanded"
+        open.lifetime = .keepAlways
+        add(open)
+        working.tap()
+        XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5), "the helper's chat")
+    }
+
+    /// Item 1957: the open group at AX3 in Turkish and dark: the words wrap, nothing is cut but a title, every row keeps
+    /// its 44 pt.
+    func testTheHelpersGroupHoldsAtAX3InTurkishAndDark() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "n2-chat", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-AppleInterfaceStyle", "Dark",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
+        ]
+        app.launch()
+        let group: XCUIElement = app.buttons["helpers.group"]
+        for _ in 0..<8 where !group.isHittable { app.swipeUp() }
+        XCTAssertTrue(group.waitForExistence(timeout: 10))
+        XCTAssertTrue(group.label.hasPrefix("2 yardımcı"), group.label)
+        group.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "helper.row")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 3))
+        for index in 0..<rows.count { XCTAssertGreaterThanOrEqual(rows.element(boundBy: index).frame.height.rounded(), 44) }
+        app.swipeUp()
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "helpers-ax3-tr-dark"
         shot.lifetime = .keepAlways
         add(shot)
     }

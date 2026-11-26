@@ -375,7 +375,7 @@
       }
     },
     "%lld done": {
-      "comment": "Away card: tasks that ended done",
+      "comment": "Away card: tasks that ended done\nHelpers group: how many helpers finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -415,7 +415,7 @@
       }
     },
     "%lld failed": {
-      "comment": "Away card: tasks that failed",
+      "comment": "Away card: tasks that failed\nHelpers group: how many helpers failed",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -437,7 +437,7 @@
       }
     },
     "%lld helpers": {
-      "comment": "Helper group header, first part; the argument is how many helpers the run started",
+      "comment": "Helper group header, first part; the argument is how many helpers the run started\nHelpers group: how many helpers the run started",
       "localizations": {
         "en": {
           "variations": {
@@ -692,12 +692,23 @@
       }
     },
     "%lld stopped": {
-      "comment": "Away card: tasks that were stopped",
+      "comment": "Away card: tasks that were stopped\nHelpers group: how many helpers the owner stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld durduruldu"
+          }
+        }
+      }
+    },
+    "%lld stopping": {
+      "comment": "Helpers group: how many helpers are being stopped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld durduruluyor"
           }
         }
       }
@@ -782,6 +793,17 @@
         }
       }
     },
+    "%lld waiting on you": {
+      "comment": "Helpers group: how many helpers wait for the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld seni bekliyor"
+          }
+        }
+      }
+    },
     "%lld without asking": {
       "comment": "Away card: decisions the mode that asks only to pay or send let through",
       "localizations": {
@@ -794,7 +816,7 @@
       }
     },
     "%lld working": {
-      "comment": "Away card: tasks still at work\nHelper group header, second part; the argument is how many still work",
+      "comment": "Away card: tasks still at work\nHelper group header, second part; the argument is how many still work\nHelpers group: how many helpers work now",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2704,7 +2726,7 @@
       }
     },
     "Collapsed": {
-      "comment": "VoiceOver value of a closed disclosure",
+      "comment": "VoiceOver value of a closed disclosure\nVoiceOver value of a closed group",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4946,7 +4968,7 @@
       }
     },
     "Expanded": {
-      "comment": "VoiceOver value of an open disclosure",
+      "comment": "VoiceOver value of an open disclosure\nVoiceOver value of an open group",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5839,6 +5861,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Canlı görüntüyü gizle"
+          }
+        }
+      }
+    },
+    "Hides the helpers": {
+      "comment": "VoiceOver hint of the open helpers group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcıları gizler"
           }
         }
       }
@@ -11245,6 +11278,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tamamını gösterir"
+          }
+        }
+      }
+    },
+    "Shows each helper": {
+      "comment": "VoiceOver hint of the closed helpers group",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her yardımcıyı gösterir"
           }
         }
       }

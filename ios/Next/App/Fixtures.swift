@@ -138,8 +138,8 @@
                  "queue":{"held":false,"messages":\(queue),"beside_run_id":"run_b","beside_thread_id":null},
                  "asks":\(asks),
                  "helpers":[
-                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"Claude","model":"Opus 5.5","effort":"Medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
-                   {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"Claude","model":"Sonnet 5.5","effort":"Low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
+                   {"run_id":"run_h1","parent_run_id":"run_b","thread_id":"thr_h1","agent_id":null,"title":"Check the dentist's free slots on their booking page","status":"running","started_at":\(now - 2475),"finished_at":null,"provider":"claude_code","model":"opus","effort":"medium","step":{"tool":"browser_open","target":"https://dentist.example/booking","line":"","at":\(now - 20)},"blocking":false,"stop":"/api/runs/run_h1/cancel"},
+                   {"run_id":"run_h2","parent_run_id":"run_b","thread_id":"thr_h2","agent_id":null,"title":"Read the calendar for next week","status":"done","started_at":\(now - 2400),"finished_at":\(now - 2380),"provider":"claude_code","model":"sonnet","effort":"low","step":null,"blocking":false,"stop":"/api/runs/run_h2/cancel"}
                  ],
                  "background":[],
                  "reactions":[{"run_id":"run_a","message":"answer","reaction":"good"}],
