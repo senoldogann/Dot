@@ -29,6 +29,19 @@ helpers done/total), whose plan and people segments open the plan's checklist an
 no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
+Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
+it) selects several chats (Select in the bar or on a row's menu) and pins or deletes them together, with a Pinned
+section on top. The composer's model chip, and a new chat before its first message, open the chat's settings
+(`App/ChatSettingsSheet.swift`, rules in `ChatSettingsRules.swift`) on the app's one model catalog
+(`Components/ModelCatalog.swift`): the recent models, the providers as folding groups with their marks, Default, ✓ and ☆
+favourites, a search with a filter, the reasoning level on the model's own levels, fast mode, the approval mode, plan
+first and hidden models; the picks go to the chat's choices or with a new chat's first message (`POST /api/runs`). The
+microphone turns the composer into a recorder (`Components/VoiceRecorder.swift`, `Data/VoiceInput.swift`): ✕, a live
+waveform, a clock, ✓; written down on the phone (Speech, on the device, a long dictation going on across the recognizer's
+pauses) or on the Mac (`/api/voice/streams`), as Settings › Voice says (`Settings/VoicePage.swift`, with the preferred
+order of the microphones, `Data/VoiceRules.swift`). A call, Siri, the app leaving the screen or a microphone going away
+end a recording with what was heard.
+
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the
 daemon's proof that it holds this phone's key, `GET /api/proof`, checked here and not yet a gate of the engine's reads; the diagnosis hop by hop,
 iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
@@ -180,7 +193,7 @@ per run in `Library/Caches/dotnext-frames.txt`).
 
 Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtures.swift`, decoded from the contract's
 JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`, `n2-editing`, `n2-failed`,
-`n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`. The UI tests (`UITests/ChatUITests.swift`, target
+`n2-offline`, `n2-deleted`, `n2-agents`, `n2-inspector`, `n2-model` (the chat's settings). The UI tests (`UITests/ChatUITests.swift`, target
 `DotNextUITests`) run on them. The e2e daemon's script words for the chat: `approve:`, `question:`, `secret:`, `tools:`,
 `fail:`, `stream:`, besides `helper:`, `wait:` and `slow:` (the daemon's home asks in the supervised mode).
 
@@ -188,7 +201,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
-`settings-general`, `settings-appearance`, `settings-chat`, `settings-models`, `settings-caps`, `settings-caps-refused`,
+`settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
 `settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
@@ -196,6 +209,12 @@ Settings and every control of each native page and fails on one after which noth
 `scripts/e2e_settings.sh <simulator udid> <derived data> [daemon checkout]` starts a throwaway daemon with a seeded
 proposal, pairs a phone, makes a schedule, runs `SettingsLiveUITests` (every page that writes) and reads on the
 daemon's side what each tap wrote; `ConnectAppsLiveUITests` reads Connect apps (a chip, the search, a detail).
+
+`scripts/e2e_chats.sh <simulator udid> <derived data> [model ref]` starts a throwaway daemon on a free port, makes two
+"[test]" chats and runs `ChatListLiveUITests` (a UI test that fails fails it): two chats pinned and deleted together
+(the deletion read on the daemon), and a new chat on the model, level
+and approvals picked in its settings (a real model, `claude_code:haiku` by default: the owner's Claude plan through the
+`claude` CLI), whose run record it reads, and the recorder on the Mac's dictation.
 
 ## Screenshots
 

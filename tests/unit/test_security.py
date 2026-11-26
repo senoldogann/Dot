@@ -6,11 +6,15 @@ from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 from urllib.parse import parse_qs, urlsplit
 
-from dotagent.config import load_default_config
+import pytest
+
+from dotagent import scopes as dot_scopes
+from dotagent.config import ReconScope, load_default_config
 from dotagent.tools.context import ToolContext
 from dotagent.tools.security import SecurityArgs, _run, forms_on
 from dotagent.web.client import WebClient
@@ -109,11 +113,11 @@ def _running_site() -> Iterator[tuple[int, Counter[str]]]:
         thread.join(timeout=5)
 
 
-def _context(owned: tuple[str, ...] = ("127.0.0.1",)) -> ToolContext:
+def _context(owned: tuple[str, ...] = ("127.0.0.1",), scopes: tuple[ReconScope, ...] = ()) -> ToolContext:
     base = load_default_config()
     config = base.model_copy(
         update={
-            "recon": base.recon.model_copy(update={"owned_hosts": owned}),
+            "recon": base.recon.model_copy(update={"owned_hosts": owned, "scopes": scopes}),
             "web": base.web.model_copy(update={"allow_private_hosts": True}),
         }
     )
@@ -128,6 +132,18 @@ async def test_a_host_that_is_not_the_owners_is_refused() -> None:
     result = await _run(SecurityArgs(target="https://example.com/login"), _context(owned=()))
     assert result.is_error
     assert "[recon] owned_hosts" in result.text
+    assert "dotx scope add" in result.text
+
+
+async def test_a_host_in_a_scope_of_a_program_is_tested_and_the_program_is_named() -> None:
+    scope = ReconScope(program="HackerOne · Local", hosts=("127.0.0.1",), note="5 req/s")
+    with _running_site() as (port, _hits):
+        result = await _run(
+            SecurityArgs(target=f"http://127.0.0.1:{port}/login", depth="forms"),
+            _context(owned=(), scopes=(scope,)),
+        )
+    assert not result.is_error
+    assert "username" in result.text
 
 
 async def test_listing_forms_sends_no_payload() -> None:
@@ -190,3 +206,22 @@ def test_forms_keep_hidden_fields_and_the_selected_option() -> None:
 
 def test_a_form_on_another_scheme_is_not_kept() -> None:
     assert forms_on("https://example.com/", '<form action="mailto:hello@example.com"></form>') == ()
+
+
+def _broken_scopes(folder: Path, content: bytes) -> Path:
+    """A ``scopes.toml`` in ``folder`` holding ``content``, written before the async test reads it."""
+    path: Path = folder / "scopes.toml"
+    path.write_bytes(content)
+    return path
+
+
+async def test_a_broken_scopes_file_stops_the_scan_with_the_file_named(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken: Path = _broken_scopes(tmp_path, b"\xff\xfe not text")
+    monkeypatch.setattr(dot_scopes, "scopes_path", lambda: broken)
+    result = await _run(SecurityArgs(target="https://example.com/login"), _context(owned=()))
+    assert result.is_error
+    assert str(broken) in result.text
+    assert "cannot be read as UTF-8" in result.text
+    assert "No form of example.com is tested" in result.text

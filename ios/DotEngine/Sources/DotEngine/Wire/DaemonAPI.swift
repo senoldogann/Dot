@@ -182,14 +182,47 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
     public let attachments: [String]
     public let mode: String
     public let standing: Bool
+    /// What the owner chose in the chat's settings before the first message (PLAN §24); left out, the daemon's.
+    public let model: String?
+    public let effort: String?
+    public let speed: String
+    public let approvals: String?
+    /// Goal mode as the chat's choices hold it; `nil` takes `[agent] goal_mode`.
+    public let goalMode: Bool?
+    public let planFirst: Bool
 
-    public init(goal: String, key: String, attachments: [String]) {
+    public init(goal: String, key: String, attachments: [String], start: ChatStart) {
         self.goal = goal
         self.key = key
         self.attachments = attachments
-        self.mode = "auto"
+        self.mode = start.choices.mode
         self.standing = false
+        self.model = start.choices.model
+        self.effort = start.choices.effort
+        self.speed = start.choices.speed
+        self.approvals = start.choices.approvals
+        self.goalMode = start.choices.goalMode
+        self.planFirst = start.planFirst
     }
+
+    enum CodingKeys: String, CodingKey {
+        case goal, key, attachments, mode, standing, model, effort, speed, approvals
+        case goalMode = "goal_mode"
+        case planFirst = "plan_first"
+    }
+}
+
+/// What a new chat starts with (PLAN §24): the choices picked before its first message, and "plan first".
+public struct ChatStart: Codable, Sendable, Hashable {
+    public let choices: ChatChoices
+    public let planFirst: Bool
+
+    public init(choices: ChatChoices, planFirst: Bool) {
+        self.choices = choices
+        self.planFirst = planFirst
+    }
+
+    public static let daemons: ChatStart = ChatStart(choices: .daemons, planFirst: false)
 }
 
 struct AttachmentUpload: Encodable, Sendable {

@@ -9,6 +9,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
 | [1891](1891.md) | done | 2026-11-25 | Item numbers are reserved, and every place that holds one is read |
 | [1890](1890.md) | done | 2026-11-25 | Dot takes the Mac's pointer and keyboard only while the owner is away |
+| [1888](1888.md) | done | 2026-11-23 | A scope is one command, not a toml block: `dotx scope add`, `list`, `remove`, `check` over a store every call reads |
+| [1887](1887.md) | done | 2026-11-23 | Authorised security testing is a scope, not a refusal: a bug bounty program's hosts are written down and tested |
 | [1880](1880.md) | done | 2026-11-25 | DotNext puts the run's work in one pill: plain words, Stop, the plan and the helpers; the stream keeps no plan or helper card and folds its thinking |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
@@ -34,6 +36,9 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1847](1847.md) | done | 2026-11-25 | DotNext drops the "Dot · <Mac> · <date>" line at the top of a chat |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
+| [1802](1802.md) | done | 2026-11-25 | DotNext's voice typing: the composer becomes a recorder; Settings › Voice |
+| [1801](1801.md) | done | 2026-11-25 | DotNext's chat settings: the model, its level, fast mode, approvals and plan first, also before a new chat |
+| [1800](1800.md) | done | 2026-11-25 | DotNext's chat list: select several, pin and delete them together, a Pinned section on top |
 | [1791](1791.md) | done | 2026-11-25 | DotNext's Settings open no web page: the Mac's setup pages have no row, and the list ends with "More settings are on your Mac." |
 | [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
 | [1771](1771.md) | done | 2026-11-25 | DotNext's Models, Scheduled tasks, Rules, Memory and Agents are native, as much of them as a phone is for |

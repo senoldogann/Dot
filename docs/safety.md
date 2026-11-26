@@ -75,9 +75,9 @@ run needs, sent where the configuration points:
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
   loads its libraries from public CDNs (see [Tools](runs.md#tools)). `recon` makes its own requests: one GET and one
   TLS handshake, and, on `depth = "ports"`, a connect to each of 34 ports that sends nothing but the handshake; that
-  scan runs only on a host in `[recon] owned_hosts` (see [Recon](recon.md)). `security_scan` sends a form's fields
-  with a small, read-only set of payloads (item 781); it too runs only on a host in `[recon] owned_hosts`, and every
-  form action must stay on that host (see [Security scan](security.md)).
+  scan runs only on a host in `[recon] owned_hosts` or in a bug bounty scope you registered (`dotx scope`, see
+  [Recon](recon.md)). `security_scan` sends a form's fields with a small, read-only set of payloads (item 781); it too
+  runs only on such a host, and every form action must stay on that host (see [Security scan](security.md)).
 - **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read
   untrusted content asks before a line that sends data out (see [Safety](#safety)).
 - **To TypeSafe, once its key is saved: the texts it judges.** `judge_items` and the tools of posts and campaigns send
@@ -134,7 +134,9 @@ run needs, sent where the configuration points:
   send.
 - **To your own Mac, from the page, if you use the microphone where the Mac can write down: your voice as you speak,
   which stays on your devices.** On every device whose Mac can write down (a Mac's browser, the desktop app, an iPhone,
-  an iPad, a browser with no speech recognition; items 626, 969), the page records the microphone itself
+  an iPad, a browser with no speech recognition; items 626, 969), and in the iPhone app Dot Next when its Settings ›
+  Voice says to write down on the Mac (item 1802; else Dot Next writes down on the iPhone and the sound leaves nothing),
+  the page (or the app) records the microphone itself
   (`getUserMedia`) and streams the sound to the daemon on this Mac while you speak, in pieces, at the address the page
   reaches Dot at (this Mac's own, or over your tailnet, as the rest of the page), behind the access token like every
   request. The Mac writes it down as it comes with macOS 26's own dictation, on the device, with a small program the

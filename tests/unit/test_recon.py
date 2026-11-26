@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
@@ -18,7 +19,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 from pydantic import ValidationError
 
-from dotagent.config import ReconConfig, load_default_config
+from dotagent import scopes as dot_scopes
+from dotagent.config import ReconAuthority, ReconConfig, ReconScope, load_default_config
 from dotagent.core.errors import WebError
 from dotagent.tools.context import ToolContext
 from dotagent.tools.recon import (
@@ -245,13 +247,17 @@ async def test_a_listening_port_answers_and_a_closed_one_does_not() -> None:
 
 
 def _context(
-    owned_hosts: tuple[str, ...] = (), *, blocked: tuple[str, ...] = (), allow_private: bool = True
+    owned_hosts: tuple[str, ...] = (),
+    *,
+    scopes: tuple[ReconScope, ...] = (),
+    blocked: tuple[str, ...] = (),
+    allow_private: bool = True,
 ) -> ToolContext:
     """A context with a real configuration, narrowed to what the recon tool reads before it refuses a scan."""
     base = load_default_config()
     config = base.model_copy(
         update={
-            "recon": base.recon.model_copy(update={"owned_hosts": owned_hosts}),
+            "recon": base.recon.model_copy(update={"owned_hosts": owned_hosts, "scopes": scopes}),
             "web": base.web.model_copy(update={"allow_private_hosts": allow_private}),
             "browser": base.browser.model_copy(update={"blocked_hosts": blocked}),
         }
@@ -264,6 +270,48 @@ async def test_a_port_scan_of_a_host_that_is_not_the_owners_is_refused() -> None
     result = await _run(ReconArgs(target="example.com", depth="ports"), _context())
     assert result.is_error
     assert "[recon] owned_hosts" in result.text
+    assert "dotx scope add" in result.text
+
+
+def test_a_scope_authorises_its_hosts_and_names_the_program() -> None:
+    config = ReconConfig(scopes=(ReconScope(program="HackerOne · Acme", hosts=("acme.com",), note="5 req/s"),))
+    assert config.authorising("acme.com") == ReconAuthority(program="HackerOne · Acme", note="5 req/s")
+    assert config.authorising("api.acme.com") == ReconAuthority(program="HackerOne · Acme", note="5 req/s")
+    assert config.authorising("notacme.com") is None
+    assert config.authorising("acme.com.evil.test") is None
+    assert config.authorising("elsewhere.test") is None
+
+
+def test_the_owners_own_list_answers_owned_and_comes_first() -> None:
+    config = ReconConfig(
+        owned_hosts=("acme.com",),
+        scopes=(ReconScope(program="HackerOne · Acme", hosts=("acme.com",)),),
+    )
+    assert config.authorising("acme.com") == ReconAuthority(program=None, note="")
+
+
+def test_a_scope_holds_bare_host_names() -> None:
+    with pytest.raises(ValidationError):
+        ReconScope(program="Acme", hosts=("https://acme.com",))
+    with pytest.raises(ValidationError):
+        ReconScope(program="Acme", hosts=("*.acme.com",))
+
+
+async def test_a_scope_opens_the_port_scan_that_owned_hosts_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake(self: object, host: str, port: int, **kwargs: object) -> list[tuple[object, ...]]:
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", port))]
+
+    monkeypatch.setattr(type(asyncio.get_running_loop()), "getaddrinfo", fake)
+    scope = ReconScope(program="Bugcrowd · Acme", hosts=("acme.com",))
+    result = await _run(
+        ReconArgs(target="api.acme.com", depth="ports"),
+        _context(scopes=(scope,), allow_private=False),
+    )
+    assert result.is_error
+    assert "private or local" in result.text
+    assert "dotx scope add" not in result.text
 
 
 async def test_a_host_on_the_blocked_list_is_refused_before_it_is_read() -> None:
@@ -348,3 +396,28 @@ async def test_the_audit_reads_a_site_over_a_real_request() -> None:
     headers = {name.lower(): value for name, value in answer.document.headers}
     assert headers["server"] == "nginx/1.18.0"
     assert "WordPress" in technology(headers, answer.document.body.decode())
+
+
+def _broken_scopes(folder: Path, content: bytes) -> Path:
+    """A ``scopes.toml`` in ``folder`` holding ``content``, written before the async test reads it."""
+    path: Path = folder / "scopes.toml"
+    path.write_bytes(content)
+    return path
+
+
+async def test_a_broken_scopes_file_stops_the_port_scan_and_leaves_the_passive_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``scopes.toml`` that cannot be read is named: the port scan of a host the owner does not list waits for it,
+    and the passive audit, which reads any public site, still answers, its Scope line saying the scope is unknown."""
+    broken: Path = _broken_scopes(tmp_path, b"[[scopes]\nprogram = ")
+    monkeypatch.setattr(dot_scopes, "scopes_path", lambda: broken)
+    ports = await _run(ReconArgs(target="example.com", depth="ports"), _context())
+    assert ports.is_error
+    assert str(broken) in ports.text
+    assert "passive audit still runs" in ports.text
+    with _site() as port:
+        passive = await _run(ReconArgs(target=f"http://127.0.0.1:{port}/"), _context())
+    assert not passive.is_error
+    assert "Scope: unknown" in passive.text
+    assert str(broken) in passive.text

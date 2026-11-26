@@ -1328,6 +1328,15 @@ review_timeout_s = 120.0
 # common ports answer, and runs only on a host listed here: one you own or may test. A name covers its subdomains
 # ("example.com" covers "www.example.com"); an address is listed as it is. Empty: no active scan anywhere.
 owned_hosts = []
+# A bug bounty program or an engagement you are in (item 1887, docs/recon.md). A host in a scope is treated as an owned
+# host: the port scan and security_scan run on it, and every report names the program that authorised it. Writing the
+# scope down is your statement that the program's rules allow the test.
+#   [[recon.scopes]]
+#   program = "HackerOne · Acme"
+#   hosts = ["acme.com"]
+#   url = "https://hackerone.com/acme"
+#   note = "no automated scanning; 5 req/s"
+scopes = []
 
 
 [meetings]

@@ -49,6 +49,8 @@ struct ChatScreen: View {
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
     @State private var changedFiles: RunChanges?
+    /// "Plan first" for the next message, set in the chat's settings (PLAN §24); spent by that message.
+    @State private var planFirst: Bool = false
     @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.locale) private var locale: Locale
@@ -349,7 +351,7 @@ struct ChatScreen: View {
                         hasContent: !(edit?.text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty,
                         runActive: activeRun != nil && !stopping, followUp: followUp, editing: edit != nil),
                     perform: perform,
-                    model: currentModel, models: modelChoices, chooseModel: { choose($0) },
+                    model: currentModel, openSettings: { panel = .model },
                     suggestions: ComposerSuggestions(sections: { trigger in
                         pickerSections(trigger, commands: composerCommands(), catalog: catalog, limit: 8)
                     }))
@@ -418,7 +420,11 @@ struct ChatScreen: View {
             case .message:
                 break
             }
-            let (words, picks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
+            let (words, typedPicks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
+            let picks: MessagePicks = MessagePicks(skills: typedPicks.skills, accounts: typedPicks.accounts, planFirst: typedPicks.planFirst || planFirst)
+            // A steer carries no picks: plan first waits for the next message that does (a steer with no run at work
+            // goes as a message, and spends it).
+            if activeRun == nil || action != .steer { planFirst = false }
             draft = ""
             attachments = []
             model.keep(draft: "", of: thread)
@@ -494,30 +500,25 @@ struct ChatScreen: View {
 
     // MARK: The model chip
 
+    /// What the chip shows: the chat's choices as the sheet reads them (a model left out is the daemon's main, a level
+    /// left out is the model's default), so the chip and the sheet never differ.
     private var currentModel: ModelChoice? {
-        let choices: ChatChoices? = view?.newest?.choices
-        let ref: String = choices?.model ?? view?.runs.last?.model ?? ""
-        guard !ref.isEmpty else { return nil }
-        // Before the daemon's models are read, the model's own name without its provider ("claude_code:opus" → "opus").
-        let label: String = model.models.flatMap(\.models).first { $0.ref == ref }?.label ?? String(ref.split(separator: ":").last ?? Substring(ref))
-        return ModelChoice(ref: ref, label: label, effort: choices?.effort ?? view?.runs.last?.effort)
+        let choices: ChatChoices = chatChoices
+        guard let ref = effectiveModel(choices, defaultRef: model.chatDefaults?.model) else { return nil }
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort)
     }
 
-    private var modelChoices: [String: [ModelChoice]] {
-        var out: [String: [ModelChoice]] = [:]
-        for provider in model.models where provider.error == nil {
-            out[provider.provider] = provider.models.flatMap { option in
-                option.efforts.count < 2
-                    ? [ModelChoice(ref: option.ref, label: option.label, effort: nil)]
-                    : option.efforts.map { ModelChoice(ref: option.ref, label: option.label, effort: $0) }
-            }
-        }
-        return out
+    /// The chat's choices as its next follow-up starts with them: those kept for it, else what its last run ran on.
+    private var chatChoices: ChatChoices {
+        if let kept = view?.newest?.choices { return kept }
+        let last: RunRecord? = view?.runs.last { $0.parentRunId == nil }
+        return ChatChoices.daemons.with(model: last?.model, effort: last?.effort)
     }
 
-    private func choose(_ choice: ModelChoice) {
-        let base: ChatChoices = view?.newest?.choices ?? ChatChoices(mode: "auto", model: nil, effort: nil, speed: "standard", approvals: nil, goalMode: nil)
-        model.perform(.choices(thread: thread, choices: base.with(model: choice.ref, effort: choice.effort)))
+    private func keep(_ settings: ChatSettingsDraft) {
+        if settings.choices != chatChoices { model.perform(.choices(thread: thread, choices: settings.choices)) }
+        planFirst = settings.planFirst
+        panel = nil
     }
 
     // MARK: Header
@@ -586,21 +587,10 @@ struct ChatScreen: View {
         case .inspector, .files, .screen:
             RunInspector(thread: thread, close: { self.panel = nil })
         case .model:
-            List(modelChoices.keys.sorted(), id: \.self) { provider in
-                Section(provider) {
-                    ForEach(modelChoices[provider] ?? []) { choice in
-                        Button {
-                            choose(choice)
-                            self.panel = nil
-                        } label: {
-                            InspectorRow(title: [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · "), systemImage: "cpu",
-                                accessory: choice == currentModel ? .detail("✓") : .none)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .inspectorSheet(title: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), close: { self.panel = nil })
+            ChatSettingsSheet(
+                initial: ChatSettingsDraft(choices: chatChoices, planFirst: planFirst), providers: model.models, defaults: model.chatDefaults,
+                problem: model.modelsProblem, retry: { Task { await model.loadModels() } },
+                confirm: { keep($0) }, cancel: { self.panel = nil })
         }
     }
 
