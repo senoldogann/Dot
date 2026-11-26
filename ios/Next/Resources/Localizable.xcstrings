@@ -1017,6 +1017,17 @@
         }
       }
     },
+    "Add a fallback model": {
+      "comment": "Models: adds a model to the fallbacks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedek model ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -1750,6 +1761,17 @@
         }
       }
     },
+    "Billed to your plan as extra usage; without it the session runs at the standard speed.": {
+      "comment": "Models: self-repair's fast mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planına ek kullanım olarak yansır; kapalıyken oturum standart hızda çalışır."
+          }
+        }
+      }
+    },
     "Bluetooth": {
       "comment": "Settings › Voice: a named Bluetooth microphone",
       "localizations": {
@@ -2179,6 +2201,17 @@
         }
       }
     },
+    "Claude Code's own choice": {
+      "comment": "Models: self-repair leaves the model to Claude Code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code'un kendi seçimi"
+          }
+        }
+      }
+    },
     "Clear search": {
       "comment": "Connect apps: clears the search and the filters",
       "localizations": {
@@ -2439,6 +2472,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Üç kliniği karşılaştırdı"
+          }
+        }
+      }
+    },
+    "Composer": {
+      "comment": "Models: the night's role that weighs the versions tried",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oluşturucu"
           }
         }
       }
@@ -2792,6 +2836,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yalnızca hata ayıklama derlemeleri."
+          }
+        }
+      }
+    },
+    "Decides what is worth doing when Dot works on its own while the Mac is idle. The work itself runs on the main model.": {
+      "comment": "Models: what the own work model does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac boştayken Dot kendi başına çalıştığında neyin yapılmaya değer olduğuna karar verir. İşin kendisi ana modelde çalışır."
           }
         }
       }
@@ -3805,6 +3860,17 @@
         }
       }
     },
+    "Dot's own work": {
+      "comment": "Models section: the model that decides Dot's own work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kendi işi"
+          }
+        }
+      }
+    },
     "Dot's proposal": {
       "comment": "Self-improvement: the sheet of one proposal",
       "localizations": {
@@ -3922,6 +3988,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacağı bırak"
+          }
+        }
+      }
+    },
+    "Each role plays on the review model unless one is chosen for it.": {
+      "comment": "Models: the night's learning roles",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her rol, kendisine bir model seçilmedikçe inceleme modelinde çalışır."
           }
         }
       }
@@ -4289,6 +4366,17 @@
         }
       }
     },
+    "Experience writer": {
+      "comment": "Models: the night's role that writes down what was learned",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deneyim yazarı"
+          }
+        }
+      }
+    },
     "Explain: Dot says why": {
       "comment": "Reaction menu: what ❓ does",
       "localizations": {
@@ -4340,6 +4428,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld koduyla başarısız oldu."
+          }
+        }
+      }
+    },
+    "Fallbacks": {
+      "comment": "Models section: the models a task moves to when its own cannot answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedekler"
           }
         }
       }
@@ -6087,7 +6186,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nInspector cost row: the seconds the model took\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7527,6 +7626,17 @@
         }
       }
     },
+    "Own work model": {
+      "comment": "Models: the model that looks for Dot's own work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendi iş modeli"
+          }
+        }
+      }
+    },
     "Pair": {
       "comment": "Pairing screen: the button that pairs the phone",
       "localizations": {
@@ -7986,6 +8096,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Önerilen değişiklikler"
+          }
+        }
+      }
+    },
+    "Proposer": {
+      "comment": "Models: the night's role that proposes a better way of working",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önerici"
           }
         }
       }
@@ -8514,6 +8635,17 @@
         }
       }
     },
+    "Remove %@": {
+      "comment": "VoiceOver: removes a fallback model; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ kaldır"
+          }
+        }
+      }
+    },
     "Remove %@ from favourites": {
       "comment": "VoiceOver: unstars a model; the argument is its name",
       "localizations": {
@@ -8664,6 +8796,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu mesaj yeniden denensin mi?"
+          }
+        }
+      }
+    },
+    "Review model": {
+      "comment": "Models: the role that double-checks Dot's work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İnceleme modeli"
           }
         }
       }
@@ -9152,6 +9295,17 @@
         }
       }
     },
+    "Security research model": {
+      "comment": "Models: the model security research in a scope starts on (item 1889)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güvenlik araştırması modeli"
+          }
+        }
+      }
+    },
     "Select": {
       "comment": "Chat list toolbar: checks chats to act on several",
       "localizations": {
@@ -9181,6 +9335,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Metni seç"
+          }
+        }
+      }
+    },
+    "Selector": {
+      "comment": "Models: the night's role that picks among versions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçici"
+          }
+        }
+      }
+    },
+    "Self-repair": {
+      "comment": "Models section: how Claude Code works when Dot repairs itself",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendini onarma"
+          }
+        }
+      }
+    },
+    "Self-repair model": {
+      "comment": "Models: self-repair's model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendini onarma modeli"
           }
         }
       }
@@ -10876,6 +11063,17 @@
         }
       }
     },
+    "The kept choice could not be read: the nights stop until one is chosen again.": {
+      "comment": "Models: self-repair's choice was lost",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıtlı seçim okunamadı: yeniden seçilene kadar gece çalışmaları durur."
+          }
+        }
+      }
+    },
     "The key could not be kept on this phone.": {
       "comment": "Pairing error: the Keychain refused to keep the key",
       "localizations": {
@@ -10883,6 +11081,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anahtar bu telefonda saklanamadı."
+          }
+        }
+      }
+    },
+    "The level a task asks of its model when none is chosen for it. It is set in the Mac's config.": {
+      "comment": "Models: the default level of reasoning, read only",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev için düzey seçilmediğinde modelinden istenen düzey. Mac'teki yapılandırmada ayarlanır."
           }
         }
       }
@@ -10942,6 +11151,17 @@
         }
       }
     },
+    "The model of your Claude plan that repairs Dot's own problems at night, from its next session.": {
+      "comment": "Models: what self-repair's model is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude planındaki, Dot'un kendi sorunlarını gece onaran model; bir sonraki oturumdan itibaren."
+          }
+        }
+      }
+    },
     "The models could not be read: %@": {
       "comment": "Model picker: the daemon's models could not be read; the argument is why",
       "localizations": {
@@ -10960,6 +11180,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sonraki mesaj önce planını yazar ve bir şeyi değiştirmeden önce sorar."
+          }
+        }
+      }
+    },
+    "The night's learning": {
+      "comment": "Models section: the roles of the improvement loop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gece öğrenmesi"
           }
         }
       }
@@ -12020,6 +12251,17 @@
         }
       }
     },
+    "Vision model": {
+      "comment": "Models: the role that reads images for a model that cannot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görme modeli"
+          }
+        }
+      }
+    },
     "Voice": {
       "comment": "General section: dictation\nSettings row: voice typing",
       "localizations": {
@@ -12463,6 +12705,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot çalışırken"
+          }
+        }
+      }
+    },
+    "When a task's model cannot answer (its allowance is used up, it is too busy, its key was refused, its safety filter stopped the reply), the task goes on with the first of these that can, each once at most.": {
+      "comment": "Models: what the fallbacks do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görevin modeli yanıt veremediğinde (kotası dolduğunda, çok yoğun olduğunda, anahtarı reddedildiğinde, güvenlik filtresi yanıtı durdurduğunda) görev bunlardan yanıt verebilen ilkiyle, her biri en fazla bir kez olmak üzere sürer."
           }
         }
       }

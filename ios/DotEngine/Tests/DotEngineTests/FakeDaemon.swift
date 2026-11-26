@@ -438,6 +438,7 @@ final class FakeDaemon: @unchecked Sendable {
             return Reply(status: 200, body: Self.json(approvalRecord(approval, status: status)), stream: false, lost: false)
         }
         if let voice: Reply = voiceReply(method: method, parts: parts, body: body) { return voice }
+        if let models: Reply = modelsReply(method: method, parts: parts, body: body) { return models }
         if method == "DELETE", let found: [String] = Self.match(parts, ["api", "threads"]) {
             _ = found
             if let fields: [String: [String]] = try? JSONDecoder().decode([String: [String]].self, from: body ?? Data()) {
@@ -482,6 +483,43 @@ final class FakeDaemon: @unchecked Sendable {
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
         return nil
+    }
+
+    /// Settings › Models' routes (item 1907): each write answers with what it kept, as the daemon's do.
+    private func modelsReply(method: String, parts: [String], body: Data?) -> Reply? {
+        let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
+        func ok(_ json: String) -> Reply { Reply(status: 200, body: Data(json.utf8), stream: false, lost: false) }
+        let config: (String, [String]) -> String = { kind, standby in
+            let list: String = standby.map { "\"\($0)\"" }.joined(separator: ",")
+            let kinds: String = kind.isEmpty ? "{}" : #"{"security":"\#(kind)"}"#
+            return #"{"main":"m:main","vision":"m:see","fast":"m:fast","review":"m:review","effort":"medium","helpers":[],"standby":[\#(list)],"kinds":\#(kinds)}"#
+        }
+        switch (method, parts) {
+        case ("PUT", ["api", "models", "kinds"]):
+            return ok(config(fields["model"]?.string ?? "", []))
+        case ("PUT", ["api", "models", "standby"]):
+            return ok(config("", (fields["models"]?.array ?? []).compactMap(\.string)))
+        case ("GET", ["api", "models", "learning"]):
+            return ok(#"{"proposer":"","composer":"m:compose","selector":"","experience":"","review":"m:review"}"#)
+        case ("PUT", ["api", "models", "learning"]):
+            let role: String = fields["role"]?.string ?? ""
+            let model: String = fields["model"]?.string ?? ""
+            let roles: String = ["proposer", "composer", "selector", "experience"].map { "\"\($0)\":\"\($0 == role ? model : "")\"" }.joined(separator: ",")
+            return ok("{\(roles),\"review\":\"m:review\"}")
+        case ("GET", ["api", "initiative"]):
+            return ok(#"{"enabled":true,"look_model":"","items":[]}"#)
+        case ("PUT", ["api", "initiative", "look-model"]):
+            return ok(#"{"enabled":true,"look_model":"\#(fields["model"]?.string ?? "")","items":[]}"#)
+        case ("GET", ["api", "repair"]):
+            return ok(#"{"worker":{"model":"default","effort":"default","fast":false},"worker_lost":false,"nights":[]}"#)
+        case ("PUT", ["api", "repair", "worker"]):
+            let model: String = fields["model"]?.string ?? ""
+            let effort: String = fields["effort"]?.string ?? ""
+            let fast: Bool = fields["fast"]?.bool ?? false
+            return ok(#"{"worker":{"model":"\#(model)","effort":"\#(effort)","fast":\#(fast)},"worker_lost":false}"#)
+        default:
+            return nil
+        }
     }
 
     /// The bodies the phone sent to a path that holds `part`, in order.
