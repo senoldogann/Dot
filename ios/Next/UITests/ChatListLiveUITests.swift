@@ -58,7 +58,7 @@ final class ChatListLiveUITests: XCTestCase {
         any(app, "chatSettings.approval.yolo").firstMatch.tap()
         app.navigationBars["Approvals"].buttons.element(boundBy: 0).tap()
         app.buttons["chatSettings.done"].tap()
-        XCTAssertTrue(chip.label.contains(label), "the bar wears the picked model: \(chip.label)")
+        XCTAssertTrue(chip.label.hasPrefix("Model: ") && chip.label.contains(label), "the chip names the picked model: \(chip.label)")
 
         let field: XCUIElement = any(app, "composer.field").firstMatch
         field.tap()
