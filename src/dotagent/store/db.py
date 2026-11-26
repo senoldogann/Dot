@@ -2136,10 +2136,11 @@ class Store:
         return {str(row["chat"]): int(row["asks"]) for row in rows}
 
     async def thread_drafts(self, thread_id: str) -> list[DraftRecord]:
-        """The drafts waiting for the owner that the chat's runs and their helpers wrote, oldest first."""
+        """The drafts waiting for the owner that the chat's runs and their helpers wrote, oldest first: those that wait
+        and those whose last send failed, which still take Send or Discard (``drafts.service``)."""
         rows: list[aiosqlite.Row] = await self._all(
             "SELECT drafts.* FROM drafts JOIN runs AS ran ON ran.id = drafts.run_id"
-            " LEFT JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE drafts.status = 'pending'"
+            " LEFT JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE drafts.status IN ('waiting', 'failed')"
             " AND (ran.thread_id = ? OR parent.thread_id = ?) ORDER BY drafts.created_at",
             (thread_id, thread_id),
         )
