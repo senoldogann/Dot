@@ -472,7 +472,6 @@ TR: dict[str, str] = {
     'All tasks a day': 'Günde tüm görevler',
     "Allow it in iOS Settings, or type the Mac's address instead.": "iOS Ayarları'nda izin ver ya da Mac'in adresini elle yaz.",
     'Answers': 'Yanıtlar',
-    'App language': 'Uygulama dili',
     'Approvals': 'Onaylar',
     'Approvals and questions that wait on you': 'Seni bekleyen onaylar ve sorular',
     'As the default': 'Varsayılan gibi',
@@ -510,7 +509,6 @@ TR: dict[str, str] = {
     'Done or failed': 'Bitti ya da başarısız oldu',
     'Dot Next gets notifications once it replaces the old Dot app on this iPhone; until then the old app keeps them. These switches are kept on your Mac for this phone.': "Dot Next bildirimleri bu iPhone'daki eski Dot uygulamasının yerini aldığında alır; o zamana kadar bildirimler eski uygulamada kalır. Bu anahtarlar Mac'inde bu telefon için saklanır.",
     'Dot Next may not use the camera': 'Dot Next kamerayı kullanamıyor',
-    'Dot Next speaks the language iOS Settings sets for it.': "Dot Next, iOS Ayarları'nın onun için seçtiği dili konuşur.",
     'Dot Next version': 'Dot Next sürümü',
     'Dot answered with an error (HTTP %lld). Look at Dot on the Mac.': "Dot bir hatayla yanıt verdi (HTTP %lld). Mac'teki Dot'a bak.",
     'Dot follows its approval mode alone.': 'Dot yalnızca onay moduna göre davranır.',
@@ -730,6 +728,13 @@ TR: dict[str, str] = {
     'Your Mac answered with what this app cannot read (%@). Update Dot on the Mac or this app.': "Mac'in bu uygulamanın okuyamadığı bir yanıt verdi (%@). Mac'teki Dot'u ya da bu uygulamayı güncelle.",
     "Your Mac did not answer the check of this phone's key, so the key was not sent. Check again in a moment.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi; bu yüzden anahtar gönderilmedi. Biraz sonra yeniden denetle.",
     "Your Mac did not answer the check of this phone's key.": "Mac'in bu telefonun anahtarının denetimine yanıt vermedi.",
+    # Helper L1 (item 1966): the app's own language.
+    'Same as the iPhone': 'iPhone ile aynı',
+    'The chat was not deleted: %@': 'Sohbet silinmedi: %@',
+    'None of the %lld chats was deleted: %@': '%lld sohbetten hiçbiri silinmedi: %@',
+    'Your assistant': 'Asistanın',
+    "Dot Next speaks this language whatever the iPhone's, as the web's own choice does.": "Dot Next, iPhone'un dili ne olursa olsun bu dili konuşur; web'deki kendi seçimi gibi.",
+    'Dot Next opens in it the next time it starts.': 'Dot Next bir sonraki açılışta bu dille açılır.',
     # Helper L1 (item 1907): Settings › Models with every model setting of the Mac.
     'Add a fallback model': 'Yedek model ekle',
     'Billed to your plan as extra usage; without it the session runs at the standard speed.': 'Planına ek kullanım olarak yansır; kapalıyken oturum standart hızda çalışır.',
@@ -761,7 +766,6 @@ TR: dict[str, str] = {
     'The models could not be read: %@': 'Modeller okunamadı: %@',
     'Recently used': 'Son kullanılanlar',
     'Chats with a run at work or waiting on you are kept; stop or answer them first.': 'Çalışan ya da seni bekleyen sohbetler silinmez; önce durdur ya da yanıtla.',
-    'Some chats were not deleted: %@': 'Bazı sohbetler silinmedi: %@',
     '%lld selected': '%lld seçili',
     'A second AI answers for you; you are asked only what it is unsure about': 'İkinci bir yapay zekâ senin yerine yanıtlar; yalnızca emin olmadığı şeyler sana sorulur',
     'Add %@ to favourites': '%@ modelini favorilere ekle',
@@ -1533,14 +1537,7 @@ TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu
 # Links and files under an answer (backlog LF1).
 TR.update(
     {
-        "%lld sources": "%lld kaynak",
-        "Unfolded": "Açık",
-        "Opens the page": "Sayfayı açar",
-        "Copy link": "Bağlantıyı kopyala",
-        "Open in Safari": "Safari'de aç",
         "Share": "Paylaş",
-        "Shows the file": "Dosyayı gösterir",
-        "File": "Dosya",
         "Loading the file": "Dosya yükleniyor",
         "The file cannot be shown": "Dosya gösterilemiyor",
         "Only the start of the file shows here; open it on the Mac for the rest.": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç.",
@@ -1558,7 +1555,6 @@ TR.update(
         "the chat's file panel": "sohbetin dosya paneli",
     }
 )
-EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
 
 # "This chat" sheet, plain (item 1922)
 TR.update({"Provider": "Sağlayıcı"})

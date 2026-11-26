@@ -64,6 +64,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "search_chats": "office",
     "send_to_chat": "office",
     "show_page": "pages",
+    # A picture drawn or generated and saved as a PNG (item 1969): rare, asked for, so out of core.
+    "generate_image": "images",
     "theme_read": "appearance",
     "theme_apply": "appearance",
     "theme_undo": "appearance",
@@ -108,6 +110,7 @@ _PURPOSES: dict[str, str] = {
     ),
     "replies": "handing a reply to a mail Dot sent to the chat that sent it, where that work goes on",
     "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
+    "images": "making a picture as a PNG: drawn from an SVG or HTML you write, or a photo from Google's picture model",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
     "vault": "the owner's saved contact details (name, address, phone, email) to type into forms",
     "todos": "your own list of work to do for the owner later, on your own while the Mac is idle, and their objectives",

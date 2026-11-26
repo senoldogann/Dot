@@ -246,7 +246,7 @@ final class ReducerTests: XCTestCase {
         XCTAssertEqual(list.freshness, .live)
         let (gone, none): (ListProjection, [ListEffect]) = ListReducer.frame(
             list, .threadChanged(ThreadChanged(threadId: "thr_a", revision: 11, deleted: true)), connection: connection)
-        XCTAssertEqual(none, [])
+        XCTAssertEqual(none, [.readList], "item 1965: a chat that went leaves room in the window for an older one, which a read brings")
         XCTAssertEqual(gone.rows.map(\.summary.id), ["thr_b"])
         let crossed: ListProjection = ListReducer.loaded(
             ListReducer.asked(gone), view: ThreadsView(revision: 11, threads: [row("thr_a", 4), row("thr_b", 10)]), connection: connection).0

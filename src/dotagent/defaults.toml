@@ -150,6 +150,10 @@ max_concurrent = 4
 # limits (docs/models.md). api_key_env holds the AI Studio key; `dotx models google` lists what it can use.
 base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
 api_key_env = "GOOGLE_API_KEY"
+# The photo path of generate_image (docs/image-generation.md): Gemini's picture model on the same key. Pictures are not on
+# the free tier, so the key's project needs billing; `dotx models google` lists text models only.
+image_model = "gemini-3.1-flash-lite-image"
+image_base_url = "https://generativelanguage.googleapis.com/v1"
 connect_timeout_s = 10.0
 read_timeout_s = 600.0
 attempts = 6
