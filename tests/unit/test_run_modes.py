@@ -14,7 +14,16 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from dotagent.agent.compact import drop_old_images
-from dotagent.agent.loop import AgentRun, RunOutcome, SendBack, _acts, _after_verdict, _since_goal, follow_ups_of
+from dotagent.agent.loop import (
+    AgentRun,
+    RunOutcome,
+    SendBack,
+    _acts,
+    _after_limit_verdict,
+    _after_verdict,
+    _since_goal,
+    follow_ups_of,
+)
 from dotagent.agent.prompt import (
     PromptInputs,
     build_system_prompt,
@@ -74,7 +83,7 @@ def test_a_question_goes_where_the_mode_sends_it(
     assert route_for(Decision(verdict=verdict, source=source, reason="", rule_id=None), mode) == route
 
 
-def _verdict(decision: Literal["achieved", "continue", "blocked", "scheduled"], reason: str) -> GoalVerdict:
+def _verdict(decision: Literal["achieved", "improve", "continue", "blocked", "scheduled"], reason: str) -> GoalVerdict:
     return GoalVerdict(decision=decision, reason=reason, unproven_steps=())
 
 
@@ -111,6 +120,21 @@ def test_a_run_that_used_up_its_patience_fails_and_keeps_its_answer() -> None:
     assert outcome.result.startswith(ENDED.result)
     assert f"still not reached after {PATIENCE} rounds" in outcome.result
     assert "the second file is missing" in outcome.result
+
+
+def test_a_reached_goal_with_a_better_result_in_reach_is_sent_back_and_never_ends_failed() -> None:
+    """K3-04 of the code review of 2026-11-19 (item 1946): the checker said continue on a goal that was reached
+    because a better price existed, and after ``goal_patience`` rounds the run ended failed, "the goal is still not
+    reached". It says improve: the run is sent back to better it, and once its rounds run out it ends done."""
+    better: GoalVerdict = _verdict("improve", "a cheaper flight leaves an hour later")
+    for sent_back in range(PATIENCE):
+        outcome: RunOutcome | SendBack = _after_verdict(better, ENDED, sent_back, PATIENCE)
+        assert isinstance(outcome, SendBack), sent_back
+        assert "a cheaper flight leaves an hour later" in outcome.note
+        assert "finds the goal reached" in outcome.note
+        assert "never for anything else" in outcome.note
+    assert _after_verdict(better, ENDED, PATIENCE, PATIENCE) == ENDED
+    assert _after_limit_verdict(better, ENDED) == ENDED
 
 
 def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_the_check_under_it() -> None:

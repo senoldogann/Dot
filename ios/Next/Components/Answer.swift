@@ -46,6 +46,7 @@ struct AnswerView: View {
         let frame: Double = 1.0 / 60
         while shown < markdown.count || tail > 0 {
             do { try await Task.sleep(for: .seconds(frame)) } catch { return }
+            PerfCounters.shared.revealed()
             if shown < markdown.count {
                 shown = revealStep(shown: shown, target: markdown.count, seconds: frame)
                 tail = fadeCharacters

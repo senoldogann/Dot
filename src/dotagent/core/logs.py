@@ -4,14 +4,18 @@ A process logs JSON lines to its log file, or, without one, to stderr. The log f
 commands run beside it, and kept under :data:`LOG_LIMIT_BYTES`: the process whose line takes it over the limit moves it
 to ``<name>.1`` (dropping the one before) and starts a new one; the others write their next line to the new one. Two
 that find it full together take turns on a lock of the file (item 556). A log call never raises into the code that logs:
-a line the disk would not take is dropped, and the next line that is written says how many were.
+a line the disk would not take is dropped, and the next line that is written says how many were. The file is written by
+a thread of its own (:class:`QueuedLog`), so a disk slow to take a line never holds the code that logs it, the daemon's
+event loop among it.
 """
 
+import atexit
 import contextlib
 import fcntl
 import json
 import logging
 import os
+import queue
 import sys
 import threading
 import time
@@ -23,6 +27,14 @@ import structlog
 from structlog.typing import FilteringBoundLogger, Processor
 
 LOG_LIMIT_BYTES: int = 10 * 1024 * 1024
+# The lines a log holds for its thread to write (:class:`QueuedLog`): about 30 MB of lines, more than a minute of the
+# busiest daemon's logging, so only a disk that takes nothing for that long drops a line.
+QUEUED_LINES: int = 100_000
+# A character UTF-8 cannot encode (a lone surrogate, from a file name of bytes that are no UTF-8) is written as its
+# escape: the line keeps it, and its write does not fail.
+_UNENCODABLE: str = "backslashreplace"
+# How long :meth:`QueuedLog.close` waits at a time to put its last item on a full queue, while the thread still reads.
+_CLOSE_WAIT_S: float = 0.5
 _OLDER_SUFFIX: str = ".1"
 
 _LEVELS: dict[str, int] = {
@@ -42,7 +54,7 @@ class RotatingLog:
         self._limit_bytes: int = limit_bytes
         # Threads of the process log at once (the workers of asyncio.to_thread).
         self._lock: threading.Lock = threading.Lock()
-        self._handle: TextIO = path.open("a", encoding="utf-8")
+        self._handle: TextIO = path.open("a", encoding="utf-8", errors=_UNENCODABLE)
         # The lines the disk would not take since the last one it took (a full disk, a folder that is gone).
         self._dropped: int = 0
 
@@ -59,6 +71,12 @@ class RotatingLog:
 
     log = debug = info = warn = warning = msg
     fatal = failure = err = error = critical = exception = msg
+
+    def count_dropped(self, count: int) -> None:
+        """Count ``count`` lines that never reached this file, which the next line it writes says, with those the disk
+        would not take."""
+        with self._lock:
+            self._dropped += count
 
     def _write(self, message: str) -> None:
         if self._moved():
@@ -94,7 +112,7 @@ class RotatingLog:
         """Write to the file at the path from now on. The new one is opened first: a folder that cannot be written
         leaves the handle it had, which is open still."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        opened: TextIO = self._path.open("a", encoding="utf-8")
+        opened: TextIO = self._path.open("a", encoding="utf-8", errors=_UNENCODABLE)
         self._handle.close()
         self._handle = opened
 
@@ -119,17 +137,89 @@ class RotatingLog:
                 fcntl.flock(held, fcntl.LOCK_UN)
 
 
-def _handing(sink: RotatingLog) -> Callable[..., RotatingLog]:
+class QueuedLog:
+    """The log file of a process as a structlog logger whose lines a thread of its own writes (item 4 of the review of
+    2026-11-26): a call puts its line on a queue and returns at once, and the thread writes the lines in the order they
+    were logged, through ``file``. A flush of the file took 2-3 s on the daemon's event loop when the disk was slow,
+    and every run, the web UI and the phone waited for it.
+
+    :meth:`close`, run when the process exits, writes every line still on the queue before it returns; a line logged
+    after it is written by the caller, so none is lost on the way out. A line that finds ``limit_lines`` lines waiting
+    is dropped and counted, as a line the disk would not take is, and the next line written says how many were."""
+
+    def __init__(self, file: RotatingLog, limit_lines: int) -> None:
+        self._file: RotatingLog = file
+        # ``None`` is the last item: the thread ends there.
+        self._queue: queue.Queue[str | None] = queue.Queue(maxsize=limit_lines)
+        self._state: threading.Lock = threading.Lock()
+        self._closed: bool = False
+        # The lines dropped on a full queue since the thread last took the count.
+        self._overflow: int = 0
+        self._writer: threading.Thread = threading.Thread(target=self._drain, name="dot-log-writer", daemon=True)
+        self._writer.start()
+
+    def msg(self, message: str) -> None:
+        with self._state:
+            closed: bool = self._closed
+            if not closed:
+                try:
+                    self._queue.put_nowait(message)
+                except queue.Full:
+                    self._overflow += 1
+        if closed:
+            # After the lines queued before it, which the thread has written once it has ended.
+            self._writer.join()
+            self._file.msg(message)
+
+    log = debug = info = warn = warning = msg
+    fatal = failure = err = error = critical = exception = msg
+
+    def close(self) -> None:
+        """Write every line on the queue and end the thread; later lines are written by their caller."""
+        with self._state:
+            if self._closed:
+                return
+            self._closed = True
+        # A thread that has ended reads no more: the last item is not waited to be put on a full queue then.
+        while self._writer.is_alive():
+            try:
+                self._queue.put(None, timeout=_CLOSE_WAIT_S)
+            except queue.Full:
+                continue
+            break
+        self._writer.join()
+
+    def _drain(self) -> None:
+        """Write the queued lines until the last item. A line whose write fails with an error :class:`RotatingLog`
+        does not expect is said on stderr with that error (the daemon's ``daemon.err.log``) and counted among the
+        lines lost, and the thread goes on with the next: ended, it would leave every later line unwritten and the
+        exit waiting on a full queue (the pre-push review of item 1944)."""
+        while (message := self._queue.get()) is not None:
+            with self._state:
+                overflow: int = self._overflow
+                self._overflow = 0
+            if overflow:
+                self._file.count_dropped(overflow)
+            try:
+                self._file.msg(message)
+            except Exception as error:  # noqa: BLE001 - said on stderr and counted, and the thread must go on
+                self._file.count_dropped(1)
+                # A stderr that is closed or full too leaves the count, which the next line written says.
+                with contextlib.suppress(OSError, ValueError):
+                    sys.stderr.write(f"dot: a log line could not be written ({type(error).__name__}: {error})\n")
+
+
+def _handing(sink: QueuedLog) -> Callable[..., QueuedLog]:
     """A structlog logger factory that hands every logger the one ``sink``."""
 
-    def factory(*_: object) -> RotatingLog:
+    def factory(*_: object) -> QueuedLog:
         return sink
 
     return factory
 
 
 def configure_logging(level: str, json_output: bool, log_file: Path | None) -> None:
-    """Configure structlog once per process: JSON lines to ``log_file`` (:class:`RotatingLog`), or, without one, to
+    """Configure structlog once per process: JSON lines to ``log_file`` (:class:`QueuedLog`), or, without one, to
     stderr, as JSON when ``json_output`` and for a person to read else."""
     renderer: Processor = (
         structlog.processors.JSONRenderer(ensure_ascii=False)
@@ -141,9 +231,13 @@ def configure_logging(level: str, json_output: bool, log_file: Path | None) -> N
         # A process that may not write the file (``dotx`` run by a command of a run, whose sandbox closes Dot's logs,
         # item 676) logs to stderr instead, and says so once, with why: a full disk or a link in the file's place.
         try:
-            factory = _handing(RotatingLog(log_file, LOG_LIMIT_BYTES))
+            sink: QueuedLog = QueuedLog(RotatingLog(log_file, LOG_LIMIT_BYTES), QUEUED_LINES)
         except OSError as error:
             sys.stderr.write(f"dot: the log file {log_file} cannot be opened ({error}); logging to stderr\n")
+        else:
+            # The lines still queued are written before the process ends.
+            atexit.register(sink.close)
+            factory = _handing(sink)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,

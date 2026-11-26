@@ -687,6 +687,15 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            uploads: list[str] = []
+            page.on(
+                "request",
+                lambda request: (
+                    uploads.append(f"{request.method} /api{request.url.split('?')[0].split('/api')[1]}")
+                    if "/api/attachments" in request.url
+                    else None
+                ),
+            )
             await page.goto(ui_url(client.base_url.host, port, TOKEN))
             composer: Locator = page.locator(".composer")
             await composer.locator(".plus-button").click()
@@ -704,6 +713,8 @@ async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
             )
             await composer.dispatch_event("drop", {"dataTransfer": transfer})
             await expect(composer.locator(".attach-chip.ready")).to_have_count(2)
+            # Both went as the raw body of the streamed upload, not as base64 in JSON (item 1933).
+            assert uploads == ["PUT /api/attachments/stream"] * 2
             await page.locator(GOAL).fill("Two ways to attach a video")
             async with page.expect_response(
                 lambda answer: answer.url.endswith("/api/runs") and answer.request.method == "POST"

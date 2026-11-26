@@ -32,7 +32,14 @@ from dotagent.agent.parking import (
     permit_parkable,
     skipped_text,
 )
-from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, review_reads_whole, shorten_reason
+from dotagent.agent.review import (
+    Reviewer,
+    ReviewRequest,
+    ReviewVerdict,
+    review_reads_instructions,
+    review_reads_whole,
+    shorten_reason,
+)
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import (
     ApprovalNoted,
@@ -84,6 +91,12 @@ _TAINT_CHECK_REASON: str = (
 _TOO_LONG_FOR_TAINT_CHECK: str = (
     "a step it did not read is not cleared; split it into shorter steps (a long text into a file first, then a short "
     "step that uses it)"
+)
+# Why a step goes to the owner without the review model (item 1947): their instructions are longer than it reads
+# together, and one it left out could forbid the step.
+_INSTRUCTIONS_UNREAD: str = (
+    "Your instructions in this chat are too long for the review model to read all of them with this step, so you "
+    "decide it."
 )
 # Who decided, as the approval records and the ``approval_auto`` event state it.
 YOLO_DECIDER: str = "yolo"
@@ -965,7 +978,10 @@ class RunGate:
 
     async def _review(self, info: ActionInfo, decision: Decision, tainted: bool, unkept: bool) -> tuple[str, Answerer]:
         """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user, who then
-        answered."""
+        answered. Instructions too long to read together with the step go to the user unasked (item 1947): what the
+        model did not read could forbid the step."""
+        if not review_reads_instructions(self._instructions):
+            return await self._ask_user(info, decision, _INSTRUCTIONS_UNREAD, tainted, unkept), "user"
         verdict: ReviewVerdict = await self._reviewer(
             ReviewRequest(instructions=self._instructions, action=info, reason=decision.reason, tainted=tainted)
         )

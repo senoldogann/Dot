@@ -6,16 +6,23 @@ route that takes no token among them (``/api/phone/pair``, whose code is 32 char
 macOS ended it (the review of 2026-11-02). The layer stands inside the guard, so that a request the guard refuses is
 never read; what the guard lets through without a token (the open routes, the pages, the files) takes
 :data:`PUBLIC_MOST` bytes, every route that needs the token or a phone's key :data:`MOST`, which holds the largest body
-a route takes, an attachment of 20 MB in base64 with its JSON."""
+a route takes, an attachment of 20 MB in base64 with its JSON. The one route that streams its body to a file
+(``PUT`` to :data:`STREAM_PATH`, item 1933) is not read whole: a declared length over :data:`STREAM_MOST` is answered
+413 at once, and the route counts what comes, so a video of 200 MB never sits in memory."""
 
 import json
 from collections.abc import Callable
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from dotagent.agent.attachments import MAX_MEDIA_BYTES
+
 # The most bytes of a body of a route that needs the token or a phone's key, and of one that needs neither.
 MOST: int = 32 * 1024 * 1024
 PUBLIC_MOST: int = 4 * 1024
+# The route that takes a file as the raw body, and the most a body of it may declare (the route's own cap is exact).
+STREAM_PATH: str = "/api/attachments/stream"
+STREAM_MOST: int = MAX_MEDIA_BYTES
 
 
 class BodyLimit:
@@ -34,10 +41,15 @@ class BodyLimit:
             await self._app(scope, receive, send)
             return
         path: str = scope["path"]
-        limit: int = self._most if self._guarded(path) else self._public_most
+        guarded: bool = self._guarded(path)
+        streams: bool = guarded and path == STREAM_PATH and scope["method"] == "PUT"
+        limit: int = STREAM_MOST if streams else self._most if guarded else self._public_most
         declared: int | None = _declared(scope)
         if declared is not None and declared > limit:
             await _too_large(send, limit, path)
+            return
+        if streams:
+            await self._app(scope, receive, send)
             return
         # A request carries a body only with a length or a transfer coding (HTTP/1.1): one without (a page, the stream
         # of events) goes on as it came, never waited on for a body it has not.

@@ -16,11 +16,12 @@ TR: dict[str, str] = {
     "OK": "Tamam",
     "Photos and videos": "Fotoğraflar ve videolar",
     "Trim video": "Videoyu kırp",
-    "Over the 20 MiB limit": "20 MiB sınırını aşıyor",
+    "Over the 200 MiB limit": "200 MiB sınırını aşıyor",
     "Preparing attachments…": "Ekler hazırlanıyor…",
     "Could not add attachment": "Ek eklenemedi",
     "At most 10 attachments can go with a message.": "Bir mesajla en fazla 10 ek gönderebilirsiniz.",
     "%@ is %@. The limit is 20 MiB per attachment.": "%@ boyutu %@. Ek başına sınır 20 MiB.",
+    "%@ is %@. The limit is 200 MiB for a video or a sound.": "%@ boyutu %@. Video veya ses için sınır 200 MiB.",
     "Could not prepare %@ as a video.": "%@ video olarak hazırlanamadı.",
     "Could not read %@. Choose a file.": "%@ okunamadı. Bir dosya seçin.",
     "The image could not be read.": "Görüntü okunamadı.",
@@ -858,6 +859,7 @@ TR: dict[str, str] = {
     "Recent": "Son",
     "Search chats": "Sohbetlerde ara",
     "Start one with the pencil above.": "Yukarıdaki kalemle bir tane başlat.",
+    "updates versions resume restart continue performance battery hangs crashes": "güncellemeler sürümler sürdür yeniden başlat devam performans pil donma çökme",
     "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
     # V1 (items 1838-1840): watch the Mac, follow a run live, take its page over. Words of the web's watch.* and
     # computer.js where they exist.
@@ -1425,6 +1427,30 @@ EN_PLURALS.update(
         "%lld minutes before an event": ("%lld minute before an event", "%lld minutes before an event"),
         "%lld decisions made for you (%@)": ("%lld decision made for you (%@)", "%lld decisions made for you (%@)"),
         "%lld actions": ("%lld action", "%lld actions"),
+    }
+)
+# Item 1926: the phone's own performance record in Settings › Maintenance.
+TR.update(
+    {
+        "This phone's performance": "Bu telefonun performansı",
+        "Nothing measured yet. iOS hands its measures about once a day; they go to your Mac only.": "Henüz ölçüm yok. iOS ölçümlerini günde bir kez kadar verir; yalnızca Mac'ine gider.",
+        "The last %lld days, measured by iOS and by Dot on this phone. Kept on your Mac only.": "Son %lld gün; iOS ve bu telefondaki Dot ölçtü. Yalnızca Mac'inde saklanır.",
+        "Processor": "İşlemci",
+        "%@ s in %@ min open": "%2$@ dk açıkken %1$@ sn",
+        "Hangs": "Donmalar",
+        "None": "Yok",
+        "%lld reported · %@ s": "%lld rapor · %@ sn",
+        "Crashes": "Çökmeler",
+        "Launch": "Açılış",
+        "%@ ms": "%@ ms",
+        "Memory at most": "En yüksek bellek",
+        "%@ MB": "%@ MB",
+        "Data with your Mac": "Mac'inle veri",
+        "%@ MB in · %@ MB out": "%1$@ MB gelen · %2$@ MB giden",
+        "Reconnects": "Yeniden bağlanmalar",
+        "%lld in %@ min": "%2$@ dk'da %1$lld",
+        "Redraws": "Yeniden çizimler",
+        "%@ a minute": "dakikada %@",
     }
 )
 # G1(a): a new scheduled task and its history.

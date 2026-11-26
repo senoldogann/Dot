@@ -12,6 +12,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1952](1952.md) | ** done | 2026-11-26 | A schedule's run that only the owner can unblock ends done and waiting, and its next firings skip that part |
 | [1951](1951.md) | no status |  | A schedule whose chat is busy waits for it, due, instead of skipping the firing |
 | [1950](1950.md) | no status |  | A schedule that goes on in its chat reads what was said there, not every step of its earlier runs |
+| [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
+| [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
+| [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |
+| [1944](1944.md) | done | 2026-11-26 | The daemon no longer freezes on a path's classification or a log line |
 | [1941](1941.md) | done | 2026-11-26 | A restart whose load launchd refuses tries again with waits that grow |
 | [1940](1940.md) | done | 2026-11-26 | An OpenCode run that hangs ends: a silence watch, and the time limit kept by the clock |
 | [1939](1939.md) | done | 2026-11-26 | A review model whose key is missing no longer crashes a long run |
@@ -19,11 +23,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1937](1937.md) | done | 2026-11-26 | The night's update syncs the environment to main's lock before it restarts |
 | [1936](1936.md) | done | 2026-11-26 | A red night of the browser suite keeps main red |
 | [1935](1935.md) | done | 2026-11-26 | DotNext opens an answer's links and files in place |
+| [1933](1933.md) | done | 2026-11-26 | A phone's video is sent by target bitrate and streamed to disk, so a quarter of an hour fits |
 | [1932](1932.md) | done | 2026-11-26 | DotNext's chat settles when nothing happens: the asks scene no longer holds the phone at 100% CPU |
 | [1930](1930.md) | done | 2026-11-26 | DotNext attaches videos and files from the composer |
 | [1929](1929.md) | done | 2026-11-26 | Check goals and helper results on a model of another family |
 | [1928](1928.md) | done | 2026-11-26 | Route new runs and helpers by task kind |
 | [1927](1927.md) | done | 2026-11-26 | DotNext says "Pending" under the owner's message until the Mac took it |
+| [1926](1926.md) | done | 2026-11-26 | DotNext's live streaming is light on the iPhone's battery and data, measured before and after, and the app's own performance record goes to the owner's Mac |
 | [1924](1924.md) | done | 2026-11-26 | DotNext's composer is one capsule with the model as its provider's mark |
 | [1923](1923.md) | done | 2026-11-26 | DotNext's open chat never changes by itself when a newer chat of the bot comes |
 | [1922](1922.md) | done | 2026-11-26 | DotNext's "This chat" sheet is plain and compact |

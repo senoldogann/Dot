@@ -618,12 +618,17 @@ Dot keeping a link to the phone from the Mac is another thing: see [Dot and your
 ## Attachments on Dot Next and the web
 
 In a new or existing Dot Next chat, tap **+** to open the photo library for photos and videos, take a photo or record a
-video with Camera, or choose a document with Files. The phone exports video as 720p MP4 with sound, and shows its
-thumbnail, duration and upload size. If it exceeds 20 MiB, tap **Trim video** on the chip and choose a shorter part.
-Files show their name, type and size. Up to 10 attachments go with a message.
+video with Camera, or choose a document with Files. The phone re-encodes video for a target size, not a preset
+(item 1933): H.264 at 1.8 Mbps with 80 kbps AAC sound, its longest side at most 1280 pixels, at most 30 frames a
+second, so a minute is about 14 MB and a quarter of an hour fits the limit. It shows the video's thumbnail, duration and
+upload size. A video or a sound goes to the daemon as the raw body of `PUT /api/attachments/stream` with the phone's
+key, read from a file as it is sent and written to the Mac's disk as it arrives, up to 200 MiB; a photo or a document
+goes as base64 in JSON (`POST /api/attachments`), up to 20 MiB. Only a video over 200 MiB (about 15 minutes) gets
+**Trim video** on its chip, to choose a shorter part. Files show their name, type and size. Up to 10 attachments go
+with a message.
 
 After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
-After cancellation, tap **Try again** to retry the message. On the Mac, choose **+ › Add files** in the web composer
+The outbox keeps a video as a file of its own beside its record, so a message waiting for the link does not hold it in memory. After cancellation, tap **Try again** to retry the message; a transfer that was cut leaves no part of the file on the Mac. On the Mac, choose **+ › Add files** in the web composer
 or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
 
 ## The iPhone app's calls
@@ -666,6 +671,8 @@ paired`) and nothing is kept for it.
 | `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
 | `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
 | `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
+| `POST /api/phone/metrics` | the phone's key | 1926 | 204, the phone's performance record kept |
+| `GET /api/phone/metrics` | the phone's key | 1926 | 200, its summary of the last seven days |
 
 What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
 wait on you (item 1422; [below](#what-the-daemon-pushes-to-the-app)); `GET /api/away` lists more runs and says each run's
@@ -773,6 +780,34 @@ switch moves at once, a second flip while a write is on its way waits and goes a
 a write the daemon does not keep (a refusal, or no answer) puts the switches back to what the daemon held and says so in a
 plain line. With no answer to the read the phone shows the switches as it last knew them (kept in `awareness.json` of the
 cache folder), dimmed, and they do not move: a switch that cannot be kept is no switch.
+
+### POST /api/phone/metrics and GET /api/phone/metrics
+
+The phone's own performance record (item 1926), which Dot Next shows in Settings › System › Maintenance under **This
+phone's performance**. The app sends what iOS's MetricKit measured of it (about once a day: CPU and GPU time, the time on
+screen and in the background, hang time, the median launch, the memory's peak, disk writes, cellular and Wi-Fi data, the
+scroll hitches; and with a diagnostics delivery the count of its crash, hang, CPU and disk-write reports, never their
+contents) and its own counters of each time it was open (the seconds, the bytes it read from and sent to the Mac, its
+requests, the streams it opened and those that broke, how often it redrew a chat). Only numbers come: no chat's words,
+no path, no stack. The reports wait on the phone and go when the app is open; nothing is sent from the background, and
+nothing goes anywhere but the paired Mac.
+
+`POST` takes `{"reports": [...]}`, 1 to 50 reports, each with `source` (`metrickit` or `app`), `begins_at` and `ends_at`
+(Unix seconds), `app_version` and `os_version` (at most 40 characters each) and the measures it has, each optional and
+not below zero: `foreground_s`, `background_s`, `cpu_s`, `gpu_s`, `hang_s`, `launch_ms`, `peak_memory_mb`,
+`disk_writes_mb`, `cellular_mb`, `wifi_mb`, `scroll_hitch_ms_per_s`, `crashes`, `hang_reports`, `cpu_exceptions`,
+`disk_write_exceptions`, `open_s`, `bytes_in`, `bytes_out`, `requests`, `stream_opens`, `stream_breaks`, `redraws`. The
+daemon keeps the newest 300 reports of the last 30 days for the phone whose key sent them and answers 204. Any other key,
+a value of another type or a report too many is a 422 and nothing of the request is kept.
+
+`GET` answers the last seven days summed: `days`, `reports`, `last_at`, `app_version` (the newest report's), from
+MetricKit's `foreground_min`, `cpu_s`, `hang_s`, `launch_ms` (the newest), `peak_memory_mb` (the highest),
+`disk_writes_mb`, `cellular_mb`, `wifi_mb`, `crashes`, `hang_reports`, `cpu_exceptions`, `disk_write_exceptions`, and from
+the app's own `open_min`, `dot_in_mb`, `dot_out_mb`, `requests`, `reconnects` (the streams that broke) and
+`redraws_per_min`. Before the first report `reports` is 0.
+
+Errors: 403 for the Mac's token (a record is a phone's own; one phone never reads another's); 404 for a phone removed
+while its `POST` was on its way. Removing a phone drops its record.
 
 ### GET /api/needs-you
 
@@ -1069,7 +1104,9 @@ then `synchronized` (`{revision, runs: {run id: newest event id sent}}`), and go
 the chat (its `run_queued` first) and every helper a followed run starts come on the same stream, which no run's end
 closes. Each frame is an event as `/api/runs/{id}/stream` sends it (`id:` for a stored one, `event:` its kind, `data:`
 the event); the words being written (`delta`) have id 0 and only add to the step being written, which a client that
-connected mid-step shows as being written until the step's stored event comes. `thread_changed` (`{thread_id,
+connected mid-step shows as being written until the step's stored event comes. The words go out at most about twelve
+times a second (item 1926): the tokens a model writes within 80 ms of each other, of the same run, step and kind, come
+joined in one `delta`, so a phone wakes for a few tokens at a time, not one; any other event sends the words held first. `thread_changed` (`{thread_id,
 revision, deleted}`, id 0) says the chat's revision moved: read the view again. `deleted: true` ends the stream.
 Cursors are per run because event ids are one order for all runs but not told in that order: a run of a `dotx` command
 reaches the daemon half a second late, and two runs stored at once may be told the other way round. A stream that falls

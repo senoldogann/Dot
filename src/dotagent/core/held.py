@@ -9,6 +9,7 @@ import errno
 import os
 import stat
 from collections.abc import Sequence
+from io import BufferedWriter
 from pathlib import Path
 
 
@@ -82,8 +83,14 @@ def read_regular(path: Path) -> bytes:
         return handle.read()
 
 
+def open_new(folder: int, name: str) -> BufferedWriter:
+    """Make the file ``name`` in the open folder ``folder`` and open it to write: never over a file or a link that is
+    there. The caller closes it. Blocking."""
+    return os.fdopen(os.open(name, _NEW, _NEW_FILE_MODE, dir_fd=folder), "wb")
+
+
 def write_new(folder: int, name: str, data: bytes) -> None:
     """Make the file ``name`` in the open folder ``folder`` with ``data``: never over a file or a link that is there.
     Blocking."""
-    with os.fdopen(os.open(name, _NEW, _NEW_FILE_MODE, dir_fd=folder), "wb") as handle:
+    with open_new(folder, name) as handle:
         handle.write(data)

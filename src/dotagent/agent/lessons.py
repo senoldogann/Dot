@@ -246,6 +246,7 @@ def run_signals(
     check sent it back (``goal_check`` events), the paths its answer named that did not exist (``answer_paths``
     events), and the owner's dislike of the earlier run this one follows up (``disliked``: the reactions that started
     it, item 654). Empty when nothing went wrong."""
+    # A run sent back to better a goal it had reached (``improve``, item 1946) did nothing wrong: only ``continue``.
     sent_back: list[_GoalCheckData] = [
         data
         for data in (_GoalCheckData.model_validate(event.data) for event in checks)

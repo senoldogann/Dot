@@ -441,7 +441,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
-  each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  each, a video or a sound up to 200 MB, sent as the raw body of `PUT /api/attachments/stream` and written to disk as
+  it arrives, as is any file over 2 MB, item 1933). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
   the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it

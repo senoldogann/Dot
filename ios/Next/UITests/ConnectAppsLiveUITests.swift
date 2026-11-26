@@ -14,7 +14,8 @@ final class ConnectAppsLiveUITests: XCTestCase {
         app.launchArguments = ["-DotNextScene", "settings", "-DotNextHost", host, "-DotNextKey", key, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
-        let row: XCUIElement = app.scrollViews.buttons.matching(NSPredicate(format: "label == %@", "Connect apps")).firstMatch
+        // The row reads "Connect apps, Search plugins" since items 1881-1885.
+        let row: XCUIElement = app.scrollViews.buttons.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", "Connect apps", "Connect apps,")).firstMatch
         for _ in 0..<6 where !row.isHittable { app.swipeUp() }
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         row.tap()

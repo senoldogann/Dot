@@ -132,6 +132,15 @@ public enum ListReducer {
         }
     }
 
+    /// Whether a frame of the list's stream tells a lifecycle event (a run, an ask, a draft, a queue): not a chat's
+    /// change, a resync, a keepalive's defect or words. Pure.
+    public static func isLifecycle(_ frame: StreamFrame) -> Bool {
+        switch frame {
+        case .event, .live: true
+        case .threadChanged, .resync, .defect, .delta, .synchronized: false
+        }
+    }
+
     static func settle(_ state: ListProjection) -> (ListProjection, [ListEffect]) {
         var next: ListProjection = state
         if next.marks.streamOpen, next.marks.viewConnection == next.marks.connection, next.revision != nil {

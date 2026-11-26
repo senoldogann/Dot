@@ -28,7 +28,7 @@ import time
 from collections.abc import AsyncIterator, Mapping
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from dotagent.agent.helper_reports import kept_detached
 from dotagent.agent.manager import RunManager
@@ -79,6 +79,11 @@ SYNCHRONIZED_EVENT: str = "synchronized"
 WATCH_S: float = 0.5
 # The keepalive of the new streams: a client takes one silent for 12 s as broken (two missed and some room).
 HEARTBEAT_S: float = 5.0
+# The words being written (``delta``, id 0) of the chat's stream go out at most this often, the tokens that came
+# meanwhile joined into one frame (item 1926): a phone's radio and CPU wake about twelve times a second while a model
+# writes, not once a token, and the frames' own bytes are paid once for several tokens.
+DELTA_BATCH_S: float = 0.08
+DELTA_EVENT: str = "delta"
 # The most runs a view holds, and the most events of its newest run.
 MOST_RUNS: int = 50
 NEWEST_EVENTS: int = 200
@@ -553,15 +558,33 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
         dropped: int = 0
         owed: bool = False
         written: float = time.monotonic()
+        # Words being written, held for up to DELTA_BATCH_S so that a model's tokens go out a few at a time (item 1926).
+        held: EventRecord | None = None
+        held_since: float = 0.0
         while True:
-            due: float = (FLUSH_S if owed else HEARTBEAT_S) - (time.monotonic() - written)
+            now: float = time.monotonic()
+            if held is not None:
+                due: float = DELTA_BATCH_S - (now - held_since)
+            else:
+                due = (FLUSH_S if owed else HEARTBEAT_S) - (now - written)
             incoming: EventRecord | None = await next_event(feed.queue, ctx.stopping, max(0.0, due))
             if incoming is None:
                 if ctx.stopping.is_set():
                     return
-                owed, written = False, time.monotonic()
-                yield KEEPALIVE
+                owed, written = held is not None, time.monotonic()
+                yield encode_event(held) if held is not None else KEEPALIVE
+                held = None
                 continue
+            if held is not None and incoming.kind == DELTA_EVENT:
+                joined: EventRecord | None = merged_delta(held, incoming)
+                if joined is not None:
+                    held = joined
+                    continue
+            # Anything else goes out after the words held, in the order it came; an event this stream does not send
+            # leaves them held.
+            before: EventRecord | None = held
+            head: bytes = encode_event(held) if held is not None else b""
+            held = None
             if feed.dropped != dropped:
                 dropped = feed.dropped
                 # The start of a run of the chat, or of a helper, may be among what was lost: the members are found
@@ -577,7 +600,8 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
                         child.id for child in await store.list_child_runs(member) if child.created_at >= opened
                     )
                 told, deleted = await changed_now()
-                caught: bytes = await stored() + told
+                caught: bytes = head + await stored() + told
+                head, before = b"", None
                 owed, written = True, time.monotonic()
                 yield caught
                 if deleted:
@@ -585,24 +609,45 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
             if incoming.kind == THREAD_CHANGED_EVENT:
                 change: ThreadChanged = ThreadChanged.model_validate(incoming.data)
                 if change.thread_id != thread_id:
+                    held = before
                     continue
                 owed, written = True, time.monotonic()
-                yield encode_event(incoming)
+                yield head + encode_event(incoming)
                 if change.deleted:
                     return
                 continue
-            if incoming.kind in UNREAD_BY_PAGES:
+            if incoming.kind in UNREAD_BY_PAGES or (incoming.run_id not in family and not await joins(incoming)):
+                held = before
                 continue
-            if incoming.run_id not in family:
-                if not await joins(incoming):
-                    continue
-                family.add(incoming.run_id)
+            family.add(incoming.run_id)
             if incoming.id > 0:
                 if incoming.id in sent:
+                    held = before
                     continue
                 sent.add(incoming)
+            elif incoming.kind == DELTA_EVENT:
+                # Held, after the words held before it went out.
+                if head:
+                    owed, written = True, time.monotonic()
+                    yield head
+                held, held_since = incoming, time.monotonic()
+                continue
             owed, written = True, time.monotonic()
-            yield encode_event(incoming)
+            yield head + encode_event(incoming)
+
+
+def merged_delta(held: EventRecord, incoming: EventRecord) -> EventRecord | None:
+    """``held`` with ``incoming``'s words after its own, when both are words being written (id 0) of the same run's same
+    step, of the same kind (thinking or text) and said as the same thing; ``None`` when they cannot be one frame."""
+    if incoming.kind != DELTA_EVENT or incoming.id != 0 or held.id != 0 or incoming.run_id != held.run_id:
+        return None
+    if any(held.data.get(field) != incoming.data.get(field) for field in ("kind", "step", "says")):
+        return None
+    before: JsonValue = held.data.get("text")
+    after: JsonValue = incoming.data.get("text")
+    if not isinstance(before, str) or not isinstance(after, str):
+        return None
+    return held.model_copy(update={"data": {**held.data, "text": before + after}, "ts": incoming.ts})
 
 
 async def follow_threads(bus: EventBus, stopping: asyncio.Event) -> AsyncIterator[bytes]:

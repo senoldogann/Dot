@@ -19,6 +19,8 @@ struct ComposerAttachment: Identifiable, Equatable {
     let preview: UIImage?
     let duration: Double?
     let icon: String
+    /// The temporary file a ready video or sound is sent from: it is removed when this is let go, so the chip holds it.
+    var holds: MovieFile? = nil
 
     var outgoing: OutgoingAttachment? {
         if case .ready(let file) = content { return file }
@@ -35,7 +37,7 @@ struct ComposerAttachment: Identifiable, Equatable {
     var size: String {
         let bytes: Int
         switch content {
-        case .ready(let file): bytes = file.data.count
+        case .ready(let file): bytes = file.byteCount
         case .needsTrim(_, _, let count): bytes = count
         }
         return Int64(bytes).formatted(.byteCount(style: .file))
@@ -46,9 +48,14 @@ struct ComposerAttachment: Identifiable, Equatable {
     }
 
     static func photo(_ image: UIImage) throws -> ComposerAttachment {
-        guard let data: Data = image.jpegData(compressionQuality: 0.8) else { throw ComposerMediaError.invalidImage }
+        // A picture goes at the upload size (a camera's 12 MP photo as about 1,600 px, not as itself), with a preview of the
+        // composer's size (item 1926).
+        let sized: UIImage = ImageSizing.fitted(image, longest: ImageSizing.upload)
+        guard let data: Data = sized.jpegData(compressionQuality: ImageSizing.quality) else { throw ComposerMediaError.invalidImage }
         try ComposerMediaError.checkSize(data.count, name: "Photo.jpg")
-        return ComposerAttachment(id: UUID(), content: .ready(OutgoingAttachment(name: "Photo.jpg", mediaType: "image/jpeg", data: data)), preview: image, duration: nil, icon: "photo")
+        return ComposerAttachment(
+            id: UUID(), content: .ready(OutgoingAttachment(name: "Photo.jpg", mediaType: "image/jpeg", data: data)), preview: ImageSizing.fitted(sized, longest: ImageSizing.preview),
+            duration: nil, icon: "photo")
     }
 
     static func document(_ url: URL) async throws -> ComposerAttachment {
@@ -60,6 +67,13 @@ struct ComposerAttachment: Identifiable, Equatable {
         let type: UTType = info.contentType ?? .data
         if type.conforms(to: .movie) || type.conforms(to: .video) {
             return try await video(MovieFile.copy(url), name: name)
+        }
+        if type.conforms(to: .audio) {
+            // A sound goes as it is, as a file (item 1933): the daemon keeps it for watch_video up to the video's limit.
+            guard bytes <= OutgoingAttachment.maximumMediaBytes else { throw ComposerMediaError.tooLargeMedia(name, bytes) }
+            let copy: MovieFile = try MovieFile.copy(url)
+            let sound: OutgoingAttachment = OutgoingAttachment(name: name, mediaType: type.preferredMIMEType ?? "audio/mpeg", file: copy.url, byteCount: bytes)
+            return ComposerAttachment(id: UUID(), content: .ready(sound), preview: nil, duration: nil, icon: "waveform", holds: copy)
         }
         try ComposerMediaError.checkSize(bytes, name: name)
         let data: Data = try Data(contentsOf: url)
@@ -74,12 +88,17 @@ struct ComposerAttachment: Identifiable, Equatable {
         defer { withExtendedLifetime(source) {} }
         let asset: AVURLAsset = AVURLAsset(url: source.url)
         let duration: Double = try await asset.load(.duration).seconds
-        guard duration.isFinite, duration > 0,
-            let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPreset1280x720)
-        else { throw ComposerMediaError.invalidVideo(name) }
+        guard duration.isFinite, duration > 0 else { throw ComposerMediaError.invalidVideo(name) }
         let output: MovieFile = MovieFile(fileExtension: "mp4")
-        export.shouldOptimizeForNetworkUse = true
-        try await export.export(to: output.url, as: .mp4)
+        // Re-encoded for a target bitrate (item 1933, `VideoTarget`), not to a preset: a minute is about 14 MB.
+        do {
+            try await VideoTranscoder.export(from: source.url, to: output.url)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            composerLogger.error("Video export failed: \(String(describing: error), privacy: .public)")
+            throw ComposerMediaError.invalidVideo(name)
+        }
         let outputAsset: AVURLAsset = AVURLAsset(url: output.url)
         let generator: AVAssetImageGenerator = AVAssetImageGenerator(asset: outputAsset)
         generator.appliesPreferredTrackTransform = true
@@ -89,13 +108,11 @@ struct ComposerAttachment: Identifiable, Equatable {
             throw ComposerMediaError.invalidVideo(name)
         }
         let exportedName: String = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent + ".mp4"
-        let content: Content
-        if bytes > OutgoingAttachment.maximumBytes {
-            content = .needsTrim(output, name: exportedName, bytes: bytes)
-        } else {
-            content = .ready(OutgoingAttachment(name: exportedName, mediaType: "video/mp4", data: try Data(contentsOf: output.url)))
+        guard bytes > OutgoingAttachment.maximumMediaBytes else {
+            let video: OutgoingAttachment = OutgoingAttachment(name: exportedName, mediaType: "video/mp4", file: output.url, byteCount: bytes)
+            return ComposerAttachment(id: UUID(), content: .ready(video), preview: UIImage(cgImage: frame), duration: duration, icon: "film", holds: output)
         }
-        return ComposerAttachment(id: UUID(), content: content, preview: UIImage(cgImage: frame), duration: duration, icon: "film")
+        return ComposerAttachment(id: UUID(), content: .needsTrim(output, name: exportedName, bytes: bytes), preview: UIImage(cgImage: frame), duration: duration, icon: "film")
     }
 }
 
@@ -141,6 +158,7 @@ enum ComposerMediaError: LocalizedError {
     case invalidDocument(String)
     case invalidVideo(String)
     case tooLarge(String, Int)
+    case tooLargeMedia(String, Int)
     case tooMany
 
     static func checkSize(_ bytes: Int, name: String) throws {
@@ -157,6 +175,8 @@ enum ComposerMediaError: LocalizedError {
             String(localized: "Could not prepare \(name) as a video.", comment: "Composer attachment error; argument is the file name")
         case .tooLarge(let name, let bytes):
             String(localized: "\(name) is \(Int64(bytes).formatted(.byteCount(style: .file))). The limit is 20 MiB per attachment.", comment: "Composer attachment error; arguments are file name and size")
+        case .tooLargeMedia(let name, let bytes):
+            String(localized: "\(name) is \(Int64(bytes).formatted(.byteCount(style: .file))). The limit is 200 MiB for a video or a sound.", comment: "Composer attachment error; arguments are file name and size")
         case .tooMany:
             String(localized: "At most 10 attachments can go with a message.", comment: "Composer attachment count limit")
         }
@@ -222,7 +242,7 @@ struct ComposerAttachmentChip: View {
                         Text(verbatim: attachment.size).textRole(.label).foregroundStyle(Tone.secondary)
                     }
                     if attachment.outgoing == nil {
-                        Text(String(localized: "Over the 20 MiB limit", comment: "On a video chip when the exported video is still too big"))
+                        Text(String(localized: "Over the 200 MiB limit", comment: "On a video chip when the exported video is still too big"))
                             .textRole(.label).foregroundStyle(Tone.failure)
                     }
                 }

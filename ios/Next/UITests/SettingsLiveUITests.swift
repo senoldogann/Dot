@@ -91,8 +91,9 @@ final class SettingsLiveUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "High")).firstMatch.waitForExistence(timeout: 10))
         back(app)
 
-        // Rules: free mode, switched on on the Mac, switched off from the phone (a phone may).
-        open(app, "Rules")
+        // Permissions (the approval mode and the rules, items 1881-1885): free mode, switched on on the Mac, switched off
+        // from the phone (a phone may).
+        open(app, "Permissions")
         let free: XCUIElement = app.switches.matching(NSPredicate(format: "label BEGINSWITH %@", "Free mode")).firstMatch
         XCTAssertTrue(free.waitForExistence(timeout: 10))
         free.tap()

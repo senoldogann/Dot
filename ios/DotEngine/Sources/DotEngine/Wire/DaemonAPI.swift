@@ -61,6 +61,7 @@ public struct DaemonAPI: Sendable {
     func data(_ request: URLRequest, path: String, delegate: (any URLSessionTaskDelegate)?) async throws(DaemonRequestError) -> Data {
         let data: Data
         let response: URLResponse
+        Traffic.shared.requested(sending: request.httpBody?.count ?? 0)
         do {
             (data, response) = try await session.data(for: request, delegate: delegate)
         } catch let error as URLError {
@@ -71,6 +72,7 @@ public struct DaemonAPI: Sendable {
         guard let http: HTTPURLResponse = response as? HTTPURLResponse else {
             throw .transport(path: path, underlying: URLError(.badServerResponse))
         }
+        Traffic.shared.received(data.count)
         guard (200..<300).contains(http.statusCode) else {
             throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
         }
@@ -286,15 +288,52 @@ extension DaemonAPI {
     public func status() async throws(DaemonRequestError) -> DaemonStatus { try await get("/api/status", query: []) }
 
     public func uploadAttachment(name: String, jpeg: Data) async throws(DaemonRequestError) -> String {
-        try await uploadAttachment(OutgoingAttachment(name: name, mediaType: "image/jpeg", data: jpeg)) { _ in }
+        try await uploadAttachment(OutgoingAttachment(name: name, mediaType: "image/jpeg", data: jpeg), folder: FileManager.default.temporaryDirectory) { _ in }
     }
 
-    public func uploadAttachment(_ attachment: OutgoingAttachment, progress: @escaping @Sendable (Int) -> Void) async throws(DaemonRequestError) -> String {
-        let path: String = "/api/attachments"
-        let body: Data = Self.json(AttachmentUpload(name: attachment.name, mediaType: attachment.mediaType, dataB64: attachment.data.base64EncodedString()))
-        let request: URLRequest = request(method: "POST", path: path, query: [], body: body)
-        let reply: Data = try await data(request, path: path, delegate: AttachmentProgressDelegate(progress))
-        let stored: StoredAttachmentId = try decode(reply, path: path)
+    /// Keeps a file for a message to come and answers its id. Bytes go as base64 in JSON (`POST /api/attachments`); a
+    /// file goes as the raw body of `PUT /api/attachments/stream`, read from the disk as it is sent and written to the
+    /// daemon's disk as it arrives (item 1933). ``folder`` is where a `kept` file is found.
+    public func uploadAttachment(_ attachment: OutgoingAttachment, folder: URL, progress: @escaping @Sendable (Int) -> Void) async throws(DaemonRequestError) -> String {
+        switch attachment.content {
+        case .bytes(let bytes):
+            let path: String = "/api/attachments"
+            let body: Data = Self.json(AttachmentUpload(name: attachment.name, mediaType: attachment.mediaType, dataB64: bytes.base64EncodedString()))
+            let request: URLRequest = request(method: "POST", path: path, query: [], body: body)
+            let reply: Data = try await data(request, path: path, delegate: AttachmentProgressDelegate(progress))
+            let stored: StoredAttachmentId = try decode(reply, path: path)
+            return stored.id
+        case .file(let url):
+            return try await streamAttachment(attachment, from: url, progress: progress)
+        case .kept(let name):
+            return try await streamAttachment(attachment, from: folder.appending(path: name), progress: progress)
+        }
+    }
+
+    private func streamAttachment(_ attachment: OutgoingAttachment, from file: URL, progress: @escaping @Sendable (Int) -> Void) async throws(DaemonRequestError) -> String {
+        let path: String = "/api/attachments/stream"
+        var request: URLRequest = request(
+            method: "PUT", path: path,
+            query: [URLQueryItem(name: "name", value: attachment.name), URLQueryItem(name: "media_type", value: attachment.mediaType)], body: nil)
+        request.setValue(attachment.mediaType.isEmpty ? "application/octet-stream" : attachment.mediaType, forHTTPHeaderField: "Content-Type")
+        // A silence of this long ends the transfer; the whole may take as long as the link needs (the stream session has no limit on it).
+        request.timeoutInterval = 120
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await streamSession.upload(for: request, fromFile: file, delegate: AttachmentProgressDelegate(progress))
+        } catch let error as URLError {
+            throw .transport(path: path, underlying: error)
+        } catch {
+            throw .transport(path: path, underlying: URLError(.unknown))
+        }
+        guard let http: HTTPURLResponse = response as? HTTPURLResponse else {
+            throw .transport(path: path, underlying: URLError(.badServerResponse))
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
+        }
+        let stored: StoredAttachmentId = try decode(data, path: path)
         return stored.id
     }
 

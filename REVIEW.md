@@ -185,6 +185,12 @@ here points at a test that no longer exists.
 - `tests/unit/test_model_refusal.py::test_an_agent_a_campaign_and_a_queued_message_are_judged_by_the_model_they_would_run_on` — the
   first check covered `start_picked` and the queue's default model only, so a message to an agent, Keep going or a team, and an
   agent's own message in the queue, still started and failed with "missing API key" (item 1350's review).
+- `tests/unit/test_log_rotation.py::test_a_line_that_cannot_be_encoded_or_written_leaves_the_thread_writing_the_next_and_the_exit_returns` — the
+  log's writer thread ended on a line it could not encode (a lone surrogate), and every later line was lost and the exit
+  waited on a full queue (the pre-push review of item 1944).
+- `tests/unit/test_review_instructions.py::test_a_short_restriction_behind_a_long_newest_message_is_still_read` — a long
+  newest message, read whole, left a short "never email anyone" out of yolo's check of a tainted run, which asks nobody
+  (the security review of item 1947).
 - `tests/unit/test_freedom_contract.py::test_no_call_of_any_kind_asks_the_owner_but_what_the_contract_names` — the owner's
   word of 2026-11-24 (yolo and free mode never break): a call of any kind of tool, prepared by its own tool, must go
   through unasked in a yolo or free run, but for the payment, the message or mail and the post the contract names, and a
