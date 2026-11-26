@@ -12430,23 +12430,23 @@ dialog.teach {
 }
 
 .chat-mark-1 {
-  color: var(--character-blue);
+  color: var(--card-mark-1);
 }
 
 .chat-mark-2 {
-  color: var(--character-green);
+  color: var(--card-mark-2);
 }
 
 .chat-mark-3 {
-  color: var(--character-amber);
+  color: var(--card-mark-3);
 }
 
 .chat-mark-4 {
-  color: var(--character-violet);
+  color: var(--card-mark-4);
 }
 
 .chat-mark-5 {
-  color: var(--character-pink);
+  color: var(--card-mark-5);
 }
 
 .chat-chart :is(g, circle)[class^="chat-mark-"] {

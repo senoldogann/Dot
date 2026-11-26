@@ -25,7 +25,7 @@ command itself over its output (one that carries more than its command, a workin
 whole); a read wears an eye and a write a sheet of paper, and each says what it did ("Read notes.txt") without its
 tool's name, which a call keeps only where its words do not say what it is (item 506). A page
 the turn's run showed with `show_page` stands where it came, in its frame
-(item 426). That line opens and folds on a click while the run still works and after it ends,
+(item 426); the cards it showed with `show_cards` (item 1967) stand there too. That line opens and folds on a click while the run still works and after it ends,
 and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
@@ -673,7 +673,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Appearance      | `theme_read`, `theme_apply`, `theme_undo` |
 | Worktrees       | `track_coding_work` |
-| Pages           | `show_page`                                                                                                        |
+| Pages           | `show_page`, `show_cards` (item 1967)                                                                              |
 | Drafts          | `draft_message`                                                                                                    |
 | Mail, calendars | `mail_search`, `mail_read`, `calendar_events`; `pass_reply` (item 926, tool group `replies`): a reply to a mail a chat sent, handed to that chat |
 | Skills          | `skill`, `find_help`; `skill_save` (item 893, tool group `skills`): how the owner said to do a kind of work, kept   |
@@ -821,7 +821,7 @@ When you are to pick between things that are seen (a layout, a logo, a design), 
 drawn side by side on one page, each tappable, Dot's pick marked. A page that loads another page in its frame is closed,
 with Show it again. A page of up to 500,000 characters is kept in the database under an id that cannot be guessed, which
 is all it takes to read it (`GET /pages/<id>`, no token, never cached); it goes with its chat, and with the events of
-its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`. The system
+its run under `dotx prune`. `dotx run` prints the page's address. The tool is in the group `pages`, with `show_cards`. The system
 prompt asks for a page whenever an answer holds something with a shape (figures to compare, a trend, a ranking, a share,
 a timeline, the steps of a process, how parts connect, a place or a layout), rather than a long list or figures in text,
 one page a question and none for a single number. It asks for a page that lives: animated in (bars that grow, lines that
@@ -860,6 +860,16 @@ written in as base64 too, so it takes as much room. The pages of one step are sh
 the calls, so they stand in the conversation in that order (item 1721). The
 tool's answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it
 showed (item 601, [Browser](browser-and-computer-use.md)).
+
+**Cards in the conversation (item 1967).** `show_cards(cards)` shows up to six validated cards, in order, as one stored
+`cards_shown` event that the web UI draws live and in history: a post draft (platform, account, text, up to four raster
+images; copy, edit and cancel), a chart (line, bar, area, pie or scatter, with its data table), a table, a choice and an
+image gallery. The call is a `meta` action of no risk, so it asks nothing in any mode. A card is data: it carries no
+markup and no approval, and nothing is sent or published by it. Images are workspace rasters read through a held path
+under the rules of `show_page`'s files and stored with the other images. A choice sends its words as your next message
+at one tap (the words are the run's own, so a run that read untrusted pages can word them; they go through the ordinary
+message path). The phone's app and the channels do not draw cards yet (the system prompt does not ask for them until
+they do); the run's answer must not depend on one.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

@@ -1,12 +1,16 @@
 """The conversation accepts bounded card data and rejects ambiguous chart and action payloads."""
 
 import math
+from pathlib import Path
 
 import pytest
+from PIL import Image
 from pydantic import ValidationError
 
+from dotagent.core.errors import ToolInputError
 from dotagent.core.types import JsonObject
-from dotagent.tools.cards import Chart, ShowCardsArgs
+from dotagent.llm.types import ImageData
+from dotagent.tools.cards import Chart, ShowCardsArgs, WorkspaceImage, _image_data
 
 
 @pytest.mark.parametrize(
@@ -72,3 +76,16 @@ def test_valid_scatter_accepts_numeric_x_values() -> None:
     )
     assert chart.x == (-2, 0.5)
     assert chart.series[0].values == (0, 1)
+
+
+@pytest.mark.parametrize("path", ["/etc/hosts", "../outside.png", "mark.svg", "missing.png"])
+def test_an_image_that_is_not_a_workspace_raster_is_refused(tmp_path: Path, path: str) -> None:
+    (tmp_path / "mark.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+    with pytest.raises((ToolInputError, OSError, ValueError, SyntaxError)):
+        _image_data(WorkspaceImage(path=path, alt="A mark"), tmp_path, (), ())
+
+
+def test_a_workspace_png_is_read_with_its_media_type(tmp_path: Path) -> None:
+    Image.new("RGB", (2, 2)).save(tmp_path / "dot.png")
+    data: ImageData = _image_data(WorkspaceImage(path="dot.png", alt="A dot"), tmp_path, (), ())
+    assert data.media_type == "image/png"

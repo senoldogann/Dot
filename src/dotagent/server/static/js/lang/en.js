@@ -473,6 +473,7 @@ export const EN = {
   "tools.consult": "Ask a helper",
   "tools.notify": "Notify",
   "tools.showPage": "Show page",
+  "tools.showCards": "Show cards",
   "tools.draftMessage": "Draft message",
   "tools.askUser": "Ask you",
   "tools.askSecret": "Ask you for a secret",

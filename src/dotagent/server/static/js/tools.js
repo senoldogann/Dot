@@ -244,6 +244,7 @@ const TOOL_WORDS = {
   consult: "tools.consult",
   notify: "tools.notify",
   show_page: "tools.showPage",
+  show_cards: "tools.showCards",
   draft_message: "tools.draftMessage",
   ask_user: "tools.askUser",
   ask_secret: "tools.askSecret",

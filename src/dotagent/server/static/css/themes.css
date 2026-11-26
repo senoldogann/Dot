@@ -109,6 +109,13 @@
   --character-grey: #a3a3a3;
   --character-cream: light-dark(#d9d4c6, #f1efe9);
   --character-notify: #2496e8;
+  /* The five hues of a chat card's chart marks (item 1967), each held to 3:1 on every surface in both schemes
+     (tests/unit/test_css_tokens.py); the first mark is the ink. */
+  --card-mark-1: light-dark(#1d63c9, #5aa9f5);
+  --card-mark-2: light-dark(#0f7a4f, #3ecf8e);
+  --card-mark-3: light-dark(#9a5f00, #f0b429);
+  --card-mark-4: light-dark(#7a3fe0, #a78bfa);
+  --card-mark-5: light-dark(#b82d85, #f27cc9);
   /* The Claude mark of the composer's model pill (item 108), in Anthropic's own colour; every other mark is ink. */
   --mark-claude: #d97757;
   --knob: light-dark(#ffffff, #f5f5f5);

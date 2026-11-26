@@ -587,7 +587,7 @@ at), never from what a page says; its title is the page's own, shown as text and
 at most and counts the rest; a fetch that failed and a search read none.
 
 Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
-tables, image galleries and choices that send the chosen words as a chat message. Post drafts show the platform,
+tables, image galleries and choices whose tap sends the chosen words, which are the run's own, as your next chat message. Post drafts show the platform,
 account and text together, and related drafts scroll sideways. You can copy, edit or cancel a draft in the current
 view. **Prepare to publish** puts a text-only draft in the composer for you to review and send as a request.
 The resulting run goes through the existing post policy. Mail and iMessage drafts are sent through their own cards.

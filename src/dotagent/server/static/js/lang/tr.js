@@ -465,6 +465,7 @@ export const TR = {
   "tools.consult": "Yardımcıya sor",
   "tools.notify": "Bildir",
   "tools.showPage": "Sayfa göster",
+  "tools.showCards": "Kart göster",
   "tools.draftMessage": "Mesaj taslağı",
   "tools.askUser": "Size sor",
   "tools.askSecret": "Sizden gizli bilgi iste",
