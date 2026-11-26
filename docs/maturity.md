@@ -7,7 +7,8 @@ and succeeded, or by the owner trying it. A row with no such proof says **unprov
 **The limit is 30 days, checked every day, never in the gate.** `.github/workflows/maturity.yml` runs
 `scripts/maturity_lapsed.py` each morning: a row whose date is more than 30 days old fails that job, so GitHub shows it,
 and one issue titled "Maturity: proofs older than 30 days" lists the lapsed rows (opened the first time, its text
-replaced while any lapse, closed once none does). The gate checks only the table's shape (`scripts/check_maturity.py`:
+replaced while any lapse, closed once none does). The script exits 0 when no proof is stale, 1 when some are, and 2 when the table cannot be read: the workflow
+fails on 2 without touching the issue, so a broken table is never taken for stale rows. The gate checks only the table's shape (`scripts/check_maturity.py`:
 it reads, each feature once, each with how it was proven, its date a day and never after today): a date passes with the
 calendar and no change of code, and a gate that failed on it would hold every merge until someone proved a feature
 again. Why 30: in the 60 days to 2026-11-25 `main` took 1,739 commits, and in
