@@ -418,6 +418,15 @@ def test_the_prompt_says_that_a_run_that_chooses_asks_without_wait_when_it_can_g
     assert going_on not in _asking(UI_SOURCE, "choose", [])
 
 
+def test_a_delegated_run_is_told_to_end_at_its_open_pull_request_and_not_to_wait_for_its_checks() -> None:
+    """Item 1953: coding helpers polled `gh pr checks` and slept inside their runs (382 calls, 9.3 of the 29 hours of
+    helpers' shell time in a week, in 37 of 76 helper runs), each poll reading their whole context again."""
+    told: str = "end your run as soon as it is pushed and open"
+    assert told in _asking(DELEGATE_SOURCE, "leave", [])
+    assert told not in _asking(UI_SOURCE, "choose", [ASK_USER_TOOL])
+    assert told not in _asking(SCHEDULE_SOURCE, "leave", [ASK_USER_TOOL])
+
+
 def test_the_prompt_says_that_questions_are_left_only_in_a_run_that_leaves_them() -> None:
     left: str = "ask_user leaves your question for the user"
     assert left in _asking("cli", "leave", [ASK_USER_TOOL])
