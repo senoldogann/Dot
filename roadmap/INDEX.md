@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1935](1935.md) | done | 2026-11-26 | DotNext opens an answer's links and files in place |
 | [1922](1922.md) | done | 2026-11-26 | DotNext's "This chat" sheet is plain and compact |
 | [1921](1921.md) | done | 2026-11-26 | DotNext opens and closes a work-log row without a hitch |
 | [1919](1919.md) | done | 2026-11-26 | DotNext's chat moves the moment a message is sent, not 10-15 s later when the run's first event comes |
