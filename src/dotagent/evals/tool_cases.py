@@ -1,6 +1,9 @@
 """The cases of the eval of tool use (item 736), each from a failure the owner's runs met between 2026-10-13 and
 2026-10-27 (`failure` says which), told with made-up pages and files so that nothing of theirs is in it."""
 
+from dotagent.core.outcomes import OutcomeCheck
+from dotagent.desktop.render import render_act_outcome
+from dotagent.desktop.types import ActOutcome, AppView, SnapshotView, StepReport
 from dotagent.evals.toolcalls import Expected, PriorStep, ToolCase
 from dotagent.tools.web import NEXT_RUNG as REFUSED_NEXT
 
@@ -12,6 +15,70 @@ _PAGE_OPENED: str = (
 _TODO: str = "1\t# To do\n2\t- buy milk\n3\t- call the bank\n"
 _NOT_FOUND: str = (
     'the text to replace was not found; re-read the file and copy it exactly | context={"path": "notes/todo.md"}'
+)
+
+# Safari as desktop_open_app returns it: its window, its tab bar and the page as one web area (item 1960).
+_SAFARI_OPENED: str = (
+    "Snapshot · pid 4411 · full view · 25 elements\n"
+    '<screen_content nonce="5f0c" source="Safari">\n'
+    'view: window "Account - Developer"\n'
+    '[a1] window "Account - Developer" @695,429 1343x795\n'
+    "  [a2] tabs @695,429 1343x795\n"
+    '    [a3] button "Back" @720,150 28x28\n'
+    '    [a4] textfield "Address" "developer.example.invalid/account" @1100,150 500x28\n'
+    '    [a26] webarea "Account - Developer" @695,520 1343x700\n'
+    '      [a27] link "Certificates, Identifiers & Profiles" @800,400 260x20\n'
+    '</screen_content nonce="5f0c">'
+)
+# A batch whose last press the window shows done, as desktop_act renders it: the result's view holds the change
+# (item 1960).
+_REGISTERED: str = render_act_outcome(
+    ActOutcome(
+        steps=(
+            StepReport(
+                index=1,
+                description="set_value a12 'Domain' (11 chars)",
+                outcome="done",
+                detail="set the value",
+                dispatched="sent",
+                checks=(
+                    OutcomeCheck(
+                        condition="the field holds the text written",
+                        status="verified",
+                        evidence="read back",
+                        reason="",
+                    ),
+                ),
+            ),
+            StepReport(
+                index=2,
+                description="press a15 'Register'",
+                outcome="done",
+                detail='pressed button "Register" a15',
+                dispatched="sent",
+            ),
+        ),
+        stopped=None,
+        view=SnapshotView(
+            app=AppView(pid=5120, name="Mail Sources", bundle_id="com.example.mailsources", frontmost=True, windows=()),
+            heading='window "Mail Sources"',
+            mode="delta",
+            body=(
+                '  [a20] statictext "example.org" @420,310 120x18\n'
+                '  [a21] statictext "Registered · SPF verified" @560,310 180x18\n'
+                '  [a22] button "Add another source" @420,360 160x24'
+            ),
+            nodes=41,
+            shown=3,
+            omitted=0,
+            removed=2,
+            truncated=False,
+            notes=(),
+        ),
+        view_note=None,
+    ),
+    "Mail Sources",
+    "9a1e",
 )
 
 CASES: tuple[ToolCase, ...] = (
@@ -98,6 +165,45 @@ CASES: tuple[ToolCase, ...] = (
             ),
         ),
         expect=Expected(tools=("browser_read_text", "browser_snapshot", "browser_find"), forbid=("browser_eval",)),
+    ),
+    ToolCase(
+        id="safari-page-by-its-elements",
+        failure=(
+            "a run drove a signed-in Safari with 28 desktop_act calls, 16 screenshots and 10 snapshots, a look after "
+            "nearly every act (2026-11-26, the Apple Developer run)"
+        ),
+        goal=(
+            "In Safari, where I am signed in, open https://developer.example.invalid/account/services and press "
+            "Configure under Email Communication."
+        ),
+        prior=(PriorStep(tool="desktop_open_app", arguments={"app": "Safari"}, result=_SAFARI_OPENED),),
+        expect=Expected(
+            tools=("safari_open", "safari_read"), forbid=("desktop_screenshot", "desktop_snapshot", "desktop_act")
+        ),
+        desktop=True,
+    ),
+    ToolCase(
+        id="no-look-after-a-change-the-result-shows",
+        failure=(
+            "12 of 16 desktop_screenshot calls of one run came right after a desktop_act whose result already showed "
+            "the window's change (2026-11-26, the Apple Developer run)"
+        ),
+        goal="In the Mail Sources app on my Mac, register example.org as a source and tell me once it is registered.",
+        prior=(
+            PriorStep(
+                tool="desktop_act",
+                arguments={
+                    "app": "Mail Sources",
+                    "steps": [
+                        {"action": "set_value", "ref": "a12", "text": "example.org"},
+                        {"action": "press", "ref": "a15"},
+                    ],
+                },
+                result=_REGISTERED,
+            ),
+        ),
+        expect=Expected(tools=("finish",), forbid=("desktop_screenshot", "desktop_snapshot")),
+        desktop=True,
     ),
     ToolCase(
         id="search-code-with-the-search-tool",

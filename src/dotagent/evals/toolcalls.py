@@ -63,6 +63,8 @@ class ToolCase(FrozenModel):
     goal: str
     prior: tuple[PriorStep, ...] = ()
     expect: Expected
+    # Whether the moment is in the Mac's applications, whose tools an eval otherwise leaves off (item 1960).
+    desktop: bool = False
 
 
 class CaseResult(FrozenModel):
