@@ -11,6 +11,8 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 next=$(dirname "$here")
 derived=${1:?usage: check_strings.sh <derived data folder>}
+# The Turkish table is Python the translator workflow imports: a broken one fails here, not at the next regeneration.
+python3 -c "import sys; sys.path.insert(0, sys.argv[1]); import translations_tr" "$here" || { echo "translations_tr.py does not import" >&2; exit 2; }
 work=$(mktemp -d)
 data=$(find "$derived" -path '*DotNext.build*' -name '*.stringsdata' ! -name 'ExtractedAppShortcuts*')
 [ -n "$data" ] || { echo "no .stringsdata under $derived: build DotNext first" >&2; exit 2; }
