@@ -9675,7 +9675,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%@ bağlanılıyor…"
+            "value": "%@ cihazına yeniden bağlanılıyor…"
           }
         }
       }

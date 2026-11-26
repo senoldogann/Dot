@@ -140,6 +140,9 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(linkLine(transport: .up, freshness: .syncing, mac: "MacBook Air"), .syncing)
         XCTAssertNil(linkLine(transport: .up, freshness: .live, mac: "MacBook Air"), "a live chat on a healthy stream says nothing")
         XCTAssertNil(linkLine(transport: .keyRefused, freshness: .cached, mac: "MacBook Air"), "a refused key is the subtitle's")
+        XCTAssertEqual(linkLine(transport: .up, freshness: nil, mac: "MacBook Air"), .syncing, "a chat not loaded yet is brought up to date")
+        XCTAssertNil(linkLine(transport: .up, freshness: .deleted, mac: "MacBook Air"), "a deleted chat says so itself")
+        XCTAssertEqual(linkLine(transport: .connecting, freshness: .cached, mac: "MacBook Air"), .syncing, "the first connection brings it up to date")
         XCTAssertTrue(LinkLine.reconnecting(mac: "MacBook Air").words.contains("MacBook Air"), "the paired Mac by its name, in the phone's language")
     }
 }

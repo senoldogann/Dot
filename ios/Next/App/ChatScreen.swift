@@ -457,7 +457,6 @@ struct ChatScreen: View {
                 summary: WorkingSummary(
                     status: shownLink == nil ? capsuleStatus : nil, activity: activityWords,
                     since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil,
-                    // Without a live link, what waits is the phone's own: the messages in its outbox (item 1931).
                     // The chat's queue on the Mac, which the segment's sheet lists; the phone's own messages still to go
                     // say so under their bubbles ("Pending", "Waiting for the link"), item 1931.
                     queued: view?.queue.messages.count ?? 0,
