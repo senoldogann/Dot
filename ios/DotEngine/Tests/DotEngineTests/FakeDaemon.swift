@@ -23,6 +23,8 @@ final class FakeDaemon: @unchecked Sendable {
         var queue: [QueuedMessageView]
         var held: Bool
         var asks: [ApprovalRecord]
+        /// Its latest run ended after the owner last saw it (item 131); `PATCH {seen: true}` clears it.
+        var unread: Bool
     }
 
     let host: DaemonHost
@@ -145,7 +147,7 @@ final class FakeDaemon: @unchecked Sendable {
         let record: ThreadRecord = ThreadRecord(id: id, title: title, source: "ui", createdAt: 1, updatedAt: 1, agentId: nil)
         lock.withLock {
             revisionCounter += 1
-            chats[id] = Chat(record: record, revision: revisionCounter, pinnedAt: nil, queue: [], held: false, asks: [])
+            chats[id] = Chat(record: record, revision: revisionCounter, pinnedAt: nil, queue: [], held: false, asks: [], unread: false)
         }
         return record
     }
@@ -217,6 +219,14 @@ final class FakeDaemon: @unchecked Sendable {
     }
 
     /// Moves a chat's revision; `tell` false is a change whose `thread_changed` was lost.
+    /// The chat's latest run ended unseen: its row says unread, told to the list.
+    func markUnread(_ thread: String) {
+        lock.withLock { chats[thread]?.unread = true }
+        bump(thread, tell: true)
+    }
+
+    func isUnread(_ thread: String) -> Bool { lock.withLock { chats[thread]?.unread ?? false } }
+
     func bump(_ thread: String, tell: Bool) {
         let revision: Int? = lock.withLock {
             guard chats[thread] != nil else { return nil }
@@ -397,10 +407,13 @@ final class FakeDaemon: @unchecked Sendable {
         }
         if method == "PATCH", let found: [String] = Self.match(parts, ["api", "threads", "*"]) {
             let thread: String = found[0]
-            if let fields: [String: JSONValue] = try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data()),
-                let title: String = fields["title"]?.string
-            {
+            let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
+            if let title: String = fields["title"]?.string {
                 rename(thread, to: title, tell: true)
+            }
+            if let seen: Bool = fields["seen"]?.bool {
+                lock.withLock { chats[thread]?.unread = !seen }
+                bump(thread, tell: true)
             }
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
@@ -559,7 +572,7 @@ final class FakeDaemon: @unchecked Sendable {
         return ThreadSummary(
             id: chat.record.id, title: chat.record.title, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: chat.pinnedAt,
             runCount: 0, latestRunId: newest?.id ?? "", latestStatus: newest?.status ?? "done", latestCreatedAt: newest?.createdAt ?? 0,
-            unread: false, actorId: nil, lastMessage: "", lastRole: "user")
+            unread: chat.unread, actorId: nil, lastMessage: "", lastRole: "user")
     }
 
     func threadsView() -> ThreadsView {
