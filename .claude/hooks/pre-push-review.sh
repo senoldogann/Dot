@@ -104,10 +104,23 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   # check reads the working tree, so it is made for the branch that is checked out.
   if [[ -f "$repo_root/scripts/prompt_surface.py" ]] && git diff --name-only "$base..$local_sha" | grep -q '^src/dotagent/'; then
     if [[ "$(git rev-parse HEAD)" == "$local_sha" ]]; then
-      if ! surface=$(uv run python scripts/prompt_surface.py --check 2>&1); then
+      # What is checked is the commit that is pushed: with uncommitted changes in what the render reads, a fixture written
+      # and not committed would pass, and a source edit not committed would fail a commit that is fine.
+      if [[ -n "$(git status --porcelain -- src/dotagent scripts/prompt_surface.py tests/fixtures/prompt_surface)" ]]; then
+        echo "claude-review: push stopped; src/dotagent, scripts/prompt_surface.py or tests/fixtures/prompt_surface has" \
+          "changes that are not committed, so the prompt surface cannot be checked for what is pushed: commit or stash" \
+          "them first" >&2
+        exit 1
+      fi
+      status=0
+      surface=$(uv run python scripts/prompt_surface.py --check 2>&1) || status=$?
+      if ((status == 3)); then
         echo "claude-review: push stopped; the prompt surface is stale: $surface" >&2
         echo "claude-review: run \`uv run python scripts/prompt_surface.py\`, commit tests/fixtures/prompt_surface and push" \
           "again" >&2
+        exit 1
+      elif ((status != 0)); then
+        echo "claude-review: push stopped; the prompt surface could not be checked (exit $status): $surface" >&2
         exit 1
       fi
     else

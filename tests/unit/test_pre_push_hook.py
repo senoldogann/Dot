@@ -91,13 +91,15 @@ def _run_hook_on(
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
-    # `uv run python scripts/prompt_surface.py --check` (item 1971): records that it ran, and fails with what `uv_says`
-    # holds when that file is there.
+    # `uv run python scripts/prompt_surface.py --check` (item 1971): records that it ran, and when `uv_exit` is there
+    # fails with that exit status and what `uv_says` holds.
     uv: Path = bin_dir / "uv"
     uv.write_text(
         "#!/bin/sh\n"
         f'echo "$@" >> "{tmp_path / "uv_called"}"\n'
-        f'if [ -f "{tmp_path / "uv_says"}" ]; then cat "{tmp_path / "uv_says"}" >&2; exit 1; fi\n'
+        f'if [ -f "{tmp_path / "uv_exit"}" ]; then\n'
+        f'  cat "{tmp_path / "uv_says"}" >&2; exit "$(cat "{tmp_path / "uv_exit"}")"\n'
+        "fi\n"
         'echo "prompt surface: up to date"\n',
         encoding="utf-8",
     )
@@ -403,6 +405,12 @@ def test_a_block_that_counts_no_important_finding_is_not_taken_as_read(repo: Pat
     assert "later.txt" in diff and "unread.txt" in diff
 
 
+def _uv_fails(tmp_path: Path, status: int, says: str) -> None:
+    """Makes the stand-in `uv` fail with ``status`` and ``says``."""
+    (tmp_path / "uv_says").write_text(f"{says}\n", encoding="utf-8")
+    (tmp_path / "uv_exit").write_text(f"{status}\n", encoding="utf-8")
+
+
 def _with_surface_script(repo: Path) -> str:
     """Puts the script the hook looks for into the branch, and returns the tip before the branch's next commit."""
     (repo / "scripts").mkdir(exist_ok=True)
@@ -429,7 +437,7 @@ def test_a_stale_prompt_surface_stops_the_push_with_the_command_that_fixes_it_an
     remote_tip: str = _with_surface_script(repo)
     (repo / "src" / "dotagent").mkdir(parents=True)
     tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
-    (tmp_path / "uv_says").write_text("prompt surface: stale (tools.json)\n", encoding="utf-8")
+    _uv_fails(tmp_path, 3, "prompt surface: stale (tools.json)")
     done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
     assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
     assert "the prompt surface is stale" in done.stderr
@@ -439,7 +447,49 @@ def test_a_stale_prompt_surface_stops_the_push_with_the_command_that_fixes_it_an
 def test_a_change_outside_src_dotagent_does_not_run_the_prompt_surface_check(repo: Path, tmp_path: Path) -> None:
     remote_tip: str = _with_surface_script(repo)
     tip: str = _commit(repo, "docs.md", "words\n", "docs")
-    (tmp_path / "uv_says").write_text("stale\n", encoding="utf-8")
+    _uv_fails(tmp_path, 3, "stale")
     done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
     assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert not (tmp_path / "uv_called").exists()
+
+
+def test_a_check_that_failed_to_run_is_not_reported_as_a_stale_surface(repo: Path, tmp_path: Path) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    _uv_fails(tmp_path, 1, "ModuleNotFoundError: no module named dotagent")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "could not be checked (exit 1)" in done.stderr and "ModuleNotFoundError" in done.stderr
+    assert "is stale" not in done.stderr
+
+
+def test_uncommitted_changes_to_what_the_surface_is_made_of_stop_the_push_instead_of_a_check_of_another_tree(
+    repo: Path, tmp_path: Path
+) -> None:
+    """The review of item 1971: a fixture written and not committed passed the check while the pushed commit kept the
+    stale one."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    (repo / "tests" / "fixtures" / "prompt_surface").mkdir(parents=True)
+    (repo / "tests" / "fixtures" / "prompt_surface" / "tools.json").write_text("{}\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "not committed" in done.stderr and "commit or stash" in done.stderr
+    assert not (tmp_path / "uv_called").exists()
+
+
+def test_a_branch_that_is_not_checked_out_is_not_checked_and_says_so(repo: Path, tmp_path: Path) -> None:
+    """The check reads the working tree, so a push of another branch goes on to its review with a note."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    _git(repo, "checkout", "-q", "main")
+    (repo / "scripts").mkdir(exist_ok=True)
+    (repo / "scripts" / "prompt_surface.py").write_text("# stand-in\n", encoding="utf-8")
+    _uv_fails(tmp_path, 3, "stale")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert "is not checked out, so its prompt surface is not checked here" in done.stderr
     assert not (tmp_path / "uv_called").exists()

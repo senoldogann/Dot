@@ -3,7 +3,8 @@ a few kinds of run and every built-in tool's schema (:mod:`dotagent.evals.prompt
 alters what the model is told, and commit the files with the change: ``tests/unit/test_prompt_surface.py`` fails until
 they match, and the review reads the change as their diff.
 
-With ``--check`` it writes nothing: it lists the files that are stale and exits 1 (item 1971: the pre-push hook runs it,
+With ``--check`` it writes nothing: it lists the files that are stale and exits 3 (any other failure exits 1 or 2 as
+Python does; item 1971: the pre-push hook runs it,
 since that test runs on macOS only and a pull request's Linux jobs never see a stale fixture).
 
 Usage: uv run python scripts/prompt_surface.py [--check]
@@ -16,6 +17,8 @@ from pathlib import Path
 from dotagent.evals.prompt_surface import SURFACE_DIR, render_surface, stale_files, write_surface
 
 FIX: str = "uv run python scripts/prompt_surface.py"
+# The exit status of a check that found a stale fixture, which tells it from a script that failed.
+STALE_EXIT: int = 3
 
 
 def main() -> int:
@@ -33,7 +36,7 @@ def main() -> int:
             f"prompt surface: stale ({', '.join(changed)}). Run `{FIX}` and commit {SURFACE_DIR} with the change.",
             file=sys.stderr,
         )
-        return 1
+        return STALE_EXIT
     write_surface(folder, rendered)
     print(f"changed: {', '.join(changed)}" if changed else "unchanged")
     print(rendered["summary.txt"], end="")
