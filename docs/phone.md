@@ -118,7 +118,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
    what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
    dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
-   `helpers` and `background` and are read again when a chat's revision moves, item 1920) is a native SwiftUI app over the
+   `helpers` and `background` and are read again when a chat's revision moves, item 1920; chats selected together are deleted
+   in one request and leave every screen at once, coming back if the Mac refuses, and the list refills with older chats
+   after a deletion, item 1964-1965; Settings › General › Language chooses English or Türkçe whatever the iPhone's,
+   item 1966) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in (a file an answer's words name is its name after its kind's symbol, in
    the words, and opens a preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open

@@ -22,6 +22,24 @@ final class ChatListTests: XCTestCase {
         XCTAssertNotEqual(AppModel.newChatDraft(agent: "agt_scout"), AppModel.newChatDraft(agent: "agt_writer"))
     }
 
+    /// Item 1966: the app's own language, as iOS keeps it.
+    func testTheAppsLanguageIsReadFromWhatIOSKeepsForIt() {
+        XCTAssertEqual(AppLanguage.chosen(kept: []), .iPhone)
+        XCTAssertEqual(AppLanguage.chosen(kept: ["tr"]), .turkish)
+        XCTAssertEqual(AppLanguage.chosen(kept: ["en-FI"]), .english, "a region after the language")
+        XCTAssertEqual(AppLanguage.chosen(kept: ["fi"]), .iPhone, "a language the app does not speak")
+        XCTAssertTrue(AppLanguage.turkish.isSpoken(running: "tr"))
+        XCTAssertFalse(AppLanguage.turkish.isSpoken(running: "en"), "the page says it applies from the next start")
+        XCTAssertTrue(AppLanguage.iPhone.isSpoken(running: "en"))
+        let suite: String = "item1966-\(UUID().uuidString)"
+        let defaults: UserDefaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        AppLanguage.turkish.keep(defaults)
+        XCTAssertEqual(defaults.stringArray(forKey: "AppleLanguages"), ["tr"])
+        AppLanguage.iPhone.keep(defaults)
+        XCTAssertNil(defaults.stringArray(forKey: "AppleLanguages").flatMap { $0 == ["tr"] ? $0 : nil }, "the iPhone's again")
+    }
+
     /// Item 1923: Dot's own work (a code review, a schedule's chat) stands last, apart from the owner's chats; one that
     /// waits on the owner stands under Needs you.
     func testDotsOwnWorkStandsApartFromTheOwnersChats() throws {
@@ -66,15 +84,28 @@ final class ChatListTests: XCTestCase {
     func testABotsScopeHoldsItsOwnChatsOnly() throws {
         let dots: ThreadRow = try row("a", status: "done", asks: 0, pinned: false, actor: nil)
         let agents: ThreadRow = try row("b", status: "done", asks: 0, pinned: false, actor: "agt_1")
-        XCTAssertTrue(ChatListScope.all.holds(agents))
-        XCTAssertTrue(ChatListScope.bot(agent: nil).holds(dots))
-        XCTAssertFalse(ChatListScope.bot(agent: nil).holds(agents))
-        XCTAssertTrue(ChatListScope.bot(agent: "agt_1").holds(agents))
+        XCTAssertTrue(ChatListScope.all.holds(agents, bots: []))
+        XCTAssertTrue(ChatListScope.bot(agent: nil).holds(dots, bots: []))
+        XCTAssertFalse(ChatListScope.bot(agent: nil).holds(agents, bots: []))
+        XCTAssertTrue(ChatListScope.bot(agent: "agt_1").holds(agents, bots: []))
         let campaign: ThreadRow = try row("c", status: "done", asks: 0, pinned: false, actor: "camp_1")
-        let dotsAsTheHomeCounts: ChatListScope = .chats(of: ["a", "c"], agent: nil)
-        XCTAssertTrue(dotsAsTheHomeCounts.holds(campaign), "a campaign's chat is Dot's, as on the home")
-        XCTAssertFalse(dotsAsTheHomeCounts.holds(agents))
+        let dot: AgentRecord = AgentRecord(
+            id: "dot", name: "Dot", role: "", instructions: "", model: "", effort: nil, approvals: nil, tools: [], createdAt: 0, updatedAt: 0, look: nil,
+            pausedAt: nil, refuses: nil)
+        let agent: AgentRecord = AgentRecord(
+            id: "agt_1", name: "Scout", role: "", instructions: "", model: "", effort: nil, approvals: nil, tools: [], createdAt: 0, updatedAt: 0, look: nil,
+            pausedAt: nil, refuses: nil)
+        let built: [Bot] = DotEngine.bots(
+            agents: [AgentSummary(record: dot, home: nil), AgentSummary(record: agent, home: nil)], rows: [dots, agents, campaign], pinned: [],
+            fallbackDot: dot, gone: [])
+        let dotsAsTheHomeCounts: ChatListScope = .botChats(bot: "dot", agent: nil)
+        XCTAssertTrue(dotsAsTheHomeCounts.holds(campaign, bots: built), "a campaign's chat is Dot's, as on the home")
+        XCTAssertFalse(dotsAsTheHomeCounts.holds(agents, bots: built))
         XCTAssertNil(dotsAsTheHomeCounts.agent)
-        XCTAssertEqual(ChatListScope.chats(of: [], agent: "agt_1").agent, "agt_1", "the pencil starts a chat with the bot")
+        XCTAssertEqual(ChatListScope.botChats(bot: "agt_1", agent: "agt_1").agent, "agt_1", "the pencil starts a chat with the bot")
+        let newer: ThreadRow = try row("d", status: "done", asks: 0, pinned: false, actor: nil)
+        let later: [Bot] = DotEngine.bots(
+            agents: [AgentSummary(record: dot, home: nil)], rows: [dots, newer], pinned: [], fallbackDot: dot, gone: [])
+        XCTAssertTrue(dotsAsTheHomeCounts.holds(newer, bots: later), "item 1965: a chat made after the page opened is there")
     }
 }

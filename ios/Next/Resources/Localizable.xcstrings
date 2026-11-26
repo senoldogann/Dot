@@ -1530,17 +1530,6 @@
         }
       }
     },
-    "App language": {
-      "comment": "General: the app's language row",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uygulama dili"
-          }
-        }
-      }
-    },
     "Appearance": {
       "comment": "Bot edit page: the section of how the bot looks\nComponent gallery (debug builds): a heading or sample text\nSettings row",
       "localizations": {
@@ -3954,13 +3943,24 @@
         }
       }
     },
-    "Dot Next speaks the language iOS Settings sets for it.": {
+    "Dot Next opens in it the next time it starts.": {
+      "comment": "General: footer once another language is chosen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next bir sonraki açılışta bu dille açılır."
+          }
+        }
+      }
+    },
+    "Dot Next speaks this language whatever the iPhone's, as the web's own choice does.": {
       "comment": "General: footer under the language",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot Next, iOS Ayarları'nın onun için seçtiği dili konuşur."
+            "value": "Dot Next, iPhone'un dili ne olursa olsun bu dili konuşur; web'deki kendi seçimi gibi."
           }
         }
       }
@@ -7556,6 +7556,17 @@
         }
       }
     },
+    "None of the %lld chats was deleted: %@": {
+      "comment": "Toast: the Mac refused to delete chats sent together; the arguments are how many and its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sohbetten hiçbiri silinmedi: %@"
+          }
+        }
+      }
+    },
     "None waits. When a task wants to change a note you wrote, it waits here.": {
       "comment": "Memory: no proposals",
       "localizations": {
@@ -10109,6 +10120,17 @@
         }
       }
     },
+    "Same as the iPhone": {
+      "comment": "General › Language: follow the iPhone's language",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone ile aynı"
+          }
+        }
+      }
+    },
     "Save": {
       "comment": "Edit sheet toolbar: keeps the edits",
       "localizations": {
@@ -11326,17 +11348,6 @@
         }
       }
     },
-    "Some chats were not deleted: %@": {
-      "comment": "Toast: the Mac refused to delete chats; the argument is its words",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bazı sohbetler silinmedi: %@"
-          }
-        }
-      }
-    },
     "Something Dot can do for you on its own": {
       "comment": "Own initiative: the placeholder of a new thing",
       "localizations": {
@@ -12302,6 +12313,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Arabanın mikrofonu"
+          }
+        }
+      }
+    },
+    "The chat was not deleted: %@": {
+      "comment": "Toast: the Mac refused to delete a chat; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet silinmedi: %@"
           }
         }
       }
@@ -14905,6 +14927,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtın gerekiyor"
+          }
+        }
+      }
+    },
+    "Your assistant": {
+      "comment": "Dot's built-in role, under its name on its profile",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asistanın"
           }
         }
       }

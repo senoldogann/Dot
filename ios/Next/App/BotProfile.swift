@@ -100,7 +100,7 @@ struct BotProfile: View {
             BotFace(id: bot.id, look: bot.record.look, size: 96)
             Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
             if !bot.record.role.isEmpty {
-                Text(bot.record.role).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+                Text(shownRole(bot.record)).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
             }
             if !bot.isDot {
                 Button(String(localized: "Edit", comment: "Bot profile: opens the bot's edit page")) { editing = true }
@@ -140,6 +140,7 @@ struct BotProfile: View {
                         accessory: .detail(rowTime(row.summary.updatedAt, now: .now)))
                 }
                 .buttonStyle(RowPressStyle())
+                .accessibilityIdentifier("profile.chat")
                 .contextMenu {
                     Button(
                         row.summary.pinnedAt != nil
@@ -157,7 +158,8 @@ struct BotProfile: View {
                 NavigationRow(
                     systemImage: "bubble.left.and.bubble.right", title: String(localized: "All chats", comment: "Bot profile: opens every chat of the bot"),
                     description: nil, detail: nil
-                ) { BotChatsPage(scope: .chats(of: Set(bot.chats.map(\.summary.id)), agent: bot.isDot ? nil : bot.id), open: open).environment(\.botChat, botChat) }
+                ) { BotChatsPage(scope: .botChats(bot: bot.id, agent: bot.isDot ? nil : bot.id), open: open).environment(\.botChat, botChat) }
+                .accessibilityIdentifier("profile.allChats")
             }
         }
     }

@@ -40,8 +40,8 @@ public func isConversation(_ chat: ThreadSummary) -> Bool { !workSources.contain
 /// one that moved last. `agents` is `GET /api/agents` (Dot first); with no Dot among them (not read yet), Dot is drawn
 /// from `fallbackDot` so its chats are never lost. `rows` holds only the newest chats the list read (the daemon's
 /// window); a bot's home chat (`AgentSummary.home`, found however many chats are newer) stands among its chats when the
-/// window left it out.
-public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fallbackDot: AgentRecord) -> [Bot] {
+/// window left it out, unless `gone` names it.
+public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fallbackDot: AgentRecord, gone: Set<String>) -> [Bot] {
     let dotRecord: AgentRecord = agents.first { $0.record.id == dotAgentId }?.record ?? fallbackDot
     let others: [AgentRecord] = agents.map(\.record).filter { $0.id != dotAgentId }
     let known: Set<String> = Set(others.map(\.id))
@@ -54,7 +54,9 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
         agents.compactMap { summary in summary.home.map { (summary.record.id, $0) } }, uniquingKeysWith: { first, _ in first })
     func bot(_ record: AgentRecord) -> Bot {
         var held: [ThreadRow] = byBot[record.id] ?? []
-        if let home = homes[record.id], !held.contains(where: { $0.summary.id == home.id }) {
+        // A home read with the agents is dropped once it went (deleted here, on the Mac or on another phone) or is going
+        // (item 1965: Dot's profile still listed a chat the owner had deleted).
+        if let home = homes[record.id], !gone.contains(home.id), !held.contains(where: { $0.summary.id == home.id }) {
             // `GET /api/agents` counts no asks: a home whose run is blocked waits on the owner, as the list says of it.
             held.append(ThreadRow(summary: home, revision: 0, asks: home.latestStatus == "blocked" ? 1 : 0, helpers: nil, background: nil))
         }
