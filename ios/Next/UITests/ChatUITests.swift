@@ -212,7 +212,7 @@ final class ChatUITests: XCTestCase {
         let line: XCUIElement = app.buttons["work.line"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label, "Waiting for you")
-        XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the line is a button: a 44 pt tap target (the design bar)")
+        XCTAssertGreaterThanOrEqual(line.frame.height, 44 - 0.01, "the line is a button: a 44 pt tap target (the design bar; a frame comes out as 43.99999 on this simulator)")
         // The run's calls, one line in plain words since item 1909 ("Started 1 helper and opened 1 page").
         let step: XCUIElement = app.buttons["tools.group"].firstMatch
         XCTAssertFalse(step.exists, "the steps are hidden")
