@@ -11,6 +11,10 @@ final class MessageActionsTests: XCTestCase {
 
     /// A run as the daemon's `RunRecord` writes it, with the fields a test changes.
     private func run(id: String, status: String, source: String, parent: String?, rewindable: Bool, follows: String?) throws -> RunRecord {
+        try run(id: id, status: status, source: source, parent: parent, rewindable: rewindable, follows: follows, ended: nil)
+    }
+
+    private func run(id: String, status: String, source: String, parent: String?, rewindable: Bool, follows: String?, ended: String?) throws -> RunRecord {
         let parentJSON: String = parent.map { "\"\($0)\"" } ?? "null"
         let followsJSON: String = follows.map { "\"\($0)\"" } ?? "null"
         return try decode(
@@ -19,7 +23,7 @@ final class MessageActionsTests: XCTestCase {
             {"id":"\(id)","thread_id":"thr_1","goal":"Book the car service","mode":"task","model":"claude_code:opus","status":"\(status)",
              "created_at":10,"finished_at":20,"result":"","steps":3,"input_tokens":100,"output_tokens":10,"parent_run_id":\(parentJSON),
              "source":"\(source)","effort":"high","speed":"standard","once":null,"approvals":"yolo","goal_mode":false,"campaign_id":null,
-             "agent_id":"agt_1","rewindable":\(rewindable),"harness_version":null,"follows_reaction":\(followsJSON),"end_reason":null,"hops":0}
+             "agent_id":"agt_1","rewindable":\(rewindable),"harness_version":null,"follows_reaction":\(followsJSON),"end_reason":\(ended.map { "\"\($0)\"" } ?? "null"),"hops":0}
             """)
     }
 
@@ -81,8 +85,12 @@ final class MessageActionsTests: XCTestCase {
         XCTAssertFalse(endOffer(run: failed, newest: try detail(later, resumable: false, cutOff: nil), chatWorking: false).resume, "only the newest run resumes")
         let stopped: RunRecord = try run(id: "run_c", status: "cancelled", source: "ui", parent: nil, rewindable: true, follows: nil)
         XCTAssertEqual(
-            endOffer(run: stopped, newest: try detail(stopped, resumable: false, cutOff: nil), chatWorking: false), EndOffer(resume: false, retry: false, cutOff: nil),
-            "a run the owner stopped is neither resumed nor retried")
+            endOffer(run: stopped, newest: try detail(stopped, resumable: false, cutOff: nil), chatWorking: false), EndOffer(resume: false, retry: true, cutOff: nil),
+            "a run the owner stopped is not resumed; its message can be retried, as the web's Retry under any answer")
+        let declined: RunRecord = try run(id: "run_e", status: "failed", source: "ui", parent: nil, rewindable: true, follows: nil, ended: "model_refused")
+        XCTAssertEqual(
+            endOffer(run: declined, newest: try detail(declined, resumable: true, cutOff: nil), chatWorking: false), EndOffer(resume: false, retry: true, cutOff: nil),
+            "a run whose model declined the task is never continued on that model (item 1889), though the daemon calls it resumable")
         let cut: RunRecord = try run(id: "run_d", status: "failed", source: "schedule", parent: nil, rewindable: false, follows: nil)
         XCTAssertEqual(endOffer(run: cut, newest: try detail(cut, resumable: true, cutOff: "daemon_restarted"), chatWorking: false), EndOffer(resume: true, retry: false, cutOff: "daemon_restarted"))
     }

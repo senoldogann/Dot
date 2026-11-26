@@ -112,6 +112,8 @@ public struct RunRecord: Codable, Sendable, Hashable {
     public var rewindable: Bool? = nil
     /// The agent the run belongs to (item 86), `nil` for Dot.
     public var agentId: String? = nil
+    /// Why the run ended (`model_refused` when its model declined the task, item 1889), `nil` while it works.
+    public var endReason: String? = nil
 
     public init(
         id: String, threadId: String, goal: String, mode: String, model: String, status: String, createdAt: Double, finishedAt: Double?,
@@ -147,6 +149,7 @@ public struct RunRecord: Codable, Sendable, Hashable {
         case followsReaction = "follows_reaction"
         case rewindable
         case agentId = "agent_id"
+        case endReason = "end_reason"
     }
 
     /// Whether the run still goes (it can be stopped, a steer reaches it).
