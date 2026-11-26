@@ -243,7 +243,7 @@ struct ComposerView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if buttons.primary != .confirmEdit {
                     if let quoted = quote { QuoteChip(quote: quoted, remove: { quote = nil }) }
-                if !attachments.isEmpty { attachmentStrip }
+                    if !attachments.isEmpty { attachmentStrip }
                     if preparing != nil {
                         ProgressView(String(localized: "Preparing attachments…", comment: "Composer status while opening or exporting selected files"))
                             .padding(.horizontal, Space.m)

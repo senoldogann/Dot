@@ -63,6 +63,8 @@ struct SwipeToQuote: ViewModifier {
     let words: String
     let quote: (String) -> Void
     @State private var pull: CGFloat = 0
+    /// How many times a pull has passed the threshold, which the haptic follows (it respects the owner's switch).
+    @State private var passes: Int = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
     private var passed: Bool { pull >= swipeThreshold }
@@ -82,13 +84,16 @@ struct SwipeToQuote: ViewModifier {
         .contentShape(Rectangle())
         .gesture(
             SwipePan(
-                follow: { pull = $0 },
+                follow: { now in
+                    if pull < swipeThreshold, now >= swipeThreshold { passes += 1 }
+                    pull = now
+                },
                 release: { final in
                     if final >= swipeThreshold { quote(words) }
                     withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75)) { pull = 0 }
                 })
         )
-        .sensoryFeedback(.impact(weight: .light), trigger: passed) { _, now in now }
+        .haptic(.light, trigger: passes)
         .accessibilityAction(named: Text(String(localized: "Quote", comment: "Message menu and VoiceOver action: puts the message in the composer as a quote"))) { quote(words) }
     }
 }
