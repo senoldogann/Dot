@@ -8,6 +8,34 @@ enum ChatScrollMemory {
     static var anchors: [String: String] = [:]
 }
 
+/// The chat screen's drawings, counted by reference (writing it draws nothing again). Debug builds with
+/// `-DotNextRenderMeter 1` show the count to the UI tests, which check that a scene settles (item 1932).
+@MainActor
+final class RenderMeter {
+    private(set) var count: Int = 0
+
+    func counted() -> Int {
+        count += 1
+        return count
+    }
+
+    static var shown: Bool {
+        #if DEBUG
+            UserDefaults.standard.bool(forKey: "DotNextRenderMeter")
+        #else
+            false
+        #endif
+    }
+}
+
+/// What stands at a chat's end: its last row, and the line under it that says a run starts or works. The chat follows
+/// a change of it, never a change of its height (item 1932).
+struct ChatEnd: Equatable {
+    let last: TranscriptItem?
+    let starting: Bool
+    let run: String?
+}
+
 /// The row of a chat that came into sight last, kept by reference: writing it draws nothing again (item 1848).
 @MainActor
 final class ReadingMark {
@@ -24,11 +52,13 @@ struct ChatScreen: View {
     let editsFirstQueued: Bool
     @Environment(AppModel.self) private var model: AppModel
     @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
+    @AppStorage(PrefKey.showSteps) private var showStepsEverywhere: Bool = true
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
     @State private var attachments: [ComposerAttachment] = []
+    @State private var keepingMessage: Bool = false
     @State private var panel: ChatPanel?
     @State private var edit: QueueEdit?
     @State private var dockFolded: Bool = false
@@ -41,6 +71,8 @@ struct ChatScreen: View {
     @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
     @State private var reading: ReadingMark = ReadingMark()
+    /// How many times the screen was drawn, for the debug render meter (item 1932).
+    @State private var renders: RenderMeter = RenderMeter()
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
@@ -75,14 +107,21 @@ struct ChatScreen: View {
     }
     /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
     private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
-    /// Whether the chosen mode hides the steps, so that the live line says the work (item 1769).
-    private var linesTheWork: Bool { chosenMode == .hideAll || chosenMode == .zen }
+    /// "Show steps" for this chat: its own where its This chat sheet set it, else Settings › Chat's (item 1915).
+    private var showsSteps: Bool { model.stepsOverrides[thread] ?? showStepsEverywhere }
+    /// Whether the steps are hidden, so that the live line says the work (items 1769 and 1915).
+    private var linesTheWork: Bool { !showsSteps || chosenMode == .hideAll || chosenMode == .zen }
     private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
-    private var builtItems: [TranscriptItem] { transcript(in: mode) }
+    private var builtItems: [TranscriptItem] {
+        // Messages only (item 1915): every step is built, the run at work's are left out, and a finished run's fold keeps
+        // its steps behind "Worked for 2m", so a tap shows them and nothing is lost.
+        guard !showsSteps, !stepsShown else { return transcript(in: mode) }
+        return messagesOnly(transcript(in: .showAll))
+    }
 
     private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
         // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
@@ -111,6 +150,7 @@ struct ChatScreen: View {
     }
 
     var body: some View {
+        let drawings: Int = renders.counted()
         let items: [TranscriptItem] = builtItems
         return content(items)
             .background(Tone.ground)
@@ -119,6 +159,11 @@ struct ChatScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $openedHelper) { helperThread in
                 ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
+            }
+            .overlay(alignment: .topLeading) {
+                if RenderMeter.shown {
+                    Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
+                }
             }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
@@ -144,6 +189,7 @@ struct ChatScreen: View {
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
             .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
             .task { await model.loadModels() }
+            .task { OutputBox.warmUp() }
             .modifier(ComposerLists(thread: thread, lastRun: ownRuns.last?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
             .modifier(FrameMeterHook(running: activeRun != nil))
@@ -157,6 +203,18 @@ struct ChatScreen: View {
     }
 
     // MARK: The transcript
+
+    /// Shows the chat's end while the owner is there: a few scrolls over half a second, then none. The lazy stack learns
+    /// the true heights of the rows a scroll brings into sight, so one scroll lands short of the end; the later passes
+    /// reach it, and the follow ends there instead of chasing every height change (item 1932). The first pass waits for
+    /// the next turn of the main actor, after the new words are laid out, so they never stand under the composer.
+    private func showEnd() async {
+        for pause in [0, 60, 150, 300] {
+            do { try await Task.sleep(for: .milliseconds(pause)) } catch { return }
+            guard pinned, !ownerScrolls else { return }
+            position.scrollTo(edge: .bottom)
+        }
+    }
 
     @ViewBuilder private func content(_ items: [TranscriptItem]) -> some View {
         if chat?.freshness == .deleted, items.isEmpty {
@@ -198,12 +256,21 @@ struct ChatScreen: View {
                     // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
                     .onAppear { reading.topVisible = block.id }
                 }
+                if startingSince != nil {
+                    // The message went out and no run has started yet: motion at once, replaced in place by the run's
+                    // own line (item 1919). Nothing more is claimed than that it starts.
+                    StartingLine()
+                }
                 if let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
-                    if !stopping, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
+                    // An ask that waits on the owner is the dock's, never this line's.
+                    if !stopping, now != .waitingForYou, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
                         // While the run waits on something, one quiet line says on what in every mode (item 1909); Stop
-                        // is the pill's, so the line offers only Details.
+                        // is the pill's, so the line offers only Details. An ask of the owner's comes first: the run
+                        // waits on them, not on its command, and the line says so (item 1932).
                         WaitingLine(words: waiting, details: { panel = .inspector })
-                    } else if linesTheWork {
+                    } else if linesTheWork || now == .queued || now == .typing {
+                        // With the steps shown too, while the run has no row to show yet (it waits to start, or its model
+                        // has not answered), the line moves so the chat never stands still (item 1919).
                         WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                     }
                 }
@@ -223,6 +290,8 @@ struct ChatScreen: View {
         // where the owner left it.
         .defaultScrollAnchor(.top, for: .alignment)
         .scrollPosition($position)
+        // A row opened or closed by the owner stays where it is: the follow stops (see `disclosureToggled`).
+        .environment(\.disclosureToggled, { pinned = false })
         .scrollDismissesKeyboard(.interactively)
         .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
         // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
@@ -232,9 +301,12 @@ struct ChatScreen: View {
         } action: { _, atEnd in
             if atEnd { pinned = true } else if ownerScrolls { pinned = false }
         }
-        // Once the new words are laid out (never before, which left them under the composer), the end is shown.
-        .onScrollGeometryChange(for: Double.self) { geometry in Double(geometry.contentSize.height) } action: { _, _ in
-            if pinned, !ownerScrolls { position.scrollTo(edge: .bottom) }
+        // New words are followed when the transcript's end changes, never when its height does (item 1932): a lazy
+        // stack estimates the rows out of sight, so its height moves as rows come into sight, and following each move
+        // scrolled, which brought other rows into sight, which moved the height again, without end (the asks scene
+        // held the phone at 100 % CPU). A newer end cancels the older one's passes.
+        .task(id: ChatEnd(last: items.last, starting: startingSince != nil, run: activeRun?.id)) {
+            await showEnd()
         }
         .task(id: pinned) {
             // The jump button comes after a short pause, so it does not flicker while words stream (debounced).
@@ -251,7 +323,7 @@ struct ChatScreen: View {
                 pinned = false
                 position.scrollTo(id: anchor, anchor: .top)
             } else {
-                position.scrollTo(edge: .bottom)
+                await showEnd()
             }
         }
         .safeAreaInset(edge: .bottom) { bottom(items) }
@@ -283,14 +355,15 @@ struct ChatScreen: View {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
                 OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
-                if let delivery { deliveryLine(id: id, delivery: delivery) }
+                // "Pending" (or why it was refused) until the Mac took the message; nothing once it did (item 1927).
+                if let delivery, delivery != .delivered { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         case .note(_, let text):
             DotNoteRow(text: text)
         case .answer(let id, let text, let writing, let endedAt):
             VStack(alignment: .leading, spacing: Space.xxs) {
-                AnswerView(markdown: text, writing: writing)
+                AnswerBody(markdown: text, writing: writing)
                 // The footer is the final answer's alone, once the run ended (plan §24): none under passing words.
                 if let endedAt, let target = chat.flatMap({ reactionTarget(of: id, in: $0) }) {
                     ReactionsBar(
@@ -331,10 +404,18 @@ struct ChatScreen: View {
     }
 
     @ViewBuilder private func deliveryLine(id: String, delivery: Delivery) -> some View {
+        let key: String = String(id.dropFirst(2))
+        if let progress = model.outbox.first(where: { $0.id == key })?.attachmentUpload {
+            AttachmentTransferLine(key: key, progress: progress)
+        } else {
+            deliveryStatus(key: key, delivery: delivery)
+        }
+    }
+
+    private func deliveryStatus(key: String, delivery: Delivery) -> some View {
         HStack(spacing: Space.xs) {
             Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(isRejected(delivery) ? Tone.failure : Tone.tertiary)
             if case .rejected(let failure) = delivery {
-                let key: String = String(id.dropFirst(2))
                 if case .runEnded = failure {
                     Button(String(localized: "Send as a new message", comment: "Under a steer refused because its run ended")) { model.sendAsMessage(key) }.textRole(.label)
                 } else {
@@ -357,7 +438,7 @@ struct ChatScreen: View {
             FloatingWorkingControl(
                 summary: WorkingSummary(
                     status: capsuleStatus, activity: activityWords,
-                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } : nil, queued: view?.queue.messages.count ?? 0,
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil, queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
                     plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
@@ -397,7 +478,7 @@ struct ChatScreen: View {
                     suggestions: ComposerSuggestions(sections: { trigger in
                         pickerSections(trigger, commands: composerCommands(), catalog: catalog, limit: 8)
                     }))
-                .disabled(chat?.freshness == .deleted)
+                .disabled(chat?.freshness == .deleted || keepingMessage)
             }
         }
         .frame(maxWidth: proseWidth)
@@ -406,7 +487,19 @@ struct ChatScreen: View {
         .padding(.bottom, Space.xs)
     }
 
+    /// When the owner's newest message went out, while it has not started a run yet (item 1919): the stream and the pill
+    /// move at once instead of waiting 10-15 s for the run's first event. `nil` once a run works, while the message only
+    /// waits for the link or behind a held queue, and when it was refused (its bubble says why).
+    private var startingSince: Date? {
+        guard activeRun == nil, let newest = model.pending(in: thread).last else { return nil }
+        switch newest.delivery {
+        case .sending, .delivered, .queued: return Date(timeIntervalSince1970: newest.at)
+        default: return nil
+        }
+    }
+
     private var capsuleStatus: ChatStatus? {
+        if startingSince != nil { return .working }
         if stopping, activeRun != nil { return nil }
         switch phase {
         case .working: return .working
@@ -426,8 +519,8 @@ struct ChatScreen: View {
             confirmEdit()
         case .send, .queue, .steer:
             let typed: String = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-            let photos: [Data] = attachments.map(\.jpeg)
-            guard !typed.isEmpty || !photos.isEmpty else { return }
+            let files: [OutgoingAttachment] = attachments.compactMap(\.outgoing)
+            guard !keepingMessage, files.count == attachments.count, !typed.isEmpty || !files.isEmpty else { return }
             // A command the composer does itself (PLAN §22) leaves the draft only once it is done or understood.
             switch composerCommand(typed) {
             case .stop:
@@ -455,7 +548,7 @@ struct ChatScreen: View {
                         draft = typed
                         return
                     }
-                    await model.send(text, thread: thread, steerInto: nil, photos: photos, picks: .none)
+                    await model.send(text, thread: thread, steerInto: nil, files: files, picks: .none)
                 }
                 attachments = []
                 return
@@ -464,14 +557,22 @@ struct ChatScreen: View {
             }
             let (words, typedPicks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
             let picks: MessagePicks = MessagePicks(skills: typedPicks.skills, accounts: typedPicks.accounts, planFirst: typedPicks.planFirst || planFirst)
-            // A steer carries no picks: plan first waits for the next message that does (a steer with no run at work
-            // goes as a message, and spends it).
-            if activeRun == nil || action != .steer { planFirst = false }
-            draft = ""
-            attachments = []
-            model.keep(draft: "", of: thread)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            Task { await model.send(words, thread: thread, steerInto: action == .steer ? activeRun?.id : nil, photos: photos, picks: picks) }
+            let run: String? = action == .steer ? activeRun?.id : nil
+            keepingMessage = true
+            Task {
+                defer { keepingMessage = false }
+                let text: String = words.isEmpty && !files.isEmpty ? attachmentMessage() : words
+                guard await model.send(text, thread: thread, steerInto: run, files: files, picks: picks) != nil else {
+                    toast = ToastMessage(id: UUID(), text: messageStorageFailure(), systemImage: "exclamationmark.triangle", actionTitle: nil)
+                    return
+                }
+                // A steer carries no picks, so plan first waits for a subsequent message.
+                if run == nil { planFirst = false }
+                draft = ""
+                attachments = []
+                model.keep(draft: "", of: thread)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
         }
     }
 
@@ -675,6 +776,19 @@ func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
         case .work(let fold):
             return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
         default: return item
+        }
+    }
+}
+
+/// A transcript with only the messages (item 1915): the owner's words, Dot's answers, the asks, the helpers, how runs
+/// ended and their folds; the steps of the run at work (its tool calls that did not fail, its thoughts) are left out, its
+/// live line saying what it does. A finished run's fold is kept whole: its steps open from "Worked for 2m". Pure.
+func messagesOnly(_ items: [TranscriptItem]) -> [TranscriptItem] {
+    items.filter { item in
+        switch item {
+        case .thought: false
+        case .tool(let entry): entry.state == .failed
+        default: true
         }
     }
 }

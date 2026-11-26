@@ -66,7 +66,7 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
 func deliveryWords(_ delivery: Delivery) -> String {
     switch delivery {
     case .offline: String(localized: "Waiting for the link", comment: "Under an owner's message: it is kept and goes when the phone is online")
-    case .sending: String(localized: "Sending…", comment: "Under an owner's message: it is going to the Mac")
+    case .sending: String(localized: "Pending", comment: "Under an owner's message: it is going to the Mac and not taken yet (item 1927)")
     case .queued(let position):
         String(localized: "Queued · \(position) · starts after this run", comment: "Under an owner's message: its place in the chat's queue")
     case .held(let position): String(localized: "Queued · \(position) · the queue is held", comment: "Under an owner's message: its place in a held queue")
@@ -86,6 +86,8 @@ func failureWords(_ failure: OutboxItem.Failure) -> String {
     case .runEnded: String(localized: "Not sent: the run had ended", comment: "Under a message meant for a run that ended before it arrived")
     case .tooOld: String(localized: "Not sent: it waited more than a day", comment: "Under an owner's message too old to send again safely")
     case .unreadable: String(localized: "Not sent: the Mac's answer could not be read", comment: "Under an owner's message whose answer was unreadable")
+    case .attachmentMissing: String(localized: "Not sent: an attachment could not be read on this phone", comment: "Under a message whose attachment is gone")
+    case .uploadCancelled: String(localized: "Upload cancelled", comment: "Under a message after the owner stops its attachment upload")
     case .photoMissing: String(localized: "Not sent: a photo of it could not be read on this phone", comment: "Under an owner's message whose photo file is gone")
     }
 }
@@ -141,6 +143,8 @@ struct ChatListView: View {
     let scope: ChatListScope
     @Binding var selection: String?
     @Environment(AppModel.self) private var model: AppModel
+    /// The bot's header, handed on to the new chat the pencil pushes.
+    @Environment(\.botChat) private var botChat: BotChat?
     @State private var query: String = ""
     @State private var renaming: ThreadRow?
     @State private var newTitle: String = ""
@@ -185,14 +189,7 @@ struct ChatListView: View {
                 Text(String(localized: "Chats with a run at work or waiting on you are kept; stop or answer them first.", comment: "Bulk delete confirmation: chats at work or waiting on the owner are not deleted"))
             }
         }
-        .sheet(isPresented: $composing) {
-            NewChatSheet(
-                agent: scopedAgent, close: { composing = false },
-                opened: { key in
-                    composing = false
-                    selection = key
-                })
-        }
+        .navigationDestination(isPresented: $composing) { PushedNewChat(botId: scope.agent ?? dotAgentId, header: botChat) }
         .toastHost($toast, seconds: 5) { _ in }
         .onChange(of: model.refusedDeletes) { _, refused in
             guard let detail = refused.values.first else { return }
@@ -201,12 +198,6 @@ struct ChatListView: View {
                 systemImage: "exclamationmark.triangle", actionTitle: nil)
             model.forgetRefusedDeletes()
         }
-    }
-
-    /// The agent a bot's list belongs to, whose chat the pencil starts (Dot's and the whole list's: none).
-    private var scopedAgent: AgentRecord? {
-        guard let agent = scope.agent else { return nil }
-        return model.agents.first { $0.record.id == agent }?.record
     }
 
     /// The checked chats the list shows now: a check hidden by the search or gone from the list is not acted on.
@@ -284,6 +275,7 @@ struct ChatListView: View {
             section(String(localized: "Needs you", comment: "Chat list section: chats that wait for the owner"), grouped.needsYou)
             section(String(localized: "Working", comment: "Chat list section: chats with a run at work"), grouped.working)
             section(String(localized: "Recent", comment: "Chat list section: the other chats, newest first"), grouped.recent)
+            section(String(localized: "Dot's own work", comment: "Chat list section: the chats of Dot's schedules, initiative and code reviews"), grouped.dotsWork)
         }
         .listStyle(.plain)
         .focusEffectDisabled()
@@ -355,7 +347,7 @@ struct ChatListView: View {
             lines.append(String(localized: "Your unsent words wait in New chat.", comment: "Chat list notice after a reset: the words that were not sent are the new chat's draft"))
         }
         if model.reset?.photosLeft == true {
-            lines.append(String(localized: "Photos of unsent messages were not kept.", comment: "Chat list notice after a reset: the photos of the messages that were not sent are gone"))
+            lines.append(String(localized: "Attachments of unsent messages were not kept.", comment: "Chat list notice after a reset: the attachments of the messages that were not sent are gone"))
         }
         return lines.joined(separator: " ")
     }
@@ -457,15 +449,22 @@ struct ChatListSections: Equatable {
     let needsYou: [ThreadRow]
     let working: [ThreadRow]
     let recent: [ThreadRow]
+    /// The chats of Dot's own work (its schedules', its initiative's, what it sends the agents, the code reviews), last
+    /// and apart from the owner's conversations, as the web folds them (item 1923); one that waits on the owner stands
+    /// under Needs you.
+    let dotsWork: [ThreadRow]
 }
 
 func chatListSections(_ rows: [ThreadRow]) -> ChatListSections {
     let pinned: [ThreadRow] = rows.filter { $0.summary.pinnedAt != nil }
     let rest: [ThreadRow] = rows.filter { $0.summary.pinnedAt == nil }
+    let needsYou: [ThreadRow] = rest.filter { chatStatus(of: $0) == .waitingOnYou }
+    let talk: [ThreadRow] = rest.filter { isConversation($0.summary) && chatStatus(of: $0) != .waitingOnYou }
     return ChatListSections(
-        pinned: pinned, needsYou: rest.filter { chatStatus(of: $0) == .waitingOnYou },
-        working: rest.filter { [.working, .starting].contains(chatStatus(of: $0)) },
-        recent: rest.filter { ![.waitingOnYou, .working, .starting].contains(chatStatus(of: $0)) })
+        pinned: pinned, needsYou: needsYou,
+        working: talk.filter { [.working, .starting].contains(chatStatus(of: $0)) },
+        recent: talk.filter { ![.working, .starting].contains(chatStatus(of: $0)) },
+        dotsWork: rest.filter { !isConversation($0.summary) && chatStatus(of: $0) != .waitingOnYou })
 }
 
 /// What a chat row shows.
@@ -475,6 +474,8 @@ struct ChatRowModel: Equatable {
     let time: String
     let status: ChatStatus?
     let agent: String?
+    /// Where it stands (item 1920).
+    let state: RowState
 
     init(row: ThreadRow, now: Date) {
         title = row.summary.title
@@ -482,15 +483,12 @@ struct ChatRowModel: Equatable {
         time = rowTime(row.summary.latestCreatedAt, now: now)
         status = chatStatus(of: row)
         agent = row.summary.actorId
+        state = rowState(row)
     }
 
-    init(title: String, preview: String, time: String, status: ChatStatus?, agent: String?) {
-        self.title = title
-        self.preview = preview
-        self.time = time
-        self.status = status
-        self.agent = agent
-    }
+    /// The outcome word of a chat at rest whose run ended unseen ("Done", "Failed"); the states say the rest.
+    var outcome: ChatStatus? { state == .rest && (status == .done || status == .failed) ? status : nil }
+
 }
 
 /// A chat in the list: the agent's face, the title (two lines at most), one status word by priority, the last line and
@@ -508,40 +506,47 @@ struct ChatRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                     Text(chat.title).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(2)
                     Spacer(minLength: Space.xs)
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(chat.time).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
-                    }
+                    if !dynamicTypeSize.isAccessibilitySize { RowTrailing(state: chat.state, time: chat.time) }
                 }
-                if let status = chat.status { StatusWord(status: status) }
-                if !chat.preview.isEmpty {
-                    Text(chat.preview).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(2)
+                if let outcome = chat.outcome { StatusWord(status: outcome) }
+                if chat.state != .rest || !chat.preview.isEmpty {
+                    RowStateLine(state: chat.state, preview: chat.preview, lineLimit: 2)
                 }
-                if dynamicTypeSize.isAccessibilitySize {
-                    Text(chat.time).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
-                }
+                if dynamicTypeSize.isAccessibilitySize { RowTrailing(state: chat.state, time: chat.time) }
             }
         }
         .frame(minHeight: Metric.rowWithDescription)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([chat.title, chat.status?.word, chat.preview, chat.time].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityLabel(
+            [chat.title, rowStateWords(chat.state) ?? chat.outcome?.word, chat.preview, chat.time].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
     }
 }
 
-/// A new chat (PLAN §24): a clean canvas, the composer, the model chip in the bar and in the composer. The chat's
-/// settings are chosen before the first message (model, level, fast mode, approvals, plan first) and go with it
-/// (`POST /runs`); once sent, the chat opens at once under the outbox's key (item 1849) and shows in the list from the
-/// outbox. With an `agent` (a bot's New chat, item 1883) the chat is with that agent, its face above the composer.
-struct NewChatSheet: View {
+/// A new chat (PLAN §24) on the chat screen's own ground: the bot's face and name (its role, or for Dot a line of what to
+/// ask) centred above the composer, which carries the model chip. The chat's settings are chosen before the first message
+/// (model, level, fast mode, approvals, plan first) and go with it (`POST /runs`); once sent, the chat opens at once under
+/// the outbox's key (item 1849). The one view of a bot's empty chat: a bot with no chat yet shows it in place, and every
+/// New chat (the bot's ⋯ menu, its profile, its chat list) pushes it as a chat (`PushedNewChat`, item 1916).
+struct BotNewChat: View {
+    /// The bot the chat is with (`dotAgentId` for Dot).
+    let botId: String
+    /// The chat was kept in the outbox under this key.
+    let opened: (String) -> Void
     @Environment(AppModel.self) private var model: AppModel
+    @Environment(\.botChat) private var botChat: BotChat?
     @State private var text: String = ""
     @State private var attachments: [ComposerAttachment] = []
-    let agent: AgentRecord?
+    @State private var keepingMessage: Bool = false
     @State private var settings: ChatSettingsDraft = ChatSettingsDraft(choices: .daemons, planFirst: false)
     @State private var choosing: Bool = false
-    let close: () -> Void
-    /// The chat was kept in the outbox under this key: the sheet closes and the chat opens.
-    let opened: (String) -> Void
+    /// The words could not be kept in the outbox (the disk): said above the composer, the words stay.
+    @State private var notKept: Bool = false
+
+    private var bot: Bot? { model.bots.first { $0.id == botId } }
+
+    /// The agent the chat is with (`nil`: Dot), which also keys the draft.
+    private var agent: String? { botId == dotAgentId ? nil : botId }
 
     private var chip: ModelChoice? {
         guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
@@ -549,57 +554,42 @@ struct NewChatSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                if let agent {
-                    BotFace(id: agent.id, look: agent.look, size: 64)
-                    Text(agent.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
-                    Spacer(minLength: 0)
-                }
-                ComposerView(
-                    text: $text, attachments: $attachments,
-                    placeholder: agent.map { askPlaceholder($0.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
-                    buttons: composerButtons(
-                        // A new chat needs words (the daemon's goal is never empty): photos alone do not start one.
-                        hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, runActive: false, followUp: .queue, editing: false),
-                    perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+        VStack(spacing: 0) {
+            // The bot was made, but its first meeting did not start: why, so that a first message is the owner's informed next step.
+            if let problem = model.welcomeProblems[botId] {
+                FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil)
+                    .padding(.horizontal, Space.gutter)
+            }
+            Spacer(minLength: 0)
+            if let bot { greeting(bot) }
+            Spacer(minLength: 0)
+            if notKept {
+                Notice(
+                    tone: .failure, message: messageStorageFailure(),
+                    dismiss: { notKept = false }
+                )
                 .padding(.horizontal, Space.s)
-                .padding(.bottom, Space.xs)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Tone.ground)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
-                }
-                ToolbarItem(placement: .principal) {
-                    Button { choosing = true } label: {
-                        HStack(spacing: Space.xxs) {
-                            Text(chip?.label ?? String(localized: "New chat", comment: "Chat list toolbar: starts a new chat")).textRole(.body).fontWeight(.semibold)
-                                .foregroundStyle(Tone.text).lineLimit(1)
-                            Symbol(name: "chevron.down", context: .chevron).foregroundStyle(Tone.glyph)
-                        }
-                        .frame(minHeight: Metric.hit)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        chip.map { String(localized: "Model, \($0.label)", comment: "VoiceOver: the new chat's model button; the argument is the model") }
-                            ?? String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"))
-                    .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
-                    .accessibilityIdentifier("newChat.model")
-                }
-            }
+            ComposerView(
+                text: $text, attachments: $attachments,
+                placeholder: bot.map { $0.isDot ? String(localized: "Message Dot", comment: "Placeholder of the composer") : askPlaceholder($0.record.name) }
+                    ?? String(localized: "Message Dot", comment: "Placeholder of the composer"),
+                buttons: composerButtons(
+                    hasContent: !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty, runActive: false, followUp: .queue, editing: false),
+                perform: { _ in send() }, model: chip, openSettings: { choosing = true }, suggestions: .none)
+            .disabled(keepingMessage)
+            .padding(.horizontal, Space.s)
+            .padding(.bottom, Space.xs)
         }
-        .presentationDetents([.large])
-        .presentationBackground(Tone.ground)
-        .tint(Tone.text)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Tone.ground)
+        .navigationTitle(botChat == nil ? bot?.record.name ?? "" : "")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, find: nil, library: nil) } }
         .task { await model.loadModels() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
-        .onAppear { text = model.draft(of: AppModel.newChatDraft) }
-        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft) }
+        .onAppear { text = model.draft(of: AppModel.newChatDraft(agent: agent)) }
+        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft(agent: agent)) }
         .sheet(isPresented: $choosing) {
             ChatSettingsSheet(
                 initial: settings, providers: model.models, defaults: model.chatDefaults, problem: model.modelsProblem,
@@ -611,18 +601,78 @@ struct NewChatSheet: View {
         }
     }
 
+    /// The bot's face and name, with its role under them, centred.
+    private func greeting(_ bot: Bot) -> some View {
+        VStack(spacing: Space.s) {
+            BotFace(id: bot.id, look: bot.record.look, size: 72)
+            Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
+            if !bot.record.role.isEmpty {
+                Text(bot.record.role).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+            } else if bot.isDot {
+                Text(String(localized: "Ask Dot for anything: a task, a lesson, an errand on the Mac.", comment: "Dot's empty chat (and the component gallery): what to ask Dot"))
+                    .textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+            }
+        }
+        .padding(.horizontal, Space.gutter)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("newChat.greeting")
+    }
+
     private func send() {
-        let words: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !words.isEmpty else { return }
-        let photos: [Data] = attachments.map(\.jpeg)
+        let typed: String = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let files: [OutgoingAttachment] = attachments.compactMap(\.outgoing)
+        guard !keepingMessage, files.count == attachments.count, !typed.isEmpty || !files.isEmpty else { return }
+        let words: String = typed.isEmpty ? attachmentMessage() : typed
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
+        keepingMessage = true
         Task {
-            if let key = await model.startChat(words, photos: photos, start: start, agent: agent?.id) {
-                model.keep(draft: "", of: AppModel.newChatDraft)
+            defer { keepingMessage = false }
+            if let key = await model.startChat(words, files: files, start: start, agent: agent) {
+                notKept = false
+                model.keep(draft: "", of: AppModel.newChatDraft(agent: agent))
                 opened(key)
             } else {
-                close()
+                notKept = true
             }
+        }
+    }
+}
+
+/// A new chat with a bot, pushed like any chat (item 1916): the empty chat until the first message, then, in the same
+/// screen, the chat that message starts (the starting chat, then the chat once the daemon names it). Back goes to where
+/// the owner came from.
+struct PushedNewChat: View {
+    let botId: String
+    /// The bot's header of the chat it is pushed from (a destination does not inherit it).
+    let header: BotChat?
+    @Environment(AppModel.self) private var model: AppModel
+    /// The outbox's key of the chat the first message started.
+    @State private var started: String?
+
+    var body: some View {
+        screen
+            // New chat in the menu of a chat started here is a fresh empty one, here: the bot's screen already pushed this one.
+            .environment(
+                \.botChat,
+                header.map { outer in
+                    outer.with(menu: { action in
+                        if case .newChat = action { started = nil } else { outer.menu(action) }
+                    })
+                })
+    }
+
+    @ViewBuilder private var screen: some View {
+        if let key = started {
+            // Named by the daemon: its own id; before that the key (the starting chat).
+            let thread: String = model.startedChats[key] ?? key
+            if model.startingChats[thread] != nil {
+                StartingChat(key: thread)
+            } else {
+                ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false).id(thread)
+            }
+        } else {
+            BotNewChat(botId: botId, opened: { started = $0 })
         }
     }
 }
@@ -640,7 +690,14 @@ struct StartingChat: View {
         ScrollView {
             VStack(alignment: .trailing, spacing: Space.xxs) {
                 OwnerMessage(text: text)
-                Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
+                if let progress = model.outbox.first(where: { $0.id == key })?.attachmentUpload {
+                    AttachmentTransferLine(key: key, progress: progress)
+                } else {
+                    Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(refused(delivery) ? Tone.failure : Tone.tertiary)
+                    if case .rejected = delivery {
+                        Button(String(localized: "Try again", comment: "Under a refused message: sends it again")) { model.retry(key) }.textRole(.label)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.horizontal, Space.gutter)
@@ -726,7 +783,7 @@ enum LatencyProbe {
                 }
                 let text: String = "probe \(number) \(UUID().uuidString.prefix(6))"
                 model.probeSent[text] = Date()
-                await model.send(text, thread: thread, steerInto: nil, photos: [], picks: .none)
+                await model.send(text, thread: thread, steerInto: nil, files: [], picks: .none)
                 for _ in 0..<200 where model.probeSent[text] != nil { try? await Task.sleep(for: .milliseconds(100)) }
                 try? await Task.sleep(for: .milliseconds(300))
             }

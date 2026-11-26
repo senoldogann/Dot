@@ -5,6 +5,13 @@
 A run is a loop. The model answers with tool calls; Dot checks each call against the [policy](safety.md#safety), runs the ones
 that pass (up to `parallel_tools` at once) and hands the results back, until the model calls `finish`.
 
+Before its first model call a run reads what it starts with, and what needs nothing else it reads at once (item 1918):
+the model's profile, its agent and the team, the accounts signed in, the skills offered, the notes recalled for its
+goal, when a model last answered in its chat and the harness's texts; the first of them that fails ends the run with
+its error, as before. The profile counts each finished run's events once and again only when they change, and a skill's
+frontmatter is parsed again only when its file's text changed. The run's page shows when its first call began and when
+its first word came: the `model_call` event carries the call's `seconds` and `first_token_seconds`.
+
 Every run's prompt, on Dot's own models and on your Claude plan, tells the model to analyse thoroughly and recommend
 boldly (item 1023, your word of 2026-11-07): an analysis weighs every side that matters, its evidence, risks and costs,
 and a recommendation names the option it would take and why, even a big change, rather than a cautious list. What a
@@ -1020,8 +1027,9 @@ and updates when a new one arrives. Both show the capture time.
 ## Delegation
 
 `delegate(goal, model?, step?, wait?)` hands a sub-goal to a separate run with a conversation of its own and returns
-its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
-helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)).
+its result, so a long investigation does not fill the parent's context. The helper takes the model named by `model`
+when that model can answer. With no explicit choice, [Task models](models.md#models-and-providers) can select a model
+for the brief. The parent's current model is the default for an unmapped brief.
 Several calls in one turn run side by side (up to `parallel_tools`; a group chat's lead sends its agents their parts all
 at once, as many as the team has, up to eight, when its reply's calls all send parts, item 831), which is how a plan's
 independent steps run at the same time; `step` names the plan step the part is, and the report closes it (see the plan

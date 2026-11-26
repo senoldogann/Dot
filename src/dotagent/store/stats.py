@@ -164,14 +164,11 @@ SELECT model, SUM(calls), SUM(errors), SUM(invalid), SUM(stalls), SUM(compaction
 )
 GROUP BY model
 """
-# One row: the newest finished runs of one model and the counts of their events. A failed tool result without a risk was
-# refused before anything ran (an unknown tool, a tool of another mode, arguments that were not JSON or did not fit).
-_PROFILE_SQL: str = f"""
-WITH recent AS (
-    SELECT id, steps FROM runs WHERE model = ? AND finished_at IS NOT NULL ORDER BY created_at DESC LIMIT ?
-)
-SELECT (SELECT COUNT(*) FROM recent),
-       (SELECT COALESCE(SUM(steps), 0) FROM recent),
+# The counts of the events of each of some runs, one row per run that has events (``{runs}``: one ``?`` per run, then
+# the key of arguments that were not JSON). A failed tool result without a risk was refused before anything ran (an
+# unknown tool, a tool of another mode, arguments that were not JSON or did not fit).
+_RUN_COUNTS_SQL: str = f"""
+SELECT e.run_id,
        COALESCE(SUM(e.kind = 'tool_call'), 0),
        COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}), 0),
        COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}
@@ -181,7 +178,7 @@ SELECT (SELECT COUNT(*) FROM recent),
                     AND json_array_length(e.data, '$.tool_calls') = 0), 0),
        COALESCE(SUM(e.kind = 'stall'), 0),
        COALESCE(SUM(e.kind = 'compacted'), 0)
-FROM events e WHERE e.run_id IN (SELECT id FROM recent)
+FROM events e WHERE e.run_id IN ({{runs}}) GROUP BY e.run_id
 """
 
 # One row per step call of one model that answered and measured its input, in the runs created since a time: the input
@@ -639,28 +636,110 @@ class ModelProfile(FrozenModel):
     compactions: int
 
 
+# The newest finished runs a model's profile is read over, each with its steps and how many events it holds, counted on
+# the index alone (item 1918): a finished run's counts change only when its events do, so they are kept by that number.
+_PROFILE_RUNS_SQL: str = (
+    "SELECT r.id, r.steps, (SELECT COUNT(*) FROM events AS e WHERE e.run_id = r.id) FROM runs AS r"
+    " WHERE r.model = ? AND r.finished_at IS NOT NULL ORDER BY r.created_at DESC LIMIT ?"
+)
+
+
+class ProfileRun(FrozenModel):
+    """One of the finished runs a model's profile is read over: its steps and how many events it holds."""
+
+    id: str
+    steps: int
+    events: int
+
+
+class RunEventCounts(FrozenModel):
+    """What the events of one run count for its model's profile (:class:`ModelProfile`)."""
+
+    tool_calls: int
+    tool_errors: int
+    refused_calls: int
+    invalid_arguments: int
+    empty_replies: int
+    stalls: int
+    compactions: int
+
+
+_NO_RUN_EVENTS: RunEventCounts = RunEventCounts(
+    tool_calls=0, tool_errors=0, refused_calls=0, invalid_arguments=0, empty_replies=0, stalls=0, compactions=0
+)
+
+
+def _read_only(database: Path) -> sqlite3.Connection:
+    return sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)
+
+
+def _history_error(database: Path, model: str, error: sqlite3.Error) -> StoreError:
+    return StoreError(
+        "the run history could not be read", {"database": str(database), "model": model, "error": str(error)}
+    )
+
+
+def read_profile_runs(database: Path, model: str, runs: int) -> tuple[ProfileRun, ...]:
+    """The newest ``runs`` finished runs of ``model``, the newest first: what its profile is read over. Read-only,
+    blocking."""
+    try:
+        with closing(_read_only(database)) as connection:
+            rows: list[tuple[str, int, int]] = connection.execute(_PROFILE_RUNS_SQL, (model, runs)).fetchall()
+    except sqlite3.Error as error:
+        raise _history_error(database, model, error) from error
+    return tuple(ProfileRun(id=str(run_id), steps=int(steps), events=int(events)) for run_id, steps, events in rows)
+
+
+def read_run_counts(database: Path, model: str, run_ids: Sequence[str]) -> dict[str, RunEventCounts]:
+    """The counts of the events of each of ``run_ids`` (runs of ``model``), every one of them: a run without events
+    counts nothing. Read-only, blocking."""
+    if not run_ids:
+        return {}
+    sql: str = _RUN_COUNTS_SQL.format(runs=", ".join("?" * len(run_ids)))
+    try:
+        with closing(_read_only(database)) as connection:
+            rows: list[tuple[str, int, int, int, int, int, int, int]] = connection.execute(
+                sql, (INVALID_ARGUMENTS_KEY, *run_ids)
+            ).fetchall()
+    except sqlite3.Error as error:
+        raise _history_error(database, model, error) from error
+    found: dict[str, RunEventCounts] = {
+        str(row[0]): RunEventCounts(
+            tool_calls=int(row[1]),
+            tool_errors=int(row[2]),
+            refused_calls=int(row[3]),
+            invalid_arguments=int(row[4]),
+            empty_replies=int(row[5]),
+            stalls=int(row[6]),
+            compactions=int(row[7]),
+        )
+        for row in rows
+    }
+    return {run_id: found.get(run_id, _NO_RUN_EVENTS) for run_id in run_ids}
+
+
+def profile_of(model: str, runs: Sequence[ProfileRun], counts: Mapping[str, RunEventCounts]) -> ModelProfile:
+    """The profile of ``model`` over ``runs``, by the counts of each of their events (``counts``, by run)."""
+    taken: list[RunEventCounts] = [counts[run.id] for run in runs]
+    return ModelProfile(
+        model=model,
+        runs=len(runs),
+        steps=sum(run.steps for run in runs),
+        tool_calls=sum(one.tool_calls for one in taken),
+        tool_errors=sum(one.tool_errors for one in taken),
+        refused_calls=sum(one.refused_calls for one in taken),
+        invalid_arguments=sum(one.invalid_arguments for one in taken),
+        empty_replies=sum(one.empty_replies for one in taken),
+        stalls=sum(one.stalls for one in taken),
+        compactions=sum(one.compactions for one in taken),
+    )
+
+
 def read_model_profile(database: Path, model: str, runs: int) -> ModelProfile:
     """The profile of ``model`` over its newest ``runs`` finished runs. The database is opened read-only, so a running
     daemon is not disturbed. Blocking."""
-    try:
-        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
-            row: tuple[object, ...] = connection.execute(_PROFILE_SQL, (model, runs, INVALID_ARGUMENTS_KEY)).fetchone()
-    except sqlite3.Error as error:
-        raise StoreError(
-            "the run history could not be read", {"database": str(database), "model": model, "error": str(error)}
-        ) from error
-    return ModelProfile(
-        model=model,
-        runs=int(str(row[0])),
-        steps=int(str(row[1])),
-        tool_calls=int(str(row[2])),
-        tool_errors=int(str(row[3])),
-        refused_calls=int(str(row[4])),
-        invalid_arguments=int(str(row[5])),
-        empty_replies=int(str(row[6])),
-        stalls=int(str(row[7])),
-        compactions=int(str(row[8])),
-    )
+    recent: tuple[ProfileRun, ...] = read_profile_runs(database, model, runs)
+    return profile_of(model, recent, read_run_counts(database, model, [run.id for run in recent]))
 
 
 class ContextCall(FrozenModel):

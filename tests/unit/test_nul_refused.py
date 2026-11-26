@@ -59,6 +59,7 @@ def test_an_opencode_step_with_a_nul_is_refused_and_the_run_goes_on(
         vision=False,
         queue=asyncio.Queue(),
         door="dot_1a2b3c4d_",
+        silence_s=600.0,
     )
     event: PermissionAsked = PermissionAsked(
         request_id="per_1", permission=permission, patterns=(), metadata=dict(metadata), call_id="call_1"

@@ -174,10 +174,12 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     jobs alone (item 1886), so what only macOS shows is first tested by main's own run after the merge. Dot asks your
     checkout's `scripts/main_macos_green.py check` every five minutes, for up to 90 but never past the night's two
     hours and the half hour a push may add (so the night still ends within the three hours a restart asked meanwhile
-    waits); once main's newest commit passed, it brings your checkout up to that commit, fast-forward only, and asks
-    for its own restart once it is idle (`dotx service restart --when-idle`, run with `python -P`, item 943). Main red
+    waits); once main's newest commit passed, it brings your checkout up to that commit, fast-forward only, syncs its
+    `.venv` to that commit's lock (`uv sync --locked`, item 1937: the daemon runs that `.venv`'s python; a sync that
+    fails puts the checkout back on the commit it stood on and syncs that again, so no restart finds code and packages
+    that disagree), and asks for its own restart once it is idle (`dotx service restart --when-idle`, run with `python -P`, item 943). Main red
     on macOS, its runs not finished by then, a check that gives no answer, a night stopped before or during the wait, a
-    checkout off main or a pull that failed is told to you, and Dot runs the code it ran. Your checkout is not changed
+    checkout off main or a pull or sync that failed is told to you, and Dot runs the code it ran. Your checkout is not changed
     while the night works, so Dot never goes on in a process whose code on disk has changed. A restart that gave up (a
     run waited for you two hours) leaves the daemon on the code before: a night whose checkout's commit is newer than
     its process (by the commit's time) then repairs nothing, asks for the restart again and tells you (*Dot waits to

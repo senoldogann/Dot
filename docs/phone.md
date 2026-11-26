@@ -106,9 +106,22 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
-   own header and menu, its profile, and one settings sheet from an avatar button) is a native SwiftUI app over the
+   own header and menu, its profile, and one settings sheet from an avatar button; a bot's unread mark counts the
+   chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
+   hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
+   item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
+   the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
+   item 1912; a new chat's half-written words are kept per bot, item 1914; each row, a bot's and a chat's, says where it
+   stands, strongest first: Needs you in the accent while an approval, a question or a secret waits, Working… shimmering
+   and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
+   what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
+   dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
+   `helpers` and `background` and are read again when a chat's revision moves, item 1920) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
-   after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
+   after the last one, answers that stream in (a file an answer names is a chip of its name and size that opens a
+   preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open on Mac, Share and Save
+   to Files; its web links gather in one chip of their sites' own icons that opens each in Safari's in-app view, item
+   1935), the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
@@ -601,6 +614,17 @@ for a lost link would hold what the owner sends.
   same Mac, where a network that is down takes nothing away).
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
+
+## Attachments on Dot Next and the web
+
+In a new or existing Dot Next chat, tap **+** to open the photo library for photos and videos, take a photo or record a
+video with Camera, or choose a document with Files. The phone exports video as 720p MP4 with sound, and shows its
+thumbnail, duration and upload size. If it exceeds 20 MiB, tap **Trim video** on the chip and choose a shorter part.
+Files show their name, type and size. Up to 10 attachments go with a message.
+
+After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
+After cancellation, tap **Try again** to retry the message. On the Mac, choose **+ › Add files** in the web composer
+or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
 
 ## The iPhone app's calls
 

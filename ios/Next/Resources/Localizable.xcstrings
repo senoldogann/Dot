@@ -34,6 +34,17 @@
         }
       }
     },
+    "%@ is %@. The limit is 20 MiB per attachment.": {
+      "comment": "Composer attachment error; arguments are file name and size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ boyutu %@. Ek başına sınır 20 MiB."
+          }
+        }
+      }
+    },
     "%@ is not a Tailscale address. It ends in .ts.net; Settings › Phone on the Mac shows it.": {
       "comment": "Pairing error: the address is not under ts.net; the argument is the host",
       "localizations": {
@@ -508,6 +519,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld oturum"
+          }
+        }
+      }
+    },
+    "%lld sources": {
+      "comment": "Under an answer: how many web links it names; tap unfolds them",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld source"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sources"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kaynak"
           }
         }
       }
@@ -1190,7 +1230,7 @@
       }
     },
     "Agents": {
-      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
+      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nSettings section: models, schedules, rules, memory\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1564,7 +1604,7 @@
       }
     },
     "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Dot's empty chat (and the component gallery): what to ask Dot",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1695,6 +1735,17 @@
         }
       }
     },
+    "At most 10 attachments can go with a message.": {
+      "comment": "Composer attachment count limit",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir mesajla en fazla 10 ek gönderebilirsiniz."
+          }
+        }
+      }
+    },
     "At this moment in your time.": {
       "comment": "New schedule footer: a single run is read in the phone's zone",
       "localizations": {
@@ -1713,6 +1764,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekle"
+          }
+        }
+      }
+    },
+    "Attachments of unsent messages were not kept.": {
+      "comment": "Chat list notice after a reset: the attachments of the messages that were not sent are gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmemiş mesajların ekleri saklanmadı."
           }
         }
       }
@@ -2022,7 +2084,7 @@
       }
     },
     "Camera": {
-      "comment": "Composer + menu: takes a photo",
+      "comment": "Composer + menu: takes a photo or records a video",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2083,6 +2145,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaydı iptal et"
+          }
+        }
+      }
+    },
+    "Cancel upload": {
+      "comment": "Stops the current attachment upload and keeps the message available for retry",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yüklemeyi iptal et"
           }
         }
       }
@@ -2149,6 +2222,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'inde değiştir."
+          }
+        }
+      }
+    },
+    "Changed": {
+      "comment": "File preview row: when the file last changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişti"
           }
         }
       }
@@ -2869,6 +2953,17 @@
         }
       }
     },
+    "Copy link": {
+      "comment": "Long press on a link under an answer: copies its address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantıyı kopyala"
+          }
+        }
+      }
+    },
     "Copy the answer": {
       "comment": "VoiceOver: copies Dot's answer",
       "localizations": {
@@ -2898,6 +2993,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Maliyet"
+          }
+        }
+      }
+    },
+    "Could not add attachment": {
+      "comment": "Composer attachment error title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ek eklenemedi"
+          }
+        }
+      }
+    },
+    "Could not prepare %@ as a video.": {
+      "comment": "Composer attachment error; argument is the file name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ video olarak hazırlanamadı."
+          }
+        }
+      }
+    },
+    "Could not read %@. Choose a file.": {
+      "comment": "Composer attachment error; argument is the file name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ okunamadı. Bir dosya seçin."
           }
         }
       }
@@ -3548,7 +3676,7 @@
       }
     },
     "Done": {
-      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nStatus word: the run finished",
+      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nFind in chat: closes the bar\nStatus word: the run finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4186,6 +4314,17 @@
         }
       }
     },
+    "Each chat's This chat sheet can show or hide them for that chat alone.": {
+      "comment": "Chat settings: footer of Show steps (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir."
+          }
+        }
+      }
+    },
     "Each role plays on the review model unless one is chosen for it.": {
       "comment": "Models: the night's learning roles",
       "localizations": {
@@ -4358,17 +4497,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yazma alanında düzenler"
-          }
-        }
-      }
-    },
-    "Effort %@": {
-      "comment": "VoiceOver: the model's reasoning level; the argument is the level",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Efor %@"
           }
         }
       }
@@ -4736,8 +4864,19 @@
         }
       }
     },
+    "File": {
+      "comment": "A file chip's second line while its size is being asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya"
+          }
+        }
+      }
+    },
     "Files": {
-      "comment": "Composer + menu: picks image files",
+      "comment": "Composer + menu: picks documents or other files",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4945,6 +5084,17 @@
         }
       }
     },
+    "Folded": {
+      "comment": "VoiceOver: the sources row shows only the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı"
+          }
+        }
+      }
+    },
     "Folded, %lld models": {
       "comment": "VoiceOver: a folded provider group; the argument is its model count",
       "localizations": {
@@ -4981,6 +5131,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot çalışırken yazılan mesaj"
+          }
+        }
+      }
+    },
+    "For this chat; Settings › Chat sets it for every chat.": {
+      "comment": "This chat sheet: the Show steps switch is this chat's own (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar."
           }
         }
       }
@@ -6107,6 +6268,17 @@
         }
       }
     },
+    "Loading the file": {
+      "comment": "VoiceOver: a file preview is being fetched",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya yükleniyor"
+          }
+        }
+      }
+    },
     "Looked %@": {
       "comment": "Watcher: when it last looked (relative, e.g. '5 min ago')",
       "localizations": {
@@ -6457,7 +6629,7 @@
       }
     },
     "Messages": {
-      "comment": "Home search: finds in what the chats say",
+      "comment": "Chat settings section: what a chat shows\nHome search: finds in what the chats say",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6512,7 +6684,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nNew schedule: the model its runs use\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nInspector row: the model and reasoning level of this chat\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6533,13 +6705,13 @@
         }
       }
     },
-    "Model, %@": {
-      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort\nVoiceOver: the new chat's model button; the argument is the model",
+    "Model: %@": {
+      "comment": "VoiceOver: the composer's model button; the argument is the model and effort",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Model, %@"
+            "value": "Model: %@"
           }
         }
       }
@@ -7204,6 +7376,17 @@
         }
       }
     },
+    "Not on your Mac": {
+      "comment": "File chip: the file the answer names is not on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde yok"
+          }
+        }
+      }
+    },
     "Not paired": {
       "comment": "Settings › Voice: no Mac is paired",
       "localizations": {
@@ -7281,6 +7464,17 @@
         }
       }
     },
+    "Not sent: an attachment could not be read on this phone": {
+      "comment": "Under a message whose attachment is gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilmedi: eklerden biri bu telefonda okunamadı"
+          }
+        }
+      }
+    },
     "Not sent: it waited more than a day": {
       "comment": "Under an owner's message too old to send again safely",
       "localizations": {
@@ -7343,6 +7537,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz belirlenmedi: ilk oturum kaydeder."
+          }
+        }
+      }
+    },
+    "Not shown from this place": {
+      "comment": "File chip: the Mac does not show files of this folder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu konumdan gösterilmiyor"
           }
         }
       }
@@ -7589,6 +7794,17 @@
         }
       }
     },
+    "OK": {
+      "comment": "Button that dismisses an alert",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamam"
+          }
+        }
+      }
+    },
     "Off": {
       "comment": "Reasoning level: none\nThis Mac: Tailscale is off\nVoiceOver value of a switch that is off",
       "localizations": {
@@ -7607,6 +7823,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapalı: tepki yalnızca Dot'un öğrendiği bir geri bildirimdir"
+          }
+        }
+      }
+    },
+    "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": {
+      "comment": "Description of the Show steps switch (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır."
           }
         }
       }
@@ -7842,6 +8069,17 @@
         }
       }
     },
+    "Only the start of the file shows here; open it on the Mac for the rest.": {
+      "comment": "File preview: the text was cut",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç."
+          }
+        }
+      }
+    },
     "Open": {
       "comment": "VoiceOver: an open provider group",
       "localizations": {
@@ -7886,6 +8124,17 @@
         }
       }
     },
+    "Open in Safari": {
+      "comment": "Long press on a link under an answer: opens it in the Safari app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safari'de aç"
+          }
+        }
+      }
+    },
     "Open its chat": {
       "comment": "Draft: opens the chat of the run that wrote it",
       "localizations": {
@@ -7893,6 +8142,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbetini aç"
+          }
+        }
+      }
+    },
+    "Open on Mac": {
+      "comment": "File preview: opens the file in its application on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'te aç"
           }
         }
       }
@@ -7915,6 +8175,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son değerlendirmeyi aç"
+          }
+        }
+      }
+    },
+    "Opened on your Mac.": {
+      "comment": "File preview: the file opened in its application on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde açıldı."
           }
         }
       }
@@ -8018,6 +8289,17 @@
         }
       }
     },
+    "Opens the page": {
+      "comment": "VoiceOver hint of a link under an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfayı açar"
+          }
+        }
+      }
+    },
     "Opens the web page": {
       "comment": "VoiceOver: the Web mark of a settings row",
       "localizations": {
@@ -8080,6 +8362,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diğer kablolu"
+          }
+        }
+      }
+    },
+    "Over the 20 MiB limit": {
+      "comment": "On a video chip when the exported video is still too big",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "20 MiB sınırını aşıyor"
           }
         }
       }
@@ -8250,6 +8543,17 @@
         }
       }
     },
+    "Pending": {
+      "comment": "Under an owner's message: it is going to the Mac and not taken yet (item 1927)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekliyor"
+          }
+        }
+      }
+    },
     "Permissions": {
       "comment": "Settings row: the approval mode and the rules",
       "localizations": {
@@ -8261,35 +8565,13 @@
         }
       }
     },
-    "Photo": {
-      "comment": "VoiceOver: a photo added to the message",
+    "Photos and videos": {
+      "comment": "Composer + menu: opens the photo library",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Fotoğraf"
-          }
-        }
-      }
-    },
-    "Photos": {
-      "comment": "Composer + menu: picks photos",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fotoğraflar"
-          }
-        }
-      }
-    },
-    "Photos of unsent messages were not kept.": {
-      "comment": "Chat list notice after a reset: the photos of the messages that were not sent are gone",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Gönderilemeyen mesajların fotoğrafları saklanmadı."
+            "value": "Fotoğraflar ve videolar"
           }
         }
       }
@@ -8433,6 +8715,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tercih sırası"
+          }
+        }
+      }
+    },
+    "Preparing attachments…": {
+      "comment": "Composer status while opening or exporting selected files",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekler hazırlanıyor…"
           }
         }
       }
@@ -8587,6 +8880,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Önerici"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "comment": "Inspector row: who serves the model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlayıcı"
           }
         }
       }
@@ -9109,7 +9413,7 @@
       }
     },
     "Remove %@": {
-      "comment": "VoiceOver: removes a fallback model; the argument is its name",
+      "comment": "VoiceOver: removes a fallback model; the argument is its name\nVoiceOver: removes an attachment from the message",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9137,17 +9441,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tepkiyi kaldır: %@"
-          }
-        }
-      }
-    },
-    "Remove the photo": {
-      "comment": "VoiceOver: removes a photo from the message",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fotoğrafı kaldır"
           }
         }
       }
@@ -9548,6 +9841,17 @@
         }
       }
     },
+    "Save to Files": {
+      "comment": "File preview: saves a copy in the Files app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyalar'a kaydet"
+          }
+        }
+      }
+    },
     "Saved securely": {
       "comment": "Transcript anchor: a secret given (§20: stays one line)",
       "localizations": {
@@ -9812,6 +10116,17 @@
         }
       }
     },
+    "See the attachments.": {
+      "comment": "Message text for a send with only attached files",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklere bak."
+          }
+        }
+      }
+    },
     "Select": {
       "comment": "Chat list toolbar: checks chats to act on several",
       "localizations": {
@@ -10033,7 +10348,7 @@
       }
     },
     "Sending…": {
-      "comment": "Draft card state: on its way\nUnder an owner's message: it is going to the Mac",
+      "comment": "Draft card state: on its way",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10362,6 +10677,17 @@
         }
       }
     },
+    "Share": {
+      "comment": "Long press on a link or a file preview: the share sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paylaş"
+          }
+        }
+      }
+    },
     "Share as template…": {
       "comment": "Bot chat menu: shares the agent as a file others can import",
       "localizations": {
@@ -10501,6 +10827,17 @@
         }
       }
     },
+    "Show steps": {
+      "comment": "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adımları göster"
+          }
+        }
+      }
+    },
     "Show the live picture": {
       "comment": "Mini pill: opens the folded mini player",
       "localizations": {
@@ -10541,6 +10878,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Değişikliği gösterir"
+          }
+        }
+      }
+    },
+    "Shows the file": {
+      "comment": "VoiceOver hint of a file chip under an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyayı gösterir"
           }
         }
       }
@@ -10596,6 +10944,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Giriş kodu"
+          }
+        }
+      }
+    },
+    "Size": {
+      "comment": "File preview row: the file's size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boyut"
           }
         }
       }
@@ -10695,17 +11054,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Standart"
-          }
-        }
-      }
-    },
-    "Start a chat": {
-      "comment": "A bot with no chat yet: starts one",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sohbet başlat"
           }
         }
       }
@@ -10920,7 +11268,7 @@
       }
     },
     "Stopped": {
-      "comment": "Campaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
+      "comment": "Activity: a run of Dot's own that was stopped\nCampaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11646,6 +11994,17 @@
         }
       }
     },
+    "The file cannot be shown": {
+      "comment": "File preview: the Mac did not give the file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya gösterilemiyor"
+          }
+        }
+      }
+    },
     "The file goes back to how it was before the task changed it.": {
       "comment": "Inspector: what the undo of a changed file does",
       "localizations": {
@@ -11653,6 +12012,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dosya, görev değiştirmeden önceki haline döner."
+          }
+        }
+      }
+    },
+    "The file is too large for the phone; open it on the Mac.": {
+      "comment": "File preview: an image or a PDF too large to show",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya telefon için çok büyük; Mac'te aç."
+          }
+        }
+      }
+    },
+    "The image could not be read.": {
+      "comment": "Composer attachment error",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görüntü okunamadı."
           }
         }
       }
@@ -11719,6 +12100,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Döngü kurulamadı: %@"
+          }
+        }
+      }
+    },
+    "The message could not be saved on this phone. Try again.": {
+      "comment": "Shown when the outbox could not keep a message or attachment",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj bu telefona kaydedilemedi. Tekrar dene."
           }
         }
       }
@@ -11829,6 +12221,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfa açılmadı"
+          }
+        }
+      }
+    },
+    "The phone cannot draw this image.": {
+      "comment": "File preview: an image of a kind iOS does not draw",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon bu görseli çizemiyor."
+          }
+        }
+      }
+    },
+    "The phone shows this kind of file by its facts; open it on the Mac to read it.": {
+      "comment": "File preview: a table or an Office file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon bu tür dosyanın yalnızca bilgilerini gösterir; okumak için Mac'te aç."
           }
         }
       }
@@ -12438,6 +12852,17 @@
         }
       }
     },
+    "Trim video": {
+      "comment": "Composer button: opens the video trimmer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Videoyu kırp"
+          }
+        }
+      }
+    },
     "Try again": {
       "comment": "Live picture: reads the stream again (web watch.retry)\nSettings: repeats a read or write that failed\nUnder a refused message: sends it again",
       "localizations": {
@@ -12614,6 +13039,17 @@
         }
       }
     },
+    "Unfolded": {
+      "comment": "VoiceOver: the sources row shows each link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
+          }
+        }
+      }
+    },
     "Unmute": {
       "comment": "Home: a bot's unread count counts again",
       "localizations": {
@@ -12753,6 +13189,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'u güncellemek ya da yeniden başlatmak Mac'te yapılır: Ayarlar › Sistem."
+          }
+        }
+      }
+    },
+    "Upload cancelled": {
+      "comment": "Under a message after the owner stops its attachment upload",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yükleme iptal edildi"
+          }
+        }
+      }
+    },
+    "Uploading attachment %lld of %lld": {
+      "comment": "Message status during an attachment upload; arguments are the ordinal and file count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ek yükleniyor (%1$lld / %2$lld)"
           }
         }
       }
@@ -13402,6 +13860,17 @@
         }
       }
     },
+    "Where": {
+      "comment": "File preview row: the file's folder on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konum"
+          }
+        }
+      }
+    },
     "Which invoices are overdue": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -13810,7 +14279,7 @@
       }
     },
     "You": {
-      "comment": "Mini player: the owner holds the run's page",
+      "comment": "Mini player: the owner holds the run's page\nSettings: the owner's card before their name is read",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13865,7 +14334,7 @@
       }
     },
     "Your Mac": {
-      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name",
+      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name\nWatch: title when the Mac's name is not known",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14701,6 +15170,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "web'deki sohbet"
+          }
+        }
+      }
+    },
+    "the chat's file panel": {
+      "comment": "Where on the Mac a file of an answer is shown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sohbetin dosya paneli"
           }
         }
       }

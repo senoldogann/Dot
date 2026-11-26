@@ -21,6 +21,7 @@ from collections.abc import Callable, Collection, Sequence
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_checker_for
 from dotagent.core.errors import ConfigError, DotError
 from dotagent.core.logs import get_logger
+from dotagent.llm.roles import ModelRoles, independent_model
 from dotagent.llm.router import ModelRouter, parse_model_ref, unavailable_reason
 
 log = get_logger(__name__)
@@ -87,3 +88,28 @@ def goal_checker_with_standby(
         run_id,
         lambda: set(router.paused(time.time())),
     )
+
+
+def goal_checker_for_run(
+    router: ModelRouter,
+    roles: ModelRoles,
+    worker: Callable[[], str],
+    timeout_s: float,
+    session_key: str,
+    run_id: str,
+) -> GoalChecker:
+    """Snapshot the settings for a goal check. Read the worker each time in case it moved to a standby."""
+    usual: GoalChecker = goal_checker_with_standby(
+        router, roles.review(), roles.standby(), timeout_s, session_key, run_id
+    )
+    alternate: str = roles.alternate_check()
+    if alternate == "":
+        return usual
+    independent: GoalChecker = goal_checker_for(router, alternate, timeout_s, session_key, run_id)
+
+    async def check(request: GoalRequest) -> GoalVerdict:
+        if independent_model(worker(), alternate) is not None:
+            return await independent(request)
+        return await usual(request)
+
+    return check

@@ -7,6 +7,23 @@ extracts them (`%@` a text argument, `%lld` a count).
 """
 
 TR: dict[str, str] = {
+    "Attachments of unsent messages were not kept.": "Gönderilmemiş mesajların ekleri saklanmadı.",
+    "Not sent: an attachment could not be read on this phone": "Gönderilmedi: eklerden biri bu telefonda okunamadı",
+    "Upload cancelled": "Yükleme iptal edildi",
+    "Cancel upload": "Yüklemeyi iptal et",
+    "Uploading attachment %lld of %lld": "Ek yükleniyor (%1$lld / %2$lld)",
+    "See the attachments.": "Eklere bak.",
+    "OK": "Tamam",
+    "Photos and videos": "Fotoğraflar ve videolar",
+    "Trim video": "Videoyu kırp",
+    "Over the 20 MiB limit": "20 MiB sınırını aşıyor",
+    "Preparing attachments…": "Ekler hazırlanıyor…",
+    "Could not add attachment": "Ek eklenemedi",
+    "At most 10 attachments can go with a message.": "Bir mesajla en fazla 10 ek gönderebilirsiniz.",
+    "%@ is %@. The limit is 20 MiB per attachment.": "%@ boyutu %@. Ek başına sınır 20 MiB.",
+    "Could not prepare %@ as a video.": "%@ video olarak hazırlanamadı.",
+    "Could not read %@. Choose a file.": "%@ okunamadı. Bir dosya seçin.",
+    "The image could not be read.": "Görüntü okunamadı.",
     "Not sent: a photo of it could not be read on this phone": "Gönderilmedi: fotoğraflarından biri bu telefonda okunamadı",
     "Accounts": "Hesaplar",
     "Ask a side question the run does not see": "Çalışmanın görmediği bir yan soru sor",
@@ -109,8 +126,6 @@ TR: dict[str, str] = {
     "Or write your own answer": "Ya da kendi yanıtını yaz",
     "Pair this phone again in Settings.": "Bu telefonu Ayarlar'dan yeniden eşleştir.",
     "Paste image": "Görseli yapıştır",
-    "Photo": "Fotoğraf",
-    "Photos": "Fotoğraflar",
     "Pin: Dot keeps a note of it": "İğnele: Dot bunu not eder",
     "Plan": "Plan",
     "Plan · %lld of %lld done": "Plan · %lld / %lld bitti",
@@ -123,7 +138,6 @@ TR: dict[str, str] = {
     "Read %@": "Okundu: %@",
     "Recommended": "Önerilen",
     "Remove reaction: %@": "Tepkiyi kaldır: %@",
-    "Remove the photo": "Fotoğrafı kaldır",
     "Resume now": "Şimdi sürdür",
     "Resume queue": "Sırayı sürdür",
     "Running %@": "Çalışıyor: %@",
@@ -344,7 +358,6 @@ TR: dict[str, str] = {
     "Looked at the screen": "Ekrana baktı",
     "Memory": "Bellek",
     "Message Dot": "Dot'a yaz",
-    "Model, %@": "Model, %@",
     "Models": "Modeller",
     "Mon": "Pzt",
     "Needs you": "Seni bekliyor",
@@ -1167,6 +1180,16 @@ TR: dict[str, str] = {
     "Waiting · %@": "Bekliyor · %@",
     "Details": "Ayrıntılar",
 
+    # D2: messages only, Show steps (item 1915).
+    "Show steps": "Adımları göster",
+    "Each chat's This chat sheet can show or hide them for that chat alone.": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir.",
+    "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır.",
+    "For this chat; Settings › Chat sets it for every chat.": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar.",
+    "Messages": "Mesajlar",
+
+    # D2: an owner's message not yet taken by the Mac (item 1927).
+    "Pending": "Bekliyor",
+
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
@@ -1474,3 +1497,42 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
+
+# The composer's model chip as the provider's mark (item 1924).
+TR.update({"Model: %@": "Model: %@"})
+
+# New chat as a pushed chat (item 1916).
+TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})
+
+# Links and files under an answer (backlog LF1).
+TR.update(
+    {
+        "%lld sources": "%lld kaynak",
+        "Unfolded": "Açık",
+        "Opens the page": "Sayfayı açar",
+        "Copy link": "Bağlantıyı kopyala",
+        "Open in Safari": "Safari'de aç",
+        "Share": "Paylaş",
+        "Shows the file": "Dosyayı gösterir",
+        "File": "Dosya",
+        "Loading the file": "Dosya yükleniyor",
+        "The file cannot be shown": "Dosya gösterilemiyor",
+        "Only the start of the file shows here; open it on the Mac for the rest.": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç.",
+        "Size": "Boyut",
+        "Changed": "Değişti",
+        "Where": "Konum",
+        "Open on Mac": "Mac'te aç",
+        "Save to Files": "Dosyalar'a kaydet",
+        "Opened on your Mac.": "Mac'inde açıldı.",
+        "The phone cannot draw this image.": "Telefon bu görseli çizemiyor.",
+        "The phone shows this kind of file by its facts; open it on the Mac to read it.": "Telefon bu tür dosyanın yalnızca bilgilerini gösterir; okumak için Mac'te aç.",
+        "The file is too large for the phone; open it on the Mac.": "Dosya telefon için çok büyük; Mac'te aç.",
+        "Not on your Mac": "Mac'inde yok",
+        "Not shown from this place": "Bu konumdan gösterilmiyor",
+        "the chat's file panel": "sohbetin dosya paneli",
+    }
+)
+EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
+
+# "This chat" sheet, plain (item 1922)
+TR.update({"Provider": "Sağlayıcı"})

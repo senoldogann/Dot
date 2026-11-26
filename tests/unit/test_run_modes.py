@@ -21,8 +21,8 @@ from dotagent.agent.loop import (
     _acts,
     _after_limit_verdict,
     _after_verdict,
-    _follow_ups,
     _since_goal,
+    follow_ups_of,
 )
 from dotagent.agent.prompt import (
     PromptInputs,
@@ -152,7 +152,7 @@ def test_a_goal_whose_rest_waits_on_a_scheduled_run_ends_the_run_as_done_with_th
 
 
 async def _run_in(store: Store, thread_id: str, source: str) -> AgentRun:
-    """A new run of ``source`` in the chat ``thread_id``, with only what :func:`_follow_ups` reads of the runtime."""
+    """A new run of ``source`` in the chat ``thread_id``, with only what :func:`follow_ups_of` reads of the runtime."""
     run: RunRecord = await store.create_run(
         thread_id, "a goal", "task", "ollama:x", None, source, "medium", "standard", None, "ask", True, None, None, None
     )
@@ -192,19 +192,21 @@ async def test_the_follow_ups_of_a_run_are_the_schedules_still_to_run_in_its_own
                 ("Gone by", time.time() - 60, here, chat, True),
             )
         ]
-        listed: list[str] = (await _follow_ups(await _run_in(store, chat, UI_SOURCE))).splitlines()
+        first: AgentRun = await _run_in(store, chat, UI_SOURCE)
+        listed: list[str] = (await follow_ups_of(first.runtime, first.run)).splitlines()
         # The schedule fired in the chat and its run asks: its own next firing is no follow-up.
         await store.link_schedule_thread(chat, made[0].id)
         fired: AgentRun = await _run_in(store, chat, SCHEDULE_SOURCE)
-        firing: str = await _follow_ups(fired)
+        firing: str = await follow_ups_of(fired.runtime, fired.run)
         # Cut by the daemon's end and resumed twice by the owner, it is still the firing.
         resumed: AgentRun = fired
         for _ in range(2):
             later_run: AgentRun = await _run_in(store, chat, RESUME_SOURCE)
             await store.add_event(later_run.run.id, RESUMED_EVENT, {"from_run_id": resumed.run.id})
             resumed = later_run
-        resumed_firing: str = await _follow_ups(resumed)
-        followed: list[str] = (await _follow_ups(await _run_in(store, chat, UI_SOURCE))).splitlines()
+        resumed_firing: str = await follow_ups_of(resumed.runtime, resumed.run)
+        reply: AgentRun = await _run_in(store, chat, UI_SOURCE)
+        followed: list[str] = (await follow_ups_of(reply.runtime, reply.run)).splitlines()
     finally:
         await store.close()
     assert len(listed) == 1, listed

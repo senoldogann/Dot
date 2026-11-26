@@ -160,13 +160,17 @@ from dotagent.store.stats import (
     ChatSpend,
     ContextEvidence,
     ModelProfile,
+    ProfileRun,
     RunCosts,
+    RunEventCounts,
     Usage,
     chat_spend,
     collect_run_costs,
     collect_usage,
+    profile_of,
     read_context_evidence,
-    read_model_profile,
+    read_profile_runs,
+    read_run_counts,
 )
 from dotagent.tools.team import TEAM_SOURCE
 
@@ -1977,6 +1981,9 @@ class Store:
         self._image_dir: Path = image_dir
         # The one door for writes (``_writing``): the daemon's writers take turns on the one connection.
         self._write_lock: asyncio.Lock = asyncio.Lock()
+        # What the events of each model's newest finished runs counted (item 1918), by model and run, with how many
+        # events the run held: reading every run's events took a second and more at every run's start.
+        self._run_counts: dict[str, dict[str, tuple[int, RunEventCounts]]] = {}
 
     @classmethod
     async def open(cls, path: Path, image_dir: Path) -> "Store":
@@ -4787,7 +4794,18 @@ class Store:
 
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
         """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""
-        return await asyncio.to_thread(read_model_profile, self._database, model, runs)
+        recent: tuple[ProfileRun, ...] = await asyncio.to_thread(read_profile_runs, self._database, model, runs)
+        kept: dict[str, tuple[int, RunEventCounts]] = self._run_counts.get(model, {})
+        # A run's counts are kept by how many events it held (item 1918): a run that finished since, or whose events
+        # were added to or pruned, is read again, and the others are not.
+        stale: list[str] = [run.id for run in recent if run.id not in kept or kept[run.id][0] != run.events]
+        read: dict[str, RunEventCounts] = await asyncio.to_thread(read_run_counts, self._database, model, stale)
+        events: dict[str, int] = {run.id: run.events for run in recent}
+        counts: dict[str, RunEventCounts] = {
+            run.id: read[run.id] if run.id in read else kept[run.id][1] for run in recent
+        }
+        self._run_counts[model] = {run_id: (events[run_id], one) for run_id, one in counts.items()}
+        return profile_of(model, recent, counts)
 
     async def context_evidence(self, model: str, days: int) -> ContextEvidence:
         """What the runs of ``model`` created in the last ``days`` days say about its context size (item 250), read on a

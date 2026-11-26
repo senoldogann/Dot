@@ -84,6 +84,15 @@ func workLineSymbol(_ now: WorkNow) -> String? {
     }
 }
 
+/// Whether the line shimmers: only while the run works on its own; never while it waits on the owner or for its stop,
+/// which may last hours with the chat on screen (item 1932). Pure.
+func workLineMoves(_ now: WorkNow) -> Bool {
+    switch now {
+    case .waitingForYou, .stopping: false
+    default: true
+    }
+}
+
 /// The live line: the mark (or the three typing dots), the words shimmering with "…", a soft fade when the words change.
 /// It is a button: a tap shows the chat's steps, a second folds them back.
 struct WorkLineView: View {
@@ -104,7 +113,15 @@ struct WorkLineView: View {
                         }
                     }
                     .frame(width: Metric.iconSlot)
-                    Text(words + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+                    Group {
+                        if workLineMoves(now) {
+                            Text(words + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+                        } else {
+                            // A state that waits on the owner or for a stop is still: no shimmer redrawing it forever
+                            // (item 1932: the asks scene held the phone at 100 % CPU on this line).
+                            Text(words).textRole(.footnote).lineLimit(1).foregroundStyle(Tone.secondary)
+                        }
+                    }
                         .id(words)
                         .transition(.opacity)
                     Spacer(minLength: 0)
@@ -175,5 +192,21 @@ struct WaitingLine: View {
             Spacer(minLength: 0)
         }
         .frame(minHeight: Metric.hit)
+    }
+}
+
+/// The line under the owner's message from the moment it is sent until its run's first event (item 1919): the typing
+/// dots and "Starting…", shimmering, as the work line draws; it is replaced in place by the run's own line.
+struct StartingLine: View {
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            TypingDots().frame(width: Metric.iconSlot)
+            Text(ChatStatus.starting.word + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Metric.hit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ChatStatus.starting.word)
+        .accessibilityIdentifier("work.starting")
     }
 }

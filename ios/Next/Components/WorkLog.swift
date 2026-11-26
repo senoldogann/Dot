@@ -5,6 +5,13 @@ import UIKit
 // The work log of a chat (wave N2, plan §4.1): one-line tool rows, the fold of a finished stretch, the plan as a
 // checklist, the helpers as one group, the asks left in place, how a run ended, and Dot's notes.
 
+extension EnvironmentValues {
+    /// Told when the owner opens or closes a row of the work log (a step, a thought, a fold): the transcript stops
+    /// following new words, so that the row they act on stays where it is. Left to follow, the end of the page chased the
+    /// growing row with a scroll on every frame of its animation, and the animation stuttered.
+    @Entry var disclosureToggled: @MainActor () -> Void = {}
+}
+
 /// What the transcript stacks: one item, or consecutive steps (tool calls and the model's thinking) drawn as one tight
 /// block (the reference's 28 pt pitch, §19: no gap between the rows of a stretch of work; item 1769: a thought is a row
 /// of the stretch, not a block of its own).
@@ -103,11 +110,15 @@ struct ToolGroupRow: View {
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.locale) private var locale: Locale
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     var body: some View {
         let words: String = toolGroupWords(entries, locale: locale)
         VStack(alignment: .leading, spacing: 0) {
-            Button { open.toggle() } label: {
+            Button {
+                disclosureToggled()
+                open.toggle()
+            } label: {
                 HStack(spacing: Space.xs) {
                     Symbol(name: entries.allSatisfy { $0.kind == .command } ? toolSymbol(.command) : "hammer", context: .tool)
                         .foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
@@ -144,6 +155,7 @@ struct WorkToolRow: View {
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     private var detail: String {
         [entry.args, entry.output].filter { !$0.isEmpty }.joined(separator: "\n\n")
@@ -152,6 +164,7 @@ struct WorkToolRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
+                disclosureToggled()
                 open.toggle()
             } label: {
                 HStack(spacing: Space.xs) {
@@ -175,6 +188,7 @@ struct WorkToolRow: View {
                     UIPasteboard.general.string = [toolLine(entry), detail].filter { !$0.isEmpty }.joined(separator: "\n")
                 }
             }
+            .modifier(ToggleMeter(open: open, kind: OutputBox.isLong(detail) ? "long" : "short"))
             .accessibilityLabel(accessibilityWords)
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             if !entry.images.isEmpty, !open {
@@ -183,13 +197,7 @@ struct WorkToolRow: View {
             if open {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     if !detail.isEmpty {
-                        ScrollView {
-                            Text(detail).textRole(.code).modifier(MonoSize(points: terminalSize)).foregroundStyle(Tone.secondary).textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
-                        }
-                        .frame(maxHeight: Metric.toolDetailMax)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .background(Tone.nested, in: rounded(Radius.inner))
+                        OutputBox(text: detail, role: .code, points: terminalSize, ink: Tone.secondary, anchorsAtEnd: false)
                     }
                     if !entry.images.isEmpty { screenshots }
                 }
@@ -275,6 +283,7 @@ struct WorkFoldView: View {
     @State private var open: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.locale) private var locale: Locale
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     init(fold: WorkFold, row: @escaping (TranscriptItem) -> AnyView) {
         self.fold = fold
@@ -285,6 +294,7 @@ struct WorkFoldView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Button {
+                disclosureToggled()
                 open.toggle()
             } label: {
                 HStack(spacing: Space.xs) {
@@ -315,18 +325,6 @@ struct WorkFoldView: View {
             }
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
-    }
-}
-
-/// The run's plan as a checklist card (the run inspector).
-struct PlanCard: View {
-    let steps: [PlanStep]
-
-    var body: some View {
-        PlanSteps(steps: steps)
-            .padding(Space.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Tone.card, in: rounded(Radius.bubble))
     }
 }
 
@@ -483,10 +481,14 @@ struct ThoughtRow: View {
     let live: Bool
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { open.toggle() } label: {
+            Button {
+                disclosureToggled()
+                open.toggle()
+            } label: {
                 HStack(spacing: Space.xs) {
                     Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.iconSlot)
                     if live {
@@ -508,14 +510,7 @@ struct ThoughtRow: View {
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
             if open {
-                ScrollView {
-                    Text(text).textRole(.footnote).foregroundStyle(Tone.secondary).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
-                }
-                .frame(maxHeight: Metric.toolDetailMax)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(Tone.nested, in: rounded(Radius.inner))
-                .defaultScrollAnchor(live ? .bottom : .top)
+                OutputBox(text: text, role: .footnote, points: 0, ink: Tone.secondary, anchorsAtEnd: live)
                 .padding(.leading, Metric.iconSlot + Space.xs)
                 .padding(.bottom, Space.xs)
                 .transition(.opacity)
