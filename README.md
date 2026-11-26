@@ -184,6 +184,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Dot comes to you](docs/proactive.md): the morning brief and the watchers
 - [Agents and campaigns](docs/agents-and-campaigns.md)
 - [Watching videos](docs/video.md): a video file or a link, seen in frames and heard in a transcript, for any model
+- [Making pictures](docs/image-generation.md): a logo, diagram or card drawn by Dot's browser, or a photo from Google's picture model
 - [Meetings](docs/meetings.md): your Google Meet calls: Dot answers in them and takes notes; a task's post asks you
 - [Recon](docs/recon.md): what a site says about itself, and the open ports of a host you own
 - [Security scan](docs/security.md): the forms of a host you own, tried with benign payloads

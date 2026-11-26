@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1969](1969.md) | done | 2026-11-26 | Dot makes pictures: `generate_image` draws a logo, diagram or card in its own browser, or asks Google's picture model for a photo, with no key of its own |
 | [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
 | [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
 | [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |

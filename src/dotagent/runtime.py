@@ -114,6 +114,7 @@ from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.drafts import build_draft_tool
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
+from dotagent.tools.images import build_image_tools
 from dotagent.tools.judge_items import build_judge_items_tool
 from dotagent.tools.mail_calendar import build_mail_calendar_tools
 from dotagent.tools.mcp import build_mcp_tools
@@ -317,6 +318,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
+        build_image_tools(),
         build_appearance_tools(),
         (build_coding_work_tool(),),
         (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),

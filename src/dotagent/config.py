@@ -243,6 +243,10 @@ class GoogleConfig(FrozenModel):
 
     base_url: ServiceAddress
     api_key_env: str
+    # The picture model of ``generate_image``'s photo path and the Gemini API route it is called on (item 1969): the
+    # same key, not on the free tier (docs/image-generation.md).
+    image_model: str
+    image_base_url: ServiceAddress
     connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     attempts: int = Field(ge=1)

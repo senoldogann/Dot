@@ -395,6 +395,8 @@ export const TR = {
   "tools.showAll": "Tümünü göster ({count} karakter)",
   "tools.screenshot": "Ekran görüntüsü",
   "tools.screenshotFull": "Ekran görüntüsünü tam boyutta göster",
+  "tools.pictureMade": "Dot'un yaptığı resim",
+  "tools.pictureFull": "Resmi tam boyutta göster",
   "tools.imageUnavailable": "Görüntü alınamadı: {problem}",
   "tools.rules": "Kurallar",
   "tools.sent": "Dot'un gönderdiği",

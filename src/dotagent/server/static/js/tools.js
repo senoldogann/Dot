@@ -166,6 +166,26 @@ function thumbnail(name) {
   return holder;
 }
 
+/**
+ * A picture a run made (`generate_image`, item 1969), part of the answer: the picture itself at the width of the
+ * conversation, no box round it, which opens full size on a press.
+ */
+export function pictureCard(name) {
+  const image = el("img", { class: "shown-picture-image", alt: t("tools.pictureMade"), loading: "lazy" });
+  const holder = el("button", { class: "shown-picture-open", type: "button", "aria-label": t("tools.pictureFull") }, image);
+  imageUrl(name).then(
+    (url) => {
+      image.src = url;
+      holder.addEventListener("click", () => showImage(url, t("tools.pictureMade")));
+    },
+    (error) => {
+      holder.replaceChildren(el("span", { class: "small muted" }, t("tools.imageUnavailable", { problem: error.message })));
+      holder.disabled = true;
+    },
+  );
+  return el("figure", { class: "shown-picture" }, holder);
+}
+
 /** Why the step ran (item 468), with the way to the rules when one of them decided it. */
 function whyLine(decision, flags) {
   return el(

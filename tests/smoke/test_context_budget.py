@@ -131,7 +131,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # 32,775 measured here.
 # Raised by 400 for the security testing line of the character and the scope words of `recon` and `security_scan`
 # (items 1887 and 1888, which item 1889 sits on): 33,116 measured on the gate's runner.
-BUDGET_TOKENS: int = 33_250
+# Raised by 300 for `generate_image` (item 1969): one tool of a few lines and seven short fields, in a group of its
+# own; 33,521 measured here.
+BUDGET_TOKENS: int = 33_550
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -174,7 +176,8 @@ SYSTEM_BUDGET_TOKENS: int = 9_200
 # Raised by 100 for `show_page`'s words of item 1721 above (23,331 measured).
 # Raised by 300 for `add_proof` of item 1853, a check that must exit 0 before the run is done (23,685 measured).
 # Raised by 100 for the scope words of `recon` and `security_scan` (item 1887): 23,768 measured on the gate's runner.
-TOOLS_BUDGET_TOKENS: int = 23_850
+# Raised by 350 for `generate_image` of item 1969 above (24,173 measured).
+TOOLS_BUDGET_TOKENS: int = 24_200
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
