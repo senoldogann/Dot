@@ -1,9 +1,9 @@
-"""Security scan (item 781, docs/security.md): the forms of a page the owner listed in ``[recon] owned_hosts``, read
-and then tried with a small, benign set of payloads — SQL injection, reflected XSS, a login bypass, default
-credentials.
+"""Security scan (item 781, docs/security.md): the forms of a page on a host the owner listed in ``[recon]``
+``owned_hosts`` or in one of its ``scopes``, read and then tried with a small, benign set of payloads — SQL injection,
+reflected XSS, a login bypass, default credentials.
 
-It is a quick check of the owner's own site, not a scanner for someone else's: the host must be in ``owned_hosts``,
-every form action must stay on that host, the payloads are read-only, the number of requests is capped, and the
+It is a quick check of a site the owner may test, never of someone else's: the host must be in ``owned_hosts`` or in a
+scope, every form action must stay on that host, the payloads are read-only, the number of requests is capped, and the
 report says what a form answered rather than dumping a page. It sends no exploit and writes nothing.
 """
 
@@ -18,6 +18,8 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 from pydantic import Field
 
+from dotagent import scopes
+from dotagent.config import ReconAuthority
 from dotagent.core.errors import ToolInputError, WebError
 from dotagent.core.text import truncate_tail
 from dotagent.policy.types import ActionInfo
@@ -32,7 +34,7 @@ from dotagent.tools.base import (
     ok,
 )
 from dotagent.tools.context import ToolContext
-from dotagent.tools.recon import Target, owned, parse_target
+from dotagent.tools.recon import Target, parse_target
 from dotagent.tools.web import checked_address
 from dotagent.web.text import decode_body
 from dotagent.web.types import FetchedDocument
@@ -103,8 +105,8 @@ class SecurityArgs(ToolArgs):
         min_length=3,
         max_length=300,
         description=(
-            "The page with the forms, on a host in `[recon] owned_hosts`: a URL (`https://example.com/login`) or a "
-            "bare domain."
+            "The page with the forms, on a host you own or a registered scope allows (`dotx scope check`): a URL "
+            "(`https://example.com/login`) or a bare domain."
         ),
     )
     depth: Literal["forms", "payloads"] = Field(
@@ -456,8 +458,8 @@ def _render(
         lines.append(f"{skipped} form(s) posted to another host and were not tried.")
     lines.append("")
     lines.append(
-        "Benign, read-only payloads; nothing was written, dropped or taken. A quick check of a host in "
-        "`[recon] owned_hosts`, not a substitute for a full assessment."
+        "Benign, read-only payloads; nothing was written, dropped or taken. A quick check of a host you own or a "
+        "registered scope allows, not a substitute for a full assessment."
     )
     return "\n".join(lines)
 
@@ -491,11 +493,18 @@ async def _run(args: SecurityArgs, ctx: ToolContext) -> ToolResult:
     if isinstance(parsed, str):
         return fail(parsed)
     target: Target = parsed
-    hosts: Sequence[str] = ctx.runtime.config.recon.owned_hosts
-    if not owned(target.host, hosts):
+    try:
+        authority: ReconAuthority | None = scopes.authorising(target.host, ctx.runtime.config.recon)
+    except scopes.ScopesFileError as exc:
+        return fail(f"{exc.message} No form of {target.host} is tested until the scopes can be read.")
+    if authority is None:
+        listed: str = ", ".join(ctx.runtime.config.recon.owned_hosts)
         return fail(
-            f"{target.host} is not in [recon] owned_hosts, so its forms are not tested. Add the host you own there "
-            "first (a name covers its subdomains)."
+            f"{target.host} is in neither [recon] owned_hosts nor a scope of any bug bounty program, so its forms are "
+            "not tested. If a program you are in lists it, register the program in one command — dotx scope add "
+            '--program "Bugcrowd · Acme" --url <its page> --hosts ' + f"{target.host} — and run it again; "
+            f"`dotx scope check {target.host}` says who covers it."
+            + (f" The owner listed {listed} instead." if listed else "")
         )
     limit: int = min(ctx.runtime.config.web.fetch_max_bytes, _MAX_BODY_BYTES)
     try:
@@ -528,19 +537,21 @@ async def _run(args: SecurityArgs, ctx: ToolContext) -> ToolResult:
             seen.add((finding.kind, finding.where))
             findings.append(finding)
         await asyncio.sleep(_SPACING_S)
-    return mark_untrusted(
-        ok(truncate_tail(_render(target, page, forms, attempts, findings, skipped), ctx.output_chars))
-    )
+    report: str = _render(target, page, forms, attempts, findings, skipped)
+    if authority.program is not None:
+        report = f"{report}\nScope: {authority.program}{f' — {authority.note}' if authority.note else ''}"
+    return mark_untrusted(ok(truncate_tail(report, ctx.output_chars)))
 
 
 def build_security_tool() -> RegisteredTool:
-    """The security scan (item 781): the forms of a host of the owner's, tried with benign payloads."""
+    """The security scan (item 781): the forms of a host the owner may test, tried with benign payloads."""
     return make_tool(
         name=SECURITY_TOOL,
         description=(
-            "Test the forms of a page you own for SQL injection, reflected XSS, a login bypass and default "
-            "credentials. Only a host in `[recon] owned_hosts` is touched, the payloads are read-only, and every "
-            'form action must stay on that host. `depth = "forms"` lists the forms without sending anything.'
+            "Test the forms of a page you may test for SQL injection, reflected XSS, a login bypass and default "
+            "credentials. Only a host you own or that a registered bug bounty scope allows is touched — `dotx scope "
+            "add` writes a program's scope in one command — the payloads are read-only, and every form action must "
+            'stay on that host. `depth = "forms"` lists the forms without sending anything.'
         ),
         args_model=SecurityArgs,
         modes=ALL_MODES,

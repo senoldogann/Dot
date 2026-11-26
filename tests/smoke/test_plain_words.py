@@ -82,6 +82,9 @@ _ADDRESS: re.Pattern[str] = re.compile(
 # The Voice card of General is item 626's (the voice and the microphone), which landed with these two sentences in its
 # own words: they are left out here until they are made plain (roadmap/625.md says to what), and then this list goes.
 _LEFT_FOR_ITEM_626: tuple[str, ...] = ("sends the text it reads to a server", "Google's servers")
+# The Usage and Caps sections of Settings › Models (item 1731) count what the tasks used in tokens, the unit the model
+# services count and bill in and the caps are set in; there is no plainer word for it.
+_TOKENS_OF_ITEM_1731: tuple[str, ...] = ("millions of tokens", "Millions of tokens", "each with its own tokens")
 
 # What a person sees of a page: the text of what is drawn (not what a closed fold, a closed dialog or a hidden node
 # holds) and the words of the controls (title, aria-label, placeholder, alt).
@@ -476,7 +479,7 @@ class _Reader:
         self.screens += 1
         for line in lines:
             shown: str = _ADDRESS.sub("", line)
-            for product in (*_PRODUCTS, *_LEFT_FOR_ITEM_626):
+            for product in (*_PRODUCTS, *_LEFT_FOR_ITEM_626, *_TOKENS_OF_ITEM_1731):
                 shown = shown.replace(product, "")
             for found in (*JARGON.finditer(shown), *RUN_AS_A_THING.finditer(shown)):
                 self.problems.append(f"{where} ({self.width}): “{found.group(0).strip()}” in “{line[:110]}”")
@@ -581,17 +584,11 @@ async def test_a_chat_its_messages_menus_and_cards_say_what_they_mean(browser: B
             ("slow", "A chat at work", "textarea"),
         ):
             await reader.go(f"/runs/{served.runs[key]}", label, settle)
-        # The composer's menus, on the home. A phone's box shows its choices once its words are touched (item 1120),
-        # and its model's menu holds the options in a tab (items 1121 and 1122).
+        # The composer's menus, on the home. A phone's model pill opens the chat's settings, which hold the options
+        # under the model (items 1202 and 1330): one sheet, read once.
         await reader.go("/runs", "New chat", "textarea")
-        if width < 720:
-            await page.get_by_role("textbox", name="Goal").click()
         await reader.opens("The model menu", page.locator("button[title='ollama:scripted']").first)
-        if width < 720:
-            await page.get_by_role("textbox", name="Goal").click()
-            await page.locator("button[title='ollama:scripted']").first.click()
-            await reader.opens("The options menu", page.get_by_role("tab", name="Options", exact=True))
-        else:
+        if width >= 720:
             await reader.opens("The options menu", page.locator("button[title^='Approvals:']").first)
         await reader.opens("The plus menu", page.get_by_role("button", name="Add files or teach a task"))
         goal: Locator = page.get_by_role("textbox", name="Goal")

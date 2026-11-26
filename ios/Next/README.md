@@ -151,10 +151,11 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
 throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
 
-- A pull request that changes `ios/**` runs `engine`, `build` and `tests (chat)` (about 20 minutes).
-- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs on a push to `main`, every night,
-  when asked (`gh workflow run ios.yml --ref <branch>`), and on a pull request with the label `ios-full`
-  (`gh pr edit <pr> --add-label ios-full`; adding it starts the run).
+- A pull request runs none of it (item 1886: the five macOS runners were what pull requests waited on). The push to
+  `main` that merges one, when it changes `ios/**`, runs `engine`, `build` and `tests (chat)` (about 20 minutes); a
+  failure there opens the issue "main is red on macOS" (`scripts/main_macos_green.py`).
+- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs every night and when asked:
+  `gh workflow run ios.yml --ref <branch>` runs it on a branch before its pull request merges.
 - A run holds two macOS runners at most, so that three of the account's five stay free for the gate.
 - A test that fails, unit or UI, runs once more (`-retry-tests-on-failure`; `e2e` runs its whole script once more): a
   fresh runner's simulator sometimes fails to launch the app or start the test runner. A test that fails twice fails

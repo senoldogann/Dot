@@ -1442,8 +1442,9 @@ dotx service uninstall   # stop the daemon and remove the job
   repair night ([Self-repair](repair.md), item 921) are no runs, and each records nothing until its end, so a restart
   would cut it off and lose the night (the reflection at 03:30; the harness's night reads Dot's record in seconds,
   item 987). A repair
-  night's work is bounded by two hours (a push already under way may add half an hour), so that it ends within the
-  three hours the job waits for the night's work. `night_work` there names those under way, and the job waits for
+  night's work is bounded by two hours (a push already under way may add half an hour, and a night that merged waits
+  for main's macOS runs within that same half hour, item 1899), so that it ends within the three hours the job waits
+  for the night's work. `night_work` there names those under way, and the job waits for
   them as for the runs. A daemon from before item 815 names none; one that does not listen counts as none, and so does
   one whose answer is refused, cannot be read or does not come within 5 seconds (each logged as
   `restart_when_idle_night_unknown`, as a token that cannot be read is): what is cut off then is a night of learning,

@@ -2405,14 +2405,14 @@
     }
   },
   {
-    "description": "Look at a site or a host the way a security engineer starts: its addresses, its TLS certificate, its HTTP answer and headers, and the technology it names, with what its owner should fix. With depth `ports` on a host in [recon] owned_hosts, which ports answer and what their services say. It only reads: it sends no payload and tries no exploit.",
+    "description": "Look at a site or a host the way a security engineer starts: its addresses, its TLS certificate, its HTTP answer and headers, and the technology it names, with what its owner should fix. With depth `ports` on a host you own or a registered scope allows (see `dotx scope check`), which ports answer and what their services say. It only reads: it sends no payload and tries no exploit.",
     "name": "recon",
     "parameters": {
       "additionalProperties": false,
       "properties": {
         "depth": {
           "default": "passive",
-          "description": "`passive` reads the addresses, the TLS certificate, the HTTP answer and its headers, as a browser's visit does. `ports` also asks which common ports answer, and reads their banners: only on a host listed in [recon] owned_hosts, one you own or may test.",
+          "description": "`passive` reads the addresses, the TLS certificate, the HTTP answer and its headers, as a browser's visit does. `ports` also asks which common ports answer, and reads their banners: only on a host you own or that a registered scope allows — `dotx scope add` writes a program's scope in one command, and `dotx scope check <host>` says who covers a host.",
           "enum": [
             "passive",
             "ports"
@@ -2622,7 +2622,7 @@
     }
   },
   {
-    "description": "Test the forms of a page you own for SQL injection, reflected XSS, a login bypass and default credentials. Only a host in `[recon] owned_hosts` is touched, the payloads are read-only, and every form action must stay on that host. `depth = \"forms\"` lists the forms without sending anything.",
+    "description": "Test the forms of a page you may test for SQL injection, reflected XSS, a login bypass and default credentials. Only a host you own or that a registered bug bounty scope allows is touched — `dotx scope add` writes a program's scope in one command — the payloads are read-only, and every form action must stay on that host. `depth = \"forms\"` lists the forms without sending anything.",
     "name": "security_scan",
     "parameters": {
       "additionalProperties": false,
@@ -2644,7 +2644,7 @@
           "type": "integer"
         },
         "target": {
-          "description": "The page with the forms, on a host in `[recon] owned_hosts`: a URL (`https://example.com/login`) or a bare domain.",
+          "description": "The page with the forms, on a host you own or a registered scope allows (`dotx scope check`): a URL (`https://example.com/login`) or a bare domain.",
           "maxLength": 300,
           "minLength": 3,
           "type": "string"
