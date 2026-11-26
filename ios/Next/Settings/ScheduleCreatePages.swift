@@ -233,7 +233,10 @@ struct ScheduleCreateSheet: View {
         !trimmedName.isEmpty && !trimmedGoal.isEmpty && (kind != .custom || rhythm.cron?.split(separator: " ").count == 5)
     }
 
-    private var dirty: Bool { !name.isEmpty || !goal.isEmpty }
+    /// Any choice moved from where the sheet opened: a swipe or Cancel then asks before throwing it away.
+    private var dirty: Bool {
+        !name.isEmpty || !goal.isEmpty || kind != .daily || !cron.isEmpty || agent != (agentId ?? "") || mode != "task" || !modelRef.isEmpty || approvals != nil || goalMode
+    }
 
     private func commit() async {
         let body: ScheduleCreate = ScheduleCreate(
