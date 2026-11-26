@@ -94,12 +94,14 @@ def _workspace_with_pngs(base: Path) -> Path:
     return workspace
 
 
+@pytest.mark.macos
 def test_a_workspace_png_is_read_with_its_media_type(tmp_path: Path) -> None:
     workspace: Path = _workspace_with_pngs(tmp_path)
     data: ImageData = _image_data(WorkspaceImage(path="dot.png", alt="A dot"), workspace, (), ())
     assert data.media_type == "image/png"
 
 
+@pytest.mark.macos
 @pytest.mark.parametrize("where", ["absolute", "outside", "crawl", "mcp-results"])
 def test_a_raster_outside_the_runs_own_files_is_refused_by_its_path(tmp_path: Path, where: str) -> None:
     workspace: Path = _workspace_with_pngs(tmp_path)
@@ -113,6 +115,7 @@ def test_a_raster_outside_the_runs_own_files_is_refused_by_its_path(tmp_path: Pa
         _image_data(WorkspaceImage(path=path, alt="A dot"), workspace, (), ())
 
 
+@pytest.mark.macos
 def test_a_link_out_of_the_workspace_and_a_svg_are_refused(tmp_path: Path) -> None:
     workspace: Path = _workspace_with_pngs(tmp_path)
     (workspace / "link.png").symlink_to(tmp_path / "outside" / "dot.png")
