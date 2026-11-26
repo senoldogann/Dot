@@ -255,7 +255,8 @@ struct DaemonImageThumb: View {
         .task(id: name) { image = await model.image(named: name) }
         .sheet(isPresented: $whole) {
             if let image {
-                ScrollView([.horizontal, .vertical]) { Image(uiImage: image).resizable().scaledToFit().frame(minWidth: 320) }
+                ZoomableImage(image: image, label: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"))
+                    .ignoresSafeArea(edges: .bottom)
                     .inspectorSheet(title: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"), close: { whole = false })
             }
         }
@@ -478,7 +479,6 @@ struct ThoughtRow: View {
     let live: Bool
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -488,9 +488,8 @@ struct ThoughtRow: View {
                     if live {
                         Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.footnote).modifier(Shimmer())
                     } else {
-                        Text(thoughtHeadline(text)).textRole(.footnote).foregroundStyle(Tone.secondary)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 6 : 3)
-                            .multilineTextAlignment(.leading)
+                        // Only the word once the step is stored (item 1904, the owner): the thinking is read opened.
+                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.footnote).foregroundStyle(Tone.secondary)
                     }
                     Spacer(minLength: Space.xs)
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
@@ -500,7 +499,8 @@ struct ThoughtRow: View {
             }
             .buttonStyle(.plain)
             .haptic(.selection, trigger: open)
-            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : thoughtHeadline(text))
+            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : String(localized: "Thought", comment: "Work log: a step's thinking, folded"))
+            .accessibilityIdentifier("thought.row")
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
             if open {
@@ -519,22 +519,6 @@ struct ThoughtRow: View {
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
     }
-}
-
-/// A thought's first sentence, its markdown marks taken out: the line a stored thought shows folded ("**Checking the
-/// diff.** Then…" reads "Checking the diff."). The words as they are when they make no sentence.
-func thoughtHeadline(_ text: String) -> String {
-    let plain: String = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "")
-        .replacingOccurrences(of: "`", with: "").replacingOccurrences(of: "#", with: "")
-    let line: String = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
-    // A sentence ends at . ! or ? before a space or the end of the line, so "3.14" or "v2.1" does not cut it.
-    var index: String.Index = line.startIndex
-    while index < line.endIndex {
-        let next: String.Index = line.index(after: index)
-        if ".!?".contains(line[index]), next == line.endIndex || line[next].isWhitespace { return String(line[...index]) }
-        index = next
-    }
-    return line
 }
 
 /// Dot's mark on a row of its own tools (item 1769), as another coding agent marks its own calls with its name: Dot's face in the quiet

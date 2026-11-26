@@ -31,60 +31,10 @@ func durationWords(_ seconds: Int, locale: Locale) -> String {
     return String(localized: "\(parts.seconds)s", bundle: bundle, locale: locale, comment: "A duration of seconds, e.g. 14s")
 }
 
-/// "read 3 files, ran 2 commands" for a fold's tally.
-func tallyWords(_ tally: WorkTally, locale: Locale) -> String {
-    tally.ordered.map { kind, count in kindWords(kind, count, locale: locale) }.joined(separator: ", ")
-}
-
-private func kindWords(_ kind: ToolKind, _ count: Int, locale: Locale) -> String {
-    let bundle: Bundle = wordsBundle(locale)
-    let one: Bool = count == 1
-    switch kind {
-    case .read:
-        return one
-            ? String(localized: "read 1 file", bundle: bundle, locale: locale, comment: "Work fold tally: one file read")
-            : String(localized: "read \(count) files", bundle: bundle, locale: locale, comment: "Work fold tally: files read; the argument is how many")
-    case .command:
-        return one
-            ? String(localized: "ran 1 command", bundle: bundle, locale: locale, comment: "Work fold tally: one command run")
-            : String(localized: "ran \(count) commands", bundle: bundle, locale: locale, comment: "Work fold tally: commands run; the argument is how many")
-    case .edit:
-        return one
-            ? String(localized: "edited 1 file", bundle: bundle, locale: locale, comment: "Work fold tally: one file edited")
-            : String(localized: "edited \(count) files", bundle: bundle, locale: locale, comment: "Work fold tally: files edited; the argument is how many")
-    case .search:
-        return one
-            ? String(localized: "searched once", bundle: bundle, locale: locale, comment: "Work fold tally: one search")
-            : String(localized: "searched \(count) times", bundle: bundle, locale: locale, comment: "Work fold tally: searches; the argument is how many")
-    case .web:
-        return one
-            ? String(localized: "1 web step", bundle: bundle, locale: locale, comment: "Work fold tally: one browser or web step")
-            : String(localized: "\(count) web steps", bundle: bundle, locale: locale, comment: "Work fold tally: browser or web steps; the argument is how many")
-    case .screen:
-        return one
-            ? String(localized: "1 screen step", bundle: bundle, locale: locale, comment: "Work fold tally: one step on the Mac's screen")
-            : String(localized: "\(count) screen steps", bundle: bundle, locale: locale, comment: "Work fold tally: steps on the Mac's screen; the argument is how many")
-    case .wait:
-        return one
-            ? String(localized: "waited once", bundle: bundle, locale: locale, comment: "Work fold tally: one wait")
-            : String(localized: "waited \(count) times", bundle: bundle, locale: locale, comment: "Work fold tally: waits; the argument is how many")
-    case .helper:
-        return one
-            ? String(localized: "started 1 helper", bundle: bundle, locale: locale, comment: "Work fold tally: one helper started")
-            : String(localized: "started \(count) helpers", bundle: bundle, locale: locale, comment: "Work fold tally: helpers started; the argument is how many")
-    case .other:
-        return one
-            ? String(localized: "1 other step", bundle: bundle, locale: locale, comment: "Work fold tally: one step of another kind")
-            : String(localized: "\(count) other steps", bundle: bundle, locale: locale, comment: "Work fold tally: steps of other kinds; the argument is how many")
-    }
-}
-
-/// The fold's line: "Worked for 2m 14s · read 3 files, ran 2 commands".
+/// The fold's line: "Worked for 2m 14s", no counts (item 1904: the owner reads how long, the steps are a tap away).
 func foldWords(_ fold: WorkFold, locale: Locale) -> String {
     let took: String = durationWords(fold.seconds, locale: locale)
-    let tally: String = tallyWords(fold.tally, locale: locale)
-    let worked: String = String(localized: "Worked for \(took)", bundle: wordsBundle(locale), locale: locale, comment: "Work fold: how long a stretch of work took; the argument is a duration")
-    return tally.isEmpty ? worked : worked + " · " + tally
+    return String(localized: "Worked for \(took)", bundle: wordsBundle(locale), locale: locale, comment: "Work fold: how long a stretch of work took; the argument is a duration")
 }
 
 /// A tool call's line: the plain verb of its kind and its target ("Read /src/app.py", "Ran git status"); one of Dot's

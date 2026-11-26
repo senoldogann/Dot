@@ -156,6 +156,34 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "a second tap folds them back")
     }
 
+    /// Item 1904: a failed run ends in one plain row, "The run failed · <reason>" (with Continue and Retry as text
+    /// buttons on it when offered); the finished run's fold says how long it worked, no counts.
+    func testAFailedRunIsOnePlainRowAndTheFoldSaysOnlyHowLong() {
+        let app: XCUIApplication = launch("n2-failed")
+        let failed: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "The run failed · The model answered HTTP 529")).firstMatch
+        XCTAssertTrue(failed.waitForExistence(timeout: 10))
+        // The fixture's run offers no Continue or Retry (its chat has no newest detail); the row is its line alone.
+        XCTAssertFalse(app.buttons["end.retry"].exists)
+        let fold: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).firstMatch
+        XCTAssertTrue(fold.waitForExistence(timeout: 5))
+        XCTAssertFalse(fold.label.contains("·"), "no counts: \(fold.label)")
+        // A stored step's thinking is one folded row, "Thought" and the chevron; its words show once opened. The failed
+        // run's steps are folded: open its fold first.
+        let folds: [XCUIElement] = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).allElementsBoundByIndex
+        folds.last?.tap()
+        let thought: XCUIElement = app.buttons["thought.row"]
+        XCTAssertTrue(thought.waitForExistence(timeout: 5))
+        XCTAssertEqual(thought.label, "Thought")
+        let words: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Compare the calendar")).firstMatch
+        XCTAssertFalse(words.exists, "no sentence of the thinking while folded")
+        thought.tap()
+        XCTAssertTrue(words.waitForExistence(timeout: 3), "the thinking opened")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "failed-row"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
         XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))

@@ -138,7 +138,7 @@ struct ActivityHome: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.groupedGutter) {
                 if picture.cold {
-                    LoadingState(message: String(localized: "Reading your Mac…", comment: "Settings: a page waits for its first read")).frame(minHeight: 240)
+                    LoadingState(message: String(localized: "Reading your Mac…", comment: "Settings: a page waits for its first read")).fillsScrollPage()
                 } else {
                     if let problem { FailureBanner(failure: problem, macPlace: activityMacPlace, retry: { Task { await load() } }) }
                     content

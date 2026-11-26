@@ -6,6 +6,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1908](1908.md) | done | 2026-11-26 | The reset test of item 1893 waits on what it reads |
+| [1904](1904.md) | done | 2026-11-26 | DotNext shows a screenshot whole and zoomable, a failed run as one plain row, a fold without counts, a stored thought as its word alone, and its waiting states centred |
 | [1903](1903.md) | done | 2026-11-26 | DotNext's long-press test reads the field afresh: on GitHub's runner its draft was empty while the wait still saw the words |
 | [1899](1899.md) | done | 2026-11-26 | A red main on macOS opens an issue, and the owner's Dot is updated only from a green commit |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
