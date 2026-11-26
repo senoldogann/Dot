@@ -14,6 +14,8 @@ choose the script:
 - "fail: ...": the model fails, so the run fails with one line of cause;
 - "write: ...": the run writes a file of its workspace, a change the inspector can undo;
 - "draft: ...": the run drafts an email, a card with Send, Edit and Discard;
+- "files: ...": the run writes a note of its workspace, then answers naming it and two web links (one the local play
+  page), for the file chip and the sources row under an answer (backlog LF1);
 - "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
@@ -202,6 +204,11 @@ class ScriptProvider:
                     arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 8},
                 ),
             )
+        elif latest.startswith("files:") and answered:
+            text = (
+                "I wrote `dotnext-e2e-report.md`. The page is at "
+                f"{self._play_page} and the source at https://example.com/dotnext."
+            )
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -275,6 +282,17 @@ class ScriptProvider:
                 ToolCall(id=f"call_{self._calls}b", name="read_file", arguments={"path": "/etc/hosts"}),
                 ToolCall(
                     id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
+                ),
+            )
+        elif latest.startswith("files:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="write_file",
+                    arguments={
+                        "path": "dotnext-e2e-report.md",
+                        "content": "# E2E report\n\nWritten by the e2e check.\n",
+                    },
                 ),
             )
         elif latest.startswith("write:"):
