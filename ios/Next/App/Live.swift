@@ -249,6 +249,8 @@ struct LiveAgentsSheet: View {
     let close: () -> Void
     @Environment(AppModel.self) private var model: AppModel
     @State private var stopping: Set<String> = []
+    /// The helper whose chat the sheet shows (item 1880: a row opens its helper's chat).
+    @State private var opened: String?
 
     var body: some View {
         let helpers: [HelperView] = model.chats[thread]?.view?.helpers ?? []
@@ -260,7 +262,7 @@ struct LiveAgentsSheet: View {
             } else {
                 List {
                     ForEach(helpers, id: \.runId) { helper in
-                        HelperRow(run: run(of: helper), open: {}, stop: {
+                        HelperRow(run: run(of: helper), open: { opened = helper.threadId }, stop: {
                             stopping.insert(helper.runId)
                             model.perform(.stopHelper(path: helper.stop, run: helper.runId, thread: thread))
                         })
@@ -272,6 +274,9 @@ struct LiveAgentsSheet: View {
                 .listStyle(.plain)
             }
         }
+        .navigationDestination(item: $opened) { helperThread in
+            ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
+        }
         .inspectorSheet(title: String(localized: "Agents", comment: "Title of the sheet of a chat's helpers"), close: close)
     }
 
@@ -280,7 +285,8 @@ struct LiveAgentsSheet: View {
         if stopping.contains(helper.runId), state.isLive { state = .stopping }
         return HelperRun(
             id: helper.runId, title: helper.shortTitle, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
-            endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper))
+            endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper),
+            doing: helper.step.map { stepWords(tool: $0.tool, target: $0.target) } ?? (state.isLive ? ChatStatus.starting.word : nil))
     }
 }
 

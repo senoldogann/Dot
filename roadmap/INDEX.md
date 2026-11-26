@@ -12,6 +12,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1883](1883.md) | done | 2026-11-25 | A bot's chat: the other bots' unread beside the back, the bot's pill, the "⋯" menu, Find in chat, "Ask <name>", a new chat with the bot |
 | [1882](1882.md) | done | 2026-11-25 | The home's search finds bots, chats and what the chats say (`GET /api/threads/search`) |
 | [1881](1881.md) | done | 2026-11-25 | DotNext's home is the owner's bots: no tab bar, Dot large on top, one row per agent, a new bot made from "+" |
+| [1880](1880.md) | done | 2026-11-25 | DotNext puts the run's work in one pill: plain words, Stop, the plan and the helpers; the stream keeps no plan or helper card and folds its thinking |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
 | [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |

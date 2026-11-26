@@ -43,6 +43,8 @@ enum ChatPanel: String, Identifiable, Sendable {
     case inspector
     /// The model of this chat (`/model`).
     case model
+    /// The plan of the chat's newest run (item 1880).
+    case plan
 
     var id: String { rawValue }
 }
