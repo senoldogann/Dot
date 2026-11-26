@@ -106,7 +106,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
-   own header and menu, its profile, and one settings sheet from an avatar button; a bot's unread mark counts the
+   own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
+   Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
+   on the owner on the home: the Mac has no push setting per bot), and one settings sheet from an avatar button; a bot's unread mark counts the
    chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
    hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
    item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at

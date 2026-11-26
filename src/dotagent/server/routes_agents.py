@@ -523,9 +523,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.post("/agents/{agent_id}/welcome", status_code=201)
     async def welcome_agent(agent_id: str, request: AgentWelcomeRequest) -> RunRecord:
         """Start the first meeting of an agent the owner has just made (item 993): its first message, on the fast model
-        whose goal asks it to call no tool (item 1962), says who it is and what it does and asks the one question that starts it, in their
-        language. An agent that has had a chat already has met them (409), and Dot
-        has its own first conversation (item 420)."""
+        with a goal that asks for no tool (item 1962), says who it is and what it does and asks the one question that
+        starts it, in their language. An agent that has had a chat already has met them (409), and Dot has its own
+        first conversation (item 420)."""
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot has a first conversation of its own", {"agent_id": agent_id})
         agent: AgentRecord = await store.get_agent(agent_id)
@@ -535,8 +535,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         # A chat made for a meeting that did not start goes, as a watcher's does: none is left empty in the list.
         thread: ThreadRecord = await store.create_thread(agent.name, UI_SOURCE, None)
         try:
+            # The agent's own reasoning level was chosen for its own model, not for the fast one the meeting runs on.
             return await ctx.manager.start_for_agent(
-                agent,
+                agent.model_copy(update={"effort": None}),
                 welcome_goal(agent, request.language),
                 "chat",
                 # One answer on the fast model (item 1962): the owner waits at the chat for it.

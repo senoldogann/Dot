@@ -658,6 +658,20 @@ async def test_an_agent_just_made_meets_the_owner_in_its_first_chat_once(
     assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
 
 
+async def test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 1962's review: the meeting runs on the fast model, which need not offer the level the agent was made with,
+    so the agent's level is left off it; the agent must greet, not be refused."""
+    agent = await runtime.store.create_agent("Scribe", "Writes", "Be brief.", "", "high", None, (), None, None)
+    MODEL.script = ScriptedProvider(_PROVIDER, [FINISH])
+    met = await client.post(f"/api/agents/{agent.id}/welcome", json={"language": "Turkish"})
+    assert met.status_code == 201, met.text
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(met.json()["id"])
+    assert (await client.delete(f"/api/agents/{agent.id}")).status_code == 204
+
+
 @pytest.mark.browser
 async def test_an_agent_made_on_the_page_opens_its_first_chat_where_it_speaks_first(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
