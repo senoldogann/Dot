@@ -6,11 +6,14 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1899](1899.md) | done | 2026-11-26 | A red main on macOS opens an issue, and the owner's Dot is updated only from a green commit |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
+| [1892](1892.md) | done | 2026-11-25 | The nightly browser run's stale tests follow today's screens, and four small bugs they found are fixed |
 | [1891](1891.md) | done | 2026-11-25 | Item numbers are reserved, and every place that holds one is read |
 | [1890](1890.md) | done | 2026-11-25 | Dot takes the Mac's pointer and keyboard only while the owner is away |
 | [1888](1888.md) | done | 2026-11-23 | A scope is one command, not a toml block: `dotx scope add`, `list`, `remove`, `check` over a store every call reads |
 | [1887](1887.md) | done | 2026-11-23 | Authorised security testing is a scope, not a refusal: a bug bounty program's hosts are written down and tested |
+| [1886](1886.md) | done | 2026-11-26 | A pull request runs the Linux checks alone; the macOS suites run on the push to main |
 | [1880](1880.md) | done | 2026-11-25 | DotNext puts the run's work in one pill: plain words, Stop, the plan and the helpers; the stream keeps no plan or helper card and folds its thinking |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |

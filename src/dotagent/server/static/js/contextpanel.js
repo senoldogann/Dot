@@ -262,8 +262,9 @@ export function chatMemory(before, own, limit = MEMORY_LIMIT) {
 }
 
 // The memory tools' results that changed the memory, "Saved: [mem_x] …" (item 313); a note saved again ("Already saved:
-// …") changed nothing.
-const MEMORY_RESULT = /^(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
+// …") changed nothing. The result of a tool whose group was off starts with one line that says the group is on now and
+// a blank line (agent/executor.py, item 742), before the tool's own words.
+const MEMORY_RESULT = /^(?:[^\n]*\n\n)?(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
 
 /**
  * The note a result of a memory tool changed, as `{ id, change, words }`: for a save and a change from the call's

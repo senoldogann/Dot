@@ -940,11 +940,15 @@ async def test_a_dialog_that_opens_during_a_wait_ends_it_and_one_that_brings_the
     """A wait for a text that a dialog stands in front of ends when the dialog opens, not at its time (item 698): the
     text would not come until the dialog is answered. A dialog that holds the text is the text appearing."""
     view: PageView = await browser.open_url("wait-asks", f"{site}/asks", True)
+    clicked: float = time.monotonic()
     await act(browser, "wait-asks", [Step(action="click", ref=ref_of(view.body, 'button "Pay"'))], False)
     wait: TextWait = await browser.wait_text("wait-asks", "Payment received", 10.0, True)
+    ended: float = time.monotonic() - clicked
     assert not wait.appeared
     assert wait.ended_by == "a dialog opened in front of the page"
-    assert 0.2 < wait.waited_s < 2.0, wait.waited_s
+    # It ended as the dialog opened, 0.9 s after the click: measured from the click, since the watch of the click's
+    # effect (item 739) takes some of those 0.9 s, more on a slow runner, and the wait itself may then be short.
+    assert 0.9 <= ended < 3.0 and wait.waited_s < 2.0, (ended, wait.waited_s)
     assert "Are you sure?" in wait.view.body or "Are you sure?" in wait.view.overlay
     result: ToolResult = wait_text_result(wait, "n0nce", 20_000)
     assert result.is_error and result.untrusted

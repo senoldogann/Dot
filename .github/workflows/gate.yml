@@ -1,24 +1,24 @@
-# The gate every change passes before it is merged. The format check, the lint, mypy, the checks of the interface and
-# the unit tests but those that need macOS (item 1270) run on Linux: the marker on the PyObjC dependencies lets `uv
-# sync` install there. The unit tests Linux leaves out (`--macos-only`), `dotx eval check` and the smoke tests run on
-# macOS.
-# The smoke tests here are every one that needs no service, chosen by their marks: a scripted model or a stand-in
-# plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model skips itself
-# here. Beside them, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's Chrome,
-# the sign-in, the secret fields, the attach mode and every phone page, on a push to main and in the release, which
-# calls this gate. A pull request runs those parts only when a changed file can affect them (scripts/browser_ci.py):
-# the web UI, the daemon and the browser code the tests start, their tests and the helpers they import, the locks and
-# these workflows. A unit test, a smoke test that is not one of theirs, the command line and the desktop shell do not,
-# and the five macOS runners stay free for a pull request that does. What the parts skip, main's own run still tests,
-# on the push that merged it. browser.yml runs every browser test every night and when asked. The tests marked live,
-# internet, desktop or hosted stay on the developer's Mac.
+# The gate. A pull request runs its Linux jobs alone (item 1886): the format check, the lint, mypy, the checks of the
+# interface, the item records and the unit tests but those that need macOS (item 1270; the marker on the PyObjC
+# dependencies lets `uv sync` install there), and the desktop checks and zizmor when their files change. The account's
+# five macOS runners were what pull requests waited on, one to two hours. The macOS jobs run on the push to main that
+# merges a pull request, chosen by the files changed since main was last green: the unit tests Linux leaves out
+# (`--macos-only`), `dotx eval check` and the smoke tests when the Python package can be affected
+# (scripts/python_ci.py), and the core of the browser tests (item 486: the URL rules of Dot's Chrome, the sign-in, the
+# secret fields, the attach mode and every phone page) when the web UI, the daemon or the browser code can be
+# (scripts/browser_ci.py). So a break only macOS shows is seen on main, and fixed before anything else is merged; the
+# job `main-health` keeps the issue "main is red on macOS" (item 1899). The release, which calls this gate, and a run
+# by hand run every job; browser.yml runs every browser test each night. The smoke tests here are every one that needs
+# no service, chosen by their marks: a scripted model or a stand-in plays the real loop, tools, policy and store; one
+# that needs the local Ollama server's embedding model skips itself here. The tests marked live, internet, desktop or
+# hosted stay on the developer's Mac.
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing heavy, as
-# no command below reads it; but docs/freedom.md, which tests/unit/test_freedom_contract.py reads, and a skill's SKILL.md
-# under src/, which Dot reads, do run the gate. The desktop shell's
-# checks (desktop.yml) and zizmor's audit of the workflows (zizmor.yml) run from here for a pull request that changes
-# what they read (item 1189), so that `ci` waits for them, and from their own workflows for a push to main.
+# no command below reads it; but docs/freedom.md, which tests/unit/test_freedom_contract.py reads, and a skill's
+# SKILL.md under src/, which Dot reads, do run the gate. The desktop shell's checks (desktop.yml) and zizmor's audit of
+# the workflows (zizmor.yml) run from here for a pull request that changes what they read (item 1189), so that `ci`
+# waits for them, and from their own workflows for a push to main.
 #
 # A pull request starts this workflow even when it changes prose alone: branch protection requires `ci`, and a workflow
 # a path filter skips reports no check at all, so that pull request would wait on a check nothing would ever report. The
@@ -40,7 +40,7 @@ on:
   # of the browser tests with it (item 486); a call ignores the paths above, so the gate always runs whole there.
   workflow_call:
   # dependabot-merge.yml starts main's run after a merge it made (item 1190): a merge made with a workflow's token
-  # starts no push run. A run started so runs whole, as a push does.
+  # starts no push run. A run started so runs whole, as a release's does.
   workflow_dispatch:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
@@ -173,15 +173,25 @@ jobs:
           mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
           uv run pytest tests/unit -q -n auto -p no:cacheprovider
 
-  # What of this pull request can affect the macOS jobs of the gate, a browser part, the desktop shell and the
-  # workflows. A push and a release do not ask: they run every browser part, and desktop.yml and zizmor.yml run on
-  # their own for a push that changes what they read. When the answer cannot be read, everything runs, which is the
-  # failure that still tests the change.
+  # What of a pull request, or of a push to main (item 1886), can affect the macOS jobs of the gate, a browser part,
+  # the desktop shell and the workflows. A pull request is read against its base. A push to main is read against the
+  # commit of the gate's last run on main that passed: runs of main that wait replace one another (item 1011), so the
+  # push before this one may never have run, and what changed since main was last green is what this run must test.
+  # A release and a run started by hand do not ask, and run everything; so does a run whose answer cannot be read,
+  # which is the failure that still tests the change. The release calls this gate from the push of its tag, so the
+  # event alone does not tell main's push: the ref does. desktop.yml and zizmor.yml run on their own for a push.
   changes:
     needs: [prose]
-    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.prose.outputs.prose_only != 'true' }}
+    if: >-
+      ${{ !cancelled() && (github.event_name == 'pull_request'
+      || github.event_name == 'push' && github.ref == 'refs/heads/main')
+      && needs.prose.outputs.prose_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # The runs of this workflow are read to find main's last green one.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       python: ${{ steps.decide.outputs.python }}
       browser: ${{ steps.decide.outputs.browser }}
@@ -195,7 +205,10 @@ jobs:
       - name: Which files run the gate's macOS jobs, the browser parts, the desktop checks and zizmor
         id: decide
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           decide() {
             {
@@ -205,6 +218,14 @@ jobs:
               echo "python=$4"
             } >> "$GITHUB_OUTPUT"
           }
+          BASE="$PR_BASE"
+          if [[ "$EVENT" == "push" ]]; then
+            if ! BASE="$(gh api "repos/$REPO/actions/workflows/gate.yml/runs?branch=main&status=success&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // ""')"; then
+              BASE=""
+            fi
+            echo "main's last green gate ran on: ${BASE:-none found}"
+          fi
           if [[ ! "$BASE" =~ ^[0-9a-f]{40}$ ]]; then
             echo "the base is not a sha; everything runs"
             decide true true true true
@@ -253,13 +274,13 @@ jobs:
           decide "$answer" "$desktop" "$workflows" "$python"
 
   gate:
-    # A pull request whose files nothing of this job reads skips it (scripts/python_ci.py); a decision that failed
+    # Not on a pull request (item 1886): it runs on the push to main that merges one. A push whose files nothing of
+    # this job reads skips it (scripts/python_ci.py); a decision that failed or was not made (a release, a run by hand)
     # runs it.
     needs: [prose, changes]
     if: >-
-      ${{ !cancelled() && (github.event_name != 'pull_request'
-      || needs.prose.outputs.prose_only != 'true'
-      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}
+      ${{ !cancelled() && github.event_name != 'pull_request'
+      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true') }}
     runs-on: macos-latest
     timeout-minutes: 30
     env:
@@ -286,13 +307,13 @@ jobs:
 
   smoke:
     name: gate (part 2)
-    # A pull request whose files nothing of this job reads skips it (scripts/python_ci.py); a decision that failed
+    # Not on a pull request (item 1886): it runs on the push to main that merges one. A push whose files nothing of
+    # this job reads skips it (scripts/python_ci.py); a decision that failed or was not made (a release, a run by hand)
     # runs it.
     needs: [prose, changes]
     if: >-
-      ${{ !cancelled() && (github.event_name != 'pull_request'
-      || needs.prose.outputs.prose_only != 'true'
-      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}
+      ${{ !cancelled() && github.event_name != 'pull_request'
+      && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true') }}
     runs-on: macos-latest
     # Room for one retry of the smoke tests below. A second failure still ends the job, inside this bound.
     timeout-minutes: 50
@@ -335,19 +356,19 @@ jobs:
   # settings file was four of that first part's ten slowest calls, on top of the walk through every page (3m25s by
   # itself), so the settings went back to pages. A new browser file still joins pages and a new phone file the second
   # part. A phone back on a network that wakes measures seconds of grace against the runner's own clock, which a slow
-  # runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
+  # runner does not keep: it runs at night (browser.yml) and on the developer's Mac. Run 45657128269's tests' times
+  # (its browser-times artifacts) were 9.6 minutes in pages, 7.4 in the first phone part and 12.5 in the second, so the
+  # phone's type, fit and back files (2.7 minutes) moved to the first (item 1886).
   browser:
     name: browser (${{ matrix.part.name }})
     needs: [changes, prose]
-    # Not a pull request (a push to main, a release): every part runs. A pull request whose files cannot affect a
-    # part skips it, and one that changes prose alone skips every part. A decision that failed runs the parts, so a
-    # broken check cannot hide a break.
+    # Not on a pull request (item 1886): the parts run on the push to main that merges one, when its files (those
+    # changed since main was last green) can affect them (scripts/browser_ci.py), and browser.yml runs every browser
+    # test each night and when asked. A decision that failed or was not made (a release, a run by hand) runs the parts,
+    # so a broken check cannot hide a break.
     if: >-
-      ${{ !cancelled() && (github.event_name != 'pull_request'
-      || needs.prose.outputs.prose_only != 'true')
-      && (github.event_name != 'pull_request'
-      || needs.changes.result != 'success'
-      || needs.changes.outputs.browser == 'true') }}
+      ${{ !cancelled() && github.event_name != 'pull_request'
+      && (needs.changes.result != 'success' || needs.changes.outputs.browser == 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -360,13 +381,16 @@ jobs:
             tests: >-
               tests/smoke/test_phone_all_pages.py tests/smoke/test_phone_screens.py tests/smoke/test_phone_reach.py
               tests/smoke/test_phone_rows.py tests/smoke/test_phone_lists.py tests/smoke/test_phone_pages.py
-              tests/smoke/test_browser_data.py
+              tests/smoke/test_browser_data.py tests/smoke/test_phone_type.py tests/smoke/test_phone_fit.py
+              tests/smoke/test_phone_back.py
           - name: phone 2
             tests: >-
               tests/smoke/test_phone_*.py tests/smoke/test_browser_attach.py tests/smoke/test_secret_fields.py
               --deselect tests/smoke/test_phone_all_pages.py --deselect tests/smoke/test_phone_screens.py
               --deselect tests/smoke/test_phone_reach.py --deselect tests/smoke/test_phone_rows.py
               --deselect tests/smoke/test_phone_lists.py --deselect tests/smoke/test_phone_pages.py
+              --deselect tests/smoke/test_phone_type.py --deselect tests/smoke/test_phone_fit.py
+              --deselect tests/smoke/test_phone_back.py
               --deselect
               tests/smoke/test_phone_return.py::test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes
     runs-on: macos-latest
@@ -418,6 +442,31 @@ jobs:
           path: ${{ runner.temp }}/junit
           retention-days: 14
           if-no-files-found: ignore
+
+  # After every other job of a run on main (item 1899): the issue "main is red on macOS" is opened, or told again, when
+  # this commit failed, and closed when it passed (scripts/main_macos_green.py reads this run, from its other jobs, and
+  # ios.yml's last run of a push). Not for a pull request, which runs no macOS job, nor for a release.
+  main-health:
+    needs: [prose, checks, changes, gate, smoke, browser, desktop, zizmor, ci]
+    if: ${{ always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: The issue of a red main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/main_macos_green.py report --sha "$SHA" --this-run "$RUN_ID"
 
   # The desktop shell's checks (desktop.yml) for a pull request that changes desktop/ or their workflow (item 1189).
   # Called from here rather than started by their own path filter, so that `ci`, the check main's protection requires,
