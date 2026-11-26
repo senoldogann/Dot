@@ -152,8 +152,10 @@ restore that copy as above, with the Dot that wrote it: what was written since t
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to
 `dotx.log.1` (the one before is dropped) and a new one is started (two processes that find it full together take
-turns). A line the disk will not take is dropped, never raised into the code that logs, and the next line that is
-written says how many were lost (`log_lines_dropped`). The output of the launchd job goes to
+turns). A thread of the process writes the lines, in the order they were logged, so a disk slow to take one holds no
+run and no screen; the lines still waiting are written before the process exits (a process killed outright loses them).
+A line the disk will not take is dropped, never raised into the code that logs, and so is one that finds 100,000 lines
+still waiting; the next line that is written says how many were lost (`log_lines_dropped`). The output of the launchd job goes to
 `daemon.out.log` and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
 A `dotx` command that ends with an error, the daemon's start included (a configuration it refuses, a daemon already
 running, an address taken), writes a `command_failed` event to `dotx.log` too, with the command and the error;

@@ -1,18 +1,21 @@
 """The log file is kept under its limit (item 144): the process whose line takes it over moves it to ``<name>.1`` and
 starts a new one, and another process that writes to the same file, or one whose file the owner deleted, writes its
 next line to the new one. Two that find it full together never move the new file over the older one, and a line the
-disk would not take is dropped and counted, never raised into the code that logs (item 556)."""
+disk would not take is dropped and counted, never raised into the code that logs (item 556). The lines are written by a
+thread of their own, so a slow disk never holds the code that logs, and none is lost on the way out."""
 
 import errno
 import fcntl
 import json
 import os
+import threading
+import time
 from pathlib import Path
 from typing import TextIO
 
 import pytest
 
-from dotagent.core.logs import RotatingLog
+from dotagent.core.logs import QueuedLog, RotatingLog
 
 _LIMIT_BYTES: int = 200
 # Lines of 50 bytes with their newline: the fourth takes the file to the limit.
@@ -123,3 +126,90 @@ def test_a_line_the_disk_will_not_take_is_dropped_without_an_error_and_the_next_
     assert [line.rstrip(".") for line in (lines[0], lines[2])] == ["before", "after"]
     notice: dict[str, object] = json.loads(lines[1])
     assert (notice["event"], notice["level"], notice["count"], len(lines)) == ("log_lines_dropped", "warning", 2, 3)
+
+
+class _SlowDisk(_FullDisk):
+    """The handle of a log file on a disk that takes ``flush_s`` to flush each line."""
+
+    def __init__(self, handle: TextIO, flush_s: float) -> None:
+        super().__init__(handle)
+        self.flush_s: float = flush_s
+        self.flushing: threading.Event = threading.Event()
+
+    def flush(self) -> None:
+        self.flushing.set()
+        time.sleep(self.flush_s)
+        super().flush()
+
+
+def test_a_line_returns_at_once_on_a_slow_disk_and_every_line_is_written_in_order_by_the_exit(tmp_path: Path) -> None:
+    """A flush took 2-3 s on the daemon's event loop when the disk was slow (item 4 of the review of 2026-11-26): the
+    lines are written by a thread of their own, and :meth:`QueuedLog.close`, run at the exit, writes what is left."""
+    path: Path = tmp_path / "dotx.log"
+    file: RotatingLog = RotatingLog(path, 10_000)
+    file._handle = _SlowDisk(file._handle, 0.1)  # type: ignore[assignment]  # a stand-in for the file's handle
+    log: QueuedLog = QueuedLog(file, 100)
+    started: float = time.monotonic()
+    for index in range(10):
+        log.info(_line(f"line {index}"))
+    assert time.monotonic() - started < 0.1
+    log.close()
+    log.info(_line("after the exit"))
+    assert _labels(path) == [*(f"line {index}" for index in range(10)), "after the exit"]
+
+
+def test_a_line_that_finds_the_queue_full_is_dropped_and_the_next_one_written_says_how_many_were(
+    tmp_path: Path,
+) -> None:
+    path: Path = tmp_path / "dotx.log"
+    file: RotatingLog = RotatingLog(path, 10_000)
+    disk: _SlowDisk = _SlowDisk(file._handle, 0.3)
+    file._handle = disk  # type: ignore[assignment]  # a stand-in for the file's handle
+    log: QueuedLog = QueuedLog(file, 2)
+    log.info(_line("taken"))
+    # The thread is flushing the first line: two lines fill the queue, and three more find it full.
+    assert disk.flushing.wait(5)
+    for index in range(5):
+        log.info(_line(f"queued {index}"))
+    disk.flush_s = 0
+    log.close()
+    lines: list[str] = path.read_text(encoding="utf-8").splitlines()
+    notice: dict[str, object] = json.loads(lines[1])
+    assert [line.rstrip(".") for line in (lines[0], lines[2], lines[3])] == ["taken", "queued 0", "queued 1"]
+    assert (notice["event"], notice["count"], len(lines)) == ("log_lines_dropped", 3, 4)
+
+
+class _BrokenOnce(_FullDisk):
+    """The handle of a log file whose next write fails with an error no disk gives, once."""
+
+    def __init__(self, handle: TextIO) -> None:
+        super().__init__(handle)
+        self.broken: bool = True
+
+    def write(self, text: str) -> int:
+        if self.broken:
+            self.broken = False
+            raise RuntimeError("not a disk's error")
+        return super().write(text)
+
+
+def test_a_line_that_cannot_be_encoded_or_written_leaves_the_thread_writing_the_next_and_the_exit_returns(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The pre-push review of item 1944: a lone surrogate (a file name of bytes that are no UTF-8) failed the write with
+    a ``UnicodeEncodeError``, which ended the thread, and every later line was lost and the exit waited."""
+    path: Path = tmp_path / "dotx.log"
+    file: RotatingLog = RotatingLog(path, 10_000)
+    log: QueuedLog = QueuedLog(file, 100)
+    log.info('{"path": "/tmp/caf\udce9"}')
+    log.close()
+    assert path.read_text(encoding="utf-8").splitlines() == ['{"path": "/tmp/caf\\udce9"}']
+    broken: QueuedLog = QueuedLog(file, 100)
+    file._handle = _BrokenOnce(file._handle)  # type: ignore[assignment]  # a stand-in for the file's handle
+    broken.info(_line("lost"))
+    broken.info(_line("after"))
+    broken.close()
+    lines: list[str] = path.read_text(encoding="utf-8").splitlines()
+    assert json.loads(lines[1])["count"] == 1
+    assert lines[2].rstrip(".") == "after"
+    assert "RuntimeError: not a disk's error" in capsys.readouterr().err

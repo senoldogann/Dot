@@ -4,6 +4,7 @@ locations."""
 import errno
 import fcntl
 import fnmatch
+import functools
 import os
 import tempfile
 from pathlib import Path
@@ -181,14 +182,24 @@ def runs_as_git_code(path: Path) -> bool:
     return False
 
 
+@functools.cache
+def _resolved_roots(prefixes: tuple[str, ...]) -> tuple[Path, ...]:
+    """``prefixes`` with their links followed, resolved once for each set (item 4 of the review of 2026-11-26): every
+    path a tool names was classified with a ``realpath`` of each, a lookup of the disk on the event loop that froze the
+    daemon for 10-15 s at a time on a slow disk. They are the system's own places and links (``/tmp`` is
+    ``/private/tmp``), which a run cannot change; the temporary folder of this process is one too, held from the first
+    look, so a link a run later puts in its place does not move it."""
+    return tuple(Path(os.path.realpath(prefix)) for prefix in prefixes)
+
+
 def _is_temp(path: Path) -> bool:
-    roots: list[Path] = [Path(os.path.realpath(prefix)) for prefix in _TEMP_PREFIXES]
-    roots.append(Path(os.path.realpath(tempfile.gettempdir())))
-    return any(within(path, root) for root in roots)
+    # ``gettempdir`` reads ``TMPDIR`` once for the process and keeps it; the folder it names is a key of the cache, so a
+    # process that names another one (``tempfile.tempdir``) has its own roots resolved.
+    return any(within(path, root) for root in _resolved_roots((*_TEMP_PREFIXES, tempfile.gettempdir())))
 
 
 def _is_system(path: Path) -> bool:
-    return any(within(path, Path(os.path.realpath(prefix))) for prefix in _SYSTEM_PREFIXES)
+    return any(within(path, root) for root in _resolved_roots(_SYSTEM_PREFIXES))
 
 
 def _without_root_names(parts: tuple[str, ...]) -> tuple[str, ...]:
