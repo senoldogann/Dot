@@ -29,6 +29,7 @@ public actor Outbox {
     private let maySend: @Sendable (OutboxItem.Action) async -> Bool
     private let waker: Waker = Waker()
     private var items: [OutboxItem]
+    private var activeUpload: (item: String, token: UUID, task: Task<Result<String, DaemonRequestError>, Never>)?
     private var draining: Task<Void, Never>?
     private var suspended: Bool = false
     private var changeWatchers: [UUID: AsyncStream<[OutboxItem]>.Continuation] = [:]
@@ -106,6 +107,40 @@ public actor Outbox {
                 names.append(name)
             }
         }
+        try enqueue(action, id: id, names: names)
+    }
+
+    /// Stores typed attachments alongside legacy JPEGs without changing the outbox's message format.
+    public func enqueue(_ action: OutboxItem.Action, id: String, attachments: [OutgoingAttachment]) throws {
+        var names: [String] = []
+        do {
+            if !attachments.isEmpty {
+                try FileManager.default.createDirectory(at: imageFolder, withIntermediateDirectories: true)
+            }
+            for (number, attachment) in attachments.enumerated() {
+                let name: String = "\(id)-\(number).attachment"
+                var stored: OutgoingAttachment = attachment
+                if case .file(let source) = attachment.content {
+                    // A video is kept as a file of its own beside its record (a copy on the same volume is a clone, not
+                    // a second set of bytes): the record names it, and holds none of it.
+                    let kept: String = Self.mediaName(of: name)
+                    try FileManager.default.copyItem(at: source, to: imageFolder.appending(path: kept))
+                    stored = attachment.kept(as: kept)
+                }
+                let data: Data = try PropertyListEncoder().encode(stored)
+                try data.write(to: imageFolder.appending(path: name), options: [.atomic])
+                names.append(name)
+            }
+            try enqueue(action, id: id, names: names)
+        } catch {
+            for name in names { removeImage(named: name) }
+            // The copy that was being made when the failure came has no record yet.
+            for number in attachments.indices { try? FileManager.default.removeItem(at: imageFolder.appending(path: Self.mediaName(of: "\(id)-\(number).attachment"))) }
+            throw error
+        }
+    }
+
+    private func enqueue(_ action: OutboxItem.Action, id: String, names: [String]) throws {
         let kept: OutboxItem.Action =
             switch action {
             case .message(let thread, let text, _, _, let picks): names.isEmpty ? action : .message(thread: thread, text: text, images: names, uploaded: [], picks: picks)
@@ -114,8 +149,10 @@ public actor Outbox {
             case .newChat(let text, _, _, let start, let agent): names.isEmpty ? action : .newChat(text: text, images: names, uploaded: [], start: start, agent: agent)
             default: action
             }
-        items.append(OutboxItem(id: id, action: kept, createdAt: clock.now()))
-        save()
+        let next: [OutboxItem] = items + [OutboxItem(id: id, action: kept, createdAt: clock.now())]
+        try persist(next)
+        items = next
+        publishChanges()
         start()
     }
 
@@ -123,7 +160,7 @@ public actor Outbox {
     public func discard(_ id: String) -> (item: OutboxItem, photos: [Data])? {
         guard let at: Int = items.firstIndex(where: { $0.id == id }) else { return nil }
         let removed: OutboxItem = items.remove(at: at)
-        let photos: [Data] = removed.images.compactMap { try? Data(contentsOf: imageFolder.appending(path: $0)) }
+        let photos: [Data] = removed.images.filter { !$0.hasSuffix(".attachment") }.compactMap { try? Data(contentsOf: imageFolder.appending(path: $0)) }
         removePhotos(of: removed)
         save()
         return (removed, photos)
@@ -138,10 +175,20 @@ public actor Outbox {
     public func dropForReset() {
         let (kept, dropped, _): ([OutboxItem], [OutboxItem], [UnsentWords]) = DaemonRules.afterReset(items)
         guard !dropped.isEmpty || kept != items else { return }
+        if let upload = activeUpload, dropped.contains(where: { $0.id == upload.item }) { upload.task.cancel() }
         for item in dropped { removePhotos(of: item) }
         items = kept
         save()
         logger.notice("outbox dropped for a reset count=\(dropped.count) kept=\(kept.count)")
+    }
+
+    /// Cancels the transfer while it is still uploading. The message and its files stay available for Try again.
+    public func cancelUpload(_ id: String) {
+        guard let upload = activeUpload, upload.item == id,
+            let at = items.firstIndex(where: { $0.id == id }), items[at].phase == .sending
+        else { return }
+        upload.task.cancel()
+        refuse(items[at], failure: .uploadCancelled)
     }
 
     /// Tries now: the wait is cut short, and a doing that failed for good is tried again (a message too old to be sent as
@@ -228,18 +275,20 @@ public actor Outbox {
                 save()
                 continue
             }
+            let candidate: OutboxItem = items[at]
             let seen: Int = await waker.current
+            guard let at: Int = items.firstIndex(where: { $0.id == candidate.id && $0.phase != .failed }) else { continue }
             if !link.state.online {
                 items[at].phase = .waiting
                 save()
                 await waker.wait(seconds: 30, clock: clock, seen: seen)
                 continue
             }
-            if !(await maySend(items[at].action)) {
+            if !(await maySend(candidate.action)) {
                 await waker.wait(seconds: 5, clock: clock, seen: seen)
                 continue
             }
-            guard let now: Int = items.firstIndex(where: { $0.id == items[at].id }) else { continue }
+            guard let now: Int = items.firstIndex(where: { $0.id == candidate.id && $0.phase != .failed }) else { continue }
             items[now].phase = .sending
             items[now].attempts += 1
             save()
@@ -247,7 +296,7 @@ public actor Outbox {
             // A photo whose file is gone is not left out in silence (the review's pre-existing finding): the message
             // stays for the owner with the reason, never sent short of a photo.
             if let missing: String = item.images.first(where: { !FileManager.default.isReadableFile(atPath: imageFolder.appending(path: $0).path) }) {
-                refuse(item, failure: .photoMissing(name: missing))
+                refuse(item, failure: missing.hasSuffix(".attachment") ? .attachmentMissing(name: missing) : .photoMissing(name: missing))
                 continue
             }
             do {
@@ -255,9 +304,13 @@ public actor Outbox {
                 finish(item.id, outcome)
             } catch {
                 let failure: DaemonRequestError = error
+                if case .transport(_, let error) = failure, error.code == .cancelled,
+                    !items.contains(where: { $0.id == item.id && $0.phase == .sending })
+                { continue }
                 if failure.isRetryable || isBeingSent(failure) {
                     if let again: Int = items.firstIndex(where: { $0.id == item.id }) {
                         items[again].phase = .waiting
+                        items[again].attachmentUpload = nil
                         save()
                     }
                     logger.warning("outbox retry id=\(item.id, privacy: .public) attempt=\(item.attempts) error=\(failure.description, privacy: .public)")
@@ -299,6 +352,7 @@ public actor Outbox {
             // A message the daemon will not take stays as "not sent", for the owner to edit or send again.
             items[at].phase = .failed
             items[at].failure = failure
+            items[at].attachmentUpload = nil
         } else {
             items.remove(at: at)
         }
@@ -385,7 +439,7 @@ public actor Outbox {
         }
     }
 
-    /// The photos of a message, each uploaded once: an id the daemon gave is written into the item before the next.
+    /// The attachments of a message, each uploaded once: an id the daemon gave is written into the item before the next.
     private func upload(_ item: OutboxItem) async throws(DaemonRequestError) -> [String] {
         var uploaded: [String] =
             switch item.action {
@@ -395,9 +449,24 @@ public actor Outbox {
         for (number, name) in item.images.enumerated() where number >= uploaded.count {
             // Checked readable before the sending began; read again here, a file gone meanwhile is the same refusal.
             guard let data: Data = try? Data(contentsOf: imageFolder.appending(path: name)) else {
-                throw DaemonRequestError.undecodable(path: name, detail: "the photo's file could not be read")
+                throw DaemonRequestError.undecodable(path: name, detail: "the attachment file could not be read")
             }
-            uploaded.append(try await api.uploadAttachment(name: name, jpeg: data))
+            let id: String
+            if name.hasSuffix(".attachment") {
+                let attachment: OutgoingAttachment
+                do {
+                    attachment = try PropertyListDecoder().decode(OutgoingAttachment.self, from: data)
+                } catch {
+                    throw .undecodable(path: name, detail: String(describing: error))
+                }
+                if case .kept(let kept) = attachment.content, !FileManager.default.isReadableFile(atPath: imageFolder.appending(path: kept).path) {
+                    throw .undecodable(path: kept, detail: "the attachment file could not be read")
+                }
+                id = try await upload(attachment, item: item, number: number + 1)
+            } else {
+                id = try await api.uploadAttachment(name: name, jpeg: data)
+            }
+            uploaded.append(id)
             if let at: Int = items.firstIndex(where: { $0.id == item.id }) {
                 items[at] = items[at].with(uploaded: uploaded)
                 save()
@@ -406,24 +475,75 @@ public actor Outbox {
         return uploaded
     }
 
+    private func upload(_ attachment: OutgoingAttachment, item: OutboxItem, number: Int) async throws(DaemonRequestError) -> String {
+        let token: UUID = UUID()
+        let folder: URL = imageFolder
+        let task: Task<Result<String, DaemonRequestError>, Never> = Task { [api, weak self] in
+            do throws(DaemonRequestError) {
+                let id: String = try await api.uploadAttachment(attachment, folder: folder) { [weak self] percent in
+                    Task { [weak self] in await self?.reportUpload(item.id, token: token, number: number, count: item.images.count, percent: percent) }
+                }
+                return .success(id)
+            } catch {
+                return .failure(error)
+            }
+        }
+        activeUpload = (item.id, token, task)
+        reportUpload(item.id, token: token, number: number, count: item.images.count, percent: 0)
+        defer { activeUpload = nil }
+        let reply: Result<String, DaemonRequestError> = await task.value
+        guard !task.isCancelled, items.contains(where: { $0.id == item.id && $0.phase == .sending }) else {
+            throw .transport(path: "/api/attachments", underlying: URLError(.cancelled))
+        }
+        return try reply.get()
+    }
+
+    private func reportUpload(_ id: String, token: UUID, number: Int, count: Int, percent: Int) {
+        guard activeUpload?.token == token, let at = items.firstIndex(where: { $0.id == id && $0.phase == .sending }),
+            percent > (items[at].attachmentUpload?.percent ?? -1)
+        else { return }
+        items[at].attachmentUpload = AttachmentUploadProgress(number: number, count: count, percent: percent)
+        publishChanges()
+    }
+
     // MARK: Keeping
 
     private func save() {
         do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try JSONEncoder().encode(OutboxFile(items: items)).write(to: file, options: [.atomic])
+            try persist(items)
         } catch {
             logger.error("the outbox could not be written error=\(String(describing: error), privacy: .public)")
         }
+        publishChanges()
+    }
+
+    private func persist(_ items: [OutboxItem]) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(OutboxFile(items: items)).write(to: file, options: [.atomic])
+    }
+
+    private func publishChanges() {
         for watcher in changeWatchers.values { watcher.yield(items) }
     }
 
     private func removePhotos(of item: OutboxItem) {
-        for name in item.images { try? FileManager.default.removeItem(at: imageFolder.appending(path: name)) }
+        for name in item.images { removeImage(named: name) }
     }
+
+    /// A kept image or attachment record, and the media file its record names.
+    private func removeImage(named name: String) {
+        try? FileManager.default.removeItem(at: imageFolder.appending(path: name))
+        if name.hasSuffix(Self.recordSuffix) { try? FileManager.default.removeItem(at: imageFolder.appending(path: Self.mediaName(of: name))) }
+    }
+
+    private static let recordSuffix: String = ".attachment"
+
+    /// The name of the media file a record ``<id>-<n>.attachment`` names.
+    private static func mediaName(of record: String) -> String { String(record.dropLast(recordSuffix.count)) + ".media" }
 
     /// Forgets everything (the phone's key was forgotten).
     public func clear() {
+        activeUpload?.task.cancel()
         items = []
         try? FileManager.default.removeItem(at: file)
         try? FileManager.default.removeItem(at: imageFolder)

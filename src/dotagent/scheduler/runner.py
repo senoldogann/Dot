@@ -1361,7 +1361,9 @@ class Scheduler:
         speed: Speed = "standard" if options.speed is None else options.speed
         asked: Effort | None = options.effort
         model: str | None = await self._firing_model(options)
-        kept: Effort | None = await self._corrected_effort(record, model)
+        # The manager rounds effort for a kind model without rewriting the schedule's choice.
+        routed: bool = model is None and self._manager.task_model(record.goal, SCHEDULE_SOURCE) is not None
+        kept: Effort | None = asked if routed else await self._corrected_effort(record, model)
         if kept != asked:
             options = options.model_copy(update={"effort": kept})
         run: RunRecord = await self._started(record, options, opening, thread_id, carried, speed)

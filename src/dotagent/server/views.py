@@ -626,6 +626,14 @@ class AttachmentUpload(FrozenModel):
     data_b64: str = Field(min_length=1, max_length=_UPLOAD_B64_CHARS)
 
 
+class AttachmentStreamQuery(FrozenModel):
+    """What names a file sent as the raw body of ``PUT /attachments/stream`` (item 1933): its name and its declared type
+    (empty when the sender has none)."""
+
+    name: str = Field(min_length=1, max_length=255)
+    media_type: str = Field(default="", max_length=200)
+
+
 class VoiceStreamOpen(FrozenModel):
     """A stream of what the owner says, for this Mac to write down as it comes (item 969), in ``language``."""
 
@@ -849,7 +857,13 @@ class KindModelRequest(FrozenModel):
     kind to the default model."""
 
     kind: TaskKind
-    model: str
+    model: Literal[""] | ModelReference
+
+
+class AlternateCheckRequest(FrozenModel):
+    """The alternate check model, or an empty string to disable it."""
+
+    model: Literal[""] | ModelReference
 
 
 class RestartRequest(FrozenModel):
@@ -1715,6 +1729,7 @@ class ModelOption(FrozenModel):
     ``fast_mode``: it has fast mode (item 223); ``label``: its name as people know it, which the pages show ("Opus 5.5"
     for the Claude plan's ``opus``, item 1054), else its id."""
 
+    family: str | None = None
     ref: str
     label: str
     vision: bool

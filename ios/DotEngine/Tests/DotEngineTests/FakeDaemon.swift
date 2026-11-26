@@ -65,6 +65,13 @@ final class FakeDaemon: @unchecked Sendable {
         set { lock.withLock { isOffline = newValue } }
     }
     private var isOffline: Bool = false
+    /// Leaves an attachment request pending until its URLSession task is cancelled.
+    var holdUploads: Bool {
+        get { lock.withLock { holdingUploads } }
+        set { lock.withLock { holdingUploads = newValue } }
+    }
+    private var holdingUploads: Bool = false
+
     /// The daemon from before item 1686: the sync calls answer 404.
     var old: Bool = false
     /// A chat's stream opens but says nothing (not its replay, not `synchronized`) until `releaseStreamStarts`.
@@ -417,8 +424,7 @@ final class FakeDaemon: @unchecked Sendable {
             }
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
-        if method == "POST", let found: [String] = Self.match(parts, ["api", "attachments"]) {
-            _ = found
+        if (method == "POST" && Self.match(parts, ["api", "attachments"]) != nil) || (method == "PUT" && Self.match(parts, ["api", "attachments", "stream"]) != nil) {
             let id: Int = lock.withLock {
                 uploads += 1
                 return uploads
@@ -618,7 +624,7 @@ final class FakeDaemon: @unchecked Sendable {
             ThreadsView(
                 revision: revisionCounter,
                 threads: chats.values.map {
-                    ThreadRow(summary: summary($0), revision: $0.revision, asks: $0.asks.count)
+                    ThreadRow(summary: summary($0), revision: $0.revision, asks: $0.asks.count, helpers: 0, background: [])
                 })
         }
     }
@@ -736,6 +742,7 @@ final class FakeProtocol: URLProtocol, @unchecked Sendable {
         for item in URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] { asked[item.name] = item.value ?? "" }
         let query: [String: String] = asked
         let body: Data? = readBody()
+        if (method == "POST" && url.path == "/api/attachments") || (method == "PUT" && url.path == "/api/attachments/stream"), found.holdUploads { return }
         DispatchQueue.global().async { [self] in
             let reply: FakeDaemon.Reply =
                 found.fate(method: method, path: url.path, query: query, body: body)

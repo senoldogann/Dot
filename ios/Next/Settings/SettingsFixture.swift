@@ -244,6 +244,19 @@
                     #"{"programs":[{"name":"Claude Code","command":"claude","path":"/opt/homebrew/bin/claude","version":"2.1.331","support":"supported","why":"measured with Dot (items 1580 to 1582)"},{"name":"OpenCode","command":"opencode","path":"/opt/homebrew/bin/opencode","version":"1.19.5","support":"unknown","why":"Dot keeps no list of the OpenCode versions it was measured on"}]}"#
                 )
             case ("PUT", "/api/agent/resume"): return (200, #"{"resume":"off","resume_within_s":3600}"#)
+            case ("GET", "/api/phone/metrics"):
+                return (
+                    200,
+                    #"{"days":7,"reports":9,"last_at":\#(now - 3600),"app_version":"1.0 (42)","foreground_min":96.5,"cpu_s":212.4,"hang_s":1.8,"launch_ms":412.0,"peak_memory_mb":184.2,"disk_writes_mb":38.0,"cellular_mb":21.3,"wifi_mb":64.0,"crashes":0,"hang_reports":2,"cpu_exceptions":0,"disk_write_exceptions":0,"open_min":88.0,"dot_in_mb":7.4,"dot_out_mb":1.2,"requests":412,"reconnects":3,"redraws_per_min":96.0}"#
+                )
+            case ("POST", "/api/phone/metrics"): return (204, "")
+            // A file an answer names (backlog LF1): its facts and text, and its open on the Mac.
+            case ("GET", "/api/files/preview"):
+                return (
+                    200,
+                    #"{"path":"/Users/owner/Desktop/ci-notes.md","name":"ci-notes.md","size":2150,"modified":\#(now - 600),"opens":true,"preview":{"kind":"text","text":"CI notes\n\nNode 22 is pinned on CI.\n","cut":false}}"#
+                )
+            case ("POST", "/api/files/open"): return (204, "")
             default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }

@@ -8,8 +8,10 @@ import os
 /// - A broken stream is opened again after a jittered wait from 0.5 s up to 15 s; the count starts again only after a
 ///   connection stayed up 30 s, so a link that passes one keepalive and dies does not hammer the Mac.
 /// - A stream silent for 12 s (the new streams write a keepalive every 5 s) is taken for dead and replaced.
-/// - Back in front: after 10 s or more away every stream is opened again from its cursors; sooner, a stream whose last
-///   byte is younger than 6 s is kept and an older one replaced (a probe by heartbeat age).
+/// - In the background nothing streams: every stream is ended at once (a socket left open while iOS suspends the app
+///   still wakes the phone's radio for every keepalive and word), and back in front each is opened again from its
+///   cursors, which reads each open chat's view once and the list's: the picture catches up in one read, not in a
+///   replay of what was missed.
 /// - The link: lost, the streams are let go (the picture stays, as not live); back, every wait is cut short; a change
 ///   of interface (Wi-Fi to cellular) opens every stream again.
 public actor Supervisor {
@@ -41,12 +43,18 @@ public actor Supervisor {
     private var beats: [Key: Heartbeat] = [:]
     private var immediate: Set<Key> = []
     private var viewFailures: [String: Int] = [:]
+    /// The streams ended when the app went to the background, opened again when it comes back.
+    private var paused: Set<Key> = []
+    /// When the app left the screen (`nil` on it): an opened chat is marked seen only while the app is on the screen.
     private var backgroundAt: Double?
     private var lastLink: LinkState
     private var halted: Bool = false
     private var watchers: [Task<Void, Never>] = []
     /// The revision of each open chat's row it was last marked seen at (item 1905).
     private var seenSent: [String: Int] = [:]
+    /// How many screens hold each chat open (item 1913): a chat shown twice (a switch back to it before the old screen
+    /// went, a chat and its helper's) stays open until the last one leaves, whichever order their calls arrive in.
+    private var openCounts: [String: Int] = [:]
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "supervisor")
 
     public init(api: DaemonAPI, store: SyncStore, outbox: Outbox, link: LinkWatcher, clock: any EngineClock, jitter: @escaping @Sendable () -> Double) {
@@ -89,41 +97,42 @@ public actor Supervisor {
 
     /// Opens a chat: its picture from the cache, its stream and its view.
     public func openChat(_ thread: String) async {
+        openCounts[thread, default: 0] += 1
         await store.chatOpened(thread)
         await seeOpenChats()
         guard loops[.chat(thread)] == nil else { return }
         run(.chat(thread))
     }
 
-    /// Leaves a chat: its stream ends, its picture is saved.
+    /// Leaves a chat: once no screen holds it, its stream ends and its picture is saved.
     public func closeChat(_ thread: String) async {
+        let left: Int = (openCounts[thread] ?? 0) - 1
+        openCounts[thread] = left > 0 ? left : nil
+        guard left <= 0 else { return }
         end(.chat(thread))
+        paused.remove(.chat(thread))
         await store.chatClosed(thread)
     }
 
+    /// The app left the screen: every stream ends (the daemon sees its connection close) and the outbox stops sending.
     public func enterBackground() async {
         backgroundAt = clock.now()
+        paused.formUnion(loops.keys)
+        for key in paused { end(key) }
         await store.persistAll()
         await outbox.suspend()
     }
 
+    /// The app is back: the streams ended in the background are opened again from their cursors.
     public func enterForeground() async {
-        let away: Double = backgroundAt.map { clock.now() - $0 } ?? 0
-        backgroundAt = nil
         await outbox.start()
+        backgroundAt = nil
         await seeOpenChats()
-        if away >= StreamRules.resubscribeAfter {
-            replaceAll()
-        } else {
-            probe()
-        }
+        let resumed: Set<Key> = paused
+        paused = []
+        // The list's first: its status read tells a reset daemon before a chat's stream reads anything of it.
+        for key in resumed.sorted(by: { first, _ in first == .list }) where loops[key] == nil && !halted { run(key) }
         await waker.wake()
-    }
-
-    /// Replaces the streams whose last byte is older than the probe age (the app came back after a short while).
-    func probe() {
-        let now: Double = clock.now()
-        for (key, beat) in beats where now - beat.last > StreamRules.probeAge { replace(key) }
     }
 
     private func replaceAll() {
@@ -242,6 +251,7 @@ public actor Supervisor {
             }
             return .ended(upFor: 0)
         }
+        Traffic.shared.streamOpened()
         let began: Double = clock.now()
         let beat: Heartbeat = Heartbeat(last: began)
         beats[key] = beat
@@ -264,6 +274,7 @@ public actor Supervisor {
         watchdog.cancel()
         if readers[key] == reader { readers[key] = nil }
         if beats[key] === beat { beats[key] = nil }
+        if !Task.isCancelled, immediate.contains(key) == false { Traffic.shared.streamBroke() }
         await broke(key, connection: connection)
         if case .chat(let thread) = key, await store.chat(thread)?.freshness == .deleted { return .gone }
         return .ended(upFor: clock.now() - began)
@@ -308,6 +319,7 @@ public actor Supervisor {
                 line.append(byte)
                 guard byte == 0x0A else { continue }
                 beat.touch(clock.now())
+                Traffic.shared.received(line.count)
                 for message in parser.feed(line) { await frame(readFrame(message)) }
                 line.removeAll(keepingCapacity: true)
             }

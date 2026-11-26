@@ -5,8 +5,11 @@ that replies by a script instead of a service, so no model is called and nothing
 choose the script:
 
 - "helper: ...": the run starts a helper (``delegate``, wait false) that waits 90 s, then ends;
+- "waithelper: ...": a helper that waits 5 min, which the run waits on (``delegate``, wait true), so its row says so
+  (item 1920);
 - "wait: ...": the run waits 2 min in ``wait_until`` (a steer meanwhile shows "read after this step", and ends it);
 - "slow: ...": the reply takes 8 s (a run at work, for the queue);
+- "hold: ...": the daemon takes the phone's sending of the message only after 3 s (it shows pending meanwhile);
 - "approve: ...": the run touches a file in /tmp with the shell, which the supervised mode asks the owner about;
 - "question: ...": the run asks the owner a question with options and waits for the answer (``ask_user``);
 - "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
@@ -14,9 +17,12 @@ choose the script:
 - "fail: ...": the model fails, so the run fails with one line of cause;
 - "write: ...": the run writes a file of its workspace, a change the inspector can undo;
 - "draft: ...": the run drafts an email, a card with Send, Edit and Discard;
+- "files: ...": the run writes a note of its workspace, then answers naming it and two web links (one the local play
+  page), for the file chip and the sources row under an answer (backlog LF1);
 - "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
+  "stream long: ..." the same with ten steps, a file of its own each;
 - "browse: ...": the run opens a local page in its (headless) browser, then waits 8 min with the tab open, so the phone
   can follow the browser live and take its page over (items 1839-1840); the page counts its clicks and shows what is
   typed in its field, and a clock on it ticks so the cast keeps sending frames;
@@ -51,6 +57,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import SplitResult, parse_qs, urlsplit
 
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.paths import ensure_layout
@@ -83,6 +91,18 @@ TOKEN: str = "dotnext-e2e-token"
 MODEL: str = "ollama:scripted"
 # The first line of the config this script writes: a home that holds it is this script's own, and may be used again.
 CONFIG_MARK: str = "# A throwaway home of ios/Next/scripts/e2e_daemon.py"
+
+# The files the "stream long:" script reads, one a step, all on every Mac.
+LONG_READS: tuple[str, ...] = (
+    "/etc/shells",
+    "/etc/protocols",
+    "/etc/services",
+    "/etc/group",
+    "/etc/networks",
+    "/etc/paths",
+    "/etc/manpaths",
+    "/etc/zshrc",
+)
 
 # The "stream:" script's words: a thought of about 40 words said four times a step, and an answer of about 300 words.
 THOUGHT: str = (
@@ -193,7 +213,9 @@ class ScriptProvider:
                 ),
             )
         elif latest.startswith("stream:"):
-            return await self._stream(request, sink, steps)
+            return await self._stream(request, sink, steps, 4)
+        elif latest.startswith("stream long:"):
+            return await self._stream(request, sink, steps, 10)
         elif latest.startswith("browse:") and tools_since == ["browser_new_tab"]:
             calls = (
                 ToolCall(
@@ -201,6 +223,11 @@ class ScriptProvider:
                     name="wait_until",
                     arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 8},
                 ),
+            )
+        elif latest.startswith("files:") and answered:
+            text = (
+                "I wrote `dotnext-e2e-report.md`. The page is at "
+                f"{self._play_page} and the source at https://example.com/dotnext."
             )
         elif answered:
             text = f"Done: {owner[:60]}"
@@ -212,12 +239,24 @@ class ScriptProvider:
                     arguments={"goal": "wait for the test, then say done", "wait": False},
                 ),
             )
-        elif latest.startswith("wait for the test"):
+        elif latest.startswith("waithelper:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="delegate",
+                    arguments={"goal": "wait for the test, a long one, then say done", "wait": True},
+                ),
+            )
+        elif "wait for the test" in latest:
             calls = (
                 ToolCall(
                     id=f"call_{self._calls}",
                     name="wait_until",
-                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
+                    arguments={
+                        "command": "test -f /nonexistent-dotnext",
+                        "every_s": 5,
+                        "within_minutes": 5 if "a long one" in latest else 1.5,
+                    },
                 ),
             )
         elif latest.startswith("browse:"):
@@ -277,6 +316,17 @@ class ScriptProvider:
                     id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
                 ),
             )
+        elif latest.startswith("files:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="write_file",
+                    arguments={
+                        "path": "dotnext-e2e-report.md",
+                        "content": "# E2E report\n\nWritten by the e2e check.\n",
+                    },
+                ),
+            )
         elif latest.startswith("write:"):
             calls = (
                 ToolCall(
@@ -326,16 +376,20 @@ class ScriptProvider:
             raw=(),
         )
 
-    async def _stream(self, request: ChatRequest, sink: DeltaSink, steps: int) -> ModelReply:
-        """One step of the "stream:" script: thinking and a file read for the first four, then the long answer."""
+    async def _stream(self, request: ChatRequest, sink: DeltaSink, steps: int, reads: int) -> ModelReply:
+        """One step of the "stream:" script: thinking and a file read for the first ``reads`` steps (4, or 12 for
+        "stream long:", about 45 s, which outlasts the app's time away in the check of what an unseen run costs),
+        then the long answer."""
         thinking: str = " ".join(THOUGHT for _ in range(4))
         for word in thinking.split(" "):
             await sink(StreamDelta(kind="thinking", text=word + " "))
             await asyncio.sleep(0.025)
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
-        if steps < 4:
-            calls = (ToolCall(id=f"call_{self._calls}", name="read_file", arguments={"path": "/etc/hosts"}),)
+        if steps < reads:
+            # A file of its own each step past the fourth: the loop stops a step repeated four times as no progress.
+            path: str = "/etc/hosts" if steps < 4 else LONG_READS[steps % len(LONG_READS)]
+            calls = (ToolCall(id=f"call_{self._calls}", name="read_file", arguments={"path": path}),)
         else:
             text = ANSWER
             for word in text.split(" "):
@@ -497,6 +551,38 @@ async def seed_activity(runtime: Runtime) -> None:
     )
 
 
+class HoldAccepts:
+    """Holds for 3 s the phone's sending of a message whose words start with "hold:" (item 1927), so that a test sees
+    it pending under the owner's bubble before the daemon takes it."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app: ASGIApp = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") != "POST":
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        more: bool = True
+        while more:
+            message: Message = await receive()
+            chunks.append(message.get("body", b""))
+            more = bool(message.get("more_body", False))
+        body: bytes = b"".join(chunks)
+        if b'"hold:' in body:
+            await asyncio.sleep(3)
+        replayed: bool = False
+
+        async def replay() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+
 async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
@@ -521,7 +607,7 @@ async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None
         started_at=time.time(),
         stopping=stopping,
     )
-    server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+    server: DotServer = DotServer(serving_config(HoldAccepts(create_app(context))), stopping)
     serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
     watching: asyncio.Task[None] = asyncio.create_task(watch_revisions(runtime.store, runtime.bus))
     # As the smoke tests wait for it: the server says it started by a flag, not an event.

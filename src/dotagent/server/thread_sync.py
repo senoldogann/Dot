@@ -28,7 +28,7 @@ import time
 from collections.abc import AsyncIterator, Mapping
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, JsonValue
 
 from dotagent.agent.helper_reports import kept_detached
 from dotagent.agent.manager import RunManager
@@ -79,6 +79,11 @@ SYNCHRONIZED_EVENT: str = "synchronized"
 WATCH_S: float = 0.5
 # The keepalive of the new streams: a client takes one silent for 12 s as broken (two missed and some room).
 HEARTBEAT_S: float = 5.0
+# The words being written (``delta``, id 0) of the chat's stream go out at most this often, the tokens that came
+# meanwhile joined into one frame (item 1926): a phone's radio and CPU wake about twelve times a second while a model
+# writes, not once a token, and the frames' own bytes are paid once for several tokens.
+DELTA_BATCH_S: float = 0.08
+DELTA_EVENT: str = "delta"
 # The most runs a view holds, and the most events of its newest run.
 MOST_RUNS: int = 50
 NEWEST_EVENTS: int = 200
@@ -189,11 +194,16 @@ class ThreadView(FrozenModel):
 
 
 class ThreadRow(FrozenModel):
-    """A chat of the list, its revision and how many asks wait in it (a helper's among them)."""
+    """A chat of the list, its revision and how many asks wait in it (a helper's among them); ``helpers``, how many of
+    its helpers its run waits on, at work; ``background``, what works for it with no run of it waiting (its view's
+    :class:`BackgroundWork`), so that a row says it waits on helpers or on that work (item 1920). A helper's start and
+    end, one let go, a background command and a loop each move the chat's revision, so the list's refresh tells them."""
 
     summary: ThreadSummary
     revision: int
     asks: int
+    helpers: int
+    background: list[BackgroundWork]
 
 
 class ThreadsView(FrozenModel):
@@ -294,27 +304,8 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         newest = await run_detail(ctx, runs[-1].id)
         events = await store.list_events_tail_without(runs[-1].id, NEWEST_EVENTS + 1, UNREAD_BY_PAGES)
     helpers: list[HelperView] = await _helpers(ctx, thread_id)
-    background: list[BackgroundWork] = [
-        BackgroundWork(kind="helper", id=helper.run_id, title=helper.title, started_at=helper.started_at)
-        for helper in helpers
-        if helper.status in _WORKING and not helper.blocking
-    ]
-    background.extend(
-        BackgroundWork(kind="command", id=session.id, title=session.command, started_at=session.started_at)
-        for session in ctx.runtime.terminals.sessions(thread_id)
-        if session.background and not session.ended
-    )
     automations: list[ThreadAutomation] = await thread_automations(ctx, thread_id)
-    background.extend(
-        BackgroundWork(
-            kind="loop",
-            id=automation.schedule.record.id,
-            title=automation.schedule.record.name,
-            started_at=automation.schedule.record.created_at,
-        )
-        for automation in automations
-        if automation.loop and automation.schedule.record.enabled
-    )
+    background: list[BackgroundWork] = _background(ctx, thread_id, helpers, automations)
     summary: ThreadSummary | None = await store.thread_summary(thread_id, ctx.runtime.config.scheduler.same_chat)
     return ThreadView(
         revision=revision,
@@ -333,6 +324,52 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         reactions=await store.thread_reactions(thread_id),
         drafts=await store.thread_drafts(thread_id),
         terminals=terminals_of(ctx, thread_id),
+    )
+
+
+def _background(
+    ctx: ServerContext, thread_id: str, helpers: list[HelperView], automations: list[ThreadAutomation]
+) -> list[BackgroundWork]:
+    """What works for the chat with no run of it waiting (:class:`BackgroundWork`): its helpers let go, its terminal
+    sessions run in the background, its switched-on loop."""
+    background: list[BackgroundWork] = [
+        BackgroundWork(kind="helper", id=helper.run_id, title=helper.title, started_at=helper.started_at)
+        for helper in helpers
+        if helper.status in _WORKING and not helper.blocking
+    ]
+    background.extend(
+        BackgroundWork(kind="command", id=session.id, title=session.command, started_at=session.started_at)
+        for session in ctx.runtime.terminals.sessions(thread_id)
+        if session.background and not session.ended
+    )
+    background.extend(
+        BackgroundWork(
+            kind="loop",
+            id=automation.schedule.record.id,
+            title=automation.schedule.record.name,
+            started_at=automation.schedule.record.created_at,
+        )
+        for automation in automations
+        if automation.loop and automation.schedule.record.enabled
+    )
+    return background
+
+
+async def _row(ctx: ServerContext, summary: ThreadSummary, revision: int, asks: int, released: set[str]) -> ThreadRow:
+    """A chat of the list (:class:`ThreadRow`). Its helpers are read only for a chat whose latest run works or that let
+    one go (``released``, the chats of the helpers let go), and its schedules only for a chat with a loop, so that the
+    list of chats at rest costs what it did."""
+    working: bool = summary.latest_status in _WORKING
+    helpers: list[HelperView] = await _helpers(ctx, summary.id) if working or summary.id in released else []
+    automations: list[ThreadAutomation] = (
+        await thread_automations(ctx, summary.id) if summary.loop_cron is not None else []
+    )
+    return ThreadRow(
+        summary=ctx.manager.as_shown_thread(summary),
+        revision=revision,
+        asks=asks,
+        helpers=sum(1 for helper in helpers if helper.blocking),
+        background=_background(ctx, summary.id, helpers, automations),
     )
 
 
@@ -378,10 +415,11 @@ async def threads_view(ctx: ServerContext, limit: int) -> ThreadsView:
     rows: list[ThreadSummary] = await store.list_thread_summaries(limit, ctx.runtime.config.scheduler.same_chat)
     revisions: dict[str, int] = await store.thread_revisions([row.id for row in rows])
     asks: dict[str, int] = await store.ask_counts()
+    released: set[str] = {entry.thread_id for entry in await kept_detached(store)}
     return ThreadsView(
         revision=revision,
         threads=[
-            ThreadRow(summary=ctx.manager.as_shown_thread(row), revision=revisions[row.id], asks=asks.get(row.id, 0))
+            await _row(ctx, row, revisions[row.id], asks.get(row.id, 0), released)
             for row in rows
             if row.id in revisions
         ],
@@ -520,15 +558,33 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
         dropped: int = 0
         owed: bool = False
         written: float = time.monotonic()
+        # Words being written, held for up to DELTA_BATCH_S so that a model's tokens go out a few at a time (item 1926).
+        held: EventRecord | None = None
+        held_since: float = 0.0
         while True:
-            due: float = (FLUSH_S if owed else HEARTBEAT_S) - (time.monotonic() - written)
+            now: float = time.monotonic()
+            if held is not None:
+                due: float = DELTA_BATCH_S - (now - held_since)
+            else:
+                due = (FLUSH_S if owed else HEARTBEAT_S) - (now - written)
             incoming: EventRecord | None = await next_event(feed.queue, ctx.stopping, max(0.0, due))
             if incoming is None:
                 if ctx.stopping.is_set():
                     return
-                owed, written = False, time.monotonic()
-                yield KEEPALIVE
+                owed, written = held is not None, time.monotonic()
+                yield encode_event(held) if held is not None else KEEPALIVE
+                held = None
                 continue
+            if held is not None and incoming.kind == DELTA_EVENT:
+                joined: EventRecord | None = merged_delta(held, incoming)
+                if joined is not None:
+                    held = joined
+                    continue
+            # Anything else goes out after the words held, in the order it came; an event this stream does not send
+            # leaves them held.
+            before: EventRecord | None = held
+            head: bytes = encode_event(held) if held is not None else b""
+            held = None
             if feed.dropped != dropped:
                 dropped = feed.dropped
                 # The start of a run of the chat, or of a helper, may be among what was lost: the members are found
@@ -544,7 +600,8 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
                         child.id for child in await store.list_child_runs(member) if child.created_at >= opened
                     )
                 told, deleted = await changed_now()
-                caught: bytes = await stored() + told
+                caught: bytes = head + await stored() + told
+                head, before = b"", None
                 owed, written = True, time.monotonic()
                 yield caught
                 if deleted:
@@ -552,24 +609,45 @@ async def follow_thread(ctx: ServerContext, thread_id: str, cursors: Mapping[str
             if incoming.kind == THREAD_CHANGED_EVENT:
                 change: ThreadChanged = ThreadChanged.model_validate(incoming.data)
                 if change.thread_id != thread_id:
+                    held = before
                     continue
                 owed, written = True, time.monotonic()
-                yield encode_event(incoming)
+                yield head + encode_event(incoming)
                 if change.deleted:
                     return
                 continue
-            if incoming.kind in UNREAD_BY_PAGES:
+            if incoming.kind in UNREAD_BY_PAGES or (incoming.run_id not in family and not await joins(incoming)):
+                held = before
                 continue
-            if incoming.run_id not in family:
-                if not await joins(incoming):
-                    continue
-                family.add(incoming.run_id)
+            family.add(incoming.run_id)
             if incoming.id > 0:
                 if incoming.id in sent:
+                    held = before
                     continue
                 sent.add(incoming)
+            elif incoming.kind == DELTA_EVENT:
+                # Held, after the words held before it went out.
+                if head:
+                    owed, written = True, time.monotonic()
+                    yield head
+                held, held_since = incoming, time.monotonic()
+                continue
             owed, written = True, time.monotonic()
-            yield encode_event(incoming)
+            yield head + encode_event(incoming)
+
+
+def merged_delta(held: EventRecord, incoming: EventRecord) -> EventRecord | None:
+    """``held`` with ``incoming``'s words after its own, when both are words being written (id 0) of the same run's same
+    step, of the same kind (thinking or text) and said as the same thing; ``None`` when they cannot be one frame."""
+    if incoming.kind != DELTA_EVENT or incoming.id != 0 or held.id != 0 or incoming.run_id != held.run_id:
+        return None
+    if any(held.data.get(field) != incoming.data.get(field) for field in ("kind", "step", "says")):
+        return None
+    before: JsonValue = held.data.get("text")
+    after: JsonValue = incoming.data.get("text")
+    if not isinstance(before, str) or not isinstance(after, str):
+        return None
+    return held.model_copy(update={"data": {**held.data, "text": before + after}, "ts": incoming.ts})
 
 
 async def follow_threads(bus: EventBus, stopping: asyncio.Event) -> AsyncIterator[bytes]:

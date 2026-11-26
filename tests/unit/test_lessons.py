@@ -134,6 +134,8 @@ def test_only_a_goal_check_that_sent_the_run_back_is_a_signal() -> None:
     checks: list[EventRecord] = [
         _event("goal_check", {"decision": "continue", "reason": "The summary misses the totals.", "final": False}),
         _event("goal_check", {"decision": "continue", "reason": "Still no totals.", "final": True}),
+        # Sent back to better a goal it had reached (item 1946): nothing went wrong.
+        _event("goal_check", {"decision": "improve", "reason": "A chart would help.", "final": False}),
         _event("goal_check", {"decision": "achieved", "reason": "The totals are there.", "final": True}),
     ]
     assert run_signals(_case((), ()), [], checks, []) == (

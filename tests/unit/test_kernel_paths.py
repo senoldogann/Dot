@@ -171,3 +171,33 @@ def test_a_home_written_in_another_case_still_gives_its_tilde_spellings(
     monkeypatch.setenv("HOME", str(real).swapcase())
     protected: tuple[Path, ...] = expand_protected(["~/secret"], ())
     assert mentions_protected("cat ~/secret/key", protected)
+
+
+def test_a_classification_resolves_the_system_and_temporary_places_once_and_names_them_as_before(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Every path a tool named was classified with a ``realpath`` of each system and temporary place, a lookup of the
+    disk on the event loop that froze the daemon for 10-15 s on a slow disk (item 4 of the review of 2026-11-26): they
+    are resolved once now, the workspace alone each time, and every class is what it was."""
+    workspace: Path = tmp_path / "work"
+    workspace.mkdir()
+    resolved: list[str] = []
+    real = os.path.realpath
+
+    def counted(path: str | os.PathLike[str], *, strict: bool = False) -> str:
+        resolved.append(os.fspath(path))
+        return real(path, strict=strict)
+
+    cases: dict[Path, str] = {
+        workspace / "a.txt": "workspace",
+        Path("/private/tmp/x"): "temp",
+        Path("/private/var/folders/x"): "temp",
+        Path("/usr/bin/env"): "system",
+        Path("/private/etc/hosts"): "system",
+        Path.home() / "Documents" / "x.txt": "home",
+    }
+    first: dict[Path, str] = {path: classify_path(path, workspace, (), ()) for path in cases}
+    monkeypatch.setattr(os.path, "realpath", counted)
+    again: dict[Path, str] = {path: classify_path(path, workspace, (), ()) for path in cases}
+    assert first == again == cases
+    assert set(resolved) == {os.fspath(workspace)}

@@ -70,7 +70,7 @@ _HANGING_START_S: float = 3.0
 
 def _server(start_timeout_s: float) -> OpenCodeServer:
     config: OpenCodeConfig = OpenCodeConfig(
-        command="opencode", start_timeout_s=start_timeout_s, idle_stop_s=600.0, models_ttl_s=60.0
+        command="opencode", start_timeout_s=start_timeout_s, idle_stop_s=600.0, models_ttl_s=60.0, silence_s=600.0
     )
     return OpenCodeServer(config, {"PATH": "/usr/bin:/bin"})
 

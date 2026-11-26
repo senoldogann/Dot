@@ -5,6 +5,13 @@
 A run is a loop. The model answers with tool calls; Dot checks each call against the [policy](safety.md#safety), runs the ones
 that pass (up to `parallel_tools` at once) and hands the results back, until the model calls `finish`.
 
+Before its first model call a run reads what it starts with, and what needs nothing else it reads at once (item 1918):
+the model's profile, its agent and the team, the accounts signed in, the skills offered, the notes recalled for its
+goal, when a model last answered in its chat and the harness's texts; the first of them that fails ends the run with
+its error, as before. The profile counts each finished run's events once and again only when they change, and a skill's
+frontmatter is parsed again only when its file's text changed. The run's page shows when its first call began and when
+its first word came: the `model_call` event carries the call's `seconds` and `first_token_seconds`.
+
 Every run's prompt, on Dot's own models and on your Claude plan, tells the model to analyse thoroughly and recommend
 boldly (item 1023, your word of 2026-11-07): an analysis weighs every side that matters, its evidence, risks and costs,
 and a recommendation names the option it would take and why, even a big change, rather than a cautious list. What a
@@ -194,11 +201,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `scaffold = "measured"` a model is weak when at least `profile_min_calls` tool calls of its newest 30 finished runs
   were measured and at least `weak_refusal_share` of them were refused before they ran (an unknown tool, or arguments
   that were not valid JSON or did not fit the tool). `scaffold = "fixed"`, the default, keeps every model standard.
-  Every model, after three acting steps in a row whose `browser_act` or `desktop_act` calls carried one step each on
+  Every model, after three acting steps in a row whose `browser_act`, `safari_act` or `desktop_act` calls carried one step each on
   the same page or application, is told once to batch the steps it can predict into one call (each call costs a model
   round trip; `dotx stats` counts the single-step share), and the timeline shows the note; `steer_single_actions =
-  false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser, the
-  desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
+  false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser and
+  the Safari tools, the desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
   went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
   The side panel's Task tab shows under Set up a budget cut to the window, why a model is weak, and each reminder
   (item 365).
@@ -434,7 +441,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   starts nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going,
   whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
-  each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  each, a video or a sound up to 200 MB, sent as the raw body of `PUT /api/attachments/stream` and written to disk as
+  it arrives, as is any file over 2 MB, item 1933). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
   the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
@@ -655,7 +663,7 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Video           | `watch_video` (item 1212, tool group `video`): a video file or a link, as frames with their moments and a transcript by the minute ([Watching videos](video.md)) |
 | Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` or a registered scope ([Recon](recon.md)) |
 | Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts` or a registered scope, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
-| Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
+| Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write`, and the pages of the owner's own Safari: `safari_open`, `safari_read`, `safari_act` (item 1959, [Browser and computer use](browser-and-computer-use.md#the-owners-own-safari)) |
 | Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`, `todo_add` (Dot's own list, item 715), `todo_drop` (item 821), `objective_add`, `objective_update`, `objectives` (the owner's objectives, item 908; Dot's own runs only, tool group `todos`) |
@@ -1020,8 +1028,9 @@ and updates when a new one arrives. Both show the capture time.
 ## Delegation
 
 `delegate(goal, model?, step?, wait?)` hands a sub-goal to a separate run with a conversation of its own and returns
-its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
-helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)).
+its result, so a long investigation does not fill the parent's context. The helper takes the model named by `model`
+when that model can answer. With no explicit choice, [Task models](models.md#models-and-providers) can select a model
+for the brief. The parent's current model is the default for an unmapped brief.
 Several calls in one turn run side by side (up to `parallel_tools`; a group chat's lead sends its agents their parts all
 at once, as many as the team has, up to eight, when its reply's calls all send parts, item 831), which is how a plan's
 independent steps run at the same time; `step` names the plan step the part is, and the report closes it (see the plan

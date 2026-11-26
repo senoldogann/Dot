@@ -19,7 +19,7 @@ final class ChatSettingsUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         let chip: XCUIElement = app.buttons["composer.model"]
-        XCTAssertTrue(chip.waitForExistence(timeout: 5), "the chip shows once the composer opens")
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "the chip shows with the composer")
         chip.tap()
         XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Claude Code"].exists, "providers by the web's names")
@@ -53,6 +53,67 @@ final class ChatSettingsUITests: XCTestCase {
         // Cancel keeps nothing of the picks.
         app.buttons["chatSettings.cancel"].tap()
         XCTAssertFalse(app.navigationBars["Chat settings"].waitForExistence(timeout: 2))
+    }
+
+    /// The composer is one capsule (item 1924): + | field | the model chip | microphone | send, on one centre line, each target
+    /// 44 pt or more. The chip is the provider's mark and a chevron; it opens the chat's grouped picker, and a pick
+    /// changes the chip (its VoiceOver label names the model; see ChatListLiveUITests).
+    func testTheChipSitsInTheCapsuleOpensThePickerAndAPickChangesIt() {
+        let app: XCUIApplication = launch("n2-chat")
+        let chip: XCUIElement = app.buttons["composer.model"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "the chip is in the capsule at rest")
+        XCTAssertTrue(chip.label.hasPrefix("Model: Opus 5.5"), chip.label)
+        let mic: XCUIElement = app.buttons["composer.mic"]
+        let send: XCUIElement = app.buttons["composer.send"]
+        let plus: XCUIElement = app.buttons["Attach"]
+        for part in [chip, mic, send, plus] {
+            XCTAssertGreaterThanOrEqual(part.frame.width, 44, "\(part.identifier) is a 44 pt target")
+            XCTAssertGreaterThanOrEqual(part.frame.height, 44)
+        }
+        print("composer capsule: plus \(plus.frame) chip \(chip.frame) mic \(mic.frame) send \(send.frame)")
+        for part in [chip, mic, plus] {
+            XCTAssertLessThanOrEqual(abs(part.frame.midY - send.frame.midY), 1, "one centre line: \(part.frame) \(send.frame)")
+        }
+        XCTAssertLessThan(plus.frame.maxX, chip.frame.minX)
+        XCTAssertLessThanOrEqual(chip.frame.maxX, mic.frame.minX + 1)
+        XCTAssertLessThanOrEqual(mic.frame.maxX, send.frame.minX + 1)
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "composer-capsule"
+        shot.lifetime = .keepAlways
+        add(shot)
+
+        chip.tap()
+        let picker: XCUIElement = app.navigationBars["Chat settings"]
+        if !picker.waitForExistence(timeout: 5) {
+            print("first tap opened nothing; hittable \(chip.isHittable) frame \(chip.frame)")
+            chip.tap()
+        }
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), "the existing grouped picker")
+        // A pick changes the chip of a new chat (no fixture keeps a chat's choice): ChatListLiveUITests picks a model there
+        // and reads the chip's label.
+        app.buttons["chatSettings.cancel"].tap()
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+    }
+
+    /// Dark and light, and the largest accessibility size: the chip stays a 44 pt target (the mark alone at AX3) and the
+    /// capsule keeps its parts on one line each. The shots go to the result bundle for the report.
+    func testTheCapsuleHoldsInDarkAndAtTheLargestAccessibilitySize() {
+        for (name, extra) in [("dark", ["-AppleInterfaceStyle", "Dark"]), ("ax3", ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"])] {
+            let app: XCUIApplication = XCUIApplication()
+            app.launchArguments = ["-DotNextScene", "n2-chat", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + extra
+            app.launch()
+            let chip: XCUIElement = app.buttons["composer.model"]
+            XCTAssertTrue(chip.waitForExistence(timeout: 10), "\(name): the chip")
+            XCTAssertGreaterThanOrEqual(chip.frame.width, 44, name)
+            XCTAssertGreaterThanOrEqual(chip.frame.height, 44, name)
+            XCTAssertLessThanOrEqual(chip.frame.maxX, app.windows.firstMatch.frame.maxX, "\(name): nothing pushed off the edge")
+            XCTAssertLessThanOrEqual(app.buttons["composer.send"].frame.maxX, app.windows.firstMatch.frame.maxX, name)
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "composer-\(name)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
     }
 
     func testFastModeFollowsTheModelAndTheLevelAndApprovalsArePicked() {

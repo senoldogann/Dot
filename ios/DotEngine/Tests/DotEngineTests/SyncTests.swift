@@ -119,41 +119,41 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(after.chats["thr_1"]?.view?.queue.messages.count, 1)
     }
 
-    /// R-e #5: the app went to the background for 15 s (the streams may have died unseen); back in front every stream is
-    /// opened again from its cursors and the chat's view is read, so what changed meanwhile shows.
-    func testBackFromTheBackgroundAfterTenSecondsEveryStreamIsOpenedAgainFromItsCursors() async throws {
+    /// R-e #5 and item 1926: in the background nothing streams. Every stream ends at once (the daemon sees its connection
+    /// close), what the Mac does meanwhile is not read, and back in front each stream is opened again from its cursors and
+    /// the chat's view is read once, so what changed meanwhile shows.
+    func testInTheBackgroundEveryStreamEndsAndBackInFrontEachIsOpenedAgainFromItsCursors() async throws {
         _ = try await openLive()
-        await rig.supervisor.enterBackground()
-        daemon.setQueueSilently("thr_1", texts: ["sent from the Mac meanwhile"])
         let opens: Int = daemon.count("GET", "/api/threads/thr_1/stream")
-        rig.clock.advance(9.9)
-        // A frame just before the return: the stream looks alive by its heartbeat, yet after 10 s away it is opened again.
+        let views: Int = daemon.count("GET", "/api/threads/thr_1/view")
+        await rig.supervisor.enterBackground()
+        try await daemonState(daemon, "every stream closed") { $0.openStreams == 0 }
+        daemon.setQueueSilently("thr_1", texts: ["sent from the Mac meanwhile"])
         daemon.say("run_1", "tool_call", ["call_id": .string("c9"), "tool": .string("shell")])
-        _ = try await snapshot(of: rig.store, "the frame was read") { $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "tool_call" } == true }
-        rig.clock.advance(0.2)
+        rig.clock.advance(3)
         await rig.supervisor.enterForeground()
         let back: EngineSnapshot = try await snapshot(of: rig.store, "caught up") {
             $0.chats["thr_1"]?.view?.queue.messages.first?.text == "sent from the Mac meanwhile" && $0.chats["thr_1"]?.freshness == .live
+                && $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "tool_call" } == true
         }
-        XCTAssertGreaterThan(daemon.count("GET", "/api/threads/thr_1/stream"), opens, "the stream was opened again")
+        XCTAssertEqual(daemon.count("GET", "/api/threads/thr_1/stream"), opens + 1, "the stream was opened again, once")
+        XCTAssertEqual(daemon.count("GET", "/api/threads/thr_1/view"), views + 1, "the view was read once")
         let reopened: FakeDaemon.Seen? = daemon.requests.last { $0.path == "/api/threads/thr_1/stream" }
         XCTAssertTrue(reopened?.query["cursors"]?.hasPrefix("run_1:") == true, "from the cursors held")
         XCTAssertEqual(back.chats["thr_1"]?.runs["run_1"]?.events.filter { $0.kind == "tool_call" }.count, 1)
+        try await daemonState(daemon, "the list's stream and the chat's open again") { $0.openStreams == 2 }
     }
 
-    /// Back in front after 3 s with a stream that spoke a moment ago: the stream is kept (a probe by heartbeat age), not
-    /// replaced.
-    func testBackFromAShortBackgroundAStreamThatSpokeLatelyIsKept() async throws {
+    /// A chat left while the app was in the background is not opened again when it comes back.
+    func testAChatClosedInTheBackgroundStaysClosed() async throws {
         _ = try await openLive()
         await rig.supervisor.enterBackground()
-        rig.clock.advance(3)
+        await rig.supervisor.closeChat("thr_1")
+        try await daemonState(daemon, "every stream closed") { $0.openStreams == 0 }
         let opens: Int = daemon.count("GET", "/api/threads/thr_1/stream")
         await rig.supervisor.enterForeground()
-        daemon.say("run_1", "assistant", ["text": .string("still here"), "step": .int(4)])
-        _ = try await snapshot(of: rig.store, "the event came on the same stream") {
-            $0.chats["thr_1"]?.runs["run_1"]?.events.contains { $0.kind == "assistant" } == true
-        }
-        XCTAssertEqual(daemon.count("GET", "/api/threads/thr_1/stream"), opens, "a live stream is not replaced")
+        try await daemonState(daemon, "the list's stream open again") { $0.openStreams(of: "/api/threads/stream") == 1 }
+        XCTAssertEqual(daemon.count("GET", "/api/threads/thr_1/stream"), opens, "the closed chat's stream stays closed")
     }
 
     /// R-e #10: a chat renamed on the Mac shows its new name in the list and in the open chat; a chat deleted on the Mac
@@ -494,6 +494,25 @@ final class SeenTests: XCTestCase {
         let daemon: FakeDaemon = daemon
         _ = try await snapshot(of: rig.store, "read again after the run ended") { _ in daemon.count("PATCH", "/api/threads/thr_1") > before }
         _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+    }
+
+    /// A switch back to a chat before its old screen went (item 1913): the old screen's close, arriving after the new
+    /// one's open, must not close the chat the owner is reading; it is still marked seen when its run ends.
+    func testAChatShownTwiceStaysOpenUntilBothLeave() async throws {
+        await rig.supervisor.start()
+        await rig.supervisor.openChat("thr_1")
+        await rig.supervisor.openChat("thr_1")
+        _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+        await rig.supervisor.closeChat("thr_1")
+        let before: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        let daemon: FakeDaemon = daemon
+        _ = try await snapshot(of: rig.store, "the chat still on screen is read again") { _ in daemon.count("PATCH", "/api/threads/thr_1") > before }
+        await rig.supervisor.closeChat("thr_1")
+        let after: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        _ = try await snapshot(of: rig.store, "once both left it keeps its unread") { seenRow($0)?.summary.unread == true }
+        XCTAssertEqual(daemon.count("PATCH", "/api/threads/thr_1"), after)
     }
 
     func testAClosedChatIsNotMarkedSeen() async throws {

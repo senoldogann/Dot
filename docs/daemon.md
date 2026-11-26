@@ -1355,7 +1355,9 @@ of a paired phone that is still listed (item 670, [Dot on the phone](phone.md)),
 phones' routes do not take (403). A request's body is read whole only within its limit, after the guard let it
 through: 4 KB on what it lets through without a token (those three routes, the pages and the files), 32 MB on every
 route that needs the token or a phone's key (an attachment of 20 MB in base64); a longer one, declared
-or streamed, is answered 413 and read no further (item 942). A page a run showed
+or streamed, is answered 413 and read no further (item 942). The one route that takes a file as its raw body,
+`PUT /api/attachments/stream`, is not read whole: a declared length over 200 MiB is answered 413 at once, and the route
+counts the rest as it writes it (item 1933). A page a run showed
 (`/pages/<id>`) needs none: its id cannot be guessed, and it is served sandboxed (see [Tools](runs.md#tools)). `dotx url` puts
 the token in the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the
 browser's local storage and removes it from the address bar. A page that cannot sign in says why: a token the daemon
@@ -1389,21 +1391,21 @@ dotx service uninstall   # stop the daemon and remove the job
   start that went well came after it. Without such a failure, read `daemon.err.log`.
 - `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout` sends
   the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
-  loaded again from its property list (a load launchd refuses is tried a second time, and then the job is started with
-  `launchctl kickstart -k`, item 1310), and the command waits up to 60 seconds for a new process to answer `GET
-  /api/health`, then prints its version. Another program that answers there meanwhile (one that listens on every
-  address of the port, such as `python3 -m http.server 8765`, takes the connections in the moment before the new
-  daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
+  loaded again from its property list (a load launchd refuses is tried again after 2, 5 and 10 s, item 1941, and then
+  the job is started with `launchctl kickstart -k`, item 1310), and the command waits up to 60 seconds for a new process
+  to answer `GET /api/health`, then prints its version. Another program that answers there meanwhile (one that listens
+  on every address of the port, such as `python3 -m http.server 8765`, takes the connections in the moment before the
+  new daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
   `service install` waits so too. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
   `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
   off, and the daemon's next start resumes them as `[agent] resume` says: with the default `safe`, a run of the pages
   goes on by itself, told to check what it left half done, unless what was cut may have paid, sent or posted for you
   (item 1854, [Autonomy](autonomy.md)). So a restart no longer loses a run's work, and an update need not wait for the
-  runs to end; `--when-idle` stays for a restart that should not cut a step in the middle. When launchd has no job of the service, the
-  command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
-  them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the daemon would stop
-  under the run, and the run's end would kill the command before it loads the daemon again (or, for the uninstall,
-  before it removes the job's file, which would bring the daemon back at the next login).
+  runs to end; `--when-idle` stays for a restart that should not cut a step in the middle. When launchd has no job of
+  the service, the command says so and names `service install`. In a command a run's tool started (the shell and
+  terminal tools mark them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the
+  daemon would stop under the run, and the run's end would kill the command before it loads the daemon again (or, for
+  the uninstall, before it removes the job's file, which would bring the daemon back at the next login).
 - **The watchdog** (item 925), `dev.dotagent.watchdog`, is a launchd job of its own beside the daemon's (its property
   list in `~/Library/LaunchAgents`, `StartInterval` 60, `RunAtLoad`, no `KeepAlive`): `service install` loads it once
   the daemon answers, `service uninstall` removes it first, and `service status` says whether it is loaded. Each
@@ -1560,6 +1562,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message, its files too when `attachments` names them (item 376; left out, they stay); send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue, each message's `files` named |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
+| `PUT /attachments/stream?name=…&media_type=…` (the file as the raw body)         | the same for a video, a sound or a large file (item 1933): the body is written to disk in chunks as it arrives, never held whole in memory, up to 200 MiB for a video or a sound and 20 MiB for any other file (422 past it); a body that is cut or refused leaves no file. Answers as `POST /attachments` does |
 | `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`), the team it is with (`team`, item 610), its last line (`last_message`, `last_role`) and its loop (`loop_cron`, `loop_next_at`, item 580); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |

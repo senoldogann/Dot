@@ -136,6 +136,14 @@ service uninstall`), move `dot.sqlite3` and its `dot.sqlite3-wal` and `dot.sqlit
 left beside the copy would be applied to it), unpack the copy in its place (`gunzip -c <copy> > "<home>/dot.sqlite3"`),
 and start the daemon again (`dotx service install`).
 
+**Free space** (item 1938). The daemon looks at the free space of the disk of Dot's home every five minutes: below
+`[store] min_free_gb` GiB (5) it tells you once (*Your Mac's disk is nearly full*, logged as `disk_space_low`), and
+again only after the disk rose above it (`disk_space_recovered`). While it is low, a copy of the database that would
+leave less than that free is not begun (`backup_skipped_low_space`, tried again ten minutes later; `dotx backup now`
+ends with that error), and an uploaded file (`POST /api/attachments`, and `PUT /api/attachments/stream` for the length
+it declares, else for the most its kind may be) is refused (507, "the disk is nearly full"), rather than either failing
+half way on a full disk. Runs and the database's own small writes go on. `min_free_gb = 0` sets no floor.
+
 **The database's version** (item 1268). The database keeps the version of its tables (SQLite's `user_version`). Every
 start makes the tables it lacks and adds the columns added since, each only where it is missing, as before versions; a
 change that cannot be made twice (a table dropped or renamed, data rewritten) comes with a new version. A Dot that finds
@@ -153,8 +161,10 @@ restore that copy as above, with the Dot that wrote it: what was written since t
 Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with `DOT_LOG_DIR`: `dotx service status`
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to
 `dotx.log.1` (the one before is dropped) and a new one is started (two processes that find it full together take
-turns). A line the disk will not take is dropped, never raised into the code that logs, and the next line that is
-written says how many were lost (`log_lines_dropped`). The output of the launchd job goes to
+turns). A thread of the process writes the lines, in the order they were logged, so a disk slow to take one holds no
+run and no screen; the lines still waiting are written before the process exits (a process killed outright loses them).
+A line the disk will not take is dropped, never raised into the code that logs, and so is one that finds 100,000 lines
+still waiting; the next line that is written says how many were lost (`log_lines_dropped`). The output of the launchd job goes to
 `daemon.out.log` and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
 A `dotx` command that ends with an error, the daemon's start included (a configuration it refuses, a daemon already
 running, an address taken), writes a `command_failed` event to `dotx.log` too, with the command and the error;

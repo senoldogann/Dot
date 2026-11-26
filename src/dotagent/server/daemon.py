@@ -56,6 +56,7 @@ from dotagent.server.thread_sync import watch_revisions
 from dotagent.store.backup import keep_backups
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
+from dotagent.store.space import floor_bytes, watch_space
 
 log = get_logger(__name__)
 
@@ -237,6 +238,18 @@ def _log_warm_end(task: "asyncio.Task[None]") -> None:
     error: BaseException | None = task.exception()
     if error is not None:
         log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
+
+
+async def _tell_low_space(bus: EventBus, text: str) -> None:
+    """Tell the owner the disk is nearly full (item 1938); a tap opens Settings › Diagnostics."""
+    await tell_owner(bus, "Your Mac's disk is nearly full", text, "#/settings/diagnostics", "system", "")
+
+
+def _log_space_end(task: asyncio.Task[None]) -> None:
+    """The watch of the free space that stops before the daemon does is logged: a full disk is not told after it."""
+    if task.cancelled() or task.exception() is None:
+        return
+    log.error("disk_space_watch_ended", error=repr(task.exception()))
 
 
 def _log_backups_end(backups: asyncio.Task[None]) -> None:
@@ -456,6 +469,19 @@ async def run_daemon(config: AppConfig) -> int:
                 backups: asyncio.Task[None] = asyncio.create_task(keep_backups(config.store, db_path()), name="backups")
                 backups.add_done_callback(_log_backups_end)
                 cleanup.push_async_callback(_cancelled, backups)
+            # The free space of Dot's disk (item 1938): below [store] min_free_gb the owner is told once.
+            if config.store.min_free_gb > 0:
+                space: asyncio.Task[None] = asyncio.create_task(
+                    watch_space(
+                        dot_home(),
+                        floor_bytes(config.store.min_free_gb),
+                        partial(_tell_low_space, runtime.bus),
+                        asyncio.sleep,
+                    ),
+                    name="disk-space",
+                )
+                space.add_done_callback(_log_space_end)
+                cleanup.push_async_callback(_cancelled, space)
             # Before the scheduler and the server start: a resumed run takes its place before any new run, and no new
             # message reaches its thread before it.
             resumed: tuple[RunRecord, ...] = await manager.resume_safe() if config.agent.resume == "safe" else ()

@@ -188,7 +188,7 @@ struct SettingsDestination: View {
         case .voice: VoicePage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
-        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
+        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, scope: .all)
         case .rules: RulesPage()
         case .memory: MemoryPage()
         case .agents: AgentsHome()
@@ -289,8 +289,8 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             String(localized: "usage tokens days", comment: "Settings search synonyms of Usage (space separated)"), .usage),
         entry(
             "maintenance", String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), system,
-            "updates versions resume restart continue claude opencode cli",
-            String(localized: "updates versions resume restart continue", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
+            "updates versions resume restart continue claude opencode cli performance battery hangs crashes data",
+            String(localized: "updates versions resume restart continue performance battery hangs crashes", comment: "Settings search synonyms of Maintenance (space separated)"), .maintenance),
         entry(
             "connect-apps", String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), "", "connectors connect apps services mcp accounts google github slack notion plugins",
             String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),

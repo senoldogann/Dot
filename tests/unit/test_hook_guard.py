@@ -54,9 +54,9 @@ def test_only_the_exact_shape_of_a_call_goes_without_the_token() -> None:
 
 
 def test_a_call_takes_the_hooks_own_body_limit_and_the_rest_theirs() -> None:
-    assert body_most(CALL, needs_token, is_hook_call, 65_536) == 65_536
-    assert body_most("/api/hooks", needs_token, is_hook_call, 65_536) == MOST
-    assert body_most("/api/health", needs_token, is_hook_call, 65_536) == PUBLIC_MOST
+    assert body_most(CALL, needs_token(CALL), is_hook_call, MOST, PUBLIC_MOST, 65_536) == 65_536
+    assert body_most("/api/hooks", needs_token("/api/hooks"), is_hook_call, MOST, PUBLIC_MOST, 65_536) == MOST
+    assert body_most("/api/health", needs_token("/api/health"), is_hook_call, MOST, PUBLIC_MOST, 65_536) == PUBLIC_MOST
 
 
 @pytest.mark.asyncio

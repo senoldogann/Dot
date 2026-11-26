@@ -50,6 +50,46 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(app.buttons["settings.close"].waitForExistence(timeout: 30), "the avatar button opens the settings sheet")
     }
 
+    /// Starts a chat with Dot on the throwaway daemon, as the Mac or a code review would (`POST /api/runs`).
+    private func startDotChat(_ goal: String) throws {
+        let environment: [String: String] = ProcessInfo.processInfo.environment
+        let host: String = try XCTUnwrap(environment["DOTNEXT_E2E_HOST"])
+        let key: String = try XCTUnwrap(environment["DOTNEXT_E2E_KEY"])
+        var request: URLRequest = URLRequest(url: try XCTUnwrap(URL(string: host + "/api/runs")))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "goal": goal, "key": "k-\(UUID().uuidString)", "attachments": [String](), "mode": "task", "standing": false, "speed": "standard",
+            "plan_first": false,
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let done: XCTestExpectation = expectation(description: "the daemon took the chat")
+        nonisolated(unsafe) var status: Int = 0
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        XCTAssertTrue((200..<300).contains(status), "POST /api/runs: \(status)")
+    }
+
+    /// The owner's build 6 (item 1923): while they read one of Dot's chats, a code review started a new chat under Dot
+    /// and the open screen jumped to it. A newer chat of the bot only shows in the list; the open one stays.
+    func testANewChatOfDotNeverReplacesTheOneOpen() throws {
+        try startDotChat("hello: the chat the owner reads")
+        let app: XCUIApplication = try launch()
+        let dot: XCUIElement = app.buttons["home.bot.dot"]
+        XCTAssertTrue(dot.waitForExistence(timeout: 60))
+        dot.tap()
+        let reading: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'the chat the owner reads'")).firstMatch
+        XCTAssertTrue(reading.waitForExistence(timeout: 30), "Dot's chat opens")
+        try startDotChat("hello: a newer chat that starts meanwhile")
+        let newer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'a newer chat that starts meanwhile'")).firstMatch
+        XCTAssertFalse(newer.waitForExistence(timeout: 12), "the newer chat does not take the screen")
+        XCTAssertTrue(reading.exists, "the chat the owner reads stays open")
+    }
+
     func testABotMadeFromTheHomeGreetsAndItsMenuProfileAndTheSettingsSheetOpen() throws {
         let app: XCUIApplication = try launch()
         XCTAssertTrue(app.buttons["home.bot.dot"].waitForExistence(timeout: 20), "Dot, featured on the home")
@@ -75,14 +115,79 @@ final class BotsLiveUITests: XCTestCase {
         sleep(3)
         shot(app, "bot-chat")
 
+        // New chat in the menu opens like a chat (item 1916): pushed under the same header with a back button and no ✕, the
+        // bot's face and name centred above the composer; its first message goes to the bot, in the same screen.
+        app.buttons["More"].tap()
+        app.buttons["New chat"].tap()
+        let greeting: XCUIElement = app.descendants(matching: .any)["newChat.greeting"]
+        XCTAssertTrue(greeting.waitForExistence(timeout: 10), "the bot's face and name in its empty chat")
+        XCTAssertFalse(app.buttons["Close"].exists, "a pushed chat, not a sheet with a ✕")
+        let bar: XCUIElement = app.navigationBars.firstMatch
+        XCTAssertTrue(app.buttons["Scout"].exists, "the bot's pill stays in the header")
+        XCTAssertTrue(app.buttons["More"].isHittable, "and its ⋯ menu")
+        let newField: XCUIElement = app.descendants(matching: .any)["composer.field"]
+        XCTAssertTrue(newField.waitForExistence(timeout: 10))
+        XCTAssertEqual(greeting.frame.midX, app.windows.firstMatch.frame.midX, accuracy: 1, "centred across")
+        let above: CGFloat = greeting.frame.minY - bar.frame.maxY
+        let below: CGFloat = newField.frame.minY - greeting.frame.maxY
+        XCTAssertGreaterThan(above, 0)
+        XCTAssertGreaterThan(below, 0)
+        // The composer's own padding lies between the field and the space the greeting is centred in.
+        XCTAssertEqual(above, below, accuracy: 60, "centred down: \(above) above, \(below) below")
+        shot(app, "bot-new-chat")
+        // The push may still be settling: tap once it can take the tap, again if the keyboard did not come.
+        XCTAssertTrue(NSPredicate(format: "isHittable == true").evaluate(with: newField) || newField.waitForExistence(timeout: 5))
+        newField.tap()
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 5) { newField.tap() }
+        newField.typeText("Hello from a new chat")
+        app.buttons["composer.send"].tap()
+        XCTAssertTrue(app.staticTexts["Hello from a new chat"].waitForExistence(timeout: 20), "the first message opens the chat in place")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), "back to the bot's earlier chat")
+
         app.buttons["More"].tap()
         XCTAssertTrue(app.buttons["Find in chat"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Share as template…"].exists)
         shot(app, "bot-menu")
         app.buttons["View profile"].tap()
-        XCTAssertTrue(app.staticTexts["Routines"].waitForExistence(timeout: 10), "the bot's profile")
+        XCTAssertTrue(app.buttons["profile.routines"].waitForExistence(timeout: 10), "the bot's profile")
         XCTAssertTrue(app.staticTexts["Watch the market and tell me each morning"].exists, "its role")
         shot(app, "profile")
+
+        // The profile as Grok's (item 1963): Library and Computer, Configure the bot with Routines "N on", a Notifications
+        // switch, and Edit under the avatar and the name.
+        let library: XCUIElement = app.buttons["profile.library"]
+        let computer: XCUIElement = app.buttons["profile.computer"]
+        let edit: XCUIElement = app.buttons["profile.edit"]
+        XCTAssertTrue(library.exists && computer.exists && edit.exists)
+        XCTAssertTrue(computer.label.contains("Idle") || computer.label.contains("Working"), "the bot's computer says what it does: \(computer.label)")
+        // The count comes with the schedules' read, a moment after the page.
+        let routinesOn: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "0 on"), object: app.buttons["profile.routines"])
+        XCTAssertEqual(XCTWaiter.wait(for: [routinesOn], timeout: 10), .completed, app.buttons["profile.routines"].label)
+        XCTAssertTrue(app.descendants(matching: .any)["profile.notifications"].exists)
+        XCTAssertLessThanOrEqual(abs(library.frame.height - computer.frame.height), 1, "rows of one kind are identical")
+        XCTAssertLessThanOrEqual(abs(edit.frame.midX - app.windows.firstMatch.frame.midX), 1, "Edit sits under the avatar, centred")
+        XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
+
+        edit.tap()
+        let nameField: XCUIElement = app.textFields["botEdit.name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the edit page")
+        XCTAssertEqual(nameField.value as? String, "Scout")
+        XCTAssertFalse(app.buttons["botEdit.done"].isEnabled, "nothing changed yet")
+        app.buttons["botEdit.avatar"].tap()
+        let cloud: XCUIElement = app.buttons["avatar.shape.cloud"]
+        XCTAssertTrue(cloud.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(cloud.frame.height, 44)
+        cloud.tap()
+        app.buttons["avatar.colour.teal"].tap()
+        shot(app, "bot-avatar")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["botEdit.done"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["botEdit.done"].isEnabled, "a new look is a change")
+        shot(app, "bot-edit")
+        app.buttons["botEdit.done"].tap()
+        XCTAssertTrue(app.buttons["profile.edit"].waitForExistence(timeout: 10), "Done keeps it and goes back to the profile")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(pill.waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()

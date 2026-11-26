@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from pydantic import JsonValue
+
 from dotagent.core.errors import RepairError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
@@ -790,14 +792,42 @@ async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     return hashlib.sha256(f"{changed}\n{config_print(listed)}\n{files}".encode()).hexdigest()
 
 
+# How long ``uv sync --locked`` may take after a pull: a new dependency is downloaded and built.
+SYNC_TIMEOUT_S: float = 600.0
+
+
 async def pull_main(repo: Path, env: Mapping[str, str], sha: str) -> bool:
     """Bring the owner's checkout at ``repo`` up to main's commit ``sha`` (the one whose macOS runs passed, item 1899),
-    fast-forward only, when it is on main; ``False`` when it is on another branch, and is left as it is."""
+    fast-forward only, when it is on main, and its environment up to that commit's lock (``uv sync --locked``, item
+    1937): the daemon runs the checkout's own ``.venv`` python, so a pulled lock with no sync restarts it on packages
+    the code was not tested with. ``False`` when it is on another branch, and is left as it is.
+
+    Raises :class:`RepairError` when the pull or the sync fails. A failed sync first puts the checkout back on the
+    commit it stood on and syncs that commit's lock again, so a restart (launchd's, the watchdog's) finds code and
+    packages that agree; the error says whether that put-back worked."""
     branch: str = (await command(("git", "-C", str(repo), "branch", "--show-current"), repo, env)).strip()
     if branch != "main":
         return False
+    before: str = (await command(("git", "-C", str(repo), "rev-parse", "HEAD"), repo, env)).strip()
     await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
     await command(("git", "-C", str(repo), "merge", "--ff-only", "--quiet", sha), repo, env)
+    try:
+        await command_within(("uv", "sync", "--locked", "--quiet"), repo, env, SYNC_TIMEOUT_S)
+    except RepairError as error:
+        context: dict[str, JsonValue] = {**error.context, "pulled": sha, "put_back_to": before}
+        try:
+            # --keep moves the branch back and leaves a change of the owner's in place (it stops rather than lose one).
+            await command(("git", "-C", str(repo), "reset", "--keep", "--quiet", before), repo, env)
+            await command_within(("uv", "sync", "--locked", "--quiet"), repo, env, SYNC_TIMEOUT_S)
+        except RepairError as again:
+            context["put_back_failed"] = again.message
+            context["put_back_context"] = again.context
+            raise RepairError(
+                "the environment could not be synced to main's lock, nor put back to the commit before", context
+            ) from error
+        raise RepairError(
+            "the environment could not be synced to main's lock; the checkout was put back", context
+        ) from error
     return True
 
 

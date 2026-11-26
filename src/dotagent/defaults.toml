@@ -74,6 +74,9 @@ backup_every_hours = 1.0
 backup_dir = ""
 backup_keep_hourly = 24
 backup_keep_days = 14
+# Below min_free_gb GiB free on the disk of Dot's home (item 1938) the owner is told once, and a copy of the database or
+# an uploaded file is refused with an error that says so, rather than failing half way on a full disk; 0 sets no floor.
+min_free_gb = 5.0
 
 [models]
 # "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter, google (the Gemini models of a
@@ -111,8 +114,11 @@ helper_cooldown_s = 600
 context = {}
 # The model a run of a kind starts on when no model is chosen for it (item 1889), so that the right model takes the work
 # before any refusal: "security" is security research within a scope (a goal that names a host of [recon] owned_hosts or
-# of a scope, and speaks of security work). Settings › Models sets it: kinds = { security = "anthropic:claude-opus-5-5" }.
+# of a scope, and speaks of security work), quick lookups, deep investigations, writing and repository changes.
+# Settings › Models sets it: kinds = { code = "anthropic:claude-opus-5-5" }.
 kinds = {}
+# An optional model for goal and helper result checks when its family differs from the worker's.
+check_other_family = ""
 
 [providers.ollama]
 base_url = "http://localhost:11434"
@@ -175,6 +181,9 @@ start_timeout_s = 60.0
 idle_stop_s = 600.0
 # How long the list of free models is kept without asking OpenCode again; OpenCode refreshes its own catalog hourly.
 models_ttl_s = 3600.0
+# A run whose session says nothing for silence_s seconds while no tool works for it and no permission waits on you is
+# ended, and fails (item 1940); the run's time limit ([agent] run_max_minutes) is kept by the clock too.
+silence_s = 600.0
 
 [providers.claude_code]
 # Claude Code on your own Claude plan (item 1013): a run on "claude_code:fable", "claude_code:opus",

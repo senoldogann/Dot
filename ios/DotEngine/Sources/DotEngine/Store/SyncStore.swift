@@ -35,10 +35,13 @@ public struct EngineSnapshot: Sendable, Equatable {
     public var refusedDeletes: [String: String]
     /// The Mac's Dot was reset and the owner was not told yet (the old chats left this phone).
     public var reset: DaemonReset?
+    /// How many lifecycle events (a run queued, started or ended, an ask, a draft, a queue changed...) the list's stream
+    /// told in this session: a screen that shows them reads again when it moves, instead of on a timer.
+    public var heard: Int
 
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
-        workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil)
+        workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil, heard: 0)
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -210,7 +213,9 @@ public actor SyncStore {
 
     public func listFrame(_ frame: StreamFrame, connection: Int) -> [ListEffect] {
         let (next, effects): (ListProjection, [ListEffect]) = ListReducer.frame(state.list, frame, connection: connection)
-        if next != state.list {
+        let told: Bool = connection == state.list.marks.connection && ListReducer.isLifecycle(frame)
+        if told { state.heard += 1 }
+        if next != state.list || told {
             state.list = next
             publish()
         }
