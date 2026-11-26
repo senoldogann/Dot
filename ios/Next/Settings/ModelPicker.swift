@@ -14,8 +14,10 @@ func effortChoices(_ ref: String, in options: [ProviderModels]) -> [String] {
 enum ModelUse: Sendable {
     case main
     case fast
-    /// A run of Dot's tools: the code review.
+    /// A run of Dot's tools: the code review, the night's learning, Dot's own work.
     case dotsTools
+    /// Reads pictures for another model in one call: a model that sees, of no agent program.
+    case vision
 }
 
 /// The models of `options` that may be chosen for `use`, by provider, providers left empty dropped (pure).
@@ -25,10 +27,11 @@ func modelCandidates(_ options: [ProviderModels], for use: ModelUse) -> [Provide
         case .main: []
         case .fast: ["opencode", "claude_code"]
         case .dotsTools: ["opencode"]
+        case .vision: ["opencode", "claude_code"]
         }
     return options.compactMap { provider in
         guard !shut.contains(provider.provider) else { return nil }
-        let fit: [ModelOption] = provider.models.filter { $0.tools != false }
+        let fit: [ModelOption] = provider.models.filter { use == .vision ? $0.vision == true : $0.tools != false }
         return fit.isEmpty ? nil : ProviderModels(provider: provider.provider, models: fit, error: nil)
     }
 }
@@ -41,6 +44,9 @@ struct ModelPick: Identifiable {
     /// The level of reasoning chosen with the model; `nil` when the choice has none.
     let effort: String?
     let candidates: [ProviderModels]
+    /// The choice that names no model of its own ("Main model", "Review model"), saved as ""; `nil` when every choice is a
+    /// model.
+    let none: String?
     let save: @MainActor (String, String?) async -> SettingsFailure?
 }
 
@@ -69,6 +75,7 @@ struct ModelPickerSheet: View {
                         providers: pick.candidates, defaultRef: defaultRef.isEmpty ? nil : defaultRef, chosenRef: chosen.isEmpty ? nil : chosen,
                         query: query, filter: filter, managesHidden: false, marks: $marks, pick: { option in choose(option) }, problem: nil, retry: {}
                     ) {
+                        if query.isEmpty, let none = pick.none { noneRow(none) }
                         if query.isEmpty, pick.effort != nil, !chosen.isEmpty { reasoning }
                     }
                 }
@@ -111,9 +118,29 @@ struct ModelPickerSheet: View {
         if pick.effort != nil, !effortChoices(option.ref, in: pick.candidates).contains(effort) { effort = option.defaultEffort ?? "medium" }
     }
 
+    /// The choice of no model of its own, ✓ while it stands.
+    private func noneRow(_ title: String) -> some View {
+        PlainSection(header: nil) {
+            Button { chosen = "" } label: {
+                HStack(spacing: Space.s) {
+                    Text(title).textRole(.body).foregroundStyle(Tone.text)
+                    Spacer(minLength: Space.s)
+                    Image(systemName: "checkmark").font(.system(.callout, weight: .semibold)).foregroundStyle(Tone.text)
+                        .opacity(chosen.isEmpty ? 1 : 0).accessibilityHidden(true)
+                }
+                .padding(.horizontal, Space.groupedGutter)
+                .frame(minHeight: Metric.row)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityAddTraits(chosen.isEmpty ? [.isSelected] : [])
+            .accessibilityIdentifier("modelPicker.none")
+        }
+    }
+
     /// The level of reasoning: the chosen model's levels, one tap.
     private var reasoning: some View {
-        GroupedSection(header: String(localized: "Options", comment: "Model picker: the options under the models"), footer: nil) {
+        PlainSection(header: String(localized: "Options", comment: "Model picker: the options under the models")) {
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text(String(localized: "Reasoning", comment: "Model picker: the level of reasoning")).textRole(.body).foregroundStyle(Tone.text)
                 Picker(String(localized: "Reasoning", comment: "Model picker: the level of reasoning"), selection: $effort) {

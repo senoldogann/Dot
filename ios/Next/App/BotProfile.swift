@@ -52,12 +52,7 @@ struct BotProfile: View {
                             systemImage: "desktopcomputer", title: String(localized: "This Mac", comment: "Settings row: the paired Mac"), description: nil,
                             detail: transportWord(model.transport)
                         ) { MacPage() }
-                        NavigationRow(
-                            systemImage: "play.display", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen"), description: nil,
-                            detail: nil
-                        ) {
-                            WebSettingsPage(target: WebSettingsPage.Target(tab: "/watch", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen")))
-                        }
+                        WatchMacRow()
                     }
                 } else if !bot.record.instructions.isEmpty {
                     instructions(bot)

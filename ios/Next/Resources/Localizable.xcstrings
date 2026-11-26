@@ -89,6 +89,17 @@
         }
       }
     },
+    "%@ · %lld steps": {
+      "comment": "Live caption: a batch of steps; the arguments are the first step and the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %lld adım"
+          }
+        }
+      }
+    },
     "%@ · %lld tasks": {
       "comment": "Usage: a day's tokens and tasks",
       "localizations": {
@@ -311,6 +322,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld başarısız"
+          }
+        }
+      }
+    },
+    "%lld fps": {
+      "comment": "Live picture status: frames a second",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld fps"
           }
         }
       }
@@ -1057,6 +1079,17 @@
         }
       }
     },
+    "Add a fallback model": {
+      "comment": "Models: adds a model to the fallbacks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedek model ekle"
+          }
+        }
+      }
+    },
     "Add schedule": {
       "comment": "Tool row of Dot's own tool: a schedule added",
       "localizations": {
@@ -1695,6 +1728,17 @@
         }
       }
     },
+    "Automatic quality": {
+      "comment": "Live viewer menu: the link decides HD or light",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otomatik kalite"
+          }
+        }
+      }
+    },
     "Back on the list.": {
       "comment": "Own initiative: a thing was put back",
       "localizations": {
@@ -1786,6 +1830,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Arka plan işi"
+          }
+        }
+      }
+    },
+    "Billed to your plan as extra usage; without it the session runs at the standard speed.": {
+      "comment": "Models: self-repair's fast mode",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planına ek kullanım olarak yansır; kapalıyken oturum standart hızda çalışır."
           }
         }
       }
@@ -2241,6 +2296,17 @@
         }
       }
     },
+    "Claude Code's own choice": {
+      "comment": "Models: self-repair leaves the model to Claude Code",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code'un kendi seçimi"
+          }
+        }
+      }
+    },
     "Clear search": {
       "comment": "Connect apps: clears the search and the filters",
       "localizations": {
@@ -2270,6 +2336,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "“Perş 15:30”a tıkladı"
+          }
+        }
+      }
+    },
+    "Clicking": {
+      "comment": "Live caption: the run clicks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tıklıyor"
+          }
+        }
+      }
+    },
+    "Clicking %@": {
+      "comment": "Live caption: the run clicks; the argument is what",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tıklıyor: %@"
           }
         }
       }
@@ -2483,6 +2571,17 @@
         }
       }
     },
+    "Composer": {
+      "comment": "Models: the night's role that weighs the versions tried",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oluşturucu"
+          }
+        }
+      }
+    },
     "Composer and floating control": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -2601,6 +2700,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlı: Dot onu görevlerinde kullanabilir."
+          }
+        }
+      }
+    },
+    "Connecting to the Mac's screen…": {
+      "comment": "Watch: the live screen is being opened (web watch.connecting)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in ekranına bağlanılıyor…"
           }
         }
       }
@@ -2821,6 +2931,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yalnızca hata ayıklama derlemeleri."
+          }
+        }
+      }
+    },
+    "Decides what is worth doing when Dot works on its own while the Mac is idle. The work itself runs on the main model.": {
+      "comment": "Models: what the own work model does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac boştayken Dot kendi başına çalıştığında neyin yapılmaya değer olduğuna karar verir. İşin kendisi ana modelde çalışır."
           }
         }
       }
@@ -3547,6 +3668,17 @@
         }
       }
     },
+    "Dot is finishing a step; try again in a moment.": {
+      "comment": "Takeover: the page is busy with the run's last step (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir adımı bitiriyor; biraz sonra yeniden dene."
+          }
+        }
+      }
+    },
     "Dot is not paired with a Mac. Choose This device in Settings › Voice.": {
       "comment": "Composer: voice set to the Mac without a paired Mac",
       "localizations": {
@@ -3679,6 +3811,17 @@
         }
       }
     },
+    "Dot waits at its next step while you tap and type on the page.": {
+      "comment": "VoiceOver hint of Take over",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen sayfada dokunup yazarken Dot bir sonraki adımında bekler."
+          }
+        }
+      }
+    },
     "Dot waits for you in 2 chats": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -3746,6 +3889,17 @@
         }
       }
     },
+    "Dot's browser, live": {
+      "comment": "VoiceOver: the mini player of the run's browser",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un tarayıcısı, canlı"
+          }
+        }
+      }
+    },
     "Dot's computer": {
       "comment": "Settings row: the paired Mac Dot works on",
       "localizations": {
@@ -3797,6 +3951,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Günde Dot'un kendi girişimi"
+          }
+        }
+      }
+    },
+    "Dot's own work": {
+      "comment": "Models section: the model that decides Dot's own work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kendi işi"
           }
         }
       }
@@ -3918,6 +4083,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacağı bırak"
+          }
+        }
+      }
+    },
+    "Each role plays on the review model unless one is chosen for it.": {
+      "comment": "Models: the night's learning roles",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her rol, kendisine bir model seçilmedikçe inceleme modelinde çalışır."
           }
         }
       }
@@ -4307,6 +4483,17 @@
         }
       }
     },
+    "Experience writer": {
+      "comment": "Models: the night's role that writes down what was learned",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deneyim yazarı"
+          }
+        }
+      }
+    },
     "Explain: Dot says why": {
       "comment": "Reaction menu: what ❓ does",
       "localizations": {
@@ -4358,6 +4545,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld koduyla başarısız oldu."
+          }
+        }
+      }
+    },
+    "Fallbacks": {
+      "comment": "Models section: the models a task moves to when its own cannot answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yedekler"
           }
         }
       }
@@ -4875,6 +5073,17 @@
         }
       }
     },
+    "HD": {
+      "comment": "Live picture status: the full HD quality",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HD"
+          }
+        }
+      }
+    },
     "Habits": {
       "comment": "Self-improvement: how Dot works",
       "localizations": {
@@ -4882,6 +5091,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alışkanlıklar"
+          }
+        }
+      }
+    },
+    "Hand back": {
+      "comment": "Live viewer: let the run go on with its page (web computer.js Return control)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri ver"
           }
         }
       }
@@ -5069,6 +5289,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanların çalıştırdığı komutları, düzenlemeleri ve aramaları gizle. Başarılıları gizle, hataları gösterir. Zen yalnızca son yanıtları gösterir. Onaylar, sorular ve hatalar her zaman görünür. Tümünü gizle ve Zen'de son mesajın altındaki tek satır Dot'un ne yaptığını söyler; adımlar için ona dokun."
+          }
+        }
+      }
+    },
+    "Hide the keyboard": {
+      "comment": "Live viewer: hides the keyboard that types on the page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Klavyeyi gizle"
+          }
+        }
+      }
+    },
+    "Hide the live picture": {
+      "comment": "Mini player: folds it into a small Live pill",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı görüntüyü gizle"
           }
         }
       }
@@ -5355,6 +5597,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanı duraklatıldı"
+          }
+        }
+      }
+    },
+    "Its browser's page is shown here only while a task is going on.": {
+      "comment": "Live picture: why an ended run shows no page (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarayıcısının sayfası burada yalnızca bir görev sürerken gösterilir."
           }
         }
       }
@@ -5667,6 +5920,28 @@
         }
       }
     },
+    "Live": {
+      "comment": "Live picture status: frames are coming",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı"
+          }
+        }
+      }
+    },
+    "Live picture": {
+      "comment": "VoiceOver: the live picture of the Mac's screen or Dot's browser",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı görüntü"
+          }
+        }
+      }
+    },
     "Loading": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -5696,6 +5971,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekrana baktı"
+          }
+        }
+      }
+    },
+    "Looking at the page": {
+      "comment": "Live caption: the run reads the page or screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfaya bakıyor"
           }
         }
       }
@@ -5747,6 +6033,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düşük"
+          }
+        }
+      }
+    },
+    "Low data": {
+      "comment": "Live picture status: the phone-sized quality for a weak link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Az veri"
+          }
+        }
+      }
+    },
+    "Low data (weak connection)": {
+      "comment": "Live viewer menu: the phone-sized quality",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Az veri (zayıf bağlantı)"
           }
         }
       }
@@ -7358,6 +7666,17 @@
         }
       }
     },
+    "Open full screen": {
+      "comment": "VoiceOver action: opens the live picture full screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tam ekran aç"
+          }
+        }
+      }
+    },
     "Open iOS Settings": {
       "comment": "Opens the app's page in iOS Settings",
       "localizations": {
@@ -7409,6 +7728,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kliniğin randevu sayfasını açtı"
+          }
+        }
+      }
+    },
+    "Opening %@": {
+      "comment": "Live caption: the run opens a page or app; the argument is which",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açıyor: %@"
+          }
+        }
+      }
+    },
+    "Opening a page": {
+      "comment": "Live caption: the run opens a page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir sayfa açıyor"
           }
         }
       }
@@ -7530,6 +7871,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diğer kablolu"
+          }
+        }
+      }
+    },
+    "Own work model": {
+      "comment": "Models: the model that looks for Dot's own work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendi iş modeli"
           }
         }
       }
@@ -7657,7 +8009,7 @@
       }
     },
     "Paused": {
-      "comment": "Schedule: switched off",
+      "comment": "Live picture status: nothing is read (the view is away)\nSchedule: switched off",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7766,6 +8118,17 @@
         }
       }
     },
+    "Pinch to zoom, double-tap to zoom in": {
+      "comment": "VoiceOver hint: how to zoom the live picture",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yakınlaştırmak için iki parmakla aç ya da iki kez dokun"
+          }
+        }
+      }
+    },
     "Pinned": {
       "comment": "Chat list section: the chats the owner pinned, on top\nMemory: a pinned note",
       "localizations": {
@@ -7861,6 +8224,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tercih sırası"
+          }
+        }
+      }
+    },
+    "Pressing %@": {
+      "comment": "Live caption: the run presses a key; the argument is the key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basıyor: %@"
+          }
+        }
+      }
+    },
+    "Pressing a key": {
+      "comment": "Live caption: the run presses a key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir tuşa basıyor"
           }
         }
       }
@@ -7986,6 +8371,17 @@
         }
       }
     },
+    "Proposer": {
+      "comment": "Models: the night's role that proposes a better way of working",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önerici"
+          }
+        }
+      }
+    },
     "Provider programs": {
       "comment": "Maintenance section: claude and opencode on the Mac",
       "localizations": {
@@ -8004,6 +8400,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ öğesini listeye geri koy"
+          }
+        }
+      }
+    },
+    "Quality": {
+      "comment": "Live viewer: the menu of the picture's quality",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kalite"
           }
         }
       }
@@ -8423,7 +8830,7 @@
       }
     },
     "Reconnecting…": {
-      "comment": "Chat subtitle: the link to the Mac broke and is being opened again",
+      "comment": "Chat subtitle: the link to the Mac broke and is being opened again\nLive picture status: the stream broke and is tried again",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8506,6 +8913,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kaldır"
+          }
+        }
+      }
+    },
+    "Remove %@": {
+      "comment": "VoiceOver: removes a fallback model; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ kaldır"
           }
         }
       }
@@ -8675,6 +9093,17 @@
         }
       }
     },
+    "Review model": {
+      "comment": "Models: the role that double-checks Dot's work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İnceleme modeli"
+          }
+        }
+      }
+    },
     "Reviews each change of Dot's own code before it is pushed. It holds from the next push.": {
       "comment": "Models: what the code review is",
       "localizations": {
@@ -8693,6 +9122,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rol"
+          }
+        }
+      }
+    },
+    "Rotate to landscape": {
+      "comment": "Live viewer: turns the picture on its side, as wide as the screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yatay çevir"
+          }
+        }
+      }
+    },
+    "Rotate to portrait": {
+      "comment": "Live viewer: turns the picture upright",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dikey çevir"
           }
         }
       }
@@ -8983,6 +9434,17 @@
         }
       }
     },
+    "Scrolling": {
+      "comment": "Live caption: the run scrolls the page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kaydırıyor"
+          }
+        }
+      }
+    },
     "Search": {
       "comment": "Home: the search of bots, chats and messages\nMemory: the search section",
       "localizations": {
@@ -9126,6 +9588,17 @@
         }
       }
     },
+    "Security research model": {
+      "comment": "Models: the model security research in a scope starts on (item 1889)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Güvenlik araştırması modeli"
+          }
+        }
+      }
+    },
     "Select": {
       "comment": "Chat list toolbar: checks chats to act on several",
       "localizations": {
@@ -9155,6 +9628,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Metni seç"
+          }
+        }
+      }
+    },
+    "Selector": {
+      "comment": "Models: the night's role that picks among versions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçici"
+          }
+        }
+      }
+    },
+    "Self-repair": {
+      "comment": "Models section: how Claude Code works when Dot repairs itself",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendini onarma"
+          }
+        }
+      }
+    },
+    "Self-repair model": {
+      "comment": "Models: self-repair's model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendini onarma modeli"
           }
         }
       }
@@ -9778,6 +10284,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfa göster"
+          }
+        }
+      }
+    },
+    "Show the live picture": {
+      "comment": "Mini pill: opens the folded mini player",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı görüntüyü göster"
           }
         }
       }
@@ -10465,6 +10982,17 @@
         }
       }
     },
+    "Take over": {
+      "comment": "Live viewer: hold the run and use its page from the phone (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devral"
+          }
+        }
+      }
+    },
     "Take this chat back to before this message. Your message and its files go back in the message box.": {
       "comment": "Edit from here: what it does",
       "localizations": {
@@ -10751,6 +11279,17 @@
         }
       }
     },
+    "The Mac stopped sending its screen.": {
+      "comment": "Watch: the live screen's stream ended (web watch.ended)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac ekranını göndermeyi bıraktı."
+          }
+        }
+      }
+    },
     "The Mac writes down five minutes at most; what was said is in the box.": {
       "comment": "Composer: the Mac's recording limit was reached",
       "localizations": {
@@ -10780,6 +11319,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'in ekranı"
+          }
+        }
+      }
+    },
+    "The Mac's screen capture did not start; trying again.": {
+      "comment": "Live picture: the daemon failed to start the capture (5xx)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in ekran kaydı başlamadı; yeniden deneniyor."
           }
         }
       }
@@ -10894,6 +11444,17 @@
         }
       }
     },
+    "The kept choice could not be read: the nights stop until one is chosen again.": {
+      "comment": "Models: self-repair's choice was lost",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıtlı seçim okunamadı: yeniden seçilene kadar gece çalışmaları durur."
+          }
+        }
+      }
+    },
     "The key could not be kept on this phone.": {
       "comment": "Pairing error: the Keychain refused to keep the key",
       "localizations": {
@@ -10901,6 +11462,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anahtar bu telefonda saklanamadı."
+          }
+        }
+      }
+    },
+    "The level a task asks of its model when none is chosen for it. It is set in the Mac's config.": {
+      "comment": "Models: the default level of reasoning, read only",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev için düzey seçilmediğinde modelinden istenen düzey. Mac'teki yapılandırmada ayarlanır."
           }
         }
       }
@@ -10960,6 +11532,17 @@
         }
       }
     },
+    "The model of your Claude plan that repairs Dot's own problems at night, from its next session.": {
+      "comment": "Models: what self-repair's model is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude planındaki, Dot'un kendi sorunlarını gece onaran model; bir sonraki oturumdan itibaren."
+          }
+        }
+      }
+    },
     "The models could not be read: %@": {
       "comment": "Model picker: the daemon's models could not be read; the argument is why",
       "localizations": {
@@ -10978,6 +11561,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sonraki mesaj önce planını yazar ve bir şeyi değiştirmeden önce sorar."
+          }
+        }
+      }
+    },
+    "The night's learning": {
+      "comment": "Models section: the roles of the improvement loop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gece öğrenmesi"
           }
         }
       }
@@ -11092,6 +11686,17 @@
         }
       }
     },
+    "The screen could not be shown": {
+      "comment": "Live picture: the daemon refused the stream (web watch.failed)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekran gösterilemedi"
+          }
+        }
+      }
+    },
     "The secure connection failed. Check the Mac's Tailscale HTTPS certificate.": {
       "comment": "Diagnosis: TLS failed",
       "localizations": {
@@ -11110,6 +11715,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yan soru sorulamadı: %@"
+          }
+        }
+      }
+    },
+    "The task has ended": {
+      "comment": "Live picture status: the run is over, its browser has no page to show (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görev bitti"
           }
         }
       }
@@ -11588,7 +12204,7 @@
       }
     },
     "Try again": {
-      "comment": "Settings: repeats a read or write that failed\nUnder a refused message: sends it again",
+      "comment": "Live picture: reads the stream again (web watch.retry)\nSettings: repeats a read or write that failed\nUnder a refused message: sends it again",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11631,6 +12247,17 @@
         }
       }
     },
+    "Type on the page": {
+      "comment": "Live viewer: shows the keyboard that types on the page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfaya yaz"
+          }
+        }
+      }
+    },
     "Type roles": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -11665,7 +12292,7 @@
       }
     },
     "Typing": {
-      "comment": "Work line: the run waits for its model to answer",
+      "comment": "Live caption: the run types\nWork line: the run waits for its model to answer",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11682,6 +12309,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adını ve telefon numaranı yazıyor"
+          }
+        }
+      }
+    },
+    "Typing “%@”": {
+      "comment": "Live caption: the run types; the argument is the text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıyor: “%@”"
           }
         }
       }
@@ -11961,6 +12599,17 @@
         }
       }
     },
+    "Using the page from the phone is off on your Mac: Settings › Browser › Use the page from the screen while I hold the task.": {
+      "comment": "Takeover refused: [browser] remote_input is off on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfayı telefondan kullanmak Mac'inde kapalı: Ayarlar › Tarayıcı › Görevi tutarken sayfayı ekrandan kullan."
+          }
+        }
+      }
+    },
     "Verified by": {
       "comment": "Campaign: how the targets are checked",
       "localizations": {
@@ -11990,6 +12639,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Profili görüntüle"
+          }
+        }
+      }
+    },
+    "Vision model": {
+      "comment": "Models: the role that reads images for a model that cannot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görme modeli"
           }
         }
       }
@@ -12100,6 +12760,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlantı bekleniyor"
+          }
+        }
+      }
+    },
+    "Waiting for the page": {
+      "comment": "Live caption: the run waits for text on the page\nLive picture: the first frame of the run's browser has not come (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfa bekleniyor"
           }
         }
       }
@@ -12217,6 +12888,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ saatinde çalışıyordu · eşitleniyor…"
+          }
+        }
+      }
+    },
+    "Watch live": {
+      "comment": "Chat header: opens the live picture of what the run does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canlı izle"
           }
         }
       }
@@ -12415,6 +13097,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot çalışırken"
+          }
+        }
+      }
+    },
+    "When a task's model cannot answer (its allowance is used up, it is too busy, its key was refused, its safety filter stopped the reply), the task goes on with the first of these that can, each once at most.": {
+      "comment": "Models: what the fallbacks do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görevin modeli yanıt veremediğinde (kotası dolduğunda, çok yoğun olduğunda, anahtarı reddedildiğinde, güvenlik filtresi yanıtı durdurduğunda) görev bunlardan yanıt verebilen ilkiyle, her biri en fazla bir kez olmak üzere sürer."
           }
         }
       }
@@ -12639,6 +13332,17 @@
         }
       }
     },
+    "Working on the page": {
+      "comment": "Live caption: another browser or desktop step",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfada çalışıyor"
+          }
+        }
+      }
+    },
     "Write a new recap": {
       "comment": "Inspector: asks for a fresh recap of the run",
       "localizations": {
@@ -12690,6 +13394,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir sohbete yaz"
+          }
+        }
+      }
+    },
+    "Writing": {
+      "comment": "Capsule: the run's model is writing its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yazıyor"
           }
         }
       }
@@ -12805,7 +13520,7 @@
       }
     },
     "You": {
-      "comment": "Settings: the owner's card before their name is read",
+      "comment": "Mini player: the owner holds the run's page",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -12936,6 +13651,17 @@
         }
       }
     },
+    "Your Mac does not let a phone do this.": {
+      "comment": "Takeover refused to a phone's key",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in bunu bir telefona yaptırmıyor."
+          }
+        }
+      }
+    },
     "Your Mac does not take this from a phone (%@). Open on the Mac: %@.": {
       "comment": "Settings: the daemon refused a phone's key; first argument its words, second where on the Mac",
       "localizations": {
@@ -13013,6 +13739,17 @@
         }
       }
     },
+    "Your Mac's screen, live": {
+      "comment": "VoiceOver: the mini player of the Mac's screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inin ekranı, canlı"
+          }
+        }
+      }
+    },
     "Your answer": {
       "comment": "Ask dock: the field of a question's answer",
       "localizations": {
@@ -13086,6 +13823,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Senin adın"
+          }
+        }
+      }
+    },
+    "Your taps go to the page.": {
+      "comment": "Takeover: the line under the picture once the phone holds the run (web computer.js)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dokunuşların sayfaya gidiyor."
           }
         }
       }

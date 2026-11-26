@@ -89,7 +89,7 @@ struct ChatSettingsSheet: View {
     // MARK: Options and catalog
 
     @ViewBuilder private var options: some View {
-        GroupedSection(header: String(localized: "Options", comment: "Chat settings section: reasoning, fast mode, approvals, plan first"), footer: nil) {
+        PlainSection(header: String(localized: "Options", comment: "Chat settings section: reasoning, fast mode, approvals, plan first")) {
             if let chosen, chosen.efforts.count >= 2 {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     Text(String(localized: "Reasoning", comment: "Chat settings row: the model's reasoning level")).textRole(.body).foregroundStyle(Tone.text)
@@ -132,7 +132,7 @@ struct ChatSettingsSheet: View {
     }
 
     @ViewBuilder private var catalog: some View {
-        GroupedSection(header: String(localized: "Catalog", comment: "Chat settings section: hidden models"), footer: nil) {
+        PlainSection(header: String(localized: "Catalog", comment: "Chat settings section: hidden models")) {
             ToggleRow(
                 systemImage: nil, title: String(localized: "Manage hidden models", comment: "Chat settings row: shows every model with a switch to hide it"),
                 description: managesHidden

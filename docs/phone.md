@@ -636,6 +636,11 @@ paired`) and nothing is kept for it.
 | `GET /api/threads/stream` | any token | 1686 | the list's event stream |
 | `GET /api/threads/{id}/view?tail=&before=` | any token | 1686 | 200, the chat at its revision |
 | `GET /api/threads/{id}/stream?cursors=` | any token | 1686 | the chat's event stream |
+| `GET /api/screen/live?quality=hd\|light` | any token | 1264, 1837 | the Mac's screen, H.264 frames |
+| `GET /api/runs/{id}/screencast` | any token | 1838 | the run's browser tab, JPEG frames |
+| `POST /api/runs/{id}/takeover/screen` | any token | 470, 1840 | 202, the run held for this screen |
+| `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
+| `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
 | `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
 
 What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
@@ -1057,6 +1062,34 @@ broken (the older streams keep 15 s). A client is live once it read the view aft
 daemon tells a moved revision within half a second of the write (it reads the moved revisions every 0.5 s, as it relays
 `dotx` runs). A daemon from before these calls answers them 404: the app says to update Dot on the Mac.
 
+### Watching from the phone (items 1837-1840)
+
+Dot Next shows the Mac's screen and a run's browser live, and lets the owner take a run's page over, with the routes the
+web uses:
+
+- **Watch the Mac** (Activity, and Dot's profile): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
+  `dotagent/desktop/live.py`, decoded by the phone's own H.264 decoder. `hd` is the page's (1920 pixels on the longest
+  side, 60 frames a second, a key frame every 4 s); `light` (item 1837) is a capture of its own at 1280 pixels, 30
+  frames a second, a fifth of the bit rate and a key frame every 2 s, for a weak link. The viewer's Automatic quality
+  reads `light` on a link iOS calls expensive or constrained (cellular, Low Data Mode) and after twelve frames in a row
+  came more than a second behind the Mac in `hd`; HD and Low data are the owner's to choose. Nothing is read while the
+  viewer is closed or the app is away; a stream that breaks is read again after 1, 2, 4, then every 8 s; a refusal (no
+  Screen Recording on the Mac) is said in the daemon's words with Try again.
+- **Following a run** (a chat): while the chat's run uses its browser (`browser_*` tools) or the desktop (`desktop_*`),
+  a mini player floats at the top of the chat with the picture (`GET /api/runs/{id}/screencast` for the browser, the
+  Mac's screen for the desktop) and what the run does now, read from the run's newest unanswered call ("Typing “Ada”",
+  "Opening example.com", "Clicking · 3 steps"; a ref such as `e12` is not shown); between steps, the chat capsule's
+  words. A tap opens it full screen (zoom with two fingers or a double tap, landscape), and the header's Watch live does
+  too. Folded into a Live pill, nothing is read. No click point is drawn: a step names its element by a ref, whose place
+  on the picture the phone does not know.
+- **Taking over** (full screen, a run's browser): Take over is `POST /takeover/screen` (nothing comes to the front of
+  the Mac); the owner's taps click (a second tap within 0.35 s is a double click), a one-finger drag scrolls the page on
+  its own scale, a press held drags, two fingers move the picture, and the keyboard button types on the page (Return is
+  Enter, ⌫ Backspace), sent as `POST /input` batches as the web's `control.js` does. Hand back is `POST /handback`. A
+  409 is said as the daemon means it: `remote_input` off (with where to switch it on), a step still going ("Dot is
+  finishing a step; try again in a moment."), or a hold that ended elsewhere (the controls go back to Take over). A
+  run held from the Mac or the web shows Hand back on the phone too.
+
 ### GET /api/threads/search
 
 The home's search of the iPhone app (item 1882) looks in what the chats say: `q` (1 to 200 characters) and `limit` (1 to
@@ -1066,6 +1099,7 @@ the run's id, `seq` -1); `snippet` holds the words around the match with the mat
 Dot holds is masked in it where the snippet holds it whole (a match inside a value, or a snippet cut through one, can
 leave a part unmasked, as the chat's own view shows the words unmasked to the same key). Words are folded as the index folds them (case, accents, the Turkish dotted and dotless i);
 words that fold to nothing find nothing, and an empty `q` is a 422. A tool's output is not in the index.
+
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and
 a reset of Dot (a new, empty home) changes. Revisions are the database's, so a reset one starts them again below what a
