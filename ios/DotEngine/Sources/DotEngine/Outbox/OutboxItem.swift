@@ -62,6 +62,8 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
         case unreadable
         /// A photo of the message could not be read from the phone; the message is kept for the owner.
         case photoMissing(name: String)
+        case attachmentMissing(name: String)
+        case uploadCancelled
     }
 
     /// The item's id; for a keyed message, the key the daemon starts it once by.
@@ -73,6 +75,11 @@ public struct OutboxItem: Codable, Sendable, Equatable, Identifiable {
     public var attempts: Int
     public var phase: Phase
     public var failure: Failure?
+    public internal(set) var attachmentUpload: AttachmentUploadProgress? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case id, action, kind, createdAt, attempts, phase, failure
+    }
 
     public init(id: String, action: Action, createdAt: Double) {
         self.id = id

@@ -145,7 +145,8 @@ The gate runs on every pull request and every push to `main` that changes more t
 release, on the tagged commit (`.github/workflows/gate.yml`; a change to the Markdown at the root, `docs/` or the issue
 and pull request templates alone skips it, but `docs/freedom.md`, which `tests/unit/test_freedom_contract.py` reads).
 A pull request runs its Linux jobs alone (item 1886): the account's five macOS runners were what pull requests waited
-on, one to two hours, so its `ci` is the Linux checks, in about five minutes. The macOS jobs run on the push to `main`
+on, one to two hours, so its `ci` is the Linux checks, in about five minutes; one that changes `ios/` also runs
+`ios.yml`'s `build` job, one macOS runner for about ten minutes (below). The other macOS jobs run on the push to `main`
 that merges it (below). The format check, the lint, mypy, the checks of the interface (`npm run check`)
 and the unit tests but those that need macOS (item 1270, above) run on Linux. PyObjC is a dependency on macOS only
 (`sys_platform == 'darwin'` in `pyproject.toml`), so `uv sync` installs the rest on Linux; the package still runs on
@@ -186,8 +187,10 @@ red `main` is fixed before anything else is merged. The owner's Dot is updated o
 uv run python scripts/main_macos_green.py check   # 0: main's newest commit passed on macOS; 1: it failed; 2: not yet
 ```
 
-It reads that commit's newest runs of `gate.yml` and `ios.yml` (ios.yml only when the push changed `ios/`); a commit
-with no gate run yet is not green. To see a branch's macOS run before its pull request merges, start it by hand:
+It reads that commit's newest runs of `gate.yml` and `ios.yml` (ios.yml only when the push changed `ios/`), and the
+newest finished run of `browser.yml` on main (item 1936: the night's run of the whole browser suite, or one by hand with
+`gh workflow run browser.yml --ref main`; a run still going or cancelled is passed over), so a red night keeps main red
+until a later run of the whole suite passes; a commit with no gate run yet is not green. To see a branch's macOS run before its pull request merges, start it by hand:
 `gh workflow run gate.yml --ref <branch>` (every job) or `gh workflow run ios.yml --ref <branch>`.
 
 The macOS runners are five at most, the most a free account runs
@@ -235,7 +238,8 @@ cached, so a job does not download them when a previous run already did. The bro
 `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the face, in
 Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of the
 gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
-browser.yml --ref <branch>`), on one worker, for hours; a red night is GitHub's to show, and blocks nothing. The phone's
+browser.yml --ref <branch>`), on one worker, for hours; a red night on main opens the issue "main is red on
+macOS" and keeps the owner's Dot from being updated until a later run on main passes (item 1936). The phone's
 test of a network that wakes after the page comes back measures seconds of grace against the runner's clock, which a
 slow runner does not keep, so the core leaves it to the night and to your Mac. A browser test that leans on another
 test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
@@ -267,13 +271,16 @@ first, on your Mac).
 (item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), the unit
 and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e` (Settings
 against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes only when
-all of them did. A pull request runs none of it (item 1886); a push to `main` that changes `ios/` runs `engine`,
+all of them did. A pull request runs `build` alone, and only when it changes `ios/` or the workflow (item 1886 left
+pull requests no macOS job, and a Swift compile error in the app or its tests reached `main`; one runner for about ten
+minutes now catches it before the merge; a new push stops the run of the one before; `ios` passes there when `build`
+did and the rest were skipped by design); a push to `main` that changes `ios/` runs `engine`,
 `build` and `tests (chat)`, about 20 minutes; the whole run, about an hour, runs every night and when asked (`gh
 workflow run ios.yml --ref <branch>`). A run holds two macOS runners at most
 (`engine` beside `build`, the test parts two at a time, then `e2e` alone), so three of the five stay free for the
 gate's macOS jobs. A test that fails runs once more, as a fresh runner's simulator sometimes fails to launch the app;
 one that passed only on its retry is named in the job's summary ("passed on retry: <test>"). The `ios` check is not
-one `main`'s protection can require: a pull request never runs the workflow.
+one `main`'s protection can require: a pull request that leaves `ios/` alone never runs the workflow.
 ios/Next/README.md "CI" says how to read a run and download its results and screenshots.
 
 A Dependabot pull request that raises versions by a patch or a minor step merges by itself

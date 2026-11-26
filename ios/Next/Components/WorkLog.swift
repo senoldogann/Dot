@@ -5,6 +5,13 @@ import UIKit
 // The work log of a chat (wave N2, plan §4.1): one-line tool rows, the fold of a finished stretch, the plan as a
 // checklist, the helpers as one group, the asks left in place, how a run ended, and Dot's notes.
 
+extension EnvironmentValues {
+    /// Told when the owner opens or closes a row of the work log (a step, a thought, a fold): the transcript stops
+    /// following new words, so that the row they act on stays where it is. Left to follow, the end of the page chased the
+    /// growing row with a scroll on every frame of its animation, and the animation stuttered.
+    @Entry var disclosureToggled: @MainActor () -> Void = {}
+}
+
 /// What the transcript stacks: one item, or consecutive steps (tool calls and the model's thinking) drawn as one tight
 /// block (the reference's 28 pt pitch, §19: no gap between the rows of a stretch of work; item 1769: a thought is a row
 /// of the stretch, not a block of its own).
@@ -43,30 +50,30 @@ enum TranscriptBlock: Identifiable {
     }
 }
 
-/// One line of a stretch of steps: a step, or consecutive commands said as one "Ran 3 commands" (item 1769, after
-/// another coding agent's work log).
+/// One line of a stretch of steps: a step, or consecutive tool calls said as one "Ran 3 commands and read 2 files" (items
+/// 1769 and 1909, after another coding agent's work log).
 enum StepGroup: Identifiable, Equatable {
     case row(TranscriptItem)
-    case commands([ToolEntry])
+    case tools([ToolEntry])
 
     var id: String {
         switch self {
         case .row(let item): item.id
-        case .commands(let entries): "commands:" + (entries.first?.id ?? "")
+        case .tools(let entries): "tools:" + (entries.first?.id ?? "")
         }
     }
 
-    /// The lines of `rows`: two or more consecutive commands that all ended well become one line; a command at work or
+    /// The lines of `rows`: two or more consecutive tool calls that all ended well become one line; a call at work or
     /// one that failed stands alone, so neither is hidden in a fold. Pure.
     static func of(_ rows: [TranscriptItem]) -> [StepGroup] {
         var groups: [StepGroup] = []
         var run: [ToolEntry] = []
         func flush() {
-            if run.count >= 2 { groups.append(.commands(run)) } else { groups.append(contentsOf: run.map { .row(.tool($0)) }) }
+            if run.count >= 2 { groups.append(.tools(run)) } else { groups.append(contentsOf: run.map { .row(.tool($0)) }) }
             run = []
         }
         for row in rows {
-            if case .tool(let entry) = row, entry.kind == .command, entry.state == .done {
+            if case .tool(let entry) = row, entry.state == .done {
                 run.append(entry)
             } else {
                 flush()
@@ -86,7 +93,7 @@ struct StepRun: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(StepGroup.of(rows)) { group in
                 switch group {
-                case .commands(let entries): CommandGroupRow(entries: entries).id(group.id)
+                case .tools(let entries): ToolGroupRow(entries: entries).id(group.id)
                 case .row(.tool(let entry)): WorkToolRow(entry: entry).id(entry.id)
                 case .row(.thought(let id, let text, let live)): ThoughtRow(text: text, live: live).id(id)
                 case .row: EmptyView()
@@ -96,20 +103,26 @@ struct StepRun: View {
     }
 }
 
-/// Consecutive commands that ended well as one quiet line, "Ran 3 commands", with the terminal's symbol; a tap opens
-/// each of them as its own row (item 1769).
-struct CommandGroupRow: View {
+/// Consecutive tool calls that ended well as one quiet line in plain words, "Ran 3 commands and read 2 files", with the
+/// terminal's symbol when all are commands and a hammer otherwise; a tap opens each of them as its own row (item 1909).
+struct ToolGroupRow: View {
     let entries: [ToolEntry]
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.locale) private var locale: Locale
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     var body: some View {
+        let words: String = toolGroupWords(entries, locale: locale)
         VStack(alignment: .leading, spacing: 0) {
-            Button { open.toggle() } label: {
+            Button {
+                disclosureToggled()
+                open.toggle()
+            } label: {
                 HStack(spacing: Space.xs) {
-                    Symbol(name: toolSymbol(.command), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
-                    Text(String(localized: "Ran \(entries.count) commands", comment: "Work log: consecutive commands said as one line; the argument is how many"))
-                        .textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(1)
+                    Symbol(name: entries.allSatisfy { $0.kind == .command } ? toolSymbol(.command) : "hammer", context: .tool)
+                        .foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
+                    Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(1)
                     Spacer(minLength: Space.xs)
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
                 }
@@ -118,6 +131,8 @@ struct CommandGroupRow: View {
             }
             .buttonStyle(.plain)
             .haptic(.selection, trigger: open)
+            .accessibilityLabel(words)
+            .accessibilityIdentifier("tools.group")
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(open ? String(localized: "Hides the steps", comment: "VoiceOver hint of an open work-log group") : String(localized: "Shows the steps", comment: "VoiceOver hint of a closed work-log group"))
             if open {
@@ -140,6 +155,7 @@ struct WorkToolRow: View {
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     private var detail: String {
         [entry.args, entry.output].filter { !$0.isEmpty }.joined(separator: "\n\n")
@@ -148,6 +164,7 @@ struct WorkToolRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
+                disclosureToggled()
                 open.toggle()
             } label: {
                 HStack(spacing: Space.xs) {
@@ -171,6 +188,7 @@ struct WorkToolRow: View {
                     UIPasteboard.general.string = [toolLine(entry), detail].filter { !$0.isEmpty }.joined(separator: "\n")
                 }
             }
+            .modifier(ToggleMeter(open: open, kind: OutputBox.isLong(detail) ? "long" : "short"))
             .accessibilityLabel(accessibilityWords)
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             if !entry.images.isEmpty, !open {
@@ -179,13 +197,7 @@ struct WorkToolRow: View {
             if open {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     if !detail.isEmpty {
-                        ScrollView {
-                            Text(detail).textRole(.code).modifier(MonoSize(points: terminalSize)).foregroundStyle(Tone.secondary).textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
-                        }
-                        .frame(maxHeight: Metric.toolDetailMax)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .background(Tone.nested, in: rounded(Radius.inner))
+                        OutputBox(text: detail, role: .code, points: terminalSize, ink: Tone.secondary, anchorsAtEnd: false)
                     }
                     if !entry.images.isEmpty { screenshots }
                 }
@@ -255,7 +267,8 @@ struct DaemonImageThumb: View {
         .task(id: name) { image = await model.image(named: name) }
         .sheet(isPresented: $whole) {
             if let image {
-                ScrollView([.horizontal, .vertical]) { Image(uiImage: image).resizable().scaledToFit().frame(minWidth: 320) }
+                ZoomableImage(image: image, label: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"))
+                    .ignoresSafeArea(edges: .bottom)
                     .inspectorSheet(title: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"), close: { whole = false })
             }
         }
@@ -270,6 +283,7 @@ struct WorkFoldView: View {
     @State private var open: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.locale) private var locale: Locale
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     init(fold: WorkFold, row: @escaping (TranscriptItem) -> AnyView) {
         self.fold = fold
@@ -280,6 +294,7 @@ struct WorkFoldView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             Button {
+                disclosureToggled()
                 open.toggle()
             } label: {
                 HStack(spacing: Space.xs) {
@@ -310,18 +325,6 @@ struct WorkFoldView: View {
             }
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
-    }
-}
-
-/// The run's plan as a checklist card (the run inspector).
-struct PlanCard: View {
-    let steps: [PlanStep]
-
-    var body: some View {
-        PlanSteps(steps: steps)
-            .padding(Space.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Tone.card, in: rounded(Radius.bubble))
     }
 }
 
@@ -478,19 +481,21 @@ struct ThoughtRow: View {
     let live: Bool
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
+    @Environment(\.disclosureToggled) private var disclosureToggled: @MainActor () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Button { open.toggle() } label: {
+            Button {
+                disclosureToggled()
+                open.toggle()
+            } label: {
                 HStack(spacing: Space.xs) {
                     Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.iconSlot)
                     if live {
                         Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.footnote).modifier(Shimmer())
                     } else {
-                        Text(thoughtHeadline(text)).textRole(.footnote).foregroundStyle(Tone.secondary)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 6 : 3)
-                            .multilineTextAlignment(.leading)
+                        // Only the word once the step is stored (item 1904, the owner): the thinking is read opened.
+                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.footnote).foregroundStyle(Tone.secondary)
                     }
                     Spacer(minLength: Space.xs)
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
@@ -500,18 +505,12 @@ struct ThoughtRow: View {
             }
             .buttonStyle(.plain)
             .haptic(.selection, trigger: open)
-            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : thoughtHeadline(text))
+            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : String(localized: "Thought", comment: "Work log: a step's thinking, folded"))
+            .accessibilityIdentifier("thought.row")
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
             if open {
-                ScrollView {
-                    Text(text).textRole(.footnote).foregroundStyle(Tone.secondary).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
-                }
-                .frame(maxHeight: Metric.toolDetailMax)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(Tone.nested, in: rounded(Radius.inner))
-                .defaultScrollAnchor(live ? .bottom : .top)
+                OutputBox(text: text, role: .footnote, points: 0, ink: Tone.secondary, anchorsAtEnd: live)
                 .padding(.leading, Metric.iconSlot + Space.xs)
                 .padding(.bottom, Space.xs)
                 .transition(.opacity)
@@ -519,22 +518,6 @@ struct ThoughtRow: View {
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
     }
-}
-
-/// A thought's first sentence, its markdown marks taken out: the line a stored thought shows folded ("**Checking the
-/// diff.** Then…" reads "Checking the diff."). The words as they are when they make no sentence.
-func thoughtHeadline(_ text: String) -> String {
-    let plain: String = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "")
-        .replacingOccurrences(of: "`", with: "").replacingOccurrences(of: "#", with: "")
-    let line: String = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
-    // A sentence ends at . ! or ? before a space or the end of the line, so "3.14" or "v2.1" does not cut it.
-    var index: String.Index = line.startIndex
-    while index < line.endIndex {
-        let next: String.Index = line.index(after: index)
-        if ".!?".contains(line[index]), next == line.endIndex || line[next].isWhitespace { return String(line[...index]) }
-        index = next
-    }
-    return line
 }
 
 /// Dot's mark on a row of its own tools (item 1769), as another coding agent marks its own calls with its name: Dot's face in the quiet
@@ -553,5 +536,57 @@ struct DotMark: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+}
+
+/// A helper the run started, as its own row of the stream (item 1909, after another coding agent's work log): its face
+/// with a dot while it works, its title, one quiet line of what it does now or said last, its time at the right, and a
+/// chevron; a tap opens the helper's own chat.
+struct HelperStreamRow: View {
+    let helper: HelperView
+    let open: () -> Void
+
+    var body: some View {
+        let state: HelperState = helperState(helper.status)
+        let started: Date = Date(timeIntervalSince1970: helper.startedAt)
+        let ended: Date? = helper.finishedAt.map { Date(timeIntervalSince1970: $0) }
+        Button(action: open) {
+            HStack(spacing: Space.xs) {
+                AgentAvatar(size: 24)
+                    .overlay(alignment: .bottomTrailing) {
+                        if state.isLive {
+                            Circle().fill(state.tone.color).frame(width: 8, height: 8)
+                                .overlay(Circle().stroke(Tone.ground, lineWidth: 1.5))
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .frame(width: Metric.iconSlot)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(helper.shortTitle).textRole(.footnote).foregroundStyle(Tone.text).lineLimit(1)
+                    Text(latest(state)).textRole(.label).foregroundStyle(Tone.secondary).lineLimit(1)
+                }
+                Spacer(minLength: Space.xs)
+                TimelineView(.periodic(from: started, by: 1)) { context in
+                    Text(elapsedWords(from: started, to: ended ?? context.date)).textRole(.label).foregroundStyle(Tone.tertiary)
+                        .tabularNumbers().lineLimit(1).fixedSize()
+                }
+                Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
+            }
+            .frame(minHeight: Metric.hit)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([helper.shortTitle, state.word, latest(state)].joined(separator: ", "))
+        .accessibilityHint(String(localized: "Opens the helper's chat", comment: "VoiceOver hint of a helper row"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("helper.row")
+    }
+
+    /// What it does now while it works, else the last line it said, else its state.
+    private func latest(_ state: HelperState) -> String {
+        if state.isLive, let step = helper.step { return callPhrase(step) }
+        let line: String = helper.step?.line.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return line.isEmpty ? state.word : line
     }
 }

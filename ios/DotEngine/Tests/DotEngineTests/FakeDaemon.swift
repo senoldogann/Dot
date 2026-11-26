@@ -23,6 +23,8 @@ final class FakeDaemon: @unchecked Sendable {
         var queue: [QueuedMessageView]
         var held: Bool
         var asks: [ApprovalRecord]
+        /// Its latest run ended after the owner last saw it (item 131); `PATCH {seen: true}` clears it.
+        var unread: Bool
     }
 
     let host: DaemonHost
@@ -63,6 +65,13 @@ final class FakeDaemon: @unchecked Sendable {
         set { lock.withLock { isOffline = newValue } }
     }
     private var isOffline: Bool = false
+    /// Leaves an attachment request pending until its URLSession task is cancelled.
+    var holdUploads: Bool {
+        get { lock.withLock { holdingUploads } }
+        set { lock.withLock { holdingUploads = newValue } }
+    }
+    private var holdingUploads: Bool = false
+
     /// The daemon from before item 1686: the sync calls answer 404.
     var old: Bool = false
     /// A chat's stream opens but says nothing (not its replay, not `synchronized`) until `releaseStreamStarts`.
@@ -145,7 +154,7 @@ final class FakeDaemon: @unchecked Sendable {
         let record: ThreadRecord = ThreadRecord(id: id, title: title, source: "ui", createdAt: 1, updatedAt: 1, agentId: nil)
         lock.withLock {
             revisionCounter += 1
-            chats[id] = Chat(record: record, revision: revisionCounter, pinnedAt: nil, queue: [], held: false, asks: [])
+            chats[id] = Chat(record: record, revision: revisionCounter, pinnedAt: nil, queue: [], held: false, asks: [], unread: false)
         }
         return record
     }
@@ -217,6 +226,14 @@ final class FakeDaemon: @unchecked Sendable {
     }
 
     /// Moves a chat's revision; `tell` false is a change whose `thread_changed` was lost.
+    /// The chat's latest run ended unseen: its row says unread, told to the list.
+    func markUnread(_ thread: String) {
+        lock.withLock { chats[thread]?.unread = true }
+        bump(thread, tell: true)
+    }
+
+    func isUnread(_ thread: String) -> Bool { lock.withLock { chats[thread]?.unread ?? false } }
+
     func bump(_ thread: String, tell: Bool) {
         let revision: Int? = lock.withLock {
             guard chats[thread] != nil else { return nil }
@@ -397,10 +414,13 @@ final class FakeDaemon: @unchecked Sendable {
         }
         if method == "PATCH", let found: [String] = Self.match(parts, ["api", "threads", "*"]) {
             let thread: String = found[0]
-            if let fields: [String: JSONValue] = try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data()),
-                let title: String = fields["title"]?.string
-            {
+            let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
+            if let title: String = fields["title"]?.string {
                 rename(thread, to: title, tell: true)
+            }
+            if let seen: Bool = fields["seen"]?.bool {
+                lock.withLock { chats[thread]?.unread = !seen }
+                bump(thread, tell: true)
             }
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
@@ -425,6 +445,7 @@ final class FakeDaemon: @unchecked Sendable {
             return Reply(status: 200, body: Self.json(approvalRecord(approval, status: status)), stream: false, lost: false)
         }
         if let voice: Reply = voiceReply(method: method, parts: parts, body: body) { return voice }
+        if let models: Reply = modelsReply(method: method, parts: parts, body: body) { return models }
         if method == "DELETE", let found: [String] = Self.match(parts, ["api", "threads"]) {
             _ = found
             if let fields: [String: [String]] = try? JSONDecoder().decode([String: [String]].self, from: body ?? Data()) {
@@ -469,6 +490,43 @@ final class FakeDaemon: @unchecked Sendable {
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
         return nil
+    }
+
+    /// Settings › Models' routes (item 1907): each write answers with what it kept, as the daemon's do.
+    private func modelsReply(method: String, parts: [String], body: Data?) -> Reply? {
+        let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
+        func ok(_ json: String) -> Reply { Reply(status: 200, body: Data(json.utf8), stream: false, lost: false) }
+        let config: (String, [String]) -> String = { kind, standby in
+            let list: String = standby.map { "\"\($0)\"" }.joined(separator: ",")
+            let kinds: String = kind.isEmpty ? "{}" : #"{"security":"\#(kind)"}"#
+            return #"{"main":"m:main","vision":"m:see","fast":"m:fast","review":"m:review","effort":"medium","helpers":[],"standby":[\#(list)],"kinds":\#(kinds)}"#
+        }
+        switch (method, parts) {
+        case ("PUT", ["api", "models", "kinds"]):
+            return ok(config(fields["model"]?.string ?? "", []))
+        case ("PUT", ["api", "models", "standby"]):
+            return ok(config("", (fields["models"]?.array ?? []).compactMap(\.string)))
+        case ("GET", ["api", "models", "learning"]):
+            return ok(#"{"proposer":"","composer":"m:compose","selector":"","experience":"","review":"m:review"}"#)
+        case ("PUT", ["api", "models", "learning"]):
+            let role: String = fields["role"]?.string ?? ""
+            let model: String = fields["model"]?.string ?? ""
+            let roles: String = ["proposer", "composer", "selector", "experience"].map { "\"\($0)\":\"\($0 == role ? model : "")\"" }.joined(separator: ",")
+            return ok("{\(roles),\"review\":\"m:review\"}")
+        case ("GET", ["api", "initiative"]):
+            return ok(#"{"enabled":true,"look_model":"","items":[]}"#)
+        case ("PUT", ["api", "initiative", "look-model"]):
+            return ok(#"{"enabled":true,"look_model":"\#(fields["model"]?.string ?? "")","items":[]}"#)
+        case ("GET", ["api", "repair"]):
+            return ok(#"{"worker":{"model":"default","effort":"default","fast":false},"worker_lost":false,"nights":[]}"#)
+        case ("PUT", ["api", "repair", "worker"]):
+            let model: String = fields["model"]?.string ?? ""
+            let effort: String = fields["effort"]?.string ?? ""
+            let fast: Bool = fields["fast"]?.bool ?? false
+            return ok(#"{"worker":{"model":"\#(model)","effort":"\#(effort)","fast":\#(fast)},"worker_lost":false}"#)
+        default:
+            return nil
+        }
     }
 
     /// The bodies the phone sent to a path that holds `part`, in order.
@@ -559,7 +617,7 @@ final class FakeDaemon: @unchecked Sendable {
         return ThreadSummary(
             id: chat.record.id, title: chat.record.title, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: chat.pinnedAt,
             runCount: 0, latestRunId: newest?.id ?? "", latestStatus: newest?.status ?? "done", latestCreatedAt: newest?.createdAt ?? 0,
-            unread: false, actorId: nil, lastMessage: "", lastRole: "user")
+            unread: chat.unread, actorId: nil, lastMessage: "", lastRole: "user")
     }
 
     func threadsView() -> ThreadsView {
@@ -567,7 +625,7 @@ final class FakeDaemon: @unchecked Sendable {
             ThreadsView(
                 revision: revisionCounter,
                 threads: chats.values.map {
-                    ThreadRow(summary: summary($0), revision: $0.revision, asks: $0.asks.count)
+                    ThreadRow(summary: summary($0), revision: $0.revision, asks: $0.asks.count, helpers: 0, background: [])
                 })
         }
     }
@@ -685,6 +743,7 @@ final class FakeProtocol: URLProtocol, @unchecked Sendable {
         for item in URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] { asked[item.name] = item.value ?? "" }
         let query: [String: String] = asked
         let body: Data? = readBody()
+        if method == "POST", url.path == "/api/attachments", found.holdUploads { return }
         DispatchQueue.global().async { [self] in
             let reply: FakeDaemon.Reply =
                 found.fate(method: method, path: url.path, query: query, body: body)

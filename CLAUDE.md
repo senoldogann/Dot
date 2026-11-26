@@ -29,7 +29,8 @@ While working, run the tests of what changed (`uv run pytest tests/unit/test_x.p
 whole gate. Run the whole gate once, when the change is done; `.github/workflows/gate.yml` runs it again on the pull
 request. On GitHub a pull request runs the Linux jobs alone (item 1886: the five macOS runners were what pull requests
 waited on): the format check, the lint, mypy, `npm run check`, the item records and the unit tests Linux runs, and the
-desktop checks and zizmor when their files change. The macOS jobs (the gate's macOS unit and smoke tests, the browser
+desktop checks and zizmor when their files change, and `ios.yml`'s `build` job alone when `ios/` or that workflow changes (the app and its tests
+compile, once). The other macOS jobs (the gate's macOS unit and smoke tests, the browser
 parts, ios.yml's short set) run on the push to main that merges it, each when the files changed since main was last
 green can affect it (`scripts/python_ci.py`, `scripts/browser_ci.py`, ios.yml's paths; a decision that fails runs
 everything). So `main`'s macOS run is where a break only macOS shows is seen: the issue "main is red on macOS" says

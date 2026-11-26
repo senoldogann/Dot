@@ -5,8 +5,11 @@ that replies by a script instead of a service, so no model is called and nothing
 choose the script:
 
 - "helper: ...": the run starts a helper (``delegate``, wait false) that waits 90 s, then ends;
+- "waithelper: ...": a helper that waits 5 min, which the run waits on (``delegate``, wait true), so its row says so
+  (item 1920);
 - "wait: ...": the run waits 2 min in ``wait_until`` (a steer meanwhile shows "read after this step", and ends it);
 - "slow: ...": the reply takes 8 s (a run at work, for the queue);
+- "hold: ...": the daemon takes the phone's sending of the message only after 3 s (it shows pending meanwhile);
 - "approve: ...": the run touches a file in /tmp with the shell, which the supervised mode asks the owner about;
 - "question: ...": the run asks the owner a question with options and waits for the answer (``ask_user``);
 - "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
@@ -14,14 +17,19 @@ choose the script:
 - "fail: ...": the model fails, so the run fails with one line of cause;
 - "write: ...": the run writes a file of its workspace, a change the inspector can undo;
 - "draft: ...": the run drafts an email, a card with Send, Edit and Discard;
+- "files: ...": the run writes a note of its workspace, then answers naming it and two web links (one the local play
+  page), for the file chip and the sources row under an answer (backlog LF1);
 - "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
   "stream long: ..." the same with ten steps, a file of its own each;
+- "browse: ...": the run opens a local page in its (headless) browser, then waits 8 min with the tab open, so the phone
+  can follow the browser live and take its page over (items 1839-1840); the page counts its clicks and shows what is
+  typed in its field, and a clock on it ticks so the cast keeps sending frames;
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
-holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop. With
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop, and an active campaign with a progress note (Settings › Campaigns). With
 ``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
 failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
 own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
@@ -43,8 +51,13 @@ import asyncio
 import json
 import os
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import SplitResult, parse_qs, urlsplit
+
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -112,11 +125,64 @@ ANSWER: str = "\n\n".join(
 )
 
 
+# The page "browse:" opens: a button that counts its clicks, a field, and a clock that ticks so the cast sends frames.
+# What the page received (its clicks, its field's text) it reports to its own server at /state, which keeps it in
+# $DOT_HOME/play-page.json: the end-to-end check reads the page's own state, not Dot's count of what was sent.
+PLAY_PAGE: bytes = b"""<!doctype html><html><head><title>DotNext play</title>
+<meta name="viewport" content="width=device-width"><style>
+body { font: 20px -apple-system, sans-serif; margin: 40px; background: #f4f4f2; color: #222; }
+button { font-size: 28px; padding: 24px 48px; border-radius: 16px; border: 0; background: #222; color: #fff; }
+input { font-size: 24px; padding: 12px; width: 60%; margin-top: 24px; }
+#clock { font-size: 64px; font-variant-numeric: tabular-nums; margin: 24px 0; }
+.tall { height: 1600px; background: linear-gradient(#f4f4f2, #c9d3dd); }
+</style></head><body>
+<h1>Play page</h1><div id="clock">0.0</div>
+<button id="press" type="button">Press me</button> <span id="count">0 clicks</span><br>
+<input id="field" placeholder="Type here" autocomplete="off"><p id="echo"></p><div class="tall"></div>
+<script>
+let clicks = 0; const t0 = Date.now();
+setInterval(() => { document.getElementById("clock").textContent = ((Date.now() - t0) / 1000).toFixed(1); }, 100);
+const count = document.getElementById("count");
+const field = document.getElementById("field");
+const report = () => fetch("/state?clicks=" + clicks + "&text=" + encodeURIComponent(field.value));
+document.getElementById("press").onclick = () => { clicks += 1; count.textContent = clicks + " clicks"; report(); };
+field.oninput = () => { document.getElementById("echo").textContent = field.value; report(); };
+</script></body></html>"""
+
+
+class _PlayPage(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        parts: SplitResult = urlsplit(self.path)
+        if parts.path == "/state":
+            asked: dict[str, list[str]] = parse_qs(parts.query, keep_blank_values=True)
+            state: dict[str, int | str] = {"clicks": int(asked["clicks"][0]), "text": asked["text"][0]}
+            (Path(os.environ["DOT_HOME"]) / "play-page.json").write_text(json.dumps(state), encoding="utf-8")
+            self.send_response(204)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(PLAY_PAGE)))
+        self.end_headers()
+        self.wfile.write(PLAY_PAGE)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+def serve_play_page() -> str:
+    """The play page on a free port of this Mac, served on a thread for the life of the script; its address."""
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _PlayPage)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_address[1]}/"
+
+
 class ScriptProvider:
     """Replies by the owner's last words (module docstring); a tool's result is answered with a closing text."""
 
-    def __init__(self) -> None:
+    def __init__(self, play_page: str) -> None:
         self._calls: int = 0
+        self._play_page: str = play_page
 
     @property
     def name(self) -> str:
@@ -132,8 +198,9 @@ class ScriptProvider:
         latest: str = request.messages[at].content.strip() if at >= 0 else ""
         owner: str = latest
         # A tool already answered since the owner's words: the step is over, the run ends with a text.
-        answered: bool = any(m.role == "tool" for m in request.messages[at + 1 :])
         steps: int = sum(1 for m in request.messages[at + 1 :] if m.role == "tool")
+        tools_since: list[str] = [m.tool_name or "" for m in request.messages[at + 1 :] if m.role == "tool"]
+        answered: bool = bool(tools_since)
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
         if any(tool.name == "goal_verdict" for tool in request.tools):
@@ -149,6 +216,19 @@ class ScriptProvider:
             return await self._stream(request, sink, steps, 4)
         elif latest.startswith("stream long:"):
             return await self._stream(request, sink, steps, 10)
+        elif latest.startswith("browse:") and tools_since == ["browser_new_tab"]:
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="wait_until",
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 8},
+                ),
+            )
+        elif latest.startswith("files:") and answered:
+            text = (
+                "I wrote `dotnext-e2e-report.md`. The page is at "
+                f"{self._play_page} and the source at https://example.com/dotnext."
+            )
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -159,14 +239,28 @@ class ScriptProvider:
                     arguments={"goal": "wait for the test, then say done", "wait": False},
                 ),
             )
-        elif latest.startswith("wait for the test"):
+        elif latest.startswith("waithelper:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="delegate",
+                    arguments={"goal": "wait for the test, a long one, then say done", "wait": True},
+                ),
+            )
+        elif "wait for the test" in latest:
             calls = (
                 ToolCall(
                     id=f"call_{self._calls}",
                     name="wait_until",
-                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
+                    arguments={
+                        "command": "test -f /nonexistent-dotnext",
+                        "every_s": 5,
+                        "within_minutes": 5 if "a long one" in latest else 1.5,
+                    },
                 ),
             )
+        elif latest.startswith("browse:"):
+            calls = (ToolCall(id=f"call_{self._calls}", name="browser_new_tab", arguments={"url": self._play_page}),)
         elif latest.startswith("wait:"):
             calls = (
                 ToolCall(
@@ -220,6 +314,17 @@ class ScriptProvider:
                 ToolCall(id=f"call_{self._calls}b", name="read_file", arguments={"path": "/etc/hosts"}),
                 ToolCall(
                     id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
+                ),
+            )
+        elif latest.startswith("files:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="write_file",
+                    arguments={
+                        "path": "dotnext-e2e-report.md",
+                        "content": "# E2E report\n\nWritten by the e2e check.\n",
+                    },
                 ),
             )
         elif latest.startswith("write:"):
@@ -342,7 +447,8 @@ def prepare_home(model: str) -> None:
 
 
 async def seed(runtime: Runtime) -> None:
-    """A note the owner wrote and a tainted run's rewrite of it, which waits for the owner as a proposal."""
+    """A note the owner wrote and a tainted run's rewrite of it, which waits for the owner as a proposal, and
+    an active campaign with a progress note."""
     note = await runtime.store.add_memory(
         "The owner prefers short answers.", ("owner",), source_run=None, agent_id=None, vector=None, tainted=False
     )
@@ -354,6 +460,24 @@ async def seed(runtime: Runtime) -> None:
         source_run="run_e2e_seed",
         tainted=True,
         new_expiry=None,
+    )
+    # Settings › Campaigns: an active campaign with a progress note (item 1895).
+    thread = await runtime.store.create_thread("E2E campaign", "ui")
+    campaign = await runtime.store.create_campaign(
+        "E2E campaign",
+        "Keep the test suite green.",
+        thread.id,
+        MODEL,
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        (),
+        None,
+        (),
+    )
+    await runtime.store.add_campaign_entry(
+        campaign.id, None, "progress", "Two failing tests fixed.", {"tests_fixed": 2}
     )
 
 
@@ -427,11 +551,45 @@ async def seed_activity(runtime: Runtime) -> None:
     )
 
 
+class HoldAccepts:
+    """Holds for 3 s the phone's sending of a message whose words start with "hold:" (item 1927), so that a test sees
+    it pending under the owner's bubble before the daemon takes it."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app: ASGIApp = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") != "POST":
+            await self.app(scope, receive, send)
+            return
+        chunks: list[bytes] = []
+        more: bool = True
+        while more:
+            message: Message = await receive()
+            chunks.append(message.get("body", b""))
+            more = bool(message.get("more_body", False))
+        body: bytes = b"".join(chunks)
+        if b'"hold:' in body:
+            await asyncio.sleep(3)
+        replayed: bool = False
+
+        async def replay() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+
 async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
+    play_page: str = serve_play_page()
+    print(f"PLAY {play_page}", flush=True)
     if scripted:
-        await runtime.router.register("ollama", ScriptProvider())
+        await runtime.router.register("ollama", ScriptProvider(play_page))
     if seeded:
         await seed(runtime)
     if activity:
@@ -449,7 +607,7 @@ async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None
         started_at=time.time(),
         stopping=stopping,
     )
-    server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+    server: DotServer = DotServer(serving_config(HoldAccepts(create_app(context))), stopping)
     serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
     watching: asyncio.Task[None] = asyncio.create_task(watch_revisions(runtime.store, runtime.bus))
     # As the smoke tests wait for it: the server says it started by a flag, not an event.

@@ -185,6 +185,7 @@ struct Shimmer: ViewModifier {
             content
                 .foregroundStyle(Tone.tertiary)
                 .overlay {
+                    // At most 30 drawings a second, and none between sweeps (items 1926 and 1932).
                     TimelineView(ShimmerSchedule(sweep: Self.sweep, pause: Self.pause, rate: 30)) { timeline in
                         GeometryReader { proxy in
                             let phase: Double = shimmerPhase(

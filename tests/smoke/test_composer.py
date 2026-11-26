@@ -23,11 +23,16 @@ from dotagent.agent.attachments import ATTACHMENTS_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.tools.meta import FINISH_TOOL
+
+_VIDEO_SAMPLE: Path = Path(__file__).resolve().parents[2] / "ios/Next/UITests/attachment-sample.mp4"
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -105,6 +110,10 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
+    finish: ScriptedTurn = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
+    )
+    await built.router.register("ollama", ScriptedProvider("ollama", [finish] * 30))
     try:
         yield built
     finally:
@@ -665,6 +674,49 @@ async def test_a_large_photo_goes_smaller_and_a_send_while_it_uploads_says_to_wa
             assert len(runs) == 1
             files = await runtime.store.events_of_kind(runs[0].id, ATTACHMENTS_EVENT, 5)
             assert [file["id"] for file in files[0].data["files"]] == [stored["id"]]
+        finally:
+            await browser.close()
+
+
+async def test_video_from_the_plus_menu_and_drag_and_drop_reaches_the_run(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+            await page.goto(ui_url(client.base_url.host, port, TOKEN))
+            composer: Locator = page.locator(".composer")
+            await composer.locator(".plus-button").click()
+            async with page.expect_file_chooser() as choosing:
+                await page.get_by_role("menuitem", name="Add files").click()
+            await (await choosing.value).set_files(_VIDEO_SAMPLE)
+            await expect(composer.locator(".attach-chip.ready")).to_have_count(1)
+            transfer = await page.evaluate_handle(
+                """bytes => {
+                    const transfer = new DataTransfer();
+                    transfer.items.add(new File([new Uint8Array(bytes)], 'drop.mp4', { type: 'video/mp4' }));
+                    return transfer;
+                }""",
+                list(await asyncio.to_thread(_VIDEO_SAMPLE.read_bytes)),
+            )
+            await composer.dispatch_event("drop", {"dataTransfer": transfer})
+            await expect(composer.locator(".attach-chip.ready")).to_have_count(2)
+            await page.locator(GOAL).fill("Two ways to attach a video")
+            async with page.expect_response(
+                lambda answer: answer.url.endswith("/api/runs") and answer.request.method == "POST"
+            ) as sent:
+                await page.locator(GOAL).press("Enter")
+            answer = await sent.value
+            assert answer.status == 201, await answer.text()
+            run = await answer.json()
+            files = await runtime.store.events_of_kind(run["id"], ATTACHMENTS_EVENT, 5)
+            assert [(file["name"], file["kind"]) for file in files[0].data["files"]] == [
+                ("attachment-sample.mp4", "video"),
+                ("drop.mp4", "video"),
+            ]
         finally:
             await browser.close()
 

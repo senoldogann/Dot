@@ -23,6 +23,8 @@
         case rules = "settings-rules"
         case memory = "settings-memory"
         case agents = "settings-agents"
+        case campaigns = "settings-campaigns"
+        case campaign = "settings-campaign"
         case system = "settings-system"
         case stopped = "settings-stopped"
         case offline = "settings-offline"
@@ -32,6 +34,8 @@
         case connectApps = "settings-connect-apps"
         case connectAppsDetail = "settings-connect-apps-detail"
         case connectAppsOffline = "settings-connect-apps-offline"
+        /// Usage on a Mac that never answers: the page's loading state, measured to stand centred (item 1904).
+        case loading = "settings-loading"
         case pairing = "pairing"
         case pairingLink = "pairing-link"
 
@@ -45,6 +49,7 @@
             case .oldDaemon: .old
             case .stopped: .stopped
             case .capsRefused: .phoneRefused
+            case .loading: .silent
             default: .normal
             }
         }
@@ -65,8 +70,11 @@
             case .rules: .rules
             case .memory: .memory
             case .agents: .agents
+            case .campaigns: .campaigns
+            case .campaign: .campaign("cmp_fixture")
             case .system: .system
             case .maintenance: .maintenance
+            case .loading: .usage
             case .pairing, .pairingLink, .connectApps, .connectAppsDetail, .connectAppsOffline: nil
             }
         }
@@ -109,6 +117,9 @@
         case stopped
         /// Every write is refused as a phone's (403 `PhoneRefused`).
         case phoneRefused
+        /// A read of a page never ends: its answer trickles a space every two seconds, so it never times out either (the
+        /// health and proof checks are answered).
+        case silent
     }
 
     /// Serves the fixture daemon. Every answer is the JSON the daemon's routes give (`server/views.py`).
@@ -117,7 +128,13 @@
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-        override func stopLoading() {}
+        /// The `silent` behaviour's keep-alive: a space every two seconds, so the request never times out and never ends.
+        private var trickle: DispatchSourceTimer?
+
+        override func stopLoading() {
+            trickle?.cancel()
+            trickle = nil
+        }
 
         override func startLoading() {
             let path: String = request.url?.path() ?? ""
@@ -125,6 +142,19 @@
             let behaviour: FixtureBehaviour = Self.behaviour
             if behaviour == .unreachable {
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
+                return
+            }
+            if behaviour == .silent, path != "/api/health", path != "/api/proof" {
+                let response: HTTPURLResponse = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                let timer: DispatchSourceTimer = DispatchSource.makeTimerSource(queue: .global())
+                timer.schedule(deadline: .now() + 2, repeating: 2)
+                timer.setEventHandler { [weak self] in
+                    guard let self else { return }
+                    self.client?.urlProtocol(self, didLoad: Data(" ".utf8))
+                }
+                timer.resume()
+                trickle = timer
                 return
             }
             let (code, body): (Int, String) = answer(method: method, path: path, behaviour: behaviour)
@@ -157,7 +187,14 @@
             case ("GET", "/api/phone/push-settings"), ("PUT", "/api/phone/push-settings"):
                 return (200, #"{"needs_you":true,"ready":true,"done":false}"#)
             case ("GET", "/api/models"): return (200, models)
-            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"): return (200, modelsConfig)
+            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/standby"):
+                return (200, modelsConfig)
+            case ("GET", "/api/models/learning"), ("PUT", "/api/models/learning"):
+                return (200, #"{"proposer":"","composer":"claude_code:opus","selector":"","experience":"","review":"claude_code:opus"}"#)
+            case ("GET", "/api/initiative"), ("PUT", "/api/initiative/look-model"):
+                return (200, #"{"enabled":true,"look_model":"","items":[]}"#)
+            case ("GET", "/api/repair"), ("PUT", "/api/repair/worker"):
+                return (200, #"{"worker":{"model":"opus","effort":"high","fast":false},"worker_lost":false}"#)
             case ("GET", "/api/code-review"):
                 return (
                     200,
@@ -179,6 +216,13 @@
                 return (403, #"{"message":"a phone cannot raise or take off a cap of what the tasks spend: do it on your Mac","context":{"phone":true}}"#)
             case ("GET", "/api/usage"): return (200, usage(now: now))
             case ("GET", "/api/schedules"): return (200, schedules(now: now))
+            case ("POST", "/api/schedules"):
+                return (201, schedule("sch_plants", "Water the plants", "0 9 * * *", true, now + 7200, nil, "never", 0, "Every day at 09:00", now: now))
+            case ("GET", let route) where route.hasPrefix("/api/schedules/") && route.hasSuffix("/firings"):
+                let run: (String, String, Double, String) -> String = { id, status, at, result in
+                    #"{"run":{"id":"\#(id)","thread_id":"thr_brief","goal":"Morning brief","mode":"task","model":"claude_code:sonnet","status":"\#(status)","created_at":\#(at),"finished_at":\#(at + 240),"result":"\#(result)","parent_run_id":null,"source":"schedule","effort":null},"chat_title":"Morning brief"}"#
+                }
+                return (200, "[" + run("run_f2", "done", now - 83160, "Three mails need you.\\nThe rest are filed.") + "," + run("run_f1", "failed", now - 169560, "") + "]")
             case ("GET", "/api/rules"): return (200, rules)
             case ("GET", "/api/memories/proposed"): return (200, proposed(now: now))
             case ("GET", "/api/memories/search"): return (200, "[]")
@@ -206,7 +250,14 @@
                     #"{"days":7,"reports":9,"last_at":\#(now - 3600),"app_version":"1.0 (42)","foreground_min":96.5,"cpu_s":212.4,"hang_s":1.8,"launch_ms":412.0,"peak_memory_mb":184.2,"disk_writes_mb":38.0,"cellular_mb":21.3,"wifi_mb":64.0,"crashes":0,"hang_reports":2,"cpu_exceptions":0,"disk_write_exceptions":0,"open_min":88.0,"dot_in_mb":7.4,"dot_out_mb":1.2,"requests":412,"reconnects":3,"redraws_per_min":96.0}"#
                 )
             case ("POST", "/api/phone/metrics"): return (204, "")
-            default: return (404, #"{"detail":"Not Found"}"#)
+            // A file an answer names (backlog LF1): its facts and text, and its open on the Mac.
+            case ("GET", "/api/files/preview"):
+                return (
+                    200,
+                    #"{"path":"/Users/owner/Desktop/ci-notes.md","name":"ci-notes.md","size":2150,"modified":\#(now - 600),"opens":true,"preview":{"kind":"text","text":"CI notes\n\nNode 22 is pinned on CI.\n","cut":false}}"#
+                )
+            case ("POST", "/api/files/open"): return (204, "")
+            default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }
 
@@ -271,7 +322,7 @@
         }
 
         private var modelsConfig: String {
-            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{}}"#
+            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus"}}"#
         }
 
         private func status(engaged: Bool) -> String {
@@ -329,11 +380,15 @@
             return #"{"days":[\#(days.joined(separator: ","))],"windows":[{"kind":"five_hour","status":"allowed","utilization":0.62,"resets_at":\#(now + 5400),"seen_at":\#(now - 60)},{"kind":"seven_day","status":"allowed","utilization":0.41,"resets_at":\#(now + 3 * 86400),"seen_at":\#(now - 60)}]}"#
         }
 
+        private func schedule(_ id: String, _ name: String, _ cron: String?, _ enabled: Bool, _ next: Double?, _ last: Double?, _ status: String, _ failed: Int, _ when: String, now: Double) -> String {
+            let record: String =
+                #"{"id":"\#(id)","name":"\#(name)","cron":\#(cron.map { "\"\($0)\"" } ?? "null"),"run_at":null,"goal":"\#(name): look and tell me what changed.","mode":"task","enabled":\#(enabled),"created_at":\#(now - 864000),"last_run_at":\#(last.map { String($0) } ?? "null"),"next_run_at":\#(next.map { String($0) } ?? "null"),"thread_id":null,"last_status":"\#(status)","options":{"model":null,"effort":null,"speed":null,"approvals":null,"goal_mode":null,"timezone":null,"history_runs":null,"same_chat":null,"stop_after_failures":null,"notify":null,"agent_id":null,"skills":[],"from_outside":false},"runs_failed_in_row":\#(failed),"skipped_in_row":0}"#
+            return #"{"record":\#(record),"when":"\#(when)","next_local":null,"last_local":null,"run_at_input":null,"zone":"Europe/Helsinki","agent":null,"brief":false,"ran_once":false}"#
+        }
+
         private func schedules(now: Double) -> String {
             let one: (String, String, String?, Bool, Double?, Double?, String, Int, String) -> String = { id, name, cron, enabled, next, last, status, failed, when in
-                let record: String =
-                    #"{"id":"\#(id)","name":"\#(name)","cron":\#(cron.map { "\"\($0)\"" } ?? "null"),"run_at":null,"goal":"\#(name): look and tell me what changed.","mode":"task","enabled":\#(enabled),"created_at":\#(now - 864000),"last_run_at":\#(last.map { String($0) } ?? "null"),"next_run_at":\#(next.map { String($0) } ?? "null"),"thread_id":null,"last_status":"\#(status)","options":{"model":null,"effort":null,"speed":null,"approvals":null,"goal_mode":null,"timezone":null,"history_runs":null,"same_chat":null,"stop_after_failures":null,"notify":null,"agent_id":null,"skills":[],"from_outside":false},"runs_failed_in_row":\#(failed),"skipped_in_row":0}"#
-                return #"{"record":\#(record),"when":"\#(when)","next_local":null,"last_local":null,"run_at_input":null,"zone":"Europe/Helsinki","agent":null,"brief":false,"ran_once":false}"#
+                self.schedule(id, name, cron, enabled, next, last, status, failed, when, now: now)
             }
             return "["
                 + [

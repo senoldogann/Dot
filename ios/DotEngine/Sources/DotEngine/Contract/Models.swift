@@ -79,6 +79,11 @@ public struct ThreadRow: Codable, Sendable, Hashable {
     public let summary: ThreadSummary
     public let revision: Int
     public let asks: Int
+    /// How many of its helpers its run waits on, at work (item 1920; absent from an older daemon).
+    public let helpers: Int?
+    /// What works for it with no run of it waiting: helpers let go, background commands, its loop (item 1920; absent
+    /// from an older daemon).
+    public let background: [BackgroundWork]?
 }
 
 /// `GET /api/threads/view`.
@@ -522,9 +527,11 @@ public struct ModelOption: Codable, Sendable, Hashable {
     public let tools: Bool?
     /// The provider serves it at no cost.
     public let free: Bool?
+    /// It can see images: the vision model must (item 232).
+    public let vision: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case ref, label, efforts, tools, free
+        case ref, label, efforts, tools, free, vision
         case defaultEffort = "default_effort"
         case contextLength = "context_length"
         case fastMode = "fast_mode"

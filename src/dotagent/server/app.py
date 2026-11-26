@@ -18,6 +18,7 @@ from dotagent.core.errors import (
     BrowserError,
     ChannelError,
     ConfigError,
+    DiskSpaceError,
     DotError,
     ElsewhereError,
     GalleryError,
@@ -133,6 +134,8 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     # A check that failed when the owner started its schedule by hand: they read why.
     (PrecheckError, 422),
     (ProviderError, 502),
+    # A large write refused on a disk nearly full (item 1938): the owner frees space; no fault of Dot's to log as one.
+    (DiskSpaceError, 507),
 )
 
 

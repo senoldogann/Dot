@@ -19,8 +19,8 @@ final class ChatWordsTests: XCTestCase {
 
     func testTheFoldSaysHowLongAndWhatInTheOwnersLanguage() {
         let fold: WorkFold = WorkFold(id: "f", seconds: 134, tally: WorkTally(counts: [.read: 3, .command: 2], failed: 0), items: [])
-        XCTAssertEqual(foldWords(fold, locale: turkish), "2 dk 14 sn çalıştı · 3 dosya okudu, 2 komut çalıştırdı")
-        XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s · read 3 files, ran 2 commands")
+        XCTAssertEqual(foldWords(fold, locale: turkish), "2 dk 14 sn çalıştı")
+        XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s", "how long only, no counts (item 1904)")
     }
 
     func testFindInChatSearchesTheWordsOfTheChatNotTheToolOutput() {
@@ -92,7 +92,23 @@ final class ChatWordsTests: XCTestCase {
         }
         let read: TranscriptItem = .tool(ToolEntry(id: "r", tool: "read_file", kind: .read, target: "/a", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1))
         let groups: [StepGroup] = StepGroup.of([command("c1", .done), command("c2", .done), read, command("c3", .done), command("c4", .failed), command("c5", .done), command("c6", .running)])
-        // Item 1769: "Ran 2 commands"; a single command, a failed one and one at work each stand alone.
-        XCTAssertEqual(groups.map(\.id), ["commands:c1", "r", "c3", "c4", "c5", "c6"])
+        // Item 1909: consecutive calls that ended well are one line, of any kinds ("Ran 3 commands and read 1 file");
+        // a failed one and one at work each stand alone, and so does a single one between them.
+        XCTAssertEqual(groups.map(\.id), ["tools:c1", "c4", "c5", "c6"])
+        guard case .tools(let entries) = groups[0] else { return XCTFail("a group first") }
+        XCTAssertEqual(toolGroupWords(entries, locale: english), "Ran 3 commands and read 1 file")
+        XCTAssertEqual(toolGroupWords(entries, locale: turkish), "3 komut çalıştırdı ve 1 dosya okudu")
+        let search: ToolEntry = ToolEntry(id: "s", tool: "web_search", kind: .search, target: "x", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)
+        let other: ToolEntry = ToolEntry(id: "o", tool: "notify", kind: .other, target: "", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)
+        XCTAssertEqual(toolGroupWords([other, search], locale: english), "Used 1 tool and searched the web 1 time")
+    }
+
+    /// Item 1932: a line that waits on the owner or for a stop is still; only work shimmers (the asks scene held the
+    /// phone at 100 % CPU redrawing "Waiting for you" thirty to sixty times a second).
+    func testOnlyWorkShimmers() {
+        XCTAssertFalse(workLineMoves(.waitingForYou))
+        XCTAssertFalse(workLineMoves(.stopping))
+        XCTAssertTrue(workLineMoves(.thinking))
+        XCTAssertTrue(workLineMoves(.typing))
     }
 }

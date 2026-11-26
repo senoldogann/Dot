@@ -162,3 +162,9 @@ public enum ListReducer {
         return (next, [.readList])
     }
 }
+
+/// The chats to mark seen on the Mac (item 1905): those open on the phone whose row says unread, each once per revision
+/// of its row (`sent` holds the revision each was last marked at), as the web's sidebar marks its open chat (pure).
+public func chatsToMarkSeen(rows: [ThreadRow], open: Set<String>, sent: [String: Int]) -> [ThreadRow] {
+    rows.filter { open.contains($0.summary.id) && $0.summary.unread && sent[$0.summary.id] != $0.revision }
+}

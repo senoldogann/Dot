@@ -84,6 +84,15 @@ func workLineSymbol(_ now: WorkNow) -> String? {
     }
 }
 
+/// Whether the line shimmers: only while the run works on its own; never while it waits on the owner or for its stop,
+/// which may last hours with the chat on screen (item 1932). Pure.
+func workLineMoves(_ now: WorkNow) -> Bool {
+    switch now {
+    case .waitingForYou, .stopping: false
+    default: true
+    }
+}
+
 /// The live line: the mark (or the three typing dots), the words shimmering with "…", a soft fade when the words change.
 /// It is a button: a tap shows the chat's steps, a second folds them back.
 struct WorkLineView: View {
@@ -104,7 +113,15 @@ struct WorkLineView: View {
                         }
                     }
                     .frame(width: Metric.iconSlot)
-                    Text(words + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+                    Group {
+                        if workLineMoves(now) {
+                            Text(words + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+                        } else {
+                            // A state that waits on the owner or for a stop is still: no shimmer redrawing it forever
+                            // (item 1932: the asks scene held the phone at 100 % CPU on this line).
+                            Text(words).textRole(.footnote).lineLimit(1).foregroundStyle(Tone.secondary)
+                        }
+                    }
                         .id(words)
                         .transition(.opacity)
                     Spacer(minLength: 0)
@@ -143,5 +160,53 @@ struct TypingDots: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// The waiting line's words, "Waiting · <on what>", while the run's step waits on something (a wait or a watch); `nil`
+/// for any other step (item 1909, after another coding agent's work log). A wait on helpers is the pill's "Waiting on 2
+/// helpers".
+func waitingWords(_ step: HelperStep) -> String? {
+    guard ToolKind.of(step.tool) == .wait else { return nil }
+    let line: String = step.line.trimmingCharacters(in: .whitespacesAndNewlines)
+    let what: String = line.isEmpty ? callPhrase(step) : middleCut(line, 90)
+    return String(localized: "Waiting · \(what)", comment: "Waiting line: the run waits on something; the argument says on what")
+}
+
+/// One quiet line under the stream while the run waits on something: the terminal's prompt, "Waiting · Watching pull
+/// request #554" and Details, a plain text button that opens the run inspector. Stop is the pill's: one Stop on the
+/// screen, where the run's state already is (item 1909).
+struct WaitingLine: View {
+    let words: String
+    let details: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+            Symbol(name: "apple.terminal", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.iconSlot)
+                .accessibilityHidden(true)
+            Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(2)
+                .accessibilityIdentifier("waiting.line")
+            Button(String(localized: "Details", comment: "Waiting line: opens the run inspector"), action: details)
+                .buttonStyle(PlainRowButtonStyle())
+                .accessibilityIdentifier("waiting.details")
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Metric.hit)
+    }
+}
+
+/// The line under the owner's message from the moment it is sent until its run's first event (item 1919): the typing
+/// dots and "Starting…", shimmering, as the work line draws; it is replaced in place by the run's own line.
+struct StartingLine: View {
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            TypingDots().frame(width: Metric.iconSlot)
+            Text(ChatStatus.starting.word + "…").textRole(.footnote).lineLimit(1).modifier(Shimmer())
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: Metric.hit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ChatStatus.starting.word)
+        .accessibilityIdentifier("work.starting")
     }
 }

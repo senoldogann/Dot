@@ -72,8 +72,8 @@ func scheduleLine(_ schedule: ScheduleView, now: Date, locale: Locale) -> String
 }
 
 /// Settings › Agents › Scheduled tasks (the owner's reference shot): each with its rhythm, its next or last run and its
-/// switch on the row, so which run and which wait is seen at once; its menu edits it, runs it now or deletes it. A new
-/// one is asked of Dot in a chat (PLAN §26).
+/// switch on the row, so which run and which wait is seen at once; its menu edits it, runs it now, opens its history or
+/// deletes it; + makes a new one.
 struct SchedulesPage: View {
     let editsFirst: Bool
     /// The agent whose schedules alone are shown (a bot's Routines); `nil` shows every schedule.
@@ -85,6 +85,8 @@ struct SchedulesPage: View {
     @State private var switching: Set<String> = []
     @State private var deleting: ScheduleView?
     @State private var said: String?
+    @State private var creating: Bool = false
+    @State private var history: ScheduleView?
     @Environment(\.locale) private var locale: Locale
 
     var body: some View {
@@ -95,7 +97,9 @@ struct SchedulesPage: View {
                 if schedules.isEmpty {
                     EmptyState(
                         title: String(localized: "No scheduled tasks", comment: "Schedules: empty"), systemImage: "clock",
-                        detail: String(localized: "Ask Dot in a chat to do something every morning.", comment: "Schedules: how one is made"), actionTitle: nil, action: {})
+                        detail: String(localized: "Dot does a task by itself, every morning or once at a time you pick.", comment: "Schedules: what one is"),
+                        actionTitle: String(localized: "New scheduled task", comment: "Title of the new schedule sheet"), action: { creating = true }
+                    ).fillsScrollPage()
                 } else {
                     VStack(alignment: .leading, spacing: Space.xs) {
                         if let mac = model.macName {
@@ -124,6 +128,25 @@ struct SchedulesPage: View {
                     return nil
                 case .failure(let box): return box.failure
                 }
+            }
+        }
+        .sheet(isPresented: $creating) {
+            ScheduleCreateSheet(agentId: agentId) { body in
+                switch await model.write({ api throws(DaemonRequestError) in try await api.createSchedule(body) }) {
+                case .success(let made):
+                    // A bot's Routines show only its own: one made for another agent goes to that agent's list.
+                    if agentId == nil || made.agent?.id == agentId { state = .loaded((state.value ?? []) + [made]) }
+                    problem = nil
+                    return nil
+                case .failure(let box): return box.failure
+                }
+            }
+        }
+        .navigationDestination(item: $history) { schedule in ScheduleHistoryPage(schedule: schedule) }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(String(localized: "New scheduled task", comment: "Title of the new schedule sheet"), systemImage: "plus") { creating = true }
+                    .accessibilityIdentifier("schedules.new")
             }
         }
         .task {
@@ -157,6 +180,7 @@ struct SchedulesPage: View {
             Menu {
                 Button(String(localized: "Edit", comment: "Schedule menu: edit"), systemImage: "pencil") { editing = schedule }
                 Button(String(localized: "Run now", comment: "Schedule menu: runs it at once"), systemImage: "play") { Task { await runNow(schedule) } }
+                Button(String(localized: "History", comment: "Schedule: its last runs"), systemImage: "clock.arrow.circlepath") { history = schedule }
                 Button(String(localized: "Delete", comment: "Schedule menu: delete"), systemImage: "trash", role: .destructive) { deleting = schedule }
             } label: {
                 Image(systemName: "ellipsis").font(.body.weight(.medium)).foregroundStyle(Tone.text).frame(width: Metric.hit, height: Metric.hit)

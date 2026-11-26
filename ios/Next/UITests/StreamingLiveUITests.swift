@@ -69,6 +69,40 @@ final class StreamingLiveUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Chats"].waitForExistence(timeout: 5))
     }
 
+    /// Item 1919: the moment a message is sent, the stream moves (the starting line, then the run's own line), within
+    /// half a second, though the scripted model answers only after 8 s.
+    func testASentMessageMovesTheStreamAtOnce() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        let field: XCUIElement = app.textFields["composer.field"].exists ? app.textFields["composer.field"] : app.textViews["composer.field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 15))
+        field.tap()
+        field.typeText("slow: take your time")
+        let moving: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", ["work.starting", "work.line"])).firstMatch
+        app.buttons["composer.send"].tap()
+        let sent: Date = Date()
+        XCTAssertTrue(moving.waitForExistence(timeout: 0.5), "motion within 0.5 s of the send")
+        add(XCTAttachment(string: "seen after \(Date().timeIntervalSince(sent)) s"))
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "starting-line"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1927: a message the Mac has not taken yet says "Pending" under its bubble, and the word goes once the Mac
+    /// took it (the scripted daemon holds "hold:" for 3 s).
+    func testAMessageIsPendingUntilTheMacTakesIt() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "hold: wait for it")
+        let pending: XCUIElement = app.staticTexts["Pending"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 3), "pending under the bubble while the Mac holds it")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "pending"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pending)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 20), .completed, "the word goes once the Mac took it")
+    }
+
     func testAStreamingRunIsMeasured() throws {
         let app: XCUIApplication = try launch(scene: "live-chat")
         type(app, "stream: where do we stand")

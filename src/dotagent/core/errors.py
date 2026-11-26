@@ -407,6 +407,11 @@ class StoreError(DotError):
     """The persistent store rejected an operation."""
 
 
+class DiskSpaceError(StoreError):
+    """A large write (a copy of the database, an uploaded file) was refused before it began: it would have left the
+    disk below ``[store] min_free_gb`` free (item 1938)."""
+
+
 class HarnessError(DotError):
     """A step or a probe of the harness (docs/harness.md) could not be carried out."""
 

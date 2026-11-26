@@ -62,9 +62,11 @@ own and word break, the tool calls in chat, response streaming, the reading widt
 follow-ups), Models (the main and fast models from the daemon's list, and the code review's model with its reasoning,
 changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's windows, today's tokens,
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
-switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks in it; free mode,
+switch on each row; edit, run now, delete; + makes a new one, item 1911, and a schedule's History lists its runs,
+each opening its chat), Rules (the approval mode tasks start in and what asks in it; free mode,
 switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every note to read, edit or
-forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and version, Usage,
+forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
+Mark achieved as the daemon takes them), Health and version, Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
 the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
 the web app; the phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says
@@ -165,7 +167,8 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
 throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
 
-- A pull request runs none of it (item 1886: the five macOS runners were what pull requests waited on). The push to
+- A pull request that changes `ios/` or this workflow runs `build` alone (about ten minutes: the app and its tests compile, the String
+  Catalog is checked; item 1886 left pull requests no macOS job, and a compile error reached `main`). The push to
   `main` that merges one, when it changes `ios/**`, runs `engine`, `build` and `tests (chat)` (about 20 minutes); a
   failure there opens the issue "main is red on macOS" (`scripts/main_macos_green.py`).
 - The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs every night and when asked:
@@ -236,7 +239,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
-`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`, `settings-campaigns`, `settings-campaign`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.

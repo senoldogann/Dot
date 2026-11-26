@@ -32,6 +32,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "agent/loop_state.py:remember_loop_state": (True,),
     "agent/gate.py:_shown": (True,),
     "agent/loop.py:_compact": (True,),
+    # The reply of a run's step, streamed masked (its start asks for the first list in ``_held_and_harness``).
+    "agent/loop.py:run_agent": (True,),
     "agent/manager.py:RunManager._record_end": (True,),
     "agent/loop.py:_route_step": (True,),
     "agent/recap.py:_write": (True,),
@@ -126,13 +128,13 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     # The prompt of a run on the Claude plan or OpenCode (items 1055, 1691 and 1695), as Dot's own loop builds it: the
     # owner's lines and the harness's texts, a line that holds a value the gate refuses by left out.
     "agent/handover.py:prompt_facts": (False,),
+    # The secrets a run starts with (item 1918): the texts its prompt takes from what Dot learned are asked for again by
+    # them, and the harness's texts masked.
+    "agent/loop.py:_held_and_harness": (False,),
     # ----- Both: refuses by the first list, then masks by the second. -----
     # A step of a run that read outside content is refused for the secret it would send out of the Mac; its record
     # masks them all.
     "agent/gate.py:RunGate._refuse_carried_secret": (False, True),
-    # The prompt of a run: the texts it takes from what Dot learned are asked for again (refused by the first), and the
-    # reply of the step is streamed masked (the second).
-    "agent/loop.py:run_agent": (False, True),
     # The words of the owner for a change of a skill: refused for a secret; the draft is written with the values masked.
     "agent/skill_proposals.py:propose_rewrite": (False, True),
 }

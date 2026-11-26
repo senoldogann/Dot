@@ -401,9 +401,13 @@ final class SyncTests: XCTestCase {
         let sleeps: Int = after.clock.askedCount
         await after.supervisor.start()
         try await after.engine.perform(.stop(run: "run_1", thread: "thr_1"))
+        // Both waits are asked before anything is read: the outbox's hold (its own task) and the supervisor's reconnect
+        // wait, which comes only after the refused status was asked. Waiting on the hold alone raced the status read.
+        let retry: Double = reconnectWait(attempt: 1, jitter: 0)
         try await after.clock.waitForSleep(of: 5, count: 1, since: sleeps)
+        try await after.clock.waitForSleep(of: retry, count: 1, since: sleeps)
         XCTAssertEqual(reset.requests.map(\.path), ["/api/status"], "nothing is sent before the daemon is heard")
-        try await after.clock.advancePastSleep(of: reconnectWait(attempt: 1, jitter: 0), count: 1, since: sleeps)
+        after.clock.advance(retry)
         let live: EngineSnapshot = try await snapshot(of: after.store, "the reset daemon's list is live and the new chat sent") {
             $0.list.freshness == .live && $0.outbox.isEmpty && $0.reset != nil
         }
@@ -447,3 +451,80 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(DaemonRules.merged([first], [first, second]), [first, second], "a reset found again tells each message once")
     }
 }
+
+/// Item 1905: a chat the owner opens is marked seen on the Mac, as the web's sidebar does (`PATCH {seen: true}`), so its
+/// row loses "unread" in the list; and one whose run ends while it is open is marked again. Before, the phone never sent
+/// it and the chat stayed unread for good.
+final class SeenTests: XCTestCase {
+    private var folder: URL!
+    private var daemon: FakeDaemon!
+    private var rig: Rig!
+
+    override func setUp() async throws {
+        folder = scratchFolder()
+        daemon = FakeDaemon(version: "1.0")
+        daemon.addChat("thr_1", title: "Book the dentist")
+        daemon.addRun("run_1", thread: "thr_1", goal: "Book the dentist", status: "done", parent: nil)
+        daemon.markUnread("thr_1")
+        rig = Rig(daemon: daemon, folder: folder)
+    }
+
+    override func tearDown() async throws {
+        await rig.supervisor.stop()
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    func testAnOpenedChatIsMarkedSeenAndItsRowSaysSo() async throws {
+        await rig.supervisor.start()
+        _ = try await snapshot(of: rig.store, "the list shows the chat unread") { seenRow($0)?.summary.unread == true }
+        XCTAssertEqual(daemon.count("PATCH", "/api/threads/thr_1"), 0, "nothing is marked before the chat is opened")
+        await rig.supervisor.openChat("thr_1")
+        _ = try await snapshot(of: rig.store, "the row is read again") { seenRow($0)?.summary.unread == false }
+        XCTAssertFalse(daemon.isUnread("thr_1"))
+        let seen: [String: JSONValue] = try JSONDecoder().decode([String: JSONValue].self, from: try XCTUnwrap(daemon.bodies("PATCH", "/api/threads/thr_1").first))
+        XCTAssertEqual(seen["seen"]?.bool, true)
+    }
+
+    func testARunThatEndsWhileTheChatIsOpenIsSeenToo() async throws {
+        await rig.supervisor.start()
+        await rig.supervisor.openChat("thr_1")
+        _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+        let before: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        let daemon: FakeDaemon = daemon
+        _ = try await snapshot(of: rig.store, "read again after the run ended") { _ in daemon.count("PATCH", "/api/threads/thr_1") > before }
+        _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+    }
+
+    /// A switch back to a chat before its old screen went (item 1913): the old screen's close, arriving after the new
+    /// one's open, must not close the chat the owner is reading; it is still marked seen when its run ends.
+    func testAChatShownTwiceStaysOpenUntilBothLeave() async throws {
+        await rig.supervisor.start()
+        await rig.supervisor.openChat("thr_1")
+        await rig.supervisor.openChat("thr_1")
+        _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+        await rig.supervisor.closeChat("thr_1")
+        let before: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        let daemon: FakeDaemon = daemon
+        _ = try await snapshot(of: rig.store, "the chat still on screen is read again") { _ in daemon.count("PATCH", "/api/threads/thr_1") > before }
+        await rig.supervisor.closeChat("thr_1")
+        let after: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        _ = try await snapshot(of: rig.store, "once both left it keeps its unread") { seenRow($0)?.summary.unread == true }
+        XCTAssertEqual(daemon.count("PATCH", "/api/threads/thr_1"), after)
+    }
+
+    func testAClosedChatIsNotMarkedSeen() async throws {
+        await rig.supervisor.start()
+        await rig.supervisor.openChat("thr_1")
+        _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+        await rig.supervisor.closeChat("thr_1")
+        let before: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        _ = try await snapshot(of: rig.store, "the list shows it unread") { seenRow($0)?.summary.unread == true }
+        XCTAssertEqual(daemon.count("PATCH", "/api/threads/thr_1"), before, "a chat not on screen keeps its unread")
+    }
+}
+
+private func seenRow(_ snapshot: EngineSnapshot) -> ThreadRow? { snapshot.list.rows.first { $0.summary.id == "thr_1" } }

@@ -343,7 +343,10 @@ count toward its parent's, which sees them when the delegation returns. Delegate
 limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are. A run on a Zen model of
 OpenCode (item 552) has them too, read between the agent's steps: the first step that ends past a limit while the agent
 goes on tells it to stop and answer, and an agent that still goes on two steps after that is stopped and the run ends
-failed, with the same words and the timeline's line.
+failed, with the same words and the timeline's line. The time limit is kept by the clock too (item 1940): a session
+that hangs mid-step is told when the limit passes and stopped five minutes later, the run failed the same way; and a
+session that says nothing for `[providers.opencode] silence_s` (600 s) while no tool works for it and no permission
+waits on you fails the run, as Claude Code's does.
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
@@ -368,8 +371,9 @@ the run is still on track: on track, or when it cannot tell, nothing happens (a 
 well); off track, it says why and gives one to three steps back to the goal, which the run is given as a note, and the
 watchdog climbs a rung of its ladder as for a pattern, so a run judged off track again and again is stopped with what it
 tried. The side panel's Set up lists the check as a progress alert (`drift`) with the diagnosis and the steps. A
-checkpoint the review model cannot answer is skipped and logged (`checkpoint_failed`): a run is never stopped for a
-judge that failed.
+checkpoint the review model cannot answer, or that cannot call it (its key is missing, item 1939), is skipped and logged
+(`checkpoint_failed`): a run is never stopped for a judge that failed; the consult rung in that case stops the run as
+stalled and says why.
 A run that ever read content others can author is marked again when the judge's note (or the consult rung's) comes,
 as the judge read what the run read, even after your steer cleared the mark.
 This is the Watchdog of DeepSeek Harness's Super-agent design (2026-11-01), which judges whether each worker makes

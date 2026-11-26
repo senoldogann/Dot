@@ -194,11 +194,16 @@ class ThreadView(FrozenModel):
 
 
 class ThreadRow(FrozenModel):
-    """A chat of the list, its revision and how many asks wait in it (a helper's among them)."""
+    """A chat of the list, its revision and how many asks wait in it (a helper's among them); ``helpers``, how many of
+    its helpers its run waits on, at work; ``background``, what works for it with no run of it waiting (its view's
+    :class:`BackgroundWork`), so that a row says it waits on helpers or on that work (item 1920). A helper's start and
+    end, one let go, a background command and a loop each move the chat's revision, so the list's refresh tells them."""
 
     summary: ThreadSummary
     revision: int
     asks: int
+    helpers: int
+    background: list[BackgroundWork]
 
 
 class ThreadsView(FrozenModel):
@@ -299,27 +304,8 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         newest = await run_detail(ctx, runs[-1].id)
         events = await store.list_events_tail_without(runs[-1].id, NEWEST_EVENTS + 1, UNREAD_BY_PAGES)
     helpers: list[HelperView] = await _helpers(ctx, thread_id)
-    background: list[BackgroundWork] = [
-        BackgroundWork(kind="helper", id=helper.run_id, title=helper.title, started_at=helper.started_at)
-        for helper in helpers
-        if helper.status in _WORKING and not helper.blocking
-    ]
-    background.extend(
-        BackgroundWork(kind="command", id=session.id, title=session.command, started_at=session.started_at)
-        for session in ctx.runtime.terminals.sessions(thread_id)
-        if session.background and not session.ended
-    )
     automations: list[ThreadAutomation] = await thread_automations(ctx, thread_id)
-    background.extend(
-        BackgroundWork(
-            kind="loop",
-            id=automation.schedule.record.id,
-            title=automation.schedule.record.name,
-            started_at=automation.schedule.record.created_at,
-        )
-        for automation in automations
-        if automation.loop and automation.schedule.record.enabled
-    )
+    background: list[BackgroundWork] = _background(ctx, thread_id, helpers, automations)
     summary: ThreadSummary | None = await store.thread_summary(thread_id, ctx.runtime.config.scheduler.same_chat)
     return ThreadView(
         revision=revision,
@@ -338,6 +324,52 @@ async def thread_view(ctx: ServerContext, thread_id: str, tail: int, before: str
         reactions=await store.thread_reactions(thread_id),
         drafts=await store.thread_drafts(thread_id),
         terminals=terminals_of(ctx, thread_id),
+    )
+
+
+def _background(
+    ctx: ServerContext, thread_id: str, helpers: list[HelperView], automations: list[ThreadAutomation]
+) -> list[BackgroundWork]:
+    """What works for the chat with no run of it waiting (:class:`BackgroundWork`): its helpers let go, its terminal
+    sessions run in the background, its switched-on loop."""
+    background: list[BackgroundWork] = [
+        BackgroundWork(kind="helper", id=helper.run_id, title=helper.title, started_at=helper.started_at)
+        for helper in helpers
+        if helper.status in _WORKING and not helper.blocking
+    ]
+    background.extend(
+        BackgroundWork(kind="command", id=session.id, title=session.command, started_at=session.started_at)
+        for session in ctx.runtime.terminals.sessions(thread_id)
+        if session.background and not session.ended
+    )
+    background.extend(
+        BackgroundWork(
+            kind="loop",
+            id=automation.schedule.record.id,
+            title=automation.schedule.record.name,
+            started_at=automation.schedule.record.created_at,
+        )
+        for automation in automations
+        if automation.loop and automation.schedule.record.enabled
+    )
+    return background
+
+
+async def _row(ctx: ServerContext, summary: ThreadSummary, revision: int, asks: int, released: set[str]) -> ThreadRow:
+    """A chat of the list (:class:`ThreadRow`). Its helpers are read only for a chat whose latest run works or that let
+    one go (``released``, the chats of the helpers let go), and its schedules only for a chat with a loop, so that the
+    list of chats at rest costs what it did."""
+    working: bool = summary.latest_status in _WORKING
+    helpers: list[HelperView] = await _helpers(ctx, summary.id) if working or summary.id in released else []
+    automations: list[ThreadAutomation] = (
+        await thread_automations(ctx, summary.id) if summary.loop_cron is not None else []
+    )
+    return ThreadRow(
+        summary=ctx.manager.as_shown_thread(summary),
+        revision=revision,
+        asks=asks,
+        helpers=sum(1 for helper in helpers if helper.blocking),
+        background=_background(ctx, summary.id, helpers, automations),
     )
 
 
@@ -383,10 +415,11 @@ async def threads_view(ctx: ServerContext, limit: int) -> ThreadsView:
     rows: list[ThreadSummary] = await store.list_thread_summaries(limit, ctx.runtime.config.scheduler.same_chat)
     revisions: dict[str, int] = await store.thread_revisions([row.id for row in rows])
     asks: dict[str, int] = await store.ask_counts()
+    released: set[str] = {entry.thread_id for entry in await kept_detached(store)}
     return ThreadsView(
         revision=revision,
         threads=[
-            ThreadRow(summary=ctx.manager.as_shown_thread(row), revision=revisions[row.id], asks=asks.get(row.id, 0))
+            await _row(ctx, row, revisions[row.id], asks.get(row.id, 0), released)
             for row in rows
             if row.id in revisions
         ],

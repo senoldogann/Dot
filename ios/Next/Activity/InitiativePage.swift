@@ -191,7 +191,7 @@ struct WatchersPage: View {
                         detail: String(
                             localized: "On your Mac, Settings › Scheduled tasks › Watchers makes one: Dot then tells you when a mail, an event or a GitHub notification you care about comes.",
                             comment: "Watchers: where one is made"),
-                        actionTitle: nil, action: {})
+                        actionTitle: nil, action: {}).fillsScrollPage()
                 } else {
                     GroupedSection(
                         header: nil,

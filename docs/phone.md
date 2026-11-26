@@ -61,7 +61,9 @@ settings are on your Mac"), and no row of it opens the web app (item 1791). The 
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Dot Next's composer records your voice (item 1802): the
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Its **Campaigns** (item 1895, under Agents) lists each
+campaign with its state, goal and last progress, and a campaign's page stops it (it asks first), resumes it or marks it
+achieved, as the web's page does; deleting one is done on the Mac. Dot Next's composer records your voice (item 1802): the
 microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
 down on the iPhone (Apple's Speech, on the device: no audio leaves the phone) or, when you choose it in its Settings ›
 Voice, on your Mac (`/api/voice/streams`, as the web page does). Settings › Voice also orders the microphones voice input
@@ -104,9 +106,22 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
-   own header and menu, its profile, and one settings sheet from the owner's initials) is a native SwiftUI app over the
+   own header and menu, its profile, and one settings sheet from an avatar button; a bot's unread mark counts the
+   chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
+   hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
+   item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
+   the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
+   item 1912; a new chat's half-written words are kept per bot, item 1914; each row, a bot's and a chat's, says where it
+   stands, strongest first: Needs you in the accent while an approval, a question or a secret waits, Working… shimmering
+   and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
+   what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
+   dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
+   `helpers` and `background` and are read again when a chat's revision moves, item 1920) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
-   after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
+   after the last one, answers that stream in (a file an answer names is a chip of its name and size that opens a
+   preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open on Mac, Share and Save
+   to Files; its web links gather in one chip of their sites' own icons that opens each in Safari's in-app view, item
+   1935), the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
@@ -600,6 +615,17 @@ for a lost link would hold what the owner sends.
 
 Dot keeping a link to the phone from the Mac is another thing: see [Dot and your iPhone](phone-control.md).
 
+## Attachments on Dot Next and the web
+
+In a new or existing Dot Next chat, tap **+** to open the photo library for photos and videos, take a photo or record a
+video with Camera, or choose a document with Files. The phone exports video as 720p MP4 with sound, and shows its
+thumbnail, duration and upload size. If it exceeds 20 MiB, tap **Trim video** on the chip and choose a shorter part.
+Files show their name, type and size. Up to 10 attachments go with a message.
+
+After Send, uploads show their progress and can be cancelled. If the link drops, the outbox resumes when it returns.
+After cancellation, tap **Try again** to retry the message. On the Mac, choose **+ › Add files** in the web composer
+or drop the video onto it. Dot keeps uploaded videos in the run's workspace, where `watch_video` can open them.
+
 ## The iPhone app's calls
 
 What the native iPhone app asks of the daemon, as a contract the app can be written to (`ios/`). Every path is under
@@ -634,6 +660,11 @@ paired`) and nothing is kept for it.
 | `GET /api/threads/stream` | any token | 1686 | the list's event stream |
 | `GET /api/threads/{id}/view?tail=&before=` | any token | 1686 | 200, the chat at its revision |
 | `GET /api/threads/{id}/stream?cursors=` | any token | 1686 | the chat's event stream |
+| `GET /api/screen/live?quality=hd\|light` | any token | 1264, 1837 | the Mac's screen, H.264 frames |
+| `GET /api/runs/{id}/screencast` | any token | 1838 | the run's browser tab, JPEG frames |
+| `POST /api/runs/{id}/takeover/screen` | any token | 470, 1840 | 202, the run held for this screen |
+| `POST /api/runs/{id}/input` | any token | 470, 1840 | 200, what the page took |
+| `POST /api/runs/{id}/handback` | any token | 1840 | 202, the run goes on |
 | `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
 | `POST /api/phone/metrics` | the phone's key | 1926 | 204, the phone's performance record kept |
 | `GET /api/phone/metrics` | the phone's key | 1926 | 200, its summary of the last seven days |
@@ -1087,6 +1118,34 @@ broken (the older streams keep 15 s). A client is live once it read the view aft
 daemon tells a moved revision within half a second of the write (it reads the moved revisions every 0.5 s, as it relays
 `dotx` runs). A daemon from before these calls answers them 404: the app says to update Dot on the Mac.
 
+### Watching from the phone (items 1837-1840)
+
+Dot Next shows the Mac's screen and a run's browser live, and lets the owner take a run's page over, with the routes the
+web uses:
+
+- **Watch the Mac** (Activity, and Dot's profile): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
+  `dotagent/desktop/live.py`, decoded by the phone's own H.264 decoder. `hd` is the page's (1920 pixels on the longest
+  side, 60 frames a second, a key frame every 4 s); `light` (item 1837) is a capture of its own at 1280 pixels, 30
+  frames a second, a fifth of the bit rate and a key frame every 2 s, for a weak link. The viewer's Automatic quality
+  reads `light` on a link iOS calls expensive or constrained (cellular, Low Data Mode) and after twelve frames in a row
+  came more than a second behind the Mac in `hd`; HD and Low data are the owner's to choose. Nothing is read while the
+  viewer is closed or the app is away; a stream that breaks is read again after 1, 2, 4, then every 8 s; a refusal (no
+  Screen Recording on the Mac) is said in the daemon's words with Try again.
+- **Following a run** (a chat): while the chat's run uses its browser (`browser_*` tools) or the desktop (`desktop_*`),
+  a mini player floats at the top of the chat with the picture (`GET /api/runs/{id}/screencast` for the browser, the
+  Mac's screen for the desktop) and what the run does now, read from the run's newest unanswered call ("Typing “Ada”",
+  "Opening example.com", "Clicking · 3 steps"; a ref such as `e12` is not shown); between steps, the chat capsule's
+  words. A tap opens it full screen (zoom with two fingers or a double tap, landscape), and the header's Watch live does
+  too. Folded into a Live pill, nothing is read. No click point is drawn: a step names its element by a ref, whose place
+  on the picture the phone does not know.
+- **Taking over** (full screen, a run's browser): Take over is `POST /takeover/screen` (nothing comes to the front of
+  the Mac); the owner's taps click (a second tap within 0.35 s is a double click), a one-finger drag scrolls the page on
+  its own scale, a press held drags, two fingers move the picture, and the keyboard button types on the page (Return is
+  Enter, ⌫ Backspace), sent as `POST /input` batches as the web's `control.js` does. Hand back is `POST /handback`. A
+  409 is said as the daemon means it: `remote_input` off (with where to switch it on), a step still going ("Dot is
+  finishing a step; try again in a moment."), or a hold that ended elsewhere (the controls go back to Take over). A
+  run held from the Mac or the web shows Hand back on the phone too.
+
 ### GET /api/threads/search
 
 The home's search of the iPhone app (item 1882) looks in what the chats say: `q` (1 to 200 characters) and `limit` (1 to
@@ -1096,6 +1155,7 @@ the run's id, `seq` -1); `snippet` holds the words around the match with the mat
 Dot holds is masked in it where the snippet holds it whole (a match inside a value, or a snippet cut through one, can
 leave a part unmasked, as the chat's own view shows the words unmasked to the same key). Words are folded as the index folds them (case, accents, the Turkish dotted and dotless i);
 words that fold to nothing find nothing, and an empty `q` is a 422. A tool's output is not in the index.
+
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and
 a reset of Dot (a new, empty home) changes. Revisions are the database's, so a reset one starts them again below what a

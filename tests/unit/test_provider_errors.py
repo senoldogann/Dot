@@ -170,3 +170,19 @@ def test_ollamas_usage_limit_reached_is_no_burst_a_months_is_spent_and_a_weeks_w
     waited for up to six hours."""
     assert type(classify_ollama(429, MONTH_LIMIT, None, {})) is ProviderQuotaError
     assert isinstance(classify_ollama(429, WEEK_LIMIT, None, {}), ProviderWindowError)
+
+
+# Google's OpenAI-compatible route of 2026-11-24 answers a model it does not have with a JSON array round the error.
+_GOOGLE_NOT_FOUND: str = (
+    '[{\n  "error": {\n    "code": 404,\n    "message": "models/gemini-does-not-exist-1 is not found for API version '
+    'v1main, or is not supported for generateContent.",\n    "status": "NOT_FOUND"\n  }\n}\n]'
+)
+
+
+def test_googles_error_in_an_array_is_read_so_a_404_names_the_missing_model() -> None:
+    """Item 1898: Google wraps its error in an array, which was not read, so a run with a model Google does not have
+    failed as a bare "provider answered HTTP 404"."""
+    error = classify_generic(404, parse_wire_error(_GOOGLE_NOT_FOUND), None, {})
+    assert str(error).startswith("provider answered HTTP 404: models/gemini-does-not-exist-1 is not found")
+    assert parse_wire_error("[]") is None
+    assert parse_wire_error('[{"error": "a"}, {"error": "b"}]') is None
