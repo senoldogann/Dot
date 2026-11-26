@@ -49,6 +49,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
 | [1826](1826.md) | done | 2026-11-25 | DotNext's Activity tab, native: while you were away, Ready drafts, Dot's proposals, what is in motion, and the ways Dot comes to you |
 | [1825](1825.md) | done | 2026-11-25 | The drafts that wait for the owner, in one list (`GET /api/drafts`) |
+| [1818](1818.md) | done | 2026-11-25 | DotNext's run inspector redrawn, with the recap, the cost, Undo of a change, Stop of a background command and a helper's own chat |
+| [1817](1817.md) | done | 2026-11-25 | Drafts reach the phone: a chat's view lists them again, and DotNext draws their card |
+| [1816](1816.md) | done | 2026-11-25 | DotNext: Retry, Continue and Resume now go to the daemon's own routes, and a cut-off run says what cut it |
+| [1815](1815.md) | done | 2026-11-25 | DotNext: the owner's message has the web's actions: Copy, Select text, Read aloud, Edit from here |
 | [1802](1802.md) | done | 2026-11-25 | DotNext's voice typing: the composer becomes a recorder; Settings › Voice |
 | [1801](1801.md) | done | 2026-11-25 | DotNext's chat settings: the model, its level, fast mode, approvals and plan first, also before a new chat |
 | [1800](1800.md) | done | 2026-11-25 | DotNext's chat list: select several, pin and delete them together, a Pinned section on top |
