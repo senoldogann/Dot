@@ -12388,7 +12388,7 @@ dialog.teach {
 .chat-chart > svg {
   display: block;
   width: 100%;
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-family: var(--font);
   fill: var(--muted);
 }

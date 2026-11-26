@@ -131,7 +131,9 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # 32,775 measured here.
 # Raised by 400 for the security testing line of the character and the scope words of `recon` and `security_scan`
 # (items 1887 and 1888, which item 1889 sits on): 33,116 measured on the gate's runner.
-BUDGET_TOKENS: int = 33_250
+# Raised by 1,300 for `show_cards` (item 1967): the schema of the five card kinds the model fills in, in the `pages`
+# group; 34,415 measured here.
+BUDGET_TOKENS: int = 34_550
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -145,7 +147,9 @@ BUDGET_TOKENS: int = 33_250
 # reads 8,465 now.
 # Raised by 150 for the Code section of item 1501 above (system 8,919 measured here).
 # Raised by 150 for the security testing line of the character (item 1887): system 9,178 measured here.
-SYSTEM_BUDGET_TOKENS: int = 9_200
+# Raised by 150 for the words main already carried when item 1967 was made (its gate run measured 9,331 on a runner,
+# with the sections of item 1967 not in the system prompt at all).
+SYSTEM_BUDGET_TOKENS: int = 9_350
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
@@ -174,7 +178,8 @@ SYSTEM_BUDGET_TOKENS: int = 9_200
 # Raised by 100 for `show_page`'s words of item 1721 above (23,331 measured).
 # Raised by 300 for `add_proof` of item 1853, a check that must exit 0 before the run is done (23,685 measured).
 # Raised by 100 for the scope words of `recon` and `security_scan` (item 1887): 23,768 measured on the gate's runner.
-TOOLS_BUDGET_TOKENS: int = 23_850
+# Raised by 1,150 for `show_cards` of item 1967 above (24,914 measured here).
+TOOLS_BUDGET_TOKENS: int = 25_000
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

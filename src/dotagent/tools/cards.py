@@ -147,7 +147,10 @@ def _image_data(
         or classify_path(path, workspace, protected, dot_paths) != "workspace"
         or holds_third_party(path, workspace)
     ):
-        raise ToolInputError("card images must be raster files you made in the workspace", {"path": source.path})
+        raise ToolInputError(
+            "card images must be raster files you made in the workspace, named by a path relative to it",
+            {"path": source.path},
+        )
 
     folder: int = held_folder(path.parent)
     try:
