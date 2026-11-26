@@ -42,7 +42,7 @@ struct HelperRun: Identifiable, Equatable, Sendable {
     let state: HelperState
     let startedAt: Date
     let endedAt: Date?
-    /// "provider · model · effort", e.g. "Claude · Opus 5.5 · Medium": the daemon's words.
+    /// "provider · model · effort" in words, e.g. "Claude Code · Opus 5.5 · Medium" (`engineLine`).
     let engine: String
     /// What it does now in plain words ("Read notes.md", "Waiting for a helper"); `nil` once it ended (item 1880).
     let doing: String?
