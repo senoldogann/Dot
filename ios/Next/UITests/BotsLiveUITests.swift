@@ -150,7 +150,7 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Share as template…"].exists)
         shot(app, "bot-menu")
         app.buttons["View profile"].tap()
-        XCTAssertTrue(app.staticTexts["Routines"].waitForExistence(timeout: 10), "the bot's profile")
+        XCTAssertTrue(app.buttons["profile.routines"].waitForExistence(timeout: 10), "the bot's profile")
         XCTAssertTrue(app.staticTexts["Watch the market and tell me each morning"].exists, "its role")
         shot(app, "profile")
 
@@ -161,7 +161,10 @@ final class BotsLiveUITests: XCTestCase {
         let edit: XCUIElement = app.buttons["profile.edit"]
         XCTAssertTrue(library.exists && computer.exists && edit.exists)
         XCTAssertTrue(computer.label.contains("Idle") || computer.label.contains("Working"), "the bot's computer says what it does: \(computer.label)")
-        XCTAssertTrue(app.buttons["profile.routines"].label.contains("0 on"), app.buttons["profile.routines"].label)
+        // The count comes with the schedules' read, a moment after the page.
+        let routinesOn: XCTNSPredicateExpectation = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "0 on"), object: app.buttons["profile.routines"])
+        XCTAssertEqual(XCTWaiter.wait(for: [routinesOn], timeout: 10), .completed, app.buttons["profile.routines"].label)
         XCTAssertTrue(app.descendants(matching: .any)["profile.notifications"].exists)
         XCTAssertLessThanOrEqual(abs(library.frame.height - computer.frame.height), 1, "rows of one kind are identical")
         XCTAssertLessThanOrEqual(abs(edit.frame.midX - app.windows.firstMatch.frame.midX), 1, "Edit sits under the avatar, centred")

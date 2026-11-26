@@ -1128,7 +1128,7 @@ daemon tells a moved revision within half a second of the write (it reads the mo
 Dot Next shows the Mac's screen and a run's browser live, and lets the owner take a run's page over, with the routes the
 web uses:
 
-- **Watch the Mac** (Activity, and Dot's profile): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
+- **Watch the Mac** (Activity, and the Computer row of a bot's profile, which opens a run's live picture with Take over when one of its chats follows one): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
   `dotagent/desktop/live.py`, decoded by the phone's own H.264 decoder. `hd` is the page's (1920 pixels on the longest
   side, 60 frames a second, a key frame every 4 s); `light` (item 1837) is a capture of its own at 1280 pixels, 30
   frames a second, a fifth of the bit rate and a key frame every 2 s, for a weak link. The viewer's Automatic quality

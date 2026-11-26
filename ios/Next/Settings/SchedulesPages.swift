@@ -71,9 +71,6 @@ func scheduleLine(_ schedule: ScheduleView, now: Date, locale: Locale) -> String
     return parts.joined(separator: " · ")
 }
 
-/// Settings › Agents › Scheduled tasks (the owner's reference shot): each with its rhythm, its next or last run and its
-/// switch on the row, so which run and which wait is seen at once; its menu edits it, runs it now, opens its history or
-/// deletes it; + makes a new one.
 /// Whose schedules a page of them shows: all, Dot's own (those of no agent) or one agent's (a bot's Routines).
 enum ScheduleScope: Equatable, Sendable {
     case all
@@ -95,6 +92,9 @@ enum ScheduleScope: Equatable, Sendable {
     }
 }
 
+/// Settings › Agents › Scheduled tasks (the owner's reference shot): each with its rhythm, its next or last run and its
+/// switch on the row, so which run and which wait is seen at once; its menu edits it, runs it now, opens its history or
+/// deletes it; + makes a new one.
 struct SchedulesPage: View {
     let editsFirst: Bool
     let scope: ScheduleScope

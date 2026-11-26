@@ -49,9 +49,9 @@ curl -fsS -H "$main" "$base/api/threads?limit=20" | check "Scout's first meeting
 # The new chat of the bot's menu carries the bot: its first message is a run of Scout's own.
 curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the new chat's first message went to Scout" \
     'any(r["goal"] == "Hello from a new chat" and r["agent_id"] is not None for r in d)'
-# Edit's avatar page changed the look on the Mac; the first meeting was one answer with no tool (item 1963).
+# Edit's avatar page changed the look on the Mac; the first meeting asks for one answer, no tool (item 1962).
 curl -fsS -H "$main" "$base/api/agents" | check "Scout's new look was kept" \
     'any(a["record"]["name"] == "Scout" and a["record"]["look"] is not None and a["record"]["look"]["shape"] == "cloud" and a["record"]["look"]["colour"] == "teal" for a in d)'
-curl -fsS -H "$main" "$base/api/runs?limit=20" | check "Scout's first meeting is a message of its own, no tool" \
+curl -fsS -H "$main" "$base/api/runs?limit=20" | check "Scout's first meeting asks for a message of its own and no tool" \
     'any(r["source"] == "welcome" and "Call no tool" in r["goal"] for r in d)'
 exit $fail
