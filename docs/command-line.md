@@ -100,9 +100,16 @@ REVIEW.md, in research mode (it reads the code and cannot change it), with `dotx
 --lines N --changed FILE --guide REVIEW.md` tells it what to run on (item 1663): `[code_review]` of `config.toml`,
 which Settings › Models › Code review chooses ([Models](models.md)), for a change of N changed lines (added and removed)
 whose paths `FILE` lists one per line. It prints `size small` or `size full`, `limit <seconds>`, then one
-`try <model> <effort>` line per model in the order they are tried: the small change model first for a change of at most
-`small_max_lines` lines that touches no path REVIEW.md lists under "Always needs a human", when one is chosen, else the
-review model; then the fallbacks, each once.
+`try <model> <effort>` line per model in the order they are tried, and a `route` line saying why the first is the first:
+the small change model first for a change of at most `small_max_lines` lines that touches no path REVIEW.md lists under
+"Always needs a human", when one is chosen (`small`), else the review model; then the fallbacks, each once. When the
+review model is on the Claude plan, two things send the review to the fallbacks that are not on the plan first, the
+review model coming after them: the change touches a path REVIEW.md lists under "Always needs a human" (`security`,
+item 1954: the plan's model refused 48 such diffs in a week as a cyber risk, and each was a try that gave no verdict),
+and the plan's five-hour window is used up as far as 80 % or refuses calls and has not reset (`plan_spent`, item 1954),
+as the newest step of Dot's own runs recorded it in the store, which `dotx review plan` reads without writing. Of 532
+reviews on the plan in a week, 56 started with the window at 80 % or more, and 4 of the 6 that the usage limit then cut
+would have started on the second model.
 
 The hook tries them in that order under **Code reviews** (the first in the branch's review chat, each next one in a
 chat of its own), as long as one gives no verdict (a
@@ -111,3 +118,14 @@ chat of its own), as long as one gives no verdict (a
 review ran past `max_minutes` in all (the run is then stopped: `dotx run` asks Dot to stop it on SIGTERM), and when the
 plan cannot be read; it never passes unreviewed. `git push --no-verify` skips it. A commit that passed is not reviewed
 again, nor a push that only brings main in.
+
+A push is reviewed from the newest commit of the branch that was reviewed here, one that passed or one whose review
+`BLOCK`ed with findings, not from where the branch leaves main (item 1954; a first push that `BLOCK`s never reaches the
+remote, so each round read the whole change again: in a week 319 of 593 reviews, 702 of 1 608 M tokens, were a later one
+in a chat that had one). It does so only while main has not moved under the branch since that commit, and a review that
+gave no verdict counts as read by nobody. The reviewer is told to read only the files the change touches (listed in
+`.git/claude-review/<commit>.paths`) and REVIEW.md, and, after a `BLOCK`, is given that review's file to check that each
+Important finding in it is fixed by the new diff or still stands. A model that is not on the Claude plan is also told
+its budget, 40 tool calls and four fifths of the time left in minutes, and to write its findings and the `VERDICT` line
+at three quarters of either: DeepSeek reads the repository at about ten seconds a step and stopped at the time limit with
+no verdict in 21 of its 61 reviews. A hook change applies to the owner only once their own checkout has pulled it.

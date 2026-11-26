@@ -19,8 +19,13 @@
 # Each review is saved under .git/claude-review/<commit>.md next to the diff it read; a commit that passed is not
 # reviewed again, and neither is a push that only brings main in (item 540): when the change the branch makes against
 # main is the same patch as at the tip already on the remote, which passed review here, there is nothing of its own to
-# read. After three earlier
-# reviews of the branch that BLOCKed, the hook says so before the next one (REVIEW.md: reconsider the approach).
+# read. A later push is reviewed from the newest commit of the branch that was reviewed here, one that passed or one
+# whose review BLOCKed with findings (item 1954: a first push that BLOCKs never reaches the remote, so every round was
+# read from where the branch leaves main, 29 times in one chat), and the reviewer is told to read only the files of that
+# diff and, after a BLOCK, to check that its findings are fixed. After three earlier reviews of the branch that BLOCKed,
+# the hook says so before the next one (REVIEW.md: reconsider the approach). A model that is not on the Claude plan is
+# also told its budget (a number of calls and the time to write its verdict by), as DeepSeek stopped at the time limit
+# in 21 of 61 reviews without a verdict.
 set -euo pipefail
 
 # The change a tip makes against main as a patch id: line numbers do not count, so lines of main moving under the change
@@ -38,6 +43,20 @@ repo_root=$(git rev-parse --show-toplevel)
 review_dir="$(git rev-parse --path-format=absolute --git-common-dir)/claude-review"
 mkdir -p "$review_dir"
 cd "$repo_root"
+
+# The newest commit of $1..$2, other than $2 itself, that was reviewed here: it passed, or its review BLOCKed with
+# findings (a review that gave no verdict read nothing for good). Nothing is printed when there is none.
+reviewed_since() {
+  local commit
+  for commit in $(git rev-list "$1..$2"); do
+    [[ "$commit" == "$2" ]] && continue
+    if [[ -f "$review_dir/$commit.pass" ]] ||
+      { [[ -f "$review_dir/$commit.md" ]] && grep -q '^VERDICT: BLOCK$' "$review_dir/$commit.md"; }; then
+      echo "$commit"
+      return 0
+    fi
+  done
+}
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   # A deleted branch has nothing to review.
@@ -86,8 +105,21 @@ while read -r local_ref local_sha remote_ref remote_sha; do
       "the approach (the structural fix, or two smaller changes) rather than closing the next spelling." >&2
   fi
 
+  # Only what the branch changed since its newest reviewed commit is read (item 1954), unless main moved under the branch
+  # since that commit (its change would then carry main's): then the change from where the branch leaves main.
+  earlier=$(reviewed_since "$base" "$local_sha" || true)
+  previous=""
+  if [[ -n "$earlier" && "$(git merge-base origin/main "$earlier" 2>/dev/null || true)" == "$fork" ]]; then
+    base=$earlier
+    if [[ -f "$review_dir/$earlier.md" ]] && grep -q '^VERDICT: BLOCK$' "$review_dir/$earlier.md"; then
+      previous="$review_dir/$earlier.md"
+    fi
+  fi
+
   review_file="$review_dir/$local_sha.md"
   diff_file="$review_dir/$local_sha.diff"
+  changed_file="$review_dir/$local_sha.paths"
+  git diff --name-only "$base..$local_sha" >"$changed_file"
   {
     git log --format='commit %h%n%n%B' "$base..$local_sha"
     git diff "$base..$local_sha"
@@ -99,7 +131,14 @@ $repo_root, since the run's own workspace is elsewhere. Follow $repo_root/REVIEW
 looks like here, file-and-line evidence, the Important / Nit / Pre-existing tags, at most 3 nits, and a summary that \
 starts with the finding count. Read the surrounding code before reporting a finding. Review only; change nothing. End \
 your answer with one last line that is exactly \`VERDICT: BLOCK\` if there is at least one Important finding or you \
-could not review the change, otherwise exactly \`VERDICT: PASS\`."
+could not review the change, otherwise exactly \`VERDICT: PASS\`. Read only the files the change touches (their paths \
+are in $changed_file) and REVIEW.md: open another file only to settle a specific doubt about a changed line, say which \
+and why, and do not survey the repository."
+  if [[ -n "$previous" ]]; then
+    prompt="$prompt This diff is only what the branch changed since an earlier review of it, which BLOCKed: that \
+review is in $previous. Check that each Important finding in it is fixed by this diff or still stands, say which, \
+then review this diff; do not repeat a finding that was fixed."
+  fi
   # The chat the review is kept in belongs to the branch being pushed, not to the one checked out: `git push origin
   # other`, `git push --all` and the repair flow push a branch that is not HEAD.
   branch=${local_ref#refs/heads/}
@@ -119,8 +158,6 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
   # Which models review this change, in order, and for how long in all: `[code_review]` of Dot's config, as `dotx review
   # plan` reads it for a change of this many changed lines and these paths. A plan that cannot be read stops the push.
   dotx=${DOTX:-$(command -v dotx || echo "$HOME/Desktop/Dot/.venv/bin/dotx")}
-  changed_file="$review_dir/$local_sha.paths"
-  git diff --name-only "$base..$local_sha" >"$changed_file"
   lines=$(git diff --numstat "$base..$local_sha" | awk '$1 != "-" { n += $1 + $2 } END { print n + 0 }')
   if ! plan=$("$dotx" review plan --lines "$lines" --changed "$changed_file" --guide "$repo_root/REVIEW.md" 2>&1); then
     echo "claude-review: could not be reviewed: \`dotx review plan\` failed: $plan" >&2
@@ -129,7 +166,9 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
   fi
   limit=$(awk '$1 == "limit" { print $2 }' <<<"$plan")
   size=$(awk '$1 == "size" { print $2 }' <<<"$plan")
-  echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref), $lines changed lines ($size)"
+  route=$(awk '$1 == "route" { print $2 }' <<<"$plan")
+  echo "claude-review: reviewing $base..$local_sha ($local_ref -> $remote_ref), $lines changed lines ($size, route" \
+    "${route:-default})"
 
   # One try: Dot's run on model $1 at effort $2, research mode, no goal mode (a review's answer is its verdict, which a
   # checker sending it back to work only makes longer), its stdin the goal's file (item 1020: the hook's stdin is git's
@@ -143,7 +182,19 @@ could not review the change, otherwise exactly \`VERDICT: PASS\`."
     if [[ -s "$thread_file" ]]; then
       args+=(--thread "$(cat "$thread_file")")
     fi
-    "$dotx" "${args[@]}" - <"$prompt_file" >"$review_file" 2>&1 &
+    # A model that is not on the Claude plan reads the whole repository at about ten seconds a step unless it is told its
+    # budget: a number of calls and the time by which its verdict is written (item 1954).
+    local goal_file="$review_dir/$local_sha.goal"
+    {
+      cat "$prompt_file"
+      if [[ "$1" != claude_code:* ]]; then
+        printf '\nYour budget: at most 40 tool calls and %d minutes in all. Read the change file first, then only the ' \
+          "$(($3 * 8 / 10 / 60))"
+        printf 'files it names. When about three quarters of the calls or the time are used, stop reading and write your '
+        printf 'findings and the VERDICT line from what you have: a review that ends without the VERDICT line is lost.\n'
+      fi
+    } >"$goal_file"
+    "$dotx" "${args[@]}" - <"$goal_file" >"$review_file" 2>&1 &
     local pid=$!
     (
       sleep "$3"

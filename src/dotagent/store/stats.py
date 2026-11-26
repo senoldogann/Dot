@@ -1703,6 +1703,15 @@ def _read_windows(database: Path, sql: str, values: tuple[object, ...]) -> list[
     ]
 
 
+def newest_plan_windows(database: Path, since: float) -> tuple[PlanWindowSeen, ...]:
+    """The newest window of each kind of the Claude plan that any step since ``since`` recorded, the newest first, read
+    on a read-only connection (item 1954: the review plan reads how much of the five-hour window is used). Blocking."""
+    newest: dict[str, PlanWindowSeen] = {}
+    for window in _read_windows(database, _NEWEST_WINDOWS_SQL, (since,)):
+        newest.setdefault(window.kind, window)
+    return tuple(sorted(newest.values(), key=lambda window: -window.seen_at))
+
+
 # One row per local day of the runs created since a time: how many, their steps, tokens and wall time (to now for a run
 # at work). The day is the run's start in the local time zone of the process, as the day of the owner's clock.
 _USAGE_SQL: str = (
