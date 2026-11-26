@@ -18,6 +18,10 @@ final class SettingsLiveUITests: XCTestCase {
     private func open(_ app: XCUIApplication, _ row: String) {
         // The row's own label ("Chat", or "This Mac, Connected"), never a tab of the same start ("Chats").
         let button: XCUIElement = app.scrollViews.buttons.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", row, row + ",")).firstMatch
+        // A row above the screen (back from a page the list was scrolled for, such as Campaigns) is brought down; a row
+        // below it, up. Only up left "Usage limits and caps" under the navigation bar on GitHub's runner.
+        let middle: CGFloat = app.windows.firstMatch.frame.midY
+        for _ in 0..<6 where button.exists && !button.isHittable && button.frame.midY < middle { app.swipeDown() }
         for _ in 0..<6 where !button.isHittable { app.swipeUp() }
         XCTAssertTrue(button.waitForExistence(timeout: 10), "row \(row)")
         button.tap()
