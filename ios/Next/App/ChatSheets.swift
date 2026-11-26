@@ -130,7 +130,7 @@ struct RunInspector: View {
     @State private var preview: URL?
 
     private var view: ThreadView? { model.chats[thread]?.view }
-    private var run: RunRecord? { view?.runs.last { $0.parentRunId == nil } }
+    private var run: RunRecord? { view.flatMap { DotEngine.ownRuns(of: $0).last } }
 
     var body: some View {
         List {

@@ -21,9 +21,10 @@ read as words with Dot's mark. A new chat opens as soon as its first message is 
 key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
 once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
-(the app's model publishes the store's snapshot by part, at most 30 times a second), and the live thinking's last
-three lines are clipped from the top rather than cut at the head, so a new word never moves the words before it
-(item 1848). The copy · reaction · time footer is on a run's final answer once it ended;
+(the app's model publishes the store's snapshot by part, at most 30 times a second; item 1848). A step's thinking is
+one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
+helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
+no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave N3 made Settings whole (`Settings/`): the reference's structure with Dot's pages. This Mac (status, address, the

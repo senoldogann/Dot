@@ -867,7 +867,8 @@ every mode but `yolo` (item 433).
   double or right click, hover, scroll, drag, type, paste, a key, `activate`) is not sent, and nor is the front taken
   for it: the run shows "Waiting for you to step away", and the batch goes on with that step once you are away,
   off the tool's time limit, at most for `desktop.away_wait_s` (4 hours); a message you write to the run ends the wait
-  so that the model reads it. Press, focus, set_value, menu and a click done as a press go at once, as they move no
+  so that the model reads it. A step you approve at the Mac still waits for you to step away, and then goes without
+  being asked again, unless it now asks for more. Press, focus, set_value, menu and a click done as a press go at once, as they move no
   pointer. Your first touch while Dot works ends its use of them at the next step, and the run says that you came
   back; your input while Dot is posting a step is hidden by Dot's own, and the next one after it is seen. A wait is
   not a question: a `yolo` or free run waits as any other. `desktop.input_only_when_away = false` lets the steps go
