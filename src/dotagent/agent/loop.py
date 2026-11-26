@@ -54,7 +54,7 @@ from dotagent.agent.continuity import (
 )
 from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls, reached_sites, with_nested
 from dotagent.agent.gate import RunGate
-from dotagent.agent.goal_chain import goal_checker_with_standby
+from dotagent.agent.goal_chain import goal_checker_for_run
 from dotagent.agent.goal_read import read_written
 from dotagent.agent.helpers import (
     MODEL_SWITCHED_EVENT,
@@ -1531,14 +1531,13 @@ _FOLLOW_UP_GOAL_CHARS: int = 300
 _RESUMES_FOLLOWED: int = 20
 
 
-def _scheduled_end(reason: str, ended: RunOutcome) -> RunOutcome:
+def scheduled_goal_end(reason: str, ended: RunOutcome) -> RunOutcome:
     """The end of a run whose goal check found that all it can do now is done and that what is left waits on time, which
     a follow-up scheduled in its chat picks up (item 675): done, with the check's words under the answer."""
-    return RunOutcome(
-        status="done",
-        result=_with_check_note(ended.result, f"what is left waits on time, and a scheduled run picks it up. {reason}"),
-        needs=ended.needs,
+    marked: str = _with_check_note(
+        ended.result, f"what is left waits on time, and a scheduled run picks it up. {reason}"
     )
+    return ended.model_copy(update={"status": "done", "result": marked})
 
 
 def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, patience: int) -> RunOutcome | SendBack:
@@ -1547,7 +1546,7 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
     if verdict.decision == "achieved":
         return RunOutcome(status="done", result=ended.result, needs=ended.needs)
     if verdict.decision == "scheduled":
-        return _scheduled_end(reason, ended)
+        return scheduled_goal_end(reason, ended)
     if verdict.decision == "blocked":
         return RunOutcome(
             status="failed",
@@ -1572,7 +1571,7 @@ def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
     if verdict.decision == "achieved":
         return RunOutcome(status="done", result=ended.result, needs=ended.needs)
     if verdict.decision == "scheduled":
-        return _scheduled_end(reason, ended)
+        return scheduled_goal_end(reason, ended)
     if verdict.decision == "blocked":
         return RunOutcome(
             status="failed",
@@ -1917,7 +1916,7 @@ async def _ask_checker(
         answer=ended.result,
         claimed_success=ended.status == "done",
         keep_going=keep_going_ask(run.goal) is not None,
-        follow_ups=await _follow_ups(agent),
+        follow_ups=await follow_ups_of(agent.runtime, run),
     )
     # The typed judge, when one is on, refuses a claim it finds clearly false before the review model is called.
     if request.claimed_success:
@@ -1982,44 +1981,43 @@ async def _ask_checker(
     return verdict
 
 
-async def _is_firing(agent: AgentRun) -> bool:
+async def _is_firing(runtime: Runtime, run: RunRecord) -> bool:
     """Whether the run is a schedule's firing, or goes on from one by Resume (item 553: the scheduler keeps such a run
     as the firing's), however many times it was resumed."""
-    run: RunRecord = agent.run
     for _ in range(_RESUMES_FOLLOWED):
         if run.source != RESUME_SOURCE:
             return run.source == SCHEDULE_SOURCE
-        resumed: EventRecord | None = await agent.runtime.store.last_event(run.id, RESUMED_EVENT)
+        resumed: EventRecord | None = await runtime.store.last_event(run.id, RESUMED_EVENT)
         origin: object = None if resumed is None else resumed.data.get("from_run_id")
         if not isinstance(origin, str):
             return False
         try:
-            run = await agent.runtime.store.get_run(origin)
+            run = await runtime.store.get_run(origin)
         except NotFoundError:
             return False
     return False
 
 
-async def _follow_ups(agent: AgentRun) -> str:
+async def follow_ups_of(runtime: Runtime, run: RunRecord) -> str:
     """The schedules that will start runs in the run's chat, one line each with the start of their goal, for the goal
     check (item 675): what is left of a goal that waits on time is picked up by one of them. A schedule whose runs go
     in a chat of their own is not one, even when its last run was in this chat, and neither is the schedule whose
     firing the run is: its next firing would make a run that fails each time end done each time. Empty when there is
     none."""
     now: float = time.time()
-    zone: ZoneInfo = agent.runtime.schedule_zone
-    same_chat: bool = agent.runtime.config.scheduler.same_chat
+    zone: ZoneInfo = runtime.schedule_zone
+    same_chat: bool = runtime.config.scheduler.same_chat
     # A firing's chat is marked as its schedule's before its run starts (``Scheduler._firing_chat``).
     firing_of: str | None = (
-        await agent.runtime.store.schedule_of_thread(agent.run.thread_id) if await _is_firing(agent) else None
+        await runtime.store.schedule_of_thread(run.thread_id) if await _is_firing(runtime, run) else None
     )
     lines: list[str] = [
         f"- {record.name}: next run {format_local(record.next_run_at, zone)} ({schedule_timing(record, zone)}); "
         f"its goal: {truncate_middle(' '.join(record.goal.split()), _FOLLOW_UP_GOAL_CHARS)}"
-        for record in await agent.runtime.store.list_schedules()
+        for record in await runtime.store.list_schedules()
         if record.enabled
         and record.id != firing_of
-        and record.thread_id == agent.run.thread_id
+        and record.thread_id == run.thread_id
         and (same_chat if record.options.same_chat is None else record.options.same_chat)
         and record.next_run_at is not None
         and record.next_run_at > now
@@ -3156,10 +3154,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         owner_words=agent.inbox,
     )
     checker: GoalChecker | None = (
-        goal_checker_with_standby(
+        goal_checker_for_run(
             runtime.router,
-            runtime.roles.review(),
-            runtime.roles.standby(),
+            runtime.roles,
+            lambda: ref.label,
             config.model_call_timeout_s,
             f"{run.thread_id}:goal",
             run.id,

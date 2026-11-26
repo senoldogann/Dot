@@ -161,7 +161,7 @@ async def test_a_refused_run_offers_a_restart_on_a_model_the_owner_picks(own_hom
     assert runtime.roles.kind_model("security") == OTHER
 
 
-async def test_settings_persists_task_models(own_home: Path) -> None:
+async def test_settings_persists_task_and_independent_check_models(own_home: Path) -> None:
     async with _served(own_home) as (runtime, _manager, address), async_playwright() as playwright:
         port: int = int(address.rpartition(":")[2])
         browser = await playwright.chromium.launch(headless=True)
@@ -174,12 +174,16 @@ async def test_settings_persists_task_models(own_home: Path) -> None:
                 "Deep task model",
                 "Writing model",
                 "Coding model",
+                "Other-family check model",
             ):
                 await expect_chosen(page, label, "")
                 await pick(page, label, OTHER)
                 await expect_chosen(page, label, OTHER)
             await page.reload()
             await expect_chosen(page, "Coding model", OTHER)
+            await expect_chosen(page, "Other-family check model", OTHER)
+            await pick(page, "Other-family check model", "")
+            await expect_chosen(page, "Other-family check model", "")
         finally:
             await browser.close()
     assert runtime.roles.applied(load_config(config_path()).models).kinds == {
@@ -188,3 +192,4 @@ async def test_settings_persists_task_models(own_home: Path) -> None:
         "writing": OTHER,
         "code": OTHER,
     }
+    assert load_config(config_path()).models.check_other_family == ""

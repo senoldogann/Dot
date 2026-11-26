@@ -14,17 +14,20 @@ import pytest
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.refusal import RESTARTED_ON_MODEL_EVENT
+from dotagent.agent.review import GOAL_TOOL
 from dotagent.config import AppConfig, ReconConfig, ReconScope, load_default_config
 from dotagent.core.paths import config_path
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.store.endings import PREFIX_MODEL_REFUSED
 from dotagent.store.models import EventRecord, RunRecord
+from dotagent.tools.delegate import DELEGATE_TOOL
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -181,3 +184,85 @@ async def test_kind_model_validation_and_explicit_model_precedence() -> None:
             async with asyncio.timeout(_TIME_LIMIT_S):
                 ended: RunRecord = await manager.wait(started.json()["id"])
             assert (ended.model, ended.status) == (expected, "done"), ended
+
+
+@pytest.mark.parametrize("deferred", [False, True])
+async def test_a_routed_helper_and_a_goal_run_use_the_other_family_for_their_checks(deferred: bool) -> None:
+    worker: str = "ollama:deepseek-scripted"
+    checker: str = "anthropic:claude-scripted"
+    verdict: ScriptedTurn = ScriptedTurn(
+        text="",
+        calls=(
+            ScriptedCall(
+                tool=GOAL_TOOL,
+                arguments={"decision": "achieved", "reason": "The answer has the detail.", "unproven_steps": []},
+            ),
+        ),
+    )
+    helper: ScriptedTurn = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool=DELEGATE_TOOL, arguments={"goal": "Draft an email for the launch."}),)
+    )
+    helper_verdict: ScriptedTurn = verdict
+    if deferred:
+        helper_verdict = ScriptedTurn(
+            text="",
+            calls=(
+                ScriptedCall(
+                    tool=GOAL_TOOL,
+                    arguments={"decision": "scheduled", "reason": "The follow-up completes it.", "unproven_steps": []},
+                ),
+            ),
+        )
+    async with _daemon(
+        [_finish("Email draft."), _finish("Three.")], [helper, helper_verdict, _finish("Draft ready."), verdict]
+    ) as (runtime, manager, client):
+        response: httpx.Response = await client.put("/api/models/kinds", json={"kind": "writing", "model": worker})
+        assert response.status_code == 200, response.text
+        response = await client.put("/api/models/check-other-family", json={"model": checker})
+        assert response.status_code == 200 and response.json()["check_other_family"] == checker, response.text
+        response = await client.put("/api/models/check-other-family", json={"model": SCRIPTED_MODEL})
+        assert response.status_code == 422, response.text
+
+        thread = await runtime.store.create_thread("Delegated task", UI_SOURCE)
+        if deferred:
+            when: float = time.time() + 3600
+            await runtime.store.add_schedule(
+                "Follow-up",
+                None,
+                when,
+                "Finish the email draft at launch time.",
+                "task",
+                when,
+                UNSET_OPTIONS.model_copy(update={"same_chat": True}),
+                thread.id,
+                True,
+            )
+        first: RunRecord = await manager.start(
+            "Hand one part to a helper.",
+            "task",
+            MAIN,
+            thread.id,
+            UI_SOURCE,
+            None,
+            None,
+            "standard",
+            None,
+            "yolo",
+            False,
+            (),
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            finished: RunRecord = await manager.wait(first.id)
+        assert finished.status == "done", finished
+        [child] = [run for run in await runtime.store.list_runs(20, None) if run.parent_run_id == first.id]
+        assert ("a scheduled run picks it up" in child.result) is deferred
+
+        root: RunRecord = await manager.start(
+            "Count the messages.", "task", worker, None, UI_SOURCE, None, None, "standard", None, "yolo", True, ()
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            ended: RunRecord = await manager.wait(root.id)
+        for checked in (child, ended):
+            assert (checked.status, checked.model) == ("done", worker), checked
+            calls: list[EventRecord] = await runtime.store.events_of_kind(checked.id, "model_call", 20)
+            assert [event.data["model"] for event in calls if event.data["purpose"] == "goal_check"] == [checker]
