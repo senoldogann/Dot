@@ -8,6 +8,7 @@ which every reader fences."""
 
 import asyncio
 import datetime as dt
+from collections.abc import Mapping, Sequence
 from email.utils import parseaddr
 from zoneinfo import ZoneInfo
 
@@ -17,12 +18,14 @@ from dotagent.connectors import google, graph
 from dotagent.connectors.http import AccountApi
 from dotagent.connectors.types import CalendarEvent, EventList, MailList, MailSummary
 from dotagent.core.errors import ConfigError
+from dotagent.core.paths import workspace_dir
 from dotagent.core.types import FrozenModel
 from dotagent.oauth.accounts import Accounts
 from dotagent.oauth.tokens import Account
 from dotagent.proactive.github import GITHUB_TOKEN_NAME, Notification, Notifications, read_notifications
 from dotagent.proactive.text import one_line
 from dotagent.proactive.watchers import WatcherRecord
+from dotagent.scheduler.precheck import CHECK_TIMEOUT_S, CheckVerdict, run_check
 from dotagent.secrets import optional_secret
 
 # Nothing that came more than this long ago is told: a daemon that was off for days comes back to no flood.
@@ -245,6 +248,26 @@ def _github_item(notification: Notification, key: str) -> Item:
         detail="It is one of the owner's GitHub notifications; use the GitHub tools you have to read more of it.",
         order=notification.updated_at.timestamp(),
     )
+
+
+async def look_check(sandbox: Sequence[str], env: Mapping[str, str], watcher: WatcherRecord, now: float) -> Gathered:
+    """A look of a check watcher (item 1855): its check, run without a model under the ``sandbox`` words with ``env``
+    (:func:`dotagent.scheduler.precheck.run_check`). When it says to wake, what it printed is the one item; when it
+    says there is nothing, none. A check that fails raises its :class:`PrecheckError`, which the watcher's row says:
+    a failure is never a quiet look."""
+    verdict: CheckVerdict = await run_check(watcher.check, sandbox, workspace_dir(), env, CHECK_TIMEOUT_S)
+    if not verdict.wake:
+        return Gathered(items=(), listed=(), look_again_s=watcher.minutes * 60.0)
+    key: str = f"check@{now:.0f}"
+    item: Item = Item(
+        key=key,
+        title=one_line(verdict.output, 120) or f"{watcher.check} said to wake",
+        source=f"check:{watcher.check}",
+        body=verdict.output or "(it printed nothing)",
+        detail="",
+        order=now,
+    )
+    return Gathered(items=(item,), listed=(key,), look_again_s=watcher.minutes * 60.0)
 
 
 async def look_github(accounts: Accounts, watcher: WatcherRecord, now: float) -> Gathered:

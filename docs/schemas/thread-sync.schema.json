@@ -2074,6 +2074,18 @@
           ],
           "title": "Notify"
         },
+        "precheck": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precheck"
+        },
         "same_chat": {
           "anyOf": [
             {

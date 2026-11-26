@@ -1217,8 +1217,8 @@ async def test_the_routes_make_list_change_delete_and_check_a_watcher_now(
 ) -> None:
     made: JsonObject = await _make(client)
     assert set(made) == {
-        "id", "name", "kind", "enabled", "account", "words", "minutes", "action", "goal", "created_at", "primed",
-        "looked_at", "next_look_at", "error", "error_at", "last", "told",
+        "id", "name", "kind", "enabled", "account", "words", "minutes", "action", "goal", "check", "created_at",
+        "primed", "looked_at", "next_look_at", "error", "error_at", "last", "told",
     }  # fmt: skip
     assert (made["primed"], made["looked_at"], made["error"], made["told"]) == (False, None, None, 0)
     assert (await client.get("/api/watchers")).json() == [made]
@@ -1305,7 +1305,7 @@ async def test_the_form_is_offered_the_accounts_and_whether_github_is_kept_but_n
             {"provider": "microsoft", "address": "ada@outlook.com"},
         ],
         "github": False,
-        "minutes": {"mail": 5, "github": 5, "calendar": 15},
+        "minutes": {"mail": 5, "github": 5, "calendar": 15, "check": 15},
         "tells_per_hour": 3,
         "runs_per_hour": 2,
         "looking": True,
