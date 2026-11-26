@@ -10,6 +10,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
 | [1963](1963.md) | done | 2026-11-26 | DotNext's bot profile is Grok's: avatar, name and Edit, Library and Computer, Configure the bot, Notifications |
 | [1962](1962.md) | done | 2026-11-26 | A new bot opens its first chat with a message of its own, within seconds |
+| [1961](1961.md) | done | 2026-11-26 | DotNext shows an answer's links and files in its words, and a table's long cells inside their rows |
 | [1960](1960.md) | done | 2026-11-26 | Fewer turns on the desktop path: a batch's result is the look, and Safari's pages go to the Safari tools |
 | [1959](1959.md) | done | 2026-11-26 | The owner's own Safari, driven like Dot's Chrome: a page's elements with refs, batches of steps, the same policy |
 | [1958](1958.md) | done | 2026-11-26 | A login refused on another host says the one step the owner takes for it to fill there |

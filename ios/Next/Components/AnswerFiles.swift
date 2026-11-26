@@ -3,56 +3,6 @@ import PDFKit
 import SwiftUI
 import UIKit
 
-/// What a file chip knows of its file: being asked, the Mac's facts of it, or why the Mac shows none.
-enum FileFacts: Equatable {
-    case loading
-    case shown(ShownFile)
-    case failed(String)
-}
-
-/// A file an answer names (backlog LF1): its kind's icon, its name, and its size once the Mac said it (`GET
-/// /api/files/preview`); a tap opens its preview sheet.
-struct FileChip: View {
-    let path: String
-    let open: () -> Void
-    @Environment(AppModel.self) private var model: AppModel
-    @State private var facts: FileFacts = .loading
-
-    var body: some View {
-        let name: String = (path as NSString).lastPathComponent
-        Button(action: open) {
-            HStack(spacing: Space.s) {
-                Symbol(name: fileSymbol(answerFileKind(name)), context: .row)
-                    .foregroundStyle(Tone.secondary)
-                    .frame(width: Metric.iconSlot)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: name).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1).truncationMode(.middle)
-                    Text(detail).textRole(.caption).foregroundStyle(Tone.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, Space.s)
-            .padding(.vertical, Space.xs)
-            .frame(maxWidth: 420, minHeight: Metric.hit, alignment: .leading)
-            .background(Tone.nested, in: rounded(Radius.inner))
-            .contentShape(rounded(Radius.inner))
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityHint(String(localized: "Shows the file", comment: "VoiceOver hint of a file chip under an answer"))
-        .accessibilityIdentifier("answer.file")
-        .task(id: path) { facts = await model.fileFacts(path) }
-    }
-
-    private var detail: String {
-        switch facts {
-        case .loading: String(localized: "File", comment: "A file chip's second line while its size is being asked")
-        case .shown(let file): fileSize(file.size)
-        case .failed(let words): words
-        }
-    }
-}
-
 /// A size in bytes in the phone's words (`2,4 MB`).
 func fileSize(_ bytes: Int) -> String {
     ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
@@ -259,18 +209,10 @@ struct SaveToFiles: UIViewControllerRepresentable {
 
 // MARK: Reading the Mac's files
 
-/// The Mac's facts of the files chips showed, for a minute, so a chip and its sheet ask once.
+/// The Mac's facts of the files the sheets showed, for a minute, so a sheet opened again asks once.
 @MainActor private var heldFacts: [String: (at: Date, file: ShownFile)] = [:]
 
 extension AppModel {
-    /// The Mac's facts of the file at `path`, or why there are none in the phone's words.
-    func fileFacts(_ path: String) async -> FileFacts {
-        switch await shownFile(path) {
-        case .success(let file): .shown(file)
-        case .failure(let words): .failed(words.words)
-        }
-    }
-
     /// What the preview sheet shows of the file at `path`: its content fetched and kept as a file on the phone.
     func filePreview(_ path: String) async -> PreviewState {
         let file: ShownFile
