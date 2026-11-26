@@ -413,6 +413,8 @@ public struct WatcherView: Codable, Sendable, Hashable, Identifiable {
     public let minutes: Int
     public let action: String
     public let goal: String
+    /// The check file a `check` watcher runs (item 1855); absent in an older daemon's view and empty for the other kinds.
+    public let check: String?
     public let lookedAt: Double?
     public let nextLookAt: Double?
     public let error: String?
@@ -420,8 +422,8 @@ public struct WatcherView: Codable, Sendable, Hashable, Identifiable {
     public let told: Int
 
     public init(
-        id: String, name: String, kind: String, enabled: Bool, account: String, words: String, minutes: Int, action: String, goal: String, lookedAt: Double?,
-        nextLookAt: Double?, error: String?, last: String, told: Int
+        id: String, name: String, kind: String, enabled: Bool, account: String, words: String, minutes: Int, action: String, goal: String, check: String?,
+        lookedAt: Double?, nextLookAt: Double?, error: String?, last: String, told: Int
     ) {
         self.id = id
         self.name = name
@@ -432,6 +434,7 @@ public struct WatcherView: Codable, Sendable, Hashable, Identifiable {
         self.minutes = minutes
         self.action = action
         self.goal = goal
+        self.check = check
         self.lookedAt = lookedAt
         self.nextLookAt = nextLookAt
         self.error = error
@@ -440,14 +443,15 @@ public struct WatcherView: Codable, Sendable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, kind, enabled, account, words, minutes, action, goal, error, last, told
+        case id, name, kind, enabled, account, words, minutes, action, goal, check, error, last, told
         case lookedAt = "looked_at"
         case nextLookAt = "next_look_at"
     }
 
     /// The whole of its choices, as `PATCH /api/watchers/{id}` takes them, with `enabled` as given.
     public func request(enabled: Bool) -> WatcherRequest {
-        WatcherRequest(name: name, kind: kind, enabled: enabled, account: account, words: words, minutes: minutes, action: action, goal: goal)
+        WatcherRequest(
+            name: name, kind: kind, enabled: enabled, account: account, words: words, minutes: minutes, action: action, goal: goal, check: check ?? "")
     }
 }
 
@@ -461,8 +465,12 @@ public struct WatcherRequest: Codable, Sendable, Hashable {
     public let minutes: Int
     public let action: String
     public let goal: String
+    /// The check file of a `check` watcher, empty for the other kinds: the route takes the whole of a watcher's choices.
+    public let check: String
 
-    public init(name: String, kind: String, enabled: Bool, account: String, words: String, minutes: Int, action: String, goal: String) {
+    public init(
+        name: String, kind: String, enabled: Bool, account: String, words: String, minutes: Int, action: String, goal: String, check: String
+    ) {
         self.name = name
         self.kind = kind
         self.enabled = enabled
@@ -471,6 +479,7 @@ public struct WatcherRequest: Codable, Sendable, Hashable {
         self.minutes = minutes
         self.action = action
         self.goal = goal
+        self.check = check
     }
 }
 
