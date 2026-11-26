@@ -197,7 +197,7 @@ final class SyncTests: XCTestCase {
     func testChatsWhoseDeleteTheMacRefusesShowAgain() async throws {
         daemon.addChat("thr_2", title: "Chat 2")
         _ = try await openLive()
-        daemon.failNext("/api/threads", status: 409, body: #"{"message":"a run of the chat is at work"}"#)
+        daemon.failNext("DELETE", path: "/api/threads", status: 409, body: #"{"message":"a run of the chat is at work"}"#)
         try await rig.engine.perform(.deleteChats(threads: ["thr_1", "thr_2"]))
         let back: EngineSnapshot = try await snapshot(of: rig.store, "shown again") {
             $0.refusedDeletes.count == 2 && $0.shownList.rows.count == 2

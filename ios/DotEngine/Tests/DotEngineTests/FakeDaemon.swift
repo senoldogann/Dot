@@ -43,7 +43,8 @@ final class FakeDaemon: @unchecked Sendable {
     private var nextEvent: Int = 1000
     private var revisionCounter: Int = 1
     private var nextId: Int = 1
-    private var failures: [(prefix: String, status: Int, body: String)] = []
+    /// The failures a test asked for, each with the requests it answers (by method and path), in order.
+    private var failures: [(matches: @Sendable (String, String) -> Bool, status: Int, body: String)] = []
     private var lostAnswers: Int = 0
     private(set) var acceptedTexts: [String] = []
     private var uploads: Int = 0
@@ -286,8 +287,15 @@ final class FakeDaemon: @unchecked Sendable {
         for stream in all { stream.fail() }
     }
 
+    /// The next request whose path starts with `prefix`, of any method, fails with `status` and `body`.
     func failNext(_ prefix: String, status: Int, body: String) {
-        lock.withLock { failures.append((prefix, status, body)) }
+        lock.withLock { failures.append(({ _, path in path.hasPrefix(prefix) }, status, body)) }
+    }
+
+    /// The next `method` request of exactly `path` fails with `status` and `body`: a stream's reconnect or a view's read
+    /// under the same path, which can come first, is not taken for it.
+    func failNext(_ method: String, path: String, status: Int, body: String) {
+        lock.withLock { failures.append(({ seen, at in seen == method && at == path }, status, body)) }
     }
 
     func loseNextAnswers(_ count: Int) { lock.withLock { lostAnswers = count } }
@@ -361,8 +369,8 @@ final class FakeDaemon: @unchecked Sendable {
         lock.withLock {
             log.append(Seen(method: method, path: path, query: query, body: body))
             if isOffline { return Reply(status: 0, body: Data(), stream: false, lost: true) }
-            if let at: Int = failures.firstIndex(where: { path.hasPrefix($0.prefix) }) {
-                let failure: (prefix: String, status: Int, body: String) = failures.remove(at: at)
+            if let at: Int = failures.firstIndex(where: { $0.matches(method, path) }) {
+                let failure: (matches: @Sendable (String, String) -> Bool, status: Int, body: String) = failures.remove(at: at)
                 return Reply(status: failure.status, body: Data(failure.body.utf8), stream: false, lost: false)
             }
             return nil
