@@ -280,7 +280,9 @@ answer keeps its words, Ollama's too.
   `https://generativelanguage.googleapis.com/v1beta/openai`; `dotx auth set GOOGLE_API_KEY` stores it. The key's
   project is on the free tier until billing is set up, and each model keeps its own daily request limit there (Gemini 3.x
   Flash 20 a day, Flash Lite 500, Gemma 14.4K); a prompt on the free tier may be used to improve Google's products.
-  `dotx models google` lists the ids the key can reach.
+  `dotx models google` lists the ids the key can reach. Google wraps an error in an array (`[{"error": …}]`), which
+  Dot reads as the error itself, so a model id the key cannot reach fails with Google's own words ("models/… is not
+  found") after the HTTP status, not a bare "provider answered HTTP 404" (item 1898).
 - **Antigravity**: the models of a Google Antigravity plan, straight over Cloud Code Assist, with no proxy and no key.
   `[providers.antigravity] credentials_file` names the Google login the Antigravity client on this Mac already holds
   (the Antigravity driver a desktop client installs writes `acp_token.json`; a `*` glob is allowed and the newest

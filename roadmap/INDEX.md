@@ -14,6 +14,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1903](1903.md) | done | 2026-11-26 | DotNext's long-press test reads the field afresh: on GitHub's runner its draft was empty while the wait still saw the words |
 | [1902](1902.md) | done | 2026-11-26 | `write_file` reads its content by the name `file_text` too |
 | [1899](1899.md) | done | 2026-11-26 | A red main on macOS opens an issue, and the owner's Dot is updated only from a green commit |
+| [1898](1898.md) | done | 2026-11-26 | Google's error in an array is read, so a run with a model Google does not have says which |
 | [1895](1895.md) | done | 2026-11-26 | DotNext: the owner's campaigns on the phone, native |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
 | [1893](1893.md) | done | 2026-11-26 | DotNext lets go of a reset Dot's chats instead of syncing them for ever |
