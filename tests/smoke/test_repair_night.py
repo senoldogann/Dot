@@ -444,12 +444,14 @@ async def login_env() -> dict[str, str]:
 
 @pytest.fixture
 def stand_ins(tmp_path: Path) -> Iterator[Path]:
-    """A folder with the stand-ins of ``claude`` and ``gh``, the state of a signed-in ``claude``, and the owner's
-    checkout of a repository whose ``origin`` is a bare one beside it."""
+    """A folder with the stand-ins of ``claude``, ``gh`` and ``uv``, the state of a signed-in ``claude``, and the
+    owner's checkout of a repository whose ``origin`` is a bare one beside it."""
     folder: Path = tmp_path / "bin"
     folder.mkdir()
     _program(folder, "claude", _CLAUDE)
     _program(folder, "gh", _GH)
+    # The night syncs the checkout's environment after its pull (item 1937): a stand-in that changes nothing.
+    _program(folder, "uv", "import sys\nsys.exit(0)\n")
     (folder / "files").write_text("src/dotagent/tools/web.py\ntests/unit/test_web.py\n", encoding="utf-8")
     (folder / ".claude.json").write_text(
         json.dumps({"oauthAccount": {"emailAddress": "owner@example.invalid", "organizationName": "Org"}}),
