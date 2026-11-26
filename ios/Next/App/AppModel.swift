@@ -105,7 +105,7 @@ final class AppModel {
         guard let engine else { return }
         let defaults: UserDefaults = UserDefaults.standard
         let newChatKey: String = "draft.\(Self.newChatDraft)"
-        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && $0 != newChatKey }.sorted()
+        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && !$0.hasPrefix(newChatKey) }.sorted()
         let oldDrafts: [String] = oldKeys.compactMap { defaults.string(forKey: $0) }
         keep(draft: DaemonRules.draft(keeping: draft(of: Self.newChatDraft), adding: fresh.words + oldDrafts), of: Self.newChatDraft)
         for key in oldKeys { defaults.removeObject(forKey: key) }

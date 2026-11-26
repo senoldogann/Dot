@@ -17,7 +17,7 @@ public struct Bot: Sendable, Hashable, Identifiable {
     /// The chat a tap on the bot opens: the conversation that moved last, or its chat that moved last when it has none.
     public var latest: ThreadRow? { chats.first { isConversation($0.summary) } ?? chats.first }
     /// When it last moved, for the home's order (its record's birth when it has no chat yet).
-    public var movedAt: Double { latest?.summary.updatedAt ?? record.createdAt }
+    public var movedAt: Double { chats.first?.summary.updatedAt ?? record.createdAt }
 
     public init(record: AgentRecord, chats: [ThreadRow], unread: Int, asks: Int) {
         self.record = record
