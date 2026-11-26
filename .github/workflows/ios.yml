@@ -9,16 +9,19 @@
 # the screenshots in it for 7 days.
 #
 # The account runs five macOS runners at once and the gate's own jobs need them, so a run holds two at most: `engine`
-# beside `build`, then the `tests` parts two at a time (`max-parallel`), then `e2e` alone. A pull request runs none of
-# it (item 1886: the five runners were what pull requests waited on); the push to main that merges one runs `engine`,
-# `build` and the `chat` part; the long parts (`controls`, `rows`) and `e2e` run every night and when asked
-# (`gh workflow run ios.yml --ref <branch>`, a branch's whole run before its pull request merges). `main-health` keeps
-# the issue "main is red on macOS" (item 1899, docs/development.md).
+# beside `build`, then the `tests` parts two at a time (`max-parallel`), then `e2e` alone. A pull request runs `build`
+# alone, and only when it changes ios/ or this file (item 1886 took macOS from pull requests, and a Swift compile error
+# then reached main: one runner for about ten minutes catches it before the merge); the push to main that merges one
+# runs `engine`, `build` and the `chat` part; the long parts (`controls`, `rows`) and `e2e` run every night and when
+# asked (`gh workflow run ios.yml --ref <branch>`, a branch's whole run before its pull request merges). `main-health`
+# keeps the issue "main is red on macOS" (item 1899, docs/development.md).
 name: ios
 
 on:
   push:
     branches: [main]
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  pull_request:
     paths: ["ios/**", ".github/workflows/ios.yml"]
   schedule:
     - cron: "17 2 * * *"
@@ -29,9 +32,10 @@ permissions:
   contents: read
 
 # A run of main is never stopped halfway; pushes that come meanwhile wait as one run, the newest, which tests them all.
+# A pull request's run is stopped by its next push (its ref is the pull request's own), as only the newest build counts.
 concurrency:
   group: ios-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The Xcode every job uses, from those the runner image holds (/Applications/Xcode_<version>.app). DotNext targets iOS
 # 26 and the engine needs Swift tools 6.2; Xcode 26.1 failed at DotNext's asset catalog, 26.6 (the image's default)
@@ -45,6 +49,8 @@ env:
 # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
 jobs:
   engine:
+    # Not in a pull request: it runs `build` alone.
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -93,6 +99,7 @@ jobs:
   tests:
     # After `engine` too, so that `engine` never runs beside two parts: two macOS runners at most.
     needs: [build, engine]
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     timeout-minutes: 65
     # The parts by the time they took on the runner: the unit tests with the chat's and Settings' UI tests 12-15
@@ -191,7 +198,7 @@ jobs:
     # After the tests, so alone, and whatever they gave: a whole run reports its end to end even when a part failed.
     needs: [build, tests]
     if: >-
-      !cancelled() && needs.build.result == 'success' &&
+      !cancelled() && needs.build.result == 'success' && github.event_name != 'pull_request' &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: macos-26
     timeout-minutes: 60
@@ -264,7 +271,8 @@ jobs:
           if-no-files-found: ignore
 
   # The one check to read: it passes only when every job above passed, `e2e` skipped only in a run that is not the whole
-  # one. Not one for main's protection to require: a pull request runs none of this workflow (item 1886).
+  # one. In a pull request `build` is the one job that runs: `engine`, `tests` and `e2e` are skipped by design, and a
+  # skipped one there is the pass; anywhere else a skipped `engine` or `tests` fails it.
   ios:
     if: always()
     needs: [engine, build, tests, e2e]
@@ -277,8 +285,13 @@ jobs:
           BUILD: ${{ needs.build.result }}
           TESTS: ${{ needs.tests.result }}
           E2E: ${{ needs.e2e.result }}
+          EVENT: ${{ github.event_name }}
         run: |
-          echo "engine=$ENGINE build=$BUILD tests=$TESTS e2e=$E2E full=$FULL"
+          echo "engine=$ENGINE build=$BUILD tests=$TESTS e2e=$E2E full=$FULL event=$EVENT"
+          if [ "$EVENT" = pull_request ]; then
+            [ "$BUILD" = success ] && [ "$ENGINE" = skipped ] && [ "$TESTS" = skipped ] && [ "$E2E" = skipped ] || exit 1
+            exit 0
+          fi
           [ "$ENGINE" = success ] && [ "$BUILD" = success ] && [ "$TESTS" = success ] || exit 1
           [ "$E2E" = success ] || { [ "$FULL" = false ] && [ "$E2E" = skipped ]; } || exit 1
 
