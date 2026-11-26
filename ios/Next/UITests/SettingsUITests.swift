@@ -113,4 +113,42 @@ final class SettingsUITests: XCTestCase {
         let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: run)
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "the run's chat is pushed over the history")
     }
+
+    // MARK: Campaigns (item 1895)
+
+    func testACampaignIsStoppedAfterItAsksAndThenResumed() {
+        let app: XCUIApplication = launch("settings-campaigns")
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Keep the test suite green")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        XCTAssertTrue(row.label.contains("Active"), "the state in the row: \(row.label)")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Ship the new landing page")).firstMatch.label.contains("Achieved"))
+        row.tap()
+        let stop: XCUIElement = app.buttons["Stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["May I skip the live mail test?"].exists, "the question that waits")
+        for _ in 0..<6 where !stop.isHittable { app.swipeUp() }
+        stop.tap()
+        XCTAssertTrue(app.staticTexts["Stop this campaign?"].waitForExistence(timeout: 5), "Stop asks first")
+        // The dialog's own Stop: the page's row lies under the dialog and cannot be tapped.
+        let confirm: XCUIElement? = app.buttons.matching(identifier: "Stop").allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(confirm, "the dialog's Stop")
+        confirm?.tap()
+        XCTAssertTrue(app.buttons["Resume"].waitForExistence(timeout: 10), "stopped: Resume is offered")
+        XCTAssertFalse(app.buttons["Stop"].exists)
+    }
+
+    func testACampaignsPageKeepsItsActionsReachableAtAX3() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = [
+            "-DotNextScene", "settings-campaign", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXLarge",
+        ]
+        app.launch()
+        let achieved: XCUIElement = app.buttons["Mark achieved"]
+        XCTAssertTrue(achieved.waitForExistence(timeout: 10))
+        for _ in 0..<20 where !achieved.isHittable { app.swipeUp() }
+        XCTAssertTrue(achieved.isHittable)
+        XCTAssertGreaterThanOrEqual(achieved.frame.height, 44, "a tap target of 44 pt at least")
+        XCTAssertLessThanOrEqual(achieved.frame.maxX, app.windows.firstMatch.frame.maxX, "nothing runs off the screen")
+    }
 }

@@ -23,7 +23,7 @@ choose the script:
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
-holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop. With
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop, and an active campaign with a progress note (Settings › Campaigns). With
 ``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
 failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
 own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
@@ -393,7 +393,8 @@ def prepare_home(model: str) -> None:
 
 
 async def seed(runtime: Runtime) -> None:
-    """A note the owner wrote and a tainted run's rewrite of it, which waits for the owner as a proposal."""
+    """A note the owner wrote and a tainted run's rewrite of it, which waits for the owner as a proposal, and
+    an active campaign with a progress note."""
     note = await runtime.store.add_memory(
         "The owner prefers short answers.", ("owner",), source_run=None, agent_id=None, vector=None, tainted=False
     )
@@ -405,6 +406,24 @@ async def seed(runtime: Runtime) -> None:
         source_run="run_e2e_seed",
         tainted=True,
         new_expiry=None,
+    )
+    # Settings › Campaigns: an active campaign with a progress note (item 1895).
+    thread = await runtime.store.create_thread("E2E campaign", "ui")
+    campaign = await runtime.store.create_campaign(
+        "E2E campaign",
+        "Keep the test suite green.",
+        thread.id,
+        MODEL,
+        "medium",
+        "standard",
+        None,
+        "supervised",
+        (),
+        None,
+        (),
+    )
+    await runtime.store.add_campaign_entry(
+        campaign.id, None, "progress", "Two failing tests fixed.", {"tests_fixed": 2}
     )
 
 

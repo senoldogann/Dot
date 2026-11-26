@@ -472,6 +472,35 @@
         }
       }
     },
+    "%lld sessions": {
+      "comment": "Campaign: the number of sessions",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld session"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sessions"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld oturum"
+          }
+        }
+      }
+    },
     "%lld steps": {
       "comment": "Activity: how many steps a task took",
       "localizations": {
@@ -918,6 +947,17 @@
         }
       }
     },
+    "A session is working": {
+      "comment": "Campaign: a session runs now",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir oturum çalışıyor"
+          }
+        }
+      }
+    },
     "A session of a campaign": {
       "comment": "Activity: a run that is a campaign's session",
       "localizations": {
@@ -973,6 +1013,17 @@
         }
       }
     },
+    "Achieved": {
+      "comment": "Campaign: its goal is met",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ulaşıldı"
+          }
+        }
+      }
+    },
     "Actions": {
       "comment": "Agents: the tools an agent may use\nInspector cost row: the seconds the tools took\nVoiceOver: a row's menu of actions",
       "localizations": {
@@ -980,6 +1031,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eylemler"
+          }
+        }
+      }
+    },
+    "Active": {
+      "comment": "Campaign: Dot keeps working on it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkin"
           }
         }
       }
@@ -1288,6 +1350,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Araba servisini de ayarla"
+          }
+        }
+      }
+    },
+    "Answer in the campaign's chat.": {
+      "comment": "Campaign: where a question is answered",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanyanın sohbetinde yanıtla."
           }
         }
       }
@@ -1944,6 +2017,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kamera"
+          }
+        }
+      }
+    },
+    "Campaign": {
+      "comment": "Title of a campaign's page while it loads",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanya"
+          }
+        }
+      }
+    },
+    "Campaigns": {
+      "comment": "Settings row: goals Dot keeps working on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kampanyalar"
           }
         }
       }
@@ -3431,7 +3526,7 @@
       }
     },
     "Done": {
-      "comment": "Chat settings toolbar: keeps the picks\nFind in chat: closes the bar\nStatus word: the run finished",
+      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nStatus word: the run finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4300,6 +4395,17 @@
         }
       }
     },
+    "Empty: the sessions write what they did here.": {
+      "comment": "Campaign: no notes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boş: oturumlar yaptıklarını buraya yazar."
+          }
+        }
+      }
+    },
     "English": {
       "comment": "A language's name",
       "localizations": {
@@ -4454,6 +4560,17 @@
         }
       }
     },
+    "Evidence": {
+      "comment": "Campaign: what showed it achieved",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kanıt"
+          }
+        }
+      }
+    },
     "Expanded": {
       "comment": "VoiceOver value of an open disclosure",
       "localizations": {
@@ -4499,7 +4616,7 @@
       }
     },
     "Failed": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nStatus word: the run failed",
+      "comment": "Campaign session: failed\nComponent gallery (debug builds): a heading or sample text\nStatus word: the run failed",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5000,6 +5117,17 @@
         }
       }
     },
+    "Goal": {
+      "comment": "Campaign: its goal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hedef"
+          }
+        }
+      }
+    },
     "Goal mode": {
       "comment": "Schedule edit: keep working until the goal is met",
       "localizations": {
@@ -5007,6 +5135,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hedef modu"
+          }
+        }
+      }
+    },
+    "Goals that Dot keeps working on, one session at a time, until a check confirms they are done.": {
+      "comment": "Campaigns: what a campaign is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un, bir denetim bittiğini doğrulayana kadar oturum oturum üzerinde çalıştığı hedefler."
           }
         }
       }
@@ -6163,6 +6302,17 @@
         }
       }
     },
+    "Mark achieved": {
+      "comment": "Campaign: closes it as achieved",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ulaşıldı olarak işaretle"
+          }
+        }
+      }
+    },
     "Mark as read": {
       "comment": "Away card: moves the moment on for every device\nHome: marks every chat of a bot read",
       "localizations": {
@@ -6181,6 +6331,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan adımını işaretle"
+          }
+        }
+      }
+    },
+    "Mark this campaign achieved?": {
+      "comment": "Campaign: confirmation of Mark achieved",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kampanya ulaşıldı olarak işaretlensin mi?"
           }
         }
       }
@@ -6329,7 +6490,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nInspector cost row: the seconds the model took\nNew schedule: the model its runs use\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6658,6 +6819,17 @@
         }
       }
     },
+    "Next session %@": {
+      "comment": "Campaign: when the next session starts; the argument is the Mac's words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki oturum %@"
+          }
+        }
+      }
+    },
     "Next session at %@": {
       "comment": "Activity: when a campaign's next session starts",
       "localizations": {
@@ -6709,6 +6881,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Burada kamera yok"
+          }
+        }
+      }
+    },
+    "No campaigns yet": {
+      "comment": "Campaigns: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz kampanya yok"
           }
         }
       }
@@ -6812,6 +6995,17 @@
         }
       }
     },
+    "No progress recorded yet": {
+      "comment": "Campaign: no progress note",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz ilerleme kaydedilmedi"
+          }
+        }
+      }
+    },
     "No recap yet.": {
       "comment": "Inspector: the run has no recap",
       "localizations": {
@@ -6867,6 +7061,28 @@
         }
       }
     },
+    "No session planned": {
+      "comment": "Campaign: no session is planned",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlanmış oturum yok"
+          }
+        }
+      }
+    },
+    "No session starts after this, and a session that is working now is stopped. You can resume it later.": {
+      "comment": "Campaign: what Stop does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundan sonra oturum başlamaz; şu an çalışan oturum da durdurulur. Sonra sürdürebilirsin."
+          }
+        }
+      }
+    },
     "No watchers": {
       "comment": "Watchers: none",
       "localizations": {
@@ -6907,6 +7123,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekleyen yok. Bir görev senin yazdığın bir notu değiştirmek istediğinde burada bekler."
+          }
+        }
+      }
+    },
+    "None yet.": {
+      "comment": "Campaign: no sessions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz yok."
           }
         }
       }
@@ -7087,6 +7314,17 @@
         }
       }
     },
+    "Not set yet: the first session records them.": {
+      "comment": "Campaign: no targets yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz belirlenmedi: ilk oturum kaydeder."
+          }
+        }
+      }
+    },
     "Not well": {
       "comment": "System: the daemon reports a problem",
       "localizations": {
@@ -7099,7 +7337,7 @@
       }
     },
     "Note": {
-      "comment": "Memory: an open note's title",
+      "comment": "Campaign note: a note\nMemory: an open note's title",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7127,6 +7365,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıt veren yok. Mac uykuda ya da kapalı olabilir veya Tailscale'i kapalı olabilir."
+          }
+        }
+      }
+    },
+    "Nothing checks it: your word closes the campaign, and a session that is working now is stopped.": {
+      "comment": "Campaign: what Mark achieved does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bunu hiçbir şey denetlemez: kampanyayı senin sözün kapatır; şu an çalışan oturum durdurulur."
           }
         }
       }
@@ -8243,6 +8492,28 @@
         }
       }
     },
+    "Progress": {
+      "comment": "Campaign note: progress",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İlerleme"
+          }
+        }
+      }
+    },
+    "Progress notes": {
+      "comment": "Campaign section: what the sessions wrote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İlerleme notları"
+          }
+        }
+      }
+    },
     "Proof of key": {
       "comment": "This Mac: whether the Mac proved it holds the phone's key",
       "localizations": {
@@ -8332,7 +8603,7 @@
       }
     },
     "Question": {
-      "comment": "Status word: Dot asked the owner a question",
+      "comment": "Campaign note: a question\nStatus word: Dot asked the owner a question",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8723,6 +8994,17 @@
         }
       }
     },
+    "Recent sessions": {
+      "comment": "Campaign section: its latest runs, newest first",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son oturumlar"
+          }
+        }
+      }
+    },
     "Recently used": {
       "comment": "Model picker section: the chosen model and the ones picked last",
       "localizations": {
@@ -8950,6 +9232,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıt akışı"
+          }
+        }
+      }
+    },
+    "Resume": {
+      "comment": "Campaign: lets it go on; its next session starts within a minute",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sürdür"
           }
         }
       }
@@ -9845,6 +10138,28 @@
         }
       }
     },
+    "Session %lld": {
+      "comment": "Campaign: a session's name; the argument is its number",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oturum %lld"
+          }
+        }
+      }
+    },
+    "Sessions": {
+      "comment": "Campaign section: its runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oturumlar"
+          }
+        }
+      }
+    },
     "Set aside": {
       "comment": "Self-improvement: sets a version aside",
       "localizations": {
@@ -9878,6 +10193,17 @@
         }
       }
     },
+    "Setback": {
+      "comment": "Campaign note: a setback",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aksilik"
+          }
+        }
+      }
+    },
     "Setting up a schedule": {
       "comment": "Work line: a schedule step",
       "localizations": {
@@ -9896,6 +10222,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ayarlar"
+          }
+        }
+      }
+    },
+    "Settings › Campaigns": {
+      "comment": "Where on the Mac: the Campaigns page",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayarlar › Kampanyalar"
           }
         }
       }
@@ -10403,7 +10740,7 @@
       }
     },
     "Started": {
-      "comment": "Inspector row: when the run started",
+      "comment": "Campaign: when it started\nInspector row: when the run started",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10447,7 +10784,7 @@
       }
     },
     "State": {
-      "comment": "Inspector row: the run's status",
+      "comment": "Campaign: its status\nInspector row: the run's status",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10524,7 +10861,7 @@
       }
     },
     "Stop": {
-      "comment": "Chat toolbar: stops the run at work\nComposer and ask dock: stops the run at work",
+      "comment": "Campaign: no session starts until it is resumed\nChat toolbar: stops the run at work\nComposer and ask dock: stops the run at work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10578,8 +10915,19 @@
         }
       }
     },
+    "Stop this campaign?": {
+      "comment": "Campaign: confirmation of Stop",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu kampanya durdurulsun mu?"
+          }
+        }
+      }
+    },
     "Stopped": {
-      "comment": "Activity: a run of Dot's own that was stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
+      "comment": "Campaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10618,6 +10966,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu yanıtı bekleyen çalışmayı durdurur"
+          }
+        }
+      }
+    },
+    "Strategy": {
+      "comment": "Campaign note: a strategy",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strateji"
           }
         }
       }
@@ -10695,6 +11054,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yüzeyler (çerçevesiz)"
+          }
+        }
+      }
+    },
+    "Switch on Keep going when you start a task, and Dot works on it until the result is checked.": {
+      "comment": "Campaigns: how one starts",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir görev başlatırken Devam et seçeneğini aç; Dot sonuç doğrulanana kadar üzerinde çalışır."
           }
         }
       }
@@ -10883,6 +11253,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir modeli bu listeden gizlemek ya da yeniden göstermek için gözüne dokun."
+          }
+        }
+      }
+    },
+    "Targets": {
+      "comment": "Campaign: what counts as done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ölçütler"
           }
         }
       }
@@ -12471,6 +12852,17 @@
         }
       }
     },
+    "Verified by": {
+      "comment": "Campaign: how the targets are checked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doğrulama"
+          }
+        }
+      }
+    },
     "Version": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -12626,7 +13018,7 @@
       }
     },
     "Waiting for you": {
-      "comment": "Work line: an approval or a question waits for the owner",
+      "comment": "Campaign section: questions that wait\nWork line: an approval or a question waits for the owner",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13183,7 +13575,7 @@
       }
     },
     "Working": {
-      "comment": "Chat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
+      "comment": "Campaign session: at work\nChat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13904,6 +14296,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "simge (3:1)"
+          }
+        }
+      }
+    },
+    "goals sessions keep going stop": {
+      "comment": "Settings search synonyms of Campaigns (space separated)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hedefler oturumlar devam durdur"
           }
         }
       }
