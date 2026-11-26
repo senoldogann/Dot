@@ -356,6 +356,8 @@ struct ActivityHome: View {
             var fresh: ActivityPicture = picture
             fresh.activity = await activity
             fresh.away = await away
+            // A newer wake cancelled this read: its reads failed as "unreachable", which is no news.
+            guard !Task.isCancelled else { return }
             picture = picture.merged(with: fresh)
             problem = fresh.failure
             return
@@ -371,6 +373,7 @@ struct ActivityHome: View {
         let fresh: ActivityPicture = ActivityPicture(
             activity: await activity, away: await away, drafts: await drafts, harness: await harness, brief: await brief, checkin: await checkin,
             initiative: await initiative, watchers: await watchers)
+        guard !Task.isCancelled else { return }
         picture = picture.merged(with: fresh)
         problem = fresh.failure
     }

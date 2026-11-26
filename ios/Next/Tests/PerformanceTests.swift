@@ -4,7 +4,7 @@ import XCTest
 
 @testable import DotNext
 
-/// Item N: the pure rules of what the app costs and of its performance record.
+/// Item 1926: the pure rules of what the app costs and of its performance record.
 final class PerformanceTests: XCTestCase {
     func testAPictureIsCutToItsLongSideAndASmallOneIsKept() {
         XCTAssertEqual(fittedSize(CGSize(width: 4032, height: 3024), longest: 1600), CGSize(width: 1600, height: 1200))

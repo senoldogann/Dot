@@ -50,10 +50,10 @@ log = get_logger(__name__)
 
 def asking_phone(http: Request) -> str:
     """The phone whose own key made ``http`` (item 997); a request made with the installation's token is refused: an
-    APNs token belongs to a phone."""
+    APNs token and a phone's performance record belong to a phone."""
     phone: object = getattr(http.state, PHONE_STATE, None)
     if not isinstance(phone, str):
-        raise PhoneOnly("only the Dot app on a paired phone registers for its pushes", {})
+        raise PhoneOnly("only the Dot app on a paired phone may do this (its pushes, its performance record)", {})
     return phone
 
 

@@ -61,10 +61,14 @@ final class PerfReporter: NSObject, MXMetricManagerSubscriber {
             do {
                 try await api.sendMetrics(batch)
             } catch {
-                // Kept for the next time the app opens: the record is the owner's, not worth a retry loop now.
                 logger.warning(
                     "performance reports not sent count=\(batch.count, privacy: .public) error=\(error.description, privacy: .public)")
-                return
+                // Refused for good (a 422): dropped, or it would block every newer report. Anything else is kept for the next
+                // time the app opens: the record is the owner's, not worth a retry loop now.
+                guard error.refusesTheReportsForGood else { return }
+                held = held.filter { !batch.contains($0) }
+                save()
+                continue
             }
             held = held.filter { !batch.contains($0) }
             save()

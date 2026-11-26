@@ -397,7 +397,7 @@ async def test_a_steps_thinking_and_words_reach_the_chats_stream_as_they_are_wri
 
 
 async def test_words_held_go_out_before_the_next_event_and_another_chats_words_never_come(served: Served) -> None:
-    """Item N: the words held for joining go out before any event that follows them (a step's stored reply, a tool
+    """Item 1926: the words held for joining go out before any event that follows them (a step's stored reply, a tool
     call), in the order they were said; another chat's words neither come nor send the held ones early; a new step's
     words are not joined to the last step's."""
     store: Store = served.runtime.store

@@ -1429,7 +1429,7 @@ EN_PLURALS.update(
         "%lld actions": ("%lld action", "%lld actions"),
     }
 )
-# Item N: the phone's own performance record in Settings › Maintenance.
+# Item 1926: the phone's own performance record in Settings › Maintenance.
 TR.update(
     {
         "This phone's performance": "Bu telefonun performansı",

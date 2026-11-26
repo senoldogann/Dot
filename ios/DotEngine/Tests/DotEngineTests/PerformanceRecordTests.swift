@@ -2,7 +2,7 @@ import XCTest
 
 @testable import DotEngine
 
-/// Item N: the phone's performance record as it goes to the Mac, and the counts it is made of.
+/// Item 1926: the phone's performance record as it goes to the Mac, and the counts it is made of.
 final class PerformanceRecordTests: XCTestCase {
     private func report(_ at: Double) -> PhoneReport {
         var made: PhoneReport = PhoneReport(source: .app, beginsAt: at - 10, endsAt: at, appVersion: "1.0 (1)", osVersion: "iOS 26.1")
@@ -42,5 +42,13 @@ final class PerformanceRecordTests: XCTestCase {
         XCTAssertTrue(ListReducer.isLifecycle(.event(event)))
         XCTAssertFalse(ListReducer.isLifecycle(.resync))
         XCTAssertFalse(ListReducer.isLifecycle(.delta(event)))
+    }
+
+    func testOnlyARefusalThatNothingWillChangeDropsTheReports() {
+        func status(_ code: Int) -> DaemonRequestError { .status(path: "/api/phone/metrics", code: code, body: "") }
+        XCTAssertTrue(status(422).refusesTheReportsForGood)
+        XCTAssertTrue(status(400).refusesTheReportsForGood)
+        for code in [401, 403, 404, 408, 429, 500, 503] { XCTAssertFalse(status(code).refusesTheReportsForGood, "\(code) keeps them") }
+        XCTAssertFalse(DaemonRequestError.transport(path: "/p", underlying: URLError(.timedOut)).refusesTheReportsForGood)
     }
 }
