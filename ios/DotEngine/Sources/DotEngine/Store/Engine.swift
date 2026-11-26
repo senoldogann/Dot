@@ -49,6 +49,26 @@ public struct Engine: Sendable {
         return key
     }
 
+    public func send(_ text: String, thread: String, attachments: [OutgoingAttachment], picks: MessagePicks) async throws -> String {
+        let key: String = newMessageKey()
+        try await outbox.enqueue(.message(thread: thread, text: text, images: [], uploaded: [], picks: picks), id: key, attachments: attachments)
+        return key
+    }
+
+    /// Sends the owner's words into the run at work (steer).
+    public func steer(_ text: String, run: String, thread: String, attachments: [OutgoingAttachment]) async throws -> String {
+        let key: String = newMessageKey()
+        try await outbox.enqueue(.steer(run: run, thread: thread, text: text, images: [], uploaded: []), id: key, attachments: attachments)
+        return key
+    }
+
+    /// A new chat with Dot (`agent` `nil`) or with one of the owner's agents.
+    public func startChat(_ text: String, attachments: [OutgoingAttachment], start: ChatStart, agent: String?) async throws -> String {
+        let key: String = newMessageKey()
+        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: [], start: start, agent: agent), id: key, attachments: attachments)
+        return key
+    }
+
     /// A doing that says the same twice (stop, queue change, rename, delete, an answer).
     public func perform(_ action: OutboxItem.Action) async throws {
         try await outbox.enqueue(action, id: newMessageKey(), images: [])
