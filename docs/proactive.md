@@ -120,8 +120,8 @@ watcher has:
   voice and keep it as a draft").
 
 **It looks; nothing reaches the daemon.** The daemon looks for each watcher at its own interval, in a loop of its own
-beside the scheduler (`[watchers] tick_s` is how often it sees which are due). There is no inbound webhook: the daemon
-stays on the loopback address, and a push of GitHub's or of a mail provider's to it is left for later. A watcher keeps
+beside the scheduler (`[watchers] tick_s` is how often it sees which are due). A watcher is not called: a service that
+can call an address starts work through a [hook](hooks.md) instead, signed with the hook's secret. A watcher keeps
 its place in the store, so a restart neither repeats nor misses: mail asks from five minutes before the last look began
 (what came while the daemon was off, up to a day, is looked at by the first look after) and leaves out what it handled
 by its id, GitHub's request is conditional on `Last-Modified` and waits at least as long as `X-Poll-Interval` says, and

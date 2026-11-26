@@ -22,6 +22,7 @@ logs), `DOT_CHROME_DIR` (where your own Chrome keeps its profiles, which Dot rea
 | `.env`                                           | API keys (mode 0600)                                                 |
 | `dot.sqlite3`                                    | runs, events, conversations, notes, schedules, rules, approvals      |
 | `api-token`                                      | the bearer token of the web UI and the API (mode 0600)               |
+| `hooks.json`                                     | the hooks: what each starts, its template and fields, its secret and its last calls (mode 0600, see [Hooks](hooks.md)) |
 | `phones.json`                                    | the phones paired with a code: names, dates and the SHA-256 of each one's key, never the key (mode 0600, item 670) |
 | `vapid-key.pem`                                  | the daemon's web push key pair, made on its first start (see [Dot on the phone](phone.md#dot-on-the-phone)) |
 | `workspace/`                                     | the working directory of the shell and the file tools                |

@@ -37,6 +37,7 @@ from dotagent.plugins.scout_types import ScoutState
 from dotagent.proactive.brief import BriefFiring, is_brief, prepare, tell_brief
 from dotagent.proactive.checkin import is_checkin, prepare_checkin, tell_checkin
 from dotagent.proactive.initiative import Initiative
+from dotagent.proactive.text import one_line
 from dotagent.repair.github import command
 from dotagent.repair.night import NIGHT_KEY, PROCESS_STARTED_AT, checkout_of, repair_night
 from dotagent.repair.settle import settle_stored
@@ -1242,6 +1243,18 @@ class Scheduler:
         while the owner's emergency stop is engaged, nor while a run of the schedule is at work or being started
         (:class:`RunConflict`). A run that cannot start is the caller's error, the chat made for it gone, and it is no
         missed firing: the owner is looking."""
+        return await self._fire_now(schedule_id, now, "by hand", None)
+
+    async def fire_by_hook(self, schedule_id: str, now: float, hook_name: str, called: str) -> RunRecord:
+        """Start a run of the schedule ``schedule_id`` now because its hook ``hook_name`` was called with a good
+        signature (:mod:`dotagent.hooks`): as :meth:`fire_by_hand` starts one, with the schedule's own choices and no
+        others, its first message ``called`` (what the call carried, fenced) before the schedule's goal, and the run
+        started tainted, as a watcher's is: what the call carried was written by whoever called."""
+        return await self._fire_now(schedule_id, now, f"hook {one_line(hook_name, 40)}", called)
+
+    async def _fire_now(self, schedule_id: str, now: float, why: str, called: str | None) -> RunRecord:
+        """The run of a firing out of its time, :meth:`fire_by_hand`'s (``called`` None) or :meth:`fire_by_hook`'s;
+        ``why`` is what its chat's title says after the time."""
         store: Store = self._runtime.store
         record: ScheduleRecord = await store.get_schedule(schedule_id)
         if await _emergency_stop_engaged():
@@ -1261,10 +1274,12 @@ class Scheduler:
                 woken = await self._check(record.options.precheck)
             zone: ZoneInfo = await schedule_zone(record.options, self._zone)
             same_chat, digest = await self._history(record, zone)
-            out_of_time: str = thread_title(f"{record.name} · {format_local(now, zone)} · by hand")
+            out_of_time: str = thread_title(f"{record.name} · {format_local(now, zone)} · {why}")
             record, digest, title = await self._briefed(record, digest, now, zone, out_of_time)
             thread_id, made = await self._firing_chat(record, same_chat, title)
-            goal: str = by_hand_goal(record.goal, now, zone)
+            goal: str = by_hand_goal(record.goal, now, zone) if called is None else f"{called}\n\n{record.goal}"
+            if called is not None:
+                record = record.model_copy(update={"options": record.options.model_copy(update={"from_outside": True})})
             started: RunRecord | None = None
             try:
                 # Inside the try, as a firing's (item 785): a store that fails here drops the chat made for the run.
@@ -1292,7 +1307,7 @@ class Scheduler:
         finally:
             self._starting.discard(schedule_id)
         log.info(
-            "schedule_fired_by_hand",
+            "schedule_fired_by_hand" if called is None else "schedule_fired_by_hook",
             schedule_id=record.id,
             run_id=run.id,
             thread_id=thread_id,

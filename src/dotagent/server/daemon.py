@@ -485,7 +485,8 @@ async def run_daemon(config: AppConfig) -> int:
                 )
                 awake_task.add_done_callback(_log_awake_end)
                 cleanup.push_async_callback(_cancelled, awake_task)
-            # The watchers (item 571) look beside the scheduler, from the daemon's own clock: no inbound webhook.
+            # The watchers (item 571) look beside the scheduler, from the daemon's own clock; a service that calls
+            # starts work through a hook instead (routes_hooks.py).
             if config.watchers.enabled:
                 watching: asyncio.Task[None] = asyncio.create_task(
                     watch_loop(runtime, manager, stopping), name="watchers"

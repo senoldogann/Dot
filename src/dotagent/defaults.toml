@@ -43,6 +43,10 @@ port = 8765
 # `tailscale serve --bg 8765` gives https://<mac>.<tailnet>.ts.net, and that name goes here. The daemon itself stays on
 # the loopback address.
 reach = []
+# Host names that reach the hooks alone (POST /api/hooks/<id>, docs/hooks.md), for a tunnel you open to the internet,
+# such as Tailscale Funnel on its own port: "<mac>.<tailnet>.ts.net:8443". Every other address refuses them. Empty: the
+# hooks answer on this Mac and the reach names above only.
+hook_hosts = []
 # Whether the daemon keeps the Mac awake while it charges (caffeinate -s, item 271), so that a phone reaches it from
 # away; Settings › Phone switches it. A closed lid still puts a MacBook to sleep.
 keep_awake = false

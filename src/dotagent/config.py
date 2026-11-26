@@ -111,6 +111,9 @@ class ServerConfig(FrozenModel):
     host: str
     port: int = Field(ge=1, le=65535)
     reach: list[str]
+    # The hosts a call to a hook may come in under besides those (``docs/hooks.md``): a name a tunnel open to the
+    # internet presents the daemon as, which reaches ``POST /api/hooks/<id>`` and nothing else. Empty: none.
+    hook_hosts: list[str]
     # Whether the daemon keeps the Mac awake while it charges (item 271), for a phone that reaches it from away.
     keep_awake: bool
 
