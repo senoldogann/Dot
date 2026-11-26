@@ -144,11 +144,15 @@ def wire_error_from_object(obj: JsonObject) -> WireError | None:
 
 
 def parse_wire_error(body: str) -> WireError | None:
-    """Parse a response body into a ``WireError``; ``None`` when the body is not a JSON error description."""
+    """Parse a response body into a ``WireError``; ``None`` when the body is not a JSON error description. Google's
+    OpenAI-compatible route wraps its one error object in an array (``[{"error": {...}}]``, item 1898), which is read
+    as that object."""
     try:
         parsed: JsonValue = json.loads(body)
     except json.JSONDecodeError:
         return None
+    if isinstance(parsed, list) and len(parsed) == 1:
+        parsed = parsed[0]
     return wire_error_from_object(parsed) if isinstance(parsed, dict) else None
 
 
