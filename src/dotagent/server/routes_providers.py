@@ -171,15 +171,24 @@ def providers_router(ctx: ServerContext) -> APIRouter:
                         "sent there from here: write the table in config.toml, or remove the key from where it is kept",
                         {"name": name, "key": config.api_key_env},
                     )
-            await asyncio.to_thread(set_custom_provider, config_path(), name, config)
             # The key Settings saved for the provider stays only while it goes to the server it was saved for: a new
             # address, a table that stops taking a key (and takes one again later) or a new provider of a name once
-            # used drop it, before the new address is in service, so the owner types it for the new one.
+            # used drop it before anything else changes, so the owner types it for the new one. What the name still
+            # finds once Dot's copy is gone (a Keychain item under it) is refused like any key Settings did not save.
             dropped: bool = (
                 not kept
                 and not _named_by_another(name, others)
                 and await asyncio.to_thread(remove_env_value, env_file_path(), key_name(name))
             )
+            if dropped and config.api_key_env != "":
+                left: SecretState = await asyncio.to_thread(secret_state, config.api_key_env)
+                if left.source is not None:
+                    raise ConfigError(
+                        f"the key {config.api_key_env} is also kept in the {left.source}, which Settings does not send "
+                        "to a new address: remove it there, or write the table in config.toml",
+                        {"name": name, "key": config.api_key_env},
+                    )
+            await asyncio.to_thread(set_custom_provider, config_path(), name, config)
             await ctx.runtime.router.set_custom(name, config)
         log.info(
             "custom_provider_saved",

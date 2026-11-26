@@ -199,7 +199,8 @@ here points at a test that no longer exists.
   custom provider's model in `[models] standby` or `helpers` raised "unknown provider" in the roster (item 1949).
 - `tests/smoke/test_custom_providers.py::test_the_api_refuses_a_header_that_carries_a_key_and_a_built_in_name` — a
   table that stopped taking a key and took it again at a new address sent the key saved for the old one there, through
-  Save and Test (item 1949's security review).
+  Save and Test (item 1949's security review), and a key under that name in the environment was attached to an address
+  by Save (its second pre-push review).
 
 ## Evidence and format
 
