@@ -642,6 +642,8 @@ ROWS: tuple[Row, ...] = (
         {"cards": [{"kind": "choice", "prompt": "Which color?", "options": ["Blue", "Green"]}]},
     ),
     _row("meta: show a page", "show_page", {"title": "A chart", "html": "<p>hi</p>"}),
+    _row("meta: draw a picture", "generate_image", {"path": "logo.png", "svg": "<svg viewBox='0 0 1 1'/>"}),
+    _row("meta: a photo from Google's picture model", "generate_image", {"path": "fox.png", "photo": "a red fox"}),
     _row("appearance: read the shared theme", "theme_read", {}),
     _row("appearance: use the device theme", "theme_apply", {"revision": 0, "theme": None}),
     _row("appearance: undo a theme change", "theme_undo", {"revision": 0}),

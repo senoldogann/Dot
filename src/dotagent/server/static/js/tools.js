@@ -8,6 +8,9 @@ import { icon, toolIconName } from "./icons.js";
 import { showImage } from "./ui.js";
 import { showsWhy, whyText } from "./why.js";
 
+/** The tool whose pictures stand as cards in the conversation (item 1969). */
+export const GENERATED_PICTURE_TOOL = "generate_image";
+
 const PRIMARY_KEYS = ["command", "url", "path", "query", "goal", "text", "name", "app", "ref", "title", "script", "key"];
 const SUMMARY_CHARS = 200;
 const TEXT_PREVIEW_CHARS = 6000;
@@ -164,6 +167,26 @@ function thumbnail(name) {
     },
   );
   return holder;
+}
+
+/**
+ * A picture a run made (`generate_image`, item 1969), part of the answer: the picture itself at the width of the
+ * conversation, no box round it, which opens full size on a press.
+ */
+export function pictureCard(name) {
+  const image = el("img", { class: "shown-picture-image", alt: t("tools.pictureMade"), loading: "lazy" });
+  const holder = el("button", { class: "shown-picture-open", type: "button", "aria-label": t("tools.pictureFull") }, image);
+  imageUrl(name).then(
+    (url) => {
+      image.src = url;
+      holder.addEventListener("click", () => showImage(url, t("tools.pictureMade")));
+    },
+    (error) => {
+      holder.replaceChildren(el("span", { class: "small muted" }, t("tools.imageUnavailable", { problem: error.message })));
+      holder.disabled = true;
+    },
+  );
+  return el("figure", { class: "shown-picture" }, holder);
 }
 
 /** Why the step ran (item 468), with the way to the rules when one of them decided it. */
@@ -384,7 +407,8 @@ export function toolRow({ tool, args }) {
     // A command keeps its own words, what it came to its tooltip; a failure's first line is the tooltip of any call.
     head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || t("tools.failed");
     time.textContent = duration(outcome.seconds);
-    shots.replaceChildren(...outcome.images.map(thumbnail));
+    // A picture the run made is an answer, drawn by its own card (`pictureCard`), not a thumbnail of the row.
+    shots.replaceChildren(...(outcome.tool === GENERATED_PICTURE_TOOL ? [] : outcome.images.map(thumbnail)));
     if (details.open) {
       buildBody();
     }

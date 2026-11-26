@@ -13,48 +13,58 @@ struct BotProfile: View {
     /// The bot's header, handed on to the pages pushed from here (a destination does not inherit it).
     @Environment(\.botChat) private var botChat: BotChat?
     @State private var schedules: Loadable<[ScheduleView]> = .loading
-    @State private var problem: SettingsFailure?
     @State private var deletingChat: ThreadRow?
     @State private var library: String?
     @State private var composing: Bool = false
+    @State private var editing: Bool = false
     @State private var showsInstructions: Bool = false
     @AppStorage(PrefKey.confirmDelete) private var confirmDelete: Bool = true
 
     private var bot: Bot? { model.bots.first { $0.id == botId } }
 
     var body: some View {
-        SettingsScroll(title: bot?.record.name ?? "") {
+        SettingsScroll(title: "") {
             if let bot {
                 header(bot)
-                chats(bot)
-                routines(bot)
                 GroupedSection(header: nil, footer: nil) {
                     if let latest = bot.latest {
                         Button { library = latest.summary.id } label: {
-                            ListRow(
-                                systemImage: "folder", title: String(localized: "Library", comment: "Bot chat menu: the files and pages this bot made"),
-                                description: String(localized: "Files and pages of its latest chat", comment: "Bot profile: what the Library row opens"), accessory: .chevron)
+                            ListRow(systemImage: "folder", title: String(localized: "Library", comment: "Bot chat menu: the files and pages this bot made"), description: nil, accessory: .chevron)
                         }
                         .buttonStyle(RowPressStyle())
+                        .accessibilityIdentifier("profile.library")
                     }
+                    BotComputerRow(bot: bot)
+                }
+                GroupedSection(header: String(localized: "Configure the bot", comment: "Bot profile: the section of what the bot does and runs on"), footer: nil) {
+                    NavigationRow(
+                        systemImage: "clock", title: String(localized: "Routines", comment: "Bot profile: the bot's scheduled tasks"), description: nil,
+                        detail: routinesWords(bot)
+                    ) { SchedulesPage(editsFirst: false, scope: bot.isDot ? .dot : .agent(bot.id)) }
+                    .accessibilityIdentifier("profile.routines")
                     modelRow(bot)
                     NavigationRow(
                         systemImage: "clock.arrow.circlepath", title: String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"),
                         description: bot.isDot ? nil : String(localized: "What \(bot.record.name) did", comment: "Bot profile: the Activity row of an agent; the argument is its name"),
                         detail: nil
                     ) { ActivityPage(agent: bot.isDot ? nil : bot.id) }
-                    ToggleRow(
-                        systemImage: "bell.slash", title: String(localized: "Mute", comment: "Home: a bot's unread chats are not counted"),
-                        description: String(localized: "Its unread chats are not counted on the home.", comment: "Bot profile: what Mute does"),
-                        isOn: Binding(get: { model.mutedBots.contains(bot.id) }, set: { _ in model.toggleMute(bot.id) }))
                 }
+                GroupedSection(
+                    header: nil,
+                    footer: String(localized: "Count this bot's unread chats and what waits for you on the home. Push alerts follow Settings › Notifications.", comment: "Bot profile: what the Notifications switch does")
+                ) {
+                    ToggleRow(
+                        systemImage: nil, title: String(localized: "Notifications", comment: "Settings row"), description: nil,
+                        isOn: Binding(get: { !model.mutedBots.contains(bot.id) }, set: { _ in model.toggleMute(bot.id) }))
+                    .accessibilityIdentifier("profile.notifications")
+                }
+                chats(bot)
                 if bot.isDot {
                     GroupedSection(header: String(localized: "Your Mac", comment: "Dot's profile: the section of the Mac"), footer: nil) {
                         NavigationRow(
                             systemImage: "desktopcomputer", title: String(localized: "This Mac", comment: "Settings row: the paired Mac"), description: nil,
                             detail: transportWord(model.transport)
                         ) { MacPage() }
-                        WatchMacRow()
                     }
                 } else if !bot.record.instructions.isEmpty {
                     instructions(bot)
@@ -71,6 +81,7 @@ struct BotProfile: View {
             RunInspector(thread: chat.id, close: { library = nil })
         }
         .navigationDestination(isPresented: $composing) { PushedNewChat(botId: botId, header: botChat) }
+        .navigationDestination(isPresented: $editing) { BotEditPage(botId: botId) }
         .confirmationDialog(
             String(localized: "Delete this chat with everything it holds?", comment: "Confirmation of deleting a chat"),
             isPresented: Binding(get: { deletingChat != nil }, set: { if !$0 { deletingChat = nil } }), titleVisibility: .visible
@@ -86,21 +97,37 @@ struct BotProfile: View {
 
     private func header(_ bot: Bot) -> some View {
         VStack(spacing: Space.s) {
-            BotFace(id: bot.id, look: bot.record.look, size: 88)
-            Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text)
+            BotFace(id: bot.id, look: bot.record.look, size: 96)
+            Text(bot.record.name).textRole(.title).foregroundStyle(Tone.text).multilineTextAlignment(.center)
             if !bot.record.role.isEmpty {
-                Text(bot.record.role).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
+                Text(shownRole(bot.record)).textRole(.footnote).foregroundStyle(Tone.secondary).multilineTextAlignment(.center)
             }
-            Button(String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), systemImage: "plus.bubble") { composing = true }
-                .buttonStyle(SecondaryButtonStyle())
-                .padding(.top, Space.xs)
+            if !bot.isDot {
+                Button(String(localized: "Edit", comment: "Bot profile: opens the bot's edit page")) { editing = true }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .padding(.top, Space.xs)
+                    .accessibilityIdentifier("profile.edit")
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Space.s)
     }
 
+    /// "2 on": how many of the bot's routines are switched on.
+    private func routinesWords(_ bot: Bot) -> String? {
+        guard let all = schedules.value else { return nil }
+        let own: [ScheduleView] = all.filter { ($0.agent?.id ?? dotAgentId) == bot.id }
+        let on: Int = own.filter { $0.record.enabled }.count
+        return String(localized: "\(on) on", comment: "Bot profile: how many of its routines are switched on")
+    }
+
     @ViewBuilder private func chats(_ bot: Bot) -> some View {
         GroupedSection(header: String(localized: "Chats", comment: "Title of the chat list"), footer: nil) {
+            Button { composing = true } label: {
+                ListRow(systemImage: "plus.bubble", title: String(localized: "New chat", comment: "Chat list toolbar: starts a new chat"), description: nil, accessory: .none)
+            }
+            .buttonStyle(RowPressStyle())
+            .accessibilityIdentifier("profile.newChat")
             if bot.chats.isEmpty {
                 ListRow(systemImage: nil, title: String(localized: "No chat yet", comment: "Home: a bot that has no chat"), description: nil, accessory: .none)
             }
@@ -113,6 +140,7 @@ struct BotProfile: View {
                         accessory: .detail(rowTime(row.summary.updatedAt, now: .now)))
                 }
                 .buttonStyle(RowPressStyle())
+                .accessibilityIdentifier("profile.chat")
                 .contextMenu {
                     Button(
                         row.summary.pinnedAt != nil
@@ -130,39 +158,8 @@ struct BotProfile: View {
                 NavigationRow(
                     systemImage: "bubble.left.and.bubble.right", title: String(localized: "All chats", comment: "Bot profile: opens every chat of the bot"),
                     description: nil, detail: nil
-                ) { BotChatsPage(scope: .chats(of: Set(bot.chats.map(\.summary.id)), agent: bot.isDot ? nil : bot.id), open: open).environment(\.botChat, botChat) }
-            }
-        }
-    }
-
-    /// The bot's schedules with their switches (Dot's: those of no agent).
-    @ViewBuilder private func routines(_ bot: Bot) -> some View {
-        GroupedSection(header: String(localized: "Routines", comment: "Bot profile: the bot's scheduled tasks"), footer: nil) {
-            // A switch the Mac refused snaps back; why stands here, beside it.
-            if let problem {
-                FailureBanner(failure: problem, macPlace: String(localized: "Settings › Scheduled tasks", comment: "Where on the Mac: the schedules"), retry: nil)
-                    .padding(Space.groupedGutter)
-            }
-            switch schedules {
-            case .loading:
-                ProgressView().frame(maxWidth: .infinity, minHeight: Metric.row)
-            case .failed(let failure):
-                FailureBanner(failure: failure, macPlace: String(localized: "Settings › Scheduled tasks", comment: "Where on the Mac: the schedules"), retry: {
-                    Task { await loadSchedules() }
-                })
-                .padding(Space.groupedGutter)
-            case .loaded(let all):
-                let own: [ScheduleView] = all.filter { ($0.agent?.id ?? dotAgentId) == bot.id }
-                if own.isEmpty {
-                    ListRow(
-                        systemImage: nil, title: String(localized: "No routine", comment: "Bot profile: the bot has no scheduled task"),
-                        description: String(localized: "Ask it in a chat to do something on a rhythm.", comment: "Bot profile: how a routine is made"), accessory: .none)
-                }
-                ForEach(own) { schedule in
-                    ToggleRow(
-                        systemImage: nil, title: schedule.record.name, description: scheduleLine(schedule, now: .now, locale: locale),
-                        isOn: Binding(get: { schedule.record.enabled }, set: { on in Task { await setEnabled(schedule, on) } }))
-                }
+                ) { BotChatsPage(scope: .botChats(bot: bot.id, agent: bot.isDot ? nil : bot.id), open: open).environment(\.botChat, botChat) }
+                .accessibilityIdentifier("profile.allChats")
             }
         }
     }
@@ -202,18 +199,6 @@ struct BotProfile: View {
 
     private func loadSchedules() async {
         schedules = await model.read { api throws(DaemonRequestError) in try await api.schedules() }
-    }
-
-    private func setEnabled(_ schedule: ScheduleView, _ on: Bool) async {
-        switch await model.write({ api throws(DaemonRequestError) in try await api.setSchedule(schedule.id, enabled: on) }) {
-        case .success(let saved):
-            problem = nil
-            if var all = schedules.value, let index = all.firstIndex(where: { $0.id == saved.id }) {
-                all[index] = saved
-                schedules = .loaded(all)
-            }
-        case .failure(let box): problem = box.failure
-        }
     }
 
     private func changeModel(_ record: AgentRecord, to ref: String) async -> SettingsFailure? {
@@ -312,6 +297,238 @@ struct ActivityPage: View {
                 title: String(localized: "Activity comes in the next version", comment: "Activity page: placeholder until the view is built"), systemImage: "clock.arrow.circlepath",
                 detail: String(localized: "What Dot does on its own (schedules, helpers, drafts that wait) will show here.", comment: "Activity page: what it will show"),
                 actionTitle: nil, action: {})
+        }
+    }
+}
+
+// MARK: Computer
+
+/// Whether a bot has a run at work (queued, running or ending): a chat that only waits on the owner is not at work.
+func botIsWorking(_ bot: Bot) -> Bool {
+    bot.chats.contains { ["queued", "running", "ending"].contains($0.summary.latestStatus) }
+}
+
+/// The profile's Computer row (item 1963): "Working" while a run of the bot works, else "Idle". A tap opens what it does
+/// on the Mac: the live picture of the run's browser or desktop with Take over, when one of the bot's chats is following a run
+/// that uses them, else the Mac's own screen.
+struct BotComputerRow: View {
+    let bot: Bot
+    @Environment(AppModel.self) private var model: AppModel
+    @State private var live: LiveCover?
+    @State private var watching: Bool = false
+
+    var body: some View {
+        Button(action: open) {
+            ListRow(
+                systemImage: "desktopcomputer", title: String(localized: "Computer", comment: "Bot profile: what the bot does on the Mac"), description: nil,
+                accessory: .detailAndChevron(
+                    botIsWorking(bot)
+                        ? String(localized: "Working", comment: "Bot profile: the bot has a run at work")
+                        : String(localized: "Idle", comment: "Bot profile: the bot has no run at work")))
+        }
+        .buttonStyle(RowPressStyle())
+        .accessibilityIdentifier("profile.computer")
+        .fullScreenCover(isPresented: $watching) { WatchMacScreen(close: { watching = false }) }
+        .fullScreenCover(item: $live) { cover in
+            LiveCoverScreen(follow: cover.follow, facts: cover.facts, close: { live = nil })
+        }
+    }
+
+    private func open() {
+        for row in bot.chats {
+            if let facts = liveRunFacts(model.chats[row.summary.id]) {
+                live = LiveCover(follow: LiveFollow(run: facts.run, surface: facts.surface), facts: facts)
+                return
+            }
+        }
+        watching = true
+    }
+}
+
+/// A run's live picture opened from the profile.
+struct LiveCover: Identifiable {
+    let follow: LiveFollow
+    let facts: LiveRunFacts
+    var id: String { facts.run }
+}
+
+/// The run's live screen with Take over, reading the picture while it shows.
+struct LiveCoverScreen: View {
+    let follow: LiveFollow
+    let facts: LiveRunFacts
+    let close: () -> Void
+    @Environment(AppModel.self) private var model: AppModel
+
+    var body: some View {
+        RunLiveScreen(follow: follow, facts: facts, close: close)
+            .onAppear { if let api = model.settingsAPI { follow.start(api: api) } }
+            .onDisappear { follow.stop() }
+    }
+}
+
+// MARK: Edit
+
+/// A bot's edit page (item 1963, as Grok's "Edit bot"): its avatar and its name; Done keeps both on the Mac.
+struct BotEditPage: View {
+    let botId: String
+    @Environment(AppModel.self) private var model: AppModel
+    @Environment(\.dismiss) private var dismiss: DismissAction
+    @State private var name: String = ""
+    @State private var look: AgentLook?
+    @State private var seeded: Bool = false
+    @State private var saving: Bool = false
+    @State private var problem: SettingsFailure?
+
+    private var bot: Bot? { model.bots.first { $0.id == botId } }
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var changed: Bool {
+        guard let bot else { return false }
+        return trimmed != bot.record.name || look != bot.record.look
+    }
+
+    var body: some View {
+        SettingsScroll(title: String(localized: "Edit bot", comment: "Bot edit page title")) {
+            if let bot {
+                if let problem { FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: nil) }
+                BotFace(id: bot.id, look: look, size: 96).frame(maxWidth: .infinity).padding(.vertical, Space.s)
+                GroupedSection(header: String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), footer: nil) {
+                    TextField(String(localized: "Name", comment: "Rename alert: the field of the chat's new name"), text: $name)
+                        .textRole(.body).foregroundStyle(Tone.text)
+                        .padding(.horizontal, Space.groupedGutter)
+                        .frame(minHeight: Metric.row)
+                        .accessibilityIdentifier("botEdit.name")
+                }
+                GroupedSection(header: String(localized: "Appearance", comment: "Bot edit page: the section of how the bot looks"), footer: nil) {
+                    NavigationRow(systemImage: nil, title: String(localized: "Avatar", comment: "Bot edit page: opens the bot's shape and colour"), description: nil, detail: nil) {
+                        BotAvatarPage(id: bot.id, look: $look)
+                    }
+                    .accessibilityIdentifier("botEdit.avatar")
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button(String(localized: "Done", comment: "Find in chat: closes the bar")) { Task { await save() } }
+                    .disabled(!changed || trimmed.isEmpty || saving)
+                    .accessibilityIdentifier("botEdit.done")
+            }
+        }
+        .onAppear {
+            guard !seeded, let bot else { return }
+            seeded = true
+            name = bot.record.name
+            look = bot.record.look
+        }
+    }
+
+    private func save() async {
+        guard let bot, !trimmed.isEmpty else { return }
+        saving = true
+        let record: AgentRecord = bot.record
+        let request: AgentRequest = AgentRequest(
+            name: String(trimmed.prefix(AgentRequest.nameLimit)), role: record.role, instructions: record.instructions, model: record.model, effort: record.effort,
+            approvals: record.approvals, tools: record.tools, look: look, refuses: record.refuses)
+        switch await model.write({ api throws(DaemonRequestError) in try await api.updateAgent(record.id, request) }) {
+        case .success:
+            await model.loadAgents()
+            dismiss()
+        case .failure(let box):
+            problem = box.failure
+            saving = false
+        }
+    }
+}
+
+/// A bot's shape and colour (its face; the daemon keeps one more thing, its resting expression, which stays as it is).
+struct BotAvatarPage: View {
+    let id: String
+    @Binding var look: AgentLook?
+
+    private var current: (shape: BotShape, colour: BotColour) { botLook(id: id, look: look) }
+    private var expression: String { look?.expression ?? "neutral" }
+    private let columns: [GridItem] = [GridItem(.adaptive(minimum: 64), spacing: Space.s)]
+
+    var body: some View {
+        SettingsScroll(title: String(localized: "Avatar", comment: "Bot edit page: opens the bot's shape and colour")) {
+            BotFace(id: id, look: look, size: 96).frame(maxWidth: .infinity).padding(.vertical, Space.s)
+            GroupedSection(header: String(localized: "Shape", comment: "Bot avatar page: the section of body shapes"), footer: nil) {
+                LazyVGrid(columns: columns, spacing: Space.s) {
+                    ForEach(BotShape.allCases, id: \.self) { shape in
+                        let chosen: Bool = current.shape == shape
+                        Button { set(shape: shape, colour: current.colour) } label: {
+                            BotFace(id: id, look: AgentLook(shape: shape.rawValue, expression: expression, colour: current.colour.rawValue), size: 40)
+                                .frame(maxWidth: .infinity, minHeight: Metric.hit + Space.s)
+                                .background(chosen ? Tone.nested : Color.clear, in: RoundedRectangle(cornerRadius: Radius.inner))
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(shape.title)
+                        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : [.isButton])
+                        .accessibilityIdentifier("avatar.shape." + shape.rawValue)
+                    }
+                }
+                .padding(Space.groupedGutter)
+            }
+            GroupedSection(header: String(localized: "Colour", comment: "Bot avatar page: the section of body colours"), footer: nil) {
+                LazyVGrid(columns: columns, spacing: Space.s) {
+                    ForEach(BotColour.allCases, id: \.self) { colour in
+                        let chosen: Bool = current.colour == colour
+                        Button { set(shape: current.shape, colour: colour) } label: {
+                            Circle().fill(colour.color).frame(width: 32, height: 32)
+                                .overlay(Circle().stroke(Tone.text, lineWidth: chosen ? 2 : 0).padding(-4))
+                                .frame(maxWidth: .infinity, minHeight: Metric.hit + Space.s)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(colour.title)
+                        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : [.isButton])
+                        .accessibilityIdentifier("avatar.colour." + colour.rawValue)
+                    }
+                }
+                .padding(Space.groupedGutter)
+            }
+        }
+    }
+
+    private func set(shape: BotShape, colour: BotColour) {
+        look = AgentLook(shape: shape.rawValue, expression: expression, colour: colour.rawValue)
+    }
+}
+
+extension BotShape {
+    var title: String {
+        switch self {
+        case .circle: String(localized: "Circle", comment: "Bot shape")
+        case .pebble: String(localized: "Pebble", comment: "Bot shape")
+        case .squircle: String(localized: "Squircle", comment: "Bot shape")
+        case .capsule: String(localized: "Capsule", comment: "Bot shape")
+        case .triangle: String(localized: "Triangle", comment: "Bot shape")
+        case .hexagon: String(localized: "Hexagon", comment: "Bot shape")
+        case .cloud: String(localized: "Cloud", comment: "Bot shape")
+        case .droplet: String(localized: "Droplet", comment: "Bot shape")
+        }
+    }
+}
+
+extension BotColour {
+    var title: String {
+        switch self {
+        case .ink: String(localized: "Ink", comment: "Bot colour")
+        case .brown: String(localized: "Brown", comment: "Bot colour")
+        case .red: String(localized: "Red", comment: "Bot colour")
+        case .orange: String(localized: "Orange", comment: "Bot colour")
+        case .amber: String(localized: "Amber", comment: "Bot colour")
+        case .green: String(localized: "Green", comment: "Bot colour")
+        case .teal: String(localized: "Teal", comment: "Bot colour")
+        case .blue: String(localized: "Blue", comment: "Bot colour")
+        case .violet: String(localized: "Violet", comment: "Bot colour")
+        case .pink: String(localized: "Pink", comment: "Bot colour")
+        case .grey: String(localized: "Grey", comment: "Bot colour")
+        case .cream: String(localized: "Cream", comment: "Bot colour")
         }
     }
 }

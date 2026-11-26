@@ -31,6 +31,9 @@ A finding that comes back gets a check, not another comment: a test or a gate st
 check in the same pull request as the finding, and name it here. `tests/unit/test_review_rules.py` fails if a line
 here points at a test that no longer exists.
 
+- `tests/smoke/test_agents.py::test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts` — the welcome ran
+  on the fast model with the agent's own reasoning level, which that model need not offer: the meeting was refused and the
+  chat deleted (item 1962's review).
 - `tests/unit/test_css_tokens.py::test_the_ink_on_dots_warm_backdrop_reads_on_every_stop_of_it_in_both_looks_and_both_schemes` — the
   hint and the title on Dot's computer's amber backdrop took the page's ink, light in dark: 1.37:1 (item 1324's review).
 - `tests/unit/test_css_tokens.py::test_no_text_is_set_in_the_accent_which_is_a_fill_colour` — six rules still set text in

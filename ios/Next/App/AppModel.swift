@@ -34,6 +34,13 @@ final class AppModel {
     private(set) var startedChats: [String: String] = [:]
     /// The chats whose delete the daemon refused, with its words (item 1800).
     private(set) var refusedDeletes: [String: String] = [:]
+    /// The chats deleted here, on the Mac or on another phone, or on their way to be (`EngineSnapshot.goneChats`).
+    private(set) var goneChats: Set<String> = []
+    /// The deletions the list was told of at the last snapshot, so that only a new one reads the agents again.
+    /// `nil` until the first snapshot, whose deletions (the cache's) read nothing.
+    @ObservationIgnored private var deletedTold: Set<String>?
+    /// Whether a read of the agents asked for by deletions is under way, and whether another was asked for meanwhile.
+    @ObservationIgnored var agentsReread: (running: Bool, owed: Bool) = (false, false)
     /// The Mac's Dot was reset and the owner has not closed the notice yet.
     private(set) var reset: DaemonReset?
     /// How many lifecycle events the list's stream told (`EngineSnapshot.heard`): what Activity reads again on.
@@ -77,7 +84,15 @@ final class AppModel {
     /// Takes the store's newest snapshot: each part is set only when it changed, so its readers alone are drawn again.
     private func show(_ next: EngineSnapshot) {
         if next.list != list || next.chats != chats { PerfCounters.shared.published() }
-        if next.list != list { list = next.list }
+        // Every screen reads the list with the deletes on their way hidden (item 1964), and drops a chat that went (item 1965).
+        let shown: ListProjection = next.shownList
+        if shown != list { list = shown }
+        let gone: Set<String> = next.goneChats
+        if gone != goneChats { goneChats = gone }
+        // A chat the Mac says went may have been a bot's home chat: the agents are read again for the one that follows it.
+        let told: Set<String> = Set(next.list.deleted.keys)
+        if let before = deletedTold, !told.subtracting(before).isEmpty, engine != nil { rereadAgents() }
+        deletedTold = told
         if next.chats != chats { chats = next.chats }
         if next.outbox != outbox { outbox = next.outbox }
         if next.accepted != accepted { accepted = next.accepted }

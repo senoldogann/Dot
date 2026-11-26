@@ -188,7 +188,7 @@ struct SettingsDestination: View {
         case .voice: VoicePage()
         case .models: ModelsPage()
         case .caps: CapsPage(triesRaise: start.triesRaise)
-        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, agentId: nil)
+        case .schedules: SchedulesPage(editsFirst: start.editsFirstSchedule, scope: .all)
         case .rules: RulesPage()
         case .memory: MemoryPage()
         case .agents: AgentsHome()

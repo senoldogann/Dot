@@ -397,6 +397,11 @@ def _ms(seconds: float) -> int:
     return int(seconds * 1000)
 
 
+async def _refuse_request(route: Route) -> None:
+    """The route of a page Dot draws for a picture: nothing it asks for is fetched."""
+    await route.abort(_ABORT_REASON)
+
+
 def driver_lost(error: BaseException) -> bool:
     """Whether ``error`` says that the Playwright driver process died. Playwright raises that as a plain ``Exception``
     (playwright/_impl/_transport.py), so the type and the message together identify it."""
@@ -3155,6 +3160,40 @@ class BrowserSession:
                 {"url": url, "landed": truncate_middle(landed, _LAUNCH_ERROR_CHARS)},
             )
         return RenderedDocument(url=landed, status=status, html=html)
+
+    async def render_image(self, html: str, width: int, height: int) -> bytes:
+        """The PNG of ``html`` drawn in a quiet tab of ``width`` by ``height`` CSS pixels (``generate_image``'s drawn
+        path), as a use of Chrome that the idle close waits for. The page is the run's own writing, so it is given no
+        way out: every request it makes is refused (only what it holds inline, ``data:`` addresses, loads), and its
+        scripts are the caller's to forbid (:func:`dotagent.tools.images.drawn_page` sets a policy that bars them)."""
+        with self._in_use():
+            return await self._render_image(html, width, height)
+
+    async def _render_image(self, html: str, width: int, height: int) -> bytes:
+        config: BrowserConfig = self._config
+        context: BrowserContext = await self._ensure_context()
+        try:
+            page: Page = await self._scratch_page(context)
+        except PlaywrightError as error:
+            raise BrowserError(
+                "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
+            ) from error
+        try:
+            await page.route("**/*", _refuse_request)
+            await page.set_viewport_size({"width": width, "height": height})
+            await page.set_content(html, wait_until="load", timeout=_ms(config.navigation_timeout_s))
+            # Web fonts written into the page (data: addresses) are decoded before the picture is taken.
+            await page.evaluate("document.fonts.ready.then(() => true)")
+            return await page.screenshot(
+                type="png", animations="disabled", caret="initial", scale="css", timeout=_ms(config.action_timeout_s)
+            )
+        except PlaywrightError as error:
+            raise BrowserError(
+                "drawing the picture failed",
+                {"width": width, "height": height, "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)},
+            ) from error
+        finally:
+            await self._discard_scratch(page)
 
     async def _background_tab(self, context: BrowserContext) -> Page:
         """A new tab created in the background through CDP. Playwright's ``new_page`` opens in the foreground, which

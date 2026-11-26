@@ -348,7 +348,9 @@ def _delegate_tool() -> RegisteredTool:
             "that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) "
             "and its report closes that step, unless the part goes on in the background; a step the plan does not have "
             "runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "
-            "check and its answer; a report without one is marked as a claim."
+            "check and its answer; a report without one is marked as a claim. A helper whose part is a pull request "
+            "ends once it is open and does not wait for its checks: you watch them with terminal_open (background) and "
+            "gh pr checks <number> --watch, and this chat is told when they end."
         ),
         args_model=DelegateArgs,
         modes=ALL_MODES,
