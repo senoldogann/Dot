@@ -12,6 +12,7 @@ from dotagent.store.endings import (
     PREFIX_EMERGENCY_STOP,
     PREFIX_INTERNAL_ERROR,
     PREFIX_LIMIT,
+    PREFIX_MODEL_REFUSED,
     RESULT_EMPTY_REPLIES,
     RESULT_RESTARTED,
     RESULT_SHUTDOWN,
@@ -34,6 +35,7 @@ from dotagent.store.models import RunStatus
         ("failed", RESULT_EMPTY_REPLIES, "empty_replies"),
         ("failed", f"{PREFIX_CUT_SHORT} and the run did not finish (the last one ended with 'length').", "cut_short"),
         ("failed", RESULT_RESTARTED, "daemon_restarted"),
+        ("failed", f"{PREFIX_MODEL_REFUSED} (ollama:m). Its words:\n\nI can't help with that.", "model_refused"),
         ("failed", f"{PREFIX_INTERNAL_ERROR}KeyError: 'x'", "internal_error"),
         ("failed", f"the answer{GOAL_CHECK_MARK}the goal is still not reached", "goal_check_refused"),
         # A refusal that happens to say a step "could not run" is the check's own word, not its absence (item 1402).

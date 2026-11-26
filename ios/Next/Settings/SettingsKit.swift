@@ -165,7 +165,7 @@ struct LoadedPage<Value: Sendable, Content: View>: View {
     var body: some View {
         switch state {
         case .loading:
-            LoadingState(message: String(localized: "Reading your Mac…", comment: "Settings: a page waits for its first read")).frame(minHeight: 240)
+            LoadingState(message: String(localized: "Reading your Mac…", comment: "Settings: a page waits for its first read")).fillsScrollPage()
         case .failed(let failure):
             FailureBanner(failure: failure, macPlace: macPlace, retry: retry)
         case .loaded(let value):

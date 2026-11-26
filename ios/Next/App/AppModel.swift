@@ -34,6 +34,8 @@ final class AppModel {
     private(set) var startedChats: [String: String] = [:]
     /// The chats whose delete the daemon refused, with its words (item 1800).
     private(set) var refusedDeletes: [String: String] = [:]
+    /// The Mac's Dot was reset and the owner has not closed the notice yet.
+    private(set) var reset: DaemonReset?
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -82,6 +84,36 @@ final class AppModel {
         if next.workingAt != workingAt { workingAt = next.workingAt }
         if next.startedChats != startedChats { startedChats = next.startedChats }
         if next.refusedDeletes != refusedDeletes { refusedDeletes = next.refusedDeletes }
+        if next.reset != reset { reset = next.reset }
+        if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
+    }
+
+    /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
+    static let newChatDraft: String = "new-chat"
+
+    /// The reset whose words were put in the new chat's draft (its `at`), kept with the draft so that a kill before the
+    /// engine heard of it does not put them there twice.
+    private static let rescuedKey: String = "resetRescuedAt"
+
+    /// A reset left words unsent: they go into the new chat's draft, with the drafts of the old chats (whose chats are
+    /// gone), so that nothing the owner wrote is lost in silence; then the engine is told they were taken.
+    private func rescue(_ fresh: DaemonReset) {
+        guard let engine else { return }
+        let defaults: UserDefaults = UserDefaults.standard
+        let newChatKey: String = "draft.\(Self.newChatDraft)"
+        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && $0 != newChatKey }.sorted()
+        let oldDrafts: [String] = oldKeys.compactMap { defaults.string(forKey: $0) }
+        keep(draft: DaemonRules.draft(keeping: draft(of: Self.newChatDraft), adding: fresh.words + oldDrafts), of: Self.newChatDraft)
+        for key in oldKeys { defaults.removeObject(forKey: key) }
+        defaults.set(fresh.at, forKey: Self.rescuedKey)
+        logger.notice("a reset's words went to the new chat's draft words=\(fresh.words.count) drafts=\(oldDrafts.count)")
+        Task { await engine.store.resetTaken() }
+    }
+
+    /// The owner closed the reset's notice.
+    func resetSeen() {
+        guard let engine else { return }
+        Task { await engine.store.resetSeen() }
     }
 
     /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
@@ -110,7 +142,21 @@ final class AppModel {
     var modelsProblem: String?
     /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
     var palette: PaletteView?
+    /// Dot and the owner's agents (`GET /api/agents`), the home's bots (PLAN §27); read when the home appears, on its pull
+    /// to refresh and after a bot is made, renamed or deleted.
     var agents: [AgentSummary] = []
+    /// Why the last read of the agents failed, for the home's banner; `nil` once one works.
+    var agentsProblem: SettingsFailure?
+    /// Why a new bot's first meeting did not start, by agent id, for its chat's banner (the bot was made).
+    var welcomeProblems: [String: SettingsFailure] = [:]
+    /// The bots the owner pinned to the top of the home, in their order (kept on this phone).
+    var pinnedBots: [String] = UserDefaults.standard.stringArray(forKey: "pinnedBots") ?? [] {
+        didSet { UserDefaults.standard.set(pinnedBots, forKey: "pinnedBots") }
+    }
+    /// The bots the owner muted: their unread chats are not counted (kept on this phone).
+    var mutedBots: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "mutedBots") ?? []) {
+        didSet { UserDefaults.standard.set(Array(mutedBots), forKey: "mutedBots") }
+    }
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
@@ -285,13 +331,13 @@ final class AppModel {
         }
     }
 
-    /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24): its key, which the chat
-    /// list opens at once (item 1849) and swaps for the chat's own id once the daemon names it; `nil` when the message
-    /// could not be kept.
-    func startChat(_ text: String, photos: [Data], start: ChatStart) async -> String? {
+    /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24) and with Dot (`agent` `nil`) or
+    /// one of the owner's agents: its key, which the chat opens at once (item 1849) and swaps for the chat's own id once
+    /// the daemon names it; `nil` when the message could not be kept.
+    func startChat(_ text: String, photos: [Data], start: ChatStart, agent: String?) async -> String? {
         guard let engine else { return nil }
         do {
-            let key: String = try await engine.startChat(text, photos: photos, start: start)
+            let key: String = try await engine.startChat(text, photos: photos, start: start, agent: agent)
             startingChats[key] = text
             return key
         } catch {
@@ -396,7 +442,7 @@ extension AppModel {
         guard let engine, palette == nil else { return }
         do {
             palette = try await engine.api.palette()
-            agents = try await engine.api.agents()
+            if agents.isEmpty { agents = try await engine.api.agents() }
             teams = try await engine.api.teams()
         } catch {
             logger.warning("the composer's lists could not be read error=\(String(describing: error), privacy: .public)")

@@ -12,24 +12,34 @@ choose the script:
 - "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
 - "tools: ...": the run reads two files and keeps a plan, so a finished run folds its steps;
 - "fail: ...": the model fails, so the run fails with one line of cause;
+- "write: ...": the run writes a file of its workspace, a change the inspector can undo;
+- "draft: ...": the run drafts an email, a card with Send, Edit and Discard;
+- "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
-holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop, and
-an active campaign with a progress note (Settings › Campaigns).
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop, and an active campaign with a progress note (Settings › Campaigns). With
+``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
+failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
+own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
+``e2e_activity.sh`` marks "while you were away" read from before them. With
+``--model <ref>`` (``claude_code:haiku``) the runs go to that real model instead of the script, for a real-model run of
+the phone's flows; the throwaway home has no key of its own, so only a provider that brings its own sign-in (the Claude
+plan's ``claude`` command) answers.
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
     DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome \\
-        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed]
+        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity]
 
 It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 ``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
 """
 
 import asyncio
+import json
 import os
 import sys
 import time
@@ -48,10 +58,20 @@ from dotagent.llm.types import (
     Usage,
 )
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.thread_sync import watch_revisions
+from dotagent.store.db import Store
+from dotagent.store.models import (
+    ApprovalRecord,
+    DraftRecord,
+    RunRecord,
+    RunStatus,
+    ScheduleRecord,
+    ThreadRecord,
+)
 
 TOKEN: str = "dotnext-e2e-token"
 MODEL: str = "ollama:scripted"
@@ -187,6 +207,35 @@ class ScriptProvider:
                     id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
                 ),
             )
+        elif latest.startswith("write:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="write_file",
+                    arguments={"path": "dotnext-e2e-note.txt", "content": "Written by the e2e check.\n"},
+                ),
+            )
+        elif latest.startswith("draft:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="draft_message",
+                    arguments={
+                        "channel": "mail",
+                        "to": ["owner@example.com"],
+                        "subject": "E2E draft",
+                        "body": "Hello from the e2e check.",
+                    },
+                ),
+            )
+        elif latest.startswith("bg:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="terminal_open",
+                    arguments={"command": "sleep 600", "background": True},
+                ),
+            )
         elif latest.startswith("fail:"):
             raise RuntimeError("the scripted model failed on purpose")
         elif latest.startswith("slow:"):
@@ -253,8 +302,8 @@ class ScriptProvider:
         return None
 
 
-def prepare_home() -> None:
-    """Refuses a home that may be the owner's, then writes the throwaway home's config (scripted model, supervised)."""
+def prepare_home(model: str) -> None:
+    """Refuses a home that may be the owner's, then writes the throwaway home's config (``model``, supervised)."""
     for name in ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR"):
         if name not in os.environ:
             raise SystemExit(f"{name} must name a throwaway folder")
@@ -267,7 +316,7 @@ def prepare_home() -> None:
         raise SystemExit(f"DOT_HOME={home} is not empty and was not made by this script: give it a mktemp -d folder")
     ensure_layout()
     config.write_text(
-        f'{CONFIG_MARK}\n[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n\n'
+        f'{CONFIG_MARK}\n[models]\nmain = "{model}"\n\n[browser]\nheadless = true\n\n'
         '[policy]\napprovals = "supervised"\n',
         encoding="utf-8",
     )
@@ -308,12 +357,85 @@ async def seed(runtime: Runtime) -> None:
     )
 
 
-async def serve(port: int, seeded: bool) -> None:
+async def _schedule_run(store: Store, name: str, goal: str, status: RunStatus, answer: str) -> RunRecord:
+    """A run of a schedule of ``name`` that ended ``status`` with ``answer``, in the schedule's own chat."""
+    schedule: ScheduleRecord = await store.add_schedule(
+        name, "0 7 * * *", None, goal, "task", time.time() + 86_400, UNSET_OPTIONS, None, True
+    )
+    chat: ThreadRecord = await store.create_thread(name, "schedule")
+    await store.link_schedule_thread(chat.id, schedule.id)
+    run: RunRecord = await store.create_run(
+        chat.id, goal, "task", MODEL, None, "schedule", "medium", "standard", None, "yolo", False, None, None, None
+    )
+    await store.finish_run(run.id, status, answer)
+    return run
+
+
+async def seed_activity(runtime: Runtime) -> None:
+    """What the Activity tab shows (module docstring): runs of schedules, decisions made for the owner, drafts, a thing
+    on Dot's list."""
+    store: Store = runtime.store
+    mail: RunRecord = await _schedule_run(
+        store,
+        "Client mail check",
+        "Read new client mail and draft replies.",
+        "done",
+        "Two clients wrote; both replies are drafted for you.",
+    )
+    await _schedule_run(
+        store, "Nightly backup", "Back up the projects folder.", "failed", "The backup disk was not mounted."
+    )
+    for decided_by in ("yolo", "yolo", "reviewer"):
+        asked: ApprovalRecord = await store.create_approval(mail.id, "shell", "Run a command", "medium", {})
+        await store.decide_approval(asked.id, "approved", decided_by, "")
+    await store.add_draft(
+        mail.id,
+        "mail",
+        ["ayse@example.com"],
+        [],
+        "Re: The March invoice",
+        "Hi Ayşe,\n\nThanks, the invoice is paid; the receipt is attached.\n\nŞenol",
+    )
+    refused: DraftRecord = await store.add_draft(
+        mail.id, "message", ["+90 555 111 22 33"], [], "", "Running ten minutes late, see you at the café."
+    )
+    await store.claim_draft(refused.id, list(refused.to), [], "", refused.body)
+    await store.settle_draft(refused.id, "Messages could not reach the number.")
+    await store.create_harness_version(
+        None,
+        "proposer",
+        "Run the tests of what changed before the whole suite.",
+        "- Run the tests of the files a change touched first.",
+        "",
+        json.dumps({"scope": "tests"}),
+    )
+    await store.create_harness_version(
+        None,
+        "proposer",
+        "Read the README of a repository before editing it.",
+        "- Read a repository's README before the first edit.",
+        "",
+        json.dumps({"tainted": True, "tainted_by": ["a web page"]}),
+    )
+    await store.add_todo(
+        "Tidy the Downloads folder",
+        "tidy the downloads folder",
+        "It holds 2,000 files from the last year.",
+        "run",
+        mail.id,
+        False,
+    )
+
+
+async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await runtime.router.register("ollama", ScriptProvider())
+    if scripted:
+        await runtime.router.register("ollama", ScriptProvider())
     if seeded:
         await seed(runtime)
+    if activity:
+        await seed_activity(runtime)
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", port)
@@ -342,6 +464,17 @@ async def serve(port: int, seeded: bool) -> None:
         await close_runtime(runtime)
 
 
+def model_argument(args: list[str]) -> str:
+    """The model ``--model <ref>`` names, else the script's own."""
+    if "--model" not in args:
+        return MODEL
+    at: int = args.index("--model")
+    if at + 1 >= len(args):
+        raise SystemExit("--model needs a model reference, such as claude_code:haiku")
+    return args[at + 1]
+
+
 if __name__ == "__main__":
-    prepare_home()
-    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:]))
+    chosen: str = model_argument(sys.argv[2:])
+    prepare_home(chosen)
+    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:], "--seed-activity" in sys.argv[2:], chosen == MODEL))

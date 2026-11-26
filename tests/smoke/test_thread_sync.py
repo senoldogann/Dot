@@ -24,6 +24,7 @@ from dotagent.agent.helper_reports import DetachedHelper, keep_detached
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.paths import db_path, ensure_layout
+from dotagent.llm.types import Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -212,6 +213,24 @@ async def test_a_chats_view_holds_its_state_at_a_revision_that_every_writer_move
             told: dict[str, object] = await _changed(frames, gone.id)
             assert told["deleted"] is True
     assert (await http.get(f"/api/threads/{gone.id}/view")).status_code == 404
+
+
+async def test_a_chats_view_holds_the_drafts_that_still_take_an_answer(served: Served) -> None:
+    """A draft of the chat's run that waits, and one whose send failed, are in the view; a discarded one is not (the
+    view once asked for a status no draft has, and held none)."""
+    store: Store = served.runtime.store
+    chat: ThreadRecord = await store.create_thread("Chat", "ui")
+    root: RunRecord = await _run(store, chat.id, None)
+    waiting = await store.add_draft(root.id, "mail", ["a@example.com"], [], "Waits", "Hello")
+    failed = await store.add_draft(root.id, "mail", ["b@example.com"], [], "Failed", "Hello")
+    await store.claim_draft(failed.id, ["b@example.com"], [], "Failed", "Hello")
+    await store.settle_draft(failed.id, "Mail is not set up")
+    dropped = await store.add_draft(root.id, "message", ["+358401234567"], [], "", "Hi")
+    await store.discard_draft(dropped.id)
+
+    view: dict[str, object] = (await served.http.get(f"/api/threads/{chat.id}/view")).json()
+    shown: list[tuple[str, str]] = [(one["id"], one["status"]) for one in view["drafts"]]  # type: ignore[attr-defined]
+    assert shown == [(waiting.id, "waiting"), (failed.id, "failed")]
 
 
 async def _until_synchronized(frames: AsyncIterator[Frame], got: list[EventRecord]) -> dict[str, object]:
@@ -544,3 +563,38 @@ def _same_instant(database: Path, run_ids: list[str]) -> None:
         connection.commit()
     finally:
         connection.close()
+
+
+async def test_the_home_search_finds_what_a_chat_said_and_refuses_an_empty_query(served: Served) -> None:
+    """The phone's home search (item 1882): `GET /api/threads/search` finds a chat by a word of its history, folded as
+    the index folds it, and says nothing of a chat that does not hold it; an empty query is refused."""
+    store: Store = served.runtime.store
+    said: ThreadRecord = await store.create_thread("Car", "ui")
+    other: ThreadRecord = await store.create_thread("Other", "ui")
+    await _run(store, said.id, None)
+    await _run(store, other.id, None)
+    await store.append_messages(said.id, [_said("user", "Book the Lastikçi garage for Friday")])
+    await store.append_messages(other.id, [_said("user", "Water the plants")])
+    found: httpx.Response = await served.http.get("/api/threads/search", params={"q": "LASTIKCI"})
+    assert found.status_code == 200
+    hits: list[dict[str, object]] = found.json()
+    assert [hit["thread_id"] for hit in hits] == [said.id]
+    assert "[Lastikçi]" in str(hits[0]["snippet"])
+    none: httpx.Response = await served.http.get("/api/threads/search", params={"q": "nothing-said-here"})
+    assert none.json() == []
+    empty: httpx.Response = await served.http.get("/api/threads/search", params={"q": ""})
+    assert empty.status_code == 422
+
+
+def _said(role: str, content: str) -> Message:
+    return Message(
+        role="user" if role == "user" else "assistant",
+        content=content,
+        images=(),
+        tool_calls=(),
+        tool_call_id=None,
+        tool_name=None,
+        thinking=None,
+        raw=(),
+        raw_origin=None,
+    )

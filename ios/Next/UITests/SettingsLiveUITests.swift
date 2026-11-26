@@ -31,8 +31,8 @@ final class SettingsLiveUITests: XCTestCase {
         let app: XCUIApplication = try launch()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
 
-        // This Mac: every hop passes and the daemon proved it holds the key.
-        open(app, "This Mac")
+        // Dot's computer (the This Mac page): every hop passes and the daemon proved it holds the key.
+        open(app, "Dot's computer")
         XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 15))
         back(app)
 

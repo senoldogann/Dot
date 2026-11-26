@@ -35,6 +35,16 @@ struct LoadingState: View {
     }
 }
 
+extension View {
+    /// A loading, empty or failed state that stands alone on a scrolling page: as tall as the page's visible area less
+    /// the page's own top and bottom padding, so it is centred both ways between the navigation bar and the bottom (item
+    /// 1904). Outside a scroll view a state fills its place with `maxWidth`/`maxHeight` and needs none of this.
+    func fillsScrollPage() -> some View {
+        frame(maxWidth: .infinity)
+            .containerRelativeFrame(.vertical) { length, _ in max(length - 2 * Space.groupedGutter, 0) }
+    }
+}
+
 /// What a notice is about: neutral information, something that waits on the owner, or a failure.
 enum NoticeTone: Sendable {
     case info

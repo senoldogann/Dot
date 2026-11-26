@@ -164,7 +164,7 @@
                 #"{"id":24,"run_id":"run_b","ts":\#(b + 34),"kind":"tool_result","data":{"call_id":"b2","ok":true,"text":"clicked Next week","images":[]}}"#,
                 #"{"id":25,"run_id":"run_b","ts":\#(b + 40),"kind":"tool_call","data":{"call_id":"b3","tool":"shell","args":{"command":"icalbuddy eventsFrom:today to:+7"}}}"#,
                 #"{"id":26,"run_id":"run_b","ts":\#(b + 41),"kind":"tool_result","data":{"call_id":"b3","ok":false,"text":"icalbuddy: command not found"}}"#,
-                #"{"id":27,"run_id":"run_b","ts":\#(b + 42),"kind":"assistant","data":{"text":"Your Tuesday and Thursday afternoons are free; the dentist shows two slots.","step":4}}"#,
+                #"{"id":27,"run_id":"run_b","ts":\#(b + 42),"kind":"assistant","data":{"text":"Your Tuesday and Thursday afternoons are free; the dentist shows two slots.","thinking":"Compare the calendar with the dentist's free slots before answering.","step":4}}"#,
                 #"{"id":28,"run_id":"run_b","ts":\#(b + 43),"kind":"tool_call","data":{"call_id":"b4","tool":"wait_until","args":{"command":"test -f /tmp/slots"}}}"#,
             ]
             switch self {

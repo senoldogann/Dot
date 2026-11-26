@@ -36,7 +36,7 @@ final class SyncTests: XCTestCase {
     func testANewChatsThreadAndWordsAreKeptWhenTheListHasItsRowFirst() async throws {
         await rig.supervisor.start()
         _ = try await snapshot(of: rig.store, "the list is live") { $0.list.freshness == .live && $0.list.rows.contains { $0.summary.id == "thr_1" } }
-        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: [], start: nil), createdAt: 1)
+        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: [], start: nil, agent: nil), createdAt: 1)
         let run: RunRecord = RunRecord(
             id: "run_1", threadId: "thr_1", goal: "Book the dentist", mode: "task", model: "m", status: "running", createdAt: 1, finishedAt: nil,
             result: "", parentRunId: nil, source: "phone", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
@@ -374,5 +374,80 @@ final class SyncTests: XCTestCase {
         await third.supervisor.start()
         _ = try await snapshot(of: third.store, "the copy of another version is dropped") { $0.chats["thr_1"]?.runs.isEmpty == true }
         await third.supervisor.stop()
+    }
+
+    /// L1's report of 2026-11-25: the Mac's Dot was reset (a new, empty home) at the same address and version. Its
+    /// revisions start again below the copies', so the kept list never went live ("Syncing…" for ever) and a new chat,
+    /// sent only on a live list, stayed "Sending…". The copies of the old daemon are dropped, its outbox doings too, the
+    /// words of an unsent message kept for the owner, a new chat goes to the new daemon, and the owner is told once.
+    func testAResetDotAtTheSameVersionDropsTheOldCopiesAndOutboxAndKeepsTheUnsentWords() async throws {
+        for number in 2...12 { daemon.addChat("thr_\(number)", title: "Chat \(number)") }
+        _ = try await openLive()
+        await rig.supervisor.closeChat("thr_1")
+        rig.link.report(.down)
+        _ = try await rig.engine.send("Thursday afternoon please", thread: "thr_1", photos: [Data("a photo".utf8)], picks: .none)
+        _ = try await rig.engine.perform(.pin(thread: "thr_2", pinned: true))
+        _ = try await rig.engine.startChat("Plan the trip to Oulu", photos: [], start: .daemons, agent: nil)
+        await rig.supervisor.enterBackground()
+        await rig.supervisor.stop()
+
+        let reset: FakeDaemon = FakeDaemon(version: daemon.version)
+        reset.addChat("thr_new", title: "Hello")
+        let after: Rig = Rig(daemon: reset, folder: folder)
+        let before: EngineSnapshot = await after.store.snapshot
+        XCTAssertEqual(before.list.freshness, .cached, "the old list is drawn until the Mac is heard")
+        // The Mac is slow to answer at first: a doing the owner makes on the old picture meanwhile is not sent either.
+        reset.failNext("/api/status", status: 503, body: "busy")
+        let sleeps: Int = after.clock.askedCount
+        await after.supervisor.start()
+        try await after.engine.perform(.stop(run: "run_1", thread: "thr_1"))
+        // Both waits are asked before anything is read: the outbox's hold (its own task) and the supervisor's reconnect
+        // wait, which comes only after the refused status was asked. Waiting on the hold alone raced the status read.
+        let retry: Double = reconnectWait(attempt: 1, jitter: 0)
+        try await after.clock.waitForSleep(of: 5, count: 1, since: sleeps)
+        try await after.clock.waitForSleep(of: retry, count: 1, since: sleeps)
+        XCTAssertEqual(reset.requests.map(\.path), ["/api/status"], "nothing is sent before the daemon is heard")
+        after.clock.advance(retry)
+        let live: EngineSnapshot = try await snapshot(of: after.store, "the reset daemon's list is live and the new chat sent") {
+            $0.list.freshness == .live && $0.outbox.isEmpty && $0.reset != nil
+        }
+        XCTAssertTrue(live.list.rows.contains { $0.summary.id == "thr_new" })
+        XCTAssertFalse(live.list.rows.contains { $0.summary.id == "thr_1" || $0.summary.id == "thr_2" }, "no old chat is left")
+        XCTAssertEqual(live.reset?.words, ["Thursday afternoon please"], "the unsent words are kept for the owner")
+        XCTAssertEqual(live.reset?.photosLeft, true, "the notice can say its photo was not kept")
+        XCTAssertEqual(reset.acceptedTexts, ["Plan the trip to Oulu"], "the new chat went to the new daemon")
+        XCTAssertEqual(reset.count("POST", "/api/threads/thr_1/queue"), 0, "nothing of the old daemon's chats is sent")
+        XCTAssertEqual(reset.count("PATCH", "/api/threads/thr_2"), 0)
+        XCTAssertEqual(reset.count("POST", "/api/runs/run_1/cancel"), 0)
+        XCTAssertEqual(reset.count("POST", "/api/attachments"), 0, "the old message's photo is not sent")
+
+        await after.store.resetTaken()
+        await after.supervisor.stop()
+        let again: Rig = Rig(daemon: reset, folder: folder)
+        let reopened: EngineSnapshot = await again.store.snapshot
+        XCTAssertEqual(reopened.reset?.taken, true, "the words are handed once, the notice kept")
+        XCTAssertEqual(reopened.reset?.words, [])
+        XCTAssertEqual(reopened.reset?.photosLeft, true)
+        await again.store.resetSeen()
+        await again.supervisor.start()
+        _ = try await snapshot(of: again.store, "live again") { $0.list.freshness == .live }
+        let told: EngineSnapshot = await again.store.snapshot
+        XCTAssertNil(told.reset, "told once: the same daemon heard again is no reset")
+        await again.supervisor.stop()
+    }
+
+    /// A restart or an update of the same database is no reset: the outbox is kept and nobody is told.
+    func testTheSameDatabaseHeardAgainUnderAnotherVersionIsNoReset() {
+        let old: DaemonIdentity = DaemonIdentity(version: "1.0", store: "store_a")
+        XCTAssertEqual(DaemonRules.change(from: nil, to: old), .same)
+        XCTAssertEqual(DaemonRules.change(from: old, to: old), .same)
+        XCTAssertEqual(DaemonRules.change(from: old, to: DaemonIdentity(version: "1.1", store: "store_a")), .updated)
+        XCTAssertEqual(DaemonRules.change(from: DaemonIdentity(version: "1.0", store: nil), to: old), .same, "an id first heard")
+        XCTAssertEqual(DaemonRules.change(from: old, to: DaemonIdentity(version: "1.0", store: "store_b")), .reset)
+        XCTAssertEqual(DaemonRules.draft(keeping: "Half a thought", adding: ["Thursday please", "  "]), "Half a thought\n\nThursday please")
+        XCTAssertEqual(DaemonRules.draft(keeping: "", adding: ["Thursday please"]), "Thursday please")
+        let first: UnsentWords = UnsentWords(key: "k1", text: "Thursday please", photos: 0)
+        let second: UnsentWords = UnsentWords(key: "k2", text: "", photos: 1)
+        XCTAssertEqual(DaemonRules.merged([first], [first, second]), [first, second], "a reset found again tells each message once")
     }
 }
