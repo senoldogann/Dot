@@ -133,6 +133,17 @@
         }
       }
     },
+    "%@, in your Mac's time zone.": {
+      "comment": "New schedule footer: the rhythm in words; repeats are read in the Mac's zone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, Mac'inin saat diliminde."
+          }
+        }
+      }
+    },
     "%@, running": {
       "comment": "VoiceOver: a tool call at work; the argument is its line",
       "localizations": {
@@ -1058,7 +1069,7 @@
       }
     },
     "Add": {
-      "comment": "Own initiative: adds a thing to the list",
+      "comment": "New schedule toolbar: makes it\nOwn initiative: adds a thing to the list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1157,7 +1168,7 @@
       }
     },
     "Agent": {
-      "comment": "Agents: an agent's page",
+      "comment": "Agents: an agent's page\nNew schedule: the agent its runs run as",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1552,17 +1563,6 @@
         }
       }
     },
-    "Ask Dot in a chat to do something every morning.": {
-      "comment": "Schedules: how one is made",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dot'tan bir sohbette her sabah bir şey yapmasını iste."
-          }
-        }
-      }
-    },
     "Ask Dot to remember something during a task.": {
       "comment": "Memory: how a note is made",
       "localizations": {
@@ -1680,6 +1680,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Saat %@"
+          }
+        }
+      }
+    },
+    "At this moment in your time.": {
+      "comment": "New schedule footer: a single run is read in the phone's zone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senin saatinle bu anda."
           }
         }
       }
@@ -2891,6 +2902,28 @@
         }
       }
     },
+    "Cron form": {
+      "comment": "VoiceOver: the custom timing field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cron biçimi"
+          }
+        }
+      }
+    },
+    "Custom (cron)": {
+      "comment": "New schedule: a cron form typed by hand",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Özel (cron)"
+          }
+        }
+      }
+    },
     "Custom font size": {
       "comment": "Appearance: a monospaced size of its own",
       "localizations": {
@@ -2920,6 +2953,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Veri"
+          }
+        }
+      }
+    },
+    "Date and time": {
+      "comment": "New schedule: the moment of a single run",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarih ve saat"
+          }
+        }
+      }
+    },
+    "Day": {
+      "comment": "New schedule: the weekday it runs on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gün"
           }
         }
       }
@@ -2969,7 +3024,7 @@
       }
     },
     "Default": {
-      "comment": "Chat settings: the badge of the daemon's main model",
+      "comment": "Chat settings: the badge of the daemon's main model\nNew schedule: the model or level left to the Mac",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2991,7 +3046,7 @@
       }
     },
     "Default model": {
-      "comment": "Agents: an agent on Dot's default model",
+      "comment": "Agents: an agent on Dot's default model\nNew schedule: no model of its own",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3448,6 +3503,17 @@
         }
       }
     },
+    "Does the job": {
+      "comment": "New schedule mode: what a task does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İşi yapar"
+          }
+        }
+      }
+    },
     "Doing now": {
       "comment": "Own initiative: a thing being done",
       "localizations": {
@@ -3653,6 +3719,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot sana gelir"
+          }
+        }
+      }
+    },
+    "Dot does a task by itself, every morning or once at a time you pick.": {
+      "comment": "Schedules: what one is",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot bir işi kendi başına yapar: her sabah ya da seçtiğin bir zamanda bir kez."
           }
         }
       }
@@ -4428,6 +4505,17 @@
         }
       }
     },
+    "Every day": {
+      "comment": "New schedule: runs every day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her gün"
+          }
+        }
+      }
+    },
     "Every day at %@": {
       "comment": "Schedule rhythm; the argument is one or more clock times",
       "localizations": {
@@ -4446,6 +4534,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Her saat"
+          }
+        }
+      }
+    },
+    "Every week": {
+      "comment": "New schedule: runs on one weekday",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her hafta"
           }
         }
       }
@@ -4776,6 +4875,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'inde bitir: Ayarlar › Bağlayıcılar › %@ sayfasını aç. Mac'in oturum açmayı, anahtarı ya da jetonu telefondan değil, orada alır."
+          }
+        }
+      }
+    },
+    "Five parts separated by spaces: minute, hour, day of the month, month, day of the week, in your Mac's time zone. Very frequent schedules are refused.": {
+      "comment": "New schedule footer: the cron form",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boşlukla ayrılmış beş parça: dakika, saat, ayın günü, ay, haftanın günü; Mac'inin saat diliminde. Çok sık zamanlamalar reddedilir."
           }
         }
       }
@@ -5337,6 +5447,17 @@
         }
       }
     },
+    "History": {
+      "comment": "Schedule: its last runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geçmiş"
+          }
+        }
+      }
+    },
     "Hold: the run waits until you write": {
       "comment": "Reaction menu: what ✋ does",
       "localizations": {
@@ -5641,6 +5762,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Listesi"
+          }
+        }
+      }
+    },
+    "Its runs show here once it has run.": {
+      "comment": "Schedule history: what fills it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalıştıkça çalışmaları burada görünür."
           }
         }
       }
@@ -6015,6 +6147,17 @@
         }
       }
     },
+    "Looks things up, changes nothing": {
+      "comment": "New schedule mode: what research does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Araştırır, hiçbir şeyi değiştirmez"
+          }
+        }
+      }
+    },
     "Loop": {
       "comment": "Background work kind: a repeating message of the chat\nBackground work kind: a repeating task of the chat",
       "localizations": {
@@ -6347,7 +6490,7 @@
       }
     },
     "Model": {
-      "comment": "Campaign: the model its sessions use\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6606,6 +6749,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni modeller Modeller açılınca görünür: Dot o an her sağlayıcıya sorar. Dot bir sağlayıcının programını kendi başına asla güncellemez; Claude Code kendini günceller."
+          }
+        }
+      }
+    },
+    "New scheduled task": {
+      "comment": "Title of the new schedule sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni zamanlanmış görev"
           }
         }
       }
@@ -7057,6 +7211,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ulaşılmadı"
+          }
+        }
+      }
+    },
+    "Not run yet": {
+      "comment": "Schedule history: empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz çalışmadı"
           }
         }
       }
@@ -7611,6 +7776,17 @@
         }
       }
     },
+    "Once": {
+      "comment": "New schedule: runs a single time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir kez"
+          }
+        }
+      }
+    },
     "Once, %@": {
       "comment": "Schedule rhythm: runs once at a date and time",
       "localizations": {
@@ -7750,6 +7926,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir sayfa açıyor"
+          }
+        }
+      }
+    },
+    "Opens its chat": {
+      "comment": "VoiceOver: a schedule's run opens its chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetini açar"
           }
         }
       }
@@ -8631,6 +8818,17 @@
         }
       }
     },
+    "Read my mail and tell me what needs me": {
+      "comment": "New schedule: the goal's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Postamı oku, bana ne gerektiğini söyle"
+          }
+        }
+      }
+    },
     "Read src/parser/tokens.py": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -8983,8 +9181,19 @@
         }
       }
     },
+    "Repeat": {
+      "comment": "New schedule: how often it runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tekrar"
+          }
+        }
+      }
+    },
     "Research": {
-      "comment": "Connect apps: a section of services",
+      "comment": "Connect apps: a section of services\nNew schedule mode: look things up",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9276,6 +9485,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düzeltmeyle birim testlerini yeniden çalıştırıyor"
+          }
+        }
+      }
+    },
+    "Runs as": {
+      "comment": "New schedule: the agent, mode and model its runs take",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kim olarak çalışır"
           }
         }
       }
@@ -11048,6 +11268,17 @@
         }
       }
     },
+    "Task": {
+      "comment": "New schedule mode: do the job",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Görev"
+          }
+        }
+      }
+    },
     "Tasks at work": {
       "comment": "System: the number of active runs",
       "localizations": {
@@ -12005,6 +12236,17 @@
         }
       }
     },
+    "Time of day": {
+      "comment": "New schedule: the clock time it runs at",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saat"
+          }
+        }
+      }
+    },
     "Timestamps": {
       "comment": "General section: how clocks read",
       "localizations": {
@@ -12947,6 +13189,17 @@
         }
       }
     },
+    "Weekdays": {
+      "comment": "New schedule: runs Monday to Friday",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hafta içi"
+          }
+        }
+      }
+    },
     "Weekdays at %@": {
       "comment": "Schedule rhythm; the argument is one or more clock times",
       "localizations": {
@@ -12976,6 +13229,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Haftalık müşteri e-postası"
+          }
+        }
+      }
+    },
+    "Weekly report": {
+      "comment": "New schedule: the name's placeholder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haftalık rapor"
           }
         }
       }
@@ -13057,6 +13321,17 @@
         }
       }
     },
+    "What is left on Default takes your Mac's setting, or the agent's, when it runs.": {
+      "comment": "New schedule: what Default means",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Varsayılan'da bırakılan, çalıştığında Mac'inin ya da ajanın ayarını alır."
+          }
+        }
+      }
+    },
     "What it acts on": {
       "comment": "Ask dock: the header of the box with the command or path",
       "localizations": {
@@ -13086,6 +13361,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ne yapmalı?"
+          }
+        }
+      }
+    },
+    "When": {
+      "comment": "New schedule: when it runs",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne zaman"
           }
         }
       }
