@@ -9,16 +9,14 @@
 # the screenshots in it for 7 days.
 #
 # The account runs five macOS runners at once and the gate's own jobs need them, so a run holds two at most: `engine`
-# beside `build`, then the `tests` parts two at a time (`max-parallel`), then `e2e` alone. A pull request runs `engine`,
-# `build` and the `chat` part only; the long parts (`controls`, `rows`) and `e2e` run on a push to main, every night,
-# when asked, and on a pull request that carries the label `ios-full` (docs/development.md).
+# beside `build`, then the `tests` parts two at a time (`max-parallel`), then `e2e` alone. A pull request runs none of
+# it (item 1886: the five runners were what pull requests waited on); the push to main that merges one runs `engine`,
+# `build` and the `chat` part; the long parts (`controls`, `rows`) and `e2e` run every night and when asked
+# (`gh workflow run ios.yml --ref <branch>`, a branch's whole run before its pull request merges). `main-health` keeps
+# the issue "main is red on macOS" (item 1899, docs/development.md).
 name: ios
 
 on:
-  pull_request:
-    # `labeled`: adding `ios-full` to a pull request starts the whole run.
-    types: [opened, synchronize, reopened, labeled]
-    paths: ["ios/**", ".github/workflows/ios.yml"]
   push:
     branches: [main]
     paths: ["ios/**", ".github/workflows/ios.yml"]
@@ -30,11 +28,10 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request stops its run still going; a run of main is never stopped halfway. Another label added
-# to the pull request starts a run that runs no job (each job's `if`), in a group of its own, so it stops nothing.
+# A run of main is never stopped halfway; pushes that come meanwhile wait as one run, the newest, which tests them all.
 concurrency:
-  group: ios-${{ github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'ios-full' && '-other-label' || '' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ios-${{ github.ref }}
+  cancel-in-progress: false
 
 # The Xcode every job uses, from those the runner image holds (/Applications/Xcode_<version>.app). DotNext targets iOS
 # 26 and the engine needs Swift tools 6.2; Xcode 26.1 failed at DotNext's asset catalog, 26.6 (the image's default)
@@ -42,13 +39,12 @@ concurrency:
 env:
   XCODE: "26.6"
   SIMULATOR: "iPhone 17 Pro"
-  # Whether this run is the whole one: everything but a pull request without the label `ios-full`.
-  FULL: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full') }}
+  # Whether this run is the whole one: the night's and one asked for.
+  FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
 
 # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
 jobs:
   engine:
-    if: github.event.action != 'labeled' || github.event.label.name == 'ios-full'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -66,7 +62,6 @@ jobs:
         run: swift test
 
   build:
-    if: github.event.action != 'labeled' || github.event.label.name == 'ios-full'
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -107,7 +102,9 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        part: ${{ fromJSON((github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full')) && '["controls", "chat", "rows"]' || '["chat"]') }}
+        part: >-
+          ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+          && '["controls", "chat", "rows"]' || '["chat"]') }}
     name: tests (${{ matrix.part }})
     steps:
       # StringCatalogTests reads Resources/Localizable.xcstrings at its source path.
@@ -195,7 +192,7 @@ jobs:
     needs: [build, tests]
     if: >-
       !cancelled() && needs.build.result == 'success' &&
-      (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios-full'))
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -267,10 +264,9 @@ jobs:
           if-no-files-found: ignore
 
   # The one check to read: it passes only when every job above passed, `e2e` skipped only in a run that is not the whole
-  # one. Not one for main's protection to require: a pull request that changes nothing under ios/ runs none of this
-  # workflow, so the check would never arrive.
+  # one. Not one for main's protection to require: a pull request runs none of this workflow (item 1886).
   ios:
-    if: always() && (github.event.action != 'labeled' || github.event.label.name == 'ios-full')
+    if: always()
     needs: [engine, build, tests, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -285,3 +281,28 @@ jobs:
           echo "engine=$ENGINE build=$BUILD tests=$TESTS e2e=$E2E full=$FULL"
           [ "$ENGINE" = success ] && [ "$BUILD" = success ] && [ "$TESTS" = success ] || exit 1
           [ "$E2E" = success ] || { [ "$FULL" = false ] && [ "$E2E" = skipped ]; } || exit 1
+
+  # After a push to main's run (item 1899): the issue "main is red on macOS" is opened, or told again, when this commit
+  # failed here or in the gate, and closed when both passed (scripts/main_macos_green.py). Not for a run of the night or
+  # by hand, whose commit main's own runs already told.
+  main-health:
+    needs: [ios]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: The issue of a red main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/main_macos_green.py report --sha "$SHA" --this-run "$RUN_ID"

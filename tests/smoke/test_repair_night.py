@@ -27,7 +27,15 @@ from dotagent.events import Subscription
 from dotagent.notify.owner import OWNER_TOLD_EVENT
 from dotagent.repair import night as night_module
 from dotagent.repair import second as second_module
-from dotagent.repair.night import FIXED_TITLE, NEEDS_YOU_TITLE, SESSIONS_KEY, RepairSession, read_sessions, repair_night
+from dotagent.repair.night import (
+    FIXED_TITLE,
+    NEEDS_YOU_TITLE,
+    RESTART_TITLE,
+    SESSIONS_KEY,
+    RepairSession,
+    read_sessions,
+    repair_night,
+)
 from dotagent.repair.problems import BOOK_KEY, EMPTY_BOOK, Book, Sighting, read_book, with_sightings
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.models import EventRecord
@@ -53,6 +61,12 @@ type Mode = Literal[
 ]
 
 _REVIEW: str = "# Review\n\n## Always needs a human\n\n- `src/dotagent/policy/`\n- `src/dotagent/agent/review.py`\n"
+# A stand-in of scripts/main_macos_green.py (item 1899): main's newest commit passed on macOS.
+_MAIN_GREEN: str = """import subprocess
+subprocess.run(["git", "fetch", "-q", "origin", "main"], check=True)
+sha = subprocess.run(["git", "rev-parse", "origin/main"], check=True, capture_output=True, text=True).stdout.strip()
+print(f"main {sha} on macOS: green")
+"""
 _GIT_ENV: dict[str, str] = {
     "GIT_AUTHOR_NAME": "Test",
     "GIT_AUTHOR_EMAIL": "test@example.invalid",
@@ -416,6 +430,13 @@ def _git(cwd: Path, *args: str) -> None:
     subprocess.run(("git", *args), cwd=cwd, check=True, capture_output=True, env={**os.environ, **_GIT_ENV})
 
 
+def _head(checkout: Path) -> str:
+    """The commit the owner's checkout stands on."""
+    return subprocess.run(
+        ("git", "-C", str(checkout), "rev-parse", "HEAD"), check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
@@ -445,7 +466,10 @@ def stand_ins(tmp_path: Path) -> Iterator[Path]:
     # The repository's own way to its next item number, which Dot runs for the session (it has no way to GitHub).
     (repo / "scripts").mkdir()
     (repo / "scripts" / "next_item.py").write_text('print("931")\n', encoding="utf-8")
-    _git(repo, "add", "REVIEW.md", "scripts/next_item.py")
+    # The repository's own word on main's macOS runs (item 1899), which the night asks before it pulls: green for
+    # main's newest commit, as the real script prints it.
+    (repo / "scripts" / "main_macos_green.py").write_text(_MAIN_GREEN, encoding="utf-8")
+    _git(repo, "add", "REVIEW.md", "scripts/next_item.py", "scripts/main_macos_green.py")
     _git(repo, "commit", "-q", "-m", "start")
     _git(repo, "push", "-q", "origin", "main")
     # The repository's review hook, as one that passes every push (a test that needs another writes its own).
@@ -574,6 +598,25 @@ async def test_a_fix_whose_checks_pass_is_merged_and_the_restart_asked(
         assert read_sessions(await runtime.store.kv_get(SESSIONS_KEY)) == sessions
         # The checkout is gone; its branch stays, for its pull request.
         assert not list((stand_ins.parent / "Dot" / ".claude" / "worktrees").iterdir())
+
+
+async def test_a_merge_whose_main_failed_on_macos_is_not_pulled_and_the_owner_is_told(
+    login_env: dict[str, str], stand_ins: Path
+) -> None:
+    """Item 1899: a pull request runs the Linux checks alone, so the night pulls the owner's checkout only once main's
+    macOS runs passed; main red on macOS leaves the checkout and the daemon as they were, and says why."""
+    checkout: Path = stand_ins.parent / "Dot"
+    before: str = _head(checkout)
+    (checkout / "scripts" / "main_macos_green.py").write_text(
+        _MAIN_GREEN.replace("green", "red") + "raise SystemExit(1)\n", encoding="utf-8"
+    )
+    async with _night(login_env, stand_ins, "pr", "on_pass") as (runtime, restarts):
+        sessions, told = await _play(runtime, restarts)
+        assert [session.end for session in sessions] == ["merged"]
+        assert restarts == []
+        assert _head(checkout) == before, "the owner's checkout was pulled onto a main that failed on macOS"
+        assert [event.data["title"] for event in told] == [FIXED_TITLE, RESTART_TITLE]
+        assert "main failed its macOS tests" in str(told[-1].data)
 
 
 async def test_a_merge_does_not_end_the_night_and_the_checkout_is_pulled_once_it_is_over(

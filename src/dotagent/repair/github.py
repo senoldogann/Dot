@@ -790,11 +790,77 @@ async def checkout_print(repo: Path, env: Mapping[str, str]) -> str:
     return hashlib.sha256(f"{changed}\n{config_print(listed)}\n{files}".encode()).hexdigest()
 
 
-async def pull_main(repo: Path, env: Mapping[str, str]) -> bool:
-    """Bring the owner's checkout at ``repo`` up to main, fast-forward only, when it is on main; ``False`` when it is
-    on another branch, and is left as it is."""
+async def pull_main(repo: Path, env: Mapping[str, str], sha: str) -> bool:
+    """Bring the owner's checkout at ``repo`` up to main's commit ``sha`` (the one whose macOS runs passed, item 1899),
+    fast-forward only, when it is on main; ``False`` when it is on another branch, and is left as it is."""
     branch: str = (await command(("git", "-C", str(repo), "branch", "--show-current"), repo, env)).strip()
     if branch != "main":
         return False
-    await command(("git", "-C", str(repo), "pull", "--ff-only", "--quiet"), repo, env)
+    await command(("git", "-C", str(repo), "fetch", "--quiet", "origin", "main"), repo, env)
+    await command(("git", "-C", str(repo), "merge", "--ff-only", "--quiet", sha), repo, env)
     return True
+
+
+type MacVerdict = Literal["green", "red", "pending"]
+
+# What `scripts/main_macos_green.py check` prints last (item 1899), and the exit code of each verdict.
+_MAC_SAID: re.Pattern[str] = re.compile(r"^main ([0-9a-f]{40}) on macOS: (green|red|pending)$", re.MULTILINE)
+_MAC_EXIT: dict[str, int] = {"green": 0, "red": 1, "pending": 2}
+
+
+class MacOnMain(FrozenModel):
+    """main's newest commit and whether its macOS runs passed."""
+
+    sha: str
+    verdict: MacVerdict
+
+
+def read_mac_verdict(printed: str, code: int) -> MacOnMain | None:
+    """The check's answer from what it printed and its exit code; ``None`` when they do not agree on one."""
+    found: list[tuple[str, str]] = _MAC_SAID.findall(printed)
+    if not found:
+        return None
+    sha, said = found[-1]
+    if _MAC_EXIT[said] != code:
+        return None
+    verdict: MacVerdict = "green" if said == "green" else "red" if said == "red" else "pending"
+    return MacOnMain(sha=sha, verdict=verdict)
+
+
+async def main_on_macos(repo: Path, env: Mapping[str, str], python: str) -> MacOnMain:
+    """Whether main's newest commit passed its macOS runs, as the checkout's own `scripts/main_macos_green.py check`
+    answers it (item 1899; it asks GitHub through ``gh``). Raises :class:`RepairError` when it gives no answer (the
+    script is not in the checkout yet, ``gh`` failed)."""
+    script: Path = repo / "scripts" / "main_macos_green.py"
+    try:
+        process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            python,
+            str(script),
+            "check",
+            cwd=str(repo),
+            env=dict(env),
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
+        )
+    except OSError as error:
+        raise RepairError("main's macOS check could not start", {"script": str(script), "error": str(error)}) from error
+    try:
+        async with asyncio.timeout(COMMAND_TIMEOUT_S):
+            out, err = await process.communicate()
+    except TimeoutError as error:
+        raise RepairError("main's macOS check took too long", {"timeout_s": COMMAND_TIMEOUT_S}) from error
+    finally:
+        kill_group(process.pid)
+        if process.returncode is None:
+            await asyncio.shield(process.wait())
+    printed: str = out.decode(errors="replace")
+    code: int = process.returncode if process.returncode is not None else -1
+    answer: MacOnMain | None = read_mac_verdict(printed, code)
+    if answer is None:
+        raise RepairError(
+            "main's macOS check gave no answer",
+            {"code": process.returncode, "out": printed[-2000:], "err": err.decode(errors="replace")[-2000:]},
+        )
+    return answer
