@@ -98,7 +98,7 @@ _PURPOSES: dict[str, str] = {
     "browser": "Chrome, for pages that need JavaScript, a log-in or clicking",
     "meetings": "the owner's Google Meet call: joining it to take notes and answer, reading them, posting on their yes",
     "phone": "the owner's iPhone over WebDriverAgent: whether it answers and whether it is locked",
-    "desktop": "the Mac's applications, windows, clipboard and AppleScript, and the pages of the owner's own Safari",
+    "desktop": "the Mac's applications, windows, clipboard and AppleScript, and Safari's pages",
     "schedule": "goals that run later, once or on a cron expression",
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",
     "memory_admin": "correcting or forgetting saved notes",
