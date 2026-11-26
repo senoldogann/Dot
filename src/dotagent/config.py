@@ -130,13 +130,15 @@ class StoreConfig(FrozenModel):
     deleted by itself; the daemon thins only its own copies of it.
     The copies of the database (item 526): made every ``backup_every_hours`` hours while the daemon runs (0: none),
     kept in ``backup_dir`` (``<home>/backups`` when empty), the newest ``backup_keep_hourly`` and one of each of the
-    last ``backup_keep_days`` days."""
+    last ``backup_keep_days`` days. Below ``min_free_gb`` GiB free on the disk (0: no floor), the owner is told once and
+    the copies and uploaded files wait (item 1938)."""
 
     retention_days: int = Field(ge=1)
     backup_every_hours: float = Field(ge=0, le=24 * 7, allow_inf_nan=False)
     backup_dir: str
     backup_keep_hourly: int = Field(ge=1, le=24 * 14)
     backup_keep_days: int = Field(ge=0, le=365)
+    min_free_gb: float = Field(ge=0, le=10_000, allow_inf_nan=False)
 
     @field_validator("backup_dir")
     @classmethod

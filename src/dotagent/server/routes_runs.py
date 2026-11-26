@@ -122,6 +122,7 @@ from dotagent.store.models import (
     ThreadRecord,
     chat_team,
 )
+from dotagent.store.space import ensure_space, floor_bytes
 from dotagent.store.stats import RunBudget, RunCosts, Usage, local_day_start
 from dotagent.tools.schedule import chat_options, schedule_mode
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
@@ -532,6 +533,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             data: bytes = base64.b64decode(request.data_b64, validate=True)
         except binascii.Error as error:
             raise InvalidValueError("the file data is not valid base64", {"name": request.name}) from error
+        # A disk nearly full refuses the file before it is written (item 1938), rather than half way.
+        floor: int = floor_bytes(ctx.runtime.config.store.min_free_gb)
+        await asyncio.to_thread(ensure_space, ctx.runtime.workspace, len(data), floor, "the uploaded file")
         return await asyncio.to_thread(store_attachment, ctx.runtime.workspace, request.name, request.media_type, data)
 
     @router.post("/runs/{run_id}/btw")
