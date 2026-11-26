@@ -12,27 +12,44 @@ choose the script:
 - "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
 - "tools: ...": the run reads two files and keeps a plan, so a finished run folds its steps;
 - "fail: ...": the model fails, so the run fails with one line of cause;
+- "write: ...": the run writes a file of its workspace, a change the inspector can undo;
+- "draft: ...": the run drafts an email, a card with Send, Edit and Discard;
+- "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
+- "browse: ...": the run opens a local page in its (headless) browser, then waits 8 min with the tab open, so the phone
+  can follow the browser live and take its page over (items 1839-1840); the page counts its clicks and shows what is
+  typed in its field, and a clock on it ticks so the cast keeps sending frames;
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
-holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop.
+holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop. With
+``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
+failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
+own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
+``e2e_activity.sh`` marks "while you were away" read from before them. With
+``--model <ref>`` (``claude_code:haiku``) the runs go to that real model instead of the script, for a real-model run of
+the phone's flows; the throwaway home has no key of its own, so only a provider that brings its own sign-in (the Claude
+plan's ``claude`` command) answers.
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
     DOT_HOME=$t/home DOT_LOG_DIR=$t/logs DOT_CHROME_DIR=$t/chrome \\
-        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed]
+        uv run python ios/Next/scripts/e2e_daemon.py 8765 [--seed] [--seed-activity]
 
 It prints ``READY <port> <token>`` once it serves; a pairing code is made with
 ``curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/phone/pairing``.
 """
 
 import asyncio
+import json
 import os
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import SplitResult, parse_qs, urlsplit
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -47,10 +64,20 @@ from dotagent.llm.types import (
     Usage,
 )
 from dotagent.runtime import Runtime, build_runtime, close_runtime
+from dotagent.scheduler.plans import UNSET_OPTIONS
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.thread_sync import watch_revisions
+from dotagent.store.db import Store
+from dotagent.store.models import (
+    ApprovalRecord,
+    DraftRecord,
+    RunRecord,
+    RunStatus,
+    ScheduleRecord,
+    ThreadRecord,
+)
 
 TOKEN: str = "dotnext-e2e-token"
 MODEL: str = "ollama:scripted"
@@ -78,11 +105,64 @@ ANSWER: str = "\n\n".join(
 )
 
 
+# The page "browse:" opens: a button that counts its clicks, a field, and a clock that ticks so the cast sends frames.
+# What the page received (its clicks, its field's text) it reports to its own server at /state, which keeps it in
+# $DOT_HOME/play-page.json: the end-to-end check reads the page's own state, not Dot's count of what was sent.
+PLAY_PAGE: bytes = b"""<!doctype html><html><head><title>DotNext play</title>
+<meta name="viewport" content="width=device-width"><style>
+body { font: 20px -apple-system, sans-serif; margin: 40px; background: #f4f4f2; color: #222; }
+button { font-size: 28px; padding: 24px 48px; border-radius: 16px; border: 0; background: #222; color: #fff; }
+input { font-size: 24px; padding: 12px; width: 60%; margin-top: 24px; }
+#clock { font-size: 64px; font-variant-numeric: tabular-nums; margin: 24px 0; }
+.tall { height: 1600px; background: linear-gradient(#f4f4f2, #c9d3dd); }
+</style></head><body>
+<h1>Play page</h1><div id="clock">0.0</div>
+<button id="press" type="button">Press me</button> <span id="count">0 clicks</span><br>
+<input id="field" placeholder="Type here" autocomplete="off"><p id="echo"></p><div class="tall"></div>
+<script>
+let clicks = 0; const t0 = Date.now();
+setInterval(() => { document.getElementById("clock").textContent = ((Date.now() - t0) / 1000).toFixed(1); }, 100);
+const count = document.getElementById("count");
+const field = document.getElementById("field");
+const report = () => fetch("/state?clicks=" + clicks + "&text=" + encodeURIComponent(field.value));
+document.getElementById("press").onclick = () => { clicks += 1; count.textContent = clicks + " clicks"; report(); };
+field.oninput = () => { document.getElementById("echo").textContent = field.value; report(); };
+</script></body></html>"""
+
+
+class _PlayPage(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        parts: SplitResult = urlsplit(self.path)
+        if parts.path == "/state":
+            asked: dict[str, list[str]] = parse_qs(parts.query, keep_blank_values=True)
+            state: dict[str, int | str] = {"clicks": int(asked["clicks"][0]), "text": asked["text"][0]}
+            (Path(os.environ["DOT_HOME"]) / "play-page.json").write_text(json.dumps(state), encoding="utf-8")
+            self.send_response(204)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(PLAY_PAGE)))
+        self.end_headers()
+        self.wfile.write(PLAY_PAGE)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+def serve_play_page() -> str:
+    """The play page on a free port of this Mac, served on a thread for the life of the script; its address."""
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _PlayPage)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_address[1]}/"
+
+
 class ScriptProvider:
     """Replies by the owner's last words (module docstring); a tool's result is answered with a closing text."""
 
-    def __init__(self) -> None:
+    def __init__(self, play_page: str) -> None:
         self._calls: int = 0
+        self._play_page: str = play_page
 
     @property
     def name(self) -> str:
@@ -98,8 +178,9 @@ class ScriptProvider:
         latest: str = request.messages[at].content.strip() if at >= 0 else ""
         owner: str = latest
         # A tool already answered since the owner's words: the step is over, the run ends with a text.
-        answered: bool = any(m.role == "tool" for m in request.messages[at + 1 :])
         steps: int = sum(1 for m in request.messages[at + 1 :] if m.role == "tool")
+        tools_since: list[str] = [m.tool_name or "" for m in request.messages[at + 1 :] if m.role == "tool"]
+        answered: bool = bool(tools_since)
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
         if any(tool.name == "goal_verdict" for tool in request.tools):
@@ -113,6 +194,14 @@ class ScriptProvider:
             )
         elif latest.startswith("stream:"):
             return await self._stream(request, sink, steps)
+        elif latest.startswith("browse:") and tools_since == ["browser_new_tab"]:
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="wait_until",
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 8},
+                ),
+            )
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -131,6 +220,8 @@ class ScriptProvider:
                     arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
                 ),
             )
+        elif latest.startswith("browse:"):
+            calls = (ToolCall(id=f"call_{self._calls}", name="browser_new_tab", arguments={"url": self._play_page}),)
         elif latest.startswith("wait:"):
             calls = (
                 ToolCall(
@@ -184,6 +275,35 @@ class ScriptProvider:
                 ToolCall(id=f"call_{self._calls}b", name="read_file", arguments={"path": "/etc/hosts"}),
                 ToolCall(
                     id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
+                ),
+            )
+        elif latest.startswith("write:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="write_file",
+                    arguments={"path": "dotnext-e2e-note.txt", "content": "Written by the e2e check.\n"},
+                ),
+            )
+        elif latest.startswith("draft:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="draft_message",
+                    arguments={
+                        "channel": "mail",
+                        "to": ["owner@example.com"],
+                        "subject": "E2E draft",
+                        "body": "Hello from the e2e check.",
+                    },
+                ),
+            )
+        elif latest.startswith("bg:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="terminal_open",
+                    arguments={"command": "sleep 600", "background": True},
                 ),
             )
         elif latest.startswith("fail:"):
@@ -252,8 +372,8 @@ class ScriptProvider:
         return None
 
 
-def prepare_home() -> None:
-    """Refuses a home that may be the owner's, then writes the throwaway home's config (scripted model, supervised)."""
+def prepare_home(model: str) -> None:
+    """Refuses a home that may be the owner's, then writes the throwaway home's config (``model``, supervised)."""
     for name in ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR"):
         if name not in os.environ:
             raise SystemExit(f"{name} must name a throwaway folder")
@@ -266,7 +386,7 @@ def prepare_home() -> None:
         raise SystemExit(f"DOT_HOME={home} is not empty and was not made by this script: give it a mktemp -d folder")
     ensure_layout()
     config.write_text(
-        f'{CONFIG_MARK}\n[models]\nmain = "{MODEL}"\n\n[browser]\nheadless = true\n\n'
+        f'{CONFIG_MARK}\n[models]\nmain = "{model}"\n\n[browser]\nheadless = true\n\n'
         '[policy]\napprovals = "supervised"\n',
         encoding="utf-8",
     )
@@ -288,12 +408,87 @@ async def seed(runtime: Runtime) -> None:
     )
 
 
-async def serve(port: int, seeded: bool) -> None:
+async def _schedule_run(store: Store, name: str, goal: str, status: RunStatus, answer: str) -> RunRecord:
+    """A run of a schedule of ``name`` that ended ``status`` with ``answer``, in the schedule's own chat."""
+    schedule: ScheduleRecord = await store.add_schedule(
+        name, "0 7 * * *", None, goal, "task", time.time() + 86_400, UNSET_OPTIONS, None, True
+    )
+    chat: ThreadRecord = await store.create_thread(name, "schedule")
+    await store.link_schedule_thread(chat.id, schedule.id)
+    run: RunRecord = await store.create_run(
+        chat.id, goal, "task", MODEL, None, "schedule", "medium", "standard", None, "yolo", False, None, None, None
+    )
+    await store.finish_run(run.id, status, answer)
+    return run
+
+
+async def seed_activity(runtime: Runtime) -> None:
+    """What the Activity tab shows (module docstring): runs of schedules, decisions made for the owner, drafts, a thing
+    on Dot's list."""
+    store: Store = runtime.store
+    mail: RunRecord = await _schedule_run(
+        store,
+        "Client mail check",
+        "Read new client mail and draft replies.",
+        "done",
+        "Two clients wrote; both replies are drafted for you.",
+    )
+    await _schedule_run(
+        store, "Nightly backup", "Back up the projects folder.", "failed", "The backup disk was not mounted."
+    )
+    for decided_by in ("yolo", "yolo", "reviewer"):
+        asked: ApprovalRecord = await store.create_approval(mail.id, "shell", "Run a command", "medium", {})
+        await store.decide_approval(asked.id, "approved", decided_by, "")
+    await store.add_draft(
+        mail.id,
+        "mail",
+        ["ayse@example.com"],
+        [],
+        "Re: The March invoice",
+        "Hi Ayşe,\n\nThanks, the invoice is paid; the receipt is attached.\n\nŞenol",
+    )
+    refused: DraftRecord = await store.add_draft(
+        mail.id, "message", ["+90 555 111 22 33"], [], "", "Running ten minutes late, see you at the café."
+    )
+    await store.claim_draft(refused.id, list(refused.to), [], "", refused.body)
+    await store.settle_draft(refused.id, "Messages could not reach the number.")
+    await store.create_harness_version(
+        None,
+        "proposer",
+        "Run the tests of what changed before the whole suite.",
+        "- Run the tests of the files a change touched first.",
+        "",
+        json.dumps({"scope": "tests"}),
+    )
+    await store.create_harness_version(
+        None,
+        "proposer",
+        "Read the README of a repository before editing it.",
+        "- Read a repository's README before the first edit.",
+        "",
+        json.dumps({"tainted": True, "tainted_by": ["a web page"]}),
+    )
+    await store.add_todo(
+        "Tidy the Downloads folder",
+        "tidy the downloads folder",
+        "It holds 2,000 files from the last year.",
+        "run",
+        mail.id,
+        False,
+    )
+
+
+async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await runtime.router.register("ollama", ScriptProvider())
+    play_page: str = serve_play_page()
+    print(f"PLAY {play_page}", flush=True)
+    if scripted:
+        await runtime.router.register("ollama", ScriptProvider(play_page))
     if seeded:
         await seed(runtime)
+    if activity:
+        await seed_activity(runtime)
     manager: RunManager = RunManager(runtime)
     stopping: asyncio.Event = asyncio.Event()
     listener = bind_listener("127.0.0.1", port)
@@ -322,6 +517,17 @@ async def serve(port: int, seeded: bool) -> None:
         await close_runtime(runtime)
 
 
+def model_argument(args: list[str]) -> str:
+    """The model ``--model <ref>`` names, else the script's own."""
+    if "--model" not in args:
+        return MODEL
+    at: int = args.index("--model")
+    if at + 1 >= len(args):
+        raise SystemExit("--model needs a model reference, such as claude_code:haiku")
+    return args[at + 1]
+
+
 if __name__ == "__main__":
-    prepare_home()
-    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:]))
+    chosen: str = model_argument(sys.argv[2:])
+    prepare_home(chosen)
+    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:], "--seed-activity" in sys.argv[2:], chosen == MODEL))

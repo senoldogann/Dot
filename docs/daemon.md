@@ -1442,8 +1442,9 @@ dotx service uninstall   # stop the daemon and remove the job
   repair night ([Self-repair](repair.md), item 921) are no runs, and each records nothing until its end, so a restart
   would cut it off and lose the night (the reflection at 03:30; the harness's night reads Dot's record in seconds,
   item 987). A repair
-  night's work is bounded by two hours (a push already under way may add half an hour), so that it ends within the
-  three hours the job waits for the night's work. `night_work` there names those under way, and the job waits for
+  night's work is bounded by two hours (a push already under way may add half an hour, and a night that merged waits
+  for main's macOS runs within that same half hour, item 1899), so that it ends within the three hours the job waits
+  for the night's work. `night_work` there names those under way, and the job waits for
   them as for the runs. A daemon from before item 815 names none; one that does not listen counts as none, and so does
   one whose answer is refused, cannot be read or does not come within 5 seconds (each logged as
   `restart_when_idle_night_unknown`, as a token that cannot be read is): what is cut off then is a night of learning,
@@ -1582,6 +1583,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `PUT /skills/learned/{name}/pin` (`{"pinned": true}`), `POST /skills/learned/{name}/rest`, `POST /skills/learned/{name}/wake` | pin a skill so that it never rests (one that rests wakes) or take the pin off; put one to rest by hand; wake one (item 585) |
 | `GET /skills/proposals`, `POST /skills/proposals/{id}/accept`, `DELETE /skills/proposals/{id}` | the merges of learned skills that wait for the owner's yes, each with why it cannot be applied now (`stale`), what its skills say now and every field the yes would write to the first (`fields`: name, description, kind, when, steps and parameters, each line marked kept, dropped or written against the skill it replaces); the yes writes exactly those fields as a new version (409 when a skill changed since); the no drops it (item 585) |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
+| `GET /drafts?limit=` | the drafts that wait for you, the newest first: none sent or discarded yet, or whose last send failed (`limit` 1-200, 50 by default; item 1825) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule; `POST` with `"enabled": false` adds one switched off, its time checked but not the room for one more switched on, which switching it on checks, item 464) |
 | `GET /threads/{id}/automations` | the schedules of a chat, its own loop among them, as the side panel's Automations lists them (item 1333): `[{schedule, loop}]`, `schedule` as `GET /schedules/{id}` gives it, `loop` true for a loop made with `/loop`; switched-on ones first, soonest first; 404 for no chat. Switching one on or off and running it now are the schedule's routes below, read at the next firing |
 | `GET /away` | what Dot did on its own since `since` (items 466 and 1424), clamped to the last week: counts, newest runs (each with its `source`), the approvals answered for you, the drafts waiting |

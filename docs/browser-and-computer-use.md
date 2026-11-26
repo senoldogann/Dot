@@ -860,6 +860,23 @@ every mode but `yolo` (item 433).
 - When a run that acted on the desktop ends, the application that was in front before its first act comes forward
   again, if the one the run left in front still is (item 702, `give_front_back`): not when you went to another
   application meanwhile, not when it quit, and not while another run acts on the desktop.
+- The Mac's own pointer and keyboard are yours while you are at the Mac (item 1890). You are away once nobody but
+  Dot has touched the keyboard, the mouse or the trackpad for `desktop.away_after_s` (10 minutes), read from macOS's
+  clock of the last input; Dot's own events reset that clock too, so the input that falls within a step Dot sent is
+  taken as Dot's. While you are here, a step of `desktop_act` that moves the pointer or sends keys (a real click, a
+  double or right click, hover, scroll, drag, type, paste, a key, `activate`) is not sent, and nor is the front taken
+  for it: the run shows "Waiting for you to step away", and the batch goes on with that step once you are away,
+  off the tool's time limit, at most for `desktop.away_wait_s` (4 hours); a message you write to the run ends the wait
+  so that the model reads it. A step you approve at the Mac still waits for you to step away, and then goes without
+  being asked again, unless it now asks for more. Press, focus, set_value, menu and a click done as a press go at once, as they move no
+  pointer. Your first touch while Dot works ends its use of them at the next step, and the run says that you came
+  back; your input while Dot is posting a step is hidden by Dot's own, and the next one after it is seen. A wait is
+  not a question: a `yolo` or free run waits as any other. `desktop.input_only_when_away = false` lets the steps go
+  at once, as before. `desktop_open_app`, which brings an application to the front, does not wait, nor do keys an
+  `apple_script` or an `osascript` sends through System Events. The wait counts toward the run's own wall-clock cap
+  (`run_max_minutes`): a run whose wait goes past it is told to finish, and its reply after that ends it, so a task run
+  (120 minutes by default) never waits the full 4 hours. A Mac whose idle time cannot be read counts as one the owner
+  is at.
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
   are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
   and a step the review sees take a credential keeps that reason in its record (item 429, see
@@ -883,7 +900,9 @@ picture within a third of a second.
   meanwhile. A page that falls behind (a slow network) drops frames until the next key frame and so shows the screen
   as it is now, not with a growing delay.
 - `GET /api/screen/live` is read with the installation's token or a phone's key, like any other answer of the API: a
-  plain HTTP answer whose body is the stream, as the daemon lets no WebSocket through. Its format is in
+  plain HTTP answer whose body is the stream, as the daemon lets no WebSocket through. `?quality=light` (item 1837) is
+  a capture of its own for a phone on a weak link: 1280 pixels, 30 frames a second, a fifth of the bit rate and a key
+  frame every 2 s rather than 4; the page reads `hd`, the default. Its format is in
   `dotagent/desktop/live.py`. A Mac that has not granted Screen Recording to the app that runs Dot answers with that
   error.
 - The whole screen goes: what it shows, passwords typed in the open included, is seen by whoever holds a key.

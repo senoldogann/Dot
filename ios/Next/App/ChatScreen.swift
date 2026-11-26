@@ -54,6 +54,11 @@ struct ChatScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.locale) private var locale: Locale
+    /// The bot this chat belongs to (PLAN §27): its header and "Ask <name>"; `nil` for a plain chat.
+    @Environment(\.botChat) private var botChat: BotChat?
+    /// Find in chat (the bot menu's): the words looked for and which find is shown; `nil` while the bar is closed.
+    @State private var finding: String?
+    @State private var findIndex: Int = 0
 
     private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
@@ -108,10 +113,11 @@ struct ChatScreen: View {
         return content(items)
             .background(Tone.ground)
             .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
-            .navigationSubtitle(subtitle)
+            .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
-            .toolbar { header }
+            .toolbar { chrome }
+            .liveFollow(thread: thread)
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
             .onAppear {
@@ -190,6 +196,7 @@ struct ChatScreen: View {
                 if linesTheWork, let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
                     WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                 }
+                ChatDrafts(thread: thread)
             }
             .frame(maxWidth: proseWidth)
             .frame(maxWidth: .infinity)
@@ -237,13 +244,34 @@ struct ChatScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom) { bottom(items) }
+        .safeAreaInset(edge: .top) {
+            if let finding {
+                let found: [String] = findMatches(items, words: finding)
+                FindBar(
+                    words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
+                    step: { delta in
+                        guard !found.isEmpty else { return }
+                        findIndex = (findIndex + delta + found.count) % found.count
+                        pinned = false
+                        position.scrollTo(id: found[findIndex], anchor: .center)
+                    },
+                    close: { self.finding = nil }
+                )
+                .onChange(of: found.first) { _, first in
+                    if let first {
+                        pinned = false
+                        position.scrollTo(id: first, anchor: .center)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
         switch item {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text)
+                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
                 if let delivery { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -281,10 +309,10 @@ struct ChatScreen: View {
             AskAnchorRow(anchor: anchor)
         case .work(let fold):
             WorkFoldView(fold: fold, row: { AnyView(self.row($0)) })
-        case .ended(_, let status, let detail):
-            RunEndedCard(status: status, detail: detail, retry: status == "failed" && activeRun == nil ? { retryLast() } : nil)
-        case .limit(_, let resetsAt):
-            UsageLimitCard(resetsAt: resetsAt, resume: { retryLast() })
+        case .ended(let id, let status, let detail):
+            RunEndCard(item: id, ending: .ended(status: status, detail: detail), thread: thread, toComposer: toComposer, tell: { toast = $0 })
+        case .limit(let id, let resetsAt):
+            RunEndCard(item: id, ending: .limit(resetsAt: resetsAt), thread: thread, toComposer: toComposer, tell: { toast = $0 })
         }
     }
 
@@ -343,7 +371,7 @@ struct ChatScreen: View {
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
                     placeholder: activeRun == nil
-                        ? String(localized: "Message Dot", comment: "Placeholder of the composer")
+                        ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
                             ? String(localized: "Queue a message", comment: "Placeholder of the composer while a run works and follow-ups queue")
                             : String(localized: "Tell the running task", comment: "Placeholder of the composer while a run works and follow-ups steer"),
@@ -438,7 +466,7 @@ struct ChatScreen: View {
     private var catalog: ComposerCatalog {
         ComposerCatalog(
             skills: (model.palette?.skills ?? []).map { PickerItem(kind: .skill, token: "/" + $0.name, name: $0.name, detail: $0.description) },
-            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role ?? "") },
+            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role) },
             teams: model.teams.map { PickerItem(kind: .team, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: "") },
             chats: model.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
                 PickerItem(kind: .chat, token: "@\"" + row.summary.title + "\"", name: row.summary.title, detail: rowTime(row.summary.latestCreatedAt, now: .now))
@@ -461,10 +489,10 @@ struct ChatScreen: View {
         }
     }
 
-    /// Try again / Resume: the newest run's goal sent again as a message of the chat.
-    private func retryLast() {
-        guard let last = ownRuns.last, !last.goal.isEmpty else { return }
-        Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: [], picks: .none) }
+    /// Words a message action hands back (Edit from here, a Retry that could not send): after the newer draft, never
+    /// over it (plan §13 B3).
+    private func toComposer(_ words: String) {
+        draft = draft.isEmpty ? words : draft + "\n" + words
     }
 
     // MARK: The queue's edit (§20)
@@ -522,6 +550,25 @@ struct ChatScreen: View {
     }
 
     // MARK: Header
+
+    /// A bot's header in a bot's chat, the plain chat's otherwise.
+    @ToolbarContentBuilder private var chrome: some ToolbarContent {
+        if let botChat {
+            BotHeader(
+                chat: botChat,
+                subtitle: chat.flatMap {
+                    freshnessLine(
+                        freshness: $0.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread],
+                        now: .now)
+                },
+                find: {
+                    findIndex = 0
+                    finding = ""
+                }, library: { panel = .files })
+        } else {
+            header
+        }
+    }
 
     @ToolbarContentBuilder private var header: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {

@@ -196,7 +196,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import playbook_root
 from dotagent.skills.types import Skill
-from dotagent.store.endings import PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
+from dotagent.store.endings import PREFIX_CUT_SHORT, PREFIX_MODEL_REFUSED, RESULT_EMPTY_REPLIES
 from dotagent.store.models import NO_PICKS, EventRecord, RunMode, RunRecord
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
@@ -1045,9 +1045,12 @@ class _Follow:
                 raise ClaudePlanLimitError(limit_message(self.window, resets_at), resets_at, context)
             if refusal_said(event.text):
                 # Declined for what it says, the same message is declined again: a try of it would be too (item 1761).
+                # The end starts as every refusal's does, so the run's page offers a restart on another model (item
+                # 1889).
                 raise ClaudeCodeRefused(
-                    f"The model declined the run's message, and asked again it declines it again: change the run's "
-                    f"model or reword the task. Claude Code said: {event.text}",
+                    f"{PREFIX_MODEL_REFUSED} ({self.agent.run.model}): its provider declined the run's message, and "
+                    f"asked again it declines it again: change the run's model or reword the task. Claude Code said: "
+                    f"{event.text}",
                     {**context, "model": self.agent.run.model},
                 )
             raise ClaudeCodeBroke(f"Claude Code's session failed: {event.text or event.subtype}", context)

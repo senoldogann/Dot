@@ -48,7 +48,7 @@ struct ModelCatalog<Options: View>: View {
                     .textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.groupedGutter)
             }
             if query.isEmpty, filter == .all, !recentModels.isEmpty {
-                GroupedSection(header: String(localized: "Recently used", comment: "Model picker section: the chosen model and the ones picked last"), footer: nil) {
+                PlainSection(header: String(localized: "Recently used", comment: "Model picker section: the chosen model and the ones picked last")) {
                     ForEach(recentModels) { row in modelRow(row) }
                 }
             }
@@ -98,9 +98,7 @@ struct ModelCatalog<Options: View>: View {
                     : String(localized: "Open", comment: "VoiceOver: an open provider group"))
             .accessibilityIdentifier("modelCatalog.provider")
             if !isFolded {
-                LazyVStack(spacing: 0) { ForEach(group.rows) { row in modelRow(row) } }
-                    .background(Tone.card, in: rounded(Radius.section))
-                    .clipShape(rounded(Radius.section))
+                PlainSection(header: nil) { ForEach(group.rows) { row in modelRow(row) } }
             }
         }
     }
@@ -213,5 +211,35 @@ struct ModelSearchBar: View {
         }
         .padding(.horizontal, Space.gutter)
         .padding(.bottom, Space.xs)
+    }
+}
+
+/// A section of a picker sheet (the owner's look of 2026-11-26): its rows plain on the sheet's ground, a hairline between
+/// two of them and no card behind, like the provider rows; the header in the same quiet ink as theirs.
+struct PlainSection<Content: View>: View {
+    let header: String?
+    @ViewBuilder let content: () -> Content
+    @Environment(\.displayScale) private var displayScale: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            if let header {
+                Text(header).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary)
+                    .padding(.horizontal, Space.xs)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            VStack(spacing: 0) {
+                Group(subviews: content()) { rows in
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        row
+                        if index < rows.count - 1 {
+                            Rectangle().fill(Tone.separator).frame(height: 1 / displayScale)
+                                .padding(.leading, Space.groupedGutter)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

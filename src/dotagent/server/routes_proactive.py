@@ -10,6 +10,7 @@ from dotagent.config_edit import set_look_model
 from dotagent.core.errors import ConfigError
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel
+from dotagent.desktop.presence import idle_seconds
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import WHOLE_RUN_AGENTS, ModelInfo, runs_dots_tools
 from dotagent.oauth.providers import ProviderId
@@ -17,7 +18,6 @@ from dotagent.oauth.tokens import Account
 from dotagent.proactive.brief import BriefRequest, BriefView, brief_view, set_brief
 from dotagent.proactive.checkin import CheckinRequest, CheckinView, checkin_view, set_checkin
 from dotagent.proactive.github import GITHUB_TOKEN_NAME
-from dotagent.proactive.initiative import idle_seconds
 from dotagent.proactive.todos import (
     InitiativeRequest,
     InitiativeView,

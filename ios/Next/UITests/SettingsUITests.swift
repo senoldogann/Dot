@@ -10,9 +10,35 @@ final class SettingsUITests: XCTestCase {
         return app
     }
 
-    func testSearchingApprovalsFindsRulesAndOpensIt() {
+    /// Item 1904: a page's loading state stands centred both ways in the visible area, between the navigation bar and
+    /// the bottom's safe area, within the design bar's 1 pt.
+    func testALoadingPageIsCentredInTheVisibleArea() {
+        let app: XCUIApplication = launch("settings-loading")
+        let words: XCUIElement = app.staticTexts["Reading your Mac…"]
+        XCTAssertTrue(words.waitForExistence(timeout: 10))
+        let spinner: XCUIElement = app.activityIndicators.firstMatch
+        XCTAssertTrue(spinner.exists)
+        let bar: XCUIElement = app.navigationBars["Usage"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 5))
+        let window: CGRect = app.windows.firstMatch.frame
+        // The visible area ends at the tab bar where one shows, else at the bottom's safe area (no home button).
+        let tabs: XCUIElement = app.tabBars.firstMatch
+        let bottom: CGFloat = tabs.exists && tabs.frame.minY > bar.frame.maxY ? tabs.frame.minY : window.maxY - 34
+        // What is drawn: the spinner over its line.
+        let frame: CGRect = spinner.frame.union(words.frame)
+        let measured: String = "drawn \(frame) (spinner \(spinner.frame), words \(words.frame)), bar \(bar.frame), bottom \(bottom), window \(window)"
+        add(XCTAttachment(string: measured))
+        XCTAssertEqual(frame.midX, window.midX, accuracy: 1, measured)
+        XCTAssertEqual(frame.midY, (bar.frame.maxY + bottom) / 2, accuracy: 1, measured)
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "loading-centred"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    func testSearchingApprovalsFindsPermissionsAndOpensIt() {
         let app: XCUIApplication = launch("settings-search")
-        let rules: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Rules")).firstMatch
+        let rules: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Permissions")).firstMatch
         XCTAssertTrue(rules.waitForExistence(timeout: 10))
         rules.tap()
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")

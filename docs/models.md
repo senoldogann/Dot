@@ -14,6 +14,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `standby`           | models a run moves to when its own model cannot answer (see below); Settings › Models sets it | `[]`                    |
 | `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
 | `context`           | a model's context size where it is not `[agent] context_tokens` (see below); Settings › Models sets it | `{}`         |
+| `kinds`             | the model a run of a kind of task starts on when none is chosen: `security` (see below); Settings › Models sets it | `{}` |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
@@ -30,6 +31,11 @@ the model that decides what Dot does on its own initiative (`[initiative] look_m
 models that call tools, or **Default model** for `[models] main`; it holds from the next look on
 (`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)). **Use my Claude plan** (shown once Claude Code
 lists its models) puts the review model on `claude_code:opus` and the roles of the night's learning on it (item 1033).
+**Security research model** (item 1889) chooses the model a task of security research within a scope starts on when no
+model is chosen for it: a goal that names a host of `[recon] owned_hosts` or of a bug bounty scope (`dotx scope`,
+[Security scan](security.md)) and asks for security work. It is kept as `[models.kinds] security`, **Default model** for
+none (`PUT /api/models/kinds`), and holds from the next such task on; a model chosen in the message box, a chat's own
+model or a schedule's still wins. The right model then takes the work before any refusal, rather than after one.
 Under the roles, the page says how many schedules and agents run on each model, each chosen on its own page; and
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
 harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. **Usage**, before the list of every
@@ -108,6 +114,24 @@ three quarters of the window (of the model's own window, for such an Ollama mode
 `#/settings/models?model=<provider:model>`): its provider's fold opens and the row comes into sight, marked, with the
 focus on its size.
 
+**A model that declines the task** (item 1889). A final answer that opens by declining the task ("I can't help with
+that", "bu konuda yardımcı olamam"; `agent/refusal.py` reads the opening only, so an answer that names a limit it met
+is work) is the model's judgement, not a technical block. When the task is in scope, Dot asks the same model once more,
+openly: a note gives the grounds it may have lacked (the program and its rules for a host the goal names that a scope
+or `[recon] owned_hosts` covers, and your own words when you sent the task from the app, `dotx run` or your phone),
+says that the work is finding and reporting, not exploiting, and that a second no stands. The timeline shows it. A
+refusal after that note, or of a task with no such grounds (one Dot began itself, a part another run handed on), ends
+the run at once: failed, with the model's own words under "The model declined this task" (`dotx stats` counts it as
+"the model declined the task", and no schedule tries it again). Dot does not argue with it, does not word the model's
+answer for it and does not move to another model on its own. The run's page offers one action over the box,
+**Restart on…**: the model menu of the box, without the model that declined, and the model you pick starts the same
+task in the same chat (`POST /api/runs/{id}/restart`), as a message of yours, with the old run's approvals, goal mode,
+and its reasoning level and speed as near as the new model offers them; the old run records that you chose it. A
+refused run of a schedule or a delegated part restarts so too, as your own task in its chat. A message the
+Claude plan's safeguards flagged (item 1761) ends the same way, and is never tried again on the same model. A Claude
+plan or OpenCode run's own answer is not read for a refusal: they take no step of Dot's loop. A yolo or free-mode run
+asks nothing new: the restart is an offer on the page, not a question.
+
 **Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
 a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has
 no tools and sees only what the question sends: the run's goal, its plan, the conversation (secrets masked, the start
@@ -115,10 +139,11 @@ and the end of a long one) and the newest screenshot, which only a helper that c
 `[agent] consult_max_per_run` questions (5); `0` offers no `consult`. A delegated run asks none (its parent does), and
 the run's own model is never its helper.
 
-`standby` lists the models a run moves to when its own model's credits, usage window, quota or rate are spent, and
-then only (item 1225, the owner's word of 2026-11-19): a refusal, a content filter's stop, replies with nothing, a
-refused key or access and a missing key end the run on its own model, saying why, and a run that needs you asks you
-first. On a spent credit or limit the run goes on from the same step, with the tools
+`standby` lists the models a run moves to when its own model's credits, usage window, quota or rate are spent (item
+1225), or when a technical block stops it: its service's content filter stopped a reply, or its replies stayed empty
+after the nudges (item 1889, the owner's word of 2026-11-25). A refused key or access and a missing key end the run on
+its own model, saying why, and a run that needs you asks you first; a model that declines the task is never moved
+from (below). On a spent credit, a limit or a technical block the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
 which the model chip follows. The run's reasoning level becomes the nearest one the new model offers, the lower of two as near, the cheaper: one rule (`choose_effort` in `llm/traits.py`) for a call, a standby model and a schedule's firing (item 1307). A run takes each
 model once at most, in the order of the list, and never goes back to one it left. The goal check of a goal-mode run (and

@@ -50,6 +50,7 @@ from dotagent.config_edit import (
     set_default_model,
     set_free_mode,
     set_judge_provider,
+    set_kind_model,
     set_learning_model,
     set_resume,
     set_role_model,
@@ -145,6 +146,7 @@ from dotagent.server.views import (
     HealthView,
     JudgeRequest,
     JudgeView,
+    KindModelRequest,
     LearnedSkillsView,
     LearnedSkillView,
     LearningModelRequest,
@@ -388,6 +390,7 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
         now: float = time.time()
         return StatusView(
             version=__version__,
+            store_id=await ctx.runtime.store.store_id(),
             pages=pages,
             pid=os.getpid(),
             started_at=ctx.started_at,
@@ -545,6 +548,19 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
             raise ConfigError(f"the {request.role} model must be one that can use actions", {"model": request.model})
         await asyncio.to_thread(set_role_model, config_path(), request.role, request.model)
         ctx.runtime.roles.choose(request.role, request.model)
+        return models_now()
+
+    @router.put("/models/kinds")
+    async def choose_kind_model(request: KindModelRequest) -> ModelsConfig:
+        """Have a run of ``kind`` that names no model start on ``model`` from the next one on, or on the default model
+        for "" (item 1889): the config file keeps it in ``[models.kinds]``. A model its provider does not offer, or one
+        that cannot call tools, is refused, and so is a config file that cannot be changed; nothing changes then."""
+        if request.model != "":
+            info: ModelInfo = await ctx.runtime.router.model_info(parse_model_ref(request.model))
+            if not info.tools:
+                raise ConfigError("a task needs a model that can use actions", {"model": request.model})
+        await asyncio.to_thread(set_kind_model, config_path(), request.kind, request.model)
+        ctx.runtime.roles.choose_kind(request.kind, request.model)
         return models_now()
 
     def learning_now() -> LearningModels:
