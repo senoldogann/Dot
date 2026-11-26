@@ -333,3 +333,26 @@ async def test_the_card_of_a_step_asked_again_shows_the_line_the_return_runs(tmp
     assert asked.summary.startswith("Terminal: key return")
     assert "terminal input" in asked.summary
     assert {"destructive", "outside_workspace"} <= set(asked.flags)
+
+
+async def test_a_step_the_owner_said_yes_to_is_not_asked_again_when_its_batch_goes_on(tmp_path: Path) -> None:
+    """Item 1890: a step approved at the Mac waits for the owner to step away, and the rest of the batch, that step
+    first, is reviewed again in the same call: the same step asking the same is not put to the owner twice; one that
+    asks for more is."""
+    authorized: list[ActionInfo] = []
+
+    async def act(
+        thread_id: str, app: str | None, steps: list[Step], review, secure_field, budget: int, who: str, first: int
+    ) -> ActOutcome:
+        step: Step = Step(action="key", key="return")
+        for line in ("rm -rf ~/Projects", "rm -rf ~/Projects", "rm -rf ~/Documents"):
+            context: StepContext = _terminal(Element(role="AXTextArea", name="shell"), line=line)
+            await review(StepReview(index=2, step=step, description="key return", context=context, target="textarea"))
+        return ActOutcome(steps=(), stopped=None, view=None, view_note="none")
+
+    ctx: ToolContext = _fake_context((_terminal(),), authorized)
+    cast(SimpleNamespace, ctx.runtime.desktop).act = act
+    tool = next(entry for entry in build_desktop_tools() if entry.spec.name == DESKTOP_ACT_TOOL)
+    prepared = await tool.prepare({"steps": [{"action": "hover", "x": 5, "y": 5}]}, ctx)
+    await prepared.run(ctx)
+    assert [info.target for info in authorized] == ["rm -rf ~/Projects", "rm -rf ~/Documents"]

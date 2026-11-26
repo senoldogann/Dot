@@ -589,6 +589,10 @@ def _act_tool() -> RegisteredTool:
         )
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        # The steps of this call the owner said yes to, by number, with what they said yes to (item 1890): a step that
+        # then waited for them to step away is not asked again when the batch goes on, unless it now asks for more.
+        allowed: dict[int, ActionInfo] = {}
+
         async def review(step_review: StepReview) -> None:
             # A step that moves into an application another run drives stops the batch there (item 305).
             app: str = step_review.context.app
@@ -606,9 +610,13 @@ def _act_tool() -> RegisteredTool:
             target: str = step_review.target or step_review.context.app
             if kind == "shell":
                 target = _shell_target([step_review.step], [step_review.context], target)
-            await ctx.gate.authorize(
-                _action(DESKTOP_ACT_TOOL, kind, live.risk, _described(summary, kind, live), target, live.flags)
+            asked: ActionInfo = _action(
+                DESKTOP_ACT_TOOL, kind, live.risk, _described(summary, kind, live), target, live.flags
             )
+            if allowed.get(step_review.index) == asked:
+                return
+            await ctx.gate.authorize(asked)
+            allowed[step_review.index] = asked
 
         # A secure field is the user's outside yolo (item 429): the step's review hands a credential to them, and a
         # field found secure only as the step runs is refused. A yolo run asks nothing, and types it (item 443).
