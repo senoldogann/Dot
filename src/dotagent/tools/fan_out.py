@@ -4,9 +4,9 @@ The DeepSeek Harness super-agent article measured that a model left to decide on
 in 5 tries of 5, and its p95 doubled; told to, it did in 4 of 5. On the owner's Mac (2026-10-28 to 11-02) 4 runs of 127
 were helpers. So the plan decides: a step of ``update_plan`` that carries a ``brief`` (an instruction a run that cannot
 see this conversation can follow) and waits for nothing open is ready, and when two or more are, they run as helpers
-at the same time, at most ``[agent] fan_out`` of them, each as ``delegate`` runs one: the parent's model and its bounds,
-research for a research run. Each step is marked done or failed from how its helper ended, with its report as the
-evidence, and the reports come back in the plan's result, fenced and marking the run untrusted when a helper read
+at the same time, at most ``[agent] fan_out`` of them. Each uses the same model selection and bounds as ``delegate``,
+including research mode for a research run. Each step is marked done or failed from how its helper ended. The report
+is its evidence and comes back fenced in the plan's result, marking the run untrusted when a helper read
 content third parties can author. A step whose helper could not start is marked failed with why. One ready step alone is
 the run's own to do, and a helper's own plan fans out nothing (it delegates nothing)."""
 

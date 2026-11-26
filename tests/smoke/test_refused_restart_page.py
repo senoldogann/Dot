@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-from model_menu import open_menu, pick
+from model_menu import expect_chosen, open_menu, pick
 from playwright.async_api import Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -34,7 +34,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 
 TOKEN: str = "refused-restart-test-token"
 DECLINING: str = "ollama:scripted"
-OTHER: str = "ollama:scripted-other"
+OTHER: str = "ollama:deepseek-scripted"
 GOAL: str = "Summarise the release notes."
 _SETTLE_S: float = 30.0
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
@@ -44,7 +44,7 @@ class TwoModels(ScriptedProvider):
     """A scripted provider that lists a second model, which a restart can be picked on."""
 
     async def list_models(self) -> tuple[ModelInfo, ...]:
-        return (await self.model_info("scripted"), await self.model_info("scripted-other"))
+        return (await self.model_info("scripted"), await self.model_info("deepseek-scripted"))
 
 
 @pytest.fixture
@@ -159,3 +159,32 @@ async def test_a_refused_run_offers_a_restart_on_a_model_the_owner_picks(own_hom
     kept: dict[str, object] = tomllib.loads(config_path().read_text(encoding="utf-8"))
     assert kept["models"] == {"main": DECLINING, "kinds": {"security": OTHER}}
     assert runtime.roles.kind_model("security") == OTHER
+
+
+async def test_settings_persists_task_models(own_home: Path) -> None:
+    async with _served(own_home) as (runtime, _manager, address), async_playwright() as playwright:
+        port: int = int(address.rpartition(":")[2])
+        browser = await playwright.chromium.launch(headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 390, "height": 900}, is_mobile=True, has_touch=True)
+            await page.goto(ui_url("127.0.0.1", port, TOKEN))
+            await page.goto(f"{address}/#/settings/models")
+            for label in (
+                "Quick task model",
+                "Deep task model",
+                "Writing model",
+                "Coding model",
+            ):
+                await expect_chosen(page, label, "")
+                await pick(page, label, OTHER)
+                await expect_chosen(page, label, OTHER)
+            await page.reload()
+            await expect_chosen(page, "Coding model", OTHER)
+        finally:
+            await browser.close()
+    assert runtime.roles.applied(load_config(config_path()).models).kinds == {
+        "quick": OTHER,
+        "deep": OTHER,
+        "writing": OTHER,
+        "code": OTHER,
+    }

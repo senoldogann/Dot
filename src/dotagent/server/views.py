@@ -849,7 +849,7 @@ class KindModelRequest(FrozenModel):
     kind to the default model."""
 
     kind: TaskKind
-    model: str
+    model: Literal[""] | ModelReference
 
 
 class RestartRequest(FrozenModel):

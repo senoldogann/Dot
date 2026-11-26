@@ -302,8 +302,8 @@ class ProvidersConfig(FrozenModel):
 
 # The kinds of task a model can be named for up front (item 1889, `[models] kinds`): ``security`` is security research
 # within a scope, a goal that names a host a scope covers and speaks of security work (dotagent.agent.refusal).
-type TaskKind = Literal["security"]
-TASK_KINDS: tuple[TaskKind, ...] = ("security",)
+type TaskKind = Literal["security", "quick", "deep", "writing", "code"]
+TASK_KINDS: tuple[TaskKind, ...] = ("security", "quick", "deep", "writing", "code")
 
 
 class ModelsConfig(FrozenModel):
