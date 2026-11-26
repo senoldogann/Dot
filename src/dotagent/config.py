@@ -197,12 +197,14 @@ class OpenCodeConfig(FrozenModel):
     """OpenCode's own agent, the one client Zen's free models serve (item 283), which Dot starts as a local server of
     its own when a run needs it. ``command`` is the ``opencode`` program: a path, or a name looked up on the login
     shell's PATH and in Homebrew's folders. The server stops once it has served nothing for ``idle_stop_s``; the free
-    models OpenCode lists are kept for ``models_ttl_s`` without asking it again."""
+    models OpenCode lists are kept for ``models_ttl_s`` without asking it again. A run whose session says nothing for
+    ``silence_s`` while no tool works for it and no permission waits on the owner fails (item 1940)."""
 
     command: str = Field(min_length=1)
     start_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     idle_stop_s: float = Field(gt=0, allow_inf_nan=False)
     models_ttl_s: float = Field(gt=0, allow_inf_nan=False)
+    silence_s: float = Field(gt=0, allow_inf_nan=False)
 
 
 class ClaudeCodeConfig(FrozenModel):

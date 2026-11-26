@@ -177,6 +177,9 @@ start_timeout_s = 60.0
 idle_stop_s = 600.0
 # How long the list of free models is kept without asking OpenCode again; OpenCode refreshes its own catalog hourly.
 models_ttl_s = 3600.0
+# A run whose session says nothing for silence_s seconds while no tool works for it and no permission waits on you is
+# ended, and fails (item 1940); the run's time limit ([agent] run_max_minutes) is kept by the clock too.
+silence_s = 600.0
 
 [providers.claude_code]
 # Claude Code on your own Claude plan (item 1013): a run on "claude_code:fable", "claude_code:opus",
