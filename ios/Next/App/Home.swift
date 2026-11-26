@@ -80,12 +80,27 @@ struct HomeList: View {
 
     private var bots: [Bot] { model.bots }
 
+    /// The owner's name for the initials; a failed read is said on the home's banner, not hidden behind the symbol.
+    private func readOwner() async {
+        switch await model.read({ api throws(DaemonRequestError) in try await api.assistant() }) {
+        case .loaded(let assistant): owner = assistant.owner
+        case .failed(let failure): problem = failure
+        case .loading: break
+        }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 0) {
                     if let problem = problem ?? model.agentsProblem {
-                        FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: { Task { await model.loadAgents() } })
+                        FailureBanner(failure: problem, macPlace: agentsOnTheMac, retry: {
+                            self.problem = nil
+                            Task {
+                                await model.loadAgents()
+                                await readOwner()
+                            }
+                        })
                             .padding(.horizontal, Space.gutter)
                     }
                     if searching, !query.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -135,9 +150,7 @@ struct HomeList: View {
                     .accessibilityIdentifier("home.newBot")
             }
         }
-        .task {
-            if case .loaded(let assistant) = await model.read({ api throws(DaemonRequestError) in try await api.assistant() }) { owner = assistant.owner }
-        }
+        .task { await readOwner() }
         .task(id: query) {
             let words: String = query.trimmingCharacters(in: .whitespaces)
             guard !words.isEmpty else {

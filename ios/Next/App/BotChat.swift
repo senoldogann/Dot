@@ -103,6 +103,14 @@ struct BotChatScreen: View {
                                 .padding(.horizontal, Space.gutter)
                         }
                     }
+            } else if let failure = model.agentsProblem {
+                // The list could not be read (a bot made a moment ago is not in the stale one): not a deleted bot.
+                VStack {
+                    FailureBanner(failure: failure, macPlace: agentsOnTheMac, retry: { Task { await model.loadAgents() } })
+                        .padding(.horizontal, Space.gutter)
+                    Spacer()
+                }
+                .background(Tone.ground)
             } else {
                 EmptyState(
                     title: String(localized: "This bot is gone", comment: "A bot's chat when the bot was deleted"), systemImage: "person.crop.circle.badge.xmark",
