@@ -375,7 +375,7 @@
 
         private func schedules(now: Double) -> String {
             let one: (String, String, String?, Bool, Double?, Double?, String, Int, String) -> String = { id, name, cron, enabled, next, last, status, failed, when in
-                schedule(id, name, cron, enabled, next, last, status, failed, when, now: now)
+                self.schedule(id, name, cron, enabled, next, last, status, failed, when, now: now)
             }
             return "["
                 + [
