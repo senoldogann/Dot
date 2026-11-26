@@ -32,8 +32,9 @@ struct ModelChoice: Hashable, Identifiable {
 }
 
 /// The composer's button: an ink disc of 30 pt in a 44 pt target. Its glyph says what a press does (send, queue,
-/// steer, stop, confirm an edit); the other way to send stands in a visible menu on a long press and as a VoiceOver
-/// action (D10).
+/// steer, stop, confirm an edit). While a run works and the draft has words, a long press opens both ways to send it,
+/// Steer now and Queue, the follow-up setting's way checked; a pick sends the draft that way and leaves the setting as
+/// it is. VoiceOver offers both as actions (D10).
 struct ComposerButton: View {
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
@@ -52,17 +53,29 @@ struct ComposerButton: View {
         .disabled(!buttons.enabled)
         .keyboardShortcut(.return, modifiers: .command)
         .contextMenu {
-            if let alternate = buttons.alternate {
-                Button(composerActionWords(alternate), systemImage: glyph(alternate)) { perform(alternate) }
+            if buttons.alternate != nil {
+                followUpChoice(.steer)
+                followUpChoice(.queue)
             }
         }
         .accessibilityLabel(composerActionWords(buttons.primary))
         .accessibilityIdentifier("composer.send")
         .accessibilityActions {
-            if let alternate = buttons.alternate {
-                Button(composerActionWords(alternate)) { perform(alternate) }
+            if buttons.alternate != nil {
+                Button(followUpTitle(.steer)) { perform(.steer) }
+                Button(followUpTitle(.queue)) { perform(.queue) }
             }
         }
+    }
+
+    /// One way to send of the long-press menu: its title, what it does under it, a check on the setting's way.
+    private func followUpChoice(_ way: FollowUp) -> some View {
+        let action: ComposerAction = way == .steer ? .steer : .queue
+        return Toggle(isOn: Binding(get: { buttons.primary == action }, set: { _ in perform(action) })) {
+            Text(followUpTitle(way))
+            Text(followUpDetail(way))
+        }
+        .accessibilityIdentifier("composer.followUp." + way.rawValue)
     }
 
     private func glyph(_ action: ComposerAction) -> String {

@@ -313,10 +313,7 @@ extension DaemonAPI {
     /// The models of every provider the daemon knows (`GET /api/models`).
     public func models() async throws(DaemonRequestError) -> [ProviderModels] { try await get("/api/models", query: []) }
 
-    /// The emergency stop (`POST /api/failsafe`): every run stops, desktop control is blocked and the scheduler held
-    /// until it is released on the Mac.
-    public func emergencyStop() async throws(DaemonRequestError) -> FailsafeState { try await send("POST", "/api/failsafe", body: nil) }
-
+    /// Whether the Mac's emergency stop holds (`GET /api/failsafe`).
     public func failsafe() async throws(DaemonRequestError) -> FailsafeState { try await get("/api/failsafe", query: []) }
 
     /// A screenshot a tool returned (`GET /api/images/{name}`).
