@@ -173,7 +173,7 @@ def step_words(tool: str, args: Mapping[str, object], words: Words = ENGLISH) ->
         return words.step("used_skill_named", name) if name else words.step("used_skill")
     if tool in _PLAIN:
         return words.step(tool)
-    if tool.startswith("browser_"):
+    if tool.startswith(("browser_", "safari_")):
         return words.step("used_browser")
     if tool.startswith("desktop_"):
         return words.step("used_desktop")

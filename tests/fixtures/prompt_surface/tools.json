@@ -2478,6 +2478,102 @@
     }
   },
   {
+    "description": "Do several steps in the page of this chat's Safari tab in one call, on the refs of your latest safari_read: click, fill (a field's whole value), select, check, uncheck, press (Enter submits the field's form), scroll_into_view. They run inside the page, without the pointer or the keyboard, so they go at once while the owner works. Batch every step you can predict, such as a whole form and its submit. The result says per step what Dot verified (a field holds what was written, a box is ticked, the expect_text showed) and shows what changed on the page: no safari_read or screenshot is needed after it. Passwords, card numbers and one-time codes go in only as your instructions on secrets say. Safari's own windows (its AutoFill, a password sheet) are not in the page: use the desktop tools for them. Refs (s12) come from your latest safari_read of this chat's Safari tab and stay valid while the page shows the same document.",
+    "name": "safari_act",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "description": "Steps run in order on the refs of your latest safari_read: every step you can predict without a new look (a whole form and its submit), since each call costs a model round trip. The batch stops at the first failure or when the page moves to another address. Example: [{\"action\": \"fill\", \"ref\": \"s5\", \"text\": \"Ada\"}, {\"action\": \"click\", \"ref\": \"s9\", \"expect_text\": \"Registered\"}].",
+          "items": {
+            "additionalProperties": false,
+            "description": "One step in the page of the owner's Safari.",
+            "properties": {
+              "action": {
+                "description": "click | fill (replace a field's value; a dropdown takes the option's label) | select (a dropdown's option by label or value) | check | uncheck | press (Enter, Escape, Tab, an arrow key: sent to the ref, or to the focused element) | scroll_into_view.",
+                "enum": [
+                  "click",
+                  "fill",
+                  "select",
+                  "check",
+                  "uncheck",
+                  "press",
+                  "scroll_into_view"
+                ],
+                "type": "string"
+              },
+              "expect_text": {
+                "description": "Words only the result shows (the label that says Saved, the next page's heading): Dot waits for them after this step and reports verified or uncertain.",
+                "maxLength": 200,
+                "minLength": 4,
+                "type": "string"
+              },
+              "key": {
+                "description": "For press: Enter, Escape, Tab, ArrowDown, …",
+                "type": "string"
+              },
+              "ref": {
+                "description": "Element ref from your latest safari_read, for example s12.",
+                "type": "string"
+              },
+              "text": {
+                "description": "Text for fill; the option for select.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Open an address in the owner's own Safari, where they are signed in and Safari's AutoFill holds their passwords, and return the page as elements with refs and its text. Use Safari when the owner's session or Safari itself is needed; Dot's Chrome (browser_open) otherwise. Refs (s12) come from your latest safari_read of this chat's Safari tab and stay valid while the page shows the same document.",
+    "name": "safari_open",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "new_tab": {
+          "default": false,
+          "description": "Open it in a new tab of Safari's window instead of this chat's tab.",
+          "type": "boolean"
+        },
+        "url": {
+          "description": "Address to open. A bare host such as example.com gets https://.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read the page of this chat's tab in the owner's Safari (the front tab, the first time): its elements with refs (s12) and its visible text, without the pointer and while the owner works on. Give a query to see only what mentions it. safari_act already returns what changed, so read again only after you lost track.",
+    "name": "safari_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "description": "Only the elements and lines of text that contain these words, letter case aside.",
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
     "description": "Run a goal later, once or repeatedly, without the user being present. Use it when the user asks for something to happen at a time or on a rhythm ('every weekday at 9', 'tomorrow at 18:30'). Times are the Mac's local time. Each run goes on in this chat with this chat's settings. Check schedule_list first so you do not create a duplicate.",
     "name": "schedule_create",
     "parameters": {
