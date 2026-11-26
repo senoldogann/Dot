@@ -201,6 +201,15 @@ runs `StreamingLiveUITests` on such a daemon: a new chat stays open when its fir
 by the debug frame meter (`-DotNextFrameMeter 1`: frames, hitches, frames over 16.7 ms, hitch time per second, one line
 per run in `Library/Caches/dotnext-frames.txt`).
 
+## A chat's message actions and the inspector, end to end
+
+`scripts/e2e_chat_actions.sh <udid> <derived data> <shots folder>` (inside the Xcode lock) makes six chats on a
+throwaway daemon with the script words `write:` (a file the inspector can undo), `draft:` (a draft card), `bg:` (a
+command in the background), `fail:`, `helper:` and a plain one, then `ChatActionsLiveUITests` walks them in the dark
+look (shots only) and the light look (Edit from here, Retry and Continue, the draft's edit and Discard, Undo, Write a
+recap, Stop, a helper's chat); the script reads on the daemon's side what each tap did. `e2e_daemon.py --model
+claude_code:haiku` runs the same daemon on a real model.
+
 ## The chat's fixtures
 
 Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtures.swift`, decoded from the contract's

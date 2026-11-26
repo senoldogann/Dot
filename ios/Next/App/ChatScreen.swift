@@ -195,6 +195,7 @@ struct ChatScreen: View {
                 if linesTheWork, let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
                     WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                 }
+                ChatDrafts(thread: thread)
             }
             .frame(maxWidth: proseWidth)
             .frame(maxWidth: .infinity)
@@ -269,7 +270,7 @@ struct ChatScreen: View {
         switch item {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text)
+                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
                 if let delivery { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -307,10 +308,10 @@ struct ChatScreen: View {
             AskAnchorRow(anchor: anchor)
         case .work(let fold):
             WorkFoldView(fold: fold, row: { AnyView(self.row($0)) })
-        case .ended(_, let status, let detail):
-            RunEndedCard(status: status, detail: detail, retry: status == "failed" && activeRun == nil ? { retryLast() } : nil)
-        case .limit(_, let resetsAt):
-            UsageLimitCard(resetsAt: resetsAt, resume: { retryLast() })
+        case .ended(let id, let status, let detail):
+            RunEndCard(item: id, ending: .ended(status: status, detail: detail), thread: thread, toComposer: toComposer, tell: { toast = $0 })
+        case .limit(let id, let resetsAt):
+            RunEndCard(item: id, ending: .limit(resetsAt: resetsAt), thread: thread, toComposer: toComposer, tell: { toast = $0 })
         }
     }
 
@@ -487,10 +488,10 @@ struct ChatScreen: View {
         }
     }
 
-    /// Try again / Resume: the newest run's goal sent again as a message of the chat.
-    private func retryLast() {
-        guard let last = ownRuns.last, !last.goal.isEmpty else { return }
-        Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: [], picks: .none) }
+    /// Words a message action hands back (Edit from here, a Retry that could not send): after the newer draft, never
+    /// over it (plan §13 B3).
+    private func toComposer(_ words: String) {
+        draft = draft.isEmpty ? words : draft + "\n" + words
     }
 
     // MARK: The queue's edit (§20)
