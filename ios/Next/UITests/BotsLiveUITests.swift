@@ -153,6 +153,38 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Routines"].waitForExistence(timeout: 10), "the bot's profile")
         XCTAssertTrue(app.staticTexts["Watch the market and tell me each morning"].exists, "its role")
         shot(app, "profile")
+
+        // The profile as Grok's (item 1963): Library and Computer, Configure the bot with Routines "N on", a Notifications
+        // switch, and Edit under the avatar and the name.
+        let library: XCUIElement = app.buttons["profile.library"]
+        let computer: XCUIElement = app.buttons["profile.computer"]
+        let edit: XCUIElement = app.buttons["profile.edit"]
+        XCTAssertTrue(library.exists && computer.exists && edit.exists)
+        XCTAssertTrue(computer.label.contains("Idle") || computer.label.contains("Working"), "the bot's computer says what it does: \(computer.label)")
+        XCTAssertTrue(app.buttons["profile.routines"].label.contains("0 on"), app.buttons["profile.routines"].label)
+        XCTAssertTrue(app.descendants(matching: .any)["profile.notifications"].exists)
+        XCTAssertLessThanOrEqual(abs(library.frame.height - computer.frame.height), 1, "rows of one kind are identical")
+        XCTAssertLessThanOrEqual(abs(edit.frame.midX - app.windows.firstMatch.frame.midX), 1, "Edit sits under the avatar, centred")
+        XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
+
+        edit.tap()
+        let nameField: XCUIElement = app.textFields["botEdit.name"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10), "the edit page")
+        XCTAssertEqual(nameField.value as? String, "Scout")
+        XCTAssertFalse(app.buttons["botEdit.done"].isEnabled, "nothing changed yet")
+        app.buttons["botEdit.avatar"].tap()
+        let cloud: XCUIElement = app.buttons["avatar.shape.cloud"]
+        XCTAssertTrue(cloud.waitForExistence(timeout: 10))
+        XCTAssertGreaterThanOrEqual(cloud.frame.height, 44)
+        cloud.tap()
+        app.buttons["avatar.colour.teal"].tap()
+        shot(app, "bot-avatar")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["botEdit.done"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["botEdit.done"].isEnabled, "a new look is a change")
+        shot(app, "bot-edit")
+        app.buttons["botEdit.done"].tap()
+        XCTAssertTrue(app.buttons["profile.edit"].waitForExistence(timeout: 10), "Done keeps it and goes back to the profile")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         XCTAssertTrue(pill.waitForExistence(timeout: 10))
         app.navigationBars.buttons.element(boundBy: 0).tap()
