@@ -1419,7 +1419,7 @@ function modelSetting({ label, hint, className, can, takes, refused, none, choos
 }
 
 const STANDBY_HINT =
-  "When a task's model cannot answer (its allowance is used up, it is too busy, its key or access was refused, or its safety filter stopped the reply), the task goes on with the first of these that can, each once at most.";
+  "When a task's model cannot answer (its allowance is used up, it is too busy, its key or access was refused, its safety filter stopped the reply, or its replies stay empty), the task goes on with the first of these that can, each once at most. A model that declines the task is never moved from: you pick the model to restart it on.";
 
 /**
  * The fallback models (item 478, the standby models; drawn as the Fallbacks section, item 563): the models a run moves to,
@@ -1554,6 +1554,21 @@ function buildModels(isDisposed, asked, head) {
     choose: async (ref) => {
       await api.post("/models/main", { model: ref });
       toast("ok", `New chats start on ${modelName(ref)}.`);
+    },
+  });
+  // The model a task of security research within a scope starts on when no model is chosen for it (item 1889): kept as
+  // [models.kinds] security, "" for the default model.
+  const security = modelSetting({
+    label: "Security research model",
+    hint: "A task that names a host of a bug bounty scope or of your own hosts, and asks for security work, starts on it when no model is chosen, so the model that takes that work is the one you chose before any refusal.",
+    className: "models-role",
+    can: (model) => model.tools,
+    takes: () => true,
+    refused: "A task's model takes its steps in Dot's own loop.",
+    none: "Default model",
+    choose: async (ref) => {
+      await api.put("/models/kinds", { kind: "security", model: ref });
+      toast("ok", ref === "" ? "Security research starts on the default model." : `Security research starts on ${modelName(ref)}.`);
     },
   });
   const roles = ROLE_SETTINGS.map((setting) => ({
@@ -1753,7 +1768,7 @@ function buildModels(isDisposed, asked, head) {
   const element = el(
     "div",
     { class: "set-sections" },
-    setSection({ title: "Roles", body: setCard(planRow, main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, usage) }),
+    setSection({ title: "Roles", body: setCard(planRow, main.element, security.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, usage) }),
     setSection({ title: "Night's learning and self-repair", body: setCard(...learning.map(({ control }) => control.element), learningFailed, repairRow) }),
     standby.element,
     setSection({ title: "Code review", body: setCard(reviewModel.element, smallModel.element, ...reviewRows, reviewFailed) }),
@@ -1778,7 +1793,8 @@ function buildModels(isDisposed, asked, head) {
     }
     const status = getSnapshot().status;
     const mainModel = status === null ? "" : status.models.main;
-    const chosen = roles.map(({ role }) => (status === null ? "" : status.models[role])).join(" ");
+    const securityModel = status === null ? "" : (status.models.kinds?.security ?? "");
+    const chosen = [...roles.map(({ role }) => (status === null ? "" : status.models[role])), securityModel].join(" ");
     const standbyModels = status === null ? [] : status.models.standby;
     const standbyKey = standbyModels.join(" ");
     const inUse = providersInUse(status);
@@ -1797,6 +1813,7 @@ function buildModels(isDisposed, asked, head) {
     head.setMeta(...modelsSummary(providers, inUse));
     search.placeholder = `Search ${plural(providers.reduce((count, provider) => count + provider.models.length, 0), "model", "models")}`;
     main.paint(providers, mainModel, null);
+    security.paint(providers, securityModel, mainModel === "" ? null : mainModel);
     for (const { role, control } of roles) {
       control.paint(providers, status === null ? "" : status.models[role], null);
     }

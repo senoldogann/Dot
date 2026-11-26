@@ -103,6 +103,7 @@ from dotagent.agent.reaction_words import ANSWER as ANSWER_MESSAGE
 from dotagent.agent.reaction_words import RELEASE_NOTE, follow_up_goal, queued_reaction_note
 from dotagent.agent.reflection import reflect, whole_run_case
 from dotagent.agent.reflection_record import Reflection
+from dotagent.agent.refusal import security_work
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     RESUMED_EVENT,
@@ -126,7 +127,7 @@ from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputResult, InputTally, MouseButton, ScreenHold
 from dotagent.browser.session import BrowserSession
 from dotagent.claude_code.run import run_in_claude_code
-from dotagent.config import ResumeMode
+from dotagent.config import ReconConfig, ResumeMode
 from dotagent.core.errors import (
     BrowserError,
     ClaudeCodeMissing,
@@ -179,6 +180,7 @@ from dotagent.process_groups import TERM_GRACE_S, GroupRecord, stop_orphans
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
+from dotagent.scopes import authorising_if_readable
 from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -1053,7 +1055,10 @@ class RunManager:
         which are refused unless the run can start with them (:meth:`_check_picks`). ``model_text`` is the first
         message when it is not the goal (a handoff note in front of the owner's words); ``resumed`` carries the plan
         of the run it goes on from; ``proof`` are the checks the owner holds its finish to (item 1853), refused for a
-        run that cannot carry them (:func:`~dotagent.agent.proof.proof_refused`)."""
+        run that cannot carry them (:func:`~dotagent.agent.proof.proof_refused`). A run that names no model starts on
+        the model ``[models] kinds`` names for its kind of task, when one is named (item 1889)."""
+        if model is None:
+            model = self._kind_model(goal)
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_proof(proof, mode, ref, self._runtime.config.shell.max_timeout_s)
         await self.check_model_answers(ref)
@@ -1085,6 +1090,19 @@ class RunManager:
             None,
         )
         return run
+
+    def _kind_model(self, goal: str) -> str | None:
+        """The model ``[models] kinds`` names for the kind of task ``goal`` is (item 1889), ``None`` when it names none
+        or the goal is of no kind it knows. Security research within a scope is the one kind: the scopes are read only
+        when a model is named for it."""
+        security: str = self._runtime.roles.kind_model("security")
+        if security == "":
+            return None
+        recon: ReconConfig = self._runtime.config.recon
+        if not security_work(goal, lambda host: authorising_if_readable(host, recon)):
+            return None
+        log.info("run_routed_by_kind", kind="security", model=security)
+        return security
 
     async def start_firing(
         self,

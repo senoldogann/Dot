@@ -300,6 +300,12 @@ class ProvidersConfig(FrozenModel):
     claude_code: ClaudeCodeConfig
 
 
+# The kinds of task a model can be named for up front (item 1889, `[models] kinds`): ``security`` is security research
+# within a scope, a goal that names a host a scope covers and speaks of security work (dotagent.agent.refusal).
+type TaskKind = Literal["security"]
+TASK_KINDS: tuple[TaskKind, ...] = ("security",)
+
+
 class ModelsConfig(FrozenModel):
     main: ModelReference
     vision: ModelReference
@@ -314,6 +320,8 @@ class ModelsConfig(FrozenModel):
     helper_cooldown_s: float = Field(gt=0, le=86_400, allow_inf_nan=False)
     # The context size of a model's runs where it is not [agent] context_tokens (item 250); Settings › Models sets it.
     context: dict[ModelReference, ContextSize]
+    # The model a run of a kind starts on when none is chosen for it (item 1889); Settings › Models sets it.
+    kinds: dict[TaskKind, ModelReference] = Field(default_factory=dict)
 
     @field_validator("search")
     @classmethod
@@ -1146,8 +1154,9 @@ def _bare_hosts(hosts: Sequence[str], where: str) -> tuple[str, ...]:
 class ReconScope(FrozenModel):
     """One scope the owner may test (item 1887, docs/recon.md): a bug bounty program or an engagement, the hosts it
     covers, and the rules that came with it. A host in a scope is treated as an owned host: the active audit and the
-    form scan run on it, and each report says which program authorised it. Writing the scope down is the owner's
-    statement that the program's rules allow the test; Dot asks nothing more before it starts."""
+    form scan run on it, and each report says which program authorised it. A scope stands for the owner's word that
+    they are in the program and its rules allow the test: they write it, or a run they asked to test the program writes
+    it from the program's own scope page; Dot asks nothing more before it starts."""
 
     program: str = Field(min_length=2, max_length=120)
     hosts: tuple[str, ...] = ()

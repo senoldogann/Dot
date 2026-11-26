@@ -661,7 +661,7 @@ async def test_a_message_the_models_safeguards_flagged_ends_the_run_as_a_failure
     ends failed saying to change the model or the task, and the schedule does not try it."""
     ended: RunRecord = await _run_as(room, "Look at the flagged page.", "schedule")
     assert ended.status == "failed", ended.result
-    assert ended.result.startswith("The model declined the run's message"), ended.result
+    assert ended.result.startswith("The model declined this task ("), ended.result
     assert "change the run's model or reword the task" in ended.result and "safeguards flagged" in ended.result
     (finished,) = await room.runtime.store.events_of_kind(ended.id, "run_finished", 5)
     error: object = finished.data["error"]

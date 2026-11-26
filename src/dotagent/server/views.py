@@ -29,6 +29,7 @@ from dotagent.config import (
     ModelsConfig,
     ResumeMode,
     SnapshotSound,
+    TaskKind,
 )
 from dotagent.config_edit import ReactionsSetting
 from dotagent.connections.catalogue import ConnectionKind
@@ -833,6 +834,20 @@ class RoleModelRequest(FrozenModel):
     """The model for a part of Dot's own work (item 232): the ``fast``, the ``review`` or the ``vision`` model."""
 
     role: ModelRole
+    model: ModelReference
+
+
+class KindModelRequest(FrozenModel):
+    """The model a run of a kind of task starts on when none is chosen for it (item 1889): ``model`` "" leaves the
+    kind to the default model."""
+
+    kind: TaskKind
+    model: str
+
+
+class RestartRequest(FrozenModel):
+    """The model the owner picked to start a run's task again on (item 1889)."""
+
     model: ModelReference
 
 

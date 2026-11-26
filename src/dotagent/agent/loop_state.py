@@ -35,6 +35,8 @@ class LoopState(FrozenModel):
     sent_back: int = 0
     plan_reminders: int = 0
     plan_handed: bool = False
+    # Whether the run's model was given the grounds of a task it declined (item 1889): once per run, resumed or not.
+    refusal_asked: bool = False
 
 
 async def remember_loop_state(bus: EventBus, run_id: str, state: LoopState) -> None:
