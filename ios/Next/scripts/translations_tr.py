@@ -1174,6 +1174,10 @@ TR.update(
         "Instructions": "Talimatlar",
         "Changed on your Mac.": "Mac'inde değiştirilir.",
         "agent agents helpers chat": "ajan ajanlar yardımcılar sohbet",
+        # A2: the Mac's Dot reset.
+        "Your Mac's Dot was reset; the old chats are gone from this phone.": "Mac'indeki Dot sıfırlandı; eski sohbetler artık bu telefonda yok.",
+        "Your unsent words wait in New chat.": "Gönderilemeyen sözlerin Yeni sohbet'te seni bekliyor.",
+        "Photos of unsent messages were not kept.": "Gönderilemeyen mesajların fotoğrafları saklanmadı.",
     }
 )
 # W2: the Activity tab (item 1826) and Agents: the English plural forms.

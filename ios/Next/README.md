@@ -94,7 +94,9 @@ A Swift package (iOS 26 and macOS 26; Foundation, Network, Security only: no UIK
 `Contract/` (the daemon's sync contract, `docs/phone.md` "A chat kept in sync"), `Wire/` (HTTP, SSE parser, host,
 retry policy), `Sync/` (the pure reducers of a chat and the list, frames, delivery states, the transcript filter, the
 clock, the link), `Store/` (`SyncStore`, `Supervisor`, `Engine`), `Outbox/` (moved from the old app), `Cache/`
-(`v2/` of the app group), `Pairing/` (typed code, Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
+(`v2/` of the app group, kept with the daemon it came from: a reset Dot, another `store_id`, drops it and the outbox's doings
+for the old chats, their words kept in the new chat's draft; `docs/phone.md` "Which daemon"), `Pairing/` (typed code,
+Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
 the DotNext scheme runs them on the simulator too. The tests never sleep: `ManualClock` is moved by hand, and
 `FakeDaemon` (a `URLProtocol`) speaks the contract and misbehaves as a test says.
 

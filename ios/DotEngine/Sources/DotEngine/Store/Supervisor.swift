@@ -59,7 +59,7 @@ public actor Supervisor {
 
     // MARK: Life
 
-    /// Starts the list's stream, the outbox and the watch on the link.
+    /// Starts the list's stream, the outbox (which sends nothing before the daemon was heard) and the watch on the link.
     public func start() async {
         guard loops[.list] == nil else { return }
         let outbox: Outbox = outbox
@@ -201,7 +201,15 @@ public actor Supervisor {
         case .list:
             do {
                 let status: DaemonStatus = try await api.status()
-                await store.daemon(version: status.version)
+                if await store.change(to: status.identity) == .reset {
+                    // The unsent messages are kept for the owner first, then the outbox lets go of its doings for the old
+                    // daemon's chats, then the new daemon is taken as the copies' (and the outbox may send): a kill at any
+                    // point finds the reset again, and nothing is told twice.
+                    await store.told(resetWith: await outbox.unsentForReset())
+                    await outbox.dropForReset()
+                }
+                await store.daemon(status.identity)
+                await outbox.nudge()
             } catch {
                 if let ending: Ending = await halt(on: error) { return ending }
                 return .ended(upFor: 0)
@@ -350,6 +358,8 @@ public actor Supervisor {
         let connection: Int = await store.listAsked()
         do {
             perform(await store.listLoaded(try await api.threadsView(), connection: connection))
+            // A new chat waits for a live list: it goes now rather than at its next look.
+            if await store.listIsLive { await outbox.nudge() }
         } catch {
             logger.warning("list read failed error=\(error.description, privacy: .public)")
             await store.listFailed()

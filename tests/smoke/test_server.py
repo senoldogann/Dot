@@ -48,6 +48,7 @@ from dotagent.server.kept_pages import keep_pages
 from dotagent.server.links import ui_url
 from dotagent.server.stream import OPENING, follow_run
 from dotagent.server.views import PermissionsView
+from dotagent.store.db import Store
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
 from dotagent.store.models import NO_PICKS, ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
 
@@ -1686,3 +1687,25 @@ async def test_a_fault_and_a_path_that_does_not_exist_are_answered_as_json(live:
     missing: httpx.Response = await live.get("/api/no-such-path-178")
     assert missing.status_code == 404, missing.text
     assert set(missing.json()) == {"message", "context"}, missing.text
+
+
+async def test_the_status_names_the_database_by_an_id_that_a_restart_keeps_and_a_reset_changes(
+    client: httpx.AsyncClient, runtime: Runtime, tmp_path: Path
+) -> None:
+    first: str = (await client.get("/api/status")).json()["store_id"]
+    assert first.startswith("store_")
+    assert (await client.get("/api/status")).json()["store_id"] == first
+    assert await runtime.store.store_id() == first
+    restarted: Store = await Store.open(tmp_path / "home" / "dot.db", tmp_path / "home" / "images")
+    kept: str = await restarted.store_id()
+    await restarted.close()
+    again: Store = await Store.open(tmp_path / "home" / "dot.db", tmp_path / "home" / "images")
+    try:
+        assert await again.store_id() == kept
+    finally:
+        await again.close()
+    reset: Store = await Store.open(tmp_path / "reset" / "dot.db", tmp_path / "reset" / "images")
+    try:
+        assert await reset.store_id() not in (kept, first)
+    finally:
+        await reset.close()
