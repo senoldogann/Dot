@@ -61,8 +61,16 @@ from dotagent.scheduler.failures import (
     record_firing_started,
     retry_after,
 )
-from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
+from dotagent.scheduler.history import (
+    NO_DIGEST,
+    Digest,
+    OwnerWait,
+    firing_opening,
+    history_digest,
+    with_owner_wait,
+)
 from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, said_nothing_new, tells
+from dotagent.scheduler.owner_wait import owner_wait_of
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.precheck import CHECK_TIMEOUT_S, CheckVerdict, failure_line, opening_with_check, run_check
 from dotagent.scheduler.recovery import (
@@ -1175,6 +1183,7 @@ class Scheduler:
         # As the store had it when it was found due: what the claim below compares (the brief rewrites its goal).
         found: ScheduleRecord = record
         same_chat, digest = await self._history(record, zone)
+        digest = await self._with_owner_wait(record, digest, zone, now)
         record, digest, title = await self._briefed(
             record, digest, now, zone, thread_title(f"{record.name} · {format_local(now, zone)}")
         )
@@ -1338,6 +1347,16 @@ class Scheduler:
             else history_digest(await store.schedule_runs(record.id, SCHEDULE_SOURCE, kept), zone, config.history_chars)
         )
         return same_chat, digest
+
+    async def _with_owner_wait(self, record: ScheduleRecord, digest: Digest, zone: ZoneInfo, now: float) -> Digest:
+        """``digest`` with, in front, the note that an earlier run of ``record`` waits on the owner while one does (item
+        1952), so that the firing does not meet again what only the owner can clear. A firing the owner starts by hand
+        has none: they asked for it."""
+        wait: OwnerWait | None = await owner_wait_of(self._runtime.store, record.id, now)
+        if wait is None:
+            return digest
+        log.info("schedule_firing_skips_owner_wait", schedule_id=record.id, waiting_run_id=wait.run_id)
+        return with_owner_wait(digest, wait, zone)
 
     async def _briefed(
         self, record: ScheduleRecord, digest: Digest, now: float, zone: ZoneInfo, title: str

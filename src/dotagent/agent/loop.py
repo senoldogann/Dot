@@ -307,7 +307,7 @@ from dotagent.oauth.tokens import Account
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, UNWATCHED_SOURCES, WATCHER_SOURCE
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
-from dotagent.scheduler.history import condensed_chat
+from dotagent.scheduler.history import OWNER_WAIT_OPEN, condensed_chat
 from dotagent.scheduler.plans import schedule_timing
 from dotagent.scheduler.timing import format_local
 from dotagent.scopes import authorising_if_readable
@@ -318,6 +318,7 @@ from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import (
     GOAL_CHECK_MARK,
     GOAL_CHECK_UNAVAILABLE,
+    OWNER_WAIT_NOTE,
     PREFIX_CUT_SHORT,
     PREFIX_MODEL_REFUSED,
     RESULT_EMPTY_REPLIES,
@@ -1541,6 +1542,29 @@ def scheduled_goal_end(reason: str, ended: RunOutcome) -> RunOutcome:
     return ended.model_copy(update={"status": "done", "result": marked})
 
 
+def owner_wait_end(reason: str, ended: RunOutcome) -> RunOutcome:
+    """The end of a schedule's firing whose goal check found that the goal cannot be reached without the owner (item
+    1952): done, not failed, with the check's words under the answer and what the run needs from them kept, so that the
+    owner is asked once, by the end's notice, and the schedule's row does not count a failure the owner has to clear."""
+    marked: str = _with_check_note(ended.result, f"{OWNER_WAIT_NOTE}{reason}")
+    return ended.model_copy(update={"status": "done", "result": marked})
+
+
+async def _owner_blocked_end(
+    agent: AgentRun, verdict: GoalVerdict, goal: Message, settled: RunOutcome, ended: RunOutcome
+) -> RunOutcome:
+    """``settled``, or the end of a firing blocked on the owner (:func:`owner_wait_end`): the goal check said the goal
+    cannot be reached, and the run's own finish says what it needs from the owner, or the firing began under the note
+    that the owner was asked already (:data:`OWNER_WAIT_OPEN`, which the scheduler writes into the run's first message,
+    where only Dot's words are). Only a schedule's firing is judged so; any other run that cannot reach its goal
+    failed."""
+    if verdict.decision != "blocked" or not await _is_firing(agent.runtime, agent.run):
+        return settled
+    if ended.needs.strip() == "" and OWNER_WAIT_OPEN not in goal.content:
+        return settled
+    return owner_wait_end(shorten_reason(verdict.reason), ended)
+
+
 def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, patience: int) -> RunOutcome | SendBack:
     """What the checker's verdict makes of the end a run reached: it stands, or the run is sent back to work."""
     reason: str = shorten_reason(verdict.reason)
@@ -2041,6 +2065,8 @@ async def check_goal(
         return asked
     patience: int = agent.runtime.config.agent.goal_patience
     settled: RunOutcome | SendBack = _after_verdict(asked, ended, sent_back, patience)
+    if isinstance(settled, RunOutcome):
+        settled = await _owner_blocked_end(agent, asked, goal, settled, ended)
     await agent.runtime.bus.emit(
         agent.run.id,
         "goal_check",
@@ -2085,7 +2111,7 @@ async def _check_goal_at_limit(
         },
         True,
     )
-    return _after_limit_verdict(asked, ended)
+    return await _owner_blocked_end(agent, asked, goal, _after_limit_verdict(asked, ended), ended)
 
 
 class StallAnswer(FrozenModel):

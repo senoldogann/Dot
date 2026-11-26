@@ -139,7 +139,17 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
   answer lacks, research that would improve it), saying how (item 809); the same `goal_patience` bounds it, and its
   words are no instruction of yours: what the run does then is decided by the gate as every step.
 - `blocked`: the goal cannot be reached from here (it needs you, a credential or something that does not exist). The run
-  ends as failed with its answer and the reason.
+  ends as failed with its answer and the reason. A **schedule's firing** whose own finish said what it needs from you
+  (`needs_from_user`) ends as **done** instead (item 1952), the check's words under its answer saying the goal waits on
+  you, and what it needs shown under it: you are asked once, by the notice of its end, and the schedule's row counts no
+  failure. The firings after it start with a note that this part is on hold (what the run asked of you, quoted, and not
+  to try it again or look for a way round it): they do the rest of the task, and when nothing else is left end at once
+  with a line, no second ask and `nothing_new`, so that a login wall you have to clear (Fiverr, TikTok: 17 failed runs and
+  some 148 M tokens in a week) is not met again by every run. A firing begun under the note whose check says `blocked`
+  ends done too. The note stands until you write in the chat of that run (a run of yours, not the schedule's, after it),
+  or for seven days, after which the part is tried again, as you may have cleared it without saying so; a firing you
+  start by hand has none. It is read from the schedule's runs, nothing is stored for it, it makes no question to you, and
+  a run of any other kind, or a firing that asked nothing of you, fails as before.
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
   to what it sent, a payment, a site's review, a moment the goal names), which a run scheduled in the same chat picks
   up. The run ends as done, with the check's words under its answer. The checker is shown the chat's schedules that are

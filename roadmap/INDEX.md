@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1952](1952.md) | ** done | 2026-11-26 | A schedule's run that only the owner can unblock ends done and waiting, and its next firings skip that part |
 | [1951](1951.md) | no status |  | A schedule whose chat is busy waits for it, due, instead of skipping the firing |
 | [1950](1950.md) | no status |  | A schedule that goes on in its chat reads what was said there, not every step of its earlier runs |
 | [1941](1941.md) | done | 2026-11-26 | A restart whose load launchd refuses tries again with waits that grow |
