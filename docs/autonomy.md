@@ -28,7 +28,13 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   question; the run waits for your answer to what the policy raises, on a card that shows what the action acts on whole
   (a long command wraps and scrolls within the box of code every command of a chat is in, whose copy takes it whole).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
-  message you sent to the run: the only authority it recognises), the action (what it acts on and what it runs, a
+  message you sent to the run: the only authority it recognises), whole or not at all (item 1947): the newest whatever
+  its length, then the first and the others, newest first, while together they fit in 60,000 characters. When one does
+  not fit, the step comes to you without asking the model, as what it did not read could forbid it: once your messages
+  to a run pass 60,000 characters together (a long pasted brief and a few more), every step the review model would have
+  answered comes to you for the rest of the run. Only yolo's check of a run that read outside content, which asks
+  nobody, is shown the rest too, the newest twelve of them cut to 1,500 characters from their middle, as every
+  instruction was before. It is given the action (what it acts on and what it runs, a
   page's script, the whole arguments of an MCP call and the whole goal of a schedule: up to 12,000 characters in one
   question, a longer one in overlapping parts of that size, each its own question, of which the strictest answer
   decides, and one longer than eight parts comes to you without asking the model; items 680, 985 and 1251), why
