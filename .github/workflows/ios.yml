@@ -282,3 +282,27 @@ jobs:
           [ "$ENGINE" = success ] && [ "$BUILD" = success ] && [ "$TESTS" = success ] || exit 1
           [ "$E2E" = success ] || { [ "$FULL" = false ] && [ "$E2E" = skipped ]; } || exit 1
 
+  # After a push to main's run (item 1899): the issue "main is red on macOS" is opened, or told again, when this commit
+  # failed here or in the gate, and closed when both passed (scripts/main_macos_green.py). Not for a run of the night or
+  # by hand, whose commit main's own runs already told.
+  main-health:
+    needs: [ios]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: The issue of a red main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/main_macos_green.py report --sha "$SHA" --this-run "$RUN_ID"

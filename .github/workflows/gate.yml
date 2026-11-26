@@ -251,7 +251,6 @@ jobs:
             workflows=true
           fi
           echo "desktop: $desktop, workflows: $workflows"
-          # The browser answer of a push to main is read by no job (the parts skip main, item 1886); it is still told.
           # The gate's macOS jobs (scripts/python_ci.py): skipped only when every file is one nothing of them reads.
           if ! python="$(printf '%s\n' "$files" | python3 scripts/python_ci.py)"; then
             echo "the gate's macOS jobs: their check failed, so they run"
@@ -443,6 +442,31 @@ jobs:
           path: ${{ runner.temp }}/junit
           retention-days: 14
           if-no-files-found: ignore
+
+  # After every other job of a run on main (item 1899): the issue "main is red on macOS" is opened, or told again, when
+  # this commit failed, and closed when it passed (scripts/main_macos_green.py reads this run, from its other jobs, and
+  # ios.yml's last run of a push). Not for a pull request, which runs no macOS job, nor for a release.
+  main-health:
+    needs: [prose, checks, changes, gate, smoke, browser, desktop, zizmor, ci]
+    if: ${{ always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: The issue of a red main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: python3 scripts/main_macos_green.py report --sha "$SHA" --this-run "$RUN_ID"
 
   # The desktop shell's checks (desktop.yml) for a pull request that changes desktop/ or their workflow (item 1189).
   # Called from here rather than started by their own path filter, so that `ci`, the check main's protection requires,
