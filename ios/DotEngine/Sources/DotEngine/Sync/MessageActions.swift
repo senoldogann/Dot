@@ -7,6 +7,9 @@ import Foundation
 /// about a command in the background, a work order's attempt.
 let runsWithoutOwnersWords: Set<String> = ["resume", "welcome", "background", "work_order"]
 
+/// How a run whose model declined its task ended (`RunRecord.end_reason`, web `restartline.js` `MODEL_REFUSED`).
+let modelRefused: String = "model_refused"
+
 /// The run an owner's message of the transcript belongs to: `u:<run>` (its goal); `nil` for a message still on its way
 /// (`p:`) or a steer into a run (`s:`), which no rewind reaches.
 public func runOfOwnerMessage(_ itemId: String) -> String? {
@@ -42,8 +45,10 @@ public func ownerMessageOffer(run: RunRecord, chatWorking: Bool) -> OwnerMessage
 }
 
 /// What the card at the end of a run that did not end done offers: Continue (`POST /runs/{id}/resume`) when the daemon
-/// says the run can be resumed (cut off, blocked or failed, the newest of its chat), and Retry (rewind, then the
-/// message again) when its message can be gone back to; `cutOff` names how a restart cut it off.
+/// says the run can be resumed (cut off, blocked or failed, the newest of its chat) and its model did not decline the
+/// task (item 1889: such a run is restarted on another model, never continued on the one that declined it), and Retry
+/// (rewind, then the message again) whenever its message can be gone back to, as the web offers it under any answer of
+/// such a message; `cutOff` names how a restart cut it off.
 public struct EndOffer: Equatable, Sendable {
     public let resume: Bool
     public let retry: Bool
@@ -59,8 +64,8 @@ public struct EndOffer: Equatable, Sendable {
 /// `newest` is the chat's newest run as the view gives it; `run` the run the card ends.
 public func endOffer(run: RunRecord, newest: RunDetail?, chatWorking: Bool) -> EndOffer {
     let isNewest: Bool = newest?.run.id == run.id
-    let resume: Bool = isNewest && !chatWorking && newest?.resumable == true
-    let retry: Bool = run.status == "failed" && ownerMessageOffer(run: run, chatWorking: chatWorking).canRewind
+    let resume: Bool = isNewest && !chatWorking && newest?.resumable == true && run.endReason != modelRefused
+    let retry: Bool = ownerMessageOffer(run: run, chatWorking: chatWorking).canRewind
     return EndOffer(resume: resume, retry: retry, cutOff: isNewest ? newest?.cutOff : nil)
 }
 
