@@ -173,6 +173,10 @@ final class AppModel {
         startedChats.first { $0.value == thread }.flatMap { startingChats[$0.key] }
     }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
+    /// "Show steps" of a chat where its This chat sheet set it, over Settings › Chat's (item 1915), kept on the phone.
+    var stepsOverrides: [String: Bool] = (UserDefaults.standard.dictionary(forKey: "stepsOverrides") as? [String: Bool]) ?? [:] {
+        didSet { UserDefaults.standard.set(stepsOverrides, forKey: "stepsOverrides") }
+    }
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
     }

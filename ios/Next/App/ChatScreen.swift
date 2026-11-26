@@ -24,6 +24,7 @@ struct ChatScreen: View {
     let editsFirstQueued: Bool
     @Environment(AppModel.self) private var model: AppModel
     @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
+    @AppStorage(PrefKey.showSteps) private var showStepsEverywhere: Bool = true
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
@@ -75,14 +76,21 @@ struct ChatScreen: View {
     }
     /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
     private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
-    /// Whether the chosen mode hides the steps, so that the live line says the work (item 1769).
-    private var linesTheWork: Bool { chosenMode == .hideAll || chosenMode == .zen }
+    /// "Show steps" for this chat: its own where its This chat sheet set it, else Settings › Chat's (item 1915).
+    private var showsSteps: Bool { model.stepsOverrides[thread] ?? showStepsEverywhere }
+    /// Whether the steps are hidden, so that the live line says the work (items 1769 and 1915).
+    private var linesTheWork: Bool { !showsSteps || chosenMode == .hideAll || chosenMode == .zen }
     private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
-    private var builtItems: [TranscriptItem] { transcript(in: mode) }
+    private var builtItems: [TranscriptItem] {
+        // Messages only (item 1915): every step is built, the run at work's are left out, and a finished run's fold keeps
+        // its steps behind "Worked for 2m", so a tap shows them and nothing is lost.
+        guard !showsSteps, !stepsShown else { return transcript(in: mode) }
+        return messagesOnly(transcript(in: .showAll))
+    }
 
     private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
         // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
@@ -695,6 +703,19 @@ func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
         case .work(let fold):
             return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
         default: return item
+        }
+    }
+}
+
+/// A transcript with only the messages (item 1915): the owner's words, Dot's answers, the asks, the helpers, how runs
+/// ended and their folds; the steps of the run at work (its tool calls that did not fail, its thoughts) are left out, its
+/// live line saying what it does. A finished run's fold is kept whole: its steps open from "Worked for 2m". Pure.
+func messagesOnly(_ items: [TranscriptItem]) -> [TranscriptItem] {
+    items.filter { item in
+        switch item {
+        case .thought: false
+        case .tool(let entry): entry.state == .failed
+        default: true
         }
     }
 }

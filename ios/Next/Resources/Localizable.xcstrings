@@ -1190,7 +1190,7 @@
       }
     },
     "Agents": {
-      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
+      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nSettings section: models, schedules, rules, memory\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3548,7 +3548,7 @@
       }
     },
     "Done": {
-      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nStatus word: the run finished",
+      "comment": "Campaign session: ended done\nChat settings toolbar: keeps the picks\nFind in chat: closes the bar\nStatus word: the run finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4182,6 +4182,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacağı bırak"
+          }
+        }
+      }
+    },
+    "Each chat's This chat sheet can show or hide them for that chat alone.": {
+      "comment": "Chat settings: footer of Show steps (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir."
           }
         }
       }
@@ -4981,6 +4992,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot çalışırken yazılan mesaj"
+          }
+        }
+      }
+    },
+    "For this chat; Settings › Chat sets it for every chat.": {
+      "comment": "This chat sheet: the Show steps switch is this chat's own (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar."
           }
         }
       }
@@ -6457,7 +6479,7 @@
       }
     },
     "Messages": {
-      "comment": "Home search: finds in what the chats say",
+      "comment": "Chat settings section: what a chat shows\nHome search: finds in what the chats say",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7607,6 +7629,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapalı: tepki yalnızca Dot'un öğrendiği bir geri bildirimdir"
+          }
+        }
+      }
+    },
+    "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": {
+      "comment": "Description of the Show steps switch (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır."
           }
         }
       }
@@ -10501,6 +10534,17 @@
         }
       }
     },
+    "Show steps": {
+      "comment": "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adımları göster"
+          }
+        }
+      }
+    },
     "Show the live picture": {
       "comment": "Mini pill: opens the folded mini player",
       "localizations": {
@@ -10920,7 +10964,7 @@
       }
     },
     "Stopped": {
-      "comment": "Campaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
+      "comment": "Activity: a run of Dot's own that was stopped\nCampaign: stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13810,7 +13854,7 @@
       }
     },
     "You": {
-      "comment": "Mini player: the owner holds the run's page",
+      "comment": "Mini player: the owner holds the run's page\nSettings: the owner's card before their name is read",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -13865,7 +13909,7 @@
       }
     },
     "Your Mac": {
-      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name",
+      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name\nWatch: title when the Mac's name is not known",
       "localizations": {
         "tr": {
           "stringUnit": {
