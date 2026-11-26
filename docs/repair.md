@@ -56,6 +56,8 @@ Some failures do not count, because they are the run's own doing, the world's, o
 - An edit whose text was not in the file.
 - A run that ended *failed*. Its result is the model's own prose. On the owner's Mac (2026-11-02), every such run of the
   week had ended on a step the owner had not approved.
+- A run your Claude plan's usage limit ended: the daemon logs its `run failed` line as a warning, not an error, since
+  the plan's window is no defect of Dot's (item 1762).
 
 Two sightings of one defect are one problem. Dot compares the words with ids, numbers, quoted words, paths and addresses
 taken out. A problem keeps its newest five lines of evidence; its words and evidence are masked of the secrets Dot

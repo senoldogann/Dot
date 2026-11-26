@@ -134,6 +134,7 @@ from dotagent.core.errors import (
     ConfigError,
     DotError,
     FailSafeTriggered,
+    FailureKind,
     HopLimitReached,
     InvalidValueError,
     MissingSecretError,
@@ -4437,12 +4438,18 @@ class RunManager:
             log.warning("run_ended_before_it_started", run_id=run.id)
         except DotError as exc:
             # How the error fares with time goes with it: a schedule tries a task a passing one ended again (item 1206).
+            kind: FailureKind = failure_kind(exc)
             status, result, error = (
                 "failed",
                 exc.message,
-                {"message": exc.message, "context": exc.context, "kind": failure_kind(exc)},
+                {"message": exc.message, "context": exc.context, "kind": kind},
             )
-            log.error("run failed", run_id=run.id, error=exc.message, context=exc.context)
+            # The Claude plan's window used up is the plan's state, not an error of Dot's: a warning, so that the
+            # repair night, which reads the log's errors as defects, does not take it for one (item 1762).
+            if kind == "plan_limit":
+                log.warning("run failed", run_id=run.id, error=exc.message, context=exc.context, kind=kind)
+            else:
+                log.error("run failed", run_id=run.id, error=exc.message, context=exc.context, kind=kind)
         except Exception as exc:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)

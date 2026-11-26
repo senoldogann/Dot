@@ -77,6 +77,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1767](1767.md) | done | 2026-11-25 | DotNext: a long press on Send offers Steer now and Queue |
 | [1766](1766.md) | done | 2026-11-25 | DotNext: the phone does not engage the emergency stop |
 | [1765](1765.md) | done | 2026-11-25 | DotNext: no Stop in the chat's header |
+| [1762](1762.md) | done | 2026-11-25 | A run the Claude plan's usage limit ended is no error in the daemon's log |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
 | [1759](1759.md) | done | 2026-11-25 | DotNext's Settings, whole: every page of the web app reachable, the hop-by-hop diagnosis, and pairing as a first run |
