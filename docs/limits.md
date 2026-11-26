@@ -59,8 +59,9 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   run that varies its steps without getting anywhere still ends at a ceiling unless you turn both off. With no bound
   there is no "left", so Dot shows what is spent: a run at work says what it has used so far on its Cost card, and
   Settings › Models › Usage sums the last days (`GET /api/usage`, item 1403). Dot records time, tokens and the windows of
-  your Claude plan, and keeps no price for a model, so none of this shows money; the plan's window is what a Claude plan
-  has instead of a price, and the usage says only what the steps recorded of it.
+  your Claude plan; beside the tokens stands an estimate in dollars from the public price list of models.dev (item
+  1856, [Models](models.md#what-a-run-costs-in-dollars)): "cost unknown" for a model the list has no price for, never a
+  guess, and no dollars for a subscription such as the Claude plan, whose window is what it has instead of a price.
 - Agents that hand work to each other are watched for a loop (item 1741): every hand-off from one agent to another (a run
   another run delegated or messaged, a work order's attempt, the lead's run woken by its agent's answer, a thing on Dot's
   list a run put there) is one hop further than the run it came from, which a run cannot lower; a message of yours, a
@@ -88,7 +89,8 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
   step, what it and its helpers used against its cap and what runs like it usually use (the median and the 90th
   percentile of the last 50 ended runs of the same model, mode and source in 30 days, with their helpers; none from
   fewer than three; `budget` of `GET /runs/{id}/stats`). Unlike `run_max_tokens`, which tells the run to finish, a cap
-  only pauses it. No money: Dot keeps no price for a model, and a plan is a window that fills.
+  only pauses it. The caps count tokens, not dollars: the dollars beside them are an estimate (item 1856), and a plan
+  is a window that fills.
 - A campaign has no end but a verified outcome or you: by default a session every hour, each costing what a run costs.
   What bounds it is Stop, `campaign_max_sessions`, `campaign_failed_sessions` (three failed sessions in a row stop it,
   item 724) and the limits of each session; its page shows the tokens of its sessions. The tests play the sessions and

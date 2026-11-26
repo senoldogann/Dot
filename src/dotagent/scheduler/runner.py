@@ -22,9 +22,9 @@ from dotagent.agent.reflection import last_reflection, record_reflection_failure
 from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT
 from dotagent.config import SchedulerConfig
-from dotagent.core.errors import DotError, NotFoundError, ProviderError, RunConflict, StoreError
+from dotagent.core.errors import DotError, NotFoundError, PrecheckError, ProviderError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import failsafe_path
+from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.schedule import schedule_of
 from dotagent.harness.weekly import night as harness_night
@@ -64,6 +64,7 @@ from dotagent.scheduler.failures import (
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
 from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, said_nothing_new, tells
 from dotagent.scheduler.plans import schedule_zone
+from dotagent.scheduler.precheck import CHECK_TIMEOUT_S, CheckVerdict, failure_line, opening_with_check, run_check
 from dotagent.scheduler.recovery import (
     SCHEDULE_RETRY_EVENT,
     EndFacts,
@@ -110,6 +111,8 @@ FAILED_TICKS_TO_END: int = 20
 
 # The status of a one-time schedule that is due while the owner's emergency stop is engaged: it waits for the release.
 HELD_STATUS: str = "waiting: the emergency stop is engaged"
+# The status of a firing whose check said there is nothing to wake for (item 1855): no run, and no skip.
+QUIET_STATUS: str = "quiet: its check found nothing to wake for"
 
 # How far apart the late starts of firings missed while the daemon was off or the Mac slept are (item 1204), so that
 # a wake that finds several due does not start them all at once; the others wait, still due, for a later tick.
@@ -160,6 +163,19 @@ def by_hand_goal(goal: str, now: float, zone: ZoneInfo) -> str:
     """The goal of a run the owner started by hand (item 455), after a note that it did not start at its time: what its
     run reads first, while the run keeps the goal alone, as a late firing's does (:func:`late_goal`)."""
     return f"(Started by hand at {format_local(now, zone)}, not at its time.)\n\n{goal}"
+
+
+def _with_check(record: ScheduleRecord, opening: str, woken: CheckVerdict | None) -> tuple[ScheduleRecord, str]:
+    """``(record, opening)`` as a firing's run starts with them: unchanged without a check's verdict; with one, the
+    opening followed by what the check printed, and the run started tainted, as a watcher's is, since a check may have
+    read what others wrote (item 1855)."""
+    if woken is None or record.options.precheck is None:
+        return record, opening
+    tainted: ScheduleOptions = record.options.model_copy(update={"from_outside": True})
+    return (
+        record.model_copy(update={"options": tainted}),
+        opening_with_check(opening, record.options.precheck, woken.output),
+    )
 
 
 def _following(record: ScheduleRecord, now: float, zone: ZoneInfo) -> float | None:
@@ -840,12 +856,52 @@ class Scheduler:
             self._next_late_start = now + CATCH_UP_GAP_S
         self._starting.add(record.id)
         try:
-            await self._start_due(record, missed.newest, told_missed, now, zone, following, late, overdue_s)
+            woken: CheckVerdict | None = None
+            if record.options.precheck is not None:
+                woken = await self._woken(record, record.options.precheck, due, following)
+                if woken is None:
+                    return
+            await self._start_due(record, missed.newest, told_missed, now, zone, following, late, overdue_s, woken)
         finally:
             self._starting.discard(record.id)
             if late and record.id not in self._in_flight:
                 # No run started (the claim was dropped, the start failed): the next late firing need not wait.
                 self._next_late_start = now
+
+    async def _check(self, name: str) -> CheckVerdict:
+        """Run the check ``name`` (item 1855) as a run's commands start: in the sandbox while it is on, from the
+        workspace, with the environment of a run's commands."""
+        return await run_check(
+            name,
+            self._runtime.sandbox.current().commands,
+            workspace_dir(),
+            self._runtime.shell_env,
+            CHECK_TIMEOUT_S,
+        )
+
+    async def _woken(
+        self, record: ScheduleRecord, name: str, due: float, following: float | None
+    ) -> CheckVerdict | None:
+        """What the check ``name`` of ``record`` said when it said to wake; ``None`` when it did not, the firing moved
+        on to the schedule's next time with its status saying why: quiet when the check said there is nothing to wake
+        for, which is no skip, or failed, which is told to the owner as a missed firing is. A failure is never taken as
+        quiet."""
+        store: Store = self._runtime.store
+        try:
+            verdict: CheckVerdict = await self._check(name)
+        except PrecheckError as error:
+            log.warning(
+                "schedule_check_failed", schedule_id=record.id, check=name, error=error.message, context=error.context
+            )
+            failed: str = f"skipped: its check failed: {failure_line(error)}"
+            await store.record_schedule_skip(record.id, due, following, failed)
+            await self._tell_missed(record, failed)
+            return None
+        if verdict.wake:
+            return verdict
+        log.info("schedule_check_quiet", schedule_id=record.id, check=name)
+        await store.record_schedule_quiet(record.id, due, following, QUIET_STATUS)
+        return None
 
     async def _adopt_resumed(self, record: ScheduleRecord) -> None:
         """Keep as the schedule's run at work one that was resumed by hand (item 553): the daemon's end cut a firing's
@@ -1081,10 +1137,12 @@ class Scheduler:
         following: float | None,
         late: bool,
         overdue_s: float,
+        woken: CheckVerdict | None,
     ) -> None:
         """Start the run of the firing of ``record`` that was due at ``occurrence``, once :meth:`_fire` let it, with the
         ``missed`` firings before it that are told: the firing is written (its next time, its chat) before the run
-        starts, so a crash can lose a firing but never repeat one."""
+        starts, so a crash can lose a firing but never repeat one. ``woken`` is what the schedule's check said when it
+        woke the firing (item 1855), which the run reads; ``None`` for a schedule without one."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
@@ -1113,7 +1171,7 @@ class Scheduler:
             # Read inside the try (item 785): a store that fails here keeps a one-time schedule due, as a run that did
             # not start does, where the firing above had switched it off for good.
             carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
-            started = await self._start(record, firing_opening(told, digest), thread_id, carried)
+            started = await self._start(*_with_check(record, firing_opening(told, digest), woken), thread_id, carried)
         except DotError as exc:
             if _chat_busy(exc) and not one_time:
                 # A run going on in a recurring schedule's own chat (the owner's message in it, item 257) is no
@@ -1196,6 +1254,11 @@ class Scheduler:
             )
         self._starting.add(schedule_id)
         try:
+            # The owner asked for the run: its check runs for what it prints, and the run starts whatever it says;
+            # a check that fails is the caller's error, before any chat is made (item 1855).
+            woken: CheckVerdict | None = None
+            if record.options.precheck is not None:
+                woken = await self._check(record.options.precheck)
             zone: ZoneInfo = await schedule_zone(record.options, self._zone)
             same_chat, digest = await self._history(record, zone)
             out_of_time: str = thread_title(f"{record.name} · {format_local(now, zone)} · by hand")
@@ -1206,7 +1269,8 @@ class Scheduler:
             try:
                 # Inside the try, as a firing's (item 785): a store that fails here drops the chat made for the run.
                 carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
-                started = await self._start(record, firing_opening(goal, digest), thread_id, carried)
+                checked: tuple[ScheduleRecord, str] = _with_check(record, firing_opening(goal, digest), woken)
+                started = await self._start(*checked, thread_id, carried)
             finally:
                 if started is None and made:
                     await self._drop_chat(record.id, thread_id)

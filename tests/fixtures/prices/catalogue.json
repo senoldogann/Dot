@@ -1,0 +1,11 @@
+{
+  "anthropic": {"id": "anthropic", "models": {
+    "claude-sonnet-5-5": {"id": "claude-sonnet-5-5", "cost": {"input": 3, "output": 15, "cache_read": 0.3, "cache_write": 3.75,
+      "tiers": [{"input": 6, "output": 22.5, "cache_read": 0.6, "cache_write": 7.5, "tier": {"type": "context", "size": 200000}}]}},
+    "claude-free-none": {"id": "claude-free-none"}
+  }},
+  "openai": {"id": "openai", "models": {"gpt-6": {"cost": {"input": 1.25, "output": 10}}}},
+  "openrouter": {"id": "openrouter", "models": {"deepseek/deepseek-v4": {"cost": {"input": 0.5, "output": 2, "cache_read": 0.05}}}},
+  "opencode": {"id": "opencode", "models": {"qwen4-max-free": {"cost": {"input": 0, "output": 0, "cache_read": 0}}}},
+  "somebody-else": {"id": "somebody-else", "models": {"x": {"cost": {"input": 9, "output": 9}}}}
+}

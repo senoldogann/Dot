@@ -29,7 +29,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.notify.owner import tell_owner
 from dotagent.proactive import NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.proactive.judge import Verdict, judge
-from dotagent.proactive.looks import Gathered, Item, look_calendar, look_github, look_mail
+from dotagent.proactive.looks import Gathered, Item, look_calendar, look_check, look_github, look_mail
 from dotagent.proactive.text import one_line
 from dotagent.proactive.watchers import (
     SEEN_KEPT,
@@ -60,11 +60,17 @@ JUDGE_TIMEOUT_S: float = 30.0
 RETRY_FLOOR_S: float = 300.0
 _HOUR_S: float = 3600.0
 _NONCE_BYTES: int = 8
-_WHAT: dict[str, str] = {"mail": "mail", "calendar": "event", "github": "GitHub notification"}
+_WHAT: dict[str, str] = {
+    "mail": "mail",
+    "calendar": "event",
+    "github": "GitHub notification",
+    "check": "finding of your check",
+}
 _LINE_WORDS: dict[str, str] = {
     "mail": "new mail",
     "calendar": "an event about to start",
     "github": "a GitHub notification",
+    "check": "your check said to wake",
 }
 _UNCHECKED: str = "it could not be checked against your words"
 _ALERT: str = (
@@ -136,6 +142,8 @@ async def _gather(runtime: Runtime, watcher: WatcherRecord, now: float) -> Gathe
             return await look_calendar(runtime.accounts, watcher, now, zone)
         case "github":
             return await look_github(runtime.accounts, watcher, now)
+        case "check":
+            return await look_check(runtime.sandbox.current().commands, runtime.shell_env, watcher, now)
 
 
 async def _verdict(runtime: Runtime, watcher: WatcherRecord, item: Item) -> Chosen | None:
@@ -161,8 +169,9 @@ async def _verdict(runtime: Runtime, watcher: WatcherRecord, item: Item) -> Chos
 
 def _judged(watcher: WatcherRecord) -> bool:
     """Whether the fast model judges the items of ``watcher`` against the owner's words. The calendar and a GitHub
-    watcher without words judge nothing: what its look found is what it tells."""
-    return not (watcher.kind == "calendar" or (watcher.kind == "github" and watcher.words == ""))
+    watcher without words judge nothing, nor does a check without them (item 1855): what its look found is what it
+    tells."""
+    return not (watcher.kind == "calendar" or (watcher.kind in ("github", "check") and watcher.words == ""))
 
 
 def _to_decide(runtime: Runtime, watcher: WatcherRecord, items: Sequence[Item]) -> tuple[list[Item], int]:
