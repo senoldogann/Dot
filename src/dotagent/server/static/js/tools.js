@@ -8,6 +8,9 @@ import { icon, toolIconName } from "./icons.js";
 import { showImage } from "./ui.js";
 import { showsWhy, whyText } from "./why.js";
 
+/** The tool whose pictures stand as cards in the conversation (item 1969). */
+export const GENERATED_PICTURE_TOOL = "generate_image";
+
 const PRIMARY_KEYS = ["command", "url", "path", "query", "goal", "text", "name", "app", "ref", "title", "script", "key"];
 const SUMMARY_CHARS = 200;
 const TEXT_PREVIEW_CHARS = 6000;
@@ -403,7 +406,8 @@ export function toolRow({ tool, args }) {
     // A command keeps its own words, what it came to its tooltip; a failure's first line is the tooltip of any call.
     head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || t("tools.failed");
     time.textContent = duration(outcome.seconds);
-    shots.replaceChildren(...outcome.images.map(thumbnail));
+    // A picture the run made is an answer, drawn by its own card (`pictureCard`), not a thumbnail of the row.
+    shots.replaceChildren(...(outcome.tool === GENERATED_PICTURE_TOOL ? [] : outcome.images.map(thumbnail)));
     if (details.open) {
       buildBody();
     }

@@ -3,7 +3,7 @@
 Dot makes a picture with the tool `generate_image` (item 1969, in the tool group `images`): a logo, a diagram, a social
 card, a cover, an icon, a simple illustration, a chart, or a photo-like image. The PNG is saved in the run's workspace
 at the path the run gives, and it shows in the conversation where it was made, at the conversation's width; a press
-opens it full size (the tool's row above it keeps a small thumbnail, as every tool's does). It takes **no key of its own**: a picture is drawn by Dot's own browser, and a photo uses a key you
+opens it full size; the tool's row above it keeps no thumbnail of its own, so the picture shows once. It takes **no key of its own**: a picture is drawn by Dot's own browser, and a photo uses a key you
 already have.
 
 ## Two ways, and how the run chooses

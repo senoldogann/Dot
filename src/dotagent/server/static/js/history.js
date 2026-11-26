@@ -13,7 +13,7 @@ import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
 import { sourcesRow } from "./sources.js";
-import { countKinds, flowIcon, flowWords, narrates, pictureCard, toolRow } from "./tools.js";
+import { countKinds, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, toolRow } from "./tools.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read before the page is drawn (items 374 and 708), side by side: they stand right
@@ -290,7 +290,7 @@ function drawFlow(past, flow, asked, events, reactions) {
         open.delete(event.data.call_id);
       }
       // A picture the run made stands where it came (item 1969), as on the run's own page.
-      if (event.data.ok && event.data.tool === "generate_image") {
+      if (event.data.ok && event.data.tool === GENERATED_PICTURE_TOOL) {
         batch = null;
         for (const name of event.data.images) {
           blocks.push({ picture: name });

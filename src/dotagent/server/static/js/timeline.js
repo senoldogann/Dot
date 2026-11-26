@@ -26,7 +26,7 @@ import { readsPages } from "./sourcelist.js";
 import { showSources } from "./sources.js";
 import { blockNode, prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
-import { callKind, describeArguments, flowIcon, flowWords, narrates, pictureCard, shortPaths, toolRow, toolWords } from "./tools.js";
+import { callKind, describeArguments, flowIcon, flowWords, GENERATED_PICTURE_TOOL, narrates, pictureCard, shortPaths, toolRow, toolWords } from "./tools.js";
 import { detailsFold } from "./ui.js";
 import { callPhrase } from "./workstatus.js";
 
@@ -1342,13 +1342,17 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         onTool({ tool: data.tool, args });
       }
       paintGroup(group);
-      for (const name of data.images) {
-        onImage(name);
-      }
-      // A picture the run made is part of its answer (item 1969): shown where it came, at the conversation's width.
-      if (data.ok && data.tool === "generate_image") {
+      // A picture the run made is part of its answer (item 1969): shown where it came, at the conversation's width,
+      // and not among the screens of Dot's computer.
+      if (data.tool === GENERATED_PICTURE_TOOL) {
+        if (data.ok) {
+          for (const name of data.images) {
+            place(scope, pictureCard(name), record.ts);
+          }
+        }
+      } else {
         for (const name of data.images) {
-          place(scope, pictureCard(name), record.ts);
+          onImage(name);
         }
       }
       const remembered = memoryChange(data, args);
