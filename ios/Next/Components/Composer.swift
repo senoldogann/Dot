@@ -5,14 +5,15 @@ import UIKit
 import UniformTypeIdentifiers
 import VisionKit
 
-/// The composer's two shapes (review S4): compact at rest (one row), split into the field and a toolbar once the
-/// owner writes more than a line, focuses it, adds a file or edits a queued message.
+/// The composer's two shapes (review S4): one capsule row at rest and while the owner types a short line (focus alone
+/// does not change it, item 1918), split into the field and a toolbar once the owner writes more than a line, adds a
+/// file or edits a queued message.
 enum ComposerLayout: Equatable, Sendable {
     case compact
     case expanded
 
-    static func of(text: String, isFocused: Bool) -> ComposerLayout {
-        if isFocused || text.contains("\n") || text.count > 32 { return .expanded }
+    static func of(text: String) -> ComposerLayout {
+        if text.contains("\n") || text.count > 32 { return .expanded }
         return .compact
     }
 }
@@ -111,7 +112,8 @@ struct ComposerSuggestions: Sendable {
 /// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
 /// button on one row; expanded with the field above and +, the model · effort chip, the microphone and the button
 /// beneath. Photos, the camera, files and a document scan go on the + menu; `/` offers commands and skills, `@` agents.
-/// The chip opens the chat's settings (PLAN §24); the microphone turns the pill into the recorder (`VoiceRecorderBar`),
+/// The model chip (the model's provider mark and a chevron, never its name) is in both shapes and opens the chat's
+/// settings (PLAN §24), the one grouped model picker; the microphone turns the pill into the recorder (`VoiceRecorderBar`),
 /// whose ✓ puts the words in the field.
 struct ComposerView: View {
     @Binding var text: String
@@ -148,7 +150,7 @@ struct ComposerView: View {
     var body: some View {
         // At the accessibility sizes the field takes its own line: one row would push the button off the edge.
         let layout: ComposerLayout =
-            attachments.isEmpty && !dynamicTypeSize.isAccessibilitySize ? ComposerLayout.of(text: text, isFocused: isFocused) : .expanded
+            attachments.isEmpty && !dynamicTypeSize.isAccessibilitySize ? ComposerLayout.of(text: text) : .expanded
         let compact: Bool = layout == .compact
         VStack(alignment: .leading, spacing: Space.xs) {
             suggestionList
@@ -257,6 +259,7 @@ struct ComposerView: View {
                         .padding(.horizontal, compact ? 0 : Space.m - Space.xxs)
                         .padding(.top, compact ? 0 : Space.m)
                     if compact {
+                        modelChip
                         micButton
                         ComposerButton(buttons: buttons, perform: perform).disabled(blocksSending)
                     }
@@ -366,20 +369,22 @@ extension ComposerView {
         .accessibilityLabel(String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"))
     }
 
+    /// The model chip: the provider's mark and a chevron (the name is in the picker, and in VoiceOver's label). At the
+    /// accessibility sizes it is the mark alone.
     @ViewBuilder fileprivate var modelChip: some View {
         if let model, let openSettings {
             Button(action: openSettings) {
                 HStack(spacing: Space.xxs) {
-                    Text(model.label).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                    if let effort = model.effort { Text(effortTitle(effort)).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
-                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
+                    Image(providerMarkAsset(providerOfModel(model.ref, in: app.models))).resizable().renderingMode(.template).scaledToFit()
+                        .frame(width: 20, height: 20).foregroundStyle(Tone.text)
+                    if !dynamicTypeSize.isAccessibilitySize { Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph) }
                 }
                 .padding(.horizontal, Space.xs)
-                .frame(minHeight: Metric.hit)
+                .frame(minWidth: Metric.hit, minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(String(localized: "Model, \(chipWords(model))", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+            .accessibilityLabel(String(localized: "Model: \(chipWords(model))", comment: "VoiceOver: the composer's model button; the argument is the model and effort"))
             .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
             .accessibilityIdentifier("composer.model")
         }
