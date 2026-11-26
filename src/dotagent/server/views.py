@@ -19,10 +19,14 @@ from dotagent.agent.welcome import LANGUAGE_CHARS
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileKind, ProfileView
 from dotagent.config import (
+    CUSTOM_MODELS_MAX,
     SHOWN_NAME,
     AfterRun,
     BrowserProfileName,
     BudgetConfig,
+    CustomModel,
+    CustomProtocol,
+    CustomProviderConfig,
     DebugPort,
     JudgeProvider,
     ModelReference,
@@ -2217,6 +2221,47 @@ class KeysView(FrozenModel):
 
     env_file: str
     keys: list[KeyView]
+
+
+class CustomProviderView(FrozenModel):
+    """A custom provider as Settings shows it (item 1949): its table of ``[providers.custom]`` and whether its
+    key is set (``key_set``; ``False`` when it takes none). The key itself never leaves the daemon."""
+
+    name: str
+    config: CustomProviderConfig
+    key_set: bool
+
+
+class CustomProvidersView(FrozenModel):
+    providers: list[CustomProviderView]
+
+
+class CustomProviderRequest(FrozenModel):
+    """A custom provider to add or change (item 1949): ``config`` as its table will be, but for its key's name,
+    which the daemon gives (``needs_key``: whether it takes a key at all)."""
+
+    base_url: str = Field(min_length=1, max_length=2000)
+    protocol: CustomProtocol
+    needs_key: StrictBool
+    headers: dict[str, str] = Field(max_length=20)
+    models: list[CustomModel] = Field(max_length=CUSTOM_MODELS_MAX)
+    list_models: StrictBool
+
+
+class CustomTestRequest(FrozenModel):
+    """One small real call to a provider as the form holds it (item 1949): ``key`` typed in the form and not yet
+    saved, or ``None`` for the one saved for ``name``; ``model`` the model to ask, ``""`` for its list of models."""
+
+    name: str = Field(min_length=1, max_length=32)
+    provider: CustomProviderRequest
+    key: str | None = Field(min_length=1, max_length=_KEY_CHARS, pattern=r"^[!-~]+$")
+    model: str = Field(max_length=200)
+
+
+class DocsRequest(FrozenModel):
+    """The address of a provider's documentation page, to propose its fields from (item 1949)."""
+
+    url: str = Field(min_length=1, max_length=2000, pattern=r"^https?://")
 
 
 class RestartPending(FrozenModel):

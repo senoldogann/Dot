@@ -19,7 +19,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
-from dotagent.config import JudgeProvider, ResumeMode, TaskKind
+from pydantic import JsonValue
+
+from dotagent.config import CustomProviderConfig, JudgeProvider, ResumeMode, TaskKind
 from dotagent.core.errors import ConfigError
 from dotagent.core.files import link_target
 from dotagent.core.types import JsonObject
@@ -616,3 +618,102 @@ def restore_browser_values(path: Path, values: tuple[tuple[BrowserSetting, Setti
         change,
         "put back " + ", ".join(key for key, _ in values) + " under [browser]",
     )
+
+
+# A TOML value as a custom provider's table holds one (item 1949): a string, a switch, a number, a list or an
+# inline table of them.
+type TomlValue = str | bool | int | float | list[TomlValue] | dict[str, TomlValue]
+
+
+def _toml(value: TomlValue) -> str:
+    """``value`` as a TOML literal, a table inline."""
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        return "{ " + ", ".join(f"{_written_key(key)} = {_toml(item)}" for key, item in value.items()) + " }"
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml(item) for item in value) + "]"
+    return _literal(value)
+
+
+def _toml_value(value: JsonValue) -> TomlValue:
+    """A JSON value of a dumped configuration as TOML holds it; TOML has no null."""
+    if value is None:
+        raise ConfigError("a custom provider's setting has no value", {})
+    if isinstance(value, dict):
+        return {key: _toml_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_toml_value(item) for item in value]
+    return value
+
+
+def _custom_header(name: str) -> re.Pattern[str]:
+    """The header of the custom provider ``name``'s table, or of a table or an array of tables within it."""
+    return re.compile(
+        rf"""^\s*\[\[?\s*providers\s*\.\s*custom\s*\.\s*(?:{re.escape(name)}|"{re.escape(name)}"|'{re.escape(name)}')"""
+        r"\s*(?:\]|\.)"
+    )
+
+
+def without_custom_provider(text: str, name: str) -> str:
+    """``text`` without the table of the custom provider ``name`` and the tables within it; nothing else changes."""
+    lines: list[str] = text.splitlines()
+    header: re.Pattern[str] = _custom_header(name)
+    kept: list[str] = []
+    inside: bool = False
+    for line in lines:
+        if _TABLE_HEADER.match(line):
+            inside = header.match(line) is not None
+        if not inside:
+            kept.append(line)
+    while kept and not kept[-1].strip():
+        kept.pop()
+    return "\n".join(kept) + "\n" if kept else ""
+
+
+def with_custom_provider(text: str, name: str, settings: dict[str, TomlValue]) -> str:
+    """``text`` with the custom provider ``name``'s table written as ``settings``, in place of the one it had (at the
+    end of the file): its scalars as keys, its lists of models and its headers inline."""
+    rest: str = without_custom_provider(text, name)
+    lines: list[str] = [f"[providers.custom.{name}]"]
+    for key, value in settings.items():
+        if isinstance(value, list) and value and all(isinstance(item, dict) for item in value):
+            lines.append(f"{_written_key(key)} = [")
+            lines.extend(f"  {_toml(item)}," for item in value)
+            lines.append("]")
+        else:
+            lines.append(f"{_written_key(key)} = {_toml(value)}")
+    separator: str = "\n" if rest.strip() else ""
+    return f"{rest}{separator}" + "\n".join(lines) + "\n"
+
+
+def set_custom_provider(path: Path, name: str, config: CustomProviderConfig | None) -> None:
+    """Write the custom provider ``name`` into the config file at ``path`` (created when missing) as ``config``, or
+    take its table out for ``None``. The result is parsed again before it replaces the file: it must hold the provider
+    as given (or none) and every other setting unchanged, or nothing is written."""
+    keys: tuple[str, ...] = ("providers", "custom", name)
+    wanted: JsonObject | None = None if config is None else config.model_dump(mode="json")
+    settings: dict[str, TomlValue] = {} if wanted is None else {key: _toml_value(item) for key, item in wanted.items()}
+    by_hand: str = (
+        f"remove the [providers.custom.{name}] table"
+        if config is None
+        else f"write the [providers.custom.{name}] table"
+    )
+    with _EDITING:
+        try:
+            before: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        except UnicodeDecodeError as error:
+            raise _by_hand(by_hand, path, f"the file is not UTF-8 text: {error}") from error
+        old_settings: JsonObject = _parse(before, path)
+        after: str = (
+            without_custom_provider(before, name) if config is None else with_custom_provider(before, name, settings)
+        )
+        try:
+            new_settings: JsonObject = tomllib.loads(after)
+        except tomllib.TOMLDecodeError as error:
+            raise _by_hand(by_hand, path, f"the edited file is not valid TOML: {error}") from error
+        if _value_at(new_settings, keys) != wanted:
+            raise _by_hand(by_hand, path, "the edited file does not hold the provider as given")
+        if _without(new_settings, keys) != _without(old_settings, keys):
+            raise _by_hand(by_hand, path, "the edit changed another setting")
+        _replace(path, after)

@@ -28,7 +28,11 @@ def keys_router(ctx: ServerContext) -> APIRouter:
     retired, and the next request makes a new one with the key in use then."""
     router: APIRouter = APIRouter(prefix="/api")
     config: AppConfig = ctx.runtime.config
-    providers: dict[str, str] = providers_by_key(config)
+
+    def providers() -> dict[str, str]:
+        # Read at each request: Settings adds and removes custom providers while the daemon runs (item 1949).
+        return providers_by_key(config, ctx.runtime.router.custom)
+
     # One change of the file at a time: each reads it, changes one entry and writes it back.
     writing: asyncio.Lock = asyncio.Lock()
 
@@ -39,14 +43,17 @@ def keys_router(ctx: ServerContext) -> APIRouter:
             await ctx.runtime.router.retire(provider)
 
     def provider_of(name: str) -> str:
-        provider: str | None = providers.get(name)
+        known: dict[str, str] = providers()
+        provider: str | None = known.get(name)
         if provider is None:
-            raise NotFoundError("no provider takes a key of this name", {"name": name, "names": list(providers)})
+            raise NotFoundError("no provider takes a key of this name", {"name": name, "names": list(known)})
         return provider
 
     @router.get("/keys")
     async def keys() -> KeysView:
-        views: list[KeyView] = [await asyncio.to_thread(_view, provider, name) for name, provider in providers.items()]
+        views: list[KeyView] = [
+            await asyncio.to_thread(_view, provider, name) for name, provider in providers().items()
+        ]
         return KeysView(env_file=str(env_file_path()), keys=views)
 
     @router.post("/keys/{name}")
@@ -76,6 +83,6 @@ def keys_router(ctx: ServerContext) -> APIRouter:
     async def check_key(name: str) -> CheckResult:
         """Ask the provider whether it takes the key in use: one call that costs nothing, or for Ollama's key one
         search of its hosted web search."""
-        return await check_provider_key(config, provider_of(name))
+        return await check_provider_key(config, provider_of(name), ctx.runtime.router.custom)
 
     return router

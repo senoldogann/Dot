@@ -222,6 +222,17 @@ read_timeout_s = 600.0
 attempts = 6
 max_concurrent = 4
 
+[providers.custom]
+# Providers you add (docs/models.md, Settings › AI services › Add provider): a server that speaks OpenAI's Chat
+# Completions ("chat"), OpenAI's Responses ("responses") or Anthropic's Messages ("messages"). The table's name is the
+# prefix of its models: "groq:llama-4-scout" for example.
+# [providers.custom.groq]
+# base_url = "https://api.groq.com/openai/v1"   # https, or http://localhost for a server on this Mac
+# protocol = "chat"
+# api_key_env = "DOT_CUSTOM_GROQ_API_KEY"       # "" for a server that takes no key
+# models = [{ id = "llama-4-scout", tools = true, vision = true, context = 131072, max_output = 8192 }]
+# list_models = false                           # true: also the models its GET /models lists
+
 [judge]
 # The typed judge answers two questions where code has no answer of its own, each with the probability of yes. Does a
 # click on a browser control whose label no pattern of the policy knows publish, send, pay or delete? At or above

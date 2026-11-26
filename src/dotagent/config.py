@@ -3,7 +3,7 @@
 import ipaddress
 import re
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -16,7 +16,8 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.learned_text import LINE_BREAKS, hidden_character
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.llm.types import KNOWN_PROVIDERS, Effort, split_model_ref
+from dotagent.llm.traits import is_known_label
+from dotagent.llm.types import KNOWN_PROVIDERS, Effort, custom_provider_name, split_model_ref
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.store.models import BrowserMode, NotifyLevel
 from dotagent.web.ladder import SearchEngine
@@ -34,10 +35,12 @@ def _service_address(value: str) -> str:
 
 
 def _model_reference(value: str) -> str:
-    """A model as ``<provider>:<model>``, the provider one Dot knows (:func:`dotagent.llm.types.split_model_ref`)."""
+    """A model as ``<provider>:<model>``, the provider a built-in one or a name a custom provider can take
+    (:func:`dotagent.llm.types.split_model_ref`); that the custom one is configured is checked by ``AppConfig``."""
     if split_model_ref(value) is None:
         raise ValueError(
-            f"a model must look like '<provider>:<model>', the provider one of {', '.join(KNOWN_PROVIDERS)}"
+            f"a model must look like '<provider>:<model>', the provider one of {', '.join(KNOWN_PROVIDERS)} or a "
+            "custom provider of [providers.custom]"
         )
     return value
 
@@ -288,6 +291,130 @@ class OpenRouterConfig(FrozenModel):
     max_concurrent: int = Field(ge=1)
 
 
+# The wire a custom provider speaks (docs/models.md): OpenAI's Chat Completions, OpenAI's Responses, or Anthropic's
+# Messages, each with the codec Dot's own connectors use.
+type CustomProtocol = Literal["chat", "responses", "messages"]
+# The hosts a custom provider may be reached at over plain http: this Mac's own.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
+# The name of a variable a key is kept under, as a shell names one (``dotagent.secrets``).
+_KEY_VARIABLE: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,127}")
+# A header name as HTTP takes one (a token); a header whose name speaks of a secret is refused, so that no key goes in
+# the config file in plain text, where the web UI and the logs would show it.
+_HEADER_NAME: re.Pattern[str] = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]{1,64}")
+_SECRET_HEADER: re.Pattern[str] = re.compile(
+    r"auth|key|token|secret|cookie|password|passwd|passphrase|signature|session|bearer|credential", re.IGNORECASE
+)
+_HEADER_VALUE: re.Pattern[str] = re.compile(r"[ -~]{0,512}")
+# The headers Dot sets itself on every call of a custom provider.
+_OWN_HEADERS: frozenset[str] = frozenset(
+    {"content-type", "content-length", "host", "user-agent", "anthropic-version", "accept", "accept-encoding"}
+)
+# The most models a custom provider may list in the config file.
+CUSTOM_MODELS_MAX: int = 200
+
+
+def _custom_base_url(value: str) -> str:
+    """The address of a custom provider: https, or http to this Mac's own server (a local Ollama, LM Studio or vLLM),
+    so that its key and the conversations never cross a network in plain text."""
+    url: httpx.URL = httpx.URL(value)
+    if url.scheme == "https" or (url.scheme == "http" and url.host in _LOOPBACK_HOSTS):
+        if url.query or url.fragment:
+            raise ValueError("a custom provider's base_url has no query and no fragment")
+        if url.userinfo:
+            raise ValueError("a custom provider's base_url carries no user name or password; its key is api_key_env")
+        return value
+    raise ValueError("a custom provider's base_url must start with https://, or http:// for localhost alone")
+
+
+class CustomModel(FrozenModel):
+    """One model of a custom provider: its id as the provider names it, and what it can do, which the provider's own
+    API does not say: whether it calls tools, reads images and thinks, its window (``context``, tokens) and its output
+    limit (``max_output``). ``efforts`` are the reasoning labels it takes (``low``, ``medium``, ``high``, ...); none
+    with ``thinking`` on a Messages provider sends the plain thinking switch."""
+
+    id: str = Field(min_length=1, max_length=200, pattern=r"^[^\s]+$")
+    tools: bool = True
+    vision: bool = False
+    thinking: bool = False
+    efforts: tuple[str, ...] = ()
+    context: int = Field(default=128_000, ge=1_000, le=100_000_000)
+    max_output: int = Field(default=8_192, ge=16, le=10_000_000)
+
+    @field_validator("efforts")
+    @classmethod
+    def _known_labels(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        unknown: list[str] = [label for label in value if not is_known_label(label)]
+        if unknown:
+            raise ValueError(f"unknown reasoning labels: {', '.join(unknown)}")
+        return value
+
+
+class CustomProviderConfig(FrozenModel):
+    """A provider the owner added (``[providers.custom.<name>]``, docs/models.md): a server that speaks one of the
+    protocols Dot already speaks, at ``base_url`` (the part before ``/chat/completions``, ``/responses`` or
+    ``/messages``, usually ending in ``/v1``). ``api_key_env`` names its key in Dot's key store, the environment or the
+    Keychain (``""``: none, for a local server); the key goes to ``base_url`` alone. ``headers`` are extra headers that
+    hold no secret. ``models`` are its models with what each can do, and ``list_models`` reads the rest from its ``GET
+    /models`` (each then assumed to call tools, read no images and hold 128,000 tokens). The defaults are the
+    configuration's own: a table that leaves a field out takes them."""
+
+    base_url: Annotated[str, AfterValidator(_service_address), AfterValidator(_custom_base_url)]
+    protocol: CustomProtocol
+    api_key_env: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)
+    models: list[CustomModel] = Field(default_factory=list, max_length=CUSTOM_MODELS_MAX)
+    list_models: bool = False
+    connect_timeout_s: float = Field(default=10.0, gt=0, le=120, allow_inf_nan=False)
+    read_timeout_s: float = Field(default=600.0, gt=0, le=3_600, allow_inf_nan=False)
+    attempts: int = Field(default=4, ge=1, le=10)
+    max_concurrent: int = Field(default=4, ge=1, le=64)
+
+    @field_validator("api_key_env")
+    @classmethod
+    def _variable_name(cls, value: str) -> str:
+        if value != "" and _KEY_VARIABLE.fullmatch(value) is None:
+            raise ValueError("api_key_env is the name of a variable (letters, digits and _), or empty for no key")
+        return value
+
+    @field_validator("headers")
+    @classmethod
+    def _plain_headers(cls, value: dict[str, str]) -> dict[str, str]:
+        for name, text in value.items():
+            if _HEADER_NAME.fullmatch(name) is None:
+                raise ValueError(f"{name!r} is not a header name")
+            if name.lower() in _OWN_HEADERS:
+                raise ValueError(f"Dot sets the {name} header itself")
+            if _SECRET_HEADER.search(name) is not None:
+                raise ValueError(f"the {name} header looks like it carries a secret: put the key in api_key_env")
+            if _HEADER_VALUE.fullmatch(text) is None:
+                raise ValueError(f"the value of the {name} header must be up to 512 printable characters")
+        return value
+
+    @model_validator(mode="after")
+    def _some_model(self) -> Self:
+        ids: list[str] = [model.id for model in self.models]
+        if len(set(ids)) != len(ids):
+            raise ValueError("a model is listed twice")
+        if not self.models and not self.list_models:
+            raise ValueError("list at least one model, or set list_models = true")
+        return self
+
+
+def _custom_names(value: dict[str, CustomProviderConfig]) -> dict[str, CustomProviderConfig]:
+    """The custom providers by name: each name one :func:`custom_provider_name` takes, and no key shared by two."""
+    for name in value:
+        if not custom_provider_name(name):
+            raise ValueError(
+                f"{name!r} cannot name a custom provider: lower case letters, digits, _ and - from a letter, up to "
+                "32, and not the name of a built-in provider"
+            )
+    keys: list[str] = [provider.api_key_env for provider in value.values() if provider.api_key_env != ""]
+    shared: list[str] = sorted({key for key in keys if keys.count(key) > 1})
+    if shared:
+        raise ValueError(f"two custom providers name the same key: {', '.join(shared)}")
+    return value
+
+
 class ProvidersConfig(FrozenModel):
     ollama: OllamaConfig
     openai: OpenAIConfig
@@ -298,6 +425,29 @@ class ProvidersConfig(FrozenModel):
     google: GoogleConfig
     opencode: OpenCodeConfig
     claude_code: ClaudeCodeConfig
+    # The providers the owner added (docs/models.md), by the name their model references start with.
+    custom: Annotated[dict[str, CustomProviderConfig], AfterValidator(_custom_names)]
+
+    @model_validator(mode="after")
+    def _own_keys(self) -> Self:
+        """A custom provider's key is its own: one a built-in provider uses would be sent to another server."""
+        builtin: set[str] = {
+            self.ollama.api_key_env,
+            self.openai.api_key_env,
+            self.openai.organization_env,
+            self.openai.project_env,
+            self.opencode_go.api_key_env,
+            self.anthropic.api_key_env,
+            self.openrouter.api_key_env,
+            self.google.api_key_env,
+        }
+        for name, provider in self.custom.items():
+            if provider.api_key_env in builtin:
+                raise ValueError(
+                    f"the custom provider {name} names {provider.api_key_env}, the key of a built-in provider: give "
+                    "it a key of its own"
+                )
+        return self
 
 
 # The kinds of task a model can be named for up front (item 1889, `[models] kinds`): ``security`` is security research
@@ -1361,6 +1511,55 @@ class AppConfig(FrozenModel):
             raise ValueError(f"MCP server names must be unique; repeated: {', '.join(repeated)}")
         return servers
 
+    @model_validator(mode="after")
+    def _models_of_known_providers(self) -> Self:
+        """Every model the configuration names is of a built-in provider or of a custom one it configures, and no
+        custom provider takes the typed judge's key."""
+        unknown: list[str] = [
+            f"{setting} names {reference}"
+            for setting, reference in model_references(self)
+            if (split := split_model_ref(reference)) is not None
+            and split[0] not in KNOWN_PROVIDERS
+            and split[0] not in self.providers.custom
+        ]
+        if unknown:
+            raise ValueError(
+                f"{'; '.join(unknown)}: no built-in provider and no [providers.custom] table has that name"
+            )
+        for name, provider in self.providers.custom.items():
+            if provider.api_key_env != "" and provider.api_key_env == self.judge.api_key_env:
+                raise ValueError(f"the custom provider {name} names the typed judge's key {provider.api_key_env}")
+        return self
+
+
+def model_references(config: AppConfig) -> list[tuple[str, str]]:
+    """Every model reference the configuration names, with the setting that names it (one left empty is left out):
+    the roles of ``[models]``, its helpers, standby models, context sizes and kinds, the pre-push review's models, the
+    improvement loop's roles and the model that looks for work."""
+    models: ModelsConfig = config.models
+    harness: HarnessConfig = config.harness
+    review: CodeReviewConfig = config.code_review
+    named: list[tuple[str, str]] = [
+        ("models.main", models.main),
+        ("models.vision", models.vision),
+        ("models.fast", models.fast),
+        ("models.review", models.review),
+        ("models.search", models.search),
+        *(("models.helpers", model) for model in models.helpers),
+        *(("models.standby", model) for model in models.standby),
+        *(("models.context", model) for model in models.context),
+        *((f"models.kinds.{kind}", model) for kind, model in models.kinds.items()),
+        ("code_review.model", review.model),
+        *(("code_review.fallback", model) for model in review.fallback),
+        ("code_review.small_model", review.small_model),
+        ("harness.proposer", harness.proposer),
+        ("harness.composer", harness.composer),
+        ("harness.selector", harness.selector),
+        ("harness.experience", harness.experience),
+        ("initiative.look_model", config.initiative.look_model),
+    ]
+    return [(setting, reference) for setting, reference in named if reference != ""]
+
 
 def deep_merge(base: JsonObject, overlay: JsonObject) -> JsonObject:
     """Return a new mapping: ``overlay`` wins, nested mappings merge, everything else is replaced."""
@@ -1496,10 +1695,11 @@ def load_user_config() -> AppConfig:
 JUDGE_SERVICE: str = "typesafe"
 
 
-def providers_by_key(config: AppConfig) -> dict[str, str]:
+def providers_by_key(config: AppConfig, custom: Mapping[str, CustomProviderConfig]) -> dict[str, str]:
     """The provider of each key Dot manages (Settings › Providers, ``dotx auth``), by the name of its variable, in the
     order they are listed: the providers whose models need a key first, Ollama (whose models the local server runs
-    without one) next, and the typed judge's service last."""
+    without one) next, the typed judge's service, and the ``custom`` providers that take a key last (the ones in use:
+    the daemon's, which Settings changes while it runs, or the configuration's)."""
     providers: ProvidersConfig = config.providers
     return {
         providers.openai.api_key_env: "openai",
@@ -1509,4 +1709,5 @@ def providers_by_key(config: AppConfig) -> dict[str, str]:
         providers.google.api_key_env: "google",
         providers.ollama.api_key_env: "ollama",
         config.judge.api_key_env: JUDGE_SERVICE,
+        **{provider.api_key_env: name for name, provider in custom.items() if provider.api_key_env != ""},
     }
