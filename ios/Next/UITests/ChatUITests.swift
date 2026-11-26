@@ -42,6 +42,37 @@ final class ChatUITests: XCTestCase {
         return now
     }
 
+    /// The owner's order of 2026-11-25: a long press on the composer's button while a run works opens Steer now and
+    /// Queue, the follow-up setting's way (Queue) checked; each pick sends the draft. No Stop in the chat's header.
+    func testALongPressOnSendOffersSteerNowAndQueue() {
+        let app: XCUIApplication = launch("n2-chat", defaults: ["-followUp", "queue"])
+        let field: XCUIElement = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.navigationBars.buttons["Stop"].exists, "no Stop in the chat's header")
+        for (way, words) in [("Steer now", "Look at the logs first"), ("Queue", "Then book the car service")] {
+            field.tap()
+            field.typeText(words)
+            let send: XCUIElement = app.buttons["composer.send"]
+            XCTAssertEqual(send.label, "Queue: starts after this run", "a tap queues, as the setting says")
+            send.press(forDuration: 1.2)
+            // The menu's subtitles join the title in the label on some iOS versions; the shots show them.
+            let steer: XCUIElement = app.buttons["composer.followUp.steer"]
+            let queue: XCUIElement = app.buttons["composer.followUp.queue"]
+            XCTAssertTrue(steer.waitForExistence(timeout: 3), "the menu opened")
+            XCTAssertTrue(steer.label.hasPrefix("Steer now"), "the title, with its subtitle where the tree has it: \(steer.label)")
+            XCTAssertTrue(queue.label.hasPrefix("Queue"), "the title, with its subtitle where the tree has it: \(queue.label)")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "composer-follow-up-menu"
+            shot.lifetime = .keepAlways
+            add(shot)
+            XCTAssertTrue(queue.isSelected, "the setting's way is checked")
+            XCTAssertFalse(steer.isSelected)
+            (way == "Steer now" ? steer : queue).tap()
+            let sent: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "NOT (value CONTAINS %@)", words), object: field)
+            XCTAssertEqual(XCTWaiter.wait(for: [sent], timeout: 3), .completed, "\(way) sent the draft: \(String(describing: field.value))")
+        }
+    }
+
     /// Item 1880: the plan is a segment of the one working pill, never a card in the stream; a tap opens its checklist.
     /// The design bar: the pill's segments stand on one line, as tall as each other, centred on the same y, 44 pt tall.
     func testThePlanIsAChipBesideTheCapsuleThatOpensItsChecklist() {
