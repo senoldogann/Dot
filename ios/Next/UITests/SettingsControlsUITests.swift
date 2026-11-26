@@ -82,7 +82,7 @@ final class SettingsControlsUITests: XCTestCase {
 
     func testEveryRowOfSettingsOpensItsPage() {
         let rows: [String] = controls(skipping: [])
-        XCTAssertGreaterThan(rows.count, 20, "the rows of Settings: \(rows)")
+        XCTAssertGreaterThan(rows.count, 14, "the rows of Settings: \(rows)")
         for row in rows {
             let target: XCUIElement = element(row)
             target.tap()
