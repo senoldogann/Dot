@@ -1181,6 +1181,16 @@ TR: dict[str, str] = {
     "Waiting · %@": "Bekliyor · %@",
     "Details": "Ayrıntılar",
 
+    # D2: messages only, Show steps (item 1915).
+    "Show steps": "Adımları göster",
+    "Each chat's This chat sheet can show or hide them for that chat alone.": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir.",
+    "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır.",
+    "For this chat; Settings › Chat sets it for every chat.": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar.",
+    "Messages": "Mesajlar",
+
+    # D2: an owner's message not yet taken by the Mac (item 1927).
+    "Pending": "Bekliyor",
+
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
