@@ -14,6 +14,7 @@
         case general = "settings-general"
         case appearance = "settings-appearance"
         case chat = "settings-chat"
+        case voice = "settings-voice"
         case models = "settings-models"
         case caps = "settings-caps"
         case capsRefused = "settings-caps-refused"
@@ -21,12 +22,20 @@
         case scheduleEdit = "settings-schedule-edit"
         case rules = "settings-rules"
         case memory = "settings-memory"
+        case agents = "settings-agents"
+        case campaigns = "settings-campaigns"
+        case campaign = "settings-campaign"
         case system = "settings-system"
         case stopped = "settings-stopped"
         case offline = "settings-offline"
         case keyRefused = "settings-key-refused"
         case oldDaemon = "settings-old-daemon"
-        case web = "settings-web"
+        case maintenance = "settings-maintenance"
+        case connectApps = "settings-connect-apps"
+        case connectAppsDetail = "settings-connect-apps-detail"
+        case connectAppsOffline = "settings-connect-apps-offline"
+        /// Usage on a Mac that never answers: the page's loading state, measured to stand centred (item 1904).
+        case loading = "settings-loading"
         case pairing = "pairing"
         case pairingLink = "pairing-link"
 
@@ -35,11 +44,12 @@
         /// What the fixture daemon does with every request.
         var behaviour: FixtureBehaviour {
             switch self {
-            case .offline: .unreachable
+            case .offline, .connectAppsOffline: .unreachable
             case .keyRefused: .keyRefused
             case .oldDaemon: .old
             case .stopped: .stopped
             case .capsRefused: .phoneRefused
+            case .loading: .silent
             default: .normal
             }
         }
@@ -53,19 +63,33 @@
             case .general: .general
             case .appearance: .appearance
             case .chat: .chat
+            case .voice: .voice
             case .models: .models
             case .caps, .capsRefused, .oldDaemon: .caps
             case .schedules, .scheduleEdit: .schedules
             case .rules: .rules
             case .memory: .memory
+            case .agents: .agents
+            case .campaigns: .campaigns
+            case .campaign: .campaign("cmp_fixture")
             case .system: .system
-            case .web: .web(WebSettingsPage.Target(tab: "vault", title: String(localized: "Vault", comment: "Settings row: logins, cards and contacts Dot can use")))
-            case .pairing, .pairingLink: nil
+            case .maintenance: .maintenance
+            case .loading: .usage
+            case .pairing, .pairingLink, .connectApps, .connectAppsDetail, .connectAppsOffline: nil
+            }
+        }
+
+        /// Whether the scene opens Connect apps (item 1862), and on which service.
+        var connectAppsOpening: ConnectAppsOpening {
+            switch self {
+            case .connectApps, .connectAppsOffline: .list
+            case .connectAppsDetail: .detail("notion")
+            default: .closed
             }
         }
 
         var start: SettingsStart {
-            SettingsStart(path: page.map { [$0] } ?? [], query: self == .search ? "approvals" : "", editsFirstSchedule: self == .scheduleEdit, triesRaise: self == .capsRefused)
+            SettingsStart(path: page.map { [$0] } ?? [], query: self == .search ? "approvals" : "", editsFirstSchedule: self == .scheduleEdit, triesRaise: self == .capsRefused, connectApps: connectAppsOpening)
         }
 
         func api() -> DaemonAPI {
@@ -78,7 +102,7 @@
 
         var transport: Transport {
             switch self {
-            case .offline: .offline
+            case .offline, .connectAppsOffline: .offline
             case .keyRefused: .keyRefused
             default: .up
             }
@@ -93,6 +117,9 @@
         case stopped
         /// Every write is refused as a phone's (403 `PhoneRefused`).
         case phoneRefused
+        /// A read of a page never ends: its answer trickles a space every two seconds, so it never times out either (the
+        /// health and proof checks are answered).
+        case silent
     }
 
     /// Serves the fixture daemon. Every answer is the JSON the daemon's routes give (`server/views.py`).
@@ -101,7 +128,13 @@
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-        override func stopLoading() {}
+        /// The `silent` behaviour's keep-alive: a space every two seconds, so the request never times out and never ends.
+        private var trickle: DispatchSourceTimer?
+
+        override func stopLoading() {
+            trickle?.cancel()
+            trickle = nil
+        }
 
         override func startLoading() {
             let path: String = request.url?.path() ?? ""
@@ -109,6 +142,19 @@
             let behaviour: FixtureBehaviour = Self.behaviour
             if behaviour == .unreachable {
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
+                return
+            }
+            if behaviour == .silent, path != "/api/health", path != "/api/proof" {
+                let response: HTTPURLResponse = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                let timer: DispatchSourceTimer = DispatchSource.makeTimerSource(queue: .global())
+                timer.schedule(deadline: .now() + 2, repeating: 2)
+                timer.setEventHandler { [weak self] in
+                    guard let self else { return }
+                    self.client?.urlProtocol(self, didLoad: Data(" ".utf8))
+                }
+                timer.resume()
+                trickle = timer
                 return
             }
             let (code, body): (Int, String) = answer(method: method, path: path, behaviour: behaviour)
@@ -130,7 +176,6 @@
             switch (method, path) {
             case ("GET", "/api/status"): return (200, status(engaged: behaviour == .stopped))
             case ("GET", "/api/failsafe"): return (200, #"{"engaged":\#(behaviour == .stopped),"cancelled_runs":[]}"#)
-            case ("POST", "/api/failsafe"): return (200, #"{"engaged":true,"cancelled_runs":["run_a"]}"#)
             case ("DELETE", "/api/failsafe"): return (200, #"{"engaged":false,"cancelled_runs":[]}"#)
             case ("GET", "/api/assistant"), ("PUT", "/api/assistant"):
                 return (200, #"{"name":"Dot","owner":"Şenol","mac_name":"MacBook Air","introduced":true}"#)
@@ -142,12 +187,29 @@
             case ("GET", "/api/phone/push-settings"), ("PUT", "/api/phone/push-settings"):
                 return (200, #"{"needs_you":true,"ready":true,"done":false}"#)
             case ("GET", "/api/models"): return (200, models)
-            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"): return (200, modelsConfig)
+            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/standby"):
+                return (200, modelsConfig)
+            case ("GET", "/api/models/learning"), ("PUT", "/api/models/learning"):
+                return (200, #"{"proposer":"","composer":"claude_code:opus","selector":"","experience":"","review":"claude_code:opus"}"#)
+            case ("GET", "/api/initiative"), ("PUT", "/api/initiative/look-model"):
+                return (200, #"{"enabled":true,"look_model":"","items":[]}"#)
+            case ("GET", "/api/repair"), ("PUT", "/api/repair/worker"):
+                return (200, #"{"worker":{"model":"opus","effort":"high","fast":false},"worker_lost":false}"#)
             case ("GET", "/api/code-review"):
                 return (
                     200,
                     #"{"model":"claude_code:opus","effort":"medium","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
                 )
+            case ("PUT", "/api/code-review"):
+                return (
+                    200,
+                    #"{"model":"claude_code:opus","effort":"high","fallback":["opencode_go:deepseek-v4.1-flash"],"fallback_effort":"high","small_model":"","small_max_lines":150,"max_minutes":15}"#
+                )
+            case ("GET", "/api/policy/free"): return (200, #"{"free":false}"#)
+            case ("GET", "/api/memories"): return (200, memories(now: now))
+            case ("GET", "/api/agents"): return (200, agents(now: now))
+            case ("GET", _) where path.hasPrefix("/api/agents/"):
+                return (200, #"{"record":\#(agent("ag_scout", "Scout", "Finds leads and checks them", now: now)),"runs":[],"messages":[],"learned":{"lessons":[],"scores":{},"skills":[]},"usage":null,"work":null,"home":null}"#)
             case ("GET", "/api/budget"): return (200, budget)
             case ("PUT", "/api/budget") where behaviour != .phoneRefused: return (200, budget)
             case ("PUT", "/api/budget"):
@@ -157,14 +219,90 @@
             case ("GET", "/api/rules"): return (200, rules)
             case ("GET", "/api/memories/proposed"): return (200, proposed(now: now))
             case ("GET", "/api/memories/search"): return (200, "[]")
+            case ("GET", "/api/plugins"): return (200, connectPlugins)
+            case ("GET", "/api/connections"): return (200, connectConnections)
+            case ("GET", "/api/mcp/servers"): return (200, connectServers)
+            case ("GET", "/api/vault"):
+                return (200, #"{"cli":"/opt/homebrew/bin/op","app":true,"connected":true,"vaults":[{"id":"v1","name":"Shared with Dot","logins":12}],"error":null}"#)
+            case ("GET", "/api/accounts"):
+                return (200, #"[{"id":"google","name":"Google","configured":true,"client_names":["Dot"],"accounts":[{"address":"senol@example.com","connected_at":\#(now - 86400)}]},{"id":"microsoft","name":"Microsoft","configured":false,"client_names":[],"accounts":[]}]"#)
+            case ("POST", let route) where route.hasPrefix("/api/connections/"):
+                return (200, #"{"id":"\#(route.split(separator: "/").last ?? "")","kind":"mac","name":"Mail","does":"x","state":"not_asked","step":"ask","waiting":true}"#)
+            case ("DELETE", let route) where route.hasPrefix("/api/mcp/servers/"): return (200, connectServers)
             case ("GET", "/api/reactions/settings"):
                 return (200, #"{"follow_ups":true,"follow_ups_per_hour":20,"hold_minutes":30,"good":"feedback","love":"feedback","wrong":"follow_up","again":"follow_up","explain":"follow_up","hold":"follow_up"}"#)
-            default: return (404, #"{"detail":"Not Found"}"#)
+            case ("GET", "/api/diagnostics/programs"):
+                return (
+                    200,
+                    #"{"programs":[{"name":"Claude Code","command":"claude","path":"/opt/homebrew/bin/claude","version":"2.1.331","support":"supported","why":"measured with Dot (items 1580 to 1582)"},{"name":"OpenCode","command":"opencode","path":"/opt/homebrew/bin/opencode","version":"1.19.5","support":"unknown","why":"Dot keeps no list of the OpenCode versions it was measured on"}]}"#
+                )
+            case ("PUT", "/api/agent/resume"): return (200, #"{"resume":"off","resume_within_s":3600}"#)
+            default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }
 
+        /// A part of the daemon's real catalogue (`connections/directory.py`): its sections in its order, Featured full.
+        private var connectPlugins: String {
+            let rows: [(String, String, String, String?, String?, [String], String)] = [
+                ("google", "Google", "popular", "google-icon.svg", nil, ["web:google"], "Gmail, Google Calendar and Drive, in Dot's browser."),
+                ("notion", "Notion", "popular", "notion-icon.svg", nil, ["mcp:notion", "web:notion"], "Search, read and write your Notion pages and databases."),
+                ("github", "GitHub", "popular", "github-icon.svg", nil, ["mcp:github", "web:github"], "Read and work on your repositories, issues, pull requests and actions."),
+                ("slack", "Slack", "popular", "slack-icon.svg", nil, ["web:slack"], "Your workspaces' channels and messages, in Dot's browser."),
+                ("linear", "Linear", "popular", "linear-icon.svg", nil, ["mcp:linear"], "Find, create and update issues, projects and comments in Linear."),
+                ("microsoft-365", "Microsoft 365", "popular", "microsoft-icon.svg", nil, ["web:microsoft"], "Outlook, OneDrive and Office on the web, in Dot's browser."),
+                ("mail", "Mail", "popular", nil, "mail", ["mac:mail"], "Reads, sorts and writes your email."),
+                ("calendar", "Calendar", "popular", nil, "calendar", ["mac:calendar"], "Reads your events and adds new ones."),
+                ("1password", "1Password", "passwords", "1password.svg", nil, ["vault:1password"], "Fills your logins into pages on their own sites."),
+                ("sentry", "Sentry", "code", "sentry-icon.svg", nil, ["mcp:sentry"], "Look into errors, issues and releases in Sentry."),
+                ("cloudflare", "Cloudflare", "code", "cloudflare-icon.svg", nil, ["mcp:cloudflare"], "Work with your Cloudflare account: Workers, DNS, logs and the rest."),
+                ("vercel", "Vercel", "code", "vercel-icon.svg", nil, ["mcp:vercel"], "Look into your Vercel projects, their deployments and logs."),
+                ("figma", "Figma", "design", "figma.svg", nil, ["mcp:figma"], "Read your Figma files and their frames, components and comments."),
+                ("linkedin", "LinkedIn", "communication", "linkedin-icon.svg", nil, ["web:linkedin"], "Your profile, messages and posts, in Dot's browser."),
+                ("todoist", "Todoist", "productivity", "todoist-icon.svg", nil, ["mcp:todoist"], "Read and manage your tasks and projects in Todoist."),
+                ("granola", "Granola", "productivity", nil, nil, ["mcp:granola"], "Read your Granola meeting notes and transcripts."),
+                ("notes", "Notes", "mac", nil, "pencil", ["mac:notes"], "Finds, writes and files your notes."),
+                ("reminders", "Reminders", "mac", nil, "list", ["mac:reminders"], "Keeps your to-dos and lists."),
+            ]
+            let listings: [String] = rows.map { id, name, section, logo, glyph, ways, does in
+                let shown: [String] = ways.map { way in
+                    let parts: [Substring] = way.split(separator: ":")
+                    return #"{"kind":"\#(parts[0])","ref":"\#(parts[1])","how":"\#(wayHow(String(parts[0])))","data":"Stays between your Mac and \#(name).","does":"\#(does)"}"#
+                }
+                return #"{"id":"\#(id)","name":"\#(name)","section":"\#(section)","does":"\#(does)","logo":\#(logo.map { "\"\($0)\"" } ?? "null"),"glyph":\#(glyph.map { "\"\($0)\"" } ?? "null"),"ways":[\#(shown.joined(separator: ","))]}"#
+            }
+            return #"{"plugins":[\#(listings.joined(separator: ","))]}"#
+        }
+
+        private func wayHow(_ kind: String) -> String {
+            switch kind {
+            case "mcp": "A connected app: Dot signs in to the service's own server."
+            case "mac": "Dot drives the app on your Mac, once macOS allows it."
+            case "web": "Dot's browser, where you sign in once."
+            case "vault": "1Password's command line, with a service account that only reads."
+            default: "A folder kept in sync on your Mac."
+            }
+        }
+
+        private var connectConnections: String {
+            let app: (String, String, String, String?) -> String = { id, kind, state, step in
+                #"{"id":"\#(id)","kind":"\#(kind)","name":"\#(id)","does":"x","state":"\#(state)","step":\#(step.map { "\"\($0)\"" } ?? "null"),"waiting":false}"#
+            }
+            let apps: [String] = [
+                app("mail", "mac", "allowed", nil), app("calendar", "mac", "not_asked", "ask"), app("notes", "mac", "allowed", nil), app("reminders", "mac", "refused", "settings"),
+                app("google", "web", "signed_out", "sign_in"), app("notion", "web", "signed_out", "sign_in"), app("github", "web", "signed_in", nil),
+                app("slack", "web", "signed_out", "sign_in"), app("microsoft", "web", "signed_out", "sign_in"), app("linkedin", "web", "signed_out", "sign_in"),
+            ]
+            return #"{"apps":[\#(apps.joined(separator: ","))],"browser_mode":"own","headless":false,"runner":"Dot"}"#
+        }
+
+        private var connectServers: String {
+            #"{"servers":[{"name":"notion","origin":"connected","address":"https://mcp.notion.com/mcp","service":"notion","state":"ready","tools":["search","fetch"],"error":null,"link":null,"signs_in":true,"mark":null,"picks_tools":true,"plugin":null},"#
+                + #"{"name":"sentry","origin":"connected","address":"https://mcp.sentry.dev/mcp","service":"sentry","state":"signing_in","tools":[],"error":null,"link":null,"signs_in":true,"mark":null,"picks_tools":false,"plugin":null}],"#
+                + #""services":[{"id":"notion","added":false},{"id":"linear","added":false},{"id":"sentry","added":false}]}"#
+        }
+
         private var modelsConfig: String {
-            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{}}"#
+            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus"}}"#
         }
 
         private func status(engaged: Bool) -> String {
@@ -173,12 +311,40 @@
 
         private var models: String {
             let option: (String, String) -> String = { ref, label in
-                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium"}"#
+                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#
-                + #"{"provider":"opencode_go","models":[\#(option("opencode_go:deepseek-v4.1-flash", "DeepSeek V4.1 Flash"))],"error":null}"#
+                + #"{"provider":"opencode_go","models":[\#(option("opencode_go:deepseek-v4.1-flash", "DeepSeek V4.1 Flash")),\#(option("opencode_go:kimi-k3", "Kimi K3"))],"error":null},"#
+                + #"{"provider":"ollama","models":[\#(option("ollama:gemma4:cloud", "Gemma 4 Cloud")),\#(option("ollama:qwen3:cloud", "Qwen 3 Cloud"))],"error":null}"#
                 + "]"
+        }
+
+        private func note(_ id: String, _ content: String, _ tags: String, now: Double, used: Int) -> String {
+            #"{"id":"\#(id)","content":"\#(content)","tags":\#(tags),"created_at":\#(now - 900000),"updated_at":\#(now - 90000),"source_run":null,"agent_id":null,"used_count":\#(used),"last_used_at":\#(now - 7200),"expires_at":null,"replaced_by":null,"tainted":false,"merged_into":null,"merged_from":[],"pinned_at":null,"rested_at":null,"edited_by":"owner","proposed":null}"#
+        }
+
+        private func memories(now: Double) -> String {
+            let items: [String] = [
+                note("mem_1", "Şenol prefers short answers in Turkish.", "[\"owner\",\"preference\"]", now: now, used: 40),
+                note("mem_2", "Invoices live in ~/Documents/Invoices.", "[\"work\"]", now: now, used: 12),
+                note("mem_3", "Oulu cafés list their hours on Facebook, not a site.", "[\"lesson\"]", now: now, used: 4),
+                note("mem_4", "The CI gate runs with -n 4 on this Mac.", "[\"lesson\",\"dot\"]", now: now, used: 9),
+            ]
+            return #"{"total":4,"items":[\#(items.joined(separator: ","))],"resting":[],"rested":{},"scores":{},"agents":{}}"#
+        }
+
+
+        private func agent(_ id: String, _ name: String, _ role: String, now: Double) -> String {
+            #"{"id":"\#(id)","name":"\#(name)","role":"\#(role)","instructions":"Work carefully and say what you checked.","model":"","effort":null,"approvals":null,"tools":[],"created_at":\#(now - 864000),"updated_at":\#(now - 86400),"made_by":null,"look":null,"paused_at":null,"refuses":""}"#
+        }
+
+
+        private func agents(now: Double) -> String {
+            let one: (String, String, String) -> String = { id, name, role in
+                #"{"record":\#(self.agent(id, name, role, now: now)),"latest":null,"latest_title":null,"home":null}"#
+            }
+            return "[" + [one("dot", "Dot", ""), one("ag_scout", "Scout", "Finds leads and checks them"), one("ag_writer", "Writer", "Drafts the mails")].joined(separator: ",") + "]"
         }
 
         private var budget: String {

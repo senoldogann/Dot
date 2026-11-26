@@ -25,9 +25,11 @@ later; nothing of Dot needs Node to run.
 
 ## The checks every change passes
 
-The gate (`.github/workflows/gate.yml`) runs these on every pull request that changes more than prose. Run them once
-before you push; while you work, the tests of what you changed are enough. `-n auto` (pytest-xdist) spreads the tests
-over your Mac's cores:
+The gate (`.github/workflows/gate.yml`) runs the Linux ones on every pull request that changes more than prose, and
+the macOS ones (the unit tests Linux leaves out, `dotx eval check`, the smoke and browser tests) on the push to `main`
+that merges it, so run those here (docs/development.md).
+Run them once before you push; while you work, the tests of what you changed are enough. `-n auto` (pytest-xdist)
+spreads the tests over your Mac's cores:
 
 ```bash
 uv run ruff format --check src tests
@@ -99,8 +101,8 @@ uvx zizmor@1.31.1 --min-severity low .
 
 - A pull request carries one change or a batch of related ones, each its own commit with its own roadmap and changes
   entry. Say what each does, why, and how you checked it; the template asks for each.
-- `uv run python scripts/next_item.py [count]` gives the numbers new items take (main, open pull requests and pushed
-  branches hold numbers); `uv run python scripts/pr_body.py <item>... [--title]` makes the pull request's title
+- `uv run python scripts/next_item.py [count]` gives and reserves the numbers new items take (main, pull requests,
+  branches, commits and worktrees hold numbers; run it once, as each call reserves new ones); `uv run python scripts/pr_body.py <item>... [--title]` makes the pull request's title
   and body from the roadmap entries of its items.
 - A change in what Dot does changes the page under [docs/](docs/) that describes it, in the same pull request.
 - `roadmap/INDEX.md` lists every item from 459 on; `uv run python scripts/roadmap_index.py` writes it again from the

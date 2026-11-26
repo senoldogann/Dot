@@ -17,7 +17,7 @@ from dotagent.agent.plan import (
     plan_from_event,
     render_plan,
 )
-from dotagent.core.errors import ToolExecutionError, ToolInputError
+from dotagent.core.errors import ToolExecutionError, ToolInputError, ToolSteer
 from dotagent.core.text import has_verification, truncate_tail, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import AgentRecord, EventRecord, RunMode, RunRecord
@@ -64,7 +64,7 @@ def checked_considered(considered: str, team: Sequence[AgentRecord], instead: st
         return None
     said: str = " ".join(considered.split())
     if said == "":
-        raise ToolInputError(
+        raise ToolSteer(
             f"the team may have an agent for this: {instead}; when none fits, say in agents_considered which agents "
             f"are nearest and why none fits. The team:\n{team_listing(team)}",
             {"agents": len(team)},

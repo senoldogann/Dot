@@ -24,6 +24,8 @@ class RunCommand(FrozenModel):
     standing: bool
     browser: BrowserMode | None
     thread: str | None
+    proof: list[str]
+    proof_timeout_s: int
     review: bool
     no_input: bool
     thinking: bool
@@ -384,6 +386,14 @@ class EvalToolsCommand(FrozenModel):
     repeat: int = Field(ge=1)
 
 
+class EvalMemoryCommand(FrozenModel):
+    """`dotx eval memory` (item 1728): the memory benchmark with ``scripted`` embeddings or the ``configured`` model of
+    ``[memory]``; no model is asked to write or to judge."""
+
+    name: Literal["eval-memory"]
+    embeddings: Literal["scripted", "configured"]
+
+
 class EvalSpeedCommand(FrozenModel):
     """`dotx eval speed` (item 1037): the speed set played on ``model``, ``repeat`` times each, and its table; or, with
     ``reports``, the table of saved reports (two: a baseline and a later run, side by side), playing nothing."""
@@ -522,6 +532,28 @@ class BackupListCommand(FrozenModel):
     name: Literal["backup-list"]
 
 
+class ScopeListCommand(FrozenModel):
+    name: Literal["scope-list"]
+
+
+class ScopeAddCommand(FrozenModel):
+    name: Literal["scope-add"]
+    program: str
+    hosts: tuple[str, ...] = ()
+    url: str = ""
+    note: str = ""
+
+
+class ScopeRemoveCommand(FrozenModel):
+    name: Literal["scope-remove"]
+    program: str
+
+
+class ScopeCheckCommand(FrozenModel):
+    name: Literal["scope-check"]
+    target: str
+
+
 type Command = Annotated[
     RunCommand
     | ResumeCommand
@@ -593,12 +625,17 @@ type Command = Annotated[
     | PruneCommand
     | BackupNowCommand
     | BackupListCommand
+    | ScopeListCommand
+    | ScopeAddCommand
+    | ScopeRemoveCommand
+    | ScopeCheckCommand
     | UndoCommand
     | EvalListCommand
     | EvalCheckCommand
     | EvalFromRunCommand
     | EvalRunCommand
     | EvalToolsCommand
+    | EvalMemoryCommand
     | EvalSpeedCommand
     | EvalReportCommand
     | StatsCommand

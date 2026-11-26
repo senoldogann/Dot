@@ -1,6 +1,6 @@
 """Resuming a run that the daemon cut off, in the real loop and store: a run of the web UI that a shutdown cut off while
-it asked a question goes on by itself with its plan when the daemon starts again, and a run that a crash cut off in a
-shell command, after a file it wrote, waits for the owner and is resumed by hand, told what each call did.
+it asked a question goes on by itself with its plan when the daemon starts again, and so does a run that a crash cut off
+in a shell command, after a file it wrote, told what each call did and to check the state first (item 1854).
 
 No network and no model service is used: the scripted model plays the runs. The crash is real: a child process works
 on the run and is killed while the command runs.
@@ -42,7 +42,7 @@ CRASHING_RUN: Path = Path(__file__).resolve().parents[1] / "fixtures" / "dot_cra
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TIME_LIMIT_S: float = 60.0
 _MAX_EVENTS: int = 10_000
-_NOTE_START: str = "[system note] The run that worked on this goal was cut off"
+_NOTE_START: str = "[system note] Dot restarted while you were working on this goal, and goes on with it now"
 # Runs until the test creates the file ``stop``, at most 30 seconds: the shell tool starts each command in a session of
 # its own, so the kill of the process that started it does not reach it.
 _WAIT_COMMAND: str = "for i in $(seq 300); do [ -e stop ] && break; sleep 0.1; done"
@@ -193,12 +193,14 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
     assert _data(events, "plan_reminder") == [{"open_steps": [2]}]
     note: str = _note(messages)
     assert note.startswith(f"{_NOTE_START}: the Dot daemon was shut down while it ran.")
+    assert "Before you repeat anything, check the current state of what was in progress" in note
     assert (
         f"\n- {ASK_USER_TOOL} {dumps_compact(ask.arguments)}: it was cut off while it ran. It only reads, so it may "
         "run again.\n"
     ) in note
     assert (
-        "Its plan, which is your plan now:\n1. [done] Read data.csv\n   evidence: read_file data.csv: 3 rows\n"
+        "Its plan, which is your plan now:\n1. [done, not verified] Read data.csv\n"
+        "   evidence: read_file data.csv: 3 rows\n"
         "2. [in_progress] Write report.md\n"
         "Targets: report.md sums every row of data.csv\n"
     ) in note
@@ -253,7 +255,7 @@ async def test_a_daemon_that_starts_leaves_the_run_of_a_process_that_lives(login
     assert expired.status == "expired"
 
 
-async def test_a_run_a_crash_cut_off_in_a_command_waits_for_the_owner_and_is_resumed_by_hand(
+async def test_a_run_a_crash_cut_off_in_a_command_goes_on_by_itself_told_to_check_what_the_command_changed(
     login_env: dict[str, str],
 ) -> None:
     write: ScriptedCall = ScriptedCall(tool="write_file", arguments={"path": "report.md", "content": "# Report"})
@@ -283,12 +285,12 @@ async def test_a_run_a_crash_cut_off_in_a_command_waits_for_the_owner_and_is_res
             try:
                 assert await manager.recover() == 1
                 cut: RunRecord = await runtime.store.get_run(run_id)
-                # The command may have changed something, so the daemon leaves the run to its owner.
-                assert await manager.resume_safe() == ()
+                # The command may have changed something: the run goes on, told to check the state first.
                 assert await manager.resumable(cut)
-                resumed: RunRecord = await manager.resume(run_id)
+                resumed: tuple[RunRecord, ...] = await manager.resume_safe()
+                assert len(resumed) == 1
                 async with asyncio.timeout(_TIME_LIMIT_S):
-                    done: RunRecord = await manager.wait(resumed.id)
+                    done: RunRecord = await manager.wait(resumed[0].id)
                 assert not await manager.resumable(cut)
                 with pytest.raises(RunConflict):
                     await manager.resume(run_id)
@@ -309,7 +311,7 @@ async def test_a_run_a_crash_cut_off_in_a_command_waits_for_the_owner_and_is_res
         {
             "from_run_id": cut.id,
             "cut_off": "daemon_restarted",
-            "automatic": False,
+            "automatic": True,
             "calls": [
                 {"tool": "write_file", "end": "succeeded", "repeatable": False},
                 {"tool": "shell", "end": "cut_off", "repeatable": False},

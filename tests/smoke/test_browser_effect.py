@@ -8,6 +8,7 @@ that only sent a request changed the page. The owner's runs repeated 13 clicks t
 30 s for a thank-you text after forms that had not gone.
 """
 
+import asyncio
 import re
 import threading
 from collections.abc import AsyncIterator, Iterator
@@ -22,6 +23,7 @@ from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ActOutcome, PageView, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
+from dotagent.core.outcomes import PAGE_REACTED, StepReport
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -38,6 +40,16 @@ _PAGE: str = """<!doctype html><title>Effect page</title>
 <label><input type="checkbox" aria-label="Terms"> Terms</label>
 <label>Note <textarea aria-label="Note"></textarea></label>
 <label>Size <select aria-label="Size"><option>S</option><option>M</option></select></label>"""
+# A page that changes by itself, as a clock or a feed does (item 1744): a change after a click tells nothing there.
+_BUSY: str = """<!doctype html><title>Busy</title>
+<p id="clock">0</p>
+<button aria-label="Nothing">Nothing</button>
+<button aria-label="Post" onclick="fetch('/save', { method: 'POST', body: 'x' })">Post</button>
+<script>let n = 0; setInterval(() => { document.getElementById("clock").textContent = String(++n); }, 100);</script>"""
+# A page that polls its site and shows nothing new, as a chat with no new message does.
+_POLLING: str = """<!doctype html><title>Polling</title>
+<button aria-label="Nothing">Nothing</button>
+<script>setInterval(() => { fetch("/poll?" + Math.random()); }, 100);</script>"""
 # A page whose controls sit at known pixels, so a click_at can be aimed without a ref (item 1142).
 _PIXEL: str = """<!doctype html><title>Pixels</title>
 <style>
@@ -54,13 +66,21 @@ _PIXEL: str = """<!doctype html><title>Pixels</title>
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path: str = urlsplit(self.path).path
-        page: str = {"/": _PAGE, "/pixel": _PIXEL}.get(path, "<!doctype html><title>Other</title><p>ok</p>")
+        page: str = {"/": _PAGE, "/pixel": _PIXEL, "/busy": _BUSY, "/polling": _POLLING}.get(
+            path, "<!doctype html><title>Other</title><p>ok</p>"
+        )
         body: bytes = page.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self) -> None:
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -104,15 +124,77 @@ def _ref(view: PageView, name: str, role: str = "button") -> str:
     return found.group(1)
 
 
-async def _click(browser: BrowserSession, thread: str, name: str, role: str = "button") -> str:
-    """The detail of the report of a click on the element ``name`` (a button) of the thread's page."""
+async def _click_report(browser: BrowserSession, thread: str, name: str, role: str) -> StepReport:
+    """The report of a click on the element ``name`` of the thread's page."""
     view: PageView = await browser.snapshot(thread, True)
     outcome: ActOutcome = await browser.act(
         thread, [Step(action="click", ref=_ref(view, name, role))], False, refuse_secret_field, True
     )
     (report,) = outcome.steps
     assert report.outcome == "done", report
-    return report.detail
+    return report
+
+
+async def _click(browser: BrowserSession, thread: str, name: str, role: str = "button") -> str:
+    """The detail of the report of a click on the element ``name`` (a button) of the thread's page."""
+    return (await _click_report(browser, thread, name, role)).detail
+
+
+async def test_a_click_is_checked_by_whether_the_page_reacted_from_the_same_looks(
+    browser: BrowserSession, site: str
+) -> None:
+    """Item 1744: a click that has no check of its own is checked by the page's reaction, which the look of item 739
+    made already: verified with what changed, or uncertain when nothing did; never contradicted."""
+    await browser.open_url("reacted", f"{site}/", True)
+
+    async def checks(name: str, role: str) -> list[tuple[str, str, str]]:
+        report: StepReport = await _click_report(browser, "reacted", name, role)
+        return [(check.condition, check.status, check.evidence) for check in report.checks]
+
+    nothing: list[tuple[str, str, str]] = await checks("Nothing", "button")
+    assert [(condition, status) for condition, status, _ in nothing] == [(PAGE_REACTED, "uncertain")]
+    assert await checks("Change", "button") == [(PAGE_REACTED, "verified", "its content changed")]
+    assert await checks("Ping", "button") == [(PAGE_REACTED, "verified", "it sent a request")]
+    assert [status for _, status, _ in await checks("Note", "textbox")] == ["verified"]
+    # On a page that changes by itself, its content changing after a click that did nothing is no check of it.
+    view: PageView = await browser.open_url("reacted", f"{site}/busy", True)
+    # The model reads the page before it acts, and the clock goes on meanwhile.
+    await asyncio.sleep(0.4)
+    outcome: ActOutcome = await browser.act(
+        "reacted", [Step(action="click", ref=_ref(view, "Nothing", "button"))], False, refuse_secret_field, True
+    )
+    busy: list[tuple[str, str, str]] = [
+        (check.condition, check.status, check.evidence) for check in outcome.steps[0].checks
+    ]
+    assert [(condition, status) for condition, status, _ in busy] == [(PAGE_REACTED, "uncertain")]
+    assert "changing by itself" in busy[0][2]
+    # There a click whose page posts to its own site is the step's all the same (item 1158).
+    view = await browser.snapshot("reacted", True)
+    await asyncio.sleep(0.4)
+    posted: ActOutcome = await browser.act(
+        "reacted", [Step(action="click", ref=_ref(view, "Post", "button"))], False, refuse_secret_field, True
+    )
+    assert [(check.status, check.evidence) for check in posted.steps[0].checks] == [("verified", "it sent a request")]
+    # A page that polls its site with nothing new to show changes by itself too.
+    view = await browser.open_url("reacted", f"{site}/polling", True)
+    await asyncio.sleep(0.4)
+    polled: ActOutcome = await browser.act(
+        "reacted", [Step(action="click", ref=_ref(view, "Nothing", "button"))], False, refuse_secret_field, True
+    )
+    assert [check.status for check in polled.steps[0].checks] == ["uncertain"]
+    # What a step of the batch set off is not the page changing by itself: a fill, then a click that changes it.
+    view = await browser.open_url("reacted", f"{site}/", True)
+    batch: ActOutcome = await browser.act(
+        "reacted",
+        [
+            Step(action="fill", ref=_ref(view, "Note", "textbox"), text="hello"),
+            Step(action="click", ref=_ref(view, "Change")),
+        ],
+        False,
+        refuse_secret_field,
+        True,
+    )
+    assert [[check.status for check in report.checks] for report in batch.steps] == [["verified"], ["verified"]]
 
 
 async def test_a_click_that_changed_nothing_is_told_and_one_that_changed_the_page_is_not(

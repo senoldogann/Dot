@@ -47,7 +47,8 @@ type CallPurpose = Literal[
     "busy",
     # The review of a plugin the scout found for the gallery (item 710).
     "scout",
-    # Which free agents could help an agent at work (item 896), asked while the office is open.
+    # Which free agents could help an agent at work (item 896); none is asked since item 1836, kept so that the
+    # calls recorded before read.
     "offer",
     # The notes of a meeting Dot is in (item 1138), written by a call with no tool but its answer's.
     "meeting",
@@ -82,6 +83,8 @@ class ModelCall(FrozenModel):
     output_tokens: int
     cached_tokens: int
     error: str | None
+    # What the provider wrote to its cache (item 1742): 0 for a provider that reports none; counted inside the input.
+    cache_write_tokens: int = 0
 
 
 CallRecorder = Callable[[ModelCall], Awaitable[None]]
@@ -97,6 +100,7 @@ def call_event_data(call: ModelCall) -> JsonObject:
         "input_tokens": call.input_tokens,
         "output_tokens": call.output_tokens,
         "cached_tokens": call.cached_tokens,
+        "cache_write_tokens": call.cache_write_tokens,
         "error": call.error,
     }
 

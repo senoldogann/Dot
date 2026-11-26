@@ -60,6 +60,10 @@ off by the command's death, and it can be resumed too; a run handed to the daemo
   `--auto-approve` and `--yolo` are short for the last two. `chat` takes the same flags (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run))
 - `--goal-mode` / `--no-goal-mode` turns the check of the answer against the goal on or off for this run (`run` only)
+- `--proof COMMAND` (repeat it, at most 5) holds the run's finish, or with `--standing` the campaign's claim, to a
+  command that must exit 0, such as a test run; `--proof-timeout SECONDS` is each one's limit (300, at most `[shell] max_timeout_s`, 1800 by default). Dot
+  runs them at the finish and sends the run back with their output while one fails (see
+  [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) (`run` only)
 - `--standing` keeps going until done: it starts a campaign on the goal with this run as its first session, and the
   daemon runs the sessions after it until the outcome is verified (see
   [Agents and campaigns](agents-and-campaigns.md)); `--browser own|attach` (with `--standing`) picks the Chrome it works

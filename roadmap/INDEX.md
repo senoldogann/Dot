@@ -6,6 +6,75 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1908](1908.md) | done | 2026-11-26 | The reset test of item 1893 waits on what it reads |
+| [1907](1907.md) | done | 2026-11-26 | DotNext's Settings › Models holds every model setting of the Mac's page |
+| [1906](1906.md) | done | 2026-11-26 | DotNext's chat settings show recent models and options as plain rows |
+| [1905](1905.md) | done | 2026-11-26 | DotNext marks an opened chat seen, so it leaves "unread" in the list |
+| [1904](1904.md) | done | 2026-11-26 | DotNext shows a screenshot whole and zoomable, a failed run as one plain row, a fold without counts, a stored thought as its word alone, and its waiting states centred |
+| [1903](1903.md) | done | 2026-11-26 | DotNext's long-press test reads the field afresh: on GitHub's runner its draft was empty while the wait still saw the words |
+| [1899](1899.md) | done | 2026-11-26 | A red main on macOS opens an issue, and the owner's Dot is updated only from a green commit |
+| [1895](1895.md) | done | 2026-11-26 | DotNext: the owner's campaigns on the phone, native |
+| [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
+| [1893](1893.md) | done | 2026-11-26 | DotNext lets go of a reset Dot's chats instead of syncing them for ever |
+| [1892](1892.md) | done | 2026-11-25 | The nightly browser run's stale tests follow today's screens, and four small bugs they found are fixed |
+| [1891](1891.md) | done | 2026-11-25 | Item numbers are reserved, and every place that holds one is read |
+| [1890](1890.md) | done | 2026-11-25 | Dot takes the Mac's pointer and keyboard only while the owner is away |
+| [1889](1889.md) | done | 2026-11-25 | A model's no is asked once with the scope, then stands: the owner restarts on a model of their choosing |
+| [1888](1888.md) | done | 2026-11-23 | A scope is one command, not a toml block: `dotx scope add`, `list`, `remove`, `check` over a store every call reads |
+| [1887](1887.md) | done | 2026-11-23 | Authorised security testing is a scope, not a refusal: a bug bounty program's hosts are written down and tested |
+| [1886](1886.md) | done | 2026-11-26 | A pull request runs the Linux checks alone; the macOS suites run on the push to main |
+| [1885](1885.md) | done | 2026-11-25 | One settings sheet from the owner's initials, grouped as the owner's reference |
+| [1884](1884.md) | done | 2026-11-25 | A bot's profile: its chats, routines, library, model, activity, instructions and mute; Dot's holds the Mac |
+| [1883](1883.md) | done | 2026-11-25 | A bot's chat: the other bots' unread beside the back, the bot's pill, the "⋯" menu, Find in chat, "Ask <name>", a new chat with the bot |
+| [1882](1882.md) | done | 2026-11-25 | The home's search finds bots, chats and what the chats say (`GET /api/threads/search`) |
+| [1881](1881.md) | done | 2026-11-25 | DotNext's home is the owner's bots: no tab bar, Dot large on top, one row per agent, a new bot made from "+" |
+| [1880](1880.md) | done | 2026-11-25 | DotNext puts the run's work in one pill: plain words, Stop, the plan and the helpers; the stream keeps no plan or helper card and folds its thinking |
+| [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
+| [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
+| [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |
+| [1871](1871.md) | done | 2026-11-25 | A pull request that nothing of the gate's macOS jobs reads skips them |
+| [1866](1866.md) | done | 2026-11-25 | What recall handed a task is never saved back as a new note; the memory benchmark measures it |
+| [1865](1865.md) | done | 2026-11-25 | A scheduled task, a watcher's task and a helper propose what they would remember; the owner decides |
+| [1864](1864.md) | done | 2026-11-25 | Every note says where it came from: an `origin` the store sets from the run that saved it |
+| [1863](1863.md) | done | 2026-11-25 | A merge no longer sends the other pull requests back to main for Markdown no test names |
+| [1862](1862.md) | done | 2026-11-25 | Connect apps on the phone: one sheet over the Mac's catalogue |
+| [1861](1861.md) | done | 2026-11-25 | DotNext's engine reads the Connectors catalogue and says what a phone may start |
+| [1858](1858.md) | done | 2026-11-25 | The prompt surface Dot sends a model is checked in, and a change to it fails until the snapshot is updated |
+| [1857](1857.md) | done | 2026-11-25 | A maturity scorecard: when each feature was last proven on the real Mac, and a daily check of stale proofs |
+| [1856](1856.md) | done | 2026-11-25 | What a run and a task cost in dollars, estimated from a public price list, beside their tokens |
+| [1855](1855.md) | done | 2026-11-25 | A schedule or a watcher may run a check first, without a model, and wake one only when it says so |
+| [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
+| [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
+| [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
+| [1851](1851.md) | done | 2026-11-25 | The orphan-groups test keeps a Dot home of its own, which no other pytest worker writes into |
+| [1850](1850.md) | done | 2026-11-25 | The iPhone app is tested on GitHub's macOS runners |
+| [1849](1849.md) | done | 2026-11-25 | DotNext opens a new chat as soon as its first message is sent |
+| [1848](1848.md) | done | 2026-11-25 | DotNext streams a run smoothly: the end is followed after layout and only at the end, a word redraws the open chat alone, the live thinking no longer reflows |
+| [1847](1847.md) | done | 2026-11-25 | DotNext drops the "Dot · <Mac> · <date>" line at the top of a chat |
+| [1840](1840.md) | done | 2026-11-25 | Take a run's page over from the iPhone, and hand it back |
+| [1839](1839.md) | done | 2026-11-25 | Follow a run live inside its chat |
+| [1838](1838.md) | done | 2026-11-25 | Watch the Mac on the iPhone, natively |
+| [1837](1837.md) | done | 2026-11-25 | The Mac's screen in a light quality, for a phone on a weak link |
+| [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
+| [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
+| [1826](1826.md) | done | 2026-11-25 | DotNext's Activity tab, native: while you were away, Ready drafts, Dot's proposals, what is in motion, and the ways Dot comes to you |
+| [1825](1825.md) | done | 2026-11-25 | The drafts that wait for the owner, in one list (`GET /api/drafts`) |
+| [1818](1818.md) | done | 2026-11-25 | DotNext's run inspector redrawn, with the recap, the cost, Undo of a change, Stop of a background command and a helper's own chat |
+| [1817](1817.md) | done | 2026-11-25 | Drafts reach the phone: a chat's view lists them again, and DotNext draws their card |
+| [1816](1816.md) | done | 2026-11-25 | DotNext: Retry, Continue and Resume now go to the daemon's own routes, and a cut-off run says what cut it |
+| [1815](1815.md) | done | 2026-11-25 | DotNext: the owner's message has the web's actions: Copy, Select text, Read aloud, Edit from here |
+| [1802](1802.md) | done | 2026-11-25 | DotNext's voice typing: the composer becomes a recorder; Settings › Voice |
+| [1801](1801.md) | done | 2026-11-25 | DotNext's chat settings: the model, its level, fast mode, approvals and plan first, also before a new chat |
+| [1800](1800.md) | done | 2026-11-25 | DotNext's chat list: select several, pin and delete them together, a Pinned section on top |
+| [1791](1791.md) | done | 2026-11-25 | DotNext's Settings open no web page: the Mac's setup pages have no row, and the list ends with "More settings are on your Mac." |
+| [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
+| [1771](1771.md) | done | 2026-11-25 | DotNext's Models, Scheduled tasks, Rules, Memory and Agents are native, as much of them as a phone is for |
+| [1770](1770.md) | done | 2026-11-25 | The code review's models and their reasoning are changed from the phone too |
+| [1769](1769.md) | done | 2026-11-25 | DotNext: the work told in one live line, thinking as rows of the work, Dot's own tools in words, softer motion |
+| [1768](1768.md) | done | 2026-11-25 | A run on the Claude plan passes on its model's thinking |
+| [1767](1767.md) | done | 2026-11-25 | DotNext: a long press on Send offers Steer now and Queue |
+| [1766](1766.md) | done | 2026-11-25 | DotNext: the phone does not engage the emergency stop |
+| [1765](1765.md) | done | 2026-11-25 | DotNext: no Stop in the chat's header |
 | [1762](1762.md) | done | 2026-11-25 | A run the Claude plan's usage limit ended is no error in the daemon's log |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
@@ -19,17 +88,35 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1752](1752.md) | done | 2026-11-25 | On a phone a note's tags stand at the height of the badge beside them again |
 | [1751](1751.md) | done | 2026-11-25 | An offline test does not read the owner's Antigravity login |
 | [1750](1750.md) | done | 2026-11-25 | The code review's model is named "Code review model", apart from the review model of the roles |
+| [1746](1746.md) | done | 2026-11-24 | The run's account: what it did by its record, on the run page and in its detail |
+| [1745](1745.md) | done | 2026-11-24 | A plan step marked done is judged by the run's record |
+| [1744](1744.md) | done | 2026-11-24 | A click that names nothing it expects is checked by whether the page reacted |
+| [1743](1743.md) | done | 2026-11-24 | What the owner does with Dot's tells is recorded and shown per watcher and per kind |
+| [1742](1742.md) | done | 2026-11-24 | The prompt cache says why it missed, and a chat that comes back within the hour keeps its Claude cache for an hour |
 | [1741](1741.md) | done | 2026-11-24 | A hop count across agents: a runaway chain of hand-offs is stopped for a run that asks, and reported in yolo and free mode |
 | [1740](1740.md) | done | 2026-11-24 | `search_chats`: a run finds what was said in any chat, by its words |
 | [1731](1731.md) | done | 2026-11-24 | What a task will cost is shown, and caps the owner sets pause a task and ask the owner, in every mode |
+| [1729](1729.md) | done | 2026-11-24 | A fact that changed replaces its older note: `memory_save` takes a subject, and the older note rests, kept |
+| [1728](1728.md) | done | 2026-11-24 | A memory benchmark: does a search find the newest fact when a fact changed (`dotx eval memory`) |
 | [1727](1727.md) | done | 2026-11-24 | DotNext's composer pickers: `/` commands and skills, `@` agents, teams, chats and accounts, `#` this chat's files |
 | [1726](1726.md) | done | 2026-11-24 | DotNext's chat, whole: the work log, the ask dock in the composer's place, the composer, the queue and its edit, the inspector |
 | [1725](1725.md) | done | 2026-11-24 | DotNext's engine reads a chat whole: the work log with its four tool modes and folds, the asks of the dock, the composer's and the queue's rules |
+| [1724](1724.md) | decided | 2026-11-24 | MCP servers are not started lazily: measured, and kept as they are |
+| [1723](1723.md) | done | 2026-11-24 | A skill without a frontmatter loads as Claude Code loads it, and a skill left out is logged with what to do |
+| [1722](1722.md) | done | 2026-11-24 | A call Dot's own rule turns another way is recorded as steered, not failed |
+| [1721](1721.md) | done | 2026-11-24 | A shown page that names media by a web address is refused with why, a page too long says how to shrink, and the pages of one step keep the call order |
+| [1720](1720.md) | done | 2026-11-24 | OpenCode's agent gets every tool of Dot's a run on the Claude plan gets, and a test holds the three harnesses' tools together |
 | [1715](1715.md) | done | 2026-11-24 | A run records why recall chose its notes and which of them it echoed |
 | [1714](1714.md) | done | 2026-11-24 | A run on the Claude plan or OpenCode is asked for its lessons as it ends |
 | [1713](1713.md) | done | 2026-11-24 | The day's room for lessons is counted by time and shared fairly between kinds of tasks |
 | [1712](1712.md) | done | 2026-11-24 | A code review starts with the notes about code alone |
 | [1711](1711.md) | done | 2026-11-24 | A run's rewrite of the owner's note waits for the owner, and the owner's words keep reaching every run |
+| [1695](1695.md) | done | 2026-11-24 | A run on Zen's free models is told Dot's own prompt and ends with Dot's finish |
+| [1694](1694.md) | done | 2026-11-24 | A run on the owner's Claude plan ends as Dot's own runs end: nudged to finish, checked, with lessons |
+| [1693](1693.md) | done | 2026-11-24 | A run on the owner's Claude plan keeps Dot's plan |
+| [1692](1692.md) | done | 2026-11-24 | A run on the owner's Claude plan has the core tools' definitions from the start |
+| [1691](1691.md) | done | 2026-11-24 | A run on the owner's Claude plan is told Dot's own system prompt |
+| [1690](1690.md) | done | 2026-11-24 | memory_save and memory_update name the longest note they take |
 | [1689](1689.md) | done | 2026-11-24 | DotNext on the store: the chat list, a chat, the helpers, pairing, checked end to end on a throwaway daemon |
 | [1688](1688.md) | done | 2026-11-24 | DotNext's engine: a store per daemon, one connection supervisor, the outbox moved, the cache, pairing |
 | [1687](1687.md) | done | 2026-11-24 | Smoke tests of the phone's sync contract on a served daemon |

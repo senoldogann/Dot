@@ -49,6 +49,11 @@ class ProviderFilterError(ProviderError):
     with the same conversation it is stopped again."""
 
 
+class ProviderEmptyError(ProviderError):
+    """The model kept replying with neither words nor a tool call after the run's nudges (item 1889): a technical block,
+    which moves the run to a standby model as a content filter's stop does."""
+
+
 class ProviderHttpError(ProviderError):
     """The provider answered with a non-success HTTP status."""
 
@@ -128,6 +133,13 @@ class ProviderRefusedError(ProviderError):
 
 class ToolInputError(DotError):
     """The model supplied arguments that do not satisfy the tool schema."""
+
+
+class ToolSteer(ToolInputError):
+    """A call Dot's own rule turns to another way, not a failure (item 1722): a background command in a run that has no
+    chat to tell when it ends, a delegation or a new agent while the team may have an agent for it. The model reads it
+    as an error, since the call did nothing, and is told what to do instead; its result is recorded as ``steered`` and
+    not as failed, so that the tools' error rates count failures alone."""
 
 
 class NulCharacterError(ToolInputError, ValueError):
@@ -238,6 +250,11 @@ class PhoneUnreachableError(PhoneError):
 class DesktopStepNotSent(DesktopError):
     """A step of a desktop batch was refused before any input went to an application (item 1146): its target was no
     longer what was reviewed, the pointer was not where the step before left it."""
+
+
+class OwnerAtTheMac(DesktopStepNotSent):
+    """A step that would move the Mac's own pointer or send keys was not sent while the owner is at the Mac (item
+    1890): it waits for them to step away."""
 
 
 class ValueNotKept(DesktopError):
@@ -374,6 +391,16 @@ class ArchiveRefused(GalleryError):
 class ElsewhereError(DotError):
     """A skill or an MCP server that another agent of the Mac set up cannot be added to Dot, or removed from it, as
     asked: it is not there, Dot has it already, its name is taken, or Dot cannot use it as it is written."""
+
+
+class PrecheckError(DotError):
+    """A schedule's or watcher's check (item 1855) could not say whether to wake: it is not there or not executable,
+    it failed, ran past its time, or its last line is not the contract's. Never taken as "nothing to wake for"."""
+
+
+class PricingError(DotError):
+    """The price list of the models (item 1856) could not be fetched or read: its address, the status and the start of
+    the answer are in the context."""
 
 
 class StoreError(DotError):

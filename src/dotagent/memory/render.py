@@ -13,7 +13,9 @@ def _day(stamp: float) -> str:
 def render_note(record: MemoryRecord) -> str:
     """``[mem_x] text #tag #tag (the user wrote it, 2026-10-06)``: who wrote the note and when it last changed, so
     the model can tell a standing statement of the user from its own note and an old note from a new one; a note saved
-    for a while says until when it holds (``you saved it, 2026-10-06, holds until 2026-10-20``, item 306)."""
+    for a while says until when it holds (``you saved it, 2026-10-06, holds until 2026-10-20``, item 306), and one
+    saved with a subject says it (``..., about user-city``, item 1729), so that a run saving the fact again gives the
+    same one."""
     tags: str = "".join(f" #{tag}" for tag in record.tags)
     author: str = (
         "the user wrote it"
@@ -23,4 +25,5 @@ def render_note(record: MemoryRecord) -> str:
         else "you saved it"
     )
     until: str = "" if record.expires_at is None else f", holds until {_day(record.expires_at)}"
-    return f"[{record.id}] {record.content}{tags} ({author}, {_day(record.updated_at)}{until})"
+    about: str = "" if record.subject is None else f", about {record.subject}"
+    return f"[{record.id}] {record.content}{tags} ({author}, {_day(record.updated_at)}{until}{about})"

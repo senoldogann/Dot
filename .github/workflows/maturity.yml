@@ -1,0 +1,55 @@
+# Every day the maturity scorecard (docs/maturity.md, item 1857) is read for features whose proof on the real Mac is more
+# than 30 days old. One that is fails this job, so GitHub shows it, and one issue titled "Maturity: proofs older than 30
+# days" holds the list: opened the first time, its text replaced while any lapse, closed once none does. It is never a
+# check of a pull request or of main: a date passes with no change of code, and a gate that failed on it would hold every
+# merge. The gate checks only the scorecard's shape (scripts/check_maturity.py). It runs on demand too.
+name: maturity
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+# It reads the code and writes the one issue; nothing else.
+permissions:
+  contents: read
+  issues: write
+
+# Each action is pinned by the commit its tag named when it was pinned, given in the comment, as in gate.yml.
+
+jobs:
+  lapsed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      # The scripts need the standard library alone: no environment of Dot is installed.
+      - name: Proofs older than 30 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Maturity: proofs older than 30 days"
+        run: |
+          body="$RUNNER_TEMP/lapsed.md"
+          status=0
+          uv run --no-project --python 3.13 python scripts/maturity_lapsed.py > "$body" || status=$?
+          cat "$body"
+          if [[ "$status" -gt 1 ]]; then
+            echo "the scorecard could not be read"
+            exit "$status"
+          fi
+          number="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")"
+          if [[ "$status" -eq 1 ]]; then
+            if [[ -n "$number" ]]; then
+              gh issue edit "$number" --body-file "$body"
+            else
+              gh issue create --title "$TITLE" --body-file "$body"
+            fi
+            exit 1
+          fi
+          if [[ -n "$number" ]]; then
+            gh issue close "$number" --comment "Every feature's proof is within 30 days again."
+          fi

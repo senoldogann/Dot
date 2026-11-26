@@ -10,6 +10,7 @@ import { api } from "../api.js";
 import { mountBrief } from "../briefcard.js";
 import { mountCheckin } from "../checkincard.js";
 import { mountInitiative } from "../initiativecard.js";
+import { mountTells } from "../tellspanel.js";
 import { mountWatchers } from "../watcherspanel.js";
 import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
@@ -192,6 +193,9 @@ function optionChips(record, agent) {
     options.notify === null
       ? null
       : el("span", { class: "chip", title: "How the end of its tasks is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
+    options.precheck === null || options.precheck === undefined
+      ? null
+      : el("span", { class: "chip mono", title: "A check runs first, without a model, and starts the task only when it says to wake" }, `Check: ${options.precheck}`),
   ];
 }
 
@@ -399,6 +403,7 @@ function scheduleForm({ view }) {
           stop_after_failures: null,
           notify: null,
           agent_id: null,
+          precheck: null,
         }
       : record.options;
   const now = defaultsNow();
@@ -587,9 +592,27 @@ function scheduleForm({ view }) {
   const repeats = segmented(REPEATS, startsOnce ? "once" : "cron", (choice) => {
     cronRow.hidden = choice !== "cron";
     atRow.hidden = choice !== "once";
+    precheckRow.hidden = choice !== "cron";
+  });
+  // A check that runs first, without a model (item 1855): a file name in Dot's checks folder; a repeating schedule only.
+  const precheck = el("input", {
+    class: "input mono",
+    type: "text",
+    maxlength: "80",
+    autocomplete: "off",
+    spellcheck: "false",
+    placeholder: "price-drop.sh",
+    "aria-label": "Check",
+  });
+  precheck.value = options.precheck ?? "";
+  const precheckRow = setRow({
+    title: "Check first",
+    lead: 'Optional. The file name of an executable script in Dot\'s "checks" folder. It runs before each time, without a model; its last line {"wake": true} starts the task with what it printed, {"wake": false} skips it quietly, and anything else is told as a failure.',
+    control: precheck,
   });
   cronRow.hidden = startsOnce;
   atRow.hidden = !startsOnce;
+  precheckRow.hidden = startsOnce;
   const enabled = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": String(record === null || record.enabled), "aria-label": "Switched on" });
   // Whether the owner moved the form's switch: an edit that leaves it alone keeps the schedule on or off as it is then,
   // not as it was when the form opened (item 723).
@@ -642,6 +665,7 @@ function scheduleForm({ view }) {
       stop_after_failures: stopAfter.value === "" ? null : Number(stopAfter.value),
       notify: notify.value === "" ? null : notify.value,
       agent_id: agent.value === "" ? null : agent.value,
+      precheck: recurring && precheck.value.trim() !== "" ? precheck.value.trim() : null,
       // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
       speed: options.speed,
     };
@@ -673,6 +697,7 @@ function scheduleForm({ view }) {
         setRow({ title: "Repeat", lead: "A repeating schedule starts again and again; a single one starts once.", control: repeats.element }),
         cronRow,
         atRow,
+        precheckRow,
         setRow({ title: "Time zone", lead: "A name such as Europe/Istanbul; empty uses Dot's own time zone.", control: zone }),
         record === null
           ? null
@@ -742,7 +767,9 @@ function mountList(root, ctx) {
   const watchers = mountWatchers();
   // Dot's own initiative (item 715), under the watchers: what Dot does for you on its own while the Mac is idle.
   const initiative = mountInitiative();
-  const others = thread === "" ? [brief.element, checkin.element, watchers.element, initiative.element] : [];
+  // What you do with the tells (item 1743), under the initiative: it only counts.
+  const tells = mountTells();
+  const others = thread === "" ? [brief.element, checkin.element, watchers.element, initiative.element, tells.element] : [];
 
   function listOf(shown, handlers) {
     return setCard(...shown.map((view) => scheduleRow(view, handlers)));
@@ -902,6 +929,7 @@ function mountList(root, ctx) {
     checkin.dispose();
     watchers.dispose();
     initiative.dispose();
+    tells.dispose();
     stopLifecycle();
     stopBack();
   };

@@ -154,6 +154,8 @@ class _Result(BaseModel):
     kind: str
     target: str
     channel: str
+    # A call Dot's own rule turned another way (item 1722): neither a failure nor a call that worked.
+    steered: bool = False
 
 
 def reflection_cron(time_of_day: str) -> str:
@@ -210,7 +212,8 @@ def digest_of(goal: str, results: Sequence[_Result], status: RunStatus, answer: 
         text: str = " ".join(result.text.split())
         clipped: str = text if len(text) <= _RESULT_CHARS else f"{text[: _RESULT_CHARS - 1]}…"
         target: str = f" {result.target}" if result.target else ""
-        lines.append(f"{result.tool}{target}: {'ok' if result.ok else 'FAILED'} - {clipped}")
+        said: str = "ok" if result.ok else "STEERED" if result.steered else "FAILED"
+        lines.append(f"{result.tool}{target}: {said} - {clipped}")
     lines.extend(("", f"The run ended {status}: {answer}"))
     return goal_digest("\n".join(lines))
 
@@ -221,6 +224,8 @@ def call_facts(results: Sequence[_Result]) -> tuple[tuple[CallFact, ...], tuple[
     failures: list[CallFact] = []
     resolved: list[CallFact] = []
     for result in results:
+        if result.steered:
+            continue
         key: tuple[str, str] = (result.tool, result.target)
         if result.ok:
             earlier: CallFact | None = next((fact for fact in failures if (fact.tool, fact.target) == key), None)

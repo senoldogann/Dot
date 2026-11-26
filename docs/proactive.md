@@ -106,7 +106,11 @@ watcher has:
 - a **kind**: **New mail** in a Google or Microsoft account you signed in (see [Mail and
   calendars](runs.md#mail-and-calendars)); **Calendar**, an event about to start in one of those accounts; or
   **GitHub**, your own notifications: a review asked of you, a mention (yours or your team's), an assignment, and a
-  check or workflow run of yours that failed;
+  check or workflow run of yours that failed; or **Check** (item 1855), your own script in Dot's `checks` folder, run
+  without a model at each look by the contract of a schedule's check ([Schedules](memory-and-schedules.md#schedules)):
+  `{"wake": true}` makes what it printed the one thing told (judged by the fast model only when you gave words),
+  `{"wake": false}` tells nothing, and a check that fails is said on the watcher's row as a failed look, never taken as
+  quiet. A check watcher's first look is a real one;
 - **what you want to hear of**, in your own words ("my bank, my landlord, anything about the visa"): needed for mail,
   optional for GitHub (then the notifications above are told as they are) and for the calendar (then every timed event
   is told);
@@ -389,13 +393,27 @@ yours and is never touched; a file with no block gets it at its end. The tool gr
 
 What Dot tells you on its own, the brief, the watchers and a model whose account ran out of money ([Models](models.md),
 item 1207), goes through one function, `tell_owner(bus, title, text,
-url)` in `dotagent/notify/owner.py`: a title, a line or two of text and the route of Dot's own pages that a tap opens
+url, kind, subject)` in `dotagent/notify/owner.py`: a title, a line or two of text, the route of Dot's own pages that a tap opens
 (`#/runs/<id>`; an address of anything else is refused, so that nobody whose words are in a tell can send you
-elsewhere). It is an event of Dot itself, `owner_told`, live only like the other notices (see [The
+elsewhere) and which kind of tell it is (`brief`, `checkin`, `watcher` with the watcher's id, `initiative`, `system`). It is an event of Dot itself, `owner_told`, live only like the other notices (see [The
 daemon](daemon.md#the-daemon-the-web-ui-and-the-service)): the web push sends it to every subscribed phone, the page
 shows it as a desktop notification where those are on, and the channel router of [Channels](channels.md) (item 582)
 sends it into your conversation with yourself while iMessage is on and a number is paired; any way to reach you added
-later listens for the same event. It is not stored: what is kept is the run it opens.
+later listens for the same event. The event is not stored: what is kept is the run it opens, and a line of the ledger
+below.
+
+**What you do with a tell** (item 1743). Each tell that goes out, and the end of a run or of a schedule's run that the
+phone is told of, is kept as a `tell_sent` line (its kind, its subject and its route, nothing of its words; the events
+table under the pseudo-run `_tells`, no table of its own), and what you do with it as `tell_response` lines. Within half an hour
+(`TELL_WINDOW_S`) of the tell, it is **acted on** when you wrote in the chat its route opens or put a reaction there, **opened**
+when you opened that chat (the page marks it seen, from any device, which is what the daemon watches), **dismissed** when you
+closed its notification unopened (the page reports a desktop notification closed without a click; a push closed on a phone
+is reported through a window of Dot that is open, and is otherwise counted as ignored), **ignored** when the half hour ended
+with none of these, and **pending** while it runs. A tell whose route is not a chat (the schedules page, the phone's
+settings) cannot be seen opened: it is counted apart (`unmeasured`) and left out of the share. *Precision* is the share of the
+tells opened or acted on among those whose half hour has ended. `GET /api/tells` answers the last 30 days per kind and subject
+(a watcher's id), and Scheduled tasks shows it: a line in each watcher's row and the panel **What you do with its tells**
+under Dot's own initiative. It only counts; nothing Dot tells, and no cap of a watcher, changes by it.
 
 **On iMessage** a tell is one message, marked with a zero-width space, of the title (a title Dot gives in your
 language, item 918), a colon, the text and the link to the page it opens
@@ -417,12 +435,14 @@ it.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/brief` | the brief as its card shows it: whether it is on (its schedule exists and is switched on), `time` and `days` (read from the schedule's cron; `custom` when that was changed in the list to a time the card cannot show), your `lines`, the `zone`, its `schedule_id`, when it fires next and last fired, how the last firing went, the run to open (`last_run_id`) and how many mail and calendar accounts are signed in |
-| `GET /api/watchers` | the watchers, in the order they were made, each with its choices (`kind`, `account`, `words`, `minutes`, `action`, `goal`, `enabled`) and how its looks go: `primed` (its first look is made), `looked_at`, `next_look_at`, `last` (what the last look came to), `error` and `error_at` (why the last one failed), `told` (tells in the last hour); never the keys of what it handled |
+| `GET /api/watchers` | the watchers, in the order they were made, each with its choices (`kind`, `account`, `words`, `minutes`, `action`, `goal`, `check`, `enabled`) and how its looks go: `primed` (its first look is made), `looked_at`, `next_look_at`, `last` (what the last look came to), `error` and `error_at` (why the last one failed), `told` (tells in the last hour); never the keys of what it handled |
 | `GET /api/watchers/options` | what the form offers: the `accounts` signed in, whether GitHub's token is kept (`github`, never the token), the `minutes` each kind starts with, `tells_per_hour` and `runs_per_hour`, and whether the watchers look at all (`looking`) |
-| `POST /api/watchers` | make one, 201: `{"name", "kind": "mail" \| "calendar" \| "github", "enabled", "account", "words", "minutes", "action": "tell" \| "run", "goal"}`; 422 for what its kind lacks (mail needs an account and words, the calendar an account, GitHub takes none, a run needs its goal), for `minutes` outside 1 to 1440, and past 20 watchers |
-| `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind or its account changed, and one switched on again looks at once (404 for none) |
+| `POST /api/watchers` | make one, 201: `{"name", "kind": "mail" \| "calendar" \| "github" \| "check", "enabled", "account", "words", "minutes", "action": "tell" \| "run", "goal", "check"}`; 422 for what its kind lacks (mail needs an account and words, the calendar an account, GitHub takes none, a check takes no account and needs `check`, the file name of an executable script in Dot's checks folder, which no other kind takes; a run needs its goal), for `minutes` outside 1 to 1440, and past 20 watchers |
+| `PATCH /api/watchers/{id}` | change the whole of its choices, as for a new one; what it handled is kept unless its kind, its account or its check changed, and one switched on again looks at once (404 for none) |
 | `DELETE /api/watchers/{id}` | delete it; answers what was deleted; the chats of the runs it started stay (404 for none) |
 | `POST /api/watchers/{id}/try` | Check now: one look at once, whatever its time: `{"outcome": {"first", "found", "told", "summary", "error"}, "watcher": …}`; a look that fails answers 200 with the failure in `outcome.error`, and `found` and `told` say how far it came (404 for none; 409 for a watcher switched off, while `[watchers] enabled` is false and while the emergency stop is engaged) |
+| `GET /api/tells` | what you did with the tells of the last 30 days (item 1743): `days`, `window_s` (1800), and `rows`, one per kind (`brief`, `checkin`, `watcher`, `initiative`, `run_end`, `schedule_end`, `system`) and subject (a watcher's id, else empty), each with `counts`: `sent`, `acted`, `opened`, `dismissed`, `ignored`, `pending`, `unmeasured` and `precision` (`null` with no tell answered) |
+| `POST /api/tells/dismissed` | a notification of the newest tell of a route was closed unopened: `{"route", "via": "app" \| "desktop" \| "push"}`; answers `{"recorded"}`, false when no tell of that route went out in the last half hour or it already had an answer |
 | `GET /api/initiative` | Dot's own initiative (item 715): `enabled`, `looked_at` (its last look for work), `idle_readable` (whether macOS says how long the Mac has been idle; without it nothing starts, and the card says so), `approvals` (the mode its runs start in, `[initiative] approvals`, which the card says: item 756), `peak_hours_utc`
 (item 826), `look_model` (the model that looks for work, "" for the default one) and `costly_tokens`
 (`[initiative] retry_under_tokens`, item 916), and `todos`, what is being done and to do, then what was done or let go in the last two weeks, each with `id`, `title`, `why`, `source` (`owner` or `run`), `status`, `attempts`, `run_id`, `note` and `updated_at` |

@@ -20,7 +20,12 @@ from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import ensure_layout, log_dir
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort
 from dotagent.policy.types import ApprovalMode
-from dotagent.store.models import BrowserMode, MemoryOrder
+from dotagent.store.models import (
+    DEFAULT_PROOF_TIMEOUT_S,
+    MAX_PROOF_CHECKS,
+    BrowserMode,
+    MemoryOrder,
+)
 
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
@@ -113,6 +118,10 @@ _FAMILIES: dict[str, str] = {
     "prune": "dotagent.cli_prune",
     "backup-now": "dotagent.cli_backup",
     "backup-list": "dotagent.cli_backup",
+    "scope-list": "dotagent.cli_scope",
+    "scope-add": "dotagent.cli_scope",
+    "scope-remove": "dotagent.cli_scope",
+    "scope-check": "dotagent.cli_scope",
     "undo": "dotagent.cli_undo",
     "eval-list": "dotagent.cli_eval",
     "eval-check": "dotagent.cli_eval",
@@ -120,6 +129,7 @@ _FAMILIES: dict[str, str] = {
     "eval-run": "dotagent.cli_eval",
     "eval-report": "dotagent.cli_eval",
     "eval-tools": "dotagent.cli_eval",
+    "eval-memory": "dotagent.cli_eval",
     "eval-speed": "dotagent.cli_eval",
     "stats": "dotagent.cli_stats",
     "daemon": "dotagent.cli_daemon",
@@ -172,6 +182,25 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     run.add_argument("--thread", default=None, help="continue an existing conversation thread")
+    run.add_argument(
+        "--proof",
+        action="append",
+        default=[],
+        metavar="COMMAND",
+        help=(
+            "a command that must exit 0 before the run (with --standing, the campaign) is done, such as a test run; "
+            f"Dot runs it at the finish and sends the run back with its output while it fails (repeat, at most "
+            f"{MAX_PROOF_CHECKS})"
+        ),
+    )
+    run.add_argument(
+        "--proof-timeout",
+        dest="proof_timeout_s",
+        type=int,
+        default=DEFAULT_PROOF_TIMEOUT_S,
+        metavar="SECONDS",
+        help=f"seconds each --proof command may run, at most [shell] max_timeout_s (default {DEFAULT_PROOF_TIMEOUT_S})",
+    )
     run.add_argument(
         "--review",
         action="store_true",
@@ -541,6 +570,24 @@ def build_parser() -> argparse.ArgumentParser:
     backup_commands.add_parser("now", help="copy the database now into [store] backup_dir and thin the older copies")
     backup_commands.add_parser("list", help="list the copies kept, newest first")
 
+    scope = commands.add_parser(
+        "scope",
+        help="the bug bounty programs you may test: one command writes a scope, check asks who covers a host",
+    )
+    scope_commands = scope.add_subparsers(dest="scope_action", required=True)
+    scope_commands.add_parser("list", help="the scopes kept, with their hosts and rules")
+    scope_add = scope_commands.add_parser("add", help="add a program's scope, or replace the one kept for it")
+    scope_add.add_argument("--program", required=True, help='the program as you name it, e.g. "Bugcrowd · Klaviyo"')
+    scope_add.add_argument(
+        "--hosts", nargs="*", default=[], help="the hosts its published scope lists, comma or space separated"
+    )
+    scope_add.add_argument("--url", default="", help="the program's page, where its scope and rules are written")
+    scope_add.add_argument("--note", default="", help="the rules that came with it: rate, exclusions, what is banned")
+    scope_remove = scope_commands.add_parser("remove", help="drop the scope kept for a program")
+    scope_remove.add_argument("program", help="the program as it is kept")
+    scope_check = scope_commands.add_parser("check", help="which program covers a host or a URL, and its rules")
+    scope_check.add_argument("target", help="a host or a URL")
+
     undo = commands.add_parser(
         "undo",
         help="take back the file changes that write_file and edit_file made in a run and in the runs it delegated to",
@@ -605,6 +652,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--case", dest="cases", action="append", default=[], help="ask only this case; give it again for more"
     )
     eval_tools.add_argument("--repeat", type=int, default=1, help="ask every case this many times")
+    eval_memory = eval_commands.add_parser(
+        "memory",
+        help="measure whether a search finds the newest fact when a fact changed: 42 owner facts saved over time, "
+        "some replaced, and a question each (no model is asked; it embeds with the model of [memory] when asked to)",
+    )
+    eval_memory.add_argument(
+        "--embeddings",
+        choices=["scripted", "configured"],
+        default="scripted",
+        help="scripted: offline, with embeddings made from measured cosines; configured: the embedding model of "
+        "[memory] (default: scripted)",
+    )
     eval_speed = eval_commands.add_parser(
         "speed",
         help="play the speed set (five browser tasks on a local site) and print what each took: passes, wall seconds, "
@@ -699,6 +758,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     eval_action: object = raw.pop("eval_action", None)
     backup_action: object = raw.pop("backup_action", None)
     review_action: object = raw.pop("review_action", None)
+    scope_action: object = raw.pop("scope_action", None)
     models_action: object = raw.pop("models_action", None)
     if raw["name"] == "models" and models_action == "profile":
         raw["name"] = "models-profile"
@@ -728,6 +788,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"service-{service_action}"
     if raw["name"] == "eval":
         raw["name"] = f"eval-{eval_action}"
+    if raw["name"] == "scope":
+        raw["name"] = f"scope-{scope_action}"
     if raw["name"] == "backup":
         raw["name"] = f"backup-{backup_action}"
     if raw["name"] == "review":

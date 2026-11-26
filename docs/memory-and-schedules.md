@@ -3,7 +3,8 @@
 ## Memory
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
-`memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
+`memory_search` and `memory_forget` are tools of the agent (`memory_save` and `memory_update` name the longest note,
+`[memory] max_chars`, 600, in their description: item 1690); you manage the same notes with `dotx memory` and in the web
 UI, where Settings › Memory (items 373 and 566) is the box that adds a note at its head (its tags beside it, one fact
 per note, **Remember** or ⌘Enter; on a phone the tags have a line of their own and **Remember** stands at the right of
 the line under them, and a touch screen is not offered the key, item 576), then **Notes** with how many there are, a
@@ -263,8 +264,66 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - `dotx setup` writes `[memory] embed_enabled = false` when it sets up the models of a provider other than Ollama and
   the Ollama of this Mac does not serve the embedding model (item 558): `dotx doctor` then passes, and no run waits
   out an embedder that is not there. It says how to switch the embeddings on again.
-- Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
-  outdated.
+- A fact that changed replaces its older note (item 1729). `memory_save` takes a `subject`, a short name for what the
+  note is about when the fact has one current value (`user-city`, `standup-time`, `nordic-pines-status`; the store keeps
+  it as lowercase words joined by hyphens, 48 characters at most), and a note recalled with one shows it ("about
+  user-city"), so a run saving the fact again gives the same one. A newer note of the same subject puts the older notes
+  of the subject aside: each rests, names the note that replaced it (`replaced_by`, "Replaced by another note" on the
+  Memory page) and keeps its words and the day it began to rest (`rested_at`, "Resting since"), which is the day it
+  stopped being true. Nothing is deleted: the page lists it among the notes that rest, pinning it or taking its `rest`
+  tag off wakes it, and after `forget_after_days` it is only ever proposed to be forgotten. A search and the notes a run starts with
+  pass over it, so the run reads the fact as it stands; the answer to the save lists what it replaced. A note saved
+  again with the words of one that rests is said now: it wakes, takes the subject when it has none (a note keeps the
+  subject it was given), and the other notes of its subject rest (the city that was Oulu, then Helsinki, said to be
+  Oulu again is Oulu); a run that read outside content gives a clean note no subject and puts no clean note aside,
+  whatever the mark of the note it saved again. A value filled into a page is masked in
+  the subject as in the note's words. With no subject,
+  a save replaces a note close to it (`similar_threshold`, so only with embeddings on) only when its words say the
+  fact changed and nothing else: the same sentence with a number, a time or a version swapped after a word a value follows (`at 09:00` and
+  `at 10:30`, `port 8765` and `port 9120`; not `invoice 1042` and `invoice 1043`, which are two things, nor `for 1077`
+  and `for 1080`, nor a time that keeps its hour) or with a word of change added (`now`, `no longer`, `moved`, `switched`), with at
+  least three words shared. A cosine alone cannot tell the two apart (measured with `bge-m3`: facts that changed lie at
+  0.68 to 0.97, two facts that are both true at 0.68 to 0.84), and no model is asked in the save: a note reworded into
+  another sentence, or two values that are names, wait for a subject or for the night, when the reflection asks the
+  review model about the notes that remain close. What a run changes is never what you wrote: a note you wrote, pinned
+  or corrected, a lesson you saved and a standing note stay as they are, and a note saved while its run had read
+  outside content never replaces one that was not (the answer to the save names the notes it left, and `memory_update`
+  proposes the change to you, item 1711). Measured with `dotx eval memory` (42 cases, 34 of facts that changed, the
+  three best notes of each search, 2026-11-24): before, the newest fact came first in 2 cases and the outdated note was
+  shown beside it in all 34; now the newest comes first in 25 and the outdated note is shown in 10 (0 of the 18 with a
+  subject; the 10 are notes reworded, whose changed value is a name, or a version after a word that names a thing), and none of the 8 facts that stayed true was put
+  aside. A store of two or three notes ties the two versions in the search and the older wins the tie, so the first
+  count before is a floor, not a rate for a large store; the shown count is not affected.
+- Every note says where it came from (item 1864): you, a task in a chat (a chat, a `dotx` command, a code review), a
+  scheduled task, a watcher's task (a watched mail or event, a reply to a mail), a helper task another task started, Dot
+  on its own initiative, or the nightly reflection. The store sets it (`origin`) from the run that saved the note, as
+  the run's source says it, and no argument of a tool reaches it, so no model writes it; a note's rewrite by another
+  task takes that task's origin, your correction keeps the one it had. The Memory page says it in the note's line
+  ("Saved 2 hours ago by a scheduled task") and the notes' API carries it. A note stored before item 1864 got its
+  origin from its run where the run is still stored; where it is gone (the runs are kept for a time and notes for
+  longer: 1,083 of the owner's 1,272 notes on 2026-11-25), it has none and says "a task".
+- A scheduled task, a watcher's task (a watched item, a reply to a mail) and a helper task another task started write no
+  lasting note on their own (item 1865): nobody watches them as they work. Their `memory_save` keeps the note on the
+  task, with its tags, subject and time, and answers that it waits for you; their `memory_update` waits beside the note
+  as the change proposed, as a task's change of your own note does; and the lessons drawn from them stay proposed
+  whatever `[agent] lessons` says. **Notes tasks proposed** on the Memory page (`GET /api/memories/waiting`) lists what
+  waits from the last 30 days, the notes and the lessons, each with Save (`POST
+  /api/memories/waiting/<run>/<index>/save`, or the lesson's own Save) and Dismiss; a saved note is written as the task
+  would have written it, unmarked, since you read it. No other task is handed it before. Nothing is asked or refused
+  that was not before: the calls are classified and approved as they were, in `yolo` and free mode too. Why proposals
+  and not nothing: on the owner's Mac on 2026-11-25 the 39 notes of scheduled tasks included some of the most used
+  lessons (a webmail's routes handed 46 and 34 times, LinkedIn's 31, 24 and 22), and all 282 lesson decisions stored
+  were made by `auto`, none on a task's page, so the proposals wait where you look at notes rather than on the task.
+- What recall gave a task is never saved back as a new note (item 1866). The store records every note a task was
+  handed (at its start, by a search, at a site, after a failed call), and a `memory_save` whose words are a handed
+  note's, or hold a handed note of four words or more whole (the line recall drew it in, a sentence around it), saves
+  nothing and tells the model to save only what is new or to correct the note with `memory_update`. The words are
+  compared exactly, case, accents, spacing and punctuation aside, so `4 CPU cores` against `8 CPU cores` is a new fact.
+  Before, such a save woke a note a newer one had replaced, and with a subject put the newer one aside: `dotx eval
+  memory` has four cases of it (E01 to E04, a task handed the old fact that saves it again after the newer note): the
+  newest came first in 0 of 4 and was among the three in 2, the outdated was shown in 4; now 4, 4 and 0.
+- Saving a note close to an existing one (`similar_threshold`) tells the model the notes that remain, which decides
+  whether the old note is outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:
   the run is tainted, so its next save asks unless the approval mode answers that question itself, and the note it
@@ -354,6 +413,39 @@ composer (items 281 and 400; see [Runs](runs.md)); a chat with such a schedule w
 `[agent] reflection_time` (see Reflection in [Autonomy](autonomy.md)); it is not a schedule and does not count against
 `max_schedules`.
 
+**A check first, no model** (item 1855). A repeating schedule may name a **check**: the file name of an executable
+script you put in Dot's `checks` folder (`~/Library/Application Support/Dot/checks/`, made at the daemon's start). Each
+firing runs it first, without a model, for at most 30 seconds, from the workspace, with the environment a run's
+commands get and, while [the sandbox](safety.md) is on, inside it. The contract of what it prints:
+
+- it ends with exit code 0, and the last line it prints that is not blank is exactly `{"wake": true}` or
+  `{"wake": false}`;
+- what it printed before that line is its output.
+
+`{"wake": false}` starts no run: the schedule moves to its next time and its status says *quiet: its check found
+nothing to wake for*, which is not counted as a skipped firing. `{"wake": true}` starts the run, its first message the
+goal followed by the output in a fence (cut at 8,000 characters): a check may read what others wrote (a page, a feed,
+a price), so the output is data, never an instruction, and the run starts tainted, as a watcher's does. Anything else
+is a failure, never taken as quiet: a file that is not there or not executable, an exit code other than 0, a check that
+runs past its 30 seconds, a last line that is not one of the two. The firing is skipped with *skipped: its check
+failed:* and the reason (with the end of what it wrote to stderr), and you are told as of a missed firing (once while
+it fails the same way). **Run now** runs the check too, for its output, and starts the task whatever it says; a check
+that fails there is the error the page shows. A one-time schedule takes no check, and the name must be a plain file
+name (letters, digits, `.`, `-`, `_`), checked to be an executable file when the schedule is saved. Only you set it,
+in the schedule's form (**When › Check first**) or the API (`precheck`); the model's `schedule_create` has no such
+field. The checks folder is among what Dot loads and runs, so a run changes a check only as it changes Dot's other code.
+The scheduler's tick waits for a check, so a slow one holds the next firings back by up to its 30 seconds, and
+the checks of several schedules due in the same tick run one after another: a third one's firing can start up to a
+minute and a half late.
+
+```sh
+#!/bin/sh
+# ~/Library/Application Support/Dot/checks/price-drop.sh
+price=$(curl -fsS https://example.com/api/price) || exit 1
+echo "price is $price"
+if [ "$price" -lt 90 ]; then echo '{"wake": true}'; else echo '{"wake": false}'; fi
+```
+
 **A reply goes to the chat it belongs to** (item 926). When a run sends a message for you (a mail's Send, a mail
 command, a script), Dot keeps the mail addresses that step and the run's calls so far named (the field To, a command's
 recipient) by the run's chat. A run that reads your mail on its own (a schedule such as one that reads your inbox every
@@ -401,7 +493,7 @@ level, approval mode, goal mode, the earlier runs it knows, whether it keeps its
 off, how the end of its runs is told, the agent it runs as and whether it is on (`history_runs`, `same_chat`,
 `stop_after_failures`, `notify`, `agent_id` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
 configured ones and the standard speed; a `PATCH` that leaves `agent_id` out keeps the schedule's agent, and `null`
-makes it Dot's).
+makes it Dot's; `precheck`, its check, likewise: left out of a `PATCH` it stays, `null` removes it, item 1855).
 Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
 chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor an agent; one made
 in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. The editor's page asks

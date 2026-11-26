@@ -94,8 +94,9 @@ effort = "medium"
 helpers = []
 # The models a run moves to, in order and each once at most, when its own model cannot answer: a quota, credit,
 # rate-limit or key error, a refused access (HTTP 403, or OpenRouter's 404 for a model its privacy settings leave no
-# provider of), a missing key, or a stop by its service's content filter. Without one that can take the run over such an
-# error ends the run.
+# provider of), a missing key, a stop by its service's content filter, or replies that stay empty (item 1889). Without one
+# that can take the run over such an error ends the run. A model that declines the task is not moved from: the run ends
+# with its words and the owner restarts it on a model they pick (item 1889).
 standby = []
 # A model that answered with such an error is left out of the helpers and the standby models for the time its provider
 # named (at most a day), or for this many seconds (at most 86400); a call it answers, or a new key, ends that.
@@ -104,6 +105,10 @@ helper_cooldown_s = 600
 # send before the older part is summarised. Settings › Models sets it, at least 48000 and at most three quarters of the
 # model's window, as a table of its own: [models.context] with "anthropic:claude-opus-5-5" = 192000.
 context = {}
+# The model a run of a kind starts on when no model is chosen for it (item 1889), so that the right model takes the work
+# before any refusal: "security" is security research within a scope (a goal that names a host of [recon] owned_hosts or
+# of a scope, and speaks of security work). Settings › Models sets it: kinds = { security = "anthropic:claude-opus-5-5" }.
+kinds = {}
 
 [providers.ollama]
 base_url = "http://localhost:11434"
@@ -432,9 +437,12 @@ verify_answer_paths = false
 # A run that a restart, a crash or a shutdown of the daemon cut off, or whose dotx command (run, resume, chat) lost its
 # terminal, was told to end or died, can go on as a new run on the same thread, which is told what the run did, how
 # each call of its last step ended, and its plan. By hand: `dotx resume RUN_ID`, or Continue on the run's page. "safe"
-# also resumes on its own, when the daemon starts, a run of the web UI that was cut off at most resume_within_s
-# seconds before and whose calls that were cut off while they ran only read; a run of a dotx command never. A run the
-# owner stopped (Ctrl-C too), a run another run started and a run after which the thread went on are never resumed.
+# also resumes on its own, when the daemon starts, a run of the web UI that a restart, a shutdown or a crash cut off at
+# most resume_within_s seconds before, told to check the state of what was in progress before it repeats any of it;
+# unless a call that reaches beyond the Mac (pays, sends, posts, uploads, releases), or one whose kind cannot be
+# told (a click on the screen or in the browser), was cut while it ran (item
+# 1854); a run of a dotx command never. A run the owner stopped (Ctrl-C too), a run another run started, a run that
+# was itself resumed and a run after which the thread went on are never resumed on their own.
 # "safe" by default since item 248, on the owner's word; "off" leaves every such run to the owner.
 resume = "safe"
 resume_within_s = 1800
@@ -872,6 +880,15 @@ give_front_back = true
 # pointer. It is drawn by a helper process, kept out of what Dot's screenshots show, and fades once the run ends; a
 # helper that fails only costs the arrow.
 show_pointer = true
+# The Mac's own pointer and keyboard are yours while you are at the Mac (item 1890): a step of desktop_act that moves
+# the pointer or sends keys (a real click, a drag, a scroll, typing, a key, bringing an application to the front) runs
+# only once nobody but Dot has touched the keyboard, the mouse or the trackpad for away_after_s, and waits for that
+# meanwhile, at most away_wait_s; press, focus, set_value and menu go on through accessibility without the pointer.
+# Your first touch while Dot works ends its use of them at the next step, and the batch waits again. false: the steps
+# go at once, as before.
+input_only_when_away = true
+away_after_s = 600
+away_wait_s = 14400
 launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
@@ -1316,6 +1333,16 @@ review_timeout_s = 120.0
 # common ports answer, and runs only on a host listed here: one you own or may test. A name covers its subdomains
 # ("example.com" covers "www.example.com"); an address is listed as it is. Empty: no active scan anywhere.
 owned_hosts = []
+# A bug bounty program or an engagement you are in (item 1887, docs/recon.md). A host in a scope is treated as an owned
+# host: the port scan and security_scan run on it, and every report names the program that authorised it. A scope stands
+# for your word that you are in the program and its rules allow the test (you write it, or a run you asked to test the
+# program writes it from the program's scope page; `dotx scope list` shows each).
+#   [[recon.scopes]]
+#   program = "HackerOne · Acme"
+#   hosts = ["acme.com"]
+#   url = "https://hackerone.com/acme"
+#   note = "no automated scanning; 5 req/s"
+scopes = []
 
 
 [meetings]

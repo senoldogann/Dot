@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Header, Query, Request, Response
 from fastapi.responses import StreamingResponse
 
+from dotagent.agent.account import RunAccount, result_fact, run_account
 from dotagent.agent.aside import AsideAnswer, answer_aside
 from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
 from dotagent.agent.budget import loosens, run_budget
@@ -18,8 +19,11 @@ from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secr
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import disliked_of, run_lessons
 from dotagent.agent.mode_words import resolved_mode
+from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import save_playbook
+from dotagent.agent.proof import added, checks_of
 from dotagent.agent.recap import RecapView, recap_view, write_recap
+from dotagent.agent.refusal import RESTARTED_ON_MODEL_EVENT
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
     NOTHING_TO_TAKE_BACK,
@@ -36,7 +40,10 @@ from dotagent.config_edit import BUDGET_SETTINGS, BudgetSetting, set_budget
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path, workspace_dir
-from dotagent.llm.router import parse_model_ref
+from dotagent.llm.pricing import PriceBook, TokenUse, estimate, tier_sizes
+from dotagent.llm.router import offers_fast_mode, parse_model_ref
+from dotagent.llm.traits import effective_effort
+from dotagent.llm.types import Effort, ModelInfo
 from dotagent.notify.needs_you import NeedsYou, read_needs_you
 from dotagent.notify.owner import tell_owner
 from dotagent.policy.chat_permits import key_of_record, may_remember
@@ -54,12 +61,10 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import local_hosts, refuse_from_a_phone
 from dotagent.server.sending import send_once
 from dotagent.server.stream import (
-    MOST_FOLLOWED_RUNS,
     UNREAD_BY_PAGES,
     event_stream,
     follow_lifecycle,
     follow_run,
-    follow_runs,
     follow_screencast,
     resume_after,
 )
@@ -79,12 +84,12 @@ from dotagent.server.views import (
     EventsQuery,
     LoopRequest,
     RecapRequest,
+    RestartRequest,
     RewindRequest,
     RewindView,
     RunActions,
     RunDetail,
     RunsQuery,
-    RunsStreamQuery,
     SavedSkill,
     SecretRequest,
     StartRunRequest,
@@ -97,12 +102,15 @@ from dotagent.server.views import (
     picks_of,
 )
 from dotagent.store.db import Store
+from dotagent.store.endings import classify_ending
 from dotagent.store.models import (
+    NO_PICKS,
     AgentRecord,
     ApprovalRecord,
     CampaignRecord,
     ChatChoices,
     EventRecord,
+    ProofCheck,
     RewindCut,
     RunMode,
     RunPicks,
@@ -114,7 +122,7 @@ from dotagent.store.models import (
     ThreadRecord,
     chat_team,
 )
-from dotagent.store.stats import RunCosts, Usage, local_day_start
+from dotagent.store.stats import RunBudget, RunCosts, Usage, local_day_start
 from dotagent.tools.schedule import chat_options, schedule_mode
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -158,6 +166,19 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
     )
 
 
+# The most tool results of a run its account reads (item 1746), the newest.
+_ACCOUNT_RESULTS: int = 5000
+
+
+async def _account_of(store: Store, run_id: str) -> RunAccount:
+    """What the run did by its record (item 1746): its tool results, without their text, and its newest plan."""
+    results: list[EventRecord] = await store.tool_results_without_text(run_id, 0, _ACCOUNT_RESULTS)
+    latest: EventRecord | None = await store.last_event(run_id, PLAN_EVENT)
+    return run_account(
+        [result_fact(event) for event in results], EMPTY_PLAN if latest is None else plan_from_event(latest)
+    )
+
+
 async def _campaign_of(store: Store, run: RunRecord) -> CampaignChip | None:
     if run.campaign_id is None:
         return None
@@ -190,6 +211,7 @@ async def run_detail(ctx: ServerContext, run_id: str) -> RunDetail:
         disliked=await disliked_of(store, run_id),
         questions=await store.list_left_questions(run_id),
         campaign=await _campaign_of(store, run),
+        account=await _account_of(store, run_id),
         held=ctx.manager.held(run_id),
         holding=ctx.manager.holding(run_id),
         agent=None if run.agent_id is None else await store.get_agent(run.agent_id),
@@ -235,6 +257,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             "task" if request.standing and request.mode == "auto" else resolved_mode(request.mode, request.goal)
         )
 
+        # The owner's proof checks (item 1853), each command once.
+        proof: tuple[ProofCheck, ...] = added((), checks_of(request.proof, "owner"))
+
         async def start() -> str:
             if request.loop is not None:
                 # The loop's schedule is asked of the scheduler before the run starts: what it would refuse (a rhythm a
@@ -256,6 +281,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     request.browser,
+                    proof,
                 )
             elif request.team_id is not None:
                 team: TeamRecord = await store.get_team(request.team_id)
@@ -305,6 +331,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.goal_mode,
                     files,
                     picks,
+                    proof=proof,
                 )
             if request.mode == "auto":
                 await keep_auto(run)
@@ -328,19 +355,6 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         name, updated = await save_playbook(ctx.runtime, await store.get_run(run_id))
         return SavedSkill(name=name, updated=updated)
 
-    @router.get("/runs/streams")
-    async def runs_stream(
-        query: Annotated[RunsStreamQuery, Query()], last_event_id: Annotated[str | None, Header()] = None
-    ) -> StreamingResponse:
-        """Several runs' events on one stream (item 889): a browser keeps six connections to a server, and a stream for
-        each working agent of the office filled them. Each run must be one; at most ``MOST_FOLLOWED_RUNS``."""
-        run_ids: frozenset[str] = frozenset(part.strip() for part in query.ids.split(",") if part.strip())
-        if not run_ids or len(run_ids) > MOST_FOLLOWED_RUNS:
-            raise InvalidValueError(f"name between 1 and {MOST_FOLLOWED_RUNS} runs", {"runs": str(len(run_ids))})
-        for run_id in run_ids:
-            await store.get_run(run_id)
-        return event_stream(follow_runs(ctx, run_ids, resume_after(query.after, last_event_id)))
-
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:
         return await detail(run_id)
@@ -351,14 +365,45 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         owner's caps and what like runs spent (item 1731)."""
         run: RunRecord = await store.get_run(run_id)
         costs: RunCosts = await store.run_costs(run_id)
-        return costs.model_copy(update={"budget": await run_budget(ctx.runtime.budget, store, run)})
+        budget: RunBudget = await run_budget(ctx.runtime.budget, store, run)
+        # Dollars beside the tokens (item 1856): the run's own, and with its helpers beside what its cap counts.
+        book: PriceBook | None = ctx.runtime.prices.book
+        sizes: tuple[int, ...] = tier_sizes(book)
+        family: dict[str, list[TokenUse]] = await store.token_uses_of_family(run_id, sizes)
+        own: list[TokenUse] = family.get("own", [])
+        return costs.model_copy(
+            update={
+                "budget": budget.model_copy(
+                    update={"spent_cost": estimate(book, [*own, *family.get("helpers", [])], sizes)}
+                ),
+                "cost": estimate(book, own, sizes),
+            }
+        )
 
     @router.get("/usage")
     async def usage(query: Annotated[UsageQuery, Query()]) -> Usage:
         """What the owner's runs used in the last ``days`` days (item 1403): for each local day the runs started on it,
         their steps, the tokens in and out and their minutes, and the last window of the Claude plan each kind of
-        window was seen in. Time and tokens are what Dot records; it holds no price per model, so it shows no money."""
-        return await store.usage(query.days)
+        window was seen in, each day and each of the runs that used the most with what its tokens cost in dollars, as
+        estimated from the public price list (item 1856)."""
+        used: Usage = await store.usage(query.days)
+        book: PriceBook | None = ctx.runtime.prices.book
+        sizes: tuple[int, ...] = tier_sizes(book)
+        by_day: dict[str, list[TokenUse]] = await store.token_uses_by_day(
+            local_day_start(time.time(), query.days - 1), sizes
+        )
+        by_run: dict[str, list[TokenUse]] = await store.token_uses_of_runs([run.run_id for run in used.top_runs], sizes)
+        return used.model_copy(
+            update={
+                "days": tuple(
+                    day.model_copy(update={"cost": estimate(book, by_day.get(day.day, []), sizes)}) for day in used.days
+                ),
+                "top_runs": tuple(
+                    run.model_copy(update={"cost": estimate(book, by_run.get(run.run_id, []), sizes)})
+                    for run in used.top_runs
+                ),
+            }
+        )
 
     @router.get("/budget")
     async def budget_view() -> BudgetView:
@@ -402,6 +447,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             edits=file_edits(plan.steps),
             ended=not active_run_ids(runs) and run_id not in ctx.manager.active_run_ids(),
             outside=outside_steps(await store.ran_steps(run_id)),
+            account=await _account_of(store, run_id),
         )
 
     @router.get("/runs/{run_id}/actions")
@@ -540,6 +586,51 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         message itself as a follow-up at once."""
         return await make_loop(run_id, request.every, request.text)
 
+    @router.post("/runs/{run_id}/restart", status_code=201)
+    async def restart_run(run_id: str, request: RestartRequest) -> RunRecord:
+        """Start the task of a run that ended again, in its chat, on the model the owner picked (item 1889): the offer
+        on the page of a run whose model declined it. The old run's ``restarted_on_model`` event records the pick as
+        the owner's choice. A run still at work is refused."""
+        parse_model_ref(request.model)
+        old: RunRecord = await store.get_run(run_id)
+        if old.finished_at is None:
+            raise InvalidValueError("the run is still at work; stop it before restarting it", {"run_id": run_id})
+        if classify_ending(old.status, old.result, old.end_reason) != "model_refused":
+            raise InvalidValueError(
+                "only a run whose model declined its task is restarted on another model; send a message instead",
+                {"run_id": run_id, "status": old.status},
+            )
+        if request.model == old.model:
+            raise InvalidValueError(
+                f"{old.model} declined this task; pick another model to restart it on",
+                {"run_id": run_id, "model": request.model},
+            )
+        # The task starts again as the old run was set: its approvals (a yolo run stays yolo and asks nothing new), its
+        # goal mode, and its reasoning level and speed as near as the new model offers them.
+        ref = parse_model_ref(request.model)
+        info: ModelInfo = await ctx.runtime.router.model_info(ref)
+        effort: Effort | None = None if old.effort is None else effective_effort(info.efforts, old.effort)
+        run: RunRecord = await ctx.manager.start_picked(
+            old.goal,
+            old.mode,
+            request.model,
+            old.thread_id,
+            UI_SOURCE,
+            None,
+            effort,
+            old.speed if offers_fast_mode(ref) else "standard",
+            None,
+            old.approvals,
+            None if old.mode == "chat" else old.goal_mode,
+            (),
+            NO_PICKS,
+        )
+        await ctx.runtime.bus.emit(
+            run_id, RESTARTED_ON_MODEL_EVENT, {"model": request.model, "run_id": run.id, "chosen_by": "owner"}, True
+        )
+        log.info("run_restarted_on_model", run_id=run_id, new_run_id=run.id, model=request.model)
+        return run
+
     @router.post("/runs/{run_id}/resume", status_code=201)
     async def resume_run(run_id: str) -> RunRecord:
         """Resume a run that was cut off (by the daemon, or by the end of its ``dotx`` command): a new run on its
@@ -583,7 +674,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         minutes: int = max(1, round(request.quiet_s / 60))
         goal: str = " ".join(run.goal.split())[:120]
         await tell_owner(
-            ctx.runtime.bus, "A task makes no progress", f"{minutes} min with no step: {goal}", f"#/runs/{run.id}"
+            ctx.runtime.bus,
+            "A task makes no progress",
+            f"{minutes} min with no step: {goal}",
+            f"#/runs/{run.id}",
+            "system",
+            "",
         )
         log.warning("run_stuck_told", run_id=run.id, quiet_s=request.quiet_s)
         return StuckView(told=True)

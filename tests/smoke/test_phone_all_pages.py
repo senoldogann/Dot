@@ -202,7 +202,7 @@ async def _fill(runtime: Runtime, port: int) -> str:
     await _vault(runtime)
     thread: ThreadRecord = await runtime.store.create_thread(_CAMPAIGN_TITLE, "test")
     await runtime.store.create_campaign(
-        _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own"
+        _CAMPAIGN_TITLE, _CAMPAIGN_GOAL, thread.id, SCRIPTED_MODEL, "medium", "standard", None, "ask", (), "own", ()
     )
     async with httpx.AsyncClient(
         base_url=f"http://127.0.0.1:{port}",
@@ -281,6 +281,31 @@ _ROUTES: tuple[str, ...] = (
 _SHOWN: tuple[str, ...] = ("/campaigns", "/schedules", "/customize/plugins", "/customize/connectors", "/agents")
 
 
+# Pages looked at side by side: each waits its 900 ms on its own, so three at once take a third of the time of one by
+# one on a runner of three cores (the 88 looks took 205 s one by one there, run 45633252941).
+_AT_ONCE: int = 3
+
+
+async def _look(
+    browser: Browser, port: int, width: int, scheme: Literal["light", "dark"], route: str, tmp_path: Path
+) -> list[str]:
+    """What is wrong with one page at one width in one scheme, its picture kept when it is one of those shown."""
+    page: Page = await _page(browser, port, width, scheme, route)
+    try:
+        measured: dict[str, Any] = await page.evaluate(_MEASURE)
+        where: str = f"{route} at {width} {scheme}"
+        seen: list[str] = []
+        if measured["sideways"] > 0:
+            seen.append(f"{where}: the page scrolls sideways by {measured['sideways']} px")
+        seen.extend(f"{where}: {fault}" for fault in measured["found"])
+        if route in _SHOWN and width in (390, 430):
+            slug: str = route.strip("/").replace("/", "-")
+            await page.screenshot(path=str(tmp_path / f"{slug}-{width}-{scheme}.png"), animations="disabled")
+        return seen
+    finally:
+        await page.context.close()
+
+
 async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
     own_home: Path, tmp_path: Path, mac_at_rest: None
 ) -> None:
@@ -288,22 +313,26 @@ async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
         team_id: str = await _fill(runtime, port)
         browser: Browser = await playwright.webkit.launch()
         try:
-            seen: list[str] = []
-            for width in _WIDTHS:
-                for scheme in _SCHEMES:
-                    for route in (*_ROUTES, f"/teams/{team_id}"):
-                        page: Page = await _page(browser, port, width, scheme, route)
-                        measured: dict[str, Any] = await page.evaluate(_MEASURE)
-                        where: str = f"{route} at {width} {scheme}"
-                        if measured["sideways"] > 0:
-                            seen.append(f"{where}: the page scrolls sideways by {measured['sideways']} px")
-                        seen.extend(f"{where}: {fault}" for fault in measured["found"])
-                        if route in _SHOWN and width in (390, 430):
-                            slug: str = route.strip("/").replace("/", "-")
-                            await page.screenshot(
-                                path=str(tmp_path / f"{slug}-{width}-{scheme}.png"), animations="disabled"
-                            )
-                        await page.context.close()
+            gate: asyncio.Semaphore = asyncio.Semaphore(_AT_ONCE)
+
+            async def one(width: int, scheme: Literal["light", "dark"], route: str) -> list[str]:
+                async with gate:
+                    return await _look(browser, port, width, scheme, route, tmp_path)
+
+            # Every look ends, and closes its page, before a failure of one is raised.
+            looks: list[list[str] | BaseException] = await asyncio.gather(
+                *(
+                    one(width, scheme, route)
+                    for width in _WIDTHS
+                    for scheme in _SCHEMES
+                    for route in (*_ROUTES, f"/teams/{team_id}")
+                ),
+                return_exceptions=True,
+            )
+            for look in looks:
+                if isinstance(look, BaseException):
+                    raise look
+            seen: list[str] = [fault for look in looks if not isinstance(look, BaseException) for fault in look]
             assert seen == [], "\n".join(seen[:20])
         finally:
             await browser.close()

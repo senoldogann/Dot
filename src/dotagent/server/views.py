@@ -5,10 +5,12 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
+from dotagent.agent.account import RunAccount
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import Disliked, RunLessons
+from dotagent.agent.proof import ProofSpec
 from dotagent.agent.resume import CutOff
 from dotagent.agent.skill_history import VersionDetail
 from dotagent.agent.skill_proposals import ProposalView
@@ -27,6 +29,7 @@ from dotagent.config import (
     ModelsConfig,
     ResumeMode,
     SnapshotSound,
+    TaskKind,
 )
 from dotagent.config_edit import ReactionsSetting
 from dotagent.connections.catalogue import ConnectionKind
@@ -49,6 +52,7 @@ from dotagent.repair.problems import Problem
 from dotagent.scheduler import NightWork
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
+    MAX_PROOF_CHECKS,
     REFUSES_CHARS,
     AgentLook,
     AgentRecord,
@@ -343,6 +347,13 @@ class ThreadsQuery(FrozenModel):
     limit: int = Field(default=100, ge=1, le=500)
 
 
+class ChatSearchQuery(FrozenModel):
+    """The words the phone's home search looks for in what the chats say (item 1882), and how many finds to return."""
+
+    q: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=20, ge=1, le=50)
+
+
 class HelpersQuery(FrozenModel):
     limit: int = Field(default=50, ge=1, le=200)
 
@@ -384,13 +395,6 @@ class UsageQuery(FrozenModel):
     asked, at most a quarter."""
 
     days: int = Field(default=7, ge=1, le=92)
-
-
-class RunsStreamQuery(FrozenModel):
-    """The runs one stream follows, their ids joined by commas (item 889), and the event id it goes on after."""
-
-    ids: str = Field(min_length=1, max_length=2000)
-    after: int = Field(default=0, ge=0)
 
 
 class StreamQuery(FrozenModel):
@@ -477,6 +481,9 @@ class StartRunRequest(FrozenModel):
     plan_first: bool = False
     # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
     loop: str | None = Field(default=None, min_length=2, max_length=8)
+    # Commands that must exit 0 before the run (with standing, the campaign) is done (item 1853). Not with an agent, a
+    # team or a loop.
+    proof: list[ProofSpec] = Field(default_factory=list, max_length=MAX_PROOF_CHECKS)
     key: MessageKey | None = None
     # Who sent it: Dot's pages and phones (``ui``), or ``dotx run``, which hands its run to the daemon (``cli``) and
     # keeps the source a run of its own process has. The two weigh the same for the policy
@@ -501,6 +508,8 @@ class StartRunRequest(FrozenModel):
             raise ValueError("a loop asks again in a chat; a campaign (standing) goes on by itself")
         if self.browser is not None and not self.standing:
             raise ValueError("browser chooses the Chrome of a campaign: it goes with standing only")
+        if self.proof and (self.agent_id is not None or self.team_id is not None or self.loop is not None):
+            raise ValueError("proof checks hold a run of Dot's or a campaign: not an agent's, a team's or a loop")
         return self
 
 
@@ -780,6 +789,9 @@ class ScheduleCreateRequest(FrozenModel):
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
     notify: NotifyLevel | None = None
     agent_id: str | None = None
+    # Item 1855: the file name of a check in Dot's checks folder that each firing runs first; only a repeating
+    # schedule takes one.
+    precheck: str | None = Field(default=None, max_length=80)
     # Item 464: false saves it switched off, as a template's schedule is until the owner has read its goal; the room for
     # one more switched on is checked when it is switched on.
     enabled: bool = True
@@ -808,6 +820,8 @@ class ScheduleUpdateRequest(FrozenModel):
     notify: NotifyLevel | None = None
     speed: Speed | None = None
     agent_id: str | None = None
+    # Left out, the schedule keeps its check (item 1855), as a client from before it sends none; null removes it.
+    precheck: str | None = Field(default=None, max_length=80)
     # Left out (item 723), the schedule stays switched on or off as it is now: a form opened before the owner switched
     # it in the list put its old state back when it was saved.
     enabled: bool | None = None
@@ -827,6 +841,20 @@ class RoleModelRequest(FrozenModel):
     """The model for a part of Dot's own work (item 232): the ``fast``, the ``review`` or the ``vision`` model."""
 
     role: ModelRole
+    model: ModelReference
+
+
+class KindModelRequest(FrozenModel):
+    """The model a run of a kind of task starts on when none is chosen for it (item 1889): ``model`` "" leaves the
+    kind to the default model."""
+
+    kind: TaskKind
+    model: str
+
+
+class RestartRequest(FrozenModel):
+    """The model the owner picked to start a run's task again on (item 1889)."""
+
     model: ModelReference
 
 
@@ -1366,6 +1394,8 @@ class RunDetail(FrozenModel):
     questions: list[ApprovalRecord]
     agent: AgentRecord | None
     campaign: CampaignChip | None
+    # What the run did by its record, not by its model (item 1746), as the run's Changes tab shows it.
+    account: RunAccount
     held: bool
     holding: bool
     keep_going: bool
@@ -1454,6 +1484,9 @@ class RunActions(FrozenModel):
     edits: list[FileEdit]
     ended: bool
     outside: list[OutsideSteps]
+    # What the run did by its record (item 1746): what it changed, ran and sent, what its act steps came to and its
+    # plan steps that are open or done with no tool result that shows them.
+    account: RunAccount
 
 
 class UndoRequest(FrozenModel):
@@ -2200,6 +2233,9 @@ class RestartPending(FrozenModel):
 
 class StatusView(FrozenModel):
     version: str
+    # The id of the daemon's database (:meth:`dotagent.store.db.Store.store_id`): the same across restarts and updates,
+    # another after a reset; a phone drops its copy of the chats when it changes.
+    store_id: str
     # What the pages the daemon serves are (a digest of their files at its start): a page loaded from other pages is out
     # of date, as after an update of Dot.
     pages: str

@@ -1,0 +1,3539 @@
+[
+  {
+    "description": "Add a proof check: a command that must exit 0 before the run (or, in a campaign's session, the campaign) counts as done, such as the tests of what you changed. Dot runs every check when you finish with success and sends you back with the output of one that fails. At most 5; a check cannot be changed or removed. Add one when the owner names a check that must pass, or when the goal has a command that proves it.",
+    "name": "add_proof",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "A command line that exits 0 only when the work is really done, for example 'uv run pytest tests/x -q' or 'test -s ~/report.pdf'. Use absolute paths or the workspace.",
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_s": {
+          "default": 300,
+          "description": "Seconds the check may run before it is killed, which counts as failing.",
+          "maximum": 3600,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Dot and the agents: role, teams and what each does now.",
+    "name": "agents_now",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Run an AppleScript (or JavaScript for Automation) with osascript and return its result as text. For applications with a scripting dictionary (Finder, Mail, Calendar, Reminders, Notes, Music, Safari, Messages, System Events, and Microsoft Excel, Word and PowerPoint where they are installed) this is much faster and more reliable than operating their windows: read and change their data directly, for example `tell application \"Notes\" to get name of every note` or `tell application \"Microsoft Excel\" to get value of range \"A1:C3\" of active sheet`. find_help says which applications of this Mac can do a task, from their dictionaries, and `sdef` with an application's path prints its whole dictionary. The first use of an application can make macOS ask the user for Automation permission; a call that times out may be waiting for that answer. A script that starts an application or works on a large document may need more than the default: give it timeout_s (at most 110). An application may go on with what a killed script asked of it, so a script sent again at once waits behind that. Outside yolo, while the sandbox is on, the script's own files are sealed as a command's are, but macOS does not hold it back from the application it names: that application acts with its own powers. Prefer desktop_act for anything that needs the interface itself, and browser_eval for a web page: a script sent to Chrome reaches whichever Chrome window macOS picks.",
+    "name": "apple_script",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "default": "AppleScript",
+          "description": "AppleScript, or JavaScript for Automation (JXA).",
+          "enum": [
+            "AppleScript",
+            "JavaScript"
+          ],
+          "type": "string"
+        },
+        "script": {
+          "description": "The script source.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Seconds before osascript is killed (at most 110; default the configured [desktop] osascript_timeout_s). Give more to a script that starts an application or opens and changes a large document.",
+          "maximum": 110,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "script"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Ask the user for a key, token or password on a card: kept out of the chat and your sight, this chat's commands read it as $name for 24 hours. Never ask for a secret in a message or with ask_user. A short code may come back in words.",
+    "name": "ask_secret",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "description": "The card's title: what it is and its least access.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "description": "The environment variable your commands read it as: CLOUDFLARE_API_TOKEN.",
+          "type": "string"
+        },
+        "replace": {
+          "default": false,
+          "description": "True to ask again for one this chat holds that is wrong.",
+          "type": "boolean"
+        },
+        "why": {
+          "description": "Why you need it, and how to make it, step by step.",
+          "maxLength": 1500,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "why"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Ask the user a question. With wait, the result is their answer. Without it the question stays on the chat for them and you go on: the result says so, and their answer comes to you later as their message. In a run nobody watches the question is always left for the user. Use sparingly: prefer deciding yourself. A question that asks for a secret (a password, a key, a code from their phone) is refused: ask_secret is the card for those.",
+    "name": "ask_user",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "multiple": {
+          "default": false,
+          "description": "True if several may be chosen.",
+          "type": "boolean"
+        },
+        "options": {
+          "description": "Answers to pick from; the user may also write their own.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "description": "What it leads to, if the label does not say.",
+                "type": "string"
+              },
+              "label": {
+                "description": "A few words.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "recommended": {
+                "default": false,
+                "description": "True on the one you recommend.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "label"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "question": {
+          "description": "One precise question. Only ask what you cannot find out or decide yourself.",
+          "type": "string"
+        },
+        "wait": {
+          "default": false,
+          "description": "True only when nothing useful can be done until the user answers: you wait for the answer. False: the question stays on the chat for them, you go on with what does not depend on it, and their answer comes to you later as their message. In a run nobody watches, every question is left for the user.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Hand a piece of work to an agent as a recorded work order and go on: its run starts at once, you do not wait, and you are told when it ends. Then judge it with review_work.",
+    "name": "assign_work",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {
+          "description": "What done means: the checks whose output its answer must show.",
+          "maxLength": 2000,
+          "minLength": 3,
+          "type": "string"
+        },
+        "agent": {
+          "description": "The agent's name.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "brief": {
+          "description": "The whole work with every input it needs: the agent cannot see this chat.",
+          "maxLength": 6000,
+          "minLength": 3,
+          "type": "string"
+        },
+        "due_hours": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "objective": {
+          "description": "The id or title of the objective it serves.",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "title",
+        "brief",
+        "acceptance"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Do up to a few steps on the current page in one call: click, double_click, right_click, hover, fill (replace a form field's value), type (key by key, where autocomplete must see the keys), insert (the text at once at the caret, without keys: long text and rich editors such as post composers or code editors), select, press (Enter, Control+A, …), check, uncheck, scroll_into_view, drag (move ref onto to_ref), click_at (pixel x,y from a screenshot: a canvas, or a cross-origin widget like a captcha), drag_at (press at pixel x,y and move to to_x,to_y: a captcha's drag puzzle or a slider, where no ref reaches inside the frame). In an editor (a contenteditable area) fill, type and insert wait until it is ready and fail when it did not take the text; insert goes only into a text field or an editor. A click that leaves the page unchanged is tried once the other way with a script before the result returns. Batch the steps you can predict, such as filling a whole form and pressing submit. The result shows what changed on the page and, for each step, done (sent) and what Dot checked: verified (seen), uncertain (sent, result unseen: look before sending again) or not checked. Passwords, card numbers and one-time codes go in only as your instructions on secrets say: otherwise the browser refuses the step. Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes.",
+    "name": "browser_act",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "accept_dialogs": {
+          "default": false,
+          "description": "Accept confirm() dialogs this batch triggers (purchase or payment confirmations are never accepted).",
+          "type": "boolean"
+        },
+        "expect": {
+          "description": "What the page should show after the steps, in a few words ('the reply shows under the post', 'the order confirmation'). When the typed judge is on, the result opens with the probability that the page shows it and that it is a login wall, a CAPTCHA or an error page, so you need not read the whole page to know. An estimate; a step's expect_text is the check.",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "retry": {
+          "default": true,
+          "description": "When a click leaves the page unchanged, reach the same element once with the full pointer sequence a script sends (`browser_eval`'s way) and take the page again, instead of returning to the model for another method. A click that already moved the page, or that names what it expects, is never sent twice.",
+          "type": "boolean"
+        },
+        "steps": {
+          "description": "Steps run in order against the latest snapshot: every step you can predict without a new look at the page (a call with one step costs a model round trip for one click); a batch holds up to 10 steps by default (a whole form and its submit), and more are cut to the first ones with the result saying so. The batch stops at the first failure or when the page surprises you (new tab, dialog, download, navigation); the remaining steps are then skipped. Example: [{\"action\": \"fill\", \"ref\": \"e5\", \"text\": \"Ada\"}, {\"action\": \"select\", \"ref\": \"e7\", \"text\": \"blue\"}, {\"action\": \"click\", \"ref\": \"e9\"}].",
+          "items": {
+            "additionalProperties": false,
+            "description": "One browser step. Which fields apply depends on ``action``; the others must be left out.",
+            "properties": {
+              "action": {
+                "description": "click | double_click | right_click | hover | fill (replace the value of a field) | type (key by key, for autocomplete widgets) | insert (put the text in at once, without keys: long text, editors) | select (choose an option by value or label) | press (a key or chord) | check | uncheck | scroll_into_view | drag (move the element ref onto to_ref) | click_at (viewport pixel x,y from a screenshot: a canvas, or a cross-origin widget like a captcha) | drag_at (press at x,y and move to to_x,to_y: a slider or a captcha's drag puzzle, where no ref reaches inside the frame).",
+                "enum": [
+                  "click",
+                  "double_click",
+                  "right_click",
+                  "hover",
+                  "fill",
+                  "type",
+                  "select",
+                  "press",
+                  "check",
+                  "uncheck",
+                  "scroll_into_view",
+                  "click_at",
+                  "drag_at",
+                  "insert",
+                  "drag"
+                ],
+                "type": "string"
+              },
+              "expect_text": {
+                "description": "Exact words the page must show after this step and not before (the line a sent form answers with). Dot waits for them and says verified or uncertain; unseen, the later steps are not run.",
+                "maxLength": 200,
+                "minLength": 4,
+                "type": "string"
+              },
+              "expect_url": {
+                "description": "Part of the address the tab must come to after this step (/order/done); like expect_text.",
+                "maxLength": 200,
+                "minLength": 2,
+                "type": "string"
+              },
+              "key": {
+                "description": "Key or chord for press, for example Enter or Control+A.",
+                "type": "string"
+              },
+              "ref": {
+                "description": "Element ref from the latest snapshot, for example e12.",
+                "type": "string"
+              },
+              "text": {
+                "description": "Text for fill, type and insert. For select: the label or value of one of the options the snapshot lists, written exactly as listed.",
+                "type": "string"
+              },
+              "to_ref": {
+                "description": "For drag: the ref of the element to drop onto.",
+                "type": "string"
+              },
+              "to_x": {
+                "description": "Viewport x in CSS pixels where a drag_at lets go.",
+                "type": "number"
+              },
+              "to_y": {
+                "description": "Viewport y in CSS pixels where a drag_at lets go.",
+                "type": "number"
+              },
+              "x": {
+                "description": "Viewport x in CSS pixels, for click_at and drag_at's start.",
+                "type": "number"
+              },
+              "y": {
+                "description": "Viewport y in CSS pixels, for click_at and drag_at's start.",
+                "type": "number"
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Go back one page in the history of the current tab.",
+    "name": "browser_back",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Pass the human check in front of the page: hCaptcha, reCAPTCHA, Cloudflare Turnstile, or the site's own 'Press & Hold' or 'Verify you are human'. It finds the widget in any frame of the page, presses its checkbox or holds its button down until the widget says it is done, and reads the page again a few times a second instead of sleeping - one call where a screenshot, a guess at a pixel and a wait used to go. Call it the moment a page shows a check, and again after acting on an image challenge. A check that needs eyes comes back with its own picture at twice its size and the box to click in.",
+    "name": "browser_captcha",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "timeout_s": {
+          "default": 8.0,
+          "description": "How long to hold a Press & Hold button, or wait for the check to clear (default 8 s).",
+          "maximum": 30.0,
+          "minimum": 2.0,
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Close a tab you are done with, or without an index every tab of this chat but the current one.",
+    "name": "browser_close_tab",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "description": "Tab number from the tab list; leave it out for all others.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "The page's console messages and uncaught errors since it loaded, newest first: why a page does not work. Read only.",
+    "name": "browser_console",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "description": "Only messages of this level; 'error' includes the errors the page did not catch.",
+          "enum": [
+            "error",
+            "warning",
+            "info",
+            "log",
+            "debug"
+          ],
+          "type": "string"
+        },
+        "limit": {
+          "description": "Most messages listed (default 30).",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "On a sign-up form: Dot makes a strong password you never see, fills it in and keeps the login in the user's vault. Never make up a password yourself. Over https only (or this Mac). Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes.",
+    "name": "browser_create_login",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "confirm": {
+          "description": "The ref of the field that asks for the password again.",
+          "type": "string"
+        },
+        "password": {
+          "description": "The ref of the new account's password field.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "replace": {
+          "default": false,
+          "description": "Only when the vault holds a login of this account that a failed sign-up left: new password.",
+          "type": "boolean"
+        },
+        "username": {
+          "description": "The account's username or email, as you typed or will type it.",
+          "maxLength": 320,
+          "minLength": 1,
+          "type": "string"
+        },
+        "username_field": {
+          "description": "The ref of the username field, to fill it too.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "password",
+        "username"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the data behind the page, or do many like actions in one call. With refs, the script gets those elements: reach a control a click of browser_act did not move (el.click(), or the events it listens for), or give a CSS selector and let the script click the first element it matches in the same call. A thrown error fails the call. It is refused on a page that holds a password, code or card field, and in every tab of the chat while a tab a login was filled into is open; cookie values come back as [hidden].",
+    "name": "browser_eval",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "refs": {
+          "description": "Refs from the latest snapshot. The script must then be a function; it gets their elements as its arguments, in this order: (el) => el.click().",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        },
+        "script": {
+          "description": "An expression or a function; a promise is awaited. Return plain data, not DOM nodes.",
+          "maxLength": 100000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "selector": {
+          "description": "A CSS selector instead of a ref: the script must be a function, and it gets the first element the selector matches: `(el) => el.click()`. One call for the click a snapshot and browser_act would take three steps to reach.",
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Seconds to wait for the value (default 30); the script runs on after it.",
+          "maximum": 600.0,
+          "minimum": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "script"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read the page's records (results, rows, cards) at once as JSON by CSS selectors. Read only; a password, code or card field is never read.",
+    "name": "browser_extract",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Name -> CSS selector in the record, 'a@href' for an attribute, '' for the record itself.",
+          "maxProperties": 20,
+          "minProperties": 1,
+          "type": "object"
+        },
+        "limit": {
+          "description": "Most records (default 50).",
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "records": {
+          "description": "CSS selector of each record, e.g. 'li.result'; none: the page.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fields"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Fill a login of the owner's 1Password or of their own vault into the current page: give the login (browser_logins lists them) and the refs of its fields: the username's, the password field's, the one-time code's (1Password only). Dot reads the values and types them itself; you never see them. It fills a login only on its own website, a password only into a password field; a form that would send by GET (it names no method) is made to send by POST first. After a script ran in this chat it reopens the page in a clean tab first; then fill again with its refs. Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes.",
+    "name": "browser_fill_login",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "login": {
+          "description": "The login's id, or its title, as browser_logins lists it.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "otp": {
+          "description": "The ref of the field the one-time code goes into (a login of 1Password only).",
+          "type": "string"
+        },
+        "password": {
+          "description": "The ref of the password field.",
+          "type": "string"
+        },
+        "username": {
+          "description": "The ref of the field the username goes into.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "login"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Find elements anywhere on the page, also below the fold, by role or name (for example 'Add to cart' or 'textbox'). Matches come with refs you can use right away, even when they are outside the viewport.",
+    "name": "browser_find",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "description": "Maximum number of matches (default 10).",
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "text": {
+          "description": "Part of an element's role or accessible name, case-insensitive.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "List the links of the whole page with their full web addresses (the element list leaves addresses out). Use it to learn where a link goes, to copy a URL into your answer, or to open a page directly with browser_open instead of clicking.",
+    "name": "browser_links",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "description": "Maximum number of links (default 40).",
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "text": {
+          "description": "Keep only links whose text or address contains this.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "List the logins Dot may fill into a page with browser_fill_login, from the owner's 1Password and from their own vault (Settings › Vault): each one's id, title and websites, never a password. A vault login's password is in the Mac's Keychain, never in Dot's database (its fields are empty) or a file you can read: do not look for it there; browser_fill_login says when a login has none.",
+    "name": "browser_logins",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "site": {
+          "description": "Part of a site's address, to list its logins alone (for example github.com).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Open a page in a new tab and switch to it. The other tabs stay as they are.",
+    "name": "browser_new_tab",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "description": "Address to open in the current tab. A bare host such as example.com gets https://.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Open a web page in the current tab of a real Chrome and return what is on screen: a compact list of elements, each with a ref you can act on. Use it for any web task. Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes.",
+    "name": "browser_open",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "description": "Address to open in the current tab. A bare host such as example.com gets https://.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read the visible text of the page as plain text, in pages. Use it to read articles, results and long content that the element list shortens. The result says which offset to continue from.",
+    "name": "browser_read_text",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "max_chars": {
+          "description": "Characters to return.",
+          "maximum": 40000,
+          "minimum": 200,
+          "type": "integer"
+        },
+        "offset": {
+          "description": "Character to start at, to continue a long text.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ref": {
+          "description": "Read only this element's text; default is the whole page.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "The page's background calls (XHR, fetch), newest first; read one by number to get its JSON: often the data of a list or a search in one call. Read only; secrets are hidden.",
+    "name": "browser_requests",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "description": "Most calls listed (default 20).",
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "number": {
+          "description": "Read this call's answer instead of listing.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "description": "Keep calls whose address has this, e.g. '/api'.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Take a screenshot of the viewport. Use it when the element list does not tell enough: charts, canvases, maps, layout problems, images.",
+    "name": "browser_screenshot",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Scroll the page (or an inner scroll area) and return what came into view.",
+    "name": "browser_scroll",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "description": "Where to scroll.",
+          "enum": [
+            "down",
+            "up",
+            "top",
+            "bottom"
+          ],
+          "type": "string"
+        },
+        "pixels": {
+          "description": "Distance for down and up (default: 80% of the viewport).",
+          "maximum": 20000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ref": {
+          "description": "Scroll this element instead of the page, for inner scroll areas.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "direction"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Show the current tab again: every element in and around the viewport, with refs. It takes no arguments. Use it after you lost track of the page; actions already return what changed.",
+    "name": "browser_snapshot",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Make another tab the current one and show it. Tabs opened by a click appear in the tab list.",
+    "name": "browser_switch_tab",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "description": "Tab number as shown in the tab list, starting at 1.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Attach local files to an upload button or file input on the page, using its ref. Outside yolo runs only files in the workspace can be uploaded (the files the user attached to a message are there); when an upload of another file is refused, ask the user to attach it to a message.",
+    "name": "browser_upload",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "paths": {
+          "description": "Files to attach. Relative paths use the workspace.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "type": "array"
+        },
+        "ref": {
+          "description": "Ref of the upload button or file input.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "paths"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Size the current tab like a phone (width 390) to see the page's phone layout; no width: back to its size. Dot's own Chrome only.",
+    "name": "browser_viewport",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "description": "Page height (default 844, a phone's).",
+          "maximum": 3000,
+          "minimum": 200,
+          "type": "integer"
+        },
+        "width": {
+          "description": "Page width in CSS pixels, e.g. 390 for a phone; none: go back.",
+          "maximum": 3000,
+          "minimum": 200,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Wait until some text is visible on the page (slow loads, progress screens), then show what changed. When it does not appear in time, or the page stands still for 3 s after the first 5, the call fails and shows the page as it is.",
+    "name": "browser_wait_text",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "Text that should appear on the page.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "How long to wait (default 10).",
+          "maximum": 60.0,
+          "minimum": 0.5,
+          "type": "number"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "The events of the owner's calendar in an account they signed in (Google Calendar or Outlook) between two days or moments: when, what, where, who, and the owner's answer. Only reads.",
+    "name": "calendar_events",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "The address of an account the owner signed in, as your instructions list them.",
+          "maxLength": 320,
+          "minLength": 3,
+          "type": "string"
+        },
+        "end": {
+          "description": "Where it ends, not included: a day (2026-10-22 ends it with 21 October) or a moment.",
+          "maxLength": 40,
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "How many events at most.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "default": "",
+          "description": "Words the events must have, in their title, place or notes.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "start": {
+          "description": "Where the time starts: a day (2026-10-21) or a moment (2026-10-21T09:00), in the Mac's time zone unless it gives an offset.",
+          "maxLength": 40,
+          "type": "string"
+        }
+      },
+      "required": [
+        "account",
+        "start",
+        "end"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "List the chats of this Mac, or find one by its title.",
+    "name": "chats",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 15,
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "words": {
+          "default": "",
+          "description": "Words of its title; empty: the newest.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Run Python 3 in a sandbox: no network, no programs, no files but its scratch folder (its working folder, kept between code_runs). Use it for many tool calls, a lot of data, a loop or a poll: call the tools from the code, filter and count in Python, and print only what you need (a count and at most 5 rows, never the raw dump): only what the code prints reaches you, with the number of tool calls and the time.\nTools are functions, parameters as keywords: `from dot_tools.servers.dot import read_file` (Dot's own), `from dot_tools.servers.<server> import <tool>` (an MCP server's). A result is the JSON the tool said, as Python objects, else its text. `import dot_tools`: dot_tools.search_tools(\"words\", detail=\"name\"|\"description\"|\"schema\") finds tools, dot_tools.list_servers() says where they are, dot_tools.call(\"<name>\", ...) calls one by name.\nEvery call goes through the same approvals as if you made it: a refused call raises dot_tools.ToolRefused (do not try another way round), a failed one dot_tools.ToolError. Not callable: code_run, finish, ask_user, delegate, terminal_*, meeting_*, phone_*. timeout_s is the code's own time (time.sleep counts); 200 tool calls at most.",
+    "name": "code_run",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "description": "The Python source. Everything it prints (stdout and stderr) is what you read.",
+          "maxLength": 200000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Seconds the code itself may run, 120 when left out; the setting caps it.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "title": {
+          "description": "One line saying what the code is for.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "title"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Ask one of your helper models, other models the user set up for you, for advice: when you are stuck, unsure which way to go, or about to take a step that is hard to undo. It answers in text from what you send it and cannot act. A run may ask only a few times, so ask one clear question with what you tried.",
+    "name": "consult",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "default": [
+            "goal",
+            "plan",
+            "recent"
+          ],
+          "description": "What the helper is sent besides the question: goal (the user's task), plan (your plan), recent (this conversation; the middle of a long one is left out), screenshot (the newest screenshot, for a helper that can see images).",
+          "items": {
+            "enum": [
+              "goal",
+              "plan",
+              "recent",
+              "screenshot"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "model": {
+          "description": "One of the helper models named in your instructions; leave it out to ask the first that can answer.",
+          "type": "string"
+        },
+        "question": {
+          "description": "What you need advice on: the problem, what you tried and what happened, the choice you are unsure about. The helper sees nothing of this conversation but what include sends.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Make a lasting teammate: an agent with a name, a role, instructions and tools, listed under Agents. One job each, for a role the work needs again or in parallel, never for one step; send it work with message_agent.",
+    "name": "create_agent",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "agents_considered": {
+          "default": "",
+          "description": "With a team: the nearest agents, why none fits.",
+          "type": "string"
+        },
+        "instructions": {
+          "description": "How it works; they open the system prompt of its runs.",
+          "maxLength": 8000,
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "description": "A helper model (provider:model) for its runs; empty: the configured one.",
+          "type": "string"
+        },
+        "name": {
+          "description": "A short name.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "refuses": {
+          "description": "What it never does, a line each: the edges of its job.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "role": {
+          "description": "What it is for, in one line.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "tools": {
+          "description": "Tool names its role needs, of yours; only those.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "role",
+        "instructions"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Make a team of agents (the owner's, or ones you made) when the owner asks for a team.",
+    "name": "create_team",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "agents": {
+          "description": "Its agents' names.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 2,
+          "type": "array"
+        },
+        "name": {
+          "description": "The team's name.",
+          "maxLength": 60,
+          "minLength": 1,
+          "type": "string"
+        },
+        "purpose": {
+          "default": "",
+          "description": "What it is for.",
+          "maxLength": 500,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "agents"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Run one self-contained part of the work in a separate agent with a clean context and get its final report back. The run starts with your plan, the files you wrote, the newest result of each check you ran and the failures you hit or fixed, so it does not read the same files again; the goal carries the rest. Use it to keep your own context small when a part is bulky (reading many pages or files, a deep research question) and to do independent parts at the same time: call it several times in one turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) and its report closes that step, unless the part goes on in the background; a step the plan does not have runs all the same and closes nothing. Ask for a final `Verification:` section with the command or check and its answer; a report without one is marked as a claim.",
+    "name": "delegate",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "agents_considered": {
+          "default": "",
+          "description": "With a team: the nearest agents, why none fits.",
+          "type": "string"
+        },
+        "goal": {
+          "description": "A complete instruction for the delegated agent: what to do, every concrete input it needs (paths, URLs, values) and what its final answer must contain. Ask it to end with a `Verification:` section that gives the command or check it ran and the answer; it cannot see this conversation.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "model": {
+          "description": "One of the helper models named in your instructions, for a part that suits a stronger or a cheaper model; leave it out to use your own model.",
+          "type": "string"
+        },
+        "step": {
+          "description": "The plan step this part is: its report closes it, done, or failed when the run did not end done. A step the plan does not have (or no plan yet) runs all the same and closes nothing.",
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "wait": {
+          "default": true,
+          "description": "false: start it and go on, or end your turn; its report reaches this chat as a note when it ends. true: wait; if the owner writes meanwhile the wait ends and it keeps working, its report coming the same way.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "goal"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Operate a Mac application with real pointer and keyboard events, several steps per call. Prefer refs from the latest snapshot to coordinates. press activates a button, checkbox or menu item through accessibility without moving the pointer, and so does click on such a ref; a real click is click with the element's x and y (use it when press does nothing); focus puts the keyboard focus in a field; set_value replaces a field's whole value at once; type enters text key by key, a line break as Return and a tab as Tab (a long text without either is pasted, which is faster); paste is for long text; key sends a shortcut or key (cmd+s, return, escape, tab); menu chooses a menu bar item by its path; scroll moves an area (give it a ref); drag, double_click, right_click (its menu then appears in the snapshot), hover, wait, and activate (switch to another application). Batch the steps you can predict, such as filling a form and pressing its button. The result shows what each step did and how the window changed, and what Dot checked of it: the field read back after set_value, type and paste, and expect_text where you gave one. Done means the step was sent; verified means Dot saw its result; not checked means only that it was sent; uncertain means it was sent and its result was not seen, so look before sending it again. Passwords, codes and card numbers go into secure fields only as your instructions on secrets say: otherwise Dot refuses the step. While the owner is at the Mac, a step that moves the pointer or sends keys waits until they step away; press, focus, set_value and menu go at once, so prefer them. Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, and then you take a new snapshot.",
+    "name": "desktop_act",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "description": "Application name, bundle id or pid. Default: the application you are working in.",
+          "type": "string"
+        },
+        "steps": {
+          "description": "Steps run in order: every step you can predict without a new look at the window (a call with one step costs a model round trip for one click). The batch stops at the first failure or when the screen surprises you (a dialog, a different application); the remaining steps are then skipped. A batch holds a few dozen steps (25 by default); more are cut to the first ones, and the result says so. Put expect_text on the step whose result matters (the press that saves): Dot then looks for those words and reports verified or uncertain, where done alone says only that the step was sent. Example: [{\"action\": \"set_value\", \"ref\": \"a3\", \"text\": \"notes.md\"}, {\"action\": \"press\", \"ref\": \"a7\", \"expect_text\": \"Saved to notes.md\"}].",
+          "items": {
+            "additionalProperties": false,
+            "description": "One desktop step. Which fields apply depends on ``action``; the others must be left out.",
+            "properties": {
+              "action": {
+                "description": "click | double_click | right_click | hover | press (activate a button or menu item through accessibility, without moving the pointer) | focus (give a field the keyboard focus) | set_value (replace a field's whole value at once through accessibility, no key typed: an application may not take it as input, so a form it checks or saves wants type) | type (key by key into the focused field; a long text without a line break or a tab is pasted) | paste (via the clipboard, for long text) | key (a key or chord such as cmd+s or return) | scroll | drag | menu (choose a menu bar item by its path) | wait | activate (bring an application to the front).",
+                "enum": [
+                  "click",
+                  "double_click",
+                  "right_click",
+                  "hover",
+                  "press",
+                  "focus",
+                  "set_value",
+                  "type",
+                  "paste",
+                  "key",
+                  "scroll",
+                  "drag",
+                  "menu",
+                  "wait",
+                  "activate"
+                ],
+                "type": "string"
+              },
+              "amount": {
+                "description": "Scroll distance in pixels (default 400).",
+                "maximum": 20000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "direction": {
+                "description": "Which way scroll reveals more content.",
+                "enum": [
+                  "up",
+                  "down",
+                  "left",
+                  "right"
+                ],
+                "type": "string"
+              },
+              "expect_text": {
+                "description": "Exact words the window must show once this step is done and does not show before it: the name or the value of an element (the label that says Saved, the counter's new value), not text you type. Dot looks for them a few seconds and reports verified or uncertain; when they do not show, the steps after this one are not run.",
+                "maxLength": 80,
+                "minLength": 4,
+                "type": "string"
+              },
+              "key": {
+                "description": "Key or chord for key: cmd+c, cmd+shift+4, return, escape, tab, left, f5, ... (modifiers: cmd, shift, alt, ctrl, fn).",
+                "type": "string"
+              },
+              "modifiers": {
+                "description": "Keys held during a click, for example [\"cmd\"] to open a link in a new tab.",
+                "items": {
+                  "enum": [
+                    "cmd",
+                    "shift",
+                    "alt",
+                    "ctrl",
+                    "fn"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "path": {
+                "description": "Menu path for menu, as shown by desktop_snapshot with scope menu_bar: [\"File\", \"Save\"].",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "ref": {
+                "description": "Element ref from the latest snapshot, for example a12.",
+                "type": "string"
+              },
+              "seconds": {
+                "description": "Seconds to pause for wait.",
+                "maximum": 10,
+                "minimum": 0,
+                "type": "number"
+              },
+              "text": {
+                "description": "Text for type, paste and set_value, or the application (name, bundle id or pid) for activate.",
+                "type": "string"
+              },
+              "to_ref": {
+                "description": "Where drag ends: an element ref.",
+                "type": "string"
+              },
+              "to_x": {
+                "description": "Where drag ends: screen x, instead of to_ref.",
+                "type": "number"
+              },
+              "to_y": {
+                "description": "Where drag ends: screen y, instead of to_ref.",
+                "type": "number"
+              },
+              "x": {
+                "description": "Screen x in the units of desktop_screenshot, instead of a ref.",
+                "type": "number"
+              },
+              "y": {
+                "description": "Screen y in the units of desktop_screenshot, instead of a ref.",
+                "type": "number"
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "List the applications that are open on this Mac with their windows (* marks the one with the keyboard focus). Use it to see what is running before you open or switch to something.",
+    "name": "desktop_apps",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read the text on the clipboard. It can hold anything the user copied, passwords included, so use it only when the task is about what they copied; the user is asked first.",
+    "name": "desktop_clipboard_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Replace the clipboard text. It overwrites what the user copied, so use it to hand text to a paste, not as a scratch pad. To enter text into a field, use the paste or type step of desktop_act.",
+    "name": "desktop_clipboard_write",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "The text to put on the clipboard; it replaces what is there.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Open a Mac application (or bring it to the front) and return its window as a list of elements with refs. It becomes the application the next desktop_* calls work in. Start every task in a Mac app with it. Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, and then you take a new snapshot.",
+    "name": "desktop_open_app",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "description": "Application name, bundle id or pid, for example Notes or com.apple.Notes.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "app"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read the full text of one element, such as a document, a text area or a long label that the snapshot shortened. Long text comes in pieces: continue with the offset the result names.",
+    "name": "desktop_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "description": "Application name, bundle id or pid. Default: the application you are working in.",
+          "type": "string"
+        },
+        "max_chars": {
+          "description": "How many characters (default 6000).",
+          "maximum": 20000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "First character to return.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ref": {
+          "description": "Element to read, from the latest snapshot.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Take a screenshot of the main display, or zoom into a region (x, y, width, height) for fine detail. Use it when the element list is not enough: canvases, games, images, custom-drawn controls, or to check how things look. Coordinates in the image are the x and y that desktop_act accepts; the text on it is listed with the x and y of each line. Windows of password managers are blacked out, and Dot's own while the owner's vault shows a secret.",
+    "name": "desktop_screenshot",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "height": {
+          "description": "Height of the region.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "width": {
+          "description": "Width of the region.",
+          "minimum": 0,
+          "type": "number"
+        },
+        "x": {
+          "description": "Left edge of a region to zoom into, in screenshot coordinates.",
+          "type": "number"
+        },
+        "y": {
+          "description": "Top edge of the region.",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read an application's window as a list of accessibility elements: role, name, value, state and screen position, each with a ref you can act on. A repeated view lists only what changed since the last one (pass full to see everything). ref zooms into one element's subtree, query finds elements anywhere in the application, scope menu_bar lists the menu bar for the menu step. Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, and then you take a new snapshot.",
+    "name": "desktop_snapshot",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "app": {
+          "description": "Application name, bundle id or pid. Default: the application you are working in.",
+          "type": "string"
+        },
+        "full": {
+          "default": false,
+          "description": "Show the whole view even when only a little changed since the last.",
+          "type": "boolean"
+        },
+        "query": {
+          "description": "Search the whole application for elements whose role, name or value contains this text.",
+          "type": "string"
+        },
+        "ref": {
+          "description": "Show only the subtree of this element.",
+          "type": "string"
+        },
+        "scope": {
+          "default": "window",
+          "description": "window: the front window · all_windows: every window of the app · menu_bar: its menu bar items.",
+          "enum": [
+            "window",
+            "all_windows",
+            "menu_bar"
+          ],
+          "type": "string"
+        },
+        "skeleton": {
+          "default": false,
+          "description": "A dense window's map: its regions with how much each holds; then read one with its ref.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Draft an email or an iMessage for the owner: a card in the conversation, which they edit and send or discard. Use it whenever you would send one on their behalf, unless they told you to send it yourself.",
+    "name": "draft_message",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "description": "The final text, in the owner's voice, no placeholders.",
+          "maxLength": 20000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "cc": {
+          "description": "Mail only.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "type": "array"
+        },
+        "channel": {
+          "description": "mail: an email; message: an iMessage.",
+          "enum": [
+            "mail",
+            "message"
+          ],
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "description": "Mail only.",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "to": {
+          "description": "Email addresses; for a message, phone numbers with the country code work too.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "channel",
+        "to",
+        "body"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Replace exact text in a file. Fails if the text is missing or ambiguous, so copy it verbatim. The change goes into the undo journal: it shows in Changes and can be undone.",
+    "name": "edit_file",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "new": {
+          "description": "Replacement text.",
+          "type": "string"
+        },
+        "old": {
+          "description": "Exact text to replace, including whitespace. Must be unique unless replace_all.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "description": "File to edit.",
+          "type": "string"
+        },
+        "replace_all": {
+          "default": false,
+          "description": "Replace every occurrence instead of requiring uniqueness.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "old",
+        "new"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Find files by glob pattern (respects .gitignore).",
+    "name": "find_files",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "glob": {
+          "description": "Glob such as '**/*.py' or '*.md'.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Directory to search. Defaults to the workspace.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "glob"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Find what this Mac already offers for a need before you take a hard way: the skills installed here, the tools of the MCP servers and the applications that AppleScript can drive, by their own dictionaries, and what other agents set up for the owner to add. It returns the best matches, each with how to use it, and changes nothing.",
+    "name": "find_help",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "need": {
+          "description": "What you need to do, in a few plain English words: \"add an event to a calendar\".",
+          "maxLength": 300,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "need"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "End the run and hand the user your final answer. Call it exactly once, when the goal is achieved and verified, or when it is impossible or blocked and the answer says why. Nothing happens after this call.",
+    "name": "finish",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "description": "Your complete final message, exactly as the user will read it, in the user's language and in markdown. It holds the result itself: the findings, the figures or the text that was asked for, with concrete paths, values and links to the sources, and what failed or could not be verified. It is all the user sees of the work, so never write about a result without including it, and do not write it a second time as plain text before the call.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "needs_from_user": {
+          "description": "What you could not do without the user: exactly what they need to give, decide or do, shown to them under the answer. Leave it out when nothing is needed.",
+          "type": "string"
+        },
+        "nothing_new": {
+          "default": false,
+          "description": "A scheduled run that found nothing new since its last: true, and its end is not pushed.",
+          "type": "boolean"
+        },
+        "success": {
+          "description": "True only if the goal was fully achieved and you verified the result.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "answer",
+        "success"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Have a small typed model answer one question about every item of a list in one call, and get the items back ranked: without levels each gets the probability of yes to a yes/no question; with 2 to 10 ordered levels each gets its expected level. Use it to filter or order search hits, posts, links, files or playbooks before reading them, instead of weighing each in your own words; the decision stays yours.",
+    "name": "judge_items",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "description": "The items to judge, each with an id.",
+          "items": {
+            "additionalProperties": false,
+            "description": "One candidate: an id the ranking gives back and the text to judge.",
+            "properties": {
+              "id": {
+                "description": "Letters, digits, - and _ only; the ranking names the item by it.",
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "type": "string"
+              },
+              "text": {
+                "description": "What there is to judge: a title and a snippet, a post, a link with its context, a file's head.",
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "text"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "type": "array"
+        },
+        "levels": {
+          "description": "Leave empty for a yes/no question. Else 2 to 10 ordered levels, the lowest first, each describing a concrete situation on its own (\"unrelated\", \"mentions the topic in passing\", \"about the topic\").",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "type": "array"
+        },
+        "question": {
+          "description": "One question about an item, complete in itself. Without levels a yes/no question (\"Is this post about Python packaging, written by a person?\"); with levels a question of degree (\"How relevant is this hit to the search for …?\").",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "items"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "List a directory (directories first). Use depth for a shallow tree.",
+    "name": "list_dir",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "description": "How many levels to descend (default 1).",
+          "maximum": 4,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Directory to list.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read one message of the owner's mail whole, by the id mail_search gave: its people, date, text and the files it carries. Only reads: it is not marked read.",
+    "name": "mail_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "The address of an account the owner signed in, as your instructions list them.",
+          "maxLength": 320,
+          "minLength": 3,
+          "type": "string"
+        },
+        "message_id": {
+          "description": "The id mail_search gave the message.",
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "account",
+        "message_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Search the owner's mail in an account they signed in (Gmail or Outlook): who wrote, to whom, when, the subject and the first words of each message. Only reads.",
+    "name": "mail_search",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "The address of an account the owner signed in, as your instructions list them.",
+          "maxLength": 320,
+          "minLength": 3,
+          "type": "string"
+        },
+        "limit": {
+          "default": 10,
+          "description": "How many messages at most.",
+          "maximum": 25,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "default": "",
+          "description": "Gmail: what Gmail's search box takes, such as from:ada is:unread newer_than:7d subject:invoice has:attachment. Outlook: words, or from:, subject:, received>=2026-10-01. Empty: the newest messages of the inbox.",
+          "maxLength": 500,
+          "type": "string"
+        }
+      },
+      "required": [
+        "account"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Mark one step of your plan as in_progress, done, failed or skipped. Call it the moment a step changes, in the same reply as your next action, so the plan the user watches matches the work. Marking a step done needs evidence: what you observed that shows it; a mark without it is refused.",
+    "name": "mark_plan_step",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "default": "",
+          "description": "What you observed that shows the step done: the tool result, quoted or named (the path and what you read back, the count or the line of output, what the page or the window showed), in at most 400 characters (a longer one is cut). Required for done; for failed or skipped, what happened or why it is no longer needed.",
+          "type": "string"
+        },
+        "status": {
+          "description": "The new state of that step.",
+          "enum": [
+            "pending",
+            "in_progress",
+            "done",
+            "failed",
+            "skipped"
+          ],
+          "type": "string"
+        },
+        "step": {
+          "description": "The number of the step in the plan, starting at 1.",
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "step",
+        "status"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Join the owner's Google Meet call at the address they gave, as Dot, camera and microphone off: it takes notes and answers who asks it. Only when the owner asks.",
+    "name": "meeting_join",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "description": "The Google Meet address the owner gave (https://meet.google.com/abc-defg-hij).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Leave the meeting Dot is in; its notes come to this chat.",
+    "name": "meeting_leave",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Post one line (500 characters at most) in the meeting's chat. The owner is asked first, with the words whole, every time.",
+    "name": "meeting_post",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "description": "One line, 500 characters at most. The owner is asked first.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "The notes and newest lines of the meeting joined in this chat: other people's words.",
+    "name": "meeting_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "default": 50,
+          "description": "How many of the newest lines to give.",
+          "maximum": 200,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Forget a saved note by its id, for example because it is outdated or wrong. It is no longer recalled or found: it goes to the owner's trash, where it waits some days and the owner can restore it (you cannot). For a fact that changed, save the new one under the old note's subject (forget it if it has none).",
+    "name": "memory_forget",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "memory_id": {
+          "description": "The id of the note as shown in brackets, for example mem_1a2b3c4d5e.",
+          "minLength": 4,
+          "type": "string"
+        }
+      },
+      "required": [
+        "memory_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, a convention that will apply again. One fact per call. Do not save secrets (one that holds a key is refused: record where the key lives), progress on the current task, or what is easy to look up again. A note holds at most 600 characters; a longer one is refused, so split it into single facts.",
+    "name": "memory_save",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "description": "One fact, preference or correction as a complete sentence that makes sense on its own, naming who or what it is about (for example: 'The user prefers answers in Turkish.').",
+          "minLength": 3,
+          "type": "string"
+        },
+        "subject": {
+          "description": "A short name for the fact's slot when it has one current value, like 'user-city'; a newer note with the same subject replaces the older. Omit for facts that add up.",
+          "maxLength": 60,
+          "type": "string"
+        },
+        "tags": {
+          "description": "Optional short topic words. 'core' asks that the note be handed to every run, for a standing rule every run must know; it is handed so once the owner pins it, and until then when it fits, as any note.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 6,
+          "type": "array"
+        },
+        "valid_days": {
+          "description": "Days a short-lived fact stays true (a trip, a deadline, an offer); none for a lasting one.",
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Search the notes you saved in earlier runs, by words or by meaning. The notes related to the goal are already under the message that recalled them; use this to look for older ones or to check before saving.",
+    "name": "memory_search",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "default": 8,
+          "description": "How many notes to return at most.",
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "What to look for: words, a name or a description of the topic.",
+          "maxLength": 400,
+          "minLength": 2,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Rewrite a saved note whose fact has changed or was wrong, keeping its id. Prefer it over forgetting and saving again. A note holds at most 600 characters; a longer one is refused, so split it into single facts.",
+    "name": "memory_update",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "description": "The corrected note: one fact as a complete sentence that names who or what it is about.",
+          "maxLength": 1000,
+          "minLength": 3,
+          "type": "string"
+        },
+        "memory_id": {
+          "description": "The id of the note as shown in brackets, for example mem_1a2b3c4d5e.",
+          "minLength": 4,
+          "type": "string"
+        },
+        "tags": {
+          "description": "The note's tags after the change (pass its current tags to keep them).",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 6,
+          "type": "array"
+        },
+        "valid_days": {
+          "description": "Days it stays true from now; none keeps its time.",
+          "maximum": 3650,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "memory_id",
+        "content",
+        "tags"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Send a message to an agent of the team and get its reply. It works in a run of its own with its own instructions and tools, cannot see this conversation and answers once: send everything it needs. Use it when a part fits an agent's role better than yours.",
+    "name": "message_agent",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "description": "The agent's name, as the team is listed.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "message": {
+          "description": "What you ask, every input it needs (paths, URLs, values) and what its reply must contain.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Show a macOS notification to the user, e.g. when a long task needs attention.",
+    "name": "notify",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "description": "Notification text.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Short notification title.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Write down something the owner wants moved forward over time (a goal, not a task): what they asked for or plainly want, never what a page says. For continuing work also say how it is done, taken from the owner's words and two or three of their real cases; ask only for a part none shows.",
+    "name": "objective_add",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "description": "What shows a step done.",
+          "maxLength": 600,
+          "type": "string"
+        },
+        "exceptions": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "measure": {
+          "description": "How progress is judged.",
+          "maxLength": 300,
+          "minLength": 3,
+          "type": "string"
+        },
+        "next_step": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "record": {
+          "description": "The workspace file of its items, kept with pipeline_*.",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "rules": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "sources": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 120,
+          "minLength": 3,
+          "type": "string"
+        },
+        "why": {
+          "description": "Why it matters to the owner.",
+          "maxLength": 400,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "why",
+        "measure"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Add a dated line of progress to an objective; mark it done when met, dropped when let go; set how its work is done or its next step (an empty text clears a part).",
+    "name": "objective_update",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "description": "What shows a step done.",
+          "maxLength": 600,
+          "type": "string"
+        },
+        "exceptions": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "next_step": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "objective": {
+          "description": "Its id or title.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "progress": {
+          "description": "A line of progress to add.",
+          "maxLength": 400,
+          "type": "string"
+        },
+        "record": {
+          "description": "The workspace file of its items, kept with pipeline_*.",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "rules": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "sources": {
+          "maxLength": 600,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "done",
+            "dropped"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "objective"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "The owner's objectives, with their newest lines of progress.",
+    "name": "objectives",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "done",
+            "dropped"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Hand a reply to a mail Dot sent to the chat that sent it, where that work goes on.",
+    "name": "pass_reply",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "sender": {
+          "description": "The reply's From address.",
+          "maxLength": 254,
+          "minLength": 3,
+          "type": "string"
+        },
+        "what": {
+          "description": "Where the reply is and what it asks.",
+          "maxLength": 1500,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "sender",
+        "what"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Write down a mail or message to a client right before you send it; never send one without it. Refused if it was sent, or its last try's result is unseen.",
+    "name": "pipeline_begin",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "description": "Same on every try: first-mail, reminder-1.",
+          "maxLength": 48,
+          "minLength": 1,
+          "type": "string"
+        },
+        "client": {
+          "maxLength": 48,
+          "minLength": 1,
+          "type": "string"
+        },
+        "record": {
+          "description": "The record file in the workspace.",
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "variant": {
+          "default": "",
+          "description": "The way of doing it, to compare ways.",
+          "maxLength": 60,
+          "type": "string"
+        }
+      },
+      "required": [
+        "record",
+        "client",
+        "action"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Add or change a client in the ledger; do-not-contact and paused only on the owner's word.",
+    "name": "pipeline_client",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "client": {
+          "description": "Id: a-z, 0-9, hyphens.",
+          "maxLength": 48,
+          "minLength": 1,
+          "type": "string"
+        },
+        "contact": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "expecting": {
+          "maxLength": 400,
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 120,
+          "type": "string"
+        },
+        "next_at": {
+          "description": "2026-11-21 or 2026-11-21 09:00",
+          "maxLength": 32,
+          "type": "string"
+        },
+        "next_step": {
+          "maxLength": 400,
+          "type": "string"
+        },
+        "record": {
+          "description": "The record file in the workspace.",
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "description": "new contacted waiting replied meeting proposal won lost paused do-not-contact",
+          "maxLength": 20,
+          "type": "string"
+        }
+      },
+      "required": [
+        "record",
+        "client"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Say what came of an action you began, with what showed it.",
+    "name": "pipeline_end",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "description": "When it went out, as the evidence dates it, if not just now.",
+          "maxLength": 32,
+          "type": "string"
+        },
+        "evidence": {
+          "description": "What showed it, with its time.",
+          "maxLength": 400,
+          "minLength": 3,
+          "type": "string"
+        },
+        "key": {
+          "description": "<client>/<action>",
+          "maxLength": 100,
+          "minLength": 3,
+          "type": "string"
+        },
+        "record": {
+          "description": "The record file in the workspace.",
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "result": {
+          "description": "What you saw; uncertain when you could not tell, never failed then.",
+          "enum": [
+            "sent",
+            "failed",
+            "uncertain"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "record",
+        "key",
+        "result",
+        "evidence"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Keep what a client did (a reply, a deal, a no), dated and sourced; never what you did not see.",
+    "name": "pipeline_outcome",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "description": "As the source dates it.",
+          "maxLength": 32,
+          "minLength": 10,
+          "type": "string"
+        },
+        "client": {
+          "maxLength": 48,
+          "minLength": 1,
+          "type": "string"
+        },
+        "outcome": {
+          "description": "reply meeting proposal won lost declined bounced unsubscribed",
+          "maxLength": 20,
+          "minLength": 1,
+          "type": "string"
+        },
+        "record": {
+          "description": "The record file in the workspace.",
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "description": "Where you saw it.",
+          "maxLength": 400,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "record",
+        "client",
+        "outcome",
+        "at",
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read a continuing work's ledger in its record: unsettled actions first, then each client, then how each way did. Read it before acting for a client.",
+    "name": "pipeline_view",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "client": {
+          "description": "One client's id, for its history.",
+          "maxLength": 48,
+          "type": "string"
+        },
+        "record": {
+          "description": "The record file in the workspace.",
+          "maxLength": 300,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "record"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "React to the user's latest message: 👍 done or under way, nothing more to say; 👀 starting something long. Once a run, never instead of an answer.",
+    "name": "react",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "reaction": {
+          "enum": [
+            "👍",
+            "👀"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "reaction"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read an agent's newest chat, or one run's, and what it does now, before you help it.",
+    "name": "read_agent_chat",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "description": "Its name, or \"Dot\".",
+          "minLength": 1,
+          "type": "string"
+        },
+        "messages": {
+          "default": 20,
+          "description": "How many newest messages.",
+          "maximum": 40,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "run": {
+          "description": "One of its runs, to read that run's chat, not its newest.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read a chat's newest messages and what it does now.",
+    "name": "read_chat",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "chat": {
+          "description": "Its id, from chats.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "messages": {
+          "default": 20,
+          "maximum": 40,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chat"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read a text file with line numbers (also images, PDFs and Word, Excel and PowerPoint files). Use offset/limit for large files.",
+    "name": "read_file",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "description": "Maximum number of lines to return.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "description": "First line to return (1-based).",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "description": "File to read. Relative paths resolve against the workspace.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read back a record of Dot's by its id, with the ids next to it.",
+    "name": "recall",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "An id of Dot's: run_, thr_ (a chat), todo_, wo_ (work order), sch_, apr_ or obj_.",
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^[a-z]+_[a-z0-9]+_[a-z0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Look at a site or a host the way a security engineer starts: its addresses, its TLS certificate, its HTTP answer and headers, and the technology it names, with what its owner should fix. With depth `ports` on a host you own or a registered scope allows (see `dotx scope check`), which ports answer and what their services say. It only reads: it sends no payload and tries no exploit.",
+    "name": "recon",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "default": "passive",
+          "description": "`passive` reads the addresses, the TLS certificate, the HTTP answer and its headers, as a browser's visit does. `ports` also asks which common ports answer, and reads their banners: only on a host you own or that a registered scope allows — `dotx scope add` writes a program's scope in one command, and `dotx scope check <host>` says who covers a host.",
+          "enum": [
+            "passive",
+            "ports"
+          ],
+          "type": "string"
+        },
+        "target": {
+          "description": "The site or host to look at: a domain (`example.com`), an address, or a URL whose path is kept.",
+          "maxLength": 300,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Judge a work order that came back: accept it on its Verification, return it with notes (after two attempts with brief; the third goes to the owner), reassign, escalate to the owner, or cancel it.",
+    "name": "review_work",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "brief": {
+          "default": "",
+          "description": "Its brief rewritten, once it came back twice: the next attempt starts afresh on it.",
+          "maxLength": 6000,
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "description": "Why; for a return, what to fix: the agent cannot see this chat.",
+          "maxLength": 3000,
+          "type": "string"
+        },
+        "order": {
+          "description": "The work order's id.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "to_agent": {
+          "description": "For reassign: who takes over.",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "accept",
+            "return",
+            "reassign",
+            "escalate",
+            "cancel"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "order",
+        "verdict"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Run a goal later, once or repeatedly, without the user being present. Use it when the user asks for something to happen at a time or on a rhythm ('every weekday at 9', 'tomorrow at 18:30'). Times are the Mac's local time. Each run goes on in this chat with this chat's settings. Check schedule_list first so you do not create a duplicate.",
+    "name": "schedule_create",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "description": "For a single run: the local date and time, for example '2026-10-06T09:30'. Give cron or at.",
+          "type": "string"
+        },
+        "cron": {
+          "description": "For a recurring schedule: five fields (minute hour day-of-month month day-of-week) in this Mac's local time, for example '0 9 * * 1-5' for 09:00 on weekdays. A schedule may not repeat more often than every 5 minutes by default.",
+          "type": "string"
+        },
+        "goal": {
+          "description": "The complete task for the future run. It goes on in this chat, with this chat's model, reasoning level, speed, approvals and goal mode, without anyone watching, so it must say everything it needs: what to do, where to look, how to report.",
+          "maxLength": 4000,
+          "minLength": 10,
+          "type": "string"
+        },
+        "mode": {
+          "description": "task may act on the Mac and the web; research only reads and reports. Leave it out to keep this chat's.",
+          "enum": [
+            "task",
+            "research"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "description": "A short label, for example 'Weekday news digest'.",
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "goal"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Delete a schedule by its id, for example because it is no longer wanted or to replace it.",
+    "name": "schedule_delete",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "schedule_id": {
+          "description": "The id as shown by schedule_list, for example sch_1a2b3c4d5e.",
+          "minLength": 4,
+          "type": "string"
+        }
+      },
+      "required": [
+        "schedule_id"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "List the schedules: what runs when, what is next and how the last run went.",
+    "name": "schedule_list",
+    "parameters": {
+      "additionalProperties": false,
+      "description": "No arguments.",
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Search what was said in every chat of this Mac and every run's answer (no model): find words, then around a hit or read a run.",
+    "name": "search_chats",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "chat": {
+          "default": "",
+          "description": "around: the chat id of a hit.",
+          "type": "string"
+        },
+        "mode": {
+          "description": "find: words to hit; around: messages by a hit; read: a run by id.",
+          "enum": [
+            "find",
+            "around",
+            "read"
+          ],
+          "type": "string"
+        },
+        "query": {
+          "default": "",
+          "description": "find: the words.",
+          "maxLength": 300,
+          "type": "string"
+        },
+        "run": {
+          "default": "",
+          "description": "read: the run id.",
+          "type": "string"
+        },
+        "seq": {
+          "default": -1,
+          "description": "around: the place of a hit.",
+          "minimum": -1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Search file contents with ripgrep (regex). Returns path:line:text.",
+    "name": "search_files",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "glob": {
+          "description": "Only search files matching this glob, e.g. '*.py'.",
+          "type": "string"
+        },
+        "ignore_case": {
+          "default": false,
+          "description": "Case-insensitive match.",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Directory or file to search. Defaults to the workspace.",
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Regular expression to search for in file contents.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Test the forms of a page you may test for SQL injection, reflected XSS, a login bypass and default credentials. Only a host you own or that a registered bug bounty scope allows is touched — `dotx scope add` writes a program's scope in one command — the payloads are read-only, and every form action must stay on that host. `depth = \"forms\"` lists the forms without sending anything.",
+    "name": "security_scan",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "default": "payloads",
+          "description": "`forms` lists the forms and their fields without sending a payload; `payloads` tries SQL injection, reflected XSS, a login bypass and default credentials on every field it can.",
+          "enum": [
+            "forms",
+            "payloads"
+          ],
+          "type": "string"
+        },
+        "max_attempts": {
+          "default": 40,
+          "description": "The most form submissions the test sends; each one waits for the answer before the next.",
+          "maximum": 120,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "target": {
+          "description": "The page with the forms, on a host you own or a registered scope allows (`dotx scope check`): a URL (`https://example.com/login`) or a bare domain.",
+          "maxLength": 300,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Send a note to the run at work in another chat (from chats); it starts no work.",
+    "name": "send_to_chat",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "chat": {
+          "description": "Its id, from chats.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "message": {
+          "description": "What its run at work should know.",
+          "maxLength": 2000,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "chat",
+        "message"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Run a shell command on the user's Mac (zsh, non-interactive, no stdin). Prefer it to the GUI whenever a command can do the job: tests, builds, git, formatters, one mechanical change across many files, a file edit_file cannot change (not UTF-8). To change the text of a file use edit_file, and write_file for a new file or one written whole: their changes go into the undo journal, show in Changes and can be undone, while what a command writes (sed -i, a heredoc, a script) cannot. Output is capped: filter with grep/head/tail/jq. Start long-running servers in the background (nohup cmd > log 2>&1 &); wait with wait_until (command, url or file; every_s, within_minutes), not sleep. A command that ends by itself but takes minutes (an eval, a long build or install) goes to terminal_open with background when it would run past timeout_s, or when there is other work to do meanwhile: this chat is told when it ends, and you read its output then. Outside yolo, while the owner keeps the sandbox on, the command runs in a macOS sandbox that keeps it out of Dot's own files, and macOS starts no program that runs as root there (ps, top, sudo): use pgrep -lf and lsof instead of ps. Nor does it open an app, a file or an address (open), start launchctl or shortcuts, or hand launchd a job: desktop_open_app opens an app. Restart Dot's daemon with dotx service restart --when-idle (where it cannot run, tell the user), never with a launchd job of your own.",
+    "name": "shell",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "Command line, executed by zsh. Chain steps with && and use absolute paths.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "Working directory. Defaults to the workspace.",
+          "type": "string"
+        },
+        "timeout_s": {
+          "description": "Seconds before the command is killed.",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Show the user a page you write in HTML, in the conversation where they read you: a chart, a table, a diagram, a 3D view, a mockup or anything that says more drawn than written. Show a document (a CV) as its text, not a picture: zoomed, text stays sharp. It is part of your answer: no title over it and no box round it, on the conversation's own ground, as wide as the conversation (about 360px on a phone) and as tall as the page; the user can open it full screen. Give it a quiet heading of its own if it needs one, not a banner; leave html, body and the outermost element without a background, a border or side padding, and give a box that needs its own ground 16px of padding and var(--radius) corners. Keep its top right corner (about 72 by 40 pixels) free of controls: Full screen and Open sit there, always on a phone. Write a whole document or only its body. Its scripts run but fetch nothing except the libraries they load from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh: put the data in the page itself. Pictures, sounds and videos load only written in: name a workspace file by its relative path or write a data: address; a web address is refused. Give charts and 3D views a height in pixels: a height in vh follows the frame, which grows with the page, so the page grows again (clamp one between pixels if you must). Take the look of the user's theme, light or dark, from the CSS variables --background, --foreground, --muted, --muted-foreground, --card, --border, --accent, --accent-foreground, --destructive, --warning, --success, --chart-1, --chart-2, --chart-3, --chart-4, --chart-5, --chart-6, --radius, --font-sans, --font-mono. To let the user choose, give each option an element with data-answer=\"Option B\": a tap writes those words into their message box, for them to send. Make it live: animate its entrance, show values on hover, let a table sort and a chart toggle its series, and keep still under prefers-reduced-motion. Libraries that fit, in a pinned version: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of your own, three.js for 3D. A page you made in the workspace (.htm, .html, .svg, .xhtml) is shown by its path instead of html. The workspace's files a page names by a relative path (style sheets, scripts, pictures, fonts) are written in; a frame, an object or an embed loads nothing, and neither does what a script loads by itself. The answer gives the page's address: open it with your browser at a phone's width and the conversation's to see what you showed, and show it again if something is cut, crowded or unreadable.",
+    "name": "show_page",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "html": {
+          "description": "The page in HTML.",
+          "maxLength": 500000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "description": "Instead of html, a page you made in the workspace. Relative paths resolve against the workspace.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "description": "A few words that name the page.",
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read an installed skill before working on a task that matches one listed under Skills in your instructions or under a message. It returns the skill's instructions and the files that come with it (scripts to run with the shell, references to read, assets to use). Then follow the instructions.",
+    "name": "skill",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "The name of the skill, exactly as listed under Skills in your instructions, under a message, or by find_help.",
+          "type": "string"
+        },
+        "start": {
+          "description": "Where to go on in instructions too long for one result: the start the result before named.",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Save how the owner told you to do a kind of work as a skill later runs follow. Their steps.",
+    "name": "skill_save",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "description": "What, where, for which goals.",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "description": "As a later goal names it.",
+          "maxLength": 60,
+          "minLength": 3,
+          "type": "string"
+        },
+        "replace": {
+          "description": "A skill saved so, to rewrite.",
+          "type": "string"
+        },
+        "steps": {
+          "description": "Their steps in order; changing values as <name>.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "description",
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "End the program of a terminal session and everything it started. Close what you no longer need.",
+    "name": "terminal_close",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "description": "The session terminal_open named, such as t1.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Start a program on a terminal of its own and keep it running: one that asks questions (an installer, npm create, ssh), a REPL (python3 -i, psql, node), or a server that must stay up while you work. Returns the session name and its first output. For a command that just runs to its end use shell. For one that runs longer than shell may wait, set background. No terminal emulator runs: full-screen programs such as vim or htop show as garbled text.",
+    "name": "terminal_open",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "background": {
+          "default": false,
+          "description": "True for a command that runs long and ends by itself (an eval, a long build or download): it runs past shell's time limit and is not closed for being left unread, and when it ends this chat is told: you at your next step, or, when no run works on the chat, in a new run. You need not poll it. Not for a program you type into, nor a server.",
+          "type": "boolean"
+        },
+        "command": {
+          "description": "The command line, run by zsh on a terminal of its own: python3 -i, npm create vite",
+          "minLength": 1,
+          "type": "string"
+        },
+        "cwd": {
+          "description": "Working directory. Defaults to the workspace.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "What a terminal session printed since the last read, waiting up to wait_s for something new: a server's log, the end of a long install.",
+    "name": "terminal_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "description": "The session terminal_open named, such as t1.",
+          "type": "string"
+        },
+        "wait_s": {
+          "default": 10.0,
+          "description": "Seconds to wait for new output.",
+          "maximum": 60.0,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Type into a terminal session and return what the program printed back. End a line with \\n to press Enter. At a password prompt every mode but yolo leaves the step to the user; yolo types one line (item 443).",
+    "name": "terminal_send",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "session": {
+          "description": "The session terminal_open named, such as t1.",
+          "type": "string"
+        },
+        "text": {
+          "description": "What to type. A line end (\\n) presses Enter; text without one waits on the line.",
+          "maxLength": 10000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "wait_s": {
+          "default": 2.0,
+          "description": "Seconds to wait for the program's answer.",
+          "maximum": 60.0,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "session",
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "When the owner explicitly asks to change Dot's appearance, compose any look as light and dark sRGB palettes, respecting their request, then apply it. All ink colors must contrast at least 4.5:1 with every ground. Keep the existing roles when the user requests a refinement. Use artwork quiet-forest for the bundled forest, or custom with an image_path in the workspace. Null restores device appearance. Quiet Forest is one example; use any suitable palette.",
+    "name": "theme_apply",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "image_path": {
+          "description": "Optional raster image in this chat's workspace. Omit it to reuse existing custom artwork.",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "theme": {
+          "additionalProperties": false,
+          "description": "Both palettes for the requested appearance, or null to clear it.",
+          "properties": {
+            "artwork": {
+              "enum": [
+                "quiet-forest",
+                "custom"
+              ],
+              "type": "string"
+            },
+            "dark": {
+              "additionalProperties": false,
+              "description": "sRGB colors that have the same meaning in SwiftUI and CSS.",
+              "properties": {
+                "accent": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "canvas": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "muted": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "raised": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "surface": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "text": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "canvas",
+                "surface",
+                "raised",
+                "text",
+                "muted",
+                "accent"
+              ],
+              "type": "object"
+            },
+            "light": {
+              "additionalProperties": false,
+              "description": "sRGB colors that have the same meaning in SwiftUI and CSS.",
+              "properties": {
+                "accent": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "canvas": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "muted": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "raised": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "surface": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                },
+                "text": {
+                  "pattern": "^#[a-fA-F0-9]{6}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "canvas",
+                "surface",
+                "raised",
+                "text",
+                "muted",
+                "accent"
+              ],
+              "type": "object"
+            },
+            "name": {
+              "maxLength": 48,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "light",
+            "dark",
+            "artwork"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "revision",
+        "theme"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read Dot's live shared appearance and revision. Read it before applying or undoing a change.",
+    "name": "theme_read",
+    "parameters": {
+      "additionalProperties": false,
+      "description": "Read the active theme revision.",
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "description": "Restore the appearance before the last change when the owner asks.",
+    "name": "theme_undo",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "revision": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Put on your own list work you can do later for the owner, alone, while the Mac is idle: what they asked for later, a follow-up, a chore you noticed. Not this run's work, nor what needs their decision.",
+    "name": "todo_add",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "again_because": {
+          "description": "Only when todo_add said it is like a thing done lately: what is new since.",
+          "maxLength": 600,
+          "type": "string"
+        },
+        "title": {
+          "description": "The work, as an instruction you can do alone.",
+          "maxLength": 200,
+          "minLength": 3,
+          "type": "string"
+        },
+        "why": {
+          "description": "Why it helps the owner.",
+          "maxLength": 600,
+          "minLength": 3,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "why"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Take back a thing this run put on your list, or let go of the one it works on.",
+    "name": "todo_drop",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "description": "Why.",
+          "maxLength": 600,
+          "minLength": 3,
+          "type": "string"
+        },
+        "title": {
+          "description": "Its title.",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "reason"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Attach your linked Git worktree to this coding run. Give its root, the full base commit ID, and an optional GitHub pull request URL. Dot records the branch, committed change summary, and PR state when verified. Call it again after pushing or when asked for an updated snapshot.",
+    "name": "track_coding_work",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+          "type": "string"
+        },
+        "pr_url": {
+          "pattern": "^https://github\\.com/([a-zA-Z0-9-]+)/([a-zA-Z0-9_.-]+)/pull/([1-9][0-9]{0,9})$",
+          "type": "string"
+        },
+        "worktree": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "worktree",
+        "base"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Record or rewrite a short step-by-step plan for multi-step work, and the targets of a goal that names an outcome. The user sees it live. Skip it for trivial tasks. To mark progress on one step use mark_plan_step instead. A step given as done needs its evidence, unless the previous plan already holds that step done. A step that must wait for others names them in depends_on; the result says which steps are ready now.",
+    "name": "update_plan",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "description": "The complete plan; it replaces the previous plan.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "brief": {
+                "default": "",
+                "description": "Only for a step a helper can do alone: its whole instruction with every input, as the helper sees nothing of this chat. Two or more ready steps with one run at once as helpers.",
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "depends_on": {
+                "description": "The numbers of the steps this one waits for, if any. Steps that wait for nothing open are ready: two or more with a brief go to helpers at once, never delegate those too; delegate can run the others in one turn.",
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              "evidence": {
+                "default": "",
+                "description": "What you observed that shows the step done: the tool result, quoted or named (the path and what you read back, the count or the line of output, what the page or the window showed), in at most 400 characters (a longer one is cut). Required for done; for failed or skipped, what happened or why it is no longer needed. A step kept from the previous plan with the same text keeps its evidence when none is given.",
+                "type": "string"
+              },
+              "status": {
+                "description": "pending, in_progress, done, failed (tried and did not work) or skipped (no longer needed).",
+                "enum": [
+                  "pending",
+                  "in_progress",
+                  "done",
+                  "failed",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              "text": {
+                "description": "One short step.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "text",
+              "status"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        },
+        "targets": {
+          "default": "",
+          "description": "For a goal that names an outcome rather than a task: the measurable targets you will reach and how your own tools will measure them, e.g. '20 new leads in leads.csv, counted with wc -l'. Leave it out to keep the targets already recorded; new targets replace them.",
+          "maxLength": 600,
+          "type": "string"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Turn on a tool group that is off, so that its tools are in your tool list from your next step on. The groups and their tools are listed under Tool groups in your instructions.",
+    "name": "use_tools",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "group": {
+          "description": "The name of the tool group, as the tool groups in your instructions list it.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "group"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "List the contact details the owner saved in their vault (Settings › Vault): each contact's label, name, address, phone and email, and the billing address of their cards. Read them to fill a form that asks for them. It never shows a password, a card number, an expiry or a security code.",
+    "name": "vault_contacts",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "description": "Part of a contact's label, to list the matching ones alone (for example Home).",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Wait in code, with no turn spent, until one condition holds: command exits 0, url answers, or file is there. Use it instead of sleep and a check. A command that changes or fetches anything is refused. On Dot's own loop and the Claude plan, the owner's message ends it.",
+    "name": "wait_until",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "description": "A check that only reads on this Mac (test -f out.zip, grep -q done build.log).",
+          "type": "string"
+        },
+        "contains": {
+          "description": "Text the output, page or file must hold.",
+          "maxLength": 200,
+          "type": "string"
+        },
+        "every_s": {
+          "default": 10,
+          "description": "Seconds between checks.",
+          "maximum": 600,
+          "minimum": 2,
+          "type": "integer"
+        },
+        "file": {
+          "description": "A file that must be there (relative to the workspace).",
+          "type": "string"
+        },
+        "url": {
+          "description": "A public address that must answer 2xx or 3xx.",
+          "type": "string"
+        },
+        "within_minutes": {
+          "default": 10.0,
+          "description": "Most minutes to wait.",
+          "maximum": 60.0,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Watch a video file or page: frames with their moments and a timestamped transcript, an hour per call (start/end to look closer, frames=0 for the transcript alone).",
+    "name": "watch_video",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "description": "Seconds where it ends (default: the end).",
+          "minimum": 0,
+          "type": "number"
+        },
+        "frames": {
+          "default": 16,
+          "description": "Frames over the part (max 40).",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "language": {
+          "description": "Language spoken: en-US, tr-TR…",
+          "type": "string"
+        },
+        "source": {
+          "description": "A video file or page address.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "start": {
+          "default": 0.0,
+          "description": "Seconds from the video's start.",
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read many pages of one site in one call, following the links within the scope, and get one clean text document per page (a page that needs JavaScript is rendered; PDFs are read; pages that do not fit one result become Markdown files in the workspace). Use it instead of many web_fetch calls.",
+    "name": "web_crawl",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "max_depth": {
+          "default": 2,
+          "description": "How many links deep to follow.",
+          "maximum": 10,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_pages": {
+          "default": 20,
+          "description": "The most pages to read.",
+          "maximum": 500,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "default": "prefix",
+          "description": "prefix: the pages under the start address's folder; host: its whole host.",
+          "enum": [
+            "host",
+            "prefix"
+          ],
+          "type": "string"
+        },
+        "url": {
+          "description": "Where the crawl starts.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Pull named fields out of pages or files as JSON on the fast model, so the pages never enter your context: per source, each field's value and the words it comes from, checked against the source.",
+    "name": "web_extract",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "description": "The fields to extract.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "description": "What the field means.",
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              "name": {
+                "description": "The key.",
+                "maxLength": 60,
+                "minLength": 1,
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "description"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        },
+        "sources": {
+          "description": "Web addresses, or files in the workspace (a crawl's).",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "sources",
+        "fields"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Download a page, PDF or text file and return it as clean text, with headings, lists, tables and link addresses kept. Fast and light: no browser, no JavaScript, no login. A long document comes in parts; pass start to continue. A page that turns the plain request away or needs JavaScript is read in a tab of the run's Chrome that you never see, and the result says so. For a login or clicking, use browser_open.",
+    "name": "web_fetch",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "default": 0,
+          "description": "Character offset to continue a long document; the end of a result says which.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "url": {
+          "description": "Address of the page, PDF or text file. A bare host such as example.com gets https://.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Search the web and get titles, addresses and short snippets. Use it to find pages or recent facts, then read the best results with web_fetch. Several engines stand behind it, tried in turn, so a search that fails outright is rare; the result names the engine that answered.",
+    "name": "web_search",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "max_results": {
+          "default": 8,
+          "description": "How many results to return, 1 to 10; a larger number is lowered to 10.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "What to look for, worded the way you would type it into a search engine.",
+          "maxLength": 400,
+          "minLength": 2,
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "The work orders you handed out: status, agent, tries, age and due time.",
+    "name": "work_orders",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "order": {
+          "description": "An order's id, to read it in full with its answers.",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "assigned",
+                "working",
+                "in_review",
+                "returned",
+                "accepted",
+                "escalated",
+                "cancelled"
+              ],
+              "type": "string"
+            },
+            {
+              "enum": [
+                "open",
+                "all"
+              ],
+              "type": "string"
+            }
+          ],
+          "default": "open"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "description": "Create or overwrite a file with the given content. Prefer edit_file for small changes. The change goes into the undo journal: it shows in Changes and can be undone.",
+    "name": "write_file",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "description": "Complete new content of the file.",
+          "type": "string"
+        },
+        "path": {
+          "description": "File to create or overwrite. Parent directories are created.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "content"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Keep the notes of this run (what you found, with sources) in its one Markdown file in the workspace, the only file a research run may write.",
+    "name": "write_notes",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "append": {
+          "default": false,
+          "description": "Add at the end of the file instead of replacing it.",
+          "type": "boolean"
+        },
+        "content": {
+          "description": "The notes, in Markdown.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "type": "object"
+    }
+  }
+]

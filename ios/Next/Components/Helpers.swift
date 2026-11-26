@@ -44,6 +44,8 @@ struct HelperRun: Identifiable, Equatable, Sendable {
     let endedAt: Date?
     /// "provider · model · effort", e.g. "Claude · Opus 5.5 · Medium": the daemon's words.
     let engine: String
+    /// What it does now in plain words ("Read notes.md", "Waiting for a helper"); `nil` once it ended (item 1880).
+    let doing: String?
 }
 
 /// The elapsed time of a run in the app's one duration shape ("41 dk 15 sn", §19).
@@ -70,6 +72,10 @@ struct HelperRow: View {
                     VStack(alignment: .leading, spacing: Space.xxs) {
                         titleLine
                         stateLine
+                        if let doing = run.doing, run.state.isLive {
+                            Text(doing).textRole(.label).foregroundStyle(Tone.secondary).lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
+                                .truncationMode(.tail)
+                        }
                         if dynamicTypeSize.isAccessibilitySize { clock }
                     }
                     Spacer(minLength: Space.xs)
@@ -82,7 +88,7 @@ struct HelperRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel([run.title, run.state.word, run.engine].joined(separator: ", "))
+            .accessibilityLabel([run.title, run.state.word, run.state.isLive ? run.doing : nil, run.engine].compactMap { $0 }.joined(separator: ", "))
             .accessibilityAddTraits(.isButton)
             .accessibilityHint(String(localized: "Opens the helper's chat", comment: "VoiceOver hint of a helper row"))
             if run.state.isLive {
@@ -116,7 +122,8 @@ struct HelperRow: View {
     }
 
     private var clock: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
+        // Ticks counted from the helper's start: a schedule from `.now` began again at every drawing of the sheet.
+        TimelineView(.periodic(from: run.startedAt, by: 1)) { context in
             Text(elapsedWords(from: run.startedAt, to: run.endedAt ?? context.date))
                 .textRole(.label)
                 .foregroundStyle(Tone.tertiary)
@@ -205,7 +212,7 @@ struct AgentsSheet: View {
     private func stop(_ run: HelperRun) {
         guard let index = runs.firstIndex(of: run) else { return }
         runs[index] = HelperRun(
-            id: run.id, title: run.title, state: .stopping, startedAt: run.startedAt, endedAt: nil, engine: run.engine)
+            id: run.id, title: run.title, state: .stopping, startedAt: run.startedAt, endedAt: nil, engine: run.engine, doing: run.doing)
     }
 }
 

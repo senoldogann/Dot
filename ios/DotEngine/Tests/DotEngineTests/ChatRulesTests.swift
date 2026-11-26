@@ -126,8 +126,9 @@ final class ChatRulesTests: XCTestCase {
         }
         XCTAssertEqual(chatPhase(of: view(false)), .working(since: 7))
         XCTAssertEqual(chatPhase(of: view(true)), .waitingOnYou, "an ask is never Working")
-        XCTAssertTrue(followsNewWords(distanceFromEnd: 40, viewport: 800))
-        XCTAssertFalse(followsNewWords(distanceFromEnd: 900, viewport: 800))
+        XCTAssertTrue(isAtEnd(distanceFromEnd: 0))
+        XCTAssertTrue(isAtEnd(distanceFromEnd: -150))
+        XCTAssertFalse(isAtEnd(distanceFromEnd: 120))
     }
 
     func testMarkdownBlocks() {
@@ -216,5 +217,20 @@ final class ChatRulesTests: XCTestCase {
         let sent = submittedAnswers(entries, drafts: drafts)
         XCTAssertEqual(sent.map(\.ask.id), ["q1"], "unanswered, already sending and non-questions are left")
         XCTAssertEqual(sent.first?.answer, "Keep; Close both\ntoday", "the labels in Dot's order, then the words")
+    }
+
+    private func runRecord(_ id: String, parent: String?) -> RunRecord {
+        RunRecord(
+            id: id, threadId: "thr", goal: "g", mode: "task", model: "m", status: "running", createdAt: 1, finishedAt: nil, result: "", parentRunId: parent,
+            source: "ui", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
+    }
+
+    func testAChatOwnsTheRunsNoRunOfItStartedAndAHelpersOwnChatOwnsItsRun() {
+        let parentChat: [RunRecord] = [runRecord("run_b", parent: nil), runRecord("run_h1", parent: "run_b")]
+        XCTAssertEqual(ownRuns(in: parentChat, helperRunIds: []).map(\.id), ["run_b"], "a helper's run is told by the helpers' group")
+        // A window that lost the parent run still hides the helper the view lists.
+        XCTAssertEqual(ownRuns(in: [runRecord("run_h1", parent: "run_gone")], helperRunIds: ["run_h1"]).map(\.id), [])
+        // The helper's own chat: its parent run is in another chat.
+        XCTAssertEqual(ownRuns(in: [runRecord("run_h1", parent: "run_b")], helperRunIds: []).map(\.id), ["run_h1"])
     }
 }

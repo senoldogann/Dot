@@ -1,10 +1,11 @@
-"""Which files of a pull request run the browser parts of the gate (gate.yml).
+"""Which files of a push to main run the browser parts of the gate (gate.yml).
 
-A push to main and a release run every browser part. A pull request runs them when a changed file can affect what
-they do, and skips them otherwise: the account has five macOS runners, and a part that cannot see the change would
-hold one for nothing. The daemon those tests start imports almost all of the package, so a change under
-``src/dotagent`` runs them, except the command line and the modules the tests never import. A unit test, a smoke
-test that is not one of theirs, the desktop shell and prose do not.
+A release and a run by hand run every browser part, a pull request none (item 1886), and browser.yml runs every
+browser test each night. The push to main that merges a pull request runs them when a file changed since main's last
+green gate can affect what they do, and skips them otherwise: the account has five macOS runners, and a part that
+cannot see the change would hold one for nothing. The daemon those tests start imports almost all of the package, so
+a change under ``src/dotagent`` runs them, except the command line and the modules the tests never import. A unit
+test, a smoke test that is not one of theirs, the desktop shell and prose do not.
 
 The script reads the changed paths on stdin, one per line, and prints ``true`` or ``false``. It is stdlib only, so
 the job that asks it needs no ``uv sync``.

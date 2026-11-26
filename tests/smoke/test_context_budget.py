@@ -123,7 +123,15 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 # Raised by 250 for the worktree capture tool (item 1658), with 32,048 measured.
 # Raised by 200 for `search_chats` (item 1740): one tool of a line and five short fields, which finds what was said in
 # any chat and reads one run, in the office group; 32,279 measured here.
-BUDGET_TOKENS: int = 32_350
+# Raised by 100 for `memory_save`'s `subject` (item 1729): a fact that changed replaces its older note; 32,367 measured
+# here.
+# Raised by 100 for `show_page`'s words on pictures, videos and a page too long (item 1721), the steered calls and
+# OpenCode's tools (items 1720 and 1722); 32,420 measured here.
+# Raised by 300 for `add_proof` (item 1853): a check that must exit 0 before the run is done, in a group of its own;
+# 32,775 measured here.
+# Raised by 400 for the security testing line of the character and the scope words of `recon` and `security_scan`
+# (items 1887 and 1888, which item 1889 sits on): 33,116 measured on the gate's runner.
+BUDGET_TOKENS: int = 33_250
 # Raised by 100 for the line that has a run say what it does as it works, as a colleague would in a chat (item 830: the
 # owner's screenshots of an app whose agents speak so, and the conversation without the steps; system 7,231 measured).
 # Raised by 100 for the rules of item 851 above.
@@ -136,7 +144,8 @@ BUDGET_TOKENS: int = 32_350
 # Raised by 300 with the block of item 1211 above: the gate's runner measures longer paths than this Mac, whose system
 # reads 8,465 now.
 # Raised by 150 for the Code section of item 1501 above (system 8,919 measured here).
-SYSTEM_BUDGET_TOKENS: int = 9_050
+# Raised by 150 for the security testing line of the character (item 1887): system 9,178 measured here.
+SYSTEM_BUDGET_TOKENS: int = 9_200
 # Item 802: the delegate goal and tool description ask for a `Verification:` line; the old ceiling was 15,300.
 # Raised by 100 for `todo_drop` (item 821): a run takes back a thing it put on Dot's own list by mistake, which one did
 # by changing Dot's database instead (22,648 measured; tools 15,474).
@@ -160,7 +169,12 @@ SYSTEM_BUDGET_TOKENS: int = 9_050
 # The appearance tools add a single portable theme schema and two revision-only calls.
 # Raised by 250 for the worktree, base commit and pull request arguments (item 1658), with 22,960 measured.
 # Raised by 200 for `search_chats` of item 1740 above (23,208 measured, with the growth of main it was made on).
-TOOLS_BUDGET_TOKENS: int = 23_250
+# Raised by 100 for `memory_save`'s `subject` of item 1729, a fact that changed replacing its older note (23,286
+# measured).
+# Raised by 100 for `show_page`'s words of item 1721 above (23,331 measured).
+# Raised by 300 for `add_proof` of item 1853, a check that must exit 0 before the run is done (23,685 measured).
+# Raised by 100 for the scope words of `recon` and `security_scan` (item 1887): 23,768 measured on the gate's runner.
+TOOLS_BUDGET_TOKENS: int = 23_850
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:

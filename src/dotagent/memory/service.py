@@ -141,7 +141,7 @@ def normalize_tags(tags: Sequence[str]) -> tuple[str, ...]:
     return tuple(cleaned)[:_MAX_TAGS]
 
 
-def _checked_text(content: str, max_chars: int) -> str:
+def checked_text(content: str, max_chars: int) -> str:
     # Every write of a note comes here, a model's save, a lesson, a pin and the owner's own: a value filled into a page
     # is never kept in one, nor sent to the embedding model (item 621). Nothing refuses a note for holding one, and
     # nothing about its size is judged after the mask: a mask is shorter or longer than the value, so a note of 608
@@ -239,7 +239,7 @@ async def save_memory(
     existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are outdated.
     When the embedding service fails the note is stored with no vector, for :func:`backfill` to embed later, and no
     near notes are named."""
-    text: str = _checked_text(content, index.config.max_chars)
+    text: str = checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
     if existing is not None:
@@ -563,7 +563,8 @@ _FETCH_NOTES: int = 200
 
 def note_tokens(record: MemoryRecord) -> int:
     """The tokens a note takes in the prompt, estimated: its text, its tags and the line around them."""
-    return estimate_text_tokens(record.content + "".join(f" #{tag}" for tag in record.tags)) + _NOTE_LINE_TOKENS
+    about: str = "" if record.subject is None else f" about {record.subject}"
+    return estimate_text_tokens(record.content + "".join(f" #{tag}" for tag in record.tags) + about) + _NOTE_LINE_TOKENS
 
 
 def memory_budget(config: MemoryConfig, context_length: int | None) -> int:
@@ -766,6 +767,16 @@ async def rewrite_memory_note(
     return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted, new_expiry)
 
 
+async def propose_memory_rewrite(
+    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str, tainted: bool
+) -> MemoryRecord:
+    """A run's rewrite of a note that waits for the owner whoever wrote the note (item 1865: the run is a scheduled
+    task's, a watcher's or a helper's, which change no note on their own): the text is checked as a note's is, and the
+    owner takes it or drops it as the change proposed for one of their notes (:func:`take_proposed_change`)."""
+    text: str = checked_text(content, index.config.max_chars)
+    return await index.store.propose_memory_change(memory_id, text, normalize_tags(tags), run_id, tainted)
+
+
 async def take_proposed_change(index: MemoryIndex, memory_id: str, at: float) -> MemoryRecord:
     """The owner takes the change a run proposed for their note at ``at``: the note gets its words and tags as the
     owner's own correction would (:func:`update_memory_note`, which vouches for the text), and the proposal goes, in
@@ -789,7 +800,7 @@ async def drop_proposed_change(index: MemoryIndex, memory_id: str, at: float) ->
 
 async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | None]:
     """A note's text, checked, and its embedding, or ``None`` when embeddings are off or the service fails."""
-    text: str = _checked_text(content, index.config.max_chars)
+    text: str = checked_text(content, index.config.max_chars)
     if index.embedder is None:
         return text, None
     try:

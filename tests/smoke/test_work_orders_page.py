@@ -22,7 +22,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import AgentRecord, ObjectiveNote, WorkOrderRecord
+from dotagent.store.models import AgentRecord, ObjectiveNote, ObjectiveWorkflow, WorkOrderRecord
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -134,10 +134,11 @@ async def test_the_part_lists_the_objectives_and_the_orders_read_only(
             "Grow the newsletter to a thousand readers",
             "More readers help the owner's business and bring clients",
             "Subscribers a week, read from the list",
+            ObjectiveWorkflow(),
             False,
         )
         await store.update_objective(
-            objective.id, None, ObjectiveNote(at=time.time(), text="Sent issue one.", tainted=False)
+            objective.id, None, ObjectiveNote(at=time.time(), text="Sent issue one.", tainted=False), None
         )
         working: WorkOrderRecord = await store.add_work_order(
             agent.id, "Write the second issue", "Brief.", "Done.", objective.id, time.time() + 7200, None, None, False

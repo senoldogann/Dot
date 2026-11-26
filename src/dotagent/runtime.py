@@ -34,6 +34,7 @@ from dotagent.core.paths import (
     browser_incognito_dir,
     browser_profile_dir,
     browser_profiles_dir,
+    checks_dir,
     chrome_data_dir,
     claude_code_dir,
     config_path,
@@ -65,12 +66,14 @@ from dotagent.core.paths import (
     workspace_dir,
 )
 from dotagent.desktop.pointer import PointerOverlay
+from dotagent.desktop.presence import mac_presence
 from dotagent.dot_app import app_path, build_path, runtime_path
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
 from dotagent.help.meaning import HelpVectors
 from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
+from dotagent.llm.price_list import PriceList, open_price_list
 from dotagent.llm.roles import ModelRoles, learning_of
 from dotagent.llm.router import ModelRouter
 from dotagent.mcp.builtin import builtin_servers
@@ -124,6 +127,7 @@ from dotagent.tools.pages import build_page_tools
 from dotagent.tools.phone import build_phone_tools
 from dotagent.tools.pipeline import build_pipeline_tools
 from dotagent.tools.posts import build_post_tools
+from dotagent.tools.proof import build_proof_tool
 from dotagent.tools.recall import build_recall_tools
 from dotagent.tools.recon import build_recon_tool
 from dotagent.tools.registry import ToolRegistry, build_registry
@@ -266,6 +270,8 @@ class Runtime:
     phone: PhoneDesk | None
     # The Mac's dictation model (item 626): what the owner says into a page, and what is said in a video (item 1212).
     transcriber: Transcriber
+    # The models' prices from the public price list (item 1856), which the estimates in dollars read.
+    prices: PriceList
 
     @property
     def search_key_present(self) -> bool:
@@ -291,7 +297,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_browser_tools(),
         build_web_tools(),
         build_notes_tools(),
-        build_memory_tools(),
+        build_memory_tools(config.memory.max_chars),
         build_todo_tools(),
         build_objective_tools(),
         build_pipeline_tools(),
@@ -299,6 +305,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_mail_calendar_tools(),
         build_schedule_tools(),
         build_campaign_tools(),
+        (build_proof_tool(),),
         build_delegate_tools(),
         build_team_tools(),
         build_work_order_tools(),
@@ -424,7 +431,8 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     server that comes with Dot, which starts with the daemon and reads it back (item 583), the folder the daemon builds
     the program that writes recordings down in and runs it from (item 626), the home of the OpenCode
     server it starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other
-    agents too) and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
+    agents too) and the playbooks it learned, which shape later runs, the owner's checks, which schedules and watchers
+    run without a model (item 1855), and the file of its emergency stop."""
     return (
         *_own_code(),
         *plugin_roots(config.plugins),
@@ -437,6 +445,7 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
         skills_dir(),
         *(Path(entry).expanduser() for entry in config.skills.dirs),
         playbooks_dir(),
+        checks_dir(),
         failsafe_path(),
     )
 
@@ -629,6 +638,8 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         approvals.switch_free(config.policy.free)
         assistant: Assistant = Assistant(config.assistant, await asyncio.to_thread(mac_first_name))
         roles: ModelRoles = ModelRoles(config.models, config.initiative.look_model, learning_of(config.harness))
+        prices: PriceList = open_price_list()
+        await prices.load()
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -650,7 +661,11 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             browser=browsers.main,
             browsers=browsers,
             desktop=DesktopSession(
-                config.desktop, failsafe_path(), browsers.chrome_pids, PointerOverlay(config.desktop.show_pointer)
+                config.desktop,
+                failsafe_path(),
+                browsers.chrome_pids,
+                PointerOverlay(config.desktop.show_pointer),
+                mac_presence(config.desktop.away_after_s),
             ),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
@@ -676,6 +691,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             peers=peers,
             phone=_phone(config),
             transcriber=Transcriber(voice_dir()),
+            prices=prices,
             meetings=MeetingDesk(
                 store,
                 approvals,

@@ -31,65 +31,19 @@ func durationWords(_ seconds: Int, locale: Locale) -> String {
     return String(localized: "\(parts.seconds)s", bundle: bundle, locale: locale, comment: "A duration of seconds, e.g. 14s")
 }
 
-/// "read 3 files, ran 2 commands" for a fold's tally.
-func tallyWords(_ tally: WorkTally, locale: Locale) -> String {
-    tally.ordered.map { kind, count in kindWords(kind, count, locale: locale) }.joined(separator: ", ")
-}
-
-private func kindWords(_ kind: ToolKind, _ count: Int, locale: Locale) -> String {
-    let bundle: Bundle = wordsBundle(locale)
-    let one: Bool = count == 1
-    switch kind {
-    case .read:
-        return one
-            ? String(localized: "read 1 file", bundle: bundle, locale: locale, comment: "Work fold tally: one file read")
-            : String(localized: "read \(count) files", bundle: bundle, locale: locale, comment: "Work fold tally: files read; the argument is how many")
-    case .command:
-        return one
-            ? String(localized: "ran 1 command", bundle: bundle, locale: locale, comment: "Work fold tally: one command run")
-            : String(localized: "ran \(count) commands", bundle: bundle, locale: locale, comment: "Work fold tally: commands run; the argument is how many")
-    case .edit:
-        return one
-            ? String(localized: "edited 1 file", bundle: bundle, locale: locale, comment: "Work fold tally: one file edited")
-            : String(localized: "edited \(count) files", bundle: bundle, locale: locale, comment: "Work fold tally: files edited; the argument is how many")
-    case .search:
-        return one
-            ? String(localized: "searched once", bundle: bundle, locale: locale, comment: "Work fold tally: one search")
-            : String(localized: "searched \(count) times", bundle: bundle, locale: locale, comment: "Work fold tally: searches; the argument is how many")
-    case .web:
-        return one
-            ? String(localized: "1 web step", bundle: bundle, locale: locale, comment: "Work fold tally: one browser or web step")
-            : String(localized: "\(count) web steps", bundle: bundle, locale: locale, comment: "Work fold tally: browser or web steps; the argument is how many")
-    case .screen:
-        return one
-            ? String(localized: "1 screen step", bundle: bundle, locale: locale, comment: "Work fold tally: one step on the Mac's screen")
-            : String(localized: "\(count) screen steps", bundle: bundle, locale: locale, comment: "Work fold tally: steps on the Mac's screen; the argument is how many")
-    case .wait:
-        return one
-            ? String(localized: "waited once", bundle: bundle, locale: locale, comment: "Work fold tally: one wait")
-            : String(localized: "waited \(count) times", bundle: bundle, locale: locale, comment: "Work fold tally: waits; the argument is how many")
-    case .helper:
-        return one
-            ? String(localized: "started 1 helper", bundle: bundle, locale: locale, comment: "Work fold tally: one helper started")
-            : String(localized: "started \(count) helpers", bundle: bundle, locale: locale, comment: "Work fold tally: helpers started; the argument is how many")
-    case .other:
-        return one
-            ? String(localized: "1 other step", bundle: bundle, locale: locale, comment: "Work fold tally: one step of another kind")
-            : String(localized: "\(count) other steps", bundle: bundle, locale: locale, comment: "Work fold tally: steps of other kinds; the argument is how many")
-    }
-}
-
-/// The fold's line: "Worked for 2m 14s · read 3 files, ran 2 commands".
+/// The fold's line: "Worked for 2m 14s", no counts (item 1904: the owner reads how long, the steps are a tap away).
 func foldWords(_ fold: WorkFold, locale: Locale) -> String {
     let took: String = durationWords(fold.seconds, locale: locale)
-    let tally: String = tallyWords(fold.tally, locale: locale)
-    let worked: String = String(localized: "Worked for \(took)", bundle: wordsBundle(locale), locale: locale, comment: "Work fold: how long a stretch of work took; the argument is a duration")
-    return tally.isEmpty ? worked : worked + " · " + tally
+    return String(localized: "Worked for \(took)", bundle: wordsBundle(locale), locale: locale, comment: "Work fold: how long a stretch of work took; the argument is a duration")
 }
 
-/// A tool call's line: the plain verb of its kind and its target ("Read /src/app.py", "Ran git status").
+/// A tool call's line: the plain verb of its kind and its target ("Read /src/app.py", "Ran git status"); one of Dot's
+/// own tools by its phrase ("Search notes · deploy"), any other by its name in words, never the raw name (item 1769).
 func toolLine(_ entry: ToolEntry) -> String {
     let target: String = entry.target
+    if entry.kind != .helper, entry.kind != .wait, let phrase = dotToolWords(entry.tool) {
+        return target.isEmpty ? phrase : "\(phrase) · \(target)"
+    }
     switch entry.kind {
     case .read where !target.isEmpty: return String(localized: "Read \(target)", comment: "Tool row: a file read; the argument is its path")
     case .edit where !target.isEmpty: return String(localized: "Edited \(target)", comment: "Tool row: a file edited; the argument is its path")
@@ -103,9 +57,38 @@ func toolLine(_ entry: ToolEntry) -> String {
         return entry.state == .running
             ? String(localized: "Waiting for a condition", comment: "Tool row: a wait_until step at work")
             : String(localized: "Waited for a condition", comment: "Tool row: a wait_until step")
-    case .helper where !target.isEmpty: return String(localized: "Started a helper: \(target)", comment: "Tool row: a helper started; the argument is its goal")
-    default: return target.isEmpty ? entry.tool : "\(entry.tool) · \(target)"
+    case .helper where !target.isEmpty:
+        switch entry.state {
+        case .running: return String(localized: "Delegating “\(target)”", comment: "Tool row: a task handed to a helper, at work; the argument is its goal")
+        case .done: return String(localized: "Delegated task “\(target)” finished", comment: "Tool row: a task handed to a helper, ended; the argument is its goal")
+        case .failed: return String(localized: "Delegated task “\(target)” failed", comment: "Tool row: a task handed to a helper that failed; the argument is its goal")
+        }
+    default: return target.isEmpty ? toolName(entry.tool) : "\(toolName(entry.tool)) · \(target)"
     }
+}
+
+/// What a step does now, in plain words, for the working capsule and a helper's row (item 1880): never a raw tool name.
+/// A step that talks to helpers waits for them; a read, edit, command, search, page or wait says what it does; any
+/// other tool is "Working".
+func stepWords(tool: String, target: String) -> String {
+    let kind: ToolKind = ToolKind.of(tool)
+    if isHelperStep(tool) {
+        return String(localized: "Waiting for a helper", comment: "Capsule and helper row: the run's step talks to or waits for a helper")
+    }
+    switch kind {
+    case .read, .edit, .command, .search, .web, .wait:
+        let line: String = toolLine(
+            ToolEntry(id: "", tool: tool, kind: kind, target: target, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: nil))
+        return line == tool || line.hasPrefix(tool + " · ") ? String(localized: "Working", comment: "Status word: a run is at work") : line
+    default:
+        return String(localized: "Working", comment: "Status word: a run is at work")
+    }
+}
+
+/// Whether a step starts or talks to a helper: Dot's `delegate` and `message_agent`, a CLI harness's `Task` or `Agent`.
+/// Named exactly: a tool that only has "agent" in its name (`agent_status`, an MCP tool) is no wait on a helper.
+func isHelperStep(_ tool: String) -> Bool {
+    ["delegate", "message_agent", "task", "agent"].contains(tool.lowercased())
 }
 
 /// The glyph of a tool call by its kind.
@@ -118,8 +101,8 @@ func toolSymbol(_ kind: ToolKind) -> String {
     case .wait: "hourglass"
     case .web: "globe"
     case .screen: "cursorarrow.click"
-    case .helper: "person.2"
-    case .other: "wrench.and.screwdriver"
+    case .helper: "hammer"
+    case .other: "hammer"
     }
 }
 
@@ -220,8 +203,24 @@ func composerActionWords(_ action: ComposerAction) -> String {
     case .send: String(localized: "Send", comment: "VoiceOver: the composer's send button")
     case .queue: String(localized: "Queue: starts after this run", comment: "Composer: queues the message after the run at work")
     case .steer: String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue")
-    case .stop: String(localized: "Stop", comment: "Chat toolbar: stops the run at work")
+    case .stop: String(localized: "Stop", comment: "Composer and ask dock: stops the run at work")
     case .confirmEdit: String(localized: "Save the queued message", comment: "Composer: confirms the edit of a queued message")
+    }
+}
+
+/// The title of a way to send a follow-up while a run works, in the composer's long-press menu.
+func followUpTitle(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Steer now", comment: "Composer long-press menu: sends the draft into the run at work")
+    case .queue: String(localized: "Queue", comment: "Follow-up setting: queued after the run")
+    }
+}
+
+/// What a way to send a follow-up does, under its title in the composer's long-press menu.
+func followUpDetail(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Interrupt what the agent is doing", comment: "Composer long-press menu: what Steer now does")
+    case .queue: String(localized: "Run after the current turn", comment: "Composer long-press menu: what Queue does")
     }
 }
 

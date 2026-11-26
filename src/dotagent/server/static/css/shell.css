@@ -1424,3 +1424,15 @@ a.stage-name-link {
   border: 1px solid var(--bad-border);
   border-radius: var(--radius-lg);
 }
+
+/* The sign-in's line of a refused key is a phone's: a Mac's page says the refusal in the card's own words. The style
+   chooses, not the script, so that a touch screen the page is told of after it drew the sign-in still shows it. */
+.signin .link-line[data-kind="refused"] {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .signin .link-line[data-kind="refused"] {
+    display: flex;
+  }
+}

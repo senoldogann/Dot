@@ -13,11 +13,15 @@ from typing import Literal
 
 from pydantic import TypeAdapter
 
+from dotagent.agent.cache_report import CacheReport, Mark, StepCall, cache_report
+from dotagent.agent.context_parts import ContextParts
 from dotagent.core.errors import StoreError
 from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
+from dotagent.llm.pricing import CostEstimate
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.endings import ENDING_LABELS, Ending, classify_ending
+from dotagent.store.failed import failed_result_sql
 from dotagent.store.models import WORKING_STATUSES, RunStatus
 from dotagent.tools.channels import CHANNELS, Channel, channel_of, is_gui
 
@@ -73,7 +77,7 @@ _RUNS_SQL: str = (
 _CALLS_SQL: str = """
 SELECT r.model, r.id, json_extract(e.data, '$.purpose'), json_extract(e.data, '$.seconds'),
        json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.error') IS NULL,
-       json_extract(e.data, '$.input_tokens')
+       json_extract(e.data, '$.input_tokens'), COALESCE(json_extract(e.data, '$.cache_write_tokens'), 0)
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = ?
 """
@@ -94,11 +98,13 @@ SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds'
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = 'assistant'
 """
+# A failed call (item 1722): ``"ok": false`` and not a call Dot's own rule turned another way.
+_FAILED: str = failed_result_sql("e.data")
 # One row per tool call of the runs that came back: the model of its run, the tool, whether it worked (``"ok": false``
 # is a failed call), its seconds, the part of them it spent at the gate (NULL for a call recorded before that was
 # measured) and the start of its text, where the cause of a failure is.
 _TOOLS_SQL: str = f"""
-SELECT r.model, json_extract(e.data, '$.tool'), json_extract(e.data, '$.ok'), json_extract(e.data, '$.seconds'),
+SELECT r.model, json_extract(e.data, '$.tool'), NOT {_FAILED}, json_extract(e.data, '$.seconds'),
        json_extract(e.data, '$.waited_s'), substr(json_extract(e.data, '$.text'), 1, {_FAILURE_CHARS})
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {{scope}} AND e.kind = 'tool_result'
@@ -140,35 +146,35 @@ WHERE {scope} AND e.kind = 'tool_call' AND json_extract(e.data, '$.tool') = 'ski
        OR json_extract(e.data, '$.args.name') LIKE 'playbook-%')
 """
 # One row per model: the events of its runs, counted, with the counts the ledger kept of the runs of deleted chats
-# (item 1323). A tool result with ``"ok": false`` is a failed call.
-_EVENTS_SQL: str = """
+# (item 1323). A tool result with ``"ok": false`` that is not ``steered`` is a failed call (item 1722).
+_EVENTS_SQL: str = f"""
 SELECT model, SUM(calls), SUM(errors), SUM(invalid), SUM(stalls), SUM(compactions) FROM (
     SELECT r.model AS model,
            COALESCE(SUM(e.kind = 'tool_call'), 0) AS calls,
-           COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0) AS errors,
+           COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}), 0) AS errors,
            COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0) AS invalid,
            COALESCE(SUM(e.kind = 'stall'), 0) AS stalls,
            COALESCE(SUM(e.kind = 'compacted'), 0) AS compactions
     FROM runs r JOIN events e ON e.run_id = r.id
-    WHERE {scope}
+    WHERE {{scope}}
     GROUP BY r.model
     UNION ALL
     SELECT r.model, r.tool_calls, r.tool_errors, r.invalid_arguments, r.stalls, r.compactions FROM run_ledger r
-    WHERE {scope}
+    WHERE {{scope}}
 )
 GROUP BY model
 """
 # One row: the newest finished runs of one model and the counts of their events. A failed tool result without a risk was
 # refused before anything ran (an unknown tool, a tool of another mode, arguments that were not JSON or did not fit).
-_PROFILE_SQL: str = """
+_PROFILE_SQL: str = f"""
 WITH recent AS (
     SELECT id, steps FROM runs WHERE model = ? AND finished_at IS NOT NULL ORDER BY created_at DESC LIMIT ?
 )
 SELECT (SELECT COUNT(*) FROM recent),
        (SELECT COALESCE(SUM(steps), 0) FROM recent),
        COALESCE(SUM(e.kind = 'tool_call'), 0),
-       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0), 0),
-       COALESCE(SUM(e.kind = 'tool_result' AND json_extract(e.data, '$.ok') = 0
+       COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}), 0),
+       COALESCE(SUM(e.kind = 'tool_result' AND {_FAILED}
                     AND json_extract(e.data, '$.risk') = ''), 0),
        COALESCE(SUM(e.kind = 'tool_call' AND instr(e.data, ?) > 0), 0),
        COALESCE(SUM(e.kind = 'assistant' AND trim(json_extract(e.data, '$.text')) = ''
@@ -220,6 +226,8 @@ class CallSample(FrozenModel):
     cached_tokens: int
     answered: bool
     input_tokens: int
+    # What the provider wrote to its cache (item 1742); 0 for a call recorded before it was counted.
+    cache_write_tokens: int = 0
 
 
 class ActSample(FrozenModel):
@@ -331,6 +339,8 @@ class TimeStats(FrozenModel):
     # (93.5 % cached), and a change that breaks the cache shows here and not in the raw count.
     fresh_tokens: int
     weighted_tokens: float
+    # What the providers wrote to their caches (item 1742), inside the input; 0 where a provider reports none.
+    cache_write_tokens: int = 0
 
 
 # What a cached input token costs against a fresh one: DeepSeek's and most providers' cache discount (Anthropic bills
@@ -465,6 +475,8 @@ class RunBudget(FrozenModel):
     day_cap: int
     source_day: int
     source_day_cap: int
+    # What ``spent`` cost in dollars (item 1856), given by the route that has the prices.
+    spent_cost: CostEstimate | None = None
 
 
 class RunCosts(FrozenModel):
@@ -485,6 +497,11 @@ class RunCosts(FrozenModel):
     plan_window: PlanWindowSeen | None = None
     # The run against the owner's caps and what like runs spent (item 1731), given by the route that has the caps.
     budget: RunBudget | None = None
+    # What the provider's cache did for the run and why a cold step was cold (item 1742); ``None`` for a run with no
+    # measured step.
+    cache: CacheReport | None = None
+    # What the run's own tokens cost in dollars (item 1856), given by the route that has the prices.
+    cost: CostEstimate | None = None
 
 
 class UsageDay(FrozenModel):
@@ -498,6 +515,8 @@ class UsageDay(FrozenModel):
     input_tokens: int
     output_tokens: int
     minutes: float
+    # What the day's tokens cost in dollars (item 1856), given by the route that has the prices.
+    cost: CostEstimate | None = None
 
 
 class TopRun(FrozenModel):
@@ -514,6 +533,8 @@ class TopRun(FrozenModel):
     steps: int
     tokens: int
     created_at: float
+    # What its tokens cost in dollars (item 1856), given by the route that has the prices.
+    cost: CostEstimate | None = None
 
 
 class Usage(FrozenModel):
@@ -817,6 +838,7 @@ def _call_samples(rows: list[tuple[object, ...]]) -> list[CallSample]:
             cached_tokens=int(_number(row[4], "cached_tokens")),
             answered=row[5] == 1,
             input_tokens=int(_number(row[6], "input_tokens")),
+            cache_write_tokens=int(_number(row[7], "cache_write_tokens")),
         )
         for row in rows
     ]
@@ -949,6 +971,7 @@ def time_stats(calls: Sequence[CallSample]) -> TimeStats:
         cached_share=None if input_tokens == 0 else cached_tokens / input_tokens,
         fresh_tokens=fresh,
         weighted_tokens=fresh + CACHED_TOKEN_WEIGHT * answered_cached,
+        cache_write_tokens=sum(call.cache_write_tokens for call in calls if call.answered),
     )
 
 
@@ -1470,6 +1493,7 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
     statistics_of_run: RunStatistics = _statistics(rows)
     tools: list[ToolSample] = _tool_samples(rows.tools)
     seen: list[PlanWindowSeen] = _read_windows(database, _RUN_WINDOW_SQL, (run_id,))
+    cache: CacheReport | None = read_cache_report(database, run_id)
     return RunCosts(
         run_id=str(run[6]),
         status=_STATUS.validate_python(run[1]),
@@ -1480,7 +1504,77 @@ def collect_run_costs(database: Path, run_id: str, now: float) -> RunCosts:
         tools=statistics_of_run.tools,
         harness_version=None if run[9] is None else str(run[9]),
         plan_window=seen[0] if seen else None,
+        cache=cache,
     )
+
+
+# The step calls of one run that answered, in order: when each ended, its seconds and its tokens (item 1742).
+_RUN_STEPS_SQL: str = (
+    "SELECT ts, json_extract(data, '$.seconds'), json_extract(data, '$.input_tokens'),"
+    " json_extract(data, '$.cached_tokens'), COALESCE(json_extract(data, '$.cache_write_tokens'), 0) FROM events"
+    " WHERE run_id = ? AND kind = ? AND json_extract(data, '$.purpose') = 'step'"
+    " AND json_extract(data, '$.error') IS NULL AND json_extract(data, '$.input_tokens') > 0 ORDER BY id"
+)
+# The moments of a run that change what a later call sends: a tool group turned on, a compaction.
+_RUN_MARKS_SQL: str = (
+    "SELECT kind, ts FROM events WHERE run_id = ? AND kind IN ('tool_groups', 'compacted') ORDER BY id"
+)
+# The parts a run recorded at its first step.
+_RUN_PARTS_SQL: str = "SELECT data FROM events WHERE run_id = ? AND kind = 'context_parts' ORDER BY id LIMIT 1"
+# The newest run of the same chat before a run that made a call: the run and the moment of its last call.
+_PREVIOUS_RUN_SQL: str = (
+    "SELECT r.id, MAX(e.ts) FROM runs AS r JOIN events AS e ON e.run_id = r.id AND e.kind = ?"
+    " WHERE r.thread_id = ? AND r.created_at < ? GROUP BY r.id ORDER BY r.created_at DESC LIMIT 1"
+)
+
+
+def _parts_of(connection: sqlite3.Connection, run_id: str) -> ContextParts | None:
+    row: tuple[object, ...] | None = connection.execute(_RUN_PARTS_SQL, (run_id,)).fetchone()
+    return None if row is None else ContextParts.model_validate_json(str(row[0]))
+
+
+def read_cache_report(database: Path, run_id: str) -> CacheReport | None:
+    """What the provider's cache did for the run ``run_id`` and why its cold steps were cold (item 1742), from the
+    calls, the marks and the parts it recorded and the chat's previous run's; ``None`` for a run with no measured
+    step. Read-only. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            steps: list[tuple[object, ...]] = connection.execute(_RUN_STEPS_SQL, (run_id, CALL_EVENT)).fetchall()
+            if not steps:
+                return None
+            marks: list[tuple[object, ...]] = connection.execute(_RUN_MARKS_SQL, (run_id,)).fetchall()
+            run: tuple[object, ...] | None = connection.execute(
+                "SELECT thread_id, created_at FROM runs WHERE id = ?", (run_id,)
+            ).fetchone()
+            previous: tuple[object, ...] | None = (
+                None
+                if run is None
+                else connection.execute(
+                    _PREVIOUS_RUN_SQL, (CALL_EVENT, str(run[0]), _number(run[1], "created_at"))
+                ).fetchone()
+            )
+            parts: ContextParts | None = _parts_of(connection, run_id)
+            before: ContextParts | None = None if previous is None else _parts_of(connection, str(previous[0]))
+    except (sqlite3.Error, ValueError) as error:
+        raise StoreError(
+            "the cache report could not be read", {"database": str(database), "run_id": run_id, "error": str(error)}
+        ) from error
+    calls: list[StepCall] = [
+        StepCall(
+            ts=_number(row[0], "ts"),
+            seconds=_number(row[1], "seconds"),
+            input_tokens=int(_number(row[2], "input_tokens")),
+            cached_tokens=int(_number(row[3], "cached_tokens")),
+            cache_write_tokens=int(_number(row[4], "cache_write_tokens")),
+        )
+        for row in steps
+    ]
+    moments: list[Mark] = [
+        Mark(kind="tool_group" if row[0] == "tool_groups" else "compaction", ts=_number(row[1], "ts")) for row in marks
+    ]
+    started: float = calls[0].ts - calls[0].seconds
+    gap: float | None = None if previous is None else max(0.0, started - _number(previous[1], "ts"))
+    return cache_report(calls, moments, parts, before, gap)
 
 
 # The window of the Claude plan the newest step of one run recorded (item 1403): its kind, status, share used and reset,

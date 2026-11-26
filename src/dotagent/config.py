@@ -3,6 +3,7 @@
 import ipaddress
 import re
 import tomllib
+from collections.abc import Sequence
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -299,6 +300,12 @@ class ProvidersConfig(FrozenModel):
     claude_code: ClaudeCodeConfig
 
 
+# The kinds of task a model can be named for up front (item 1889, `[models] kinds`): ``security`` is security research
+# within a scope, a goal that names a host a scope covers and speaks of security work (dotagent.agent.refusal).
+type TaskKind = Literal["security"]
+TASK_KINDS: tuple[TaskKind, ...] = ("security",)
+
+
 class ModelsConfig(FrozenModel):
     main: ModelReference
     vision: ModelReference
@@ -313,6 +320,8 @@ class ModelsConfig(FrozenModel):
     helper_cooldown_s: float = Field(gt=0, le=86_400, allow_inf_nan=False)
     # The context size of a model's runs where it is not [agent] context_tokens (item 250); Settings › Models sets it.
     context: dict[ModelReference, ContextSize]
+    # The model a run of a kind starts on when none is chosen for it (item 1889); Settings › Models sets it.
+    kinds: dict[TaskKind, ModelReference] = Field(default_factory=dict)
 
     @field_validator("search")
     @classmethod
@@ -569,6 +578,12 @@ class DesktopConfig(FrozenModel):
     give_front_back: bool
     # Whether Dot's own pointer shows where the steps of desktop_act go (item 706).
     show_pointer: bool
+    # Whether the steps that move the Mac's own pointer or send keys wait while the owner is at the Mac (item 1890),
+    # how long nobody may have touched the keyboard, the mouse or the trackpad before the owner is away, and how long a
+    # batch waits for that before it gives up the steps it holds.
+    input_only_when_away: bool
+    away_after_s: int = Field(ge=0)
+    away_wait_s: int = Field(ge=0)
     launch_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     activate_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -1116,40 +1131,78 @@ class PluginsConfig(FrozenModel):
     dirs: list[str] = Field(default_factory=list)
 
 
+def _bare_hosts(hosts: Sequence[str], where: str) -> tuple[str, ...]:
+    """The host names of ``hosts``, written the one way a scope holds them: no wildcard, port, scheme or path, an IPv6
+    address without brackets. The names of a list stay in their order, each once."""
+    names: list[str] = []
+    for host in hosts:
+        name: str = host.strip().lower().rstrip(".")
+        if not name or "/" in name or "*" in name or "://" in name or any(character.isspace() for character in name):
+            raise ValueError(f"{where} holds bare host names, without a wildcard, port, scheme or path; not {host!r}")
+        if ":" in name:
+            try:
+                ipaddress.IPv6Address(name)
+            except ValueError:
+                raise ValueError(
+                    f"{where} holds bare host names, without a wildcard, port, scheme or path; an IPv6 address is "
+                    f"written without brackets; not {host!r}"
+                ) from None
+        names.append(name)
+    return tuple(dict.fromkeys(names))
+
+
+class ReconScope(FrozenModel):
+    """One scope the owner may test (item 1887, docs/recon.md): a bug bounty program or an engagement, the hosts it
+    covers, and the rules that came with it. A host in a scope is treated as an owned host: the active audit and the
+    form scan run on it, and each report says which program authorised it. A scope stands for the owner's word that
+    they are in the program and its rules allow the test: they write it, or a run they asked to test the program writes
+    it from the program's own scope page; Dot asks nothing more before it starts."""
+
+    program: str = Field(min_length=2, max_length=120)
+    hosts: tuple[str, ...] = ()
+    url: str = Field(default="", max_length=300)
+    note: str = Field(default="", max_length=600)
+
+    @field_validator("hosts")
+    @classmethod
+    def _scope_hosts(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
+        return _bare_hosts(hosts, "[recon] scopes hosts")
+
+
+class ReconAuthority(FrozenModel):
+    """Who allows a test of a host (items 1887 and 1888): ``program`` is ``None`` for a host of the owner's own list,
+    and otherwise the program or engagement whose scope covers it, with the rules it wrote in ``note``."""
+
+    program: str | None
+    note: str
+
+
 class ReconConfig(FrozenModel):
     """Network reconnaissance (``[recon]``, item 776, docs/recon.md). A passive audit reads what a browser's visit
     reads, on any public site; an active one asks which common ports answer, and runs only on a host whose name is in
-    ``owned_hosts``, or is a subdomain of one: the owner's own, or one they may test. Nothing else can widen it, and
-    the list is empty until the owner writes it."""
+    ``owned_hosts`` or in a scope of ``scopes``, or is a subdomain of one: the owner's own, or one a program or an
+    engagement they are in allows them to test. Both lists are empty until the owner writes them; the scopes
+    ``dotx scope`` keeps in ``scopes.toml`` (:mod:`dotagent.scopes`) widen it too."""
 
     owned_hosts: tuple[str, ...] = ()
+    scopes: tuple[ReconScope, ...] = ()
 
     @field_validator("owned_hosts")
     @classmethod
     def _host_names(cls, hosts: tuple[str, ...]) -> tuple[str, ...]:
-        names: list[str] = []
-        for host in hosts:
-            name: str = host.strip().lower().rstrip(".")
-            if (
-                not name
-                or "/" in name
-                or "*" in name
-                or "://" in name
-                or any(character.isspace() for character in name)
-            ):
-                raise ValueError(
-                    f"[recon] owned_hosts holds bare host names, without a wildcard, port, scheme or path; not {host!r}"
-                )
-            if ":" in name:
-                try:
-                    ipaddress.IPv6Address(name)
-                except ValueError:
-                    raise ValueError(
-                        "[recon] owned_hosts holds bare host names, without a wildcard, port, scheme or path; an "
-                        f"IPv6 address is written without brackets; not {host!r}"
-                    ) from None
-            names.append(name)
-        return tuple(dict.fromkeys(names))
+        return _bare_hosts(hosts, "[recon] owned_hosts")
+
+    def authorising(self, host: str) -> ReconAuthority | None:
+        """Who allows a test of ``host``: the owner (``program`` ``None``) for a host of the owner's list, the program
+        and the rules it wrote for a host in one of the scopes, and ``None`` for a host nothing allows. A name covers
+        its subdomains (``example.com`` covers ``www.example.com``, and not ``notexample.com``)."""
+        wanted: str = host.strip().lower().rstrip(".")
+        if any(wanted == entry or wanted.endswith(f".{entry}") for entry in self.owned_hosts):
+            return ReconAuthority(program=None, note="")
+        for scope in self.scopes:
+            if any(wanted == entry or wanted.endswith(f".{entry}") for entry in scope.hosts):
+                return ReconAuthority(program=scope.program, note=scope.note)
+        return None
 
 
 # Who the typed judge asks: nobody, or TypeSafe's System One API.

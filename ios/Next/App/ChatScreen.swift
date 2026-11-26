@@ -8,6 +8,12 @@ enum ChatScrollMemory {
     static var anchors: [String: String] = [:]
 }
 
+/// The row of a chat that came into sight last, kept by reference: writing it draws nothing again (item 1848).
+@MainActor
+final class ReadingMark {
+    var topVisible: String?
+}
+
 /// One chat (wave N2, plan §4.1): the transcript with its work log, the ask dock in the composer's place, the
 /// composer with Send / Queue / Stop, the queue with its edit, the header's quick panels and the run inspector.
 struct ChatScreen: View {
@@ -17,10 +23,9 @@ struct ChatScreen: View {
     /// Begins the edit of the first queued message at once (the debug fixtures); `false` in the app.
     let editsFirstQueued: Bool
     @Environment(AppModel.self) private var model: AppModel
-    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
+    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
-    @AppStorage(PrefKey.confirmStop) private var confirmStop: Bool = true
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
     @State private var attachments: [ComposerAttachment] = []
@@ -29,40 +34,65 @@ struct ChatScreen: View {
     @State private var dockFolded: Bool = false
     @State private var shownAsks: [DockEntry] = []
     @State private var dismissedAsks: Set<String> = []
-    @State private var nearEnd: Bool = true
+    @State private var position: ScrollPosition = ScrollPosition()
+    /// The transcript follows new words (the owner is at its end, or went back to it).
+    @State private var pinned: Bool = true
+    /// The owner's finger moves the transcript, or it glides on after it.
+    @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
-    @State private var topVisible: String?
+    @State private var reading: ReadingMark = ReadingMark()
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
-    @State private var confirmingStop: Bool = false
+    /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
+    @State private var stepsShown: Bool = false
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
     /// This chat's changed files, for the `#` picker.
     @State private var changedFiles: RunChanges?
+    /// "Plan first" for the next message, set in the chat's settings (PLAN §24); spent by that message.
+    @State private var planFirst: Bool = false
     @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.locale) private var locale: Locale
+    /// The bot this chat belongs to (PLAN §27): its header and "Ask <name>"; `nil` for a plain chat.
+    @Environment(\.botChat) private var botChat: BotChat?
+    /// Find in chat (the bot menu's): the words looked for and which find is shown; `nil` while the bar is closed.
+    @State private var finding: String?
+    @State private var findIndex: Int = 0
 
-    private var chat: ChatProjection? { model.snapshot.chats[thread] }
+    private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
-    private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
+    /// The chat's own runs (`ownRuns`): a helper's own chat shows the run that is its work.
+    private var ownRuns: [RunRecord] { view.map(DotEngine.ownRuns(of:)) ?? [] }
+    private var activeRun: RunRecord? { ownRuns.last { $0.isActive } }
     private var helpers: [HelperView] { view?.helpers ?? [] }
-    private var mode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .showAll }
+    /// The helpers the chat's newest run started (item 1880): the pill counts these, never an older run's.
+    private var newestRunHelpers: [HelperView] {
+        guard let run = ownRuns.last else { return [] }
+        return helpers.filter { $0.parentRunId == run.id }
+    }
+    /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
+    private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
+    /// Whether the chosen mode hides the steps, so that the live line says the work (item 1769).
+    private var linesTheWork: Bool { chosenMode == .hideAll || chosenMode == .zen }
+    private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
 
     /// The transcript, built once per drawing of the screen (`body` reads it once and hands it on).
-    private var builtItems: [TranscriptItem] {
-        guard let chat else { return [] }
-        return transcript(
-            of: chat, pending: model.snapshot.pending(in: thread), mode: mode, streaming: streaming,
+    private var builtItems: [TranscriptItem] { transcript(in: mode) }
+
+    private func transcript(in mode: DotEngine.ToolCallMode) -> [TranscriptItem] {
+        // Before the chat's picture is opened (a new chat the daemon just named, item 1849) its own messages still show.
+        DotEngine.transcript(
+            of: chat ?? ChatProjection(threadId: thread), pending: model.pending(in: thread), mode: mode, streaming: streaming,
             context: TranscriptContext(answeredHere: model.answeredHere))
     }
 
     private var dock: [DockEntry] {
-        let ownRuns: Set<String> = Set((view?.runs ?? []).filter { $0.parentRunId == nil }.map(\.id))
+        let ownRunIds: Set<String> = Set(ownRuns.map(\.id))
         return dockEntries(
-            asks: view?.asks ?? [], chatRuns: ownRuns, outbox: model.snapshot.outbox, online: model.snapshot.online, local: model.askPhases,
+            asks: view?.asks ?? [], chatRuns: ownRunIds, outbox: model.outbox, online: model.online, local: model.askPhases,
             shown: shownAsks, decided: decidedAsks, answeredHere: model.answeredHere
         ).filter { !dismissedAsks.contains($0.id) }
     }
@@ -82,18 +112,14 @@ struct ChatScreen: View {
         let items: [TranscriptItem] = builtItems
         return content(items)
             .background(Tone.ground)
-            .navigationTitle(view?.thread.title ?? model.snapshot.list.rows.first { $0.summary.id == thread }?.summary.title ?? "")
-            .navigationSubtitle(subtitle)
+            .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
+            .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
-            .toolbar { header }
+            .toolbar { chrome }
+            .liveFollow(thread: thread)
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
-            .confirmationDialog(
-                String(localized: "Stop this run?", comment: "Confirmation of Stop from the chat header"), isPresented: $confirmingStop, titleVisibility: .visible
-            ) {
-                Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), role: .destructive) { stop() }
-            }
             .onAppear {
                 model.open(thread)
                 draft = model.draft(of: thread)
@@ -106,15 +132,16 @@ struct ChatScreen: View {
             .onDisappear {
                 model.close(thread)
                 if edit == nil { model.keep(draft: draft, of: thread) }
-                if let topVisible { ChatScrollMemory.anchors[thread] = topVisible }
+                if let topVisible = reading.topVisible { ChatScrollMemory.anchors[thread] = topVisible }
             }
             .onChange(of: draft) { _, words in if edit == nil { model.keep(draft: words, of: thread) } }
             .onChange(of: dock) { _, entries in shownAsks = entries }
             .onChange(of: activeRun?.id) { _, run in if run == nil { stopping = false } }
             .onChange(of: items.count) { _, _ in LatencyProbe.saw(items: items, model: model) }
             .task { await model.loadModels() }
-            .modifier(ComposerLists(thread: thread, lastRun: view?.runs.last(where: { $0.parentRunId == nil })?.id, changedFiles: $changedFiles, aside: $aside))
+            .modifier(ComposerLists(thread: thread, lastRun: ownRuns.last?.id, changedFiles: $changedFiles, aside: $aside))
             .task { await LatencyProbe.run(thread: thread, model: model) }
+            .modifier(FrameMeterHook(running: activeRun != nil))
             .onKeyPress(.escape) {
                 if panel != nil {
                     panel = nil
@@ -131,13 +158,13 @@ struct ChatScreen: View {
             EmptyState(
                 title: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), systemImage: "trash",
                 detail: String(localized: "It was deleted on your Mac or another device.", comment: "Empty state of a deleted chat"), actionTitle: nil, action: {})
-        } else if items.isEmpty, model.snapshot.transport == .offline || model.snapshot.transport == .keyRefused {
+        } else if items.isEmpty, model.transport == .offline || model.transport == .keyRefused {
             EmptyState(
-                title: model.snapshot.transport == .keyRefused
+                title: model.transport == .keyRefused
                     ? String(localized: "This phone's key was refused", comment: "Chat subtitle: the Mac no longer takes this phone's key")
                     : String(localized: "Can't reach your Mac", comment: "Empty chat when offline with nothing saved"),
                 systemImage: "wifi.slash",
-                detail: model.snapshot.transport == .keyRefused
+                detail: model.transport == .keyRefused
                     ? String(localized: "Pair this phone again in Settings.", comment: "Empty chat when the key was refused")
                     : String(localized: "Nothing of this chat is saved on this phone yet. It loads once the phone reaches your Mac.", comment: "Empty chat when offline with nothing saved"),
                 actionTitle: nil, action: {})
@@ -147,86 +174,96 @@ struct ChatScreen: View {
     }
 
     private func transcriptView(_ items: [TranscriptItem]) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Space.m) {
-                    chatStart
-                    if chat?.freshness == .deleted {
-                        Notice(tone: .info, message: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), dismiss: nil)
-                    }
-                    if let unreadable = chat?.unreadable, unreadable > 0 {
-                        Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
-                    }
-                    ForEach(TranscriptBlock.of(items)) { block in
-                        Group {
-                            switch block {
-                            case .item(let item): row(item)
-                            case .tools(let entries): ToolRun(entries: entries)
-                            }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: Space.m) {
+                if chat?.freshness == .deleted {
+                    Notice(tone: .info, message: String(localized: "This chat was deleted", comment: "Chat subtitle: the chat was deleted on the Mac or the web"), dismiss: nil)
+                }
+                if let unreadable = chat?.unreadable, unreadable > 0 {
+                    Notice(tone: .info, message: String(localized: "\(unreadable) steps could not be shown", comment: "Notice in a chat: frames the app could not read; the argument is how many"), dismiss: nil)
+                }
+                ForEach(TranscriptBlock.of(streamItems(items))) { block in
+                    Group {
+                        switch block {
+                        case .item(let item): row(item)
+                        case .steps(let rows): StepRun(rows: rows)
                         }
-                        .id(block.id)
-                        .onAppear { topVisible = block.id }
                     }
-                    Color.clear.frame(height: 1).id("end")
+                    .id(block.id)
+                    // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
+                    .onAppear { reading.topVisible = block.id }
                 }
-                .frame(maxWidth: proseWidth)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, Space.gutter)
-                .padding(.vertical, Space.m)
-            }
-            .overlay {
-                if items.isEmpty, chat?.freshness != .deleted {
-                    LoadingState(message: String(localized: "Syncing…", comment: "Chat subtitle: the chat is being brought up to date"))
+                if linesTheWork, let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
+                    WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                 }
+                ChatDrafts(thread: thread)
             }
-            // A short chat stands at the top under the header; a long one opens at its end (the lead's look at N1c), or
-            // where the owner left it.
-            .defaultScrollAnchor(.top, for: .alignment)
-            .scrollDismissesKeyboard(.interactively)
-            .onScrollGeometryChange(for: Double.self) { geometry in
-                Double(geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height)
-            } action: { _, distance in
-                nearEnd = followsNewWords(distanceFromEnd: distance, viewport: 800)
-            }
-            .onChange(of: items.last) { _, _ in
-                // Follow new words only while the owner reads near the end (plan §13 S5).
-                if nearEnd { proxy.scrollTo("end", anchor: .bottom) }
-            }
-            .task(id: nearEnd) {
-                // The jump button comes after a short pause, so it does not flicker while words stream (debounced).
-                if nearEnd {
-                    showsJump = false
-                    return
-                }
-                do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-                showsJump = !nearEnd
-            }
-            .task(id: thread) {
-                try? await Task.sleep(for: .milliseconds(80))
-                if let anchor = ChatScrollMemory.anchors[thread] {
-                    proxy.scrollTo(anchor, anchor: .top)
-                } else {
-                    proxy.scrollTo("end", anchor: .bottom)
-                }
-            }
-            .safeAreaInset(edge: .bottom) { bottom(proxy) }
-        }
-    }
-
-    /// Where the chat begins: who works in it, on which Mac, since when (a short chat does not look empty).
-    @ViewBuilder private var chatStart: some View {
-        if let started = view?.thread.createdAt {
-            HStack(spacing: Space.xs) {
-                DotFace(size: 20)
-                Text(
-                    [view?.thread.agentId ?? String(localized: "Dot", comment: "The assistant's name in a chat's subtitle"), model.macName,
-                        Date(timeIntervalSince1970: started).formatted(date: .abbreviated, time: .shortened)].compactMap { $0 }.joined(separator: " · ")
-                )
-                .textRole(.label).foregroundStyle(Tone.tertiary)
-            }
+            .frame(maxWidth: proseWidth)
             .frame(maxWidth: .infinity)
-            .padding(.bottom, Space.xs)
-            .accessibilityElement(children: .combine)
+            .padding(.horizontal, Space.gutter)
+            .padding(.vertical, Space.m)
+        }
+        .overlay {
+            if items.isEmpty, chat?.freshness != .deleted {
+                LoadingState(message: String(localized: "Syncing…", comment: "Chat subtitle: the chat is being brought up to date"))
+            }
+        }
+        // A short chat stands at the top under the header; a long one opens at its end (the lead's look at N1c), or
+        // where the owner left it.
+        .defaultScrollAnchor(.top, for: .alignment)
+        .scrollPosition($position)
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollPhaseChange { _, now in ownerScrolls = now == .interacting || now == .decelerating }
+        // Follow new words only while the owner is at the end (plan §13 S5, item 1848): their own scroll away stops it,
+        // their scroll back to the end starts it again; words that grow the transcript never stop it.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            isAtEnd(distanceFromEnd: Double(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.contentOffset.y - geometry.containerSize.height))
+        } action: { _, atEnd in
+            if atEnd { pinned = true } else if ownerScrolls { pinned = false }
+        }
+        // Once the new words are laid out (never before, which left them under the composer), the end is shown.
+        .onScrollGeometryChange(for: Double.self) { geometry in Double(geometry.contentSize.height) } action: { _, _ in
+            if pinned, !ownerScrolls { position.scrollTo(edge: .bottom) }
+        }
+        .task(id: pinned) {
+            // The jump button comes after a short pause, so it does not flicker while words stream (debounced).
+            if pinned {
+                showsJump = false
+                return
+            }
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            showsJump = !pinned
+        }
+        .task(id: thread) {
+            try? await Task.sleep(for: .milliseconds(80))
+            if let anchor = ChatScrollMemory.anchors[thread] {
+                pinned = false
+                position.scrollTo(id: anchor, anchor: .top)
+            } else {
+                position.scrollTo(edge: .bottom)
+            }
+        }
+        .safeAreaInset(edge: .bottom) { bottom(items) }
+        .safeAreaInset(edge: .top) {
+            if let finding {
+                let found: [String] = findMatches(items, words: finding)
+                FindBar(
+                    words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
+                    step: { delta in
+                        guard !found.isEmpty else { return }
+                        findIndex = (findIndex + delta + found.count) % found.count
+                        pinned = false
+                        position.scrollTo(id: found[findIndex], anchor: .center)
+                    },
+                    close: { self.finding = nil }
+                )
+                .onChange(of: found.first) { _, first in
+                    if let first {
+                        pinned = false
+                        position.scrollTo(id: first, anchor: .center)
+                    }
+                }
+            }
         }
     }
 
@@ -234,7 +271,7 @@ struct ChatScreen: View {
         switch item {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
-                OwnerMessage(text: text)
+                OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
                 if let delivery { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -262,18 +299,20 @@ struct ChatScreen: View {
             ThoughtRow(text: text, live: live)
         case .tool(let entry):
             WorkToolRow(entry: entry)
-        case .helpers(_, _, let list):
-            HelperGroupCard(helpers: list, open: { panel = .agents })
-        case .plan(_, let steps):
-            PlanCard(steps: steps)
+        case .helpers:
+            // The helpers are the capsule's people segment and its Agents sheet (item 1880), never a card here.
+            EmptyView()
+        case .plan:
+            // The plan is the chip beside the capsule (item 1880), never a card in the stream.
+            EmptyView()
         case .decision(let anchor):
             AskAnchorRow(anchor: anchor)
         case .work(let fold):
             WorkFoldView(fold: fold, row: { AnyView(self.row($0)) })
-        case .ended(_, let status, let detail):
-            RunEndedCard(status: status, detail: detail, retry: status == "failed" && activeRun == nil ? { retryLast() } : nil)
-        case .limit(_, let resetsAt):
-            UsageLimitCard(resetsAt: resetsAt, resume: { retryLast() })
+        case .ended(let id, let status, let detail):
+            RunEndCard(item: id, ending: .ended(status: status, detail: detail), thread: thread, toComposer: toComposer, tell: { toast = $0 })
+        case .limit(let id, let resetsAt):
+            RunEndCard(item: id, ending: .limit(resetsAt: resetsAt), thread: thread, toComposer: toComposer, tell: { toast = $0 })
         }
     }
 
@@ -298,16 +337,22 @@ struct ChatScreen: View {
 
     // MARK: The bottom: capsule, dock or composer
 
-    @ViewBuilder private func bottom(_ proxy: ScrollViewProxy) -> some View {
+    @ViewBuilder private func bottom(_ items: [TranscriptItem]) -> some View {
         let entries: [DockEntry] = dock
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
                     status: capsuleStatus, activity: activityWords,
-                    since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
-                    helpers: helpers.filter { helperState($0.status).isLive }.count),
-                showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
-                scrollToBottom: { withAnimation { proxy.scrollTo("end", anchor: .bottom) } }
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } : nil, queued: view?.queue.messages.count ?? 0,
+                    helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
+                    plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
+                showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
+                stop: { stop() },
+                openPlan: { panel = .plan }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
+                scrollToBottom: {
+                    pinned = true
+                    withAnimation { position.scrollTo(edge: .bottom) }
+                }
             )
             .frame(maxWidth: .infinity, alignment: .center)
             if !entries.isEmpty {
@@ -326,7 +371,7 @@ struct ChatScreen: View {
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
                     placeholder: activeRun == nil
-                        ? String(localized: "Message Dot", comment: "Placeholder of the composer")
+                        ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
                             ? String(localized: "Queue a message", comment: "Placeholder of the composer while a run works and follow-ups queue")
                             : String(localized: "Tell the running task", comment: "Placeholder of the composer while a run works and follow-ups steer"),
@@ -334,7 +379,7 @@ struct ChatScreen: View {
                         hasContent: !(edit?.text ?? draft).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty,
                         runActive: activeRun != nil && !stopping, followUp: followUp, editing: edit != nil),
                     perform: perform,
-                    model: currentModel, models: modelChoices, chooseModel: { choose($0) },
+                    model: currentModel, openSettings: { panel = .model },
                     suggestions: ComposerSuggestions(sections: { trigger in
                         pickerSections(trigger, commands: composerCommands(), catalog: catalog, limit: 8)
                     }))
@@ -383,12 +428,12 @@ struct ChatScreen: View {
                 toast = ToastMessage(id: UUID(), text: String(localized: "Ask again every so often: /loop 30m <message>", comment: "Composer command: what /loop does"), systemImage: "info.circle", actionTitle: nil)
                 return
             case .aside(let question):
-                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                guard let run = ownRuns.last else { break }
                 draft = ""
                 Task { aside = SideAnswer(question: question, answer: await model.aside(run: run.id, question: question)) }
                 return
             case .loop(let every, let text):
-                guard let run = view?.runs.last(where: { $0.parentRunId == nil }) else { break }
+                guard let run = ownRuns.last else { break }
                 draft = ""
                 Task {
                     if let problem = await model.loop(run: run.id, every: every, text: text) {
@@ -403,7 +448,11 @@ struct ChatScreen: View {
             case .message:
                 break
             }
-            let (words, picks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
+            let (words, typedPicks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
+            let picks: MessagePicks = MessagePicks(skills: typedPicks.skills, accounts: typedPicks.accounts, planFirst: typedPicks.planFirst || planFirst)
+            // A steer carries no picks: plan first waits for the next message that does (a steer with no run at work
+            // goes as a message, and spends it).
+            if activeRun == nil || action != .steer { planFirst = false }
             draft = ""
             attachments = []
             model.keep(draft: "", of: thread)
@@ -417,9 +466,9 @@ struct ChatScreen: View {
     private var catalog: ComposerCatalog {
         ComposerCatalog(
             skills: (model.palette?.skills ?? []).map { PickerItem(kind: .skill, token: "/" + $0.name, name: $0.name, detail: $0.description) },
-            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role ?? "") },
+            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role) },
             teams: model.teams.map { PickerItem(kind: .team, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: "") },
-            chats: model.snapshot.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
+            chats: model.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
                 PickerItem(kind: .chat, token: "@\"" + row.summary.title + "\"", name: row.summary.title, detail: rowTime(row.summary.latestCreatedAt, now: .now))
             },
             accounts: (model.palette?.accounts ?? []).map { PickerItem(kind: .account, token: "@" + $0.address, name: $0.address, detail: [$0.providerName, $0.reads].filter { !$0.isEmpty }.joined(separator: " · ")) },
@@ -440,10 +489,10 @@ struct ChatScreen: View {
         }
     }
 
-    /// Try again / Resume: the newest run's goal sent again as a message of the chat.
-    private func retryLast() {
-        guard let last = view?.runs.last(where: { $0.parentRunId == nil }), !last.goal.isEmpty else { return }
-        Task { await model.send(last.goal, thread: thread, steerInto: nil, photos: [], picks: .none) }
+    /// Words a message action hands back (Edit from here, a Retry that could not send): after the newer draft, never
+    /// over it (plan §13 B3).
+    private func toComposer(_ words: String) {
+        draft = draft.isEmpty ? words : draft + "\n" + words
     }
 
     // MARK: The queue's edit (§20)
@@ -479,47 +528,58 @@ struct ChatScreen: View {
 
     // MARK: The model chip
 
+    /// What the chip shows: the chat's choices as the sheet reads them (a model left out is the daemon's main, a level
+    /// left out is the model's default), so the chip and the sheet never differ.
     private var currentModel: ModelChoice? {
-        let choices: ChatChoices? = view?.newest?.choices
-        let ref: String = choices?.model ?? view?.runs.last?.model ?? ""
-        guard !ref.isEmpty else { return nil }
-        // Before the daemon's models are read, the model's own name without its provider ("claude_code:opus" → "opus").
-        let label: String = model.models.flatMap(\.models).first { $0.ref == ref }?.label ?? String(ref.split(separator: ":").last ?? Substring(ref))
-        return ModelChoice(ref: ref, label: label, effort: choices?.effort ?? view?.runs.last?.effort)
+        let choices: ChatChoices = chatChoices
+        guard let ref = effectiveModel(choices, defaultRef: model.chatDefaults?.model) else { return nil }
+        return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: choices.effort)
     }
 
-    private var modelChoices: [String: [ModelChoice]] {
-        var out: [String: [ModelChoice]] = [:]
-        for provider in model.models where provider.error == nil {
-            out[provider.provider] = provider.models.flatMap { option in
-                option.efforts.count < 2
-                    ? [ModelChoice(ref: option.ref, label: option.label, effort: nil)]
-                    : option.efforts.map { ModelChoice(ref: option.ref, label: option.label, effort: $0) }
-            }
-        }
-        return out
+    /// The chat's choices as its next follow-up starts with them: those kept for it, else what its last run ran on.
+    private var chatChoices: ChatChoices {
+        if let kept = view?.newest?.choices { return kept }
+        let last: RunRecord? = view?.runs.last { $0.parentRunId == nil }
+        return ChatChoices.daemons.with(model: last?.model, effort: last?.effort)
     }
 
-    private func choose(_ choice: ModelChoice) {
-        let base: ChatChoices = view?.newest?.choices ?? ChatChoices(mode: "auto", model: nil, effort: nil, speed: "standard", approvals: nil, goalMode: nil)
-        model.perform(.choices(thread: thread, choices: base.with(model: choice.ref, effort: choice.effort)))
+    private func keep(_ settings: ChatSettingsDraft) {
+        if settings.choices != chatChoices { model.perform(.choices(thread: thread, choices: settings.choices)) }
+        planFirst = settings.planFirst
+        panel = nil
     }
 
     // MARK: Header
+
+    /// A bot's header in a bot's chat, the plain chat's otherwise.
+    @ToolbarContentBuilder private var chrome: some ToolbarContent {
+        if let botChat {
+            BotHeader(
+                chat: botChat,
+                subtitle: chat.flatMap {
+                    freshnessLine(
+                        freshness: $0.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread],
+                        now: .now)
+                },
+                find: {
+                    findIndex = 0
+                    finding = ""
+                }, library: { panel = .files })
+        } else {
+            header
+        }
+    }
 
     @ToolbarContentBuilder private var header: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button(String(localized: "Changes and files", comment: "Chat header quick panel: what the run changed"), systemImage: "folder") { panel = .inspector }
             Button(String(localized: "Agents", comment: "Chat header quick panel: the chat's helpers"), systemImage: "person.2") { panel = .agents }
-            if activeRun != nil {
-                Button(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), systemImage: "stop.fill") { if confirmStop { confirmingStop = true } else { stop() } }
-            }
         }
     }
 
     private var subtitle: String {
         if let chat, let line = freshnessLine(
-            freshness: chat.freshness, transport: model.snapshot.transport, savedAt: model.snapshot.savedAt[thread], workingAt: model.snapshot.workingAt[thread], now: .now)
+            freshness: chat.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread], now: .now)
         {
             return line
         }
@@ -536,22 +596,32 @@ struct ChatScreen: View {
         }
     }
 
-    /// What the run at work does now, for the capsule (thinking, writing, the tool that runs); `nil` between steps.
+    /// The capsule's words in place of "Working" (item 1880, the owner's reference app): "Waiting on N helpers" while the
+    /// main run's own step only waits for its helpers (N still working); `nil` while it takes a step of its own, which
+    /// the capsule says as "Working" with the turn's clock.
     private var activityWords: String? {
-        guard capsuleStatus == .working, let run = activeRun, let chat, let now = activity(of: chat, run: run.id) else { return nil }
-        switch now {
-        case .thinking: return String(localized: "Thinking", comment: "Capsule: the run's model is thinking")
-        case .writing: return String(localized: "Writing", comment: "Capsule: the run's model is writing its words")
-        case .tool(let step):
-            return toolLine(
-                ToolEntry(
-                    id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [],
-                    startedAt: step.at, endedAt: nil))
-        }
+        guard capsuleStatus == .working, let run = activeRun, let chat, case .tool(let step)? = activity(of: chat, run: run.id) else { return nil }
+        let working: Int = newestRunHelpers.filter { helperState($0.status).isLive }.count
+        guard working > 0, isHelperStep(step.tool) else { return nil }
+        return String(localized: "Waiting on \(working) helpers", comment: "Capsule: the run waits for its helpers; the argument is how many still work")
+    }
+
+    /// The plan of the chat's newest run, live as its steps are done; `nil` when that run keeps none. Zen filters the
+    /// plan out of its transcript, and the pill is its only place, so it is read from a transcript of every row.
+    private func newestPlan(_ items: [TranscriptItem]) -> [PlanStep]? {
+        guard let run = ownRuns.last else { return nil }
+        return plan(of: run.id, in: mode == .zen ? transcript(in: .showAll) : items)
     }
 
     @ViewBuilder private func sheet(_ panel: ChatPanel) -> some View {
         switch panel {
+        case .plan:
+            ScrollView {
+                PlanSteps(steps: newestPlan(builtItems) ?? [])
+                    .padding(.horizontal, Space.gutter)
+                    .padding(.vertical, Space.m)
+            }
+            .inspectorSheet(title: String(localized: "Plan", comment: "Inspector section: the run's plan"), close: { self.panel = nil })
         case .agents:
             LiveAgentsSheet(thread: thread, close: { self.panel = nil })
         case .background:
@@ -564,21 +634,10 @@ struct ChatScreen: View {
         case .inspector, .files, .screen:
             RunInspector(thread: thread, close: { self.panel = nil })
         case .model:
-            List(modelChoices.keys.sorted(), id: \.self) { provider in
-                Section(provider) {
-                    ForEach(modelChoices[provider] ?? []) { choice in
-                        Button {
-                            choose(choice)
-                            self.panel = nil
-                        } label: {
-                            InspectorRow(title: [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · "), systemImage: "cpu",
-                                accessory: choice == currentModel ? .detail("✓") : .none)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .inspectorSheet(title: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), close: { self.panel = nil })
+            ChatSettingsSheet(
+                initial: ChatSettingsDraft(choices: chatChoices, planFirst: planFirst), providers: model.models, defaults: model.chatDefaults,
+                problem: model.modelsProblem, retry: { Task { await model.loadModels() } },
+                confirm: { keep($0) }, cancel: { self.panel = nil })
         }
     }
 
@@ -591,6 +650,32 @@ struct ChatScreen: View {
         guard sizeClass == .regular else { return nil }
         return ProseColumn.width(charactersPerLine: ReadingWidth.current(readingWidthRaw).charactersPerLine, font: ProseColumn.bodyFont(dynamicTypeSize))
     }
+}
+
+/// A transcript as the stream draws it, at its top and inside each folded run: no plan (the chip beside the capsule)
+/// and no helper group (the capsule's people segment and its Agents sheet), item 1880. Pure.
+func streamItems(_ items: [TranscriptItem]) -> [TranscriptItem] {
+    items.compactMap { item in
+        switch item {
+        case .plan, .helpers: return nil
+        case .work(let fold):
+            return .work(WorkFold(id: fold.id, seconds: fold.seconds, tally: fold.tally, items: streamItems(fold.items)))
+        default: return item
+        }
+    }
+}
+
+/// The plan a run keeps, from the transcript, a folded run's included; `nil` when it keeps none. Pure.
+func plan(of run: String, in items: [TranscriptItem]) -> [PlanStep]? {
+    for item in items.reversed() {
+        switch item {
+        case .plan(let id, let steps) where id == "plan:\(run)": return steps
+        case .work(let fold):
+            if let steps = plan(of: run, in: fold.items) { return steps }
+        default: continue
+        }
+    }
+    return nil
 }
 
 /// A side question and the run's answer (`/btw`).

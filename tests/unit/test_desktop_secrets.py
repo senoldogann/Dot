@@ -161,6 +161,7 @@ def _notes_env(tmp_path: Path, expected_front: int | None) -> StepEnv:
         expected_pointer=None,
         preferred=frozenset(),
         secure_field=lambda inspection, what: None,
+        owner_here=False,
     )
 
 

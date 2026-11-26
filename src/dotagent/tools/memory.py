@@ -12,6 +12,7 @@ from typing import Annotated
 
 from pydantic import Field
 
+from dotagent.memory.held import MOST_HELD, HeldNote, hold_note
 from dotagent.memory.render import render_note
 from dotagent.memory.service import (
     CORE_TAG,
@@ -19,16 +20,19 @@ from dotagent.memory.service import (
     SEPARATE_TAG,
     MemoryHit,
     SavedMemory,
+    checked_text,
     forget_memory,
     normalize_tags,
+    propose_memory_rewrite,
     recall_for,
     rewrite_memory_note,
-    save_memory,
 )
+from dotagent.memory.supersede import Replacing, handed_echo, normalize_subject, save_replacing
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.secrets import known_secrets
 from dotagent.store.models import MemoryRecord, MemoryRewrite
+from dotagent.store.provenance import holds_saves
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -46,8 +50,28 @@ from dotagent.tools.context import ToolContext
 
 _TIMEOUT_S: float = 60.0
 _SUMMARY_CHARS: int = 200
+# The longest subject a run gives a note (the store keeps it as :func:`normalize_subject` cuts it).
+_MOST_SUBJECT_CHARS: int = 60
 # The longest a note may be saved for a while: past a few years a fact is one that holds until it changes.
 _MOST_VALID_DAYS: int = 3650
+# What a scheduled task's, a watcher's or a helper's save and rewrite say (item 1865): they wait for the owner.
+_HELD: str = (
+    "Proposed, not saved: a scheduled task, a watcher's task or a helper writes no lasting note on its own, so this "
+    "waits for the owner on the Memory page, who saves it or dismisses it. Go on with the task; no other run is "
+    "handed it until then."
+)
+_HELD_CHANGE: str = (
+    "Proposed: a scheduled task, a watcher's task or a helper changes no note on its own, so your change waits for the "
+    "owner on the Memory page and is not handed to any run until they take it."
+)
+_HELD_DAYS: str = (
+    " The days you gave are not kept with a proposal: the note keeps the time it has when the owner takes the change."
+)
+# What a save of the words of a note recall handed the run says (item 1866): it is not saved again.
+_ECHO: str = (
+    "Not saved: these are the words of a note you were handed in this task, which is kept as it is. Save only what is "
+    "new; if its fact changed, save the new fact (under its subject) or correct it with memory_update:"
+)
 # What a run's rewrite of a note the owner wrote or approved says: it waits for them (audit 2026-11-24, D1).
 _PROPOSED: str = (
     "Proposed: the owner wrote or approved this note, so your change waits for them on the Memory page and is not "
@@ -93,15 +117,27 @@ async def _secret_refusal(content: str) -> ToolResult | None:
     )
 
 
-def render_saved(saved: SavedMemory) -> str:
-    """What the model reads after saving: the note, or that it existed, plus the notes it may now have outdated."""
-    if not saved.created:
-        return f"Already saved: {render_note(saved.record)}"
-    lines: list[str] = [f"Saved: {render_note(saved.record)}"]
+def render_saved(result: Replacing) -> str:
+    """What the model reads after saving: the note, or that it existed, the notes it replaced (kept, resting), the notes
+    of the same fact it could not replace, and the notes it may still have outdated."""
+    saved: SavedMemory = result.saved
+    lines: list[str] = [f"{'Saved' if saved.created else 'Already saved'}: {render_note(saved.record)}"]
+    if result.replaced:
+        lines.append(
+            "It replaced these older notes, which rest now (kept: the owner can wake them) and are no longer recalled:"
+        )
+        lines.extend(f"- {render_note(record)}" for record in result.replaced)
+    if result.kept:
+        lines.append(
+            "These notes of the same fact stay as they are, since the owner wrote or approved them or this run read "
+            "outside content; to change one, use memory_update (the owner decides) or tell the owner:"
+        )
+        lines.extend(f"- {render_note(record)}" for record in result.kept)
     if saved.similar:
         lines.append(
             "These saved notes say nearly the same. If one is outdated or contradicts the new note, "
-            "remove it with memory_forget:"
+            "remove it with memory_forget (next time give both notes the same subject, and the newer replaces the "
+            "older):"
         )
         lines.extend(f"- {render_note(hit.record)}" for hit in saved.similar)
     return "\n".join(lines)
@@ -155,6 +191,14 @@ class SaveArgs(ToolArgs):
         le=_MOST_VALID_DAYS,
         description=("Days a short-lived fact stays true (a trip, a deadline, an offer); none for a lasting one."),
     )
+    subject: str | None = Field(
+        default=None,
+        max_length=_MOST_SUBJECT_CHARS,
+        description=(
+            "A short name for the fact's slot when it has one current value, like 'user-city'; a newer note with the "
+            "same subject replaces the older. Omit for facts that add up."
+        ),
+    )
 
 
 def expiry_of(valid_days: int | None, now: float) -> float | None:
@@ -163,7 +207,13 @@ def expiry_of(valid_days: int | None, now: float) -> float | None:
     return None if valid_days is None else now + valid_days * 86400.0
 
 
-def _save_tool() -> RegisteredTool:
+def _length_rule(max_chars: int) -> str:
+    """What a note may hold, said in the tools that write one: a run on the owner's plan sent 6 of 21 notes over the
+    limit, which no word of its tools named (the audit of 2026-11-24)."""
+    return f" A note holds at most {max_chars} characters; a longer one is refused, so split it into single facts."
+
+
+def _save_tool(max_chars: int) -> RegisteredTool:
     def classify(args: SaveArgs, ctx: ToolContext) -> ActionInfo:
         flags: tuple[Flag, ...] = ("persistence", "exfiltration") if looks_like_key(args.content) else ("persistence",)
         return _write_action("memory_save", f"Remember: {args.content}", flags)
@@ -175,10 +225,41 @@ def _save_tool() -> RegisteredTool:
         # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94). A run that had read
         # content third parties can author saves a tainted note: yolo removes the approval, not the origin.
         expires_at: float | None = expiry_of(args.valid_days, time.time())
+        echo: MemoryRecord | None = await handed_echo(ctx.runtime.memory, ctx.run_id, args.content)
+        if echo is not None:
+            return ok(f"{_ECHO} {render_note(echo)}")
+        if holds_saves(await ctx.runtime.memory.store.origin_of_run(ctx.run_id)):
+            held: HeldNote | None = await hold_note(
+                ctx.runtime.bus,
+                ctx.runtime.memory.store,
+                ctx.run_id,
+                checked_text(args.content, ctx.runtime.memory.config.max_chars),
+                normalize_tags(_own_tags(args.tags)),
+                None if args.subject is None else normalize_subject(args.subject),
+                expires_at,
+                ctx.ever_tainted(),
+            )
+            if held is None:
+                return ok(
+                    f"Not kept: this task holds the {MOST_HELD} notes one task may propose, so this one is neither "
+                    "saved nor proposed. Go on with the task; tell the owner in your answer if it matters."
+                )
+            if held.state != "proposed":
+                return ok(
+                    f"Not proposed again: the owner {held.state} these words already in this task "
+                    f"[{ctx.run_id} #{held.index}]. Go on with the task."
+                )
+            return ok(f"{_HELD} [{ctx.run_id} #{held.index}] {held.content}")
         # Read at any time in the run, not as it stands: the owner's "go on" clears the run's taint, not the page's
         # words it may quote (the review of 2026-11-01, as skill_save does).
-        saved: SavedMemory = await save_memory(
-            ctx.runtime.memory, args.content, _own_tags(args.tags), ctx.run_id, None, expires_at, ctx.ever_tainted()
+        saved: Replacing = await save_replacing(
+            ctx.runtime.memory,
+            args.content,
+            _own_tags(args.tags),
+            ctx.run_id,
+            expires_at,
+            ctx.ever_tainted(),
+            args.subject,
         )
         return ok(render_saved(saved))
 
@@ -188,6 +269,7 @@ def _save_tool() -> RegisteredTool:
             "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, "
             "a convention that will apply again. One fact per call. Do not save secrets (one that holds a key is "
             "refused: record where the key lives), progress on the current task, or what is easy to look up again."
+            + _length_rule(max_chars)
         ),
         args_model=SaveArgs,
         modes=ALL_MODES,
@@ -255,7 +337,7 @@ def _forget_tool() -> RegisteredTool:
         description=(
             "Forget a saved note by its id, for example because it is outdated or wrong. It is no longer recalled or "
             "found: it goes to the owner's trash, where it waits some days and the owner can restore it (you cannot). "
-            "When a fact has changed, forget the old note and save the corrected one."
+            "For a fact that changed, save the new one under the old note's subject (forget it if it has none)."
         ),
         args_model=ForgetArgs,
         modes=ACTING_MODES,
@@ -286,7 +368,7 @@ class UpdateArgs(ToolArgs):
     )
 
 
-def _update_tool() -> RegisteredTool:
+def _update_tool(max_chars: int) -> RegisteredTool:
     async def classify(args: UpdateArgs, ctx: ToolContext) -> ActionInfo:
         record: MemoryRecord = await ctx.runtime.memory.store.get_memory(args.memory_id)
         flags: tuple[Flag, ...] = ("persistence", "exfiltration") if looks_like_key(args.content) else ("persistence",)
@@ -296,6 +378,18 @@ def _update_tool() -> RegisteredTool:
         refused: ToolResult | None = await _secret_refusal(args.content)
         if refused is not None:
             return refused
+        if holds_saves(await ctx.runtime.memory.store.origin_of_run(ctx.run_id)):
+            waiting: MemoryRecord = await propose_memory_rewrite(
+                ctx.runtime.memory,
+                args.memory_id,
+                args.content,
+                _own_tags(args.tags, (await ctx.runtime.memory.store.get_memory(args.memory_id)).tags),
+                ctx.run_id,
+                ctx.ever_tainted(),
+            )
+            # A proposal keeps no time of its own: the note keeps the time it has when the owner takes the change.
+            days: str = "" if args.valid_days is None else _HELD_DAYS
+            return ok(f"{_HELD_CHANGE}{days} The note runs are handed stays: {render_note(waiting)}")
         rewrite: MemoryRewrite = await rewrite_memory_note(
             ctx.runtime.memory,
             args.memory_id,
@@ -313,7 +407,7 @@ def _update_tool() -> RegisteredTool:
         name="memory_update",
         description=(
             "Rewrite a saved note whose fact has changed or was wrong, keeping its id. Prefer it over forgetting and "
-            "saving again."
+            "saving again." + _length_rule(max_chars)
         ),
         args_model=UpdateArgs,
         modes=ACTING_MODES,
@@ -324,5 +418,7 @@ def _update_tool() -> RegisteredTool:
     )
 
 
-def build_memory_tools() -> tuple[RegisteredTool, ...]:
-    return (_save_tool(), _search_tool(), _update_tool(), _forget_tool())
+def build_memory_tools(max_chars: int) -> tuple[RegisteredTool, ...]:
+    """The tools of Dot's memory; ``max_chars`` is the longest note (``[memory] max_chars``), which the tools that write
+    one name."""
+    return (_save_tool(max_chars), _search_tool(), _update_tool(max_chars), _forget_tool())

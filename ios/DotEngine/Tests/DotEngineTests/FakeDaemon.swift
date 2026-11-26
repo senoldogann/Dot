@@ -23,10 +23,14 @@ final class FakeDaemon: @unchecked Sendable {
         var queue: [QueuedMessageView]
         var held: Bool
         var asks: [ApprovalRecord]
+        /// Its latest run ended after the owner last saw it (item 131); `PATCH {seen: true}` clears it.
+        var unread: Bool
     }
 
     let host: DaemonHost
     let version: String
+    /// The id of its database: each fake daemon is a database of its own, as a reset Dot is.
+    let store: String = "store_\(UUID().uuidString.prefix(8).lowercased())"
     private let lock: NSLock = NSLock()
     private var chats: [String: Chat] = [:]
     private var runs: [String: RunRecord] = [:]
@@ -44,6 +48,8 @@ final class FakeDaemon: @unchecked Sendable {
     private(set) var acceptedTexts: [String] = []
     private var uploads: Int = 0
     private var decided: [String: String] = [:]
+    private var voiceBytes: [String: Int] = [:]
+    private var voicePieces: [String: Int] = [:]
 
     var uploadCount: Int { lock.withLock { uploads } }
 
@@ -141,7 +147,7 @@ final class FakeDaemon: @unchecked Sendable {
         let record: ThreadRecord = ThreadRecord(id: id, title: title, source: "ui", createdAt: 1, updatedAt: 1, agentId: nil)
         lock.withLock {
             revisionCounter += 1
-            chats[id] = Chat(record: record, revision: revisionCounter, pinnedAt: nil, queue: [], held: false, asks: [])
+            chats[id] = Chat(record: record, revision: revisionCounter, pinnedAt: nil, queue: [], held: false, asks: [], unread: false)
         }
         return record
     }
@@ -213,6 +219,14 @@ final class FakeDaemon: @unchecked Sendable {
     }
 
     /// Moves a chat's revision; `tell` false is a change whose `thread_changed` was lost.
+    /// The chat's latest run ended unseen: its row says unread, told to the list.
+    func markUnread(_ thread: String) {
+        lock.withLock { chats[thread]?.unread = true }
+        bump(thread, tell: true)
+    }
+
+    func isUnread(_ thread: String) -> Bool { lock.withLock { chats[thread]?.unread ?? false } }
+
     func bump(_ thread: String, tell: Bool) {
         let revision: Int? = lock.withLock {
             guard chats[thread] != nil else { return nil }
@@ -354,7 +368,7 @@ final class FakeDaemon: @unchecked Sendable {
         if old, path == "/api/threads/view" || path.hasSuffix("/stream") || path.hasSuffix("/view") { return Self.refused(404, "Not Found") }
         if method == "GET", let found: [String] = Self.match(parts, ["api", "status"]) {
             _ = found
-            return Reply(status: 200, body: Self.json(DaemonStatus(version: version)), stream: false, lost: false)
+            return Reply(status: 200, body: Self.json(DaemonStatus(version: version, storeId: store)), stream: false, lost: false)
         }
         if method == "GET", let found: [String] = Self.match(parts, ["api", "threads", "view"]) {
             _ = found
@@ -378,6 +392,9 @@ final class FakeDaemon: @unchecked Sendable {
             let thread: String = found[0]
             return queue(thread: thread, body: body)
         }
+        if method == "POST", Self.match(parts, ["api", "runs"]) != nil {
+            return startChat(body: body)
+        }
         if method == "POST", let found: [String] = Self.match(parts, ["api", "runs", "*", "steer"]) {
             let run: String = found[0]
             return steer(run: run, body: body)
@@ -390,10 +407,13 @@ final class FakeDaemon: @unchecked Sendable {
         }
         if method == "PATCH", let found: [String] = Self.match(parts, ["api", "threads", "*"]) {
             let thread: String = found[0]
-            if let fields: [String: JSONValue] = try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data()),
-                let title: String = fields["title"]?.string
-            {
+            let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
+            if let title: String = fields["title"]?.string {
                 rename(thread, to: title, tell: true)
+            }
+            if let seen: Bool = fields["seen"]?.bool {
+                lock.withLock { chats[thread]?.unread = !seen }
+                bump(thread, tell: true)
             }
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
@@ -417,6 +437,8 @@ final class FakeDaemon: @unchecked Sendable {
             let status: String = lock.withLock { decided[approval] ?? "pending" }
             return Reply(status: 200, body: Self.json(approvalRecord(approval, status: status)), stream: false, lost: false)
         }
+        if let voice: Reply = voiceReply(method: method, parts: parts, body: body) { return voice }
+        if let models: Reply = modelsReply(method: method, parts: parts, body: body) { return models }
         if method == "DELETE", let found: [String] = Self.match(parts, ["api", "threads"]) {
             _ = found
             if let fields: [String: [String]] = try? JSONDecoder().decode([String: [String]].self, from: body ?? Data()) {
@@ -426,6 +448,86 @@ final class FakeDaemon: @unchecked Sendable {
         }
         return Self.refused(404, "Not Found")
     }
+
+    /// The Mac's dictation (`routes_voice.py`): a stream takes its pieces in order; its end says how many bytes came.
+    private func voiceReply(method: String, parts: [String], body: Data?) -> Reply? {
+        if method == "GET", Self.match(parts, ["api", "voice"]) != nil {
+            return Reply(status: 200, body: Data(#"{"transcribe":true,"why":null}"#.utf8), stream: false, lost: false)
+        }
+        if method == "POST", Self.match(parts, ["api", "voice", "streams"]) != nil {
+            let id: String = lock.withLock {
+                nextId += 1
+                voiceBytes["vs_\(nextId)"] = 0
+                return "vs_\(nextId)"
+            }
+            return Reply(status: 200, body: Data(#"{"id":"\#(id)"}"#.utf8), stream: false, lost: false)
+        }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*", "audio"]) {
+            guard let fields = try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data()),
+                let piece: Int = fields["piece"]?.int, let b64: String = fields["data_b64"]?.string, let data = Data(base64Encoded: b64)
+            else { return Self.refused(422, "bad piece") }
+            let inTurn: Bool = lock.withLock {
+                guard voiceBytes[found[0]] != nil, voicePieces[found[0], default: 0] == piece else { return false }
+                voicePieces[found[0], default: 0] += 1
+                voiceBytes[found[0], default: 0] += data.count
+                return true
+            }
+            return inTurn ? Reply(status: 204, body: Data(), stream: false, lost: false) : Self.refused(422, "piece out of turn")
+        }
+        if method == "POST", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*", "end"]) {
+            guard let bytes: Int = lock.withLock({ voiceBytes.removeValue(forKey: found[0]) }) else { return Self.refused(404, "no such stream") }
+            return Reply(status: 200, body: Data(#"{"text":"heard \#(bytes) bytes"}"#.utf8), stream: false, lost: false)
+        }
+        if method == "DELETE", let found: [String] = Self.match(parts, ["api", "voice", "streams", "*"]) {
+            lock.withLock { voiceBytes[found[0]] = nil }
+            return Reply(status: 204, body: Data(), stream: false, lost: false)
+        }
+        return nil
+    }
+
+    /// Settings › Models' routes (item 1907): each write answers with what it kept, as the daemon's do.
+    private func modelsReply(method: String, parts: [String], body: Data?) -> Reply? {
+        let fields: [String: JSONValue] = (try? JSONDecoder().decode([String: JSONValue].self, from: body ?? Data())) ?? [:]
+        func ok(_ json: String) -> Reply { Reply(status: 200, body: Data(json.utf8), stream: false, lost: false) }
+        let config: (String, [String]) -> String = { kind, standby in
+            let list: String = standby.map { "\"\($0)\"" }.joined(separator: ",")
+            let kinds: String = kind.isEmpty ? "{}" : #"{"security":"\#(kind)"}"#
+            return #"{"main":"m:main","vision":"m:see","fast":"m:fast","review":"m:review","effort":"medium","helpers":[],"standby":[\#(list)],"kinds":\#(kinds)}"#
+        }
+        switch (method, parts) {
+        case ("PUT", ["api", "models", "kinds"]):
+            return ok(config(fields["model"]?.string ?? "", []))
+        case ("PUT", ["api", "models", "standby"]):
+            return ok(config("", (fields["models"]?.array ?? []).compactMap(\.string)))
+        case ("GET", ["api", "models", "learning"]):
+            return ok(#"{"proposer":"","composer":"m:compose","selector":"","experience":"","review":"m:review"}"#)
+        case ("PUT", ["api", "models", "learning"]):
+            let role: String = fields["role"]?.string ?? ""
+            let model: String = fields["model"]?.string ?? ""
+            let roles: String = ["proposer", "composer", "selector", "experience"].map { "\"\($0)\":\"\($0 == role ? model : "")\"" }.joined(separator: ",")
+            return ok("{\(roles),\"review\":\"m:review\"}")
+        case ("GET", ["api", "initiative"]):
+            return ok(#"{"enabled":true,"look_model":"","items":[]}"#)
+        case ("PUT", ["api", "initiative", "look-model"]):
+            return ok(#"{"enabled":true,"look_model":"\#(fields["model"]?.string ?? "")","items":[]}"#)
+        case ("GET", ["api", "repair"]):
+            return ok(#"{"worker":{"model":"default","effort":"default","fast":false},"worker_lost":false,"nights":[]}"#)
+        case ("PUT", ["api", "repair", "worker"]):
+            let model: String = fields["model"]?.string ?? ""
+            let effort: String = fields["effort"]?.string ?? ""
+            let fast: Bool = fields["fast"]?.bool ?? false
+            return ok(#"{"worker":{"model":"\#(model)","effort":"\#(effort)","fast":\#(fast)},"worker_lost":false}"#)
+        default:
+            return nil
+        }
+    }
+
+    /// The bodies the phone sent to a path that holds `part`, in order.
+    func bodies(_ method: String, _ part: String) -> [Data] {
+        requests.filter { $0.method == method && $0.path.contains(part) }.compactMap(\.body)
+    }
+
+    var openVoiceStreams: Int { lock.withLock { voiceBytes.count } }
 
     private func queue(thread: String, body: Data?) -> Reply {
         guard let message: QueueMessage = try? JSONDecoder().decode(QueueMessage.self, from: body ?? Data()) else {
@@ -465,6 +567,27 @@ final class FakeDaemon: @unchecked Sendable {
         return Reply(status: 201, body: Self.json(view), stream: false, lost: false)
     }
 
+    /// A new chat (`POST /api/runs`): a chat of its own and its first run, started once per key.
+    private func startChat(body: Data?) -> Reply {
+        guard let message: NewChatMessage = try? JSONDecoder().decode(NewChatMessage.self, from: body ?? Data()) else {
+            return Self.refused(422, "bad body")
+        }
+        let (first, number): (Bool, Int) = lock.withLock {
+            if let known: String = keys["run:\(message.key)"], let made: Int = Int(known) { return (false, made) }
+            nextId += 1
+            keys["run:\(message.key)"] = String(nextId)
+            return (true, nextId)
+        }
+        if first {
+            acceptedTexts.append(message.goal)
+            addChat("thr_c\(number)", title: message.goal)
+            addRun("run_c\(number)", thread: "thr_c\(number)", goal: message.goal, status: "running", parent: nil)
+        }
+        let record: RunRecord? = lock.withLock { runs["run_c\(number)"] }
+        guard let record else { return Self.refused(500, "the run was not made") }
+        return Reply(status: 201, body: Self.json(record), stream: false, lost: false)
+    }
+
     private func steer(run: String, body: Data?) -> Reply {
         guard let message: SteerMessage = try? JSONDecoder().decode(SteerMessage.self, from: body ?? Data()) else {
             return Self.refused(422, "bad body")
@@ -487,7 +610,7 @@ final class FakeDaemon: @unchecked Sendable {
         return ThreadSummary(
             id: chat.record.id, title: chat.record.title, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: chat.pinnedAt,
             runCount: 0, latestRunId: newest?.id ?? "", latestStatus: newest?.status ?? "done", latestCreatedAt: newest?.createdAt ?? 0,
-            unread: false, actorId: nil, lastMessage: "", lastRole: "user")
+            unread: chat.unread, actorId: nil, lastMessage: "", lastRole: "user")
     }
 
     func threadsView() -> ThreadsView {

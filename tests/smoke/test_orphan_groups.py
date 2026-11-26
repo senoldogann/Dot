@@ -54,12 +54,11 @@ def _files() -> list[str]:
 
 
 @pytest.fixture(autouse=True)
-def no_records() -> None:
-    """Each test starts with no group written down (the folder is the throwaway home's)."""
-    directory: Path = process_groups_dir()
-    if directory.is_dir():
-        for path in directory.glob("*.json"):
-            path.unlink()
+def own_home(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each test has a Dot home of its own, so it starts with no group written down and sees only its own: the run's
+    ``DOT_HOME`` is shared by every pytest worker, whose shell, terminal and code-mode starts write their groups into
+    the same folder, and whose runtimes' recovery ends the groups of a dead Dot there."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path_factory.mktemp("orphan-home")))
 
 
 @pytest.fixture

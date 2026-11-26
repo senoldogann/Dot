@@ -334,10 +334,28 @@ public enum ChatPhase: Sendable, Equatable {
     case done
 }
 
+/// The runs that belong to the chat itself (item 1880): those no run of the chat started. A helper's run in its parent's
+/// chat has the parent's run as its parent and is told by the helpers' group; the same run in the helper's own chat has
+/// a parent that lives in another chat, so it is this chat's own run and the chat shows its steps and answer. Pure.
+public func ownRuns(of view: ThreadView) -> [RunRecord] {
+    ownRuns(in: view.runs, helperRunIds: view.helpers.map(\.runId))
+}
+
+/// `ownRuns(of:)` on the view's runs and the runs its helpers' group lists (a window that lost a parent run still hides
+/// the helper the view names).
+public func ownRuns(in runs: [RunRecord], helperRunIds: [String]) -> [RunRecord] {
+    let inChat: Set<String> = Set(runs.map(\.id))
+    let helpers: Set<String> = Set(helperRunIds)
+    return runs.filter { run in
+        guard let parent: String = run.parentRunId else { return true }
+        return !inChat.contains(parent) && !helpers.contains(run.id)
+    }
+}
+
 public func chatPhase(of view: ThreadView?) -> ChatPhase {
     guard let view else { return .idle }
     if !view.asks.isEmpty { return .waitingOnYou }
-    let own: [RunRecord] = view.runs.filter { $0.parentRunId == nil }
+    let own: [RunRecord] = ownRuns(of: view)
     guard let newest: RunRecord = own.max(by: { $0.createdAt < $1.createdAt }) else { return .idle }
     switch newest.status {
     case "blocked": return .waitingOnYou
@@ -352,9 +370,10 @@ public func chatPhase(of view: ThreadView?) -> ChatPhase {
 
 // MARK: Scrolling
 
-/// Whether the transcript follows new words: only while the owner reads near its end (plan §13 S5).
-public func followsNewWords(distanceFromEnd: Double, viewport: Double) -> Bool {
-    distanceFromEnd <= max(80, viewport * 0.25)
+/// Whether the owner is at the transcript's end, where it follows new words (plan §13 S5, item 1848): a few points of
+/// slack, never a screenful, so a short scroll up to read is not pulled back down by the next word. Pure.
+public func isAtEnd(distanceFromEnd: Double) -> Bool {
+    distanceFromEnd <= 24
 }
 
 // MARK: Titles

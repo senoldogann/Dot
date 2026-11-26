@@ -109,6 +109,9 @@ public struct ModelsConfig: Codable, Sendable, Hashable {
     public let effort: String
     public let helpers: [String]
     public let standby: [String]
+    /// The model a run of a kind of task starts on when none is chosen for it (item 1889; `security`), absent from a
+    /// daemon before it and for a kind left to the main model.
+    public let kinds: [String: String]?
 
     public init(main: String, vision: String, fast: String, review: String, effort: String, helpers: [String], standby: [String]) {
         self.main = main
@@ -118,6 +121,7 @@ public struct ModelsConfig: Codable, Sendable, Hashable {
         self.effort = effort
         self.helpers = helpers
         self.standby = standby
+        self.kinds = nil
     }
 }
 
@@ -128,7 +132,7 @@ public enum ModelRole: String, Codable, Sendable, CaseIterable {
     case vision
 }
 
-/// `GET /api/code-review` (item 1663): the models of the pre-push review; a phone reads it and cannot change it.
+/// `GET /api/code-review` (item 1663): the models of the pre-push review; a phone changes it too (item 1770).
 public struct CodeReviewConfig: Codable, Sendable, Hashable {
     public let model: String
     public let effort: String
@@ -146,6 +150,36 @@ public struct CodeReviewConfig: Codable, Sendable, Hashable {
         self.smallModel = smallModel
         self.smallMaxLines = smallMaxLines
         self.maxMinutes = maxMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case model, effort, fallback
+        case fallbackEffort = "fallback_effort"
+        case smallModel = "small_model"
+        case smallMaxLines = "small_max_lines"
+        case maxMinutes = "max_minutes"
+    }
+}
+
+/// The body of `PUT /api/code-review` (item 1770): the whole table as it should stand, both efforts included.
+public struct CodeReviewChange: Codable, Sendable, Hashable {
+    public var model: String
+    public var effort: String
+    public var fallback: [String]
+    public var fallbackEffort: String
+    public var smallModel: String
+    public var smallMaxLines: Int
+    public var maxMinutes: Int
+
+    /// The table as it stands, to change one part of.
+    public init(_ config: CodeReviewConfig) {
+        model = config.model
+        effort = config.effort
+        fallback = config.fallback
+        fallbackEffort = config.fallbackEffort
+        smallModel = config.smallModel
+        smallMaxLines = config.smallMaxLines
+        maxMinutes = config.maxMinutes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -599,4 +633,81 @@ public struct ProofAnswer: Codable, Sendable, Hashable {
     public let proof: String
 
     public init(proof: String) { self.proof = proof }
+}
+
+/// A role of the night's learning (item 1033), `PUT /api/models/learning` sets.
+public enum LearningRole: String, Codable, Sendable, CaseIterable {
+    case proposer
+    case composer
+    case selector
+    case experience
+}
+
+/// `GET`/`PUT /api/models/learning`: the model of each role of the night's learning, "" where it plays on the review
+/// model, and that review model.
+public struct LearningModels: Codable, Sendable, Hashable {
+    public let proposer: String
+    public let composer: String
+    public let selector: String
+    public let experience: String
+    public let review: String
+
+    public init(proposer: String, composer: String, selector: String, experience: String, review: String) {
+        self.proposer = proposer
+        self.composer = composer
+        self.selector = selector
+        self.experience = experience
+        self.review = review
+    }
+
+    public func model(of role: LearningRole) -> String {
+        switch role {
+        case .proposer: proposer
+        case .composer: composer
+        case .selector: selector
+        case .experience: experience
+        }
+    }
+}
+
+/// The part of `GET /api/initiative` the Models page reads: the model that looks for work on Dot's own initiative
+/// (item 916), "" for the main model.
+public struct InitiativeLook: Codable, Sendable, Hashable {
+    public let lookModel: String
+
+    public init(lookModel: String) { self.lookModel = lookModel }
+
+    enum CodingKeys: String, CodingKey {
+        case lookModel = "look_model"
+    }
+}
+
+/// How Claude Code works for self-repair (item 933): its model of the Claude plan (`default`, `opus`, …), its effort
+/// (`default`, `low` … `max`) and fast mode.
+public struct RepairWorker: Codable, Sendable, Hashable {
+    public let model: String
+    public let effort: String
+    public let fast: Bool
+
+    public init(model: String, effort: String, fast: Bool) {
+        self.model = model
+        self.effort = effort
+        self.fast = fast
+    }
+}
+
+/// The part of `GET /api/repair` the Models page reads: the worker, and whether its kept choice could not be read.
+public struct RepairWorkerView: Codable, Sendable, Hashable {
+    public let worker: RepairWorker
+    public let workerLost: Bool
+
+    public init(worker: RepairWorker, workerLost: Bool) {
+        self.worker = worker
+        self.workerLost = workerLost
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case worker
+        case workerLost = "worker_lost"
+    }
 }

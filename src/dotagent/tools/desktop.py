@@ -6,18 +6,21 @@ of steps is classified once from the controls it targets, and each step is judge
 before it runs; a step that turns out riskier than what was approved goes back to the gate on its own.
 """
 
+import asyncio
 import base64
 import os
 import secrets
+import time
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
-from dotagent.config import AppConfig
+from dotagent.config import AppConfig, DesktopConfig
 from dotagent.core.errors import DesktopError, NotFoundError, ToolInputError
-from dotagent.core.outcomes import DESKTOP_EXPECTATIONS, echoes_written, expectation_on_last_step
+from dotagent.core.outcomes import DESKTOP_EXPECTATIONS, echoes_written, expectation_on_last_step, tally_of
 from dotagent.core.text import truncate_tail
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
@@ -32,7 +35,7 @@ from dotagent.desktop.render import (
     render_text_read,
 )
 from dotagent.desktop.safety import StepContext, assess_step, exceeds, is_secrets_app, reaches_a_shell, shell_input
-from dotagent.desktop.session import DOT_NAME, StepReview
+from dotagent.desktop.session import DOT_NAME, StepReview, StepReviewer
 from dotagent.desktop.types import (
     DESKTOP_ACT_TOOL,
     ActOutcome,
@@ -42,6 +45,7 @@ from dotagent.desktop.types import (
     ScreenshotView,
     SnapshotView,
     Step,
+    StepReport,
     TextRead,
     parse_ref,
 )
@@ -64,7 +68,7 @@ from dotagent.tools.base import (
     text_room,
 )
 from dotagent.tools.batch import batch_cut_note, first_steps
-from dotagent.tools.context import ToolContext
+from dotagent.tools.context import OwnerWords, ToolContext
 
 _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 3500  # room next to the window body for steps, notes and the fence lines
@@ -83,6 +87,138 @@ _REF_HELP: str = (
     "Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, "
     "and then you take a new snapshot."
 )
+
+
+# What a run shows while a batch of desktop_act waits for the owner to step away, and when it ends (item 1890).
+DESKTOP_WAITING_EVENT: str = "desktop_waiting_away"
+DESKTOP_AWAY_EVENT: str = "desktop_away"
+
+type AwayEnd = Literal["away", "limit", "owner"]
+
+
+@dataclass(frozen=True, slots=True)
+class AwayWait:
+    """How a wait for the owner to step away ended: they did, ``away_wait_s`` went by first, or they wrote to the run
+    first; and after how long."""
+
+    end: AwayEnd
+    waited_s: float
+
+
+def _minutes(seconds: float) -> str:
+    whole: int = round(seconds)
+    if whole >= 3600:
+        return f"{whole // 3600} h {whole % 3600 // 60} min"
+    return f"{whole // 60} min {whole % 60} s" if whole >= 60 else f"{whole} s"
+
+
+def away_note(index: int, wait: AwayWait, config: DesktopConfig) -> str:
+    """What the model reads of a wait for the owner to step away before step ``index`` (item 1890)."""
+    match wait.end:
+        case "away":
+            return (
+                f"[Step {index} needed the Mac's own pointer or keyboard while the owner was at the Mac: Dot waited "
+                f"{_minutes(wait.waited_s)} until they stepped away, then went on.]"
+            )
+        case "limit":
+            return (
+                f"[Step {index} needs the Mac's own pointer or keyboard, and the owner stayed at the Mac for the "
+                f"{_minutes(config.away_wait_s)} Dot waits: it and the steps after it were not sent. Do them later, or "
+                "through press, focus, set_value and menu, which need neither.]"
+            )
+        case "owner":
+            return (
+                f"[Step {index} waited for the owner to step away, and they wrote to you meanwhile: it and the steps "
+                "after it were not sent. Read their message, which follows this result, before going on.]"
+            )
+
+
+async def _until_away(ctx: ToolContext) -> AwayWait:
+    """Wait until the owner steps away, at most ``[desktop] away_wait_s``; their own message to the run ends the wait
+    first, so that the model reads it at once (as ``wait_until`` gives way to it, item 1685)."""
+    began: float = time.monotonic()
+    owner: OwnerWords | None = ctx.owner_words
+    if owner is not None and owner.owner_unread():
+        owner.heed_owner()
+        return AwayWait(end="owner", waited_s=0.0)
+    away: asyncio.Task[float | None] = asyncio.ensure_future(
+        ctx.runtime.desktop.until_away(ctx.cancel, float(ctx.runtime.config.desktop.away_wait_s))
+    )
+    wrote: asyncio.Task[None] | None = None if owner is None else asyncio.ensure_future(owner.owner_arrival())
+    try:
+        await asyncio.wait({away} if wrote is None else {away, wrote}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for task in (away, wrote):
+            if task is not None and not task.done():
+                task.cancel()
+    waited: float = time.monotonic() - began
+    if not away.done() or away.cancelled():
+        if owner is not None:
+            owner.heed_owner()
+        return AwayWait(end="owner", waited_s=waited)
+    return AwayWait(end="limit" if away.result() is None else "away", waited_s=waited)
+
+
+@dataclass(frozen=True, slots=True)
+class DesktopBatch:
+    """A batch of desktop_act as the session runs it: where, which steps, and how each is reviewed."""
+
+    app: str | None
+    steps: tuple[Step, ...]
+    review: StepReviewer
+    secure_field: SecureFieldCheck
+    max_chars: int
+    who: str
+
+
+async def act_when_away(ctx: ToolContext, batch: DesktopBatch) -> tuple[ActOutcome, tuple[str, ...]]:
+    """Run ``batch``; a step that takes the pointer or the keyboard while the owner is at the Mac waits for them to
+    step away (item 1890), off the tool's clock, the run showing it, and the rest of the batch goes on once they did,
+    in the application the batch got to. Returns the outcome with what the model reads of each wait."""
+    config: DesktopConfig = ctx.runtime.config.desktop
+    outcome: ActOutcome = await ctx.runtime.desktop.act(
+        ctx.thread_id, batch.app, batch.steps, batch.review, batch.secure_field, batch.max_chars, batch.who, 1
+    )
+    waits: list[str] = []
+    while outcome.waits_from is not None:
+        index: int = outcome.waits_from
+        await ctx.runtime.bus.emit(
+            ctx.run_id,
+            DESKTOP_WAITING_EVENT,
+            {
+                "step": index,
+                "came_back": outcome.owner_came_back,
+                "away_after_s": config.away_after_s,
+                "until": time.time() + config.away_wait_s,
+            },
+            True,
+        )
+        wait: AwayWait = await ctx.off_clock(_until_away(ctx))
+        await ctx.runtime.bus.emit(
+            ctx.run_id, DESKTOP_AWAY_EVENT, {"step": index, "end": wait.end, "waited_s": round(wait.waited_s, 1)}, True
+        )
+        waits.append(away_note(index, wait, config))
+        if wait.end != "away":
+            break
+        rest: ActOutcome = await ctx.runtime.desktop.act(
+            ctx.thread_id,
+            None,
+            batch.steps[index - 1 :],
+            batch.review,
+            batch.secure_field,
+            batch.max_chars,
+            batch.who,
+            index,
+        )
+        outcome = joined(outcome, rest, index)
+    return outcome, tuple(waits)
+
+
+def joined(before: ActOutcome, after: ActOutcome, waits_from: int) -> ActOutcome:
+    """The outcome of a batch that waited for the owner at step ``waits_from`` and then went on: the steps done
+    before the wait, and what the rest came to."""
+    kept: tuple[StepReport, ...] = tuple(report for report in before.steps if report.index < waits_from)
+    return after.model_copy(update={"steps": (*kept, *after.steps)})
 
 
 def _nonce() -> str:
@@ -453,6 +589,10 @@ def _act_tool() -> RegisteredTool:
         )
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        # The steps of this call the owner said yes to, by number, with what they said yes to (item 1890): a step that
+        # then waited for them to step away is not asked again when the batch goes on, unless it now asks for more.
+        allowed: dict[int, ActionInfo] = {}
+
         async def review(step_review: StepReview) -> None:
             # A step that moves into an application another run drives stops the batch there (item 305).
             app: str = step_review.context.app
@@ -470,9 +610,13 @@ def _act_tool() -> RegisteredTool:
             target: str = step_review.target or step_review.context.app
             if kind == "shell":
                 target = _shell_target([step_review.step], [step_review.context], target)
-            await ctx.gate.authorize(
-                _action(DESKTOP_ACT_TOOL, kind, live.risk, _described(summary, kind, live), target, live.flags)
+            asked: ActionInfo = _action(
+                DESKTOP_ACT_TOOL, kind, live.risk, _described(summary, kind, live), target, live.flags
             )
+            if allowed.get(step_review.index) == asked:
+                return
+            await ctx.gate.authorize(asked)
+            allowed[step_review.index] = asked
 
         # A secure field is the user's outside yolo (item 429): the step's review hands a credential to them, and a
         # field found secure only as the step runs is refused. A yolo run asks nothing, and types it (item 443).
@@ -480,19 +624,22 @@ def _act_tool() -> RegisteredTool:
             refuse_secure_field if ctx.approvals != "yolo" and not ctx.runtime.approvals.free else enter_secure_field
         )
         limit: int = ctx.runtime.config.desktop.max_batch_steps
-        outcome: ActOutcome = await ctx.runtime.desktop.act(
-            ctx.thread_id,
-            args.app,
-            first_steps(args.steps, limit),
-            review,
-            secure_field,
-            snapshot_budget(ctx.runtime.config, ctx.output_chars),
-            await _who(ctx),
+        batch: DesktopBatch = DesktopBatch(
+            app=args.app,
+            steps=tuple(first_steps(args.steps, limit)),
+            review=review,
+            secure_field=secure_field,
+            max_chars=snapshot_budget(ctx.runtime.config, ctx.output_chars),
+            who=await _who(ctx),
         )
+        outcome, waits = await act_when_away(ctx, batch)
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
-        note: str = batch_cut_note(len(args.steps), limit)
+        note: str = "\n".join(part for part in (batch_cut_note(len(args.steps), limit), *waits) if part)
         rendered: str = render_act_outcome(outcome, source, _nonce())
-        return _screen_result(f"{note}\n{rendered}" if note else rendered)
+        # What the steps came to, counted, goes with the result for the run's account (item 1744).
+        return _screen_result(f"{note}\n{rendered}" if note else rendered).model_copy(
+            update={"tally": tally_of(outcome.steps)}
+        )
 
     return make_reviewed_tool(
         name=DESKTOP_ACT_TOOL,
@@ -511,7 +658,9 @@ def _act_tool() -> RegisteredTool:
             "back after set_value, type and paste, and expect_text where you gave one. Done means the step was sent; "
             "verified means Dot saw its result; not checked means only that it was sent; uncertain means it was sent "
             "and its result was not seen, so look before sending it again. Passwords, codes and card numbers go into "
-            "secure fields only as your instructions on secrets say: otherwise Dot refuses the step. " + _REF_HELP
+            "secure fields only as your instructions on secrets say: otherwise Dot refuses the step. While the owner "
+            "is at the Mac, a step that moves the pointer or sends keys waits until they step away; press, focus, "
+            "set_value and menu go at once, so prefer them. " + _REF_HELP
         ),
         args_model=ActArgs,
         modes=ACTING_MODES,

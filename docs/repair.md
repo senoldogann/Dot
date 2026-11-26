@@ -170,13 +170,18 @@ Dot pushes the branch, opens the pull request and merges it. It never takes a se
     branch on GitHub and, once the checkout is gone, here. The night goes on to the next problem (item 1110: a merge
     ended the night before, one problem a night),
     each session on a checkout of its own of the new main. Once the night is over, if it merged anything and your
-    checkout (`repo`) is on main, Dot pulls it fast-forward only and asks for its own restart once it is idle
-    (`dotx service restart --when-idle`, run with `python -P`, item 943); a checkout off main or a pull that failed is
-    told to you. Your checkout is not changed while the night works, so Dot never goes on in a process whose code on
-    disk has changed. A restart that gave up (a run waited for you two
-    hours) leaves the daemon on the code before: a night whose checkout's commit is newer than its process (by the
-    commit's time) then repairs nothing, asks for the restart again and
-    tells you (*Dot waits to restart on new code*, item 943).
+    checkout (`repo`) is on main, Dot waits for main's macOS runs (item 1899): a pull request's checks are its Linux
+    jobs alone (item 1886), so what only macOS shows is first tested by main's own run after the merge. Dot asks your
+    checkout's `scripts/main_macos_green.py check` every five minutes, for up to 90 but never past the night's two
+    hours and the half hour a push may add (so the night still ends within the three hours a restart asked meanwhile
+    waits); once main's newest commit passed, it brings your checkout up to that commit, fast-forward only, and asks
+    for its own restart once it is idle (`dotx service restart --when-idle`, run with `python -P`, item 943). Main red
+    on macOS, its runs not finished by then, a check that gives no answer, a night stopped before or during the wait, a
+    checkout off main or a pull that failed is told to you, and Dot runs the code it ran. Your checkout is not changed
+    while the night works, so Dot never goes on in a process whose code on disk has changed. A restart that gave up (a
+    run waited for you two hours) leaves the daemon on the code before: a night whose checkout's commit is newer than
+    its process (by the commit's time) then repairs nothing, asks for the restart again and tells you (*Dot waits to
+    restart on new code*, item 943).
   - `merge = "ask"` (the default): the pull request waits for you.
 - **Cleanup.** The checkout is removed afterwards. Its branch stays when it has a pull request, or commits that wait
   for you (the session asked for you, or the review still stopped it); otherwise it is deleted.
@@ -288,9 +293,10 @@ You are told, by the push, the page and iMessage, in each of these cases:
   - no round, push or wait for the checks starts once they are spent (the branch stays and the problem is tried again);
   - no session starts with less than a quarter of an hour left.
 
-  A push already under way through the review hook may add its own half hour, as the hook's review takes minutes. So
-  a night ends within about two and a half hours, and a restart asked meanwhile, which waits three hours for the
-  night's work, is not given up on. A problem left *being fixed* by a daemon that stopped short (a crash, the Mac
+  A push already under way through the review hook may add its own half hour, as the hook's review takes minutes, and
+  a night that merged waits for main's macOS runs within that same half hour past its two (item 1899). So a night
+  ends within about two and a half hours, and a restart asked meanwhile, which waits three hours for the night's work,
+  is not given up on. A problem left *being fixed* by a daemon that stopped short (a crash, the Mac
   shutting down) is open again when the next night begins.
 - **Emergency stop.** It cancels a night under way and keeps the next session from starting.
 - **The record.** Each session is kept (kv `repair.sessions`, the newest 100): its account, rounds, tokens, what it

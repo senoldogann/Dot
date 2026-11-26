@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.config import load_default_config
-from dotagent.core.errors import DesktopError
+from dotagent.core.errors import DesktopError, OwnerAtTheMac
 from dotagent.desktop import actions, apps, ax, session
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Inspection, StepEnv
@@ -40,6 +40,7 @@ def _env(tmp_path: Path) -> StepEnv:
         expected_pointer=None,
         preferred=frozenset(),
         secure_field=lambda inspection, what: None,
+        owner_here=False,
     )
 
 
@@ -123,6 +124,26 @@ def test_a_control_that_takes_no_press_is_clicked_with_its_window_in_front(
     assert seen.activated == ["Mail"]
     assert seen.posted == [("click", Point(100.0, 100.0))]
     assert effect.pointer == Point(100.0, 100.0)
+
+
+def test_while_the_owner_is_at_the_mac_a_click_is_a_press_or_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1890: the press goes, as it moves no pointer; a control that takes no press is not clicked for real while
+    the owner is here, nor brought to the front, and the step says that it waits."""
+    here: StepEnv = replace(_env(tmp_path), owner_here=True)
+    seen = _Screen(monkeypatch, "AXButton")
+    actions._click(here, Step(action="click", ref="a3"), _inspection(), 1)
+    assert seen.pressed == ["element"] and seen.posted == []
+    refused = _Screen(monkeypatch, "AXButton", press_code=_UNSUPPORTED)
+    with pytest.raises(OwnerAtTheMac):
+        actions._click(here, Step(action="click", ref="a3"), _inspection(), 1)
+    assert refused.posted == [] and refused.activated == []
+    unpressable = _Screen(monkeypatch, "AXStaticText")
+    unpressable.front = 1
+    with pytest.raises(OwnerAtTheMac):
+        actions._click(here, Step(action="click", ref="a3"), _inspection(), 1)
+    assert unpressable.posted == [] and unpressable.activated == []
 
 
 def test_a_press_that_fails_otherwise_fails_the_step(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -27,10 +27,18 @@ public struct EngineSnapshot: Sendable, Equatable {
     public var savedAt: [String: Double]
     /// When a chat's copy was saved while a run of it worked.
     public var workingAt: [String: Double]
+    /// The chats this phone started, by the outbox key of their first message: the thread the daemon named for each
+    /// (item 1849), kept for the session.
+    public var startedChats: [String: String]
+    /// The chats whose delete the daemon refused (a run or a helper of theirs at work, 409), with its words: the list
+    /// says so, as the outbox drops a refused doing (item 1800).
+    public var refusedDeletes: [String: String]
+    /// The Mac's Dot was reset and the owner was not told yet (the old chats left this phone).
+    public var reset: DaemonReset?
 
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
-        workingAt: [:])
+        workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil)
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -73,6 +81,7 @@ public actor SyncStore {
     private let cache: SyncCache
     private let clock: any EngineClock
     private var version: String?
+    private var identity: DaemonIdentity?
     private var watchers: [UUID: AsyncStream<EngineSnapshot>.Continuation] = [:]
     private var runsAtSend: [String: Set<String>] = [:]
 
@@ -84,6 +93,7 @@ public actor SyncStore {
             first.list = ListReducer.restored(list.content)
             first.savedAt["list"] = list.savedAt
         }
+        first.reset = cache.loadReset()
         self.state = first
     }
 
@@ -108,20 +118,63 @@ public actor SyncStore {
 
     // MARK: The daemon
 
-    /// The daemon's version, read at each connection; a version other than the cache's drops the cache's cursors.
-    public func daemon(version next: String) {
-        defer { version = next }
-        guard let was: String = version ?? cachedVersion(), was != next else { return }
-        cache.clear()
+    /// How the daemon heard now stands to the one the copies came from (`DaemonRules.change`).
+    public func change(to next: DaemonIdentity) -> DaemonChange {
+        DaemonRules.change(from: knownDaemon(), to: next)
+    }
+
+    /// The daemon heard at each connection: another version or another database drops the copies and their cursors (a
+    /// reset daemon's revisions start again below the copies', so a copy kept would never go live); another database
+    /// also drops what this phone knew it sent there.
+    public func daemon(_ next: DaemonIdentity) {
+        let change: DaemonChange = DaemonRules.change(from: knownDaemon(), to: next)
+        if identity != next {
+            if cache.loadDaemon() != next { cache.saveDaemon(next) }
+            identity = next
+            version = next.version
+        }
+        guard change != .same else { return }
+        cache.dropPictures()
         state.savedAt = [:]
         state.workingAt = [:]
         for id in state.chats.keys { state.chats[id] = ChatProjection(threadId: id) }
         state.list = ListProjection()
+        if change == .reset {
+            state.accepted = [:]
+            state.startedChats = [:]
+            runsAtSend = [:]
+        }
         publish()
     }
 
-    private func cachedVersion() -> String? {
-        cache.loadList(now: clock.now())?.daemonVersion
+    private func knownDaemon() -> DaemonIdentity? {
+        identity ?? cache.loadDaemon() ?? cache.loadList(now: clock.now()).map { DaemonIdentity(version: $0.daemonVersion, store: nil) }
+    }
+
+    /// The Mac's Dot was reset: the owner is told once, with the messages the reset left unsent (added to those of an
+    /// earlier reset not yet told, each once).
+    public func told(resetWith unsent: [UnsentWords]) {
+        let next: DaemonReset = DaemonReset(at: clock.now(), unsent: DaemonRules.merged(state.reset?.unsent ?? [], unsent), taken: false)
+        cache.saveReset(next)
+        state.reset = next
+        publish()
+    }
+
+    /// The app put the reset's words (and the old chats' drafts) in the new chat's draft: they are not handed again.
+    public func resetTaken() {
+        guard let reset: DaemonReset = state.reset, !reset.taken else { return }
+        let next: DaemonReset = DaemonReset(at: reset.at, unsent: reset.unsent.map { UnsentWords(key: $0.key, text: "", photos: $0.photos) }, taken: true)
+        cache.saveReset(next)
+        state.reset = next
+        publish()
+    }
+
+    /// The owner read the reset's notice.
+    public func resetSeen() {
+        guard state.reset != nil else { return }
+        cache.saveReset(nil)
+        state.reset = nil
+        publish()
     }
 
     public func set(transport: Transport) {
@@ -188,6 +241,14 @@ public actor SyncStore {
     }
 
     public var listIsLive: Bool { state.list.freshness == .live }
+
+    /// Whether the outbox may send a doing now: once the daemon was heard in this session, and a new chat only on a live
+    /// list (`Outbox.maySend`).
+    public func maySend(_ action: OutboxItem.Action) -> Bool {
+        guard identity != nil else { return false }
+        if case .newChat = action { return listIsLive }
+        return true
+    }
 
     // MARK: Chats
 
@@ -309,26 +370,45 @@ public actor SyncStore {
     }
 
     public func outcome(_ outcome: OutboxOutcome) {
+        if case .refused(let item, let failure) = outcome, case .delete(let thread) = item.action {
+            state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" }
+            publish()
+            return
+        }
         let key: String? =
             switch outcome {
             case .delivered(let item, _), .steered(let item), .started(let item, _): item.id
             default: nil
             }
         let before: Set<String> = key.flatMap { runsAtSend.removeValue(forKey: $0) } ?? []
+        var changed: Bool = false
+        if case .started(let item, let run) = outcome {
+            state.startedChats[item.id] = run.threadId
+            changed = true
+        }
         if let message: AcceptedMessage = accepted(from: outcome, at: clock.now(), runsBefore: before) {
             state.accepted[message.key] = message
             pruneAccepted()
-            publish()
+            changed = true
         }
+        if changed { publish() }
+    }
+
+    /// The list told the owner of the refused deletes: they are let go.
+    public func forgetRefusedDeletes() {
+        guard !state.refusedDeletes.isEmpty else { return }
+        state.refusedDeletes = [:]
+        publish()
     }
 
     /// Drops the overlay of a message the chat now shows in its own place.
     private func pruneAccepted() {
         for (key, message) in state.accepted {
             guard let thread: String = message.thread, let chat: ChatProjection = state.chats[thread] else {
-                // A new chat: dropped once the list has its row.
-                if message.kind == .run, let thread: String = message.thread, state.list.rows.contains(where: { $0.summary.id == thread }),
-                    state.chats[thread] == nil
+                // A new chat: dropped once the list has its row, unless this phone started it (item 1849): the chat opens
+                // at once and draws the owner's words from this overlay until its own picture shows them, below.
+                if message.kind == .run, state.startedChats[key] == nil, let thread: String = message.thread,
+                    state.list.rows.contains(where: { $0.summary.id == thread }), state.chats[thread] == nil
                 {
                     state.accepted[key] = nil
                 }
@@ -344,6 +424,7 @@ public actor SyncStore {
         cache.clear()
         state = .empty
         version = nil
+        identity = nil
         publish()
     }
 }

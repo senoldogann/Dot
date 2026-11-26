@@ -1,7 +1,7 @@
 import XCTest
 
 /// A walk of the app against a real daemon over the tailnet (the owner allowed it, 2026-11-25): every native Settings
-/// page read (nothing of the owner's settings is changed), a web row, and one short "[test]" chat on the daemon's
+/// page read (nothing of the owner's settings is changed), and one short "[test]" chat on the daemon's
 /// default model, which the calling script deletes afterwards. Skipped unless the script names the daemon
 /// (`DOTNEXT_REAL_HOST`, `DOTNEXT_REAL_KEY`).
 @MainActor
@@ -26,13 +26,18 @@ final class RealDaemonWalkUITests: XCTestCase {
 
     func testEverySettingsPageReadsTheRealMac() throws {
         let app: XCUIApplication = try launch(scene: "settings")
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 20), "the emergency stop at the top (never pressed here)")
-        open(app, "This Mac")
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 20), "the settings sheet")
+        open(app, "Dot's computer")
         XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 30))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        let pages: [String] = ["Notifications", "General", "Appearance", "Chat", "Models", "Usage limits and caps", "Scheduled tasks", "Rules", "Memory", "Health and version", "Usage"]
-        for page in pages {
-            open(app, page)
+        // Each row of the settings sheet (PLAN §27) and the title of the page it opens.
+        let pages: [(String, String)] = [
+            ("Notifications", "Notifications"), ("General", "General"), ("Appearance", "Appearance"), ("Chat", "Chat"), ("Models", "Models"),
+            ("Usage limits and caps", "Usage limits and caps"), ("Scheduled tasks", "Scheduled tasks"), ("Permissions", "Rules"), ("Memory", "Memory"),
+            ("Health and version", "Health and version"), ("Usage", "Usage"),
+        ]
+        for (row, page) in pages {
+            open(app, row)
             XCTAssertTrue(app.navigationBars[page].waitForExistence(timeout: 10), page)
             let loading: XCUIElement = app.staticTexts["Reading your Mac…"]
             let deadline: Date = Date().addingTimeInterval(20)
@@ -46,28 +51,23 @@ final class RealDaemonWalkUITests: XCTestCase {
             add(shot)
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
-        open(app, "Vault")
-        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 20))
-        sleep(4)
-        let web: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
-        web.name = "real-web-vault"
-        web.lifetime = .keepAlways
-        add(web)
     }
 
     func testAShortTestChatIsAnswered() throws {
-        let app: XCUIApplication = try launch(scene: "chats")
-        let pencil: XCUIElement = app.buttons["New chat"]
-        XCTAssertTrue(pencil.waitForExistence(timeout: 20))
-        pencil.tap()
+        let app: XCUIApplication = try launch(scene: "home")
+        let dot: XCUIElement = app.buttons["home.bot.dot"]
+        XCTAssertTrue(dot.waitForExistence(timeout: 20))
+        dot.tap()
+        let more: XCUIElement = app.buttons["More"]
+        XCTAssertTrue(more.waitForExistence(timeout: 20))
+        more.tap()
+        app.buttons["New chat"].tap()
         let field: XCUIElement = app.textFields["composer.field"].exists ? app.textFields["composer.field"] : app.textViews["composer.field"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         field.typeText("[test] Reply with the single word: ready")
         app.buttons["composer.send"].tap()
-        let row: XCUIElement = app.collectionViews.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "[test]")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "the new chat in the list")
-        row.tap()
+        // Dot's chat opens the new chat at once and it turns into the real chat in place (item 1849).
         let answer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ AND NOT (label CONTAINS %@)", "ready", "[test]")).firstMatch
         XCTAssertTrue(answer.waitForExistence(timeout: 180), "Dot's answer")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())

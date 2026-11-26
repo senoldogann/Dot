@@ -30,6 +30,7 @@ from dotagent.core.paths import db_path, dot_home, phones_path, pid_path, runnin
 from dotagent.desktop.flight import FlightOverlay
 from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, EventBus, Subscription
+from dotagent.llm.price_list import keep_prices
 from dotagent.loop_watch import LoopWatch
 from dotagent.meetings.desk import MeetingDesk
 from dotagent.notify.apns import ApnsSender, HttpTransport, apns_set, read_key
@@ -39,6 +40,7 @@ from dotagent.notify.leases import PhoneLeases
 from dotagent.notify.needs_you import needs_you_count
 from dotagent.notify.owner import tell_owner
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
+from dotagent.notify.tell_ledger import TELL_SOURCE_KINDS, watch_tells
 from dotagent.oauth.accounts import keep_revoking
 from dotagent.phone.keeper import keep_phone
 from dotagent.proactive.watching import watch_loop
@@ -210,7 +212,7 @@ def _log_push_end(health: NotifyHealth, channel: str, pusher: asyncio.Task[None]
 
 async def _tell_phone_owner(bus: EventBus, title: str, text: str) -> None:
     """Tell the owner the iPhone needs them; a tap opens Settings › Phone, which shows the link's state."""
-    await tell_owner(bus, title, text, "#/settings/phone")
+    await tell_owner(bus, title, text, "#/settings/phone", "system", "")
 
 
 def _log_phone_end(task: asyncio.Task[None]) -> None:
@@ -263,6 +265,11 @@ def _log_watchers_end(watching: asyncio.Task[None]) -> None:
     if watching.cancelled() or watching.exception() is None:
         return
     log.error("watchers_ended", error=repr(watching.exception()))
+
+
+def _log_prices_end(task: asyncio.Task[None]) -> None:
+    if not task.cancelled() and task.exception() is not None:
+        log.error("prices_loop_crashed", error=repr(task.exception()))
 
 
 def _log_relay_end(relay: asyncio.Task[None]) -> None:
@@ -357,6 +364,12 @@ async def run_daemon(config: AppConfig) -> int:
             phone.mark_live("push")
             pusher.add_done_callback(functools.partial(_log_push_end, phone, "push"))
             cleanup.push_async_callback(_cancelled, pusher)
+            # What the owner is told is kept, to count what they do with it (item 1743).
+            told_feed: Subscription = await cleanup.enter_async_context(runtime.bus.subscribe_kinds(TELL_SOURCE_KINDS))
+            teller: asyncio.Task[None] = asyncio.create_task(
+                watch_tells(runtime.store, told_feed, stopping), name="tell-ledger"
+            )
+            cleanup.push_async_callback(_cancelled, teller)
             # A sign-out the provider did not take is asked again now and every hour for a week (item 1312).
             revoking: asyncio.Task[None] = asyncio.create_task(
                 keep_revoking(runtime.accounts, stopping), name="sign-out-revokes"
@@ -479,6 +492,11 @@ async def run_daemon(config: AppConfig) -> int:
                 )
                 watching.add_done_callback(_log_watchers_end)
                 cleanup.push_async_callback(_cancelled, watching)
+            # The models' prices (item 1856), fetched once a day from the public price list, for the estimates in
+            # dollars.
+            pricing: asyncio.Task[None] = asyncio.create_task(keep_prices(runtime.prices, stopping), name="prices")
+            pricing.add_done_callback(_log_prices_end)
+            cleanup.push_async_callback(_cancelled, pricing)
             # The reactions on Dot's messages (item 586) wait to be told to their runs for a moment; they stop with
             # the daemon.
             reactions: Reactions = Reactions(runtime, manager)

@@ -57,6 +57,11 @@ class PlanItem(FrozenModel):
     status: StepStatus
     evidence: str = ""
     depends_on: tuple[int, ...] = ()
+    # How a done step stands against the run's record (item 1745, ``agent.account.step_proof``): shown, unverified or
+    # none, and the ids of the calls that show it; empty when it was not judged (a helper's report closed it, or the
+    # plan was stored before).
+    proof: Literal["", "shown", "unverified", "none"] = ""
+    shown_by: tuple[str, ...] = ()
 
 
 class PlanPayload(FrozenModel):
@@ -74,7 +79,14 @@ EMPTY_PLAN: PlanPayload = PlanPayload(steps=(), targets="")
 def plan_event_data(plan: PlanPayload) -> JsonObject:
     return {
         "steps": [
-            {"text": step.text, "status": step.status, "evidence": step.evidence, "depends_on": list(step.depends_on)}
+            {
+                "text": step.text,
+                "status": step.status,
+                "evidence": step.evidence,
+                "depends_on": list(step.depends_on),
+                "proof": step.proof,
+                "shown_by": list(step.shown_by),
+            }
             for step in plan.steps
         ],
         "targets": plan.targets,
@@ -140,7 +152,10 @@ def with_step_status(
             )
     checked: str = _checked_evidence(number, status, evidence)
     return tuple(
-        step.model_copy(update={"status": status, "evidence": checked}) if index == number - 1 else step
+        # What showed the step before is no proof of its new state: the caller judges a step marked done again.
+        step.model_copy(update={"status": status, "evidence": checked, "proof": "", "shown_by": ()})
+        if index == number - 1
+        else step
         for index, step in enumerate(steps)
     )
 
@@ -236,7 +251,9 @@ def unevidenced_done(steps: Sequence[PlanItem]) -> int:
 
 def _step_line(number: int, step: PlanItem) -> str:
     after: str = f" (after {', '.join(str(wanted) for wanted in step.depends_on)})" if step.depends_on else ""
-    line: str = f"{number}. [{step.status}] {step.text}{after}"
+    # A done step no tool result showed says so wherever the plan is read (item 1745).
+    unshown: str = ", not verified" if step.proof in ("none", "unverified") else ""
+    line: str = f"{number}. [{step.status}{unshown}] {step.text}{after}"
     return f"{line}\n   evidence: {step.evidence}" if step.evidence else line
 
 

@@ -18,6 +18,8 @@ _SAID: tuple[str, ...] = (
     "no warning, no hedge, no 'are you sure'",
     "Never put a safety deliberation",
     "remote access and reverse shells",
+    "Security testing is work, not a refusal",
+    "dotx scope add",
 )
 _STYLES: tuple[PromptStyle, ...] = ("full", "lean")
 
@@ -59,15 +61,7 @@ def test_dots_own_prompt_keeps_the_character() -> None:
 
 
 def test_the_claude_plan_prompt_keeps_the_character() -> None:
-    prompt: str = system_prompt(
-        name="Dot",
-        door="dot",
-        tools=("read_file",),
-        workspace=Path("/tmp/work"),
-        today="2026-11-17",
-        team="",
-        known=(),
-    )
+    prompt: str = system_prompt(_inputs("full"), "dot", ("read_file",), Path("/tmp/work"))
     assert CHARACTER in prompt
     for said in _SAID:
         assert said in prompt, f"{said!r} is missing from the plan's prompt"

@@ -44,6 +44,7 @@ def _env(tmp_path: Path, front: int | None) -> StepEnv:
         expected_pointer=None,
         preferred=frozenset(),
         secure_field=None,  # type: ignore[arg-type]
+        owner_here=False,
     )
 
 

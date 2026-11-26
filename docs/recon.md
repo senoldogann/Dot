@@ -26,14 +26,46 @@ names its version is a finding, and whether that version has a known bug is a qu
 
 **`ports`** adds a TCP connect to the 34 usual public services (ftp, ssh, smtp, http, https, smb, imap, mysql,
 postgresql, redis, mongodb, rdp, vnc, elasticsearch and the rest) and reads the banner of the ones that greet first.
-It runs **only on a host in `[recon] owned_hosts`**: scanning a host is not reading a page, and the one who runs it must
-be the one who may.
+It runs **only on a host you own or a scope allows**: scanning a host is not reading a page, and the one who runs it
+must be the one who may.
 
 ```toml
 [recon]
 # Your own sites; a name covers its subdomains. An empty list allows no scan anywhere.
 owned_hosts = ["example.com", "senoldogan.dev"]
 ```
+
+## A bug bounty program's scope: one command
+
+A target that is someone else's is tested under a scope: the published list of a program or an engagement you are in.
+`dotx scope` keeps those, writes them, and answers who covers a host — you never edit a toml block for it (item 1888).
+
+```
+dotx scope add --program "Bugcrowd · Klaviyo" \
+    --url https://bugcrowd.com/engagements/klaviyo-og \
+    --hosts a.klaviyo.com,klaviyo.com,myklpages.com \
+    --note "no scanners; 5 req/s; other subdomains out of scope"
+
+dotx scope check https://api.klaviyo.com/v1/lists     # -> may be tested under Bugcrowd · Klaviyo
+dotx scope list                                        # every scope, its hosts and its rules
+dotx scope remove "Bugcrowd · Klaviyo"
+```
+
+The scopes live in `scopes.toml` in Dot's home, which `dotx scope` writes and every call reads by its stamp: a scope
+added in one run holds for the next one without a restart. A file that cannot be read (not TOML, a host with a
+wildcard) is named with what is wrong: the port scan and `security_scan` wait for it, the passive audit goes on and its
+report says the scope is unknown. A run whose commands run outside the sandbox (a yolo run) registers the program
+itself — it reads the program's published scope in the browser, then one `dotx scope add` — and goes on. Under the
+sandbox Dot's home is closed to a run's commands ([Safety](safety.md)), so there the run hands you that one
+`dotx scope add` line to run, never a toml block.
+
+A host in a scope is treated as an owned host: the port scan and `security_scan` run on it, and every report ends with
+`Scope: <program> — <rules>`. A scope stands for your word that you are in the program and that its rules allow the
+test: you write it, or a run you asked to test that program writes it from the program's own scope page, and `dotx
+scope list` shows what each holds, so remove one you did not mean. The `note` is where its rate limit, its exclusions
+and what it bans belong. When a model declines the work, those rules are quoted to it as recorded, never as Dot's own
+words ([Models](models.md), item 1889). A scope may also be written in the config file
+as `[[recon.scopes]]`; the store is the place `dotx scope` keeps, and both are read.
 
 A port whose service should stay behind the firewall (a database, SMB, RDP, VNC, Redis, memcached, Elasticsearch) is a
 finding of its own; so is a banner that names a version. An entry is a bare host name: a wildcard, a port or a scheme
@@ -44,7 +76,7 @@ is refused, and a name covers its subdomains.
 ```
 recon(target="example.com")                  # the public face
 recon(target="https://example.com/shop")     # the same, with the path read
-recon(target="example.com", depth="ports")   # the ports too, only when example.com is in owned_hosts
+recon(target="example.com", depth="ports")   # the ports too, only when example.com is in owned_hosts or a scope
 ```
 
 The report is written for a person: the addresses, the HTTP answer, the certificate, the technology, then the findings
@@ -66,7 +98,7 @@ private hosts.
 
 - No authentication: a site that answers only a signed-in visitor is audited as a visitor sees it.
 - No CVE lookup and no exploit; a version is a hint for the owner, not a verdict.
-- No payloads: the forms of a host in `owned_hosts` are tried by `security_scan`, a separate tool ([Security
+- No payloads: the forms of a host in `owned_hosts` or a scope are tried by `security_scan`, a separate tool ([Security
   scan](security.md)). This audit stays what a browser's visit reads.
 - The port list is fixed and short on purpose. A scan of every port is long, noisy and rarely what the owner asked
   for; `nmap` run by hand in a terminal is the tool for that, on a host you may test.

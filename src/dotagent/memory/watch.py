@@ -73,7 +73,9 @@ class WatchedEmbedder:
             error=error.message,
         )
         try:
-            await tell_owner(self._bus, DEGRADED_TITLE, degraded_text(self._inner.model, error), MEMORY_ROUTE)
+            await tell_owner(
+                self._bus, DEGRADED_TITLE, degraded_text(self._inner.model, error), MEMORY_ROUTE, "system", ""
+            )
         except (DotError, OSError) as failure:
             self._down = False
             log.warning("memory_degraded_not_told", error=str(failure))

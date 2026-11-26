@@ -7,21 +7,6 @@ struct DotNextApp: App {
     @State private var model: AppModel = AppModel()
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
-    init() {
-        // The Chats badge counts what waits on the owner: amber, never the system's red (red means failure only).
-        let appearance: UITabBarAppearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-        for item in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
-            item.normal.badgeBackgroundColor = .dynamic(\.warn)
-            item.normal.badgeTextAttributes = [.foregroundColor: UIColor.dynamic(\.ground)]
-        }
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-        // The iPad's floating tab bar does not read the layout appearances above; it reads the item's own colour (§19).
-        UITabBarItem.appearance().badgeColor = .dynamic(\.warn)
-        UITabBarItem.appearance().setBadgeTextAttributes([.foregroundColor: UIColor.dynamic(\.ground)], for: .normal)
-    }
-
     var body: some Scene {
         WindowGroup {
             RootView(launch: LaunchOptions.read(UserDefaults.standard))
@@ -36,12 +21,11 @@ struct DotNextApp: App {
     }
 }
 
-/// The four tabs (plan §2, review S1): Chats = answerable and active, Agents = agents and delegation, Activity = what
-/// happened while you were away, Settings = configuration.
-enum AppTab: String, CaseIterable, Hashable, Sendable {
+/// Where the app opens (PLAN §27: bots, not tabs): the home, or the home with the settings sheet open. `chats` is the
+/// home's old name, kept for the scripts that still launch it.
+enum HomeScene: String, CaseIterable, Hashable, Sendable {
+    case home
     case chats
-    case agents
-    case activity
     case settings
 }
 
@@ -57,17 +41,17 @@ enum LaunchScene: Equatable, Sendable {
         /// Settings on a fixture daemon (wave N3).
         case settingsFixture(SettingsFixture)
     #endif
-    case tab(AppTab)
+    case home(HomeScene)
     /// The live chat list with its first chat open.
     case liveChat
 
     /// Every scene name the harness knows.
     static var names: [String] {
         #if DEBUG
-            GalleryPage.allCases.map(\.rawValue) + AppTab.allCases.map(\.rawValue) + ["chat", "chat-agents", "chat-background", "live-chat"]
+            GalleryPage.allCases.map(\.rawValue) + HomeScene.allCases.map(\.rawValue) + ["chat", "chat-agents", "chat-background", "live-chat"]
                 + ChatFixture.allCases.map(\.rawValue) + SettingsFixture.allCases.map(\.rawValue)
         #else
-            AppTab.allCases.map(\.rawValue) + ["live-chat"]
+            HomeScene.allCases.map(\.rawValue) + ["live-chat"]
         #endif
     }
 
@@ -84,7 +68,7 @@ enum LaunchScene: Equatable, Sendable {
             default: break
             }
         #endif
-        if let tab = AppTab(rawValue: name) { return .tab(tab) }
+        if let scene = HomeScene(rawValue: name) { return .home(scene) }
         return name == "live-chat" ? .liveChat : nil
     }
 }
@@ -129,12 +113,13 @@ struct RootView: View {
                     }
                     .onAppear { model.showFixture(fixture.snapshot(now: Date().timeIntervalSince1970), mac: "MacBook Air") }
                 case .settingsFixture(let fixture):
-                    paired(AppShell(initialTab: .settings, opensFirstChat: false, settings: fixture.start))
+                    paired(HomeShell(opensFirstChat: false, settings: fixture.start))
                         .onAppear { model.showSettingsFixture(fixture) }
             #endif
-            case .tab(let tab): paired(AppShell(initialTab: tab, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
-            case .liveChat: paired(AppShell(initialTab: .chats, opensFirstChat: true, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
-            case nil: paired(AppShell(initialTab: .chats, opensFirstChat: false, settings: SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false)))
+            case .home(let scene):
+                paired(HomeShell(opensFirstChat: false, settings: scene == .settings ? SettingsStart(path: [], query: "", editsFirstSchedule: false, triesRaise: false, connectApps: .closed) : nil))
+            case .liveChat: paired(HomeShell(opensFirstChat: true, settings: nil))
+            case nil: paired(HomeShell(opensFirstChat: false, settings: nil))
             }
         }
         .tint(Tone.text)
@@ -182,7 +167,7 @@ struct RootView: View {
 
 extension RootView {
     /// The shell once a key is held; pairing before; a plain word while the key is read.
-    @ViewBuilder func paired(_ shell: AppShell) -> some View {
+    @ViewBuilder func paired(_ shell: HomeShell) -> some View {
         switch model.phase {
         case .loading: LoadingState(message: String(localized: "Reaching your Mac…", comment: "Chat list while the first list read is under way")).background(Tone.ground)
         case .unpaired: PairingView()
@@ -194,33 +179,6 @@ extension RootView {
                 actionTitle: nil, action: {}
             ).background(Tone.ground)
         }
-    }
-}
-
-/// The shell: the system's floating tab bar (never minimised), tinted with the ink.
-struct AppShell: View {
-    @State private var tab: AppTab
-    let opensFirstChat: Bool
-    let settings: SettingsStart
-    @Environment(AppModel.self) private var model: AppModel
-
-    init(initialTab: AppTab, opensFirstChat: Bool, settings: SettingsStart) {
-        _tab = State(initialValue: initialTab)
-        self.opensFirstChat = opensFirstChat
-        self.settings = settings
-    }
-
-    var body: some View {
-        TabView(selection: $tab) {
-            Tab(String(localized: "Chats", comment: "Tab bar: the chats tab"), systemImage: "bubble.left.and.bubble.right", value: AppTab.chats) {
-                ChatsTab(opensFirstChat: opensFirstChat)
-            }
-            .badge(model.snapshot.list.needsYou)
-            Tab(String(localized: "Agents", comment: "Tab bar: the agents and teams tab"), systemImage: "person.2", value: AppTab.agents) { AgentsTab() }
-            Tab(String(localized: "Activity", comment: "Tab bar: what Dot did while the owner was away"), systemImage: "clock.arrow.circlepath", value: AppTab.activity) { ActivityTab() }
-            Tab(String(localized: "Settings", comment: "Tab bar: the settings tab"), systemImage: "gearshape", value: AppTab.settings) { SettingsTab(start: settings) }
-        }
-        .tabBarMinimizeBehavior(.never)
     }
 }
 

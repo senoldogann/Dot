@@ -109,8 +109,8 @@ work.
 2. **The files**: the archive of the pinned commit is downloaded and its skill folders unpacked as Install unpacks them
    (no link, nothing outside the plugin, within the size limit), and the hash of the files taken. A skill folder inside
    another skill is the outer skill's; a catalogue that names a skill folder without a `SKILL.md` has it left out, and
-   so has a skill whose `SKILL.md` the skills parser a run loads it with refuses (no `---` line that opens the
-   frontmatter, no name or description, no instructions; item 1305): a plugin none of whose skills loads is unusable and
+   so has a skill whose `SKILL.md` the skills parser a run loads it with refuses (a frontmatter not closed or not valid,
+   no instructions; item 1305; one with no frontmatter at all loads, named for its folder, item 1723): a plugin none of whose skills loads is unusable and
    is not proposed.
 3. **The scan** of exactly those files: invisible or direction-changing characters and long base64, where an instruction
    can hide from you and still reach a model, text that tells a model to set aside its instructions or to keep something
@@ -625,7 +625,13 @@ does not know ping is there), so that the calls that come go to a new session ra
 server's words: "Session not found", "Session has been terminated") is a connection that broke, and the next call
 connects again. A call
 whose connection broke is not repeated, as the tool may have done part of its work, unless the server declares the
-tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log.
+Every Dot process that opens its own runtime (the daemon, a `dotx` command that is not handed to it) starts each enabled
+server as it starts, never lazily on a tool's first call: a run's tools, the gate's reading of each one (its
+annotations) and the server's line in the instructions come from the server's own listing (item 1724). A server you
+never use costs its start (1.4 to 2.8 s for Playwright's, in parallel with the others, about 140 MB of processes as it
+starts) in each such process; switch it off on Settings › Connectors if Dot's own browser tools do the work. A server
+that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, or two of its tools would share a
 name) is left out, and Dot starts without its tools: Settings › System, under **Details**,
 names it with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin when they start their own
@@ -697,8 +703,13 @@ unchanged: Dot reads only `name`, `description` and its own `icon` of the frontm
 map under `metadata`, a list of `allowed-tools`) do not leave a skill out, and neither does a `name` other than
 its folder's (a plugin's `canva-brand-check` in `brand-check`: the skill goes by its frontmatter's name, as Claude Code
 takes it) nor a description past the specification's 1,024 characters (cut there with an ellipsis; item 948). Dot's
-own learned and taught skills still carry their folders' names, by which they are kept. A `SKILL.md` may begin with blank lines before its opening `---` line; anything else there leaves the skill out.
-A skill left out is logged once while its file stays as it is (`skill_skipped`, item 1305), not at every run; Doctor's
+own learned and taught skills still carry their folders' names, by which they are kept. A `SKILL.md` may begin with blank lines before its opening `---` line. One of yours or a plugin's with no frontmatter at all (its first line is
+not `---`) loads as Claude Code loads it (item 1723): named for its folder, the whole file its instructions, its first
+line of words outside a fenced block that is no heading, table row, list item or quote its description (else its first
+heading, else its folder's name) (a Twilio plugin's `twilio-agent-connect` opens with a title); Dot's own
+learned and taught skills still need their frontmatter.
+A skill left out is logged once while its file stays as it is (`skill_skipped`, item 1305), not at every run, with what
+to do (`fix`: correct the SKILL.md as the reason says, or remove its folder or plugin; item 1723); Doctor's
 `skills` row, `dotx skills list` and Settings › Skills (Left out, item 1405) keep saying so, each with the file and the
 reason. To use your own, put `dirs =
 ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be

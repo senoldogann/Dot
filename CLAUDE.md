@@ -27,7 +27,16 @@ Point `DOT_HOME`, `DOT_LOG_DIR` and `DOT_CHROME_DIR` at throwaway folders first,
 `plugins_dir()` is the owner's own; a run that holds `live`, `hosted`, `internet` or `desktop` tests keeps its variables.
 While working, run the tests of what changed (`uv run pytest tests/unit/test_x.py tests/smoke/test_y.py -q`), not the
 whole gate. Run the whole gate once, when the change is done; `.github/workflows/gate.yml` runs it again on the pull
-request. `-n auto` spreads the tests over the Mac's cores.
+request. On GitHub a pull request runs the Linux jobs alone (item 1886: the five macOS runners were what pull requests
+waited on): the format check, the lint, mypy, `npm run check`, the item records and the unit tests Linux runs, and the
+desktop checks and zizmor when their files change. The macOS jobs (the gate's macOS unit and smoke tests, the browser
+parts, ios.yml's short set) run on the push to main that merges it, each when the files changed since main was last
+green can affect it (`scripts/python_ci.py`, `scripts/browser_ci.py`, ios.yml's paths; a decision that fails runs
+everything). So `main`'s macOS run is where a break only macOS shows is seen: the issue "main is red on macOS" says
+so (item 1899), and a red `main` is fixed before anything else is merged. The owner's Dot is updated only from a
+commit `uv run python scripts/main_macos_green.py check` says is green. The whole browser and iPhone suites run each
+night and when asked (`gh workflow run browser.yml` or `ios.yml --ref <branch>`, a branch's macOS run before its pull
+request merges). `-n auto` spreads the tests over the Mac's cores.
 
 ```bash
 uv run ruff format --check src tests
@@ -88,15 +97,17 @@ A change that takes days is many pushes, each waiting on the review and the gate
   reverted alone (a pull request of one item may be squashed: `squash`). Order the commits by item and say in the body which is which. Keep a part out of
   the batch when it needs the owner's look (a change under "Always needs a human" waiting on them must not hold the
   rest) or is a risk that should be reverted alone.
-- **The item numbers** come from `uv run python scripts/next_item.py [count]` right before the first push (main, open
-  pull requests and pushed branches all hold numbers), and the pull request is made from the entries (`gh pr create
+- **The item numbers** come from `uv run python scripts/next_item.py [count]`, run once (main, pull requests open and
+  closed, every branch, commit and worktree on this Mac hold numbers; each call reserves what it gives for three days in
+  the shared git directory, so a second call gives new ones, item 1891), and the pull request is made from the entries (`gh pr create
   --title "$(uv run python scripts/pr_body.py N M --title)" --body "$(uv run python scripts/pr_body.py N M)"`).
 - **`main` does not require a branch up to date (item 944).** `scripts/merge_pr.py` merges once the checks passed,
-  and brings the branch up to `main` first only when `main` changed one of its files since they ran (exit 2: merge
-  again once they pass). After a merge, look at `main`'s run of the gate for it before the next merge, and never
-  cancel it: it is what shows two pull requests that pass alone and break `main` together. A run of `main` shown as
-  cancelled before it began was replaced by a newer waiting one (item 1011), whose run checks that merge too. A red
-  `main` is fixed before anything else is merged.
+  and brings the branch up to `main` first only when `main` changed one of its files since they ran, Markdown no
+  test names aside (item 1863; exit 2: merge again once they pass). After a merge, look at `main`'s run of the gate
+  for it before the next merge, and never cancel it: it is what shows a break only macOS sees (a pull request runs no
+  macOS job, item 1886) and two pull requests that pass alone and break `main` together. A run of `main` shown as
+  cancelled before it began was replaced by a newer waiting one (item 1011),
+  whose run checks that merge too. A red `main` is fixed before anything else is merged.
 - **Merging main** into a branch whose own change is unchanged costs no review (the hook sees it); do it when the
   branch is ready, never while a test run of the same worktree is going.
 - **A failure that is not the change's** (a known flaky test, `main` red): rerun the job (`gh run rerun <id> --failed`)

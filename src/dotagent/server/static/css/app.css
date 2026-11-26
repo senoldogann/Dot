@@ -5339,6 +5339,16 @@ dialog.modal.versions-dialog {
   white-space: nowrap;
 }
 
+/* A done step no tool result of the run shows (item 1745): a word, in the muted ink, never a colour alone. */
+.plan-step .unshown {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
 /* What the run observed that closed the step; the goal check reads the same text. */
 .plan-step .evidence {
   font-size: var(--text-sm);
@@ -7498,6 +7508,19 @@ summary:has(> .chev)::-webkit-details-marker {
   font-size: var(--text-xs);
 }
 
+/* What the run's record says it checked, sent and left open (item 1746), under the line of what it ran. */
+.run-changes-account {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.run-changes-account p {
+  margin: 0;
+}
+
 /* What a task at work has used so far (item 1403), above the details of the Cost card: its own quiet block. */
 .cost-so-far {
   display: grid;
@@ -8490,6 +8513,15 @@ dialog.message-sheet::backdrop {
 
 .resume-line .btn .label {
   display: inline;
+}
+
+/* Restart on…, for a run whose model declined its task (item 1889): the model menu opens from the line's button. */
+.refused-line {
+  position: relative;
+}
+
+.refused-line > .icon {
+  color: var(--bad);
 }
 
 /* The queue of a chat (item 148): a sheet that rises from behind the top of the composer, its lower
@@ -12212,435 +12244,6 @@ dialog.teach {
   .first-step:has(a.first-step-title) .first-step-mark {
     align-items: center;
     height: 44px;
-  }
-}
-
-/* The office of the Agents page: a 3D room under the page's head, its agents' tags over it and a panel to message one.
-   The room is drawn on a dark stage in both themes, as a diorama is lit; the tags and the panel are the page's own. */
-.office-holder {
-  position: relative;
-}
-.office-frame {
-  position: relative;
-  height: clamp(340px, 62vh, 680px);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--office-stage);
-  touch-action: none;
-  user-select: none;
-}
-.office-canvas {
-  display: block;
-  cursor: grab;
-}
-.office-canvas:active {
-  cursor: grabbing;
-}
-.office-tags {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.office-tag {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--office-glass);
-  color: var(--office-ink);
-  font: inherit;
-  font-size: var(--text-xs);
-  line-height: var(--leading-sm);
-  white-space: nowrap;
-  pointer-events: auto;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  will-change: transform;
-}
-.office-tag:focus-visible {
-  background: var(--office-glass-strong);
-}
-
-@media (hover: hover) {
-  .office-tag:hover {
-    background: var(--office-glass-strong);
-  }
-}
-@media (pointer: coarse) {
-  .office-tag {
-    min-height: 32px;
-  }
-}
-.office-bubble {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + var(--space-1));
-  transform: translateX(-50%);
-  max-width: 240px;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--office-bubble);
-  color: var(--office-bubble-ink);
-  box-shadow: var(--office-bubble-shadow);
-  font-size: var(--text-xs);
-  line-height: var(--leading-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-.office-bubble[hidden] {
-  display: none;
-}
-/* What the run at work does now, at the foot of its chat (item 905): its steps as quiet activity rows, then its words. */
-.office-panel-live {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  color: var(--muted);
-}
-.office-panel-live[hidden] {
-  display: none;
-}
-.office-steps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.office-step {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-  color: var(--text-2);
-}
-.office-step-words {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.office-step-mark {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--office-working);
-}
-.office-step[data-state="ok"] .office-step-mark {
-  background: var(--office-working);
-}
-.office-step[data-state="failed"] .office-step-mark {
-  border-color: var(--bad);
-  background: var(--bad);
-}
-.office-live-text {
-  color: var(--text);
-  overflow-wrap: anywhere;
-}
-.office-tag-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--office-free);
-}
-.office-tag[data-mode="working"] .office-tag-dot {
-  background: var(--office-working);
-}
-.office-tag[data-mode="waiting"] .office-tag-dot {
-  background: var(--office-waiting);
-}
-.office-tag-name {
-  font-weight: var(--weight-label);
-}
-.office-tag-word {
-  color: var(--office-ink-soft);
-}
-.office-tag-word:empty {
-  display: none;
-}
-.office-reset,
-.office-big {
-  position: absolute;
-  right: var(--space-2);
-  bottom: var(--space-2);
-  background: var(--office-glass);
-  color: var(--office-ink);
-}
-.office-big {
-  top: var(--space-2);
-  bottom: auto;
-}
-/* Full screen (item 901): over the whole window, the page under it, the panel taller and its chat with it. Over the
-   sidebar (30) and under what its own panel opens over it, a menu (50) and the toasts (60), so that a send that failed
-   still says so (the pre-push review). */
-.office-frame.office-full {
-  position: fixed;
-  inset: 0;
-  z-index: 45;
-  height: auto;
-  aspect-ratio: auto;
-  border-radius: 0;
-}
-.office-full .office-panel-slot {
-  width: min(440px, calc(100% - 2 * var(--space-2)));
-}
-.office-panel-slot {
-  position: absolute;
-  left: var(--space-2);
-  top: var(--space-2);
-  bottom: var(--space-2);
-  width: min(360px, calc(100% - 2 * var(--space-2)));
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-}
-.office-panel {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-height: 100%;
-  min-height: 0;
-  /* The chat scrolls; the panel too, as a last resort, when what stays (the head, offers, a box of many lines, a phone's
-     keyboard) is taller than it: the box is never cut off out of reach (the pre-push review of item 905). */
-  overflow-y: auto;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: var(--office-panel-shadow);
-}
-.office-panel-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.office-panel-head .avatar {
-  width: 44px;
-  height: 44px;
-  flex: none;
-}
-.office-panel-who {
-  flex: 1;
-  min-width: 0;
-}
-.office-panel-name {
-  font-weight: var(--weight-title);
-}
-.office-panel-role,
-.office-panel-doing {
-  color: var(--muted);
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-  margin: 0;
-}
-/* What it does in a word, with its state's dot (item 905): the goal is the first message of the chat. */
-.office-panel-doing {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: none;
-}
-.office-panel-doing::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--office-free);
-}
-.office-panel-doing[data-mode="working"]::before {
-  background: var(--office-working);
-  animation: office-doing var(--motion-pulse) ease-in-out infinite;
-  animation-play-state: var(--endless);
-}
-.office-panel-doing[data-mode="waiting"]::before {
-  background: var(--office-waiting);
-}
-@keyframes office-doing {
-  50% {
-    opacity: 0.35;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .office-panel-doing[data-mode="working"]::before {
-    animation: none;
-  }
-}
-.office-panel-head,
-.office-panel-links {
-  flex: none;
-}
-/* Help offers in a panel (item 896): each free agent that could help, the part it could take, and the button that lets
-   it help. */
-/* The chat in a panel (item 898): the owner's words at the right, the agent's answers as the chat page writes them,
-   the newest at the foot. It takes the height the panel has, and is the one part of it that scrolls (item 905). */
-.office-chat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: min(140px, 30vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: var(--space-1);
-}
-.office-chat[hidden] {
-  display: none;
-}
-.office-chat-log {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.office-turn {
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-  overflow-wrap: anywhere;
-}
-.office-turn .prose,
-.office-live-text .prose {
-  font-size: var(--text-sm);
-  line-height: var(--leading-sm);
-}
-.office-turn .prose > :first-child,
-.office-live-text .prose > :first-child {
-  margin-top: 0;
-}
-.office-turn .prose > :last-child,
-.office-live-text .prose > :last-child {
-  margin-bottom: 0;
-}
-.office-turn-you {
-  align-self: flex-end;
-  max-width: 88%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-lg);
-  background: var(--msg-me);
-  color: var(--on-msg-me);
-}
-/* The answer as the chat page shows one: no bubble, the panel's width. */
-.office-turn-agent {
-  align-self: stretch;
-  color: var(--text);
-}
-.office-chat-note {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
-.office-offers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  /* Many offers scroll in their own part rather than squeeze the chat away (item 905). */
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: 35%;
-  overflow-y: auto;
-}
-.office-offers[hidden] {
-  display: none;
-}
-.office-offers-head {
-  font-size: var(--text-xs);
-  color: var(--muted);
-}
-.office-offer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.office-offer-words {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.office-offer-name {
-  font-size: var(--text-sm);
-}
-.office-offer-part {
-  overflow: hidden;
-  font-size: var(--text-xs);
-  color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.office-panel-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-.office-panel-links:empty {
-  display: none;
-}
-.office-off {
-  display: grid;
-  place-items: center;
-  height: auto;
-  min-height: 120px;
-}
-.office-note {
-  color: var(--office-ink-soft);
-  margin: 0;
-  padding: var(--space-3);
-  text-align: center;
-}
-@media (max-width: 640px) {
-  /* A phone's frame is square, the room seen more from above in it (office.js), so that its floor fills the frame:
-     it fills its width, and the page scrolls on under it. */
-  .office-frame {
-    height: auto;
-    aspect-ratio: 1 / 1;
-  }
-  /* Seven tags hid a phone's small room (item 894, the owner's look): a free agent's is its name alone, small and
-     quiet, still a finger's height; those that work or wait for you, and the one in the panel, keep the full tag. */
-  .office-tag[data-mode="free"]:not([data-chosen]) {
-    padding: 0 var(--space-2);
-    font-size: var(--text-xs);
-    background: var(--office-glass-quiet);
-  }
-  .office-tag[data-mode="free"]:not([data-chosen]) .office-tag-dot {
-    display: none;
-  }
-  /* The panel takes the frame's foot, where the reset button stood over its message box. */
-  .office-holder:has(.office-panel) .office-reset {
-    display: none;
-  }
-  /* Full screen keeps the phone's panel across the foot. */
-  .office-full .office-panel-slot {
-    width: auto;
-  }
-  /* A tag takes a finger (32 px at least), as every control of a phone does. */
-  .office-tag {
-    min-height: 32px;
-    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
-    gap: var(--space-2);
-  }
-  .office-tag:not([data-mode="working"], [data-mode="waiting"]) .office-tag-word {
-    display: none;
-  }
-  .office-panel-slot {
-    top: auto;
-    left: var(--space-1);
-    right: var(--space-1);
-    bottom: var(--space-1);
-    width: auto;
-    max-height: 70%;
   }
 }
 

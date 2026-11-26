@@ -13,7 +13,7 @@ public struct Engine: Sendable {
         let store: SyncStore = SyncStore(cache: SyncCache(folder: folder.appending(path: "cache", directoryHint: .isDirectory)), clock: clock)
         let outbox: Outbox = Outbox(
             directory: folder.appending(path: "outbox", directoryHint: .isDirectory), api: api, link: link, clock: clock,
-            policy: .delivery, jitter: jitter, mayStartChat: { await store.listIsLive })
+            policy: .delivery, jitter: jitter, maySend: { action in await store.maySend(action) })
         self.api = api
         self.store = store
         self.outbox = outbox
@@ -42,9 +42,10 @@ public struct Engine: Sendable {
         return key
     }
 
-    public func startChat(_ text: String, photos: [Data]) async throws -> String {
+    /// A new chat with Dot (`agent` `nil`) or with one of the owner's agents.
+    public func startChat(_ text: String, photos: [Data], start: ChatStart, agent: String?) async throws -> String {
         let key: String = newMessageKey()
-        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: []), id: key, images: photos)
+        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: [], start: start, agent: agent), id: key, images: photos)
         return key
     }
 

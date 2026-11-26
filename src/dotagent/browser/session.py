@@ -185,6 +185,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.noted import noted_in_batch_text
 from dotagent.core.outcomes import (
     ADDRESS_SHOWN_BEFORE,
+    PAGE_REACTED,
     TEXT_SHOWN_BEFORE,
     WRITTEN_BY_THE_BATCH,
     Dispatch,
@@ -195,6 +196,8 @@ from dotagent.core.outcomes import (
     holds_back,
     judge_sight,
     not_looked_for,
+    page_did_not_react,
+    page_reacted,
     url_shows,
 )
 from dotagent.core.text import truncate_middle
@@ -923,6 +926,88 @@ def _dispatch_of(error: BrowserError) -> Dispatch:
     return "unknown"
 
 
+# How :func:`describe_surprise` begins when the page went to another address.
+_NAVIGATED: str = "the page navigated to"
+# What :func:`_what_moved` says of a page whose documents could not be read: it counts as changed, and checks nothing.
+_UNREAD: str = "the page could not be read"
+# A page that changed after Dot's last look and before a step changes by itself (a clock, a feed, a carousel, a poll),
+# so a change of its content or a request after the step does not tell what the step did (item 1744): such a change is
+# no check. A change within this much of the look is the look's own (the page settling while it was read).
+_LOOK_SLACK_S: float = 0.05
+_CONTENT: str = "its content changed"
+_REQUESTED: str = "it sent a request"
+
+
+def changed_by_itself(quiet_ms: float | None, read_at: float, looked_at: float, asked: bool) -> bool:
+    """Whether a page changed after Dot last looked at it (``looked_at``) and before the look before a step, read at
+    ``read_at`` (both ``time.monotonic()``) and ``quiet_ms`` after its last change, or started a request in between
+    (``asked``): what the model acts on had changed by itself (a clock, a feed, a poll). Not known for a page Dot has
+    not looked at. :data:`_LOOK_SLACK_S` takes up the time a look takes."""
+    if looked_at <= 0.0:
+        return False
+    return asked or (quiet_ms is not None and read_at - quiet_ms / 1000.0 > looked_at + _LOOK_SLACK_S)
+
+
+def _looked(tab: Tab) -> None:
+    """Dot has just looked at ``tab``'s page (a view, or the end of a step it ran, item 1744): what changes after this
+    and before the next step changed by itself."""
+    tab.looked_at = time.monotonic()
+    tab.looked_requests = tab.requests
+
+
+def _reaction(moved: str, busy: bool) -> OutcomeCheck:
+    """The check of a step after which ``moved`` changed: verified, unless the page changes by itself and what changed
+    is its content or a request, which it may have made on its own."""
+    if busy and moved in (_CONTENT, _REQUESTED):
+        return OutcomeCheck(
+            condition=PAGE_REACTED,
+            status="uncertain",
+            evidence=f"{moved}, but the page was changing by itself before the step",
+            reason="look at what the step was for before sending it again, so nothing is sent twice",
+        )
+    return page_reacted(moved)
+
+
+def _what_moved_on(surprise: str) -> str:
+    """What a step's :func:`describe_surprise` says changed, in the words of its check."""
+    return "its address changed" if surprise.startswith(_NAVIGATED) else "a tab, a dialog or a download came or went"
+
+
+def _what_moved(pulse: Pulse, after: Pulse, at_point: bool, requested: bool, surprise: str | None) -> str | None:
+    """What changed on a page between two looks around a step (item 739), in the words of its check (item 1744), the
+    weightiest first; ``None`` when nothing did. ``requested``: the page asked for something; ``surprise``:
+    :func:`describe_surprise` of the step (a new address, a tab or a dialog)."""
+    if after.changes is None or pulse.changes is None:
+        return _UNREAD
+    if surprise is not None:
+        return _what_moved_on(surprise)
+    if requested:
+        return _REQUESTED
+    if after.changes != pulse.changes:
+        return _CONTENT
+    if at_point and focus_landed(pulse.focus, after.focus):
+        return "the keyboard went to a field"
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class _Effect:
+    """What a step that should change the page did: the words its line says, and its check (``None`` when the page
+    could not be read)."""
+
+    words: str
+    check: OutcomeCheck | None
+
+
+def _checks_of(
+    own: tuple[OutcomeCheck, ...], sights: tuple[OutcomeCheck, ...], reaction: OutcomeCheck | None
+) -> tuple[OutcomeCheck, ...]:
+    """The checks of a step that went through: what it wrote read back and what it was expected to show, and, when
+    neither was checked, whether the page reacted to it (item 1744), which says less than either."""
+    checks: tuple[OutcomeCheck, ...] = (*own, *sights)
+    return checks if checks or reaction is None else (reaction,)
+
+
 def _moves_the_page(step: Step) -> bool:
     """Whether ``step`` is meant to change the page, so that a step that does not is told (item 739)."""
     return step.action in _MOVING_ACTIONS or (step.action == "press" and (step.key or "").lower() == "enter")
@@ -939,7 +1024,7 @@ def describe_surprise(before: _Watch, after: _Watch) -> str | None:
     if after.events != before.events:
         return "a dialog, download or file chooser appeared (see notes)"
     if urldefrag(after.url).url != urldefrag(before.url).url:
-        return f"the page navigated to {after.url}"
+        return f"{_NAVIGATED} {after.url}"
     return None
 
 
@@ -2232,7 +2317,17 @@ class BrowserSession:
                     elif not task.cancelled():
                         task.exception()  # read, so that the one not raised here is not reported as never read
 
-        viewport, (lines, part_note) = await self._read_held(tab, read)
+        # The page's watch of its own changes starts with the view a run acts from (item 1744), beside the read and
+        # with nothing of it kept: a step after the view then knows whether the page was changing by itself.
+        watching: asyncio.Task[Pulse] = asyncio.ensure_future(page_pulse(tab.page))
+        try:
+            viewport, (lines, part_note) = await self._read_held(tab, read)
+        finally:
+            if not watching.done():
+                watching.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await watching
+        _looked(tab)
         kept: tuple[SnapshotLine, ...] = viewport_filter(
             lines, viewport.width, viewport.height, config.viewport_margin_px
         )
@@ -3598,6 +3693,8 @@ class BrowserSession:
                 made: _StepMade = await self._run_one(thread, tab, index, step, secret_field, sends, left, written)
             finally:
                 sends.stop()
+                # Every step Dot ran ends with its look (item 1744): what it set off is not the page changing by itself.
+                _looked(tab)
             reports.append(made.report)
             stopped, left = made.stopped, made.left
             if stopped is None and made.unjudged and index < len(steps):
@@ -3621,6 +3718,10 @@ class BrowserSession:
         verified, and the waits the batch has left. ``written`` is every text the batch writes."""
         before: _Watch = self._watch(thread, tab)
         pulse: Pulse | None = await page_pulse(tab.page) if _moves_the_page(step) else None
+        # Whether the page changed by itself since Dot last looked (item 1744): then its changes tell nothing.
+        busy: bool = pulse is not None and changed_by_itself(
+            pulse.quiet_ms, time.monotonic(), tab.looked_at, tab.requests != tab.looked_requests
+        )
         requests: int = tab.requests
         try:
             named: _Sights = await self._sights_of(tab, step, written)
@@ -3696,6 +3797,8 @@ class BrowserSession:
         if step.has_side_effects():
             opening = await self._let_events_land(tab)
         effect: str = ""
+        # The page's reaction, the step's check when it has none of its own (item 1744).
+        reaction: OutcomeCheck | None = None
         if pulse is not None and not tab.page.is_closed():
             # Only a click is meant to focus a field; Enter pressed in one leaves it there whatever it did.
             # A click at a point names no ref, so the field it focuses is read from the page (item 1142). A click
@@ -3703,7 +3806,8 @@ class BrowserSession:
             # and Enter in one, still did nothing.
             clicked: str | None = step.ref if step.action in _MOVING_ACTIONS else None
             at_point: bool = step.action in _MOVING_ACTIONS and step.ref is None
-            effect = await self._effect(thread, tab, before, pulse, requests, clicked, at_point)
+            seen: _Effect = await self._effect(thread, tab, before, pulse, requests, clicked, at_point, busy)
+            effect, reaction = seen.words, seen.check
         if result.submits and not effect.startswith(PAGE_UNCHANGED):
             # The page changed at once, and a form whose script sends it after a check of its own has sent
             # nothing yet: it is given the time a page that did not change was watched for.
@@ -3721,12 +3825,20 @@ class BrowserSession:
         # What the step's page sent is waited for, so that the steps after it do not run on a page whose server has
         # not answered, and its answer stands in the step's line (item 1158).
         sent, left = await self._answers(tab, sends, left)
+        # What the step's own page sent to its own site, not a read, is the step's even on a busy page (item 1158).
+        if sent and reaction is not None and reaction.status != "verified":
+            reaction = page_reacted(_REQUESTED)
         surprise: str | None = describe_surprise(before, self._watch(thread, tab))
         if effect.startswith(PAGE_UNCHANGED) and (sent or looked != requests):
             # A request left just after the page had been watched: it did change, and a click that sent something
             # is not one to try again with a script (item 781). Counted up to the end of the step's own look: what
             # a page asks for by itself during the waits after it (a chat that polls) leaves the finding as it is.
             effect = ""
+            # What the step's page sent to its own site, not a read, is the step's even on a busy page (item 1158).
+            reaction = _reaction(_REQUESTED, busy and not sent) if pulse is not None else reaction
+        if pulse is not None and (reaction is None or reaction.status != "verified") and surprise is not None:
+            # The page went on after its own look, or could not be read: a new address, tab or dialog is its reaction.
+            reaction = page_reacted(_what_moved_on(surprise))
         said: list[str] = [effect or result.note, sent_words(sent)]
         if result.submits and form_sent_nothing(
             asked=bool(sent) or tab.requests != requests,
@@ -3743,7 +3855,8 @@ class BrowserSession:
             outcome="done",
             detail="; ".join(part for part in said if part),
             dispatched="sent",
-            checks=(*result.checks, *sights),
+            # A step that named what it expects is judged by that alone (item 1164), seen or not looked for.
+            checks=_checks_of(result.checks, sights, None if step.expects() else reaction),
         )
         stopped: str | None = surprise
         if stopped is None and opening:
@@ -3907,8 +4020,9 @@ class BrowserSession:
         pulse: Pulse,
         requests: int,
         ref: str | None,
-        at_point: bool = False,
-    ) -> str:
+        at_point: bool,
+        busy: bool,
+    ) -> _Effect:
         """What a step that should change the page did (item 739), as its report says it: nothing when the page
         changed and shows nothing new to read; what it shows new (an alert, a field it marks invalid) when it did; and,
         when nothing changed within :data:`_EFFECT_WAIT_S` (no change to its documents, no box ticked or field typed
@@ -3916,29 +4030,34 @@ class BrowserSession:
         field), that it did not, with what the page marks invalid, so that the run does not take a click that
         did nothing for one that worked. ``at_point`` is a click or a drag that names no ref (item 1142): the field
         it focuses is read from the page. A click on a ref uses :func:`holds_field_focus` instead, and Enter is
-        neither. A page that could not be read counts as changed."""
+        neither. A page that could not be read counts as changed, and is no check.
+
+        What changed is also the step's check (item 1744), from the same looks and no wait of its own: the page
+        reacted (verified, with what changed) or did not (uncertain); on a page that changed by itself since Dot last
+        looked (``busy``), a change of its content or a request is no check."""
         after: Pulse = pulse
-        moved: bool = False
+        moved: str | None = None
         waited: float = 0.0
         while True:
             after = await page_pulse(tab.page)
-            moved = (
-                after.changes is None
-                or pulse.changes is None
-                or after.changes != pulse.changes
-                or (at_point and focus_landed(pulse.focus, after.focus))
-                or tab.requests != requests
-                or describe_surprise(before, self._watch(thread, tab)) is not None
+            moved = _what_moved(
+                pulse,
+                after,
+                at_point,
+                tab.requests != requests,
+                describe_surprise(before, self._watch(thread, tab)),
             )
-            if moved or waited >= _EFFECT_WAIT_S or tab.page.is_closed():
+            if moved is not None or waited >= _EFFECT_WAIT_S or tab.page.is_closed():
                 break
             await asyncio.sleep(_EFFECT_POLL_S)
             waited += _EFFECT_POLL_S
-        if not moved and ref is not None and await holds_field_focus(tab.page, ref):
-            return ""
-        if not moved:
+        if moved is None and ref is not None and await holds_field_focus(tab.page, ref):
+            return _Effect(words="", check=page_reacted("the field clicked has the keyboard"))
+        if moved is None:
             invalid: str = f"; fields it marks invalid: {'; '.join(after.invalid)}" if after.invalid else ""
-            return f"{_UNCHANGED_FACTS}{invalid}{_UNCHANGED_ADVICE}"
+            return _Effect(
+                words=f"{_UNCHANGED_FACTS}{invalid}{_UNCHANGED_ADVICE}", check=page_did_not_react(_EFFECT_WAIT_S)
+            )
         said: list[str] = [one for one in after.alerts if one not in pulse.alerts]
         marked: list[str] = [one for one in after.invalid if one not in pulse.invalid]
         parts: list[str] = []
@@ -3946,7 +4065,7 @@ class BrowserSession:
             parts.append(f"the page says: {' | '.join(said)}")
         if marked:
             parts.append(f"it marks invalid: {'; '.join(marked)}")
-        return "; ".join(parts)
+        return _Effect(words="; ".join(parts), check=None if moved == _UNREAD else _reaction(moved, busy))
 
     def _watch(self, thread: ThreadTabs, tab: Tab) -> _Watch:
         return _Watch(url=tab.page.url, tabs=len(thread.tabs), events=tab.events, closed=tab.page.is_closed())

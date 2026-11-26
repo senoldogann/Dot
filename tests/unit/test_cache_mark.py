@@ -27,10 +27,10 @@ _KEEP_RESULTS: int = 6
 _KEEP_IMAGES: int = 2
 _ORIGIN: str = "anthropic"
 _CLAUDE: MessagesOptions = MessagesOptions(
-    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
+    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None, long_ttl=True
 )
 _GATEWAY: MessagesOptions = MessagesOptions(
-    adaptive_thinking=False, prompt_cache=True, settled_mark=False, default_max_tokens=32768
+    adaptive_thinking=False, prompt_cache=True, settled_mark=False, default_max_tokens=32768, long_ttl=False
 )
 _OPUS: ModelTraits = claude_traits(
     {

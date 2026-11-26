@@ -44,6 +44,7 @@ from dotagent.events import SYSTEM_RUN_ID, EventBus
 from dotagent.llm.router import ModelRouter
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.notify.owner import OWNER_TOLD_EVENT
+from dotagent.notify.tellkinds import TellKind
 from dotagent.oauth.tokens import Account
 from dotagent.proactive import watching
 from dotagent.proactive.github import GITHUB_TOKEN_NAME
@@ -790,8 +791,8 @@ async def test_a_look_cut_while_it_tells_has_told_and_kept_each_item_or_neither(
     WORLD.gmail = _rents(3)
     tell = watching.tell_owner
 
-    async def dawdling(bus: EventBus, title: str, text: str, url: str) -> None:
-        await tell(bus, title, text, url)
+    async def dawdling(bus: EventBus, title: str, text: str, url: str, kind: TellKind, subject: str) -> None:
+        await tell(bus, title, text, url, kind, subject)
         await asyncio.sleep(0.4)
 
     monkeypatch.setattr(watching, "tell_owner", dawdling)
@@ -1216,8 +1217,8 @@ async def test_the_routes_make_list_change_delete_and_check_a_watcher_now(
 ) -> None:
     made: JsonObject = await _make(client)
     assert set(made) == {
-        "id", "name", "kind", "enabled", "account", "words", "minutes", "action", "goal", "created_at", "primed",
-        "looked_at", "next_look_at", "error", "error_at", "last", "told",
+        "id", "name", "kind", "enabled", "account", "words", "minutes", "action", "goal", "check", "created_at",
+        "primed", "looked_at", "next_look_at", "error", "error_at", "last", "told",
     }  # fmt: skip
     assert (made["primed"], made["looked_at"], made["error"], made["told"]) == (False, None, None, 0)
     assert (await client.get("/api/watchers")).json() == [made]
@@ -1304,7 +1305,7 @@ async def test_the_form_is_offered_the_accounts_and_whether_github_is_kept_but_n
             {"provider": "microsoft", "address": "ada@outlook.com"},
         ],
         "github": False,
-        "minutes": {"mail": 5, "github": 5, "calendar": 15},
+        "minutes": {"mail": 5, "github": 5, "calendar": 15, "check": 15},
         "tells_per_hour": 3,
         "runs_per_hour": 2,
         "looking": True,

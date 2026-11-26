@@ -302,6 +302,66 @@ def render_step(report: StepReport, detail: str) -> str:
     return f"  {report.index}. {report.description} — {report.outcome}{sent}{f': {detail}' if detail else ''}{marks}"
 
 
+# What a step that should change the page is checked for when nothing else of it is (item 1744): whether the page
+# reacted to it at all. It says that the page did something, not that it did what the step was for.
+PAGE_REACTED: str = "the page reacted to the step"
+
+
+def page_reacted(what: str) -> OutcomeCheck:
+    """The check of a step that should change the page and did: ``what`` is what changed (its address, its content, a
+    request it sent, the field that has the keyboard), never what a field holds."""
+    return _verified(PAGE_REACTED, what)
+
+
+def page_did_not_react(waited_s: float) -> OutcomeCheck:
+    """The check of a step that should change the page and left it as it was for ``waited_s``: uncertain, never
+    contradicted, since a page may answer later or keep what it did to itself (a copy to the clipboard)."""
+    return OutcomeCheck(
+        condition=PAGE_REACTED,
+        status="uncertain",
+        evidence=f"nothing changed within {waited_s:g} s: no new content, request, address, tab or keyboard focus",
+        reason="look at the page before sending the step again, so nothing is sent twice",
+    )
+
+
+class StepTally(FrozenModel):
+    """What the steps of one act call came to, counted by step (item 1744): verified when every check of a step held,
+    contradicted when one was refuted, uncertain otherwise; the steps that went through with nothing checked; and the
+    steps that failed. Kept with the call's result, so that what a run did can be counted from its record without
+    reading the text a model was shown."""
+
+    verified: int
+    contradicted: int
+    uncertain: int
+    not_checked: int
+    failed: int
+
+
+def _step_status(checks: Sequence[OutcomeCheck]) -> CheckStatus:
+    statuses: list[CheckStatus] = [check.status for check in checks]
+    if "contradicted" in statuses:
+        return "contradicted"
+    return "verified" if all(status == "verified" for status in statuses) else "uncertain"
+
+
+def tally_of(reports: Sequence[StepReport]) -> StepTally:
+    done: list[StepReport] = [report for report in reports if report.outcome == "done"]
+    judged: list[CheckStatus] = [_step_status(report.checks) for report in done if report.checks]
+    return StepTally(
+        verified=judged.count("verified"),
+        contradicted=judged.count("contradicted"),
+        uncertain=judged.count("uncertain"),
+        not_checked=sum(1 for report in done if not report.checks),
+        failed=sum(1 for report in reports if report.outcome == "failed"),
+    )
+
+
+def tally_unverified(tally: StepTally) -> bool:
+    """Whether an act call left anything that was not seen to hold: a check not verified, or a step that went through
+    with nothing checked."""
+    return tally.contradicted + tally.uncertain + tally.not_checked > 0
+
+
 def render_outcomes(reports: Sequence[StepReport]) -> str:
     """What the checks of a batch's steps came to, for the line above its result: how many verified, contradicted and
     uncertain, and how many steps went through with nothing checked."""

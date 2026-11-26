@@ -1,6 +1,7 @@
 // What Dot says of what its tasks used (item 1403): the days of Settings › Models › Usage (`GET /api/usage`) and the
 // "so far" of a task that works (`GET /runs/{id}/stats`), in words. Dot records time, tokens and the windows of the Claude
-// plan, no price per model, so there is no money here. Pure, so that it runs under Node without a page.
+// plan; the dollars beside the tokens are an estimate from a public price list (item 1856), "unknown" where a model has
+// no price there, never a guess. Pure, so that it runs under Node without a page.
 
 import { compact, duration, plural } from "./dom.js";
 
@@ -48,12 +49,55 @@ export function dayLabel(day, today) {
   return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
 }
 
-/** One day's figures in a line: "12 tasks · 1.2M in · 30k out · 3h 20m", or "No tasks". */
+/** Dollars as a line says them: "$12.34", "$0.42", "<$0.01" for less than a cent, "$0" for none. */
+export function dollars(usd) {
+  if (usd === 0) {
+    return "$0";
+  }
+  return usd < 0.01 ? "<$0.01" : `$${usd.toFixed(2)}`;
+}
+
+/**
+ * What an estimate of `GET /api/usage` or `GET /runs/{id}/stats` (`CostEstimate`, item 1856) says, or null without one:
+ * "~$0.42", "~$0.42 + plan" when part ran on a subscription, "on a plan" when all of it did, and "cost unknown" when
+ * part of it was of a model with no known price (or before any prices were fetched).
+ */
+export function costWords(cost) {
+  if (cost === null || cost === undefined) {
+    return null;
+  }
+  if (cost.usd === null) {
+    return cost.prices_at === null ? "cost unknown (no prices yet)" : "cost unknown";
+  }
+  const plan = cost.plan_models.length > 0;
+  if (plan && cost.usd === 0) {
+    return "on a plan";
+  }
+  return `~${dollars(cost.usd)}${plan ? " + plan" : ""}`;
+}
+
+/** The estimates `costs` summed as one (`usd` null when any is), or null when none is there. */
+export function sumCosts(costs) {
+  const present = costs.filter((cost) => cost !== null && cost !== undefined);
+  if (present.length === 0) {
+    return null;
+  }
+  return {
+    usd: present.some((cost) => cost.usd === null) ? null : present.reduce((sum, cost) => sum + cost.usd, 0),
+    priced_usd: present.reduce((sum, cost) => sum + cost.priced_usd, 0),
+    unknown_models: [...new Set(present.flatMap((cost) => cost.unknown_models))],
+    plan_models: [...new Set(present.flatMap((cost) => cost.plan_models))],
+    prices_at: present[0].prices_at,
+  };
+}
+
+/** One day's figures in a line: "12 tasks · 1.2M in · 30k out · ~$0.42 · 3h 20m", or "No tasks". */
 export function dayLine(day) {
   if (day.runs === 0) {
     return "No tasks";
   }
-  return `${plural(day.runs, "task", "tasks")} · ${compact(day.input_tokens)} in · ${compact(day.output_tokens)} out · ${duration(day.minutes * 60)}`;
+  const cost = costWords(day.cost);
+  return `${plural(day.runs, "task", "tasks")} · ${compact(day.input_tokens)} in · ${compact(day.output_tokens)} out${cost === null ? "" : ` · ${cost}`} · ${duration(day.minutes * 60)}`;
 }
 
 /** The figures of all `days` in one line, as a day's, or "No tasks in the last 7 days". */
@@ -65,8 +109,9 @@ export function totalLine(days) {
       output_tokens: sum.output_tokens + day.output_tokens,
       minutes: sum.minutes + day.minutes,
     }),
-    { runs: 0, input_tokens: 0, output_tokens: 0, minutes: 0 },
+    { runs: 0, input_tokens: 0, output_tokens: 0, minutes: 0, cost: null },
   );
+  total.cost = sumCosts(days.filter((day) => day.runs > 0).map((day) => day.cost));
   return total.runs === 0 ? `No tasks in the last ${plural(days.length, "day", "days")}` : dayLine(total);
 }
 
@@ -127,6 +172,38 @@ export function windowLine(window, now) {
     parts.push(`seen ${sinceWords(window.seen_at, now)}`);
   }
   return parts.join(" · ");
+}
+
+const FIRST_STEP_CAUSES = {
+  new_chat: "its first step was cold: a new chat",
+  prefix_changed: "its first step was cold: the instructions changed since the chat's last task",
+  after_pause: "its first step was cold after a pause",
+  unexplained: "its first step was cold a few minutes after the last call",
+};
+const COLD_STEP_CAUSES = { tool_group: "a tool group turned on", compaction: "a summary of the chat", other: "no known cause" };
+
+/**
+ * What the service's cache did for a task (item 1742), from `cache` of `GET /runs/{id}/stats`, as a line: why its first
+ * step was cold, if it was, and how many later steps were read at full price and after what. "None" when the task
+ * found its prompt in the cache from the first step to the last, or measured no step.
+ */
+export function cacheWords(cache) {
+  if (cache === null || cache === undefined) {
+    return "None";
+  }
+  const parts = [];
+  const first = FIRST_STEP_CAUSES[cache.first_cause];
+  if (first !== undefined) {
+    parts.push(first);
+  }
+  if (cache.changed.length > 0) {
+    parts.push(`changed: ${cache.changed.slice(0, 3).join(", ")}${cache.changed.length > 3 ? ` and ${cache.changed.length - 3} more` : ""}`);
+  }
+  if (cache.cold_steps.length > 0) {
+    const causes = [...new Set(cache.cold_steps.map((step) => COLD_STEP_CAUSES[step.cause]))].join(", ");
+    parts.push(`${plural(cache.cold_steps.length, "later step", "later steps")} read at full price after ${causes}`);
+  }
+  return parts.length === 0 ? "None" : parts.join(" · ");
 }
 
 /**
@@ -190,7 +267,9 @@ export function budgetLine(budget) {
   if (budget === null || budget === undefined) {
     return null;
   }
-  const used = budget.cap > 0 ? `With helpers ${compact(budget.spent)} of its ${compact(budget.cap)} cap` : `With helpers ${compact(budget.spent)}, no cap`;
+  const cost = costWords(budget.spent_cost);
+  const spent = `${compact(budget.spent)}${cost === null ? "" : ` (${cost})`}`;
+  const used = budget.cap > 0 ? `With helpers ${spent} of its ${compact(budget.cap)} cap` : `With helpers ${spent}, no cap`;
   const usual = budget.estimate === null ? "too few tasks like it to say what it usually uses" : `usually ${compact(budget.estimate.median)}, 9 in 10 under ${compact(budget.estimate.p90)}`;
   return `${used} · ${usual}`;
 }
@@ -200,7 +279,8 @@ export function todayLine(view) {
   return view.caps.day_tokens > 0 ? `Today ${compact(view.today)} of ${compact(view.caps.day_tokens)}` : `Today ${compact(view.today)}, no cap`;
 }
 
-/** One of the tasks that used the most: "Helpers · claude_code:sonnet · 371 steps · 209.8M". */
+/** One of the tasks that used the most: "Helpers · claude_code:sonnet · 371 steps · 209.8M · on a plan". */
 export function topRunLine(run) {
-  return `${sourceName(run.source)} · ${run.model} · ${plural(run.steps, "step", "steps")} · ${compact(run.tokens)}`;
+  const cost = costWords(run.cost);
+  return `${sourceName(run.source)} · ${run.model} · ${plural(run.steps, "step", "steps")} · ${compact(run.tokens)}${cost === null ? "" : ` · ${cost}`}`;
 }

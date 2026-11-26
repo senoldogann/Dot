@@ -29,6 +29,7 @@ from dotagent.core.errors import (
     PhoneRefused,
     PhoneSetupError,
     PluginError,
+    PrecheckError,
     PreviewError,
     ProviderError,
     RunConflict,
@@ -82,6 +83,7 @@ from dotagent.server.routes_snapshots import snapshots_router
 from dotagent.server.routes_system import awake_state, health_router, proof_router, system_router
 from dotagent.server.routes_teach import teach_router
 from dotagent.server.routes_teams import teams_router
+from dotagent.server.routes_tells import tells_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
 from dotagent.server.routes_vault import vault_router
@@ -127,6 +129,8 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (McpError, 422),
     (SkillError, 422),
     (PluginError, 422),
+    # A check that failed when the owner started its schedule by hand: they read why.
+    (PrecheckError, 422),
     (ProviderError, 502),
 )
 
@@ -206,6 +210,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(runs_router(ctx))
     app.include_router(queue_router(ctx))
     app.include_router(reactions_router(ctx))
+    app.include_router(tells_router(ctx))
     app.include_router(iphone_router(ctx))
     app.include_router(threads_router(ctx))
     app.include_router(rules_router(ctx))

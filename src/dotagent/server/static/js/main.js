@@ -4,13 +4,13 @@ import { isAway, onAway } from "./infront.js";
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken, tellPhoneApp, unreachable } from "./api.js";
 import { lineOf } from "./linewords.js";
-import { noteRefused, phoneScreen } from "./linkfacts.js";
+import { noteRefused } from "./linkfacts.js";
 import { followSharedAppearance } from "./sharedappearance.js";
 import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { forgetSentPictures } from "./attachments.js";
-import { setPageTitle, watchAttention } from "./attention.js";
+import { reportDismissed, setPageTitle, watchAttention } from "./attention.js";
 import { createLeaveGuard } from "./leaveguard.js";
 import { loadMacVoice } from "./macvoice.js";
 import { wireConversationCopy } from "./clipboard.js";
@@ -97,7 +97,7 @@ const ROUTES = [
     pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/,
     load: () => import("./views/agents.js"),
     // An agent's page is its conversation (item 1233), so its way back is the list of chats, as a chat's is: the sidebar
-    // opens it on a phone, and a Back to the office between them left the chats behind. Opened by a link of the agents'
+    // opens it on a phone, and a Back to the Agents page between them left the chats behind. Opened by a link of the agents'
     // page, it still goes back there.
     parent: () => null,
   },
@@ -291,8 +291,10 @@ function renderSignIn(message, keyFailed = false, refused = false) {
   onEnter(code, () => attempt(pair));
   onEnter(input, submit);
   const problem = message === "" ? null : el("div", { class: "note bad", role: "alert" }, icon("alert"), el("span", null, message));
-  // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field.
-  const said = refused && phoneScreen() ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
+  // A key that Dot refused is said in the line's own words, with the way to pair again (item 1524): the code's field. The
+  // line is a phone's, and the style shows it on a touch screen alone (shell.css): a touch screen can reach the page
+  // after its first frames, when this is drawn, as the phone browser tests saw (item 966).
+  const said = refused ? lineOf({ online: true, copyFrom: null, waiting: 0, reconnecting: false, refused: true, now: Date.now() }) : null;
   const refusedLine =
     said === null
       ? null
@@ -884,6 +886,10 @@ if ("serviceWorker" in navigator) {
   // chat that asks, or the page the notification is about. Only Dot's own worker, of this origin, says so.
   navigator.serviceWorker.addEventListener("message", (event) => {
     const data = event.data;
+    if (event.origin === location.origin && data?.type === "dot:tell-dismissed" && typeof data.route === "string" && data.route.startsWith("#/")) {
+      reportDismissed(data.route, "push");
+      return;
+    }
     if (event.origin !== location.origin || data?.type !== "dot:open-route" || typeof data.route !== "string" || !data.route.startsWith("#/")) {
       return;
     }

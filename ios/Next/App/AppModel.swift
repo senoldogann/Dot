@@ -21,7 +21,21 @@ final class AppModel {
     }
 
     private(set) var phase: Phase = .loading
-    private(set) var snapshot: EngineSnapshot = .empty
+    // The store's snapshot by part (item 1848): a screen is drawn again only when a part it reads changed, so a streamed word
+    // redraws the open chat and not the chat list beneath it, the tab bar or Settings.
+    private(set) var list: ListProjection = ListProjection()
+    private(set) var chats: [String: ChatProjection] = [:]
+    private(set) var outbox: [OutboxItem] = []
+    private(set) var accepted: [String: AcceptedMessage] = [:]
+    private(set) var transport: Transport = .connecting
+    private(set) var online: Bool = true
+    private(set) var savedAt: [String: Double] = [:]
+    private(set) var workingAt: [String: Double] = [:]
+    private(set) var startedChats: [String: String] = [:]
+    /// The chats whose delete the daemon refused, with its words (item 1800).
+    private(set) var refusedDeletes: [String: String] = [:]
+    /// The Mac's Dot was reset and the owner has not closed the notice yet.
+    private(set) var reset: DaemonReset?
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -41,7 +55,7 @@ final class AppModel {
             var drawn: EngineSnapshot = .empty
             drawn.transport = fixture.transport
             drawn.online = fixture.transport != .offline
-            snapshot = drawn
+            show(drawn)
             fixtureMac = "MacBook Air"
             fixtureAPI = fixture.api()
             phase = fixture == .pairing || fixture == .pairingLink ? .unpaired : .ready
@@ -50,20 +64,110 @@ final class AppModel {
 
         /// Draws a fixture's snapshot with no engine (the screenshot harness and the UI tests).
         func showFixture(_ fixture: EngineSnapshot, mac: String) {
-            snapshot = fixture
+            show(fixture)
             fixtureMac = mac
+            // The models and defaults the chip and the chat's settings read, from the Settings fixture's daemon.
+            fixtureAPI = SettingsFixture.root.api()
             phase = .ready
         }
     #endif
 
+    /// Takes the store's newest snapshot: each part is set only when it changed, so its readers alone are drawn again.
+    private func show(_ next: EngineSnapshot) {
+        if next.list != list { list = next.list }
+        if next.chats != chats { chats = next.chats }
+        if next.outbox != outbox { outbox = next.outbox }
+        if next.accepted != accepted { accepted = next.accepted }
+        if next.transport != transport { transport = next.transport }
+        if next.online != online { online = next.online }
+        if next.savedAt != savedAt { savedAt = next.savedAt }
+        if next.workingAt != workingAt { workingAt = next.workingAt }
+        if next.startedChats != startedChats { startedChats = next.startedChats }
+        if next.refusedDeletes != refusedDeletes { refusedDeletes = next.refusedDeletes }
+        if next.reset != reset { reset = next.reset }
+        if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
+    }
+
+    /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
+    static let newChatDraft: String = "new-chat"
+
+    /// The reset whose words were put in the new chat's draft (its `at`), kept with the draft so that a kill before the
+    /// engine heard of it does not put them there twice.
+    private static let rescuedKey: String = "resetRescuedAt"
+
+    /// A reset left words unsent: they go into the new chat's draft, with the drafts of the old chats (whose chats are
+    /// gone), so that nothing the owner wrote is lost in silence; then the engine is told they were taken.
+    private func rescue(_ fresh: DaemonReset) {
+        guard let engine else { return }
+        let defaults: UserDefaults = UserDefaults.standard
+        let newChatKey: String = "draft.\(Self.newChatDraft)"
+        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && $0 != newChatKey }.sorted()
+        let oldDrafts: [String] = oldKeys.compactMap { defaults.string(forKey: $0) }
+        keep(draft: DaemonRules.draft(keeping: draft(of: Self.newChatDraft), adding: fresh.words + oldDrafts), of: Self.newChatDraft)
+        for key in oldKeys { defaults.removeObject(forKey: key) }
+        defaults.set(fresh.at, forKey: Self.rescuedKey)
+        logger.notice("a reset's words went to the new chat's draft words=\(fresh.words.count) drafts=\(oldDrafts.count)")
+        Task { await engine.store.resetTaken() }
+    }
+
+    /// The owner closed the reset's notice.
+    func resetSeen() {
+        guard let engine else { return }
+        Task { await engine.store.resetSeen() }
+    }
+
+    /// A chat's messages on their way, from the parts they come from (outbox, accepted, the chat, the link).
+    func pending(in thread: String) -> [PendingMessage] {
+        var parts: EngineSnapshot = .empty
+        parts.chats = chats[thread].map { [thread: $0] } ?? [:]
+        parts.outbox = outbox
+        parts.accepted = accepted
+        parts.online = online
+        return parts.pending(in: thread)
+    }
+
+    /// New chats not yet in the list, from the outbox and the link.
+    var pendingChats: [PendingMessage] {
+        var parts: EngineSnapshot = .empty
+        parts.outbox = outbox
+        parts.online = online
+        return parts.pendingChats
+    }
+
     /// The models the daemon offers (`GET /api/models`), for the composer's chip.
     var models: [ProviderModels] = []
+    /// The daemon's main model and approval mode (`GET /api/status`), what "Default" means in the chat's settings.
+    var chatDefaults: ChatDefaults?
+    /// Why the models could not be read, for the model picker to say with a retry; `nil` once they are.
+    var modelsProblem: String?
     /// What the composer's pickers offer from the daemon: skills, agents, teams, accounts (PLAN §22).
     var palette: PaletteView?
+    /// Dot and the owner's agents (`GET /api/agents`), the home's bots (PLAN §27); read when the home appears, on its pull
+    /// to refresh and after a bot is made, renamed or deleted.
     var agents: [AgentSummary] = []
+    /// Why the last read of the agents failed, for the home's banner; `nil` once one works.
+    var agentsProblem: SettingsFailure?
+    /// Why a new bot's first meeting did not start, by agent id, for its chat's banner (the bot was made).
+    var welcomeProblems: [String: SettingsFailure] = [:]
+    /// The bots the owner pinned to the top of the home, in their order (kept on this phone).
+    var pinnedBots: [String] = UserDefaults.standard.stringArray(forKey: "pinnedBots") ?? [] {
+        didSet { UserDefaults.standard.set(pinnedBots, forKey: "pinnedBots") }
+    }
+    /// The bots the owner muted: their unread chats are not counted (kept on this phone).
+    var mutedBots: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "mutedBots") ?? []) {
+        didSet { UserDefaults.standard.set(Array(mutedBots), forKey: "mutedBots") }
+    }
     var teams: [TeamSummary] = []
     /// How the asks this phone answered without the outbox stand (the secrets), by approval id.
     var askPhases: [String: AskPhase] = [:]
+    /// The new chats this phone started in this session, by their outbox key: their first words (item 1849).
+    var startingChats: [String: String] = [:]
+
+    /// The first words of a chat this phone started, once the daemon named its thread: its title until the chat's own
+    /// is read (item 1849).
+    func firstWords(of thread: String) -> String? {
+        startedChats.first { $0.value == thread }.flatMap { startingChats[$0.key] }
+    }
     /// The asks this phone answered, kept so the transcript can say "by you on this phone".
     var answeredHere: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "answeredHere") ?? []) {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
@@ -121,7 +225,10 @@ final class AppModel {
         watching = Task { [weak self] in
             for await next in await engine.store.updates() {
                 guard let self else { return }
-                if next != self.snapshot { self.snapshot = next }
+                self.show(next)
+                // At most one picture a display frame at 30 Hz: the store's stream keeps only the newest, so the words
+                // that came meanwhile are drawn together, never dropped (item 1848).
+                try? await Task.sleep(for: .milliseconds(33))
             }
         }
         Task { await engine.supervisor.start() }
@@ -183,7 +290,7 @@ final class AppModel {
         }
         hosts.forget()
         self.engine = nil
-        snapshot = .empty
+        show(.empty)
         phase = .unpaired
     }
 
@@ -224,12 +331,18 @@ final class AppModel {
         }
     }
 
-    func startChat(_ text: String, photos: [Data]) async {
-        guard let engine else { return }
+    /// Starts a new chat through the outbox, with what was picked in its settings (PLAN §24) and with Dot (`agent` `nil`) or
+    /// one of the owner's agents: its key, which the chat opens at once (item 1849) and swaps for the chat's own id once
+    /// the daemon names it; `nil` when the message could not be kept.
+    func startChat(_ text: String, photos: [Data], start: ChatStart, agent: String?) async -> String? {
+        guard let engine else { return nil }
         do {
-            _ = try await engine.startChat(text, photos: photos)
+            let key: String = try await engine.startChat(text, photos: photos, start: start, agent: agent)
+            startingChats[key] = text
+            return key
         } catch {
             logger.error("a new chat could not be kept error=\(String(describing: error), privacy: .public)")
+            return nil
         }
     }
 
@@ -291,14 +404,37 @@ extension AppModel {
         }
     }
 
-    /// The models the daemon offers, read once per launch for the composer's chip.
+    /// The models the daemon offers and its defaults, read once per launch for the composer's chip and the chat's
+    /// settings (each again on the next ask while it could not be read).
+    /// A read that fails says why (`modelsProblem`), for the picker to show with its retry: the defaults' too, without
+    /// which no row is marked chosen or Default.
     func loadModels() async {
-        guard let engine, models.isEmpty else { return }
-        do {
-            models = try await engine.api.models()
-        } catch {
-            logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+        guard let api: DaemonAPI = settingsAPI else { return }
+        let place: String = String(localized: "Settings › Models", comment: "Where on the Mac: the Models page")
+        var problem: String?
+        if models.isEmpty {
+            do {
+                models = try await api.models()
+            } catch {
+                logger.warning("the models could not be read error=\(String(describing: error), privacy: .public)")
+                problem = failureWords(settingsFailure(error), macPlace: place)
+            }
         }
+        if chatDefaults == nil {
+            do {
+                let status: StatusView = try await api.fullStatus()
+                chatDefaults = ChatDefaults(model: status.models.main, approvals: status.approvals)
+            } catch {
+                logger.warning("the daemon's defaults could not be read error=\(String(describing: error), privacy: .public)")
+                problem = problem ?? failureWords(settingsFailure(error), macPlace: place)
+            }
+        }
+        modelsProblem = problem
+    }
+
+    /// A model's name as the daemon gives it, else the reference's last part ("claude_code:opus" → "opus").
+    func modelLabel(_ ref: String) -> String {
+        models.flatMap(\.models).first { $0.ref == ref }?.label ?? String(ref.split(separator: ":").last ?? Substring(ref))
     }
 
     /// The pickers' lists, read once per launch; a list that cannot be read stays empty and says so in the log.
@@ -306,7 +442,7 @@ extension AppModel {
         guard let engine, palette == nil else { return }
         do {
             palette = try await engine.api.palette()
-            agents = try await engine.api.agents()
+            if agents.isEmpty { agents = try await engine.api.agents() }
             teams = try await engine.api.teams()
         } catch {
             logger.warning("the composer's lists could not be read error=\(String(describing: error), privacy: .public)")
@@ -315,7 +451,7 @@ extension AppModel {
 
     /// A side question (`/btw`): the run's answer, or why there is none.
     func aside(run: String, question: String) async -> String {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired") }
         do {
             return try await engine.api.aside(run: run, question: question).answer
         } catch {
@@ -325,7 +461,7 @@ extension AppModel {
 
     /// A loop of the chat (`/loop`); `nil` when it was made, else why not.
     func loop(run: String, every: String, text: String) async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
+        guard let engine else { return String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired") }
         do {
             try await engine.api.loop(run: run, every: every, text: text)
             return nil
@@ -346,17 +482,6 @@ extension AppModel {
         } catch {
             logger.warning("a screenshot could not be read name=\(name, privacy: .public) error=\(String(describing: error), privacy: .public)")
             return nil
-        }
-    }
-
-    /// The emergency stop (Settings, the daemon's failsafe): every run stops. `nil` when it worked, else why not.
-    func emergencyStop() async -> String? {
-        guard let engine else { return String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop") }
-        do {
-            _ = try await engine.api.emergencyStop()
-            return nil
-        } catch {
-            return String(describing: error)
         }
     }
 

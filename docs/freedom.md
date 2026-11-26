@@ -23,7 +23,10 @@ contract, and `tests/unit/test_freedom_contract.py` is what makes it executable.
 **Freedom costs no speed.** The gate of such a run is one policy decision and one record; it awaits no answer and no kept
 step (the pace the owner set for a site, which spaces the public actions of the browser, is the one wait left, and is
 theirs), and a call's `tool_result` event keeps `waited_s`, the time it spent at the gate. A change that puts a wait in
-that path breaks the contract as an ask does.
+that path breaks the contract as an ask does. Outside the gate, a desktop step that would take the Mac's own pointer or
+keyboard while the owner is at the Mac waits for them to step away (item 1890, the owner's own rule of 2026-11-25,
+`[desktop] input_only_when_away`): it asks nothing, in every mode, and is in
+[Browser and computer use](browser-and-computer-use.md).
 
 ## The exceptions, with the code that makes each
 
@@ -100,8 +103,9 @@ is told so. A run that did what the policy would have asked about can always be 
   classification and not a hand-written action: shell (read, write and delete in and outside the workspace, `curl`, `git
   push`, a deploy, mail), files (write and edit anywhere, Dot's own files, a protected place), the browser (navigate,
   click, type, submit a form, a post, a payment, an upload, a vault login), the desktop (click, type, open an app,
-  AppleScript), the web, MCP, schedules, memory, delegation and teams, the terminal, waits, drafts, the phone and
-  code mode's `code_run`. A real
+  AppleScript), the web, MCP, schedules, memory, delegation and teams, the terminal, waits, drafts, the phone,
+  `add_proof` and code mode's `code_run`. A proof check (item 1853) is a `shell` call Dot makes for the run, judged as
+  that row of the table is, so it adds no ask. A real
   `RunGate` on a real store decides each in every way a run can stand: yolo and free (also over `ask`, `auto` and
   `supervised`, in a chat of Dot's own, after outside content), and yolo alone in each kind of chat. Where this page names an
   ask the owner is asked and nothing else; everywhere else the call goes through unasked and a step the policy would have

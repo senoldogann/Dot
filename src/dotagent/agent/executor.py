@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Coroutine, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -17,7 +17,7 @@ from dotagent.agent.limits import LIMIT_TOOLS
 from dotagent.agent.playbooks import arguments_name_dot, daemon_addresses, dot_names
 from dotagent.agent.sites import hand_outside_site_lessons
 from dotagent.agent.yolo_log import note_checkpoint
-from dotagent.codemode.inner import CODE_RUN_TOOL, NestedResult
+from dotagent.codemode.inner import CAMPAIGN_ACHIEVED_TOOL, CODE_RUN_TOOL, NestedResult
 from dotagent.core.errors import (
     ApprovalNoted,
     ApprovalParked,
@@ -29,6 +29,7 @@ from dotagent.core.errors import (
     PolicyDenied,
     RunCancelled,
     ToolInputError,
+    ToolSteer,
     WebError,
     WebTransportError,
 )
@@ -158,6 +159,11 @@ def batch_steps(arguments: JsonObject) -> int:
     return len(steps) if isinstance(steps, list) else 0
 
 
+def failed_call(result: ToolResult) -> bool:
+    """Whether ``result`` is a failed call: an error that is not Dot's rule turning the call another way (item 1722)."""
+    return result.is_error and not result.steered
+
+
 def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
     """The text the model sees for a call that failed: what an expected error says, or the kind and the words of one
     that no tool expects (a fault in Dot, not in what the call asked)."""
@@ -237,13 +243,18 @@ class _PausedClock:
         self._spent: _GateTime = spent
 
     async def authorize(self, info: ActionInfo) -> str:
+        return await self.off_clock(self._inner.authorize(info))
+
+    async def off_clock[T](self, waiting: Awaitable[T]) -> T:
+        """Await ``waiting`` with the tool's clock stopped (item 1890): the owner's answer, or a batch of desktop steps
+        that waits for them to step away."""
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         deadline: float | None = self._scope.when()
         remaining: float | None = None if deadline is None else max(deadline - loop.time(), 0.0)
         self._scope.reschedule(None)
         asked_at: float = time.monotonic()
         try:
-            return await self._inner.authorize(info)
+            return await waiting
         finally:
             self._spent.seconds += time.monotonic() - asked_at
             self._scope.reschedule(None if remaining is None else loop.time() + remaining)
@@ -292,11 +303,14 @@ class _Nesting:
     (``parent_call_id``), and its id is that call's, a dot and its number. ``ctx`` is the run's own context with room
     for whole results and no nesting of its own: a call made here cannot make calls."""
 
-    def __init__(self, registry: ToolRegistry, ctx: ToolContext, gate: RunGate, parent_call_id: str) -> None:
+    def __init__(
+        self, registry: ToolRegistry, ctx: ToolContext, gate: RunGate, parent_call_id: str, via_kind: str
+    ) -> None:
         self._registry: ToolRegistry = registry
         self._ctx: ToolContext = ctx
         self._gate: RunGate = gate
         self._parent: str = parent_call_id
+        self._via: str = via_kind
         self.outcomes: list[ToolOutcome] = []
 
     def specs(self) -> Mapping[str, ToolSpec]:
@@ -311,7 +325,9 @@ class _Nesting:
 
     async def call(self, name: str, arguments: JsonObject) -> NestedResult:
         made: ToolCall = ToolCall(id=f"{self._parent}.{len(self.outcomes) + 1}", name=name, arguments=arguments)
-        outcome: ToolOutcome = await _execute_one(made, self._registry, {}, self._ctx, self._gate, None, self._parent)
+        outcome: ToolOutcome = await _execute_one(
+            made, self._registry, {}, self._ctx, self._gate, None, self._parent, self._via
+        )
         self.outcomes.append(outcome)
         return NestedResult(
             text=outcome.result.text,
@@ -321,19 +337,23 @@ class _Nesting:
             refused=outcome.refused,
             seconds=outcome.seconds,
             waited_s=outcome.waited_s,
+            reached_tool=outcome.action is not None,
         )
 
 
 def _nesting_for(
     tool: RegisteredTool, call: ToolCall, registry: ToolRegistry, ctx: ToolContext, gate: RunGate
 ) -> _Nesting | None:
-    """What a call of ``tool`` makes its own calls with: only ``code_run`` makes any. Its results are not cut to the
-    model's budget (item 494's cap is for what a model reads: code reads what it filters, and only prints reach the
-    model), and the context it makes them in has no nesting of its own."""
-    if tool.spec.name != CODE_RUN_TOOL:
-        return None
-    inner: ToolContext = replace(ctx, output_chars=ctx.runtime.config.code.result_chars, nested=None)
-    return _Nesting(registry, inner, gate, call.id)
+    """What a call of ``tool`` makes its own calls with: only ``code_run`` and ``campaign_achieved`` make any. The
+    results of a code's are not cut to the model's budget (item 494's cap is for what a model reads: code reads what it
+    filters, and only prints reach the model); a claim's are its proof checks (item 1853), cut as the model's are. The
+    context they are made in has no nesting of its own."""
+    if tool.spec.name == CODE_RUN_TOOL:
+        inner: ToolContext = replace(ctx, output_chars=ctx.runtime.config.code.result_chars, nested=None)
+        return _Nesting(registry, inner, gate, call.id, "code")
+    if tool.spec.name == CAMPAIGN_ACHIEVED_TOOL:
+        return _Nesting(registry, replace(ctx, nested=None), gate, call.id, "proof")
+    return None
 
 
 async def _run_checked(
@@ -386,8 +406,9 @@ async def _run_checked(
             try:
                 with in_tool.attempt(at_gate):
                     async with asyncio.timeout(tool.timeout_s) as scope:
+                        paused: _PausedClock = _PausedClock(ctx.gate, scope, at_gate)
                         result: ToolResult = await prepared.run(
-                            replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate), nested=nesting)
+                            replace(ctx, gate=paused, nested=nesting, off_clock=paused.off_clock)
                         )
             except (RunCancelled, FailSafeTriggered):
                 raise
@@ -445,6 +466,8 @@ async def _run_checked(
             gate.taint()
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
+        if isinstance(exc, ToolSteer):
+            failed = failed.model_copy(update={"steered": True})
         failed = await _record_yolo(ctx, tool.spec.name, action, failed)
         return _Checked(
             result=failed,
@@ -504,16 +527,18 @@ async def _execute_one(
     gate: RunGate,
     refused: str | None = None,
     parent: str | None = None,
+    via_kind: str = "code",
 ) -> ToolOutcome:
-    """Run one call, as the model's or, with ``parent`` (the id of the ``code_run`` call it is made in, item 1501), as a
-    call a code makes: the same path, and its two events say which (``via`` and ``parent_call_id``)."""
+    """Run one call, as the model's or, with ``parent`` (the id of the call it is made in), as a call that one makes:
+    a code's (``code_run``, item 1501) or a proof check's (``campaign_achieved``, item 1853), named by ``via_kind``.
+    The same path, and its two events say which (``via`` and ``parent_call_id``)."""
     started: float = time.monotonic()
     # The secrets Dot holds, masked in the step's events as the forms of keys are.
     known: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
     tool: RegisteredTool | None = registry.tools.get(call.name)
     # The call's own limit goes with it (item 925): the watchdog reads a run inside a call that may take hours (a
     # helper, a wait) as busy until that limit, not as stuck.
-    via: JsonObject = {} if parent is None else {"via": "code", "parent_call_id": parent}
+    via: JsonObject = {} if parent is None else {"via": via_kind, "parent_call_id": parent}
     await ctx.runtime.bus.emit(
         ctx.run_id,
         "tool_call",
@@ -559,7 +584,7 @@ async def _execute_one(
         # A run that is tainted now, in a context that shows them, is handed the lessons saved while reading outside
         # content too (item 1192): fenced, next to the result in its own requests, stored nowhere.
         outside_lessons: bool = gate.tainted and ctx.shows_outside_lessons
-        if result.is_error and lessons_on:
+        if failed_call(result) and lessons_on:
             # What earlier runs learned about the tool, at the moment it is of use (item 1111); added after the error
             # is cut to the run's room, so that no lesson is cut in the middle.
             learned = await hand_failure_lessons(
@@ -606,7 +631,10 @@ async def _execute_one(
         {
             "call_id": call.id,
             "tool": call.name,
+            # Whether the call did its job; ``steered`` marks one Dot's rule turned another way (item 1722), which
+            # did not, and which the counts of failed calls leave out (``store/failed.py``).
             "ok": not clipped.is_error,
+            "steered": clipped.steered,
             "text": truncate_middle(redact_known(clipped.text, known), _EVENT_TEXT_CHARS),
             "images": list(files),
             "seconds": round(seconds, 2),
@@ -620,6 +648,8 @@ async def _execute_one(
             "target": shown.target if shown is not None else "",
             "site": redact_known(_site(call, action), known),
             "steps": batch_steps(call.arguments),
+            # What the steps of an act call came to, counted (item 1744): the run's account reads it.
+            "tally": None if clipped.tally is None else clipped.tally.model_dump(mode="json"),
             "channel": channel_of(call.name),
             # Whether the run is tainted after this result: a run that goes on from it takes it over (item 243).
             "tainted": gate.tainted,

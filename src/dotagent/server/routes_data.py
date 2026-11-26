@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import regex
 from fastapi import APIRouter, Query, Request
 
+from dotagent.agent.held_notes import WaitingProposal, waiting_proposals
 from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
@@ -390,7 +391,25 @@ def memories_router(ctx: ServerContext) -> APIRouter:
         """The owner's notes a run proposed a change of that waits for them, the newest proposal first."""
         return await index.store.memories_with_proposals(_MOST_PROPOSALS)
 
-    # After the routes above: "owner", "learning", "search" and "proposed" are not ids.
+    @router.get("/memories/waiting")
+    async def waiting_to_remember() -> list[WaitingProposal]:
+        """What scheduled tasks, watchers' tasks and helpers proposed to remember, and the lessons that wait, for the
+        owner to save or dismiss (item 1865), the newest run first."""
+        return await waiting_proposals(index.store, time.time())
+
+    @router.post("/memories/waiting/{run_id}/{index}/save")
+    async def save_waiting_note(run_id: str, index: int) -> list[WaitingProposal]:
+        """Save a note a run held for the owner, as the run would have saved it (409 when it was decided already)."""
+        await ctx.manager.save_held_note(run_id, index)
+        return await waiting_proposals(ctx.runtime.store, time.time())
+
+    @router.post("/memories/waiting/{run_id}/{index}/dismiss")
+    async def dismiss_waiting_note(run_id: str, index: int) -> list[WaitingProposal]:
+        """Dismiss a note a run held for the owner: it is not saved (409 when it was decided already)."""
+        await ctx.manager.dismiss_held_note(run_id, index)
+        return await waiting_proposals(ctx.runtime.store, time.time())
+
+    # After the routes above: "owner", "learning", "search", "proposed" and "waiting" are not ids.
     @router.get("/memories/{memory_id}")
     async def get_memory(memory_id: str) -> MemoryRecord:
         return await index.store.get_memory(memory_id)
@@ -513,6 +532,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 stop_after_failures=request.stop_after_failures,
                 notify=request.notify,
                 agent_id=request.agent_id,
+                precheck=request.precheck,
             ),
         )
         if not request.enabled:
@@ -524,6 +544,8 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
         kept: ScheduleOptions = (await store.get_schedule(schedule_id)).options
         # A change that does not name the agent keeps the schedule's (item 462): only an explicit null makes it Dot's.
         agent_id: str | None = request.agent_id if "agent_id" in request.model_fields_set else kept.agent_id
+        # Its check likewise (item 1855): left out it stays, null removes it.
+        precheck: str | None = request.precheck if "precheck" in request.model_fields_set else kept.precheck
         plan: ScheduleRequest = ScheduleRequest(
             name=request.name,
             goal=request.goal,
@@ -547,6 +569,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 # Nor for where its goal came from: one a run made after reading a page stays so (the review of
                 # 2026-11-01); a schedule the owner makes anew is theirs.
                 from_outside=kept.from_outside,
+                precheck=precheck,
             ),
         )
         # Left out, on or off stays as it is now, not as a form saw it when it opened (item 723).

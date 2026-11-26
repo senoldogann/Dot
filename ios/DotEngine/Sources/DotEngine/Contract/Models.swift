@@ -107,6 +107,13 @@ public struct RunRecord: Codable, Sendable, Hashable {
     public let approvals: String?
     /// The owner's reaction the run follows up (item 844): the transcript draws no owner's message for it.
     public let followsReaction: String?
+    /// Whether the chat can be rewound to before this run's message (Edit from here and Retry, item 282); `nil` from a
+    /// daemon or a fixture that does not say.
+    public var rewindable: Bool? = nil
+    /// The agent the run belongs to (item 86), `nil` for Dot.
+    public var agentId: String? = nil
+    /// Why the run ended (`model_refused` when its model declined the task, item 1889), `nil` while it works.
+    public var endReason: String? = nil
 
     public init(
         id: String, threadId: String, goal: String, mode: String, model: String, status: String, createdAt: Double, finishedAt: Double?,
@@ -140,6 +147,9 @@ public struct RunRecord: Codable, Sendable, Hashable {
         case inputTokens = "input_tokens"
         case outputTokens = "output_tokens"
         case followsReaction = "follows_reaction"
+        case rewindable
+        case agentId = "agent_id"
+        case endReason = "end_reason"
     }
 
     /// Whether the run still goes (it can be stopped, a steer reaches it).
@@ -168,6 +178,20 @@ public struct ChatChoices: Codable, Sendable, Hashable {
         ChatChoices(mode: mode, model: next, effort: level, speed: speed, approvals: approvals, goalMode: goalMode)
     }
 
+    /// The same choices with another speed (`standard` or `fast`).
+    public func with(speed next: String) -> ChatChoices {
+        ChatChoices(mode: mode, model: model, effort: effort, speed: next, approvals: approvals, goalMode: goalMode)
+    }
+
+    /// The same choices with another approval mode; `nil` takes the daemon's `[policy] approvals`.
+    public func with(approvals next: String?) -> ChatChoices {
+        ChatChoices(mode: mode, model: model, effort: effort, speed: speed, approvals: next, goalMode: goalMode)
+    }
+
+    /// What a new chat starts with when the owner chose nothing: the daemon's model, level and approvals, the words
+    /// settling the mode (item 495).
+    public static let daemons: ChatChoices = ChatChoices(mode: "auto", model: nil, effort: nil, speed: "standard", approvals: nil, goalMode: nil)
+
     enum CodingKeys: String, CodingKey {
         case mode, model, effort, speed, approvals
         case goalMode = "goal_mode"
@@ -181,6 +205,16 @@ public struct RunDetail: Codable, Sendable, Hashable {
     public let active: Bool
     public let held: Bool
     public let choices: ChatChoices?
+    /// Whether the run was cut off, blocked or failed and a new run can go on from where it stopped (`POST
+    /// /runs/{id}/resume`); `nil` from a daemon or a fixture that does not say.
+    public var resumable: Bool? = nil
+    /// How the run was cut off (`daemon_restarted`, `daemon_shutdown`, `process_ended`, `process_died`), else `nil`.
+    public var cutOff: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case run, title, active, held, choices, resumable
+        case cutOff = "cut_off"
+    }
 }
 
 public struct QueuedMessageView: Codable, Sendable, Hashable {
@@ -456,9 +490,23 @@ public struct PairedKey: Codable, Sendable {
     public let token: String
 }
 
-/// `GET /api/status`, the part the cache keys on.
+/// `GET /api/status`, the part the cache keys on: the version, and the id of the daemon's database (absent from a daemon
+/// from before it), which a reset of the Mac's Dot changes.
 public struct DaemonStatus: Codable, Sendable, Hashable {
     public let version: String
+    public let storeId: String?
+
+    public init(version: String, storeId: String?) {
+        self.version = version
+        self.storeId = storeId
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case storeId = "store_id"
+    }
+
+    public var identity: DaemonIdentity { DaemonIdentity(version: version, store: storeId) }
 }
 
 /// A model as the pickers show it (`GET /api/models`), the part the composer's chip reads.
@@ -468,11 +516,20 @@ public struct ModelOption: Codable, Sendable, Hashable {
     public let efforts: [String]
     public let defaultEffort: String?
     public let contextLength: Int?
+    /// It has fast mode (item 223); `nil` from a daemon that does not say.
+    public let fastMode: Bool?
+    /// It can call tools: a run needs them, so the picker leaves the others out (as the web's does).
+    public let tools: Bool?
+    /// The provider serves it at no cost.
+    public let free: Bool?
+    /// It can see images: the vision model must (item 232).
+    public let vision: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case ref, label, efforts
+        case ref, label, efforts, tools, free, vision
         case defaultEffort = "default_effort"
         case contextLength = "context_length"
+        case fastMode = "fast_mode"
     }
 }
 
@@ -481,6 +538,12 @@ public struct ProviderModels: Codable, Sendable, Hashable {
     public let provider: String
     public let models: [ModelOption]
     public let error: String?
+
+    public init(provider: String, models: [ModelOption], error: String?) {
+        self.provider = provider
+        self.models = models
+        self.error = error
+    }
 }
 
 /// `GET`/`POST /api/failsafe`.
@@ -559,11 +622,6 @@ public struct NamedRecord: Codable, Sendable, Hashable {
     public let id: String
     public let name: String
     public let role: String?
-}
-
-/// An agent or a team as `/api/agents` and `/api/teams` list them, the part the `@` menu reads.
-public struct AgentSummary: Codable, Sendable, Hashable {
-    public let record: NamedRecord
 }
 
 public struct TeamSummary: Codable, Sendable, Hashable {

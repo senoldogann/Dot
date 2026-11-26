@@ -78,7 +78,7 @@ from dotagent.config import AppConfig, BrowserConfig
 from dotagent.core.errors import DotError, NotFoundError, ToolExecutionError, ToolInputError
 from dotagent.core.held import held_folder, open_regular
 from dotagent.core.logs import get_logger
-from dotagent.core.outcomes import BROWSER_EXPECTATIONS, expectation_on_last_step
+from dotagent.core.outcomes import BROWSER_EXPECTATIONS, PAGE_REACTED, expectation_on_last_step, tally_of
 from dotagent.core.paths import uploads_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
@@ -552,7 +552,9 @@ async def _retry_unchanged(
     steps: list[StepReport] = list(outcome.steps)
     retried: bool = False
     for index, (step, report) in enumerate(zip(args.steps, steps, strict=False)):
-        if step.action != "click" or step.ref is None or step.expects() or report.checks:
+        # The page's reaction (item 1744) is no check of what the click was for: a click that has only that is tried.
+        judged: bool = any(check.condition != PAGE_REACTED for check in report.checks)
+        if step.action != "click" or step.ref is None or step.expects() or judged:
             continue
         if report.outcome != "done" or not report.detail.startswith(PAGE_UNCHANGED):
             continue
@@ -826,10 +828,14 @@ def _act_tool() -> RegisteredTool:
             rendered = f"{note}\n{rendered}"
         # The page that comes back from a click is a stranger's to write, as one that was opened is: the run reads it as
         # untrusted from here on (item 561), though the step's own kind (a click, an entry) is not one that taints.
+        # What the steps came to, counted, goes with the result for the run's account (item 1744).
+        tallied: ToolResult = ok(rendered).model_copy(update={"tally": tally_of(outcome.steps)})
         if args.expect is None:
-            return mark_untrusted(ok(rendered))
+            return mark_untrusted(tallied)
         check: PageCheck | None = await _page_check(args.expect, outcome, ctx)
-        return mark_untrusted(ok(rendered if check is None else f"{render_page_check(check)}\n{rendered}"))
+        if check is not None:
+            tallied = tallied.model_copy(update={"text": f"{render_page_check(check)}\n{rendered}"})
+        return mark_untrusted(tallied)
 
     return make_reviewed_tool(
         name="browser_act",

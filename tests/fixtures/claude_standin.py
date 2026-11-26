@@ -54,6 +54,7 @@ It calls no model and reaches nothing but Dot's bridge on this Mac."""
 import asyncio
 import json
 import os
+import re
 import secrets
 import signal
 import stat
@@ -72,9 +73,40 @@ SESSION: str = "ses-standin-1"
 RECORD: Path = Path(".")
 
 
+# The answer of the last result the stand-in said, which a note of Dot's telling it to finish is answered with.
+LAST_ANSWER: str = ""
+
+
 def _say(item: dict[str, object]) -> None:
+    global LAST_ANSWER
+    if item.get("type") == "result" and isinstance(item.get("result"), str) and item["result"]:
+        LAST_ANSWER = str(item["result"])
     sys.stdout.write(json.dumps(item) + "\n")
     sys.stdout.flush()
+
+
+async def _finish_as_told(server: dict[str, object], door: str, answer: str) -> None:
+    """Call Dot's finish with ``answer``, as a model told to finish does (item 1694)."""
+    headers: dict[str, str] = server["headers"]  # type: ignore[assignment]  # the config Dot wrote
+    async with (
+        httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(10.0, read=60.0)) as http,
+        Client(streamable_http_client(str(server["url"]), http_client=http), mode="auto") as client,
+    ):
+        _step([("tool_use", f"mcp__{door}__finish")], "tool_use")
+        await client.call_tool("finish", {"answer": answer, "success": True})
+
+
+def _answer_notes(server: dict[str, object] | None, door: str) -> None:
+    """Take in what Dot sends after the stand-in's work, as the real program does, until Dot closes its input: a note
+    that tells it to finish (item 1694: a run that worked and did not call finish is told to, as in Dot's own loop) is
+    answered with a finish of its last answer, anything else with that answer again."""
+    for line in sys.stdin:
+        message: dict[str, object] = json.loads(line)["message"]
+        _say({"type": "user", "isReplay": True, "message": message, "session_id": SESSION})
+        if server is not None and "call finish" in json.dumps(message["content"]):
+            asyncio.run(_finish_as_told(server, door, LAST_ANSWER))
+        _step([("text", "")], "end_turn")
+        _say({"type": "result", "subtype": "success", "is_error": False, "result": "", "session_id": SESSION})
 
 
 def _event(event: dict[str, object]) -> None:
@@ -330,6 +362,22 @@ async def _work(
             _step([("text", heard)], "end_turn")
             _say({"type": "result", "subtype": "success", "is_error": False, "result": heard, "session_id": SESSION})
             return
+        if "plan the work" in said:
+            # Item 1693: the plan's tools are the door's, as Dot's own loop gives them.
+            _step([("tool_use", f"mcp__{door}__update_plan")], "tool_use")
+            planned: CallToolResult = await client.call_tool(
+                "update_plan", {"steps": [{"text": "Write the note", "status": "in_progress"}]}
+            )
+            _step([("tool_use", f"mcp__{door}__mark_plan_step")], "tool_use")
+            marked: CallToolResult = await client.call_tool(
+                "mark_plan_step", {"step": 1, "status": "done", "evidence": "notes.txt read back: from claude"}
+            )
+            said_back: str = f"Planned: {_text(planned)} | {_text(marked)}"
+            _step([("text", said_back)], "end_turn")
+            _say(
+                {"type": "result", "subtype": "success", "is_error": False, "result": said_back, "session_id": SESSION}
+            )
+            return
         if "slow command" in said:
             _step([("text", "Running it."), ("tool_use", f"mcp__{door}__shell")], "tool_use")
             await client.call_tool("shell", {"command": "sleep 2; echo late > late.txt"})
@@ -423,6 +471,8 @@ def main() -> None:
                 },
                 "cwd": os.getcwd(),
                 "config_file": str(config_file),
+                "prompt": Path(_flag(args, "--append-system-prompt-file")).read_text(encoding="utf-8"),
+                "prompt_mode": stat.S_IMODE(Path(_flag(args, "--append-system-prompt-file")).stat().st_mode),
                 "config_mode": stat.S_IMODE(config_file.stat().st_mode),
                 "folder_mode": stat.S_IMODE(config_file.parent.stat().st_mode),
             }
@@ -431,7 +481,9 @@ def main() -> None:
     )
     first: dict[str, object] = json.loads(sys.stdin.readline())
     message: dict[str, object] = first["message"]  # type: ignore[assignment]  # Dot's user line
-    said: str = json.dumps(message["content"])
+    # What the goal asks of the stand-in is in the owner's words, not in the notes of Dot's under them (item 1691: how
+    # the run was started, whose words, "once" among them, would read as a mode).
+    said: str = re.sub(r"\[system note\] How this run was started.*?(?:\\n\\n|$)", "", json.dumps(message["content"]))
     resumed: str | None = _flag(args, "--resume") if "--resume" in args else None
     plan: dict[str, object] | None = _plan_of(record, said, resumed)
     # As the real program does with --replay-user-messages: it says it took the message in.
@@ -442,13 +494,14 @@ def main() -> None:
     with (record / "starts.log").open("a", encoding="utf-8") as starts:
         starts.write(json.dumps({"resume": resumed, "session": SESSION}) + "\n")
     (record / "first.json").write_text(json.dumps(message["content"]), encoding="utf-8")
+    server: dict[str, object] | None = None
     if "extra tools" in said:
         _init(door, ["Bash", f"mcp__{door}__notify"])
     else:
-        server: dict[str, object] = json.loads(config_file.read_text(encoding="utf-8"))["mcpServers"][door]
+        server = json.loads(config_file.read_text(encoding="utf-8"))["mcpServers"][door]
         asyncio.run(_work(server, door, said, plan, resumed))
     # Dot closes the input once each message has its result, or ends the program.
-    sys.stdin.read()
+    _answer_notes(server, door)
 
 
 if __name__ == "__main__":

@@ -289,7 +289,7 @@ async def test_the_agents_forget_tool_says_the_note_goes_to_the_trash_and_it_doe
 ) -> None:
     """The review of item 584 (P3): the tool still told the model that it deletes a note, which since this item moves it
     to the owner's trash, whence only the owner brings it back."""
-    forget = next(tool for tool in build_memory_tools() if tool.spec.name == "memory_forget")
+    forget = next(tool for tool in build_memory_tools(600) if tool.spec.name == "memory_forget")
     assert "trash" in forget.spec.description and "restore" in forget.spec.description
     assert "Delete" not in forget.spec.description
     async with _index(tmp_path, monkeypatch) as index:
@@ -593,3 +593,12 @@ def test_a_run_cannot_give_its_note_the_reflections_own_tags() -> None:
     # Six of the run's own and the store's cap of six: the run's sixth gives way, not keep-separate.
     six: list[str] = ["a1", "a2", "a3", "a4", "a5", "a6"]
     assert normalize_tags(_own_tags(six, ("lesson", "keep-separate")))[0] == "keep-separate"
+
+
+def test_tools_that_write_a_note_name_its_limit() -> None:
+    """The audit of 2026-11-24: 6 of 21 notes a run on the owner's plan saved were refused as longer than the limit,
+    which no word of the tools named. memory_save and memory_update say it, from ``[memory] max_chars``."""
+    tools = {tool.spec.name: tool for tool in build_memory_tools(450)}
+    for name in ("memory_save", "memory_update"):
+        assert "at most 450 characters" in tools[name].spec.description
+    assert "characters" not in tools["memory_search"].spec.description

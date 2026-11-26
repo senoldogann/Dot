@@ -3,8 +3,13 @@ import XCTest
 /// The ask dock and the queue's edit on the real chat screen, drawn from the debug build's fixtures (wave N2).
 final class ChatUITests: XCTestCase {
     private func launch(_ scene: String) -> XCUIApplication {
+        launch(scene, defaults: [])
+    }
+
+    /// `defaults` are `UserDefaults` given as arguments (`-key value`), over what an earlier test left on the simulator.
+    private func launch(_ scene: String, defaults: [String]) -> XCUIApplication {
         let app: XCUIApplication = XCUIApplication()
-        app.launchArguments = ["-DotNextScene", scene, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-DotNextScene", scene, "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + defaults
         app.launch()
         return app
     }
@@ -13,15 +18,170 @@ final class ChatUITests: XCTestCase {
     /// all, yet the clock goes on every second; and the capsule says what the run does (here: writing its words).
     func testTheCapsuleClockTicksWithNoEventsAndSaysWhatTheRunDoes() {
         let app: XCUIApplication = launch("n2-chat")
-        let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
+        // Found by its kind (a button): a search of the whole tree is slow to read on a loaded runner.
+        let status: XCUIElement = app.buttons["capsule.status"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
         let first: String = status.label
-        XCTAssertTrue(first.hasPrefix("Writing, "), "the capsule says what the run does: \(first)")
-        let moved: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", first), object: status)
-        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 2.5), .completed, "the clock moved on its own: \(first) -> \(status.label)")
-        let second: String = status.label
-        let again: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", second), object: status)
-        XCTAssertEqual(XCTWaiter.wait(for: [again], timeout: 2.5), .completed, "and again a second later: \(second) -> \(status.label)")
+        // Items 1769 and 1880: the capsule says Working and its clock; what the run does is the live line's.
+        XCTAssertTrue(first.hasPrefix("Working, "), "the capsule says the main run works, with its clock: \(first)")
+        let second: String = nextLabel(of: status, after: first, within: 2.5)
+        XCTAssertNotEqual(second, first, "the clock moved on its own: \(first) -> \(second)")
+        let third: String = nextLabel(of: status, after: second, within: 2.5)
+        XCTAssertNotEqual(third, second, "and again a second later: \(second) -> \(third)")
+    }
+
+    /// The element's label once it differs from `label`, read every 100 ms (an `XCTNSPredicateExpectation` reads it about
+    /// once a second, so a tick could be seen a second late, past the wait on a slow runner); the last label read when
+    /// nothing changed within `seconds`.
+    private func nextLabel(of element: XCUIElement, after label: String, within seconds: TimeInterval) -> String {
+        var now: String = element.label
+        _ = holds(within: seconds) {
+            now = element.label
+            return now != label
+        }
+        return now
+    }
+
+    /// The owner's order of 2026-11-25: a long press on the composer's button while a run works opens Steer now and
+    /// Queue, the follow-up setting's way (Queue) checked; each pick sends the draft. No Stop in the chat's header.
+    func testALongPressOnSendOffersSteerNowAndQueue() {
+        let app: XCUIApplication = launch("n2-chat", defaults: ["-followUp", "queue"])
+        let field: XCUIElement = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.navigationBars.buttons["Stop"].exists, "no Stop in the chat's header")
+        for (way, words) in [("Steer now", "Look at the logs first"), ("Queue", "Then book the car service")] {
+            field.tap()
+            field.typeText(words)
+            let send: XCUIElement = app.buttons["composer.send"]
+            XCTAssertEqual(send.label, "Queue: starts after this run", "a tap queues, as the setting says")
+            send.press(forDuration: 1.2)
+            // The menu's subtitles join the title in the label on some iOS versions; the shots show them.
+            let steer: XCUIElement = app.buttons["composer.followUp.steer"]
+            let queue: XCUIElement = app.buttons["composer.followUp.queue"]
+            XCTAssertTrue(steer.waitForExistence(timeout: 3), "the menu opened")
+            XCTAssertTrue(steer.label.hasPrefix("Steer now"), "the title, with its subtitle where the tree has it: \(steer.label)")
+            XCTAssertTrue(queue.label.hasPrefix("Queue"), "the title, with its subtitle where the tree has it: \(queue.label)")
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "composer-follow-up-menu"
+            shot.lifetime = .keepAlways
+            add(shot)
+            XCTAssertTrue(queue.isSelected, "the setting's way is checked")
+            XCTAssertFalse(steer.isSelected)
+            (way == "Steer now" ? steer : queue).tap()
+            // Polled, the field read afresh each time: on GitHub's runner a predicate expectation on the field kept
+            // seeing the draft long after the field was empty (item 1903).
+            let deadline: Date = Date().addingTimeInterval(15)
+            while ((field.value as? String) ?? "").contains(words), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+            XCTAssertFalse(((field.value as? String) ?? "").contains(words), "\(way) sent the draft: \(String(describing: field.value))")
+        }
+    }
+
+    /// Item 1880: the plan is a segment of the one working pill, never a card in the stream; a tap opens its checklist.
+    /// The design bar: the pill's segments stand on one line, as tall as each other, centred on the same y, 44 pt tall.
+    func testThePlanIsAChipBesideTheCapsuleThatOpensItsChecklist() {
+        let app: XCUIApplication = launch("n2-chat")
+        let chip: XCUIElement = app.buttons["capsule.plan"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 10))
+        XCTAssertEqual(chip.label, "Plan, 1 of 3 steps done")
+        XCTAssertFalse(app.staticTexts["Plan · 1 of 3 done"].exists, "no plan card in the stream")
+        let status: XCUIElement = app.descendants(matching: .any).matching(identifier: "capsule.status").firstMatch
+        let stop: XCUIElement = app.buttons["capsule.stop"]
+        let people: XCUIElement = app.buttons["capsule.helpers"]
+        XCTAssertTrue(status.exists && stop.exists && people.exists)
+        let segments: [XCUIElement] = [status, stop, chip, people]
+        let measured: String = segments.map { "\($0.identifier) \($0.frame)" }.joined(separator: "; ") + "; window \(app.windows.firstMatch.frame)"
+        add(XCTAttachment(string: measured))
+        for segment in segments {
+            XCTAssertEqual(segment.frame.midY, status.frame.midY, accuracy: 1, measured)
+            XCTAssertEqual(segment.frame.height, status.frame.height, accuracy: 1, measured)
+            XCTAssertGreaterThanOrEqual(segment.frame.height, 44, measured)
+        }
+        XCTAssertLessThan(status.frame.maxX, stop.frame.minX + 1, "one line, in order: \(measured)")
+        XCTAssertLessThan(chip.frame.maxX, people.frame.minX + 1, "one line, in order: \(measured)")
+        XCTAssertLessThanOrEqual(people.frame.maxX, app.windows.firstMatch.frame.maxX, "inside the screen: \(measured)")
+        let bar: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        bar.name = "plan-chip"
+        bar.lifetime = .keepAlways
+        add(bar)
+        chip.tap()
+        XCTAssertTrue(app.staticTexts["Plan · 1 of 3 done"].waitForExistence(timeout: 5), "the checklist in a sheet")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Find free afternoon slots at the dentist")).firstMatch.exists)
+        let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheet.name = "plan-sheet"
+        sheet.lifetime = .keepAlways
+        add(sheet)
+    }
+
+    /// Item 1880: the helpers are no card in the stream; the capsule's people segment opens the Agents sheet, where a
+    /// working helper's row says what it does in plain words beside its state, clock and model.
+    func testTheHelpersLiveBehindTheCapsuleNotInTheStream() {
+        let app: XCUIApplication = launch("n2-chat")
+        XCTAssertTrue(app.buttons["capsule.plan"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "helpers ·")).firstMatch.exists, "no helper card in the stream")
+        let people: XCUIElement = app.buttons["capsule.helpers"]
+        XCTAssertEqual(people.label, "Helpers, 1 of 2 done")
+        people.tap()
+        XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.label.contains("Working"), row.label)
+        XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
+        // A tap opens the helper's own chat, which shows the helper's run (its parent run lives in another chat).
+        row.tap()
+        XCTAssertTrue(app.staticTexts["The booking page lists two free afternoons next week."].waitForExistence(timeout: 5), "the helper's chat shows its words")
+        let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheet.name = "helper-chat"
+        sheet.lifetime = .keepAlways
+        add(sheet)
+    }
+
+    /// Item 1769: with the steps hidden (Hide all, the default), one live line under the last message says what the run
+    /// does; a tap shows the steps and a second folds them back.
+    func testTheLiveLineSaysTheWorkAndATapShowsTheSteps() {
+        let app: XCUIApplication = launch("n2-asks", defaults: ["-toolCallMode", "hideAll"])
+        let line: XCUIElement = app.buttons["work.line"]
+        XCTAssertTrue(line.waitForExistence(timeout: 10))
+        XCTAssertEqual(line.label, "Waiting for you")
+        XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the line is a button: a 44 pt tap target (the design bar)")
+        let step: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Browsed")).firstMatch
+        XCTAssertFalse(step.exists, "the steps are hidden")
+        line.tap()
+        XCTAssertTrue(step.waitForExistence(timeout: 3), "a tap shows the steps")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "work-line-steps"
+        shot.lifetime = .keepAlways
+        add(shot)
+        line.tap()
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: step)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "a second tap folds them back")
+    }
+
+    /// Item 1904: a failed run ends in one plain row, "The run failed · <reason>" (with Continue and Retry as text
+    /// buttons on it when offered); the finished run's fold says how long it worked, no counts.
+    func testAFailedRunIsOnePlainRowAndTheFoldSaysOnlyHowLong() {
+        let app: XCUIApplication = launch("n2-failed")
+        let failed: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "The run failed · The model answered HTTP 529")).firstMatch
+        XCTAssertTrue(failed.waitForExistence(timeout: 10))
+        // The fixture's run offers no Continue or Retry (its chat has no newest detail); the row is its line alone.
+        XCTAssertFalse(app.buttons["end.retry"].exists)
+        let fold: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).firstMatch
+        XCTAssertTrue(fold.waitForExistence(timeout: 5))
+        XCTAssertFalse(fold.label.contains("·"), "no counts: \(fold.label)")
+        // A stored step's thinking is one folded row, "Thought" and the chevron; its words show once opened. The failed
+        // run's steps are folded: open its fold first.
+        let folds: [XCUIElement] = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).allElementsBoundByIndex
+        folds.last?.tap()
+        let thought: XCUIElement = app.buttons["thought.row"]
+        XCTAssertTrue(thought.waitForExistence(timeout: 5))
+        XCTAssertEqual(thought.label, "Thought")
+        let words: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Compare the calendar")).firstMatch
+        XCTAssertFalse(words.exists, "no sentence of the thinking while folded")
+        thought.tap()
+        XCTAssertTrue(words.waitForExistence(timeout: 3), "the thinking opened")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "failed-row"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
@@ -56,21 +216,40 @@ final class ChatUITests: XCTestCase {
 
     func testSlashOpensTheCommandsPanelFilteredAsTheOwnerTypes() {
         let app: XCUIApplication = launch("n2-chat")
-        // The field is a text field at rest and a text view once it grows: found by its identifier, whatever its kind.
-        let field: XCUIElement = app.descendants(matching: .any).matching(identifier: "composer.field").firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap()
-        field.typeText("/")
+        let atRest: XCUIElement = app.textFields["composer.field"]
+        XCTAssertTrue(atRest.waitForExistence(timeout: 10))
+        atRest.tap()
+        // Focused, the composer grows and its field may become a text view: found by its kind, never by a search of the
+        // whole tree (`descendants(matching: .any)`), whose every read took seconds on a loaded CI runner (#1105).
+        composerField(app).typeText("/")
         XCTAssertTrue(app.staticTexts["COMMANDS"].waitForExistence(timeout: 3) || app.staticTexts["Commands"].exists)
-        XCTAssertEqual(app.buttons.matching(identifier: "picker.row").count, 6)
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "picker.row")
+        XCTAssertTrue(holds(within: 5) { rows.count == 6 }, "six commands: \(rows.count)")
         // A row puts its token in the text (tapped on the bare "/": XCUITest's typed letters stay as the keyboard's
         // candidate, which a tap does not replace; a hand-typed word is replaced, seen on the simulator).
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "/loop")).firstMatch.tap()
-        let completed: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value BEGINSWITH %@", "/loop"), object: field)
-        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 3), .completed, "the row puts its token in the text: \(String(describing: field.value))")
-        let cleared: XCUIElement = field
-        cleared.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
-        XCTAssertEqual(app.buttons.matching(identifier: "picker.row").count, 1, "\"/lo\" leaves only /loop")
+        // Read every 100 ms: the predicate expectation read the value about once a second, and on the runner of #1105
+        // the token was in the text ("/loop ") when the 3 s wait had already given up.
+        XCTAssertTrue(holds(within: 5) { (composerField(app).value as? String)?.hasPrefix("/loop") == true }, "the row puts its token in the text: \(String(describing: composerField(app).value))")
+        composerField(app).typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
+        // The panel filters once the deletions are in the text: waited for, not read at once.
+        XCTAssertTrue(holds(within: 5) { rows.count == 1 }, "\"/lo\" leaves only /loop: \(rows.count)")
+    }
+
+    /// The composer's field, a text view while the composer is grown and a text field at rest.
+    private func composerField(_ app: XCUIApplication) -> XCUIElement {
+        let grown: XCUIElement = app.textViews["composer.field"]
+        return grown.exists ? grown : app.textFields["composer.field"]
+    }
+
+    /// Whether `condition` holds within `seconds`, read every 100 ms: as soon as it holds, not on a fixed pause.
+    private func holds(within seconds: TimeInterval, _ condition: () -> Bool) -> Bool {
+        let deadline: Date = Date().addingTimeInterval(seconds)
+        while !condition() {
+            if Date() >= deadline { return false }
+            usleep(100_000)
+        }
+        return true
     }
 
     func testEditingAQueuedMessageKeepsTheLiveDraftForCancel() {

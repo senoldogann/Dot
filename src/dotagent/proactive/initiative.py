@@ -30,6 +30,7 @@ from dotagent.config import InitiativeConfig
 from dotagent.core.errors import DotError, HopLimitReached, NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
+from dotagent.desktop.presence import idle_seconds
 from dotagent.notify.owner import tell_owner
 from dotagent.proactive import INITIATIVE_SOURCE, NOTICE_SOURCE, WATCHER_SOURCE
 from dotagent.proactive.brief import BRIEF_CLOSE, BRIEF_OPEN, Quoted, record_parts
@@ -153,22 +154,6 @@ def in_peak(now: float, hours: tuple[int, ...]) -> bool:
         return False
     moment: datetime = datetime.fromtimestamp(now, UTC)
     return moment.weekday() < _SATURDAY and hours[0] <= moment.hour < hours[1]
-
-
-def idle_seconds() -> float | None:
-    """How long nobody touched the keyboard, the mouse or the trackpad, in seconds; ``None`` when macOS cannot say,
-    which counts as not idle."""
-    # Quartz is loaded by the look, so the initiative loads where it is not (item 1270).
-    from Quartz import CGEventSourceSecondsSinceLastEventType, kCGAnyInputEventType, kCGEventSourceStateHIDSystemState
-
-    try:
-        seconds: object = CGEventSourceSecondsSinceLastEventType(
-            kCGEventSourceStateHIDSystemState, kCGAnyInputEventType
-        )
-    except Exception:
-        log.warning("idle_time_unknown", exc_info=True)
-        return None
-    return float(seconds) if isinstance(seconds, int | float) else None
 
 
 def _first_line(text: str) -> str:
@@ -471,6 +456,8 @@ class Initiative:
                     HOP_STOP_TITLE,
                     one_line(f"{todo.title}: {exc.message}", _TELL_CHARS),
                     f"#/runs/{todo.source_run_id}",
+                    "initiative",
+                    "",
                 )
             return
         except BaseException:
@@ -694,12 +681,14 @@ class Initiative:
                     LET_GO_SAID_TITLE,
                     one_line(f"{todo.title}: {todo.note.removeprefix(LET_GO_BY_ITS_RUN)}", _TELL_CHARS),
                     url,
+                    "initiative",
+                    "",
                 )
             return
         if ended.status == "done":
             if await store.set_todo(todo.id, todo.status, "done", todo.attempts + 1, ended.id, note) is None:
                 return
-            await tell_owner(self._runtime.bus, DID_TITLE, one_line(todo.title, _TELL_CHARS), url)
+            await tell_owner(self._runtime.bus, DID_TITLE, one_line(todo.title, _TELL_CHARS), url, "initiative", "")
             return
         # The emergency stop ends a run in two words: the stop of every run, and the STOP file a run saw as it worked
         # ("Emergency stop: …"); either leaves the thing to do, as the docs say (item 790).
@@ -751,4 +740,6 @@ class Initiative:
             LET_GO_TITLE,
             one_line(f"{todo.title}: {note}", _TELL_CHARS),
             f"#/runs/{run_id}" if run_id is not None else _LIST_ROUTE,
+            "initiative",
+            "",
         )

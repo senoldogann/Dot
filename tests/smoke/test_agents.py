@@ -224,10 +224,13 @@ async def test_a_run_makes_a_lasting_teammate_and_learns_of_it_at_its_next_step(
     agents = (await client.get("/api/agents")).json()
     pilot = next(row["record"] for row in agents if row["record"]["name"] == "Pilot")
     assert (pilot["role"], pilot["tools"], pilot["made_by"]) == ("Writes copy", ["shell"], run_id)
-    # The first step offered message_agent though the run could make a teammate before it had one; the second step's
-    # request carries the note of the newcomer.
+    # The first step offered message_agent though the run could make a teammate before it had one; create_agent is in
+    # the team's group, off until the task needs it ([agent] tool_surface "grouped"), and the call of it ran all the
+    # same and turned the group on for the second step, whose request carries the note of the newcomer.
     first, second = MODEL.requests[-2], MODEL.requests[-1]
-    assert {CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL} <= {spec.name for spec in first.tools}
+    offered: set[str] = {spec.name for spec in first.tools}
+    assert MESSAGE_AGENT_TOOL in offered and CREATE_AGENT_TOOL not in offered, offered
+    assert CREATE_AGENT_TOOL in {spec.name for spec in second.tools}
     notes: list[str] = [
         message.content
         for message in second.messages

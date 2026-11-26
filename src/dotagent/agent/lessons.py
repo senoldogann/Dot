@@ -70,6 +70,7 @@ from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, LessonSave, MemoryRecord, ReactionName, RunMode, RunRecord, RunStatus
+from dotagent.store.provenance import holds_saves
 
 log = get_logger(__name__)
 
@@ -676,8 +677,14 @@ async def learn_from(
         await runtime.bus.emit(case.run_id, LESSONS_NONE, {}, True)
         return DrawnLessons(lessons=(), error=None)
     await runtime.bus.emit(case.run_id, LESSONS_PROPOSED, {"lessons": list(lessons), "tainted": case.tainted}, True)
+    # A scheduled task's, a watcher's or a helper's lessons wait for the owner whatever ``auto`` says (item 1865).
+    held: bool = holds_saves(await runtime.store.origin_of_run(case.run_id))
+    if held:
+        log.info("lessons_held", run_id=case.run_id, lessons=len(lessons))
     decided: str | None = (
-        await _decide_all(runtime, deciding, case, lessons) if runtime.config.agent.lessons == "auto" else None
+        await _decide_all(runtime, deciding, case, lessons)
+        if runtime.config.agent.lessons == "auto" and not held
+        else None
     )
     return DrawnLessons(lessons=lessons, error=decided)
 

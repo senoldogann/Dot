@@ -1,6 +1,7 @@
 import Foundation
 
-/// How much of the work log a chat shows (D9, §20): a pure view filter, default Show all. The table below is the
+/// How much of the work log a chat shows (D9, §20): a pure view filter, default Hide all (item 1769, the web's
+/// "What it is doing"). The table below is the
 /// contract (PLAN.md §13 S6); `shows(_:mode:)` is it in code and `WorkLogTests` checks every cell.
 ///
 /// | What                                   | Show all | Hide successful | Hide all | Zen    |
@@ -9,7 +10,7 @@ import Foundation
 /// | the same, still running                | row      | row             | hidden   | hidden |
 /// | a failed tool                          | row      | row             | row      | hidden |
 /// | helper group (each helper's step)      | card     | card            | card     | hidden |
-/// | thinking (live as written, then the step's stored thinking) | row | row       | row      | hidden |
+/// | thinking (live as written, then the step's stored thinking) | row | row       | hidden   | hidden |
 /// | plan                                   | card     | card            | card     | hidden |
 /// | interim prose (not the run's last answer) | shown | shown           | shown    | hidden |
 /// | the run's answer                       | shown    | shown           | shown    | shown  |
@@ -18,7 +19,15 @@ import Foundation
 /// | an ask nobody had to answer (`approval_auto` the policy allowed) | not drawn: the run's inspector keeps it ||||
 /// | the owner's words, Dot's notes         | shown    | shown           | shown    | shown  |
 ///
+/// The helper group and the plan are cards of the transcript this engine builds; the app's stream draws neither (item
+/// 1880: the working capsule's people and plan segments keep them), and reads a Zen run's plan from every row.
+///
+/// The app draws two or more consecutive commands that ended well as one "Ran N commands" line that opens to them (item
+/// 1769); a command at work or one that failed stands alone. This filter keeps each of them a row.
 /// "Response streaming" off: the words and the thinking being written are not drawn; an answer appears once it is whole.
+/// Hide all and Zen draw one live line under the last message instead of the steps (`workNow`, item 1769): what the run
+/// does now ("Thinking", "Running swift test"); a tap on it shows the steps of the chat. Once a run ended, Hide all folds
+/// all of its steps into its "Worked for" line; Zen shows none.
 /// The answer's footer (copy, reaction, time) is on the run's final answer alone, once the run ended (`endedAt`).
 public enum ToolCallMode: String, CaseIterable, Codable, Sendable {
     case showAll
@@ -226,7 +235,7 @@ public func transcript(
     of chat: ChatProjection, pending: [PendingMessage], mode: ToolCallMode, streaming: Bool, context: TranscriptContext
 ) -> [TranscriptItem] {
     var items: [TranscriptItem] = []
-    let listed: [RunRecord] = (chat.view?.runs ?? []).filter { $0.parentRunId == nil }
+    let listed: [RunRecord] = chat.view.map(ownRuns(of:)) ?? []
     // A run the stream told of (its `run_queued`) before the view was read again shows at once (the send's first event).
     let known: Set<String> = Set(listed.map(\.id)).union((chat.view?.helpers ?? []).map(\.runId))
     let told: [RunRecord] = chat.runs.compactMap { id, timeline in
@@ -297,8 +306,10 @@ private func runItems(
     let opening: TranscriptItem =
         run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil)
     // A run that follows the owner's reaction (item 844) draws no message of the owner's: the reaction stands on its message.
+    // Nor does an agent's first meeting (item 993, source `welcome`): its goal is Dot's words to the agent, and the agent
+    // speaks first (item 1881).
     var items: [Built] =
-        run.followsReaction != nil
+        run.followsReaction != nil || run.source == "welcome"
         ? [] : [Built(item: opening, category: run.source == "helper_report" ? .note : .owner, start: run.createdAt, end: run.createdAt)]
     var calls: [String: Int] = [:]
     var asks: [String: Int] = [:]
@@ -494,7 +505,7 @@ func shows(_ category: Category, mode: ToolCallMode) -> Bool {
     switch (mode, category) {
     case (.showAll, _): true
     case (_, .owner), (_, .note), (_, .answer(final: true)), (_, .writing), (_, .decision), (_, .runEnd): true
-    case (.zen, .thought): false
+    case (.zen, .thought), (.hideAll, .thought): false
     case (_, .thought): true
     case (.hideSuccessful, .tool(let state)): state != .done
     case (.hideAll, .tool(let state)): state == .failed
@@ -515,9 +526,10 @@ private func foldable(_ category: Category) -> Bool {
 /// The tools whose calls the transcript shows as their own rows instead (an ask's anchor, the plan's card).
 let silentTools: Set<String> = ["ask_user", "ask_secret", "update_plan", "mark_plan_step"]
 
-/// The rows of one run, filtered by `mode`, and folded when the run has ended.
+/// The rows of one run, filtered by `mode`, and folded when the run has ended. In Hide all an ended run's fold holds all
+/// of its steps (item 1769): the live line said the work while it ran, and the fold is the way to it afterwards.
 func shaped(_ built: [Built], finished: Bool, mode: ToolCallMode) -> [TranscriptItem] {
-    let kept: [Built] = built.filter { shows($0.category, mode: mode) }
+    let kept: [Built] = built.filter { shows($0.category, mode: finished && mode == .hideAll ? .showAll : mode) }
     guard finished else { return kept.map(\.item) }
     var out: [TranscriptItem] = []
     var stretch: [Built] = []

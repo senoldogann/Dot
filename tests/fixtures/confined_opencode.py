@@ -7,6 +7,7 @@ import http.server
 import json
 import os
 import socket
+import socketserver
 import subprocess
 import sys
 from pathlib import Path
@@ -49,5 +50,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return
 
 
+class _Server(http.server.HTTPServer):
+    """Bound without asking the address's name (``socket.getfqdn``), which waited 35 s on GitHub's macOS runners; as
+    the tests' own stand-ins are (tests/conftest.py)."""
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        self.server_name = "127.0.0.1"
+        self.server_port = PORT
+
+
 socket.setdefaulttimeout(5)
-http.server.HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+_Server(("127.0.0.1", PORT), Handler).serve_forever()

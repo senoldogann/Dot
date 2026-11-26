@@ -14,6 +14,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `standby`           | models a run moves to when its own model cannot answer (see below); Settings › Models sets it | `[]`                    |
 | `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
 | `context`           | a model's context size where it is not `[agent] context_tokens` (see below); Settings › Models sets it | `{}`         |
+| `kinds`             | the model a run of a kind of task starts on when none is chosen: `security` (see below); Settings › Models sets it | `{}` |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
@@ -30,6 +31,11 @@ the model that decides what Dot does on its own initiative (`[initiative] look_m
 models that call tools, or **Default model** for `[models] main`; it holds from the next look on
 (`PUT /api/initiative/look-model`, [Dot comes to you](proactive.md)). **Use my Claude plan** (shown once Claude Code
 lists its models) puts the review model on `claude_code:opus` and the roles of the night's learning on it (item 1033).
+**Security research model** (item 1889) chooses the model a task of security research within a scope starts on when no
+model is chosen for it: a goal that names a host of `[recon] owned_hosts` or of a bug bounty scope (`dotx scope`,
+[Security scan](security.md)) and asks for security work. It is kept as `[models.kinds] security`, **Default model** for
+none (`PUT /api/models/kinds`), and holds from the next such task on; a model chosen in the message box, a chat's own
+model or a schedule's still wins. The right model then takes the work before any refusal, rather than after one.
 Under the roles, the page says how many schedules and agents run on each model, each chosen on its own page; and
 **Night's learning and self-repair** chooses the model of each role of the improvement loop ([The
 harness](harness.md)) and Self-repair's model, as Settings › Self-repair does. **Usage**, before the list of every
@@ -42,8 +48,9 @@ the newest window of each kind that a step of the period recorded (`assistant.pl
 task that did not run on the plan records none), and `top_runs`, the five runs of the period that used the most tokens
 (each its own: a helper is a run of its own), which the page lists under **Tasks that used the most**, each opening its
 task. **Caps** under it sets the caps of what the runs spend, in millions of tokens, with today's tokens in all and by
-source (item 1731, [Limits](limits.md)). Dot keeps no price for a model, so the page shows time and tokens and
-the plan's window, never money. Each role's box opens the composer's
+source (item 1731, [Limits](limits.md)). Beside the tokens of each day, of the week and of each costliest task, and
+on a task's Cost card (its own tokens, and with its helpers beside its cap), stands **an estimate in dollars** (item
+1856): see [What a run costs in dollars](#what-a-run-costs-in-dollars). Each role's box opens the composer's
 model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
 starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
@@ -78,8 +85,9 @@ that touches no path REVIEW.md lists under "Always needs a human" (none by defau
 and the **Time limit**, the minutes a push's review may take in all (15). Under it, **Code review fallbacks** are the
 models that review the change in their order, each once, when the one before gave no verdict (it refused the diff, its plan was spent, it failed): by default
 `opencode_go:deepseek-v4.1-flash` at effort high. Any model that runs Dot's tools and can use actions may be one, your
-Claude plan's included; the efforts are `effort` and `fallback_effort` in the file. A change is written whole or not at
-all (`GET` and `PUT /api/code-review`), and holds from the next push; a phone reads it and cannot change it.
+Claude plan's included; the efforts are `effort` and `fallback_effort` in the file, chosen on the same page. A change
+is written whole or not at all (`GET` and `PUT /api/code-review`), and holds from the next push; the phone's Settings ›
+Models › Code review changes it as the Mac does (item 1770).
 
 **Chat size** (the context size). Beside each model's window, Settings › Models sets the chat size of the model's runs
 (item 250): how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's
@@ -106,6 +114,24 @@ three quarters of the window (of the model's own window, for such an Ollama mode
 `#/settings/models?model=<provider:model>`): its provider's fold opens and the row comes into sight, marked, with the
 focus on its size.
 
+**A model that declines the task** (item 1889). A final answer that opens by declining the task ("I can't help with
+that", "bu konuda yardımcı olamam"; `agent/refusal.py` reads the opening only, so an answer that names a limit it met
+is work) is the model's judgement, not a technical block. When the task is in scope, Dot asks the same model once more,
+openly: a note gives the grounds it may have lacked (the program and its rules for a host the goal names that a scope
+or `[recon] owned_hosts` covers, and your own words when you sent the task from the app, `dotx run` or your phone),
+says that the work is finding and reporting, not exploiting, and that a second no stands. The timeline shows it. A
+refusal after that note, or of a task with no such grounds (one Dot began itself, a part another run handed on), ends
+the run at once: failed, with the model's own words under "The model declined this task" (`dotx stats` counts it as
+"the model declined the task", and no schedule tries it again). Dot does not argue with it, does not word the model's
+answer for it and does not move to another model on its own. The run's page offers one action over the box,
+**Restart on…**: the model menu of the box, without the model that declined, and the model you pick starts the same
+task in the same chat (`POST /api/runs/{id}/restart`), as a message of yours, with the old run's approvals, goal mode,
+and its reasoning level and speed as near as the new model offers them; the old run records that you chose it. A
+refused run of a schedule or a delegated part restarts so too, as your own task in its chat. A message the
+Claude plan's safeguards flagged (item 1761) ends the same way, and is never tried again on the same model. A Claude
+plan or OpenCode run's own answer is not read for a refusal: they take no step of Dot's loop. A yolo or free-mode run
+asks nothing new: the restart is an offer on the page, not a question.
+
 **Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
 a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has
 no tools and sees only what the question sends: the run's goal, its plan, the conversation (secrets masked, the start
@@ -113,10 +139,11 @@ and the end of a long one) and the newest screenshot, which only a helper that c
 `[agent] consult_max_per_run` questions (5); `0` offers no `consult`. A delegated run asks none (its parent does), and
 the run's own model is never its helper.
 
-`standby` lists the models a run moves to when its own model's credits, usage window, quota or rate are spent, and
-then only (item 1225, the owner's word of 2026-11-19): a refusal, a content filter's stop, replies with nothing, a
-refused key or access and a missing key end the run on its own model, saying why, and a run that needs you asks you
-first. On a spent credit or limit the run goes on from the same step, with the tools
+`standby` lists the models a run moves to when its own model's credits, usage window, quota or rate are spent (item
+1225), or when a technical block stops it: its service's content filter stopped a reply, or its replies stayed empty
+after the nudges (item 1889, the owner's word of 2026-11-25). A refused key or access and a missing key end the run on
+its own model, saying why, and a run that needs you asks you first; a model that declines the task is never moved
+from (below). On a spent credit, a limit or a technical block the run goes on from the same step, with the tools
 that step had, on the first standby model that can take it over, the model is told, and the timeline shows the switch,
 which the model chip follows. The run's reasoning level becomes the nearest one the new model offers, the lower of two as near, the cheaper: one rule (`choose_effort` in `llm/traits.py`) for a call, a standby model and a schedule's firing (item 1307). A run takes each
 model once at most, in the order of the list, and never goes back to one it left. The goal check of a goal-mode run (and
@@ -309,13 +336,19 @@ answer keeps its words, Ollama's too.
   read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
   and is rounded to `low` where it does not. A model without adaptive thinking (the 4.5 generation and older) runs
-  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes), and
-  from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
+  without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes, or an hour:
+  below), and from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
   names the day and the time zone; the time of day, the notes recalled for the message and the skills that fit it go in
   a note under the message, item 404, and so does how the run was started, by the owner, a schedule, a watcher, a
   phone's message or another run, with what that asks of it, item 1219), so the cache holds the instructions and the history up to the message. A
   question Dot asks once (the review model's, a summary, a recap, a consult) is not cached (item 1010): writing the
-  cache costs a quarter more than reading the prompt, and nothing would read it back. A request may use the model's
+  cache costs a quarter more than reading the prompt, and nothing would read it back. A run of a chat whose last call
+  was between five minutes and fifty-five minutes before writes its cache for an hour instead of five minutes
+  (`cache_control` with `"ttl": "1h"`, item 1742): the pace of a schedule or a watcher that fires every few minutes to
+  every hour, or of a chat that is left and come back to, which the five minutes lose every time. The hour's write is
+  billed at twice the price of input (the five minutes' at a quarter more), so a chat that is new, busy or away for
+  longer writes the five minutes. Only Anthropic's own API takes the hour (OpenCode Go's messages route is sent none);
+  the run's page says what was written (`dotx stats --run ID`, [Development](development.md)). A request may use the model's
   whole output limit. The thinking of earlier steps is sent back; a block whose earlier context has
   changed since (a run drops an old screenshot, a compaction folds the history, a new day changes the instructions) is
   dropped by the API instead of failing the request (beta `thinking-binding-controls-2026-08-01`).
@@ -340,10 +373,19 @@ answer keeps its words, Ollama's too.
   data, state and cache they write and whose config they do not, and nothing it starts reaches the server's own port
   (where the password its environment holds would answer its own asks); a `yolo` run's agent works in the other server,
   as before. Its web fetches reach no address of this Mac or its network
-  unless `[web] allow_private_hosts` says so. Besides its own, the agent has Dot's tools for what OpenCode has none for
-  (item 284): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page in the
-  conversation, skills, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
-  them. Dot serves them to the OpenCode server it started as an MCP server of its own on a loopback port, one door per
+  unless `[web] allow_private_hosts` says so. Besides its own, the agent has every tool of Dot's a run on your Claude plan has
+  (item 284, item 1720): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page
+  in the conversation, Dot's look (`theme_*`), a video watched, a draft, a wait (`wait_until`, which your message does
+  not cut short here: OpenCode does not say when it takes one in), skills and saving one, the team and helpers, your
+  mail and calendars, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
+  them and as Dot's own loop withholds them (no accounts, no skills, no helpers). It has none of Dot's for what its own
+  tools do (files, `shell`, `web_fetch` and `web_search`); `finish` and the plan's tools are its since item 1695
+  (below). It does
+  have Dot's terminal sessions (`terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`), `web_crawl` and
+  `web_extract`: a command sent to a terminal session runs in Dot's own terminal, under Dot's gate and Dot's sandbox as
+  Dot's own commands do, not in the OpenCode server above.
+  `tests/unit/test_harness_tool_parity.py` lists each tool one way lacks and why. OpenCode puts every one of a
+  server's tools in its prompt, so the agent's tool definitions are about 75,000 characters (43 tools, 41,000, before). Dot serves them to the OpenCode server it started as an MCP server of its own on a loopback port, one door per
   chat (`dot_` and eight hex digits, with a secret of its own), and a chat's session sees its own door's tools only;
   each call goes through the run's approvals and time limit as a call of Dot's own loop does, and shows on the timeline
   under the tool's own name. A call that waits for your answer tells OpenCode so every 20 s, so a slow approval does not
@@ -354,12 +396,21 @@ answer keeps its words, Ollama's too.
   (`run_max_minutes`, `run_max_tokens`) bind the agent as they bind Dot's own loop (item 552): the first step that ends
   past one while the agent goes on tells it to stop and answer, and an agent that goes on two steps after that is
   stopped and the run ends failed. A reply that stopped at the model's output limit ends the run failed too ("the
-  model's replies were cut short"), not done with half an answer. A run here that ended is asked for its lessons as
-  Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own runs bring
-  besides (the memory recalled at the start, the checks of a finish and playbooks) a run here does not have,
+  model's replies were cut short"), not done with half an answer. Since item 1695 the agent is told Dot's own system
+  prompt, the one Dot's own loop builds for the run (its character, how to work, trust and safety, the plan, what Dot
+  knows of you, the skills), in each prompt's `system`, after OpenCode's own, then which of OpenCode's tools stand for
+  the ones it names (Zen's free tier answered with it on Big Pickle and DeepSeek V4.1 Flash Free, measured 2026-11-24
+  on OpenCode 1.19.5; before, the agent heard nothing of Dot's but your words); under your message come how the run
+  was started, the notes of Dot's memory recalled for it and the skills that fit its goal; and it has Dot's `finish`,
+  `update_plan` and `mark_plan_step`, so it keeps Dot's plan and the run ends as its `finish` says (done only when it
+  succeeded, with what it needs from you; a later call of a tool, Dot's or OpenCode's, drops it). A run here that ended
+  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called (item 1714). What Dot's own
+  runs bring besides (the goal check of a finish and playbooks) a run here does not have,
   and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
   apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models
-  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models. The free tier is Zen's to give: it
+  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models: since item 1695 every run here
+  sends them Dot's prompt with what Dot knows of you (your names, the accounts you signed in, what the nightly
+  reflection keeps of you; the secrets Dot holds stay masked) and the notes recalled for your message. The free tier is Zen's to give: it
   turned requests down for a few minutes after many in a short time, OpenCode's own command line's too (measured
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
@@ -386,10 +437,18 @@ answer keeps its words, Ollama's too.
   (`claude_code_version_not_measured`) and runs; a version listed as broken refuses the run, saying which version and to
   install another (none is listed yet). `dotx doctor` shows it in its **claude code** row. A run on one goes whole to
   Claude Code, started without a terminal (`claude -p`, its input and output
-  lines of JSON) in Dot's workspace, as Dot: the model is told it is Dot (or the agent whose run it is), your name and
-  the name you call Dot by, what Dot's nightly reflection keeps of you, and, under your message, the notes of Dot's
-  memory recalled for it, as Dot's own loop hands them (item 1055: before it, a run on the plan said it did not know
-  what the memory held), and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
+  lines of JSON) in Dot's workspace, as Dot: the model is told, after Claude Code's own prompt, the system prompt
+  Dot's own loop builds for the run, whole (item 1691: how to work and verify, the plan, how a run ends, trust and
+  safety, the character, what the adopted harness learned, the skills listed for the chat, the team, the environment
+  and what Dot knows of you; before it, a run on the plan was told 3.9 KB of its own, now about 32 KB), then what this
+  harness changes of it (the door, the tools' names, Claude Code's own tools off), passed with
+  `--append-system-prompt-file` at every start, a `--resume` too, so Claude Code's compaction keeps it: a file only you
+  can read in the run's private folder, removed as the run ends, since the prompt holds what Dot knows of you and the
+  program's arguments are shown by `ps` to every process; Claude Code records it with the session, and a resume sends
+  it as recorded until a compaction renders it again; under your message
+  come how the run was started, the notes of Dot's memory recalled for it, as Dot's own loop hands them (item 1055:
+  before it, a run on the plan said it did not know what the memory held), and the skills that fit its goal that the
+  prompt does not list; and it works with Dot's tools alone, served by Dot's bridge at a door named `dot` for every
   chat (item 1052: the tools' names, in their order, head every chat's prompt the same, so Anthropic's cache of that
   head is read by a new chat instead of written again), every tool a run of Dot's own loop gets (`code_run`, item 1501, among
   them: found with `ToolSearch` like the others) (Claude Code's own are
@@ -398,8 +457,10 @@ answer keeps its words, Ollama's too.
   connected, your mail and calendars, drafts, the vault, Dot's own list, and the team, as the run's mode and agent allow
   them (item 1063: before it, a run on the plan had no tool to message an agent, give it a work order or delegate). Its
   prompt names the team as Dot's own does: the team its chat is with, the agents it may message by name and role, and
-  how to give them work orders. Only the tools of Dot's own loop stay out (finish, the plan, `use_tools` and a reaction:
-  the program runs its own loop), and a run another run handed its work to asks you nothing and hands nothing on, as
+  how to give them work orders. Only the tools of Dot's own loop stay out (`use_tools` and a reaction: the program
+  finds its tools in its own way; `finish` is the door's since item 1076, and `update_plan` and `mark_plan_step` since
+  item 1693, so the plan you watch moves as on Dot's own runs, a resumed run takes the plan of the run it goes on from,
+  and a `delegate` that names a step closes it), and a run another run handed its work to asks you nothing and hands nothing on, as
   in Dot's own loop. An agent a run on the plan messages works on its own model, or on the plan when it names none.
   Each call goes through the run's approvals, sandbox,
   shell guard and time limit as a call of Dot's own loop does, and shows on the timeline under the tool's own name. The
@@ -409,7 +470,9 @@ answer keeps its words, Ollama's too.
   the model to look a tool up before its first call of it rather than guess its parameters, item 1201; `terminal_open`
   and `wait_until`, which the shell's description sends the model to, are in the prompt whole from the start, marked
   `anthropic/alwaysLoad` in the door's list, as the model called them by their names alone, with no arguments or
-  guessed ones, item 1341), no settings
+  guessed ones, item 1341; so is every tool of Dot's core group, as Dot's own loop gives a run whose tools come in
+  groups the core ones whole, item 1692: "Invalid arguments" came in 19 % of the plan's runs against 6 % of the loop's,
+  most of them core tools called before they were looked up; about 27,000 characters more in the prompt), no settings
   file of yours, a project's or the workspace's
   (`--setting-sources ""`: no hook runs, no `CLAUDE.md` or `AGENTS.md` is read), no MCP server but the door
   (`--strict-mcp-config`), no slash command, and a permission mode that refuses whatever the door and the search do
@@ -432,8 +495,9 @@ answer keeps its words, Ollama's too.
   calls no tool is not a failed run, and a schedule's row says `failed`, not `done`, for one that ended so.
   The door's secret is in a file only you can read in a folder of the run's own, removed as the run ends, never in the
   program's arguments. The
-  timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
-  window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
+  timeline shows the model's text and thinking as they come (the summary of its thinking, which Claude Code 2.1.331 and
+  later is asked for with `--thinking-display summarized`; an older version passes on none) and each step with its
+  tools, its tokens and the plan's window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
   composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first
   message, the apps' tools through the door, and so the accounts picked, whose mail and calendars the door gives (item
   1063); a message picked with Plan first is refused before it runs, as its plan and ask are Dot's own loop's. A chat keeps its Claude Code session from
@@ -477,11 +541,13 @@ answer keeps its words, Ollama's too.
   tool of it meets ends it as the emergency stop, not as an error the model reads; a message sent as it ends is kept or
   marked unread as Dot's own loop does, not dropped; a resumed run says which it goes on from and is told that the steps
   of that run are not in its session; and Claude Code's own limit on a call of Dot's tool is a day, so a question or an
-  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. A run here that ended
-  is asked for its lessons as Dot's own runs are, from the results of Dot's tools it called, which the store keeps as
-  for any run (item 1714: they waited for the night's reflection before, which reads only some). What Dot's own runs
-  bring besides (the checks of a finish and playbooks) a run here does not
-  have, and these models cannot be the fast, vision or standby model chosen on the
+  approval you take long over is not cut short. A Stop ends a call of Dot's tool at work for it too. Its end is
+  decided as on Dot's own runs (item 1694): a turn that ends after the model worked without `finish` is nudged towards
+  it (`finish_nudges`), a `finish` with plan steps open is reminded of them (`stall_limit`), and in goal mode a
+  `finish` goes to the goal check, read from Dot's record of the run's calls and words, which settles it or sends it
+  back to work with its reason (`goal_patience`); the lessons of its end are drawn from the same record (a run on
+  OpenCode's are drawn from the results of Dot's tools the store keeps, item 1714). What Dot's own
+  runs bring besides (the playbooks offered, Dot's own compaction) a run here does not have, and these models cannot be the fast, vision or standby model chosen on the
   Models page, whose calls include conversations and pictures; they can be the review model (item 1032) and the own
   work model, whose look has its tools there (item 1063). They can be the models of the improvement loop's roles
   (`[harness] proposer`, `composer`, `selector`, `experience`, item 1017): each of those is a single question, which
@@ -595,3 +661,33 @@ provider that sits idle is dropped after 30 seconds, where a longer one met "bad
 sent the prompt again. The memory search (an OpenAI or ollama.com key) and the MCP servers
 read their keys when the daemon starts: after changing a key they use, restart the daemon (`dotx service restart`; a
 run in `yolo` asks for `dotx service restart --when-idle`, see [Daemon](daemon.md)).
+
+## What a run costs in dollars
+
+Dot estimates what tokens cost from the public price list of [models.dev](https://models.dev) (item 1856), never from
+a guess. The daemon fetches `https://models.dev/api.json` when it starts and once a day, keeps the prices of the
+providers below in `prices.json` in its home, and asks with the list's ETag, so an unchanged list is not downloaded
+again; a fetch is tried three times with a growing wait, each failure logged, and one that still fails is logged as
+`prices_not_fetched` and tried again an hour later, the prices Dot had kept meanwhile (their date is `prices_at` of each
+estimate). `DOT_PRICES_URL` sets another address, and an empty one fetches nothing (the tests do so).
+
+Each model call a run made is priced on its own model (its `model_call` event: the main model, a standby model, the
+summaries), at the list's dollars per million tokens of input, output, cache reads and cache writes; a cached or
+cache-written token the list gives no price for is billed as input, and a call whose input is above a dearer tier's
+context size is priced at that tier. Tokens a run counts beyond its calls (OpenCode's own agent records none, a deleted
+chat's run keeps only its totals) are its own model's, with no cache.
+
+How a model's tokens are paid for decides what is shown:
+
+- **priced**: Anthropic, OpenAI and Google with your own key, OpenRouter and OpenCode Zen, by the list's price of the
+  model; OpenCode Zen's free models cost `$0`;
+- **plan**: the Claude plan (`claude_code`), OpenCode Go, Antigravity and Ollama's cloud models are subscriptions, with
+  no price per token: they add no dollars, and the line says `+ plan` (`on a plan` when all of it was);
+- **local**: Ollama's models on this Mac cost no dollars;
+- **unknown**: a model of a priced provider that the list has no price for, a call whose model was not recorded, or any
+  priced model before a list was fetched. Then the whole estimate is **cost unknown**, never a smaller number.
+
+It is an estimate: a provider may bill otherwise (a discount, a batch price, OpenRouter's own provider routing), and
+the caps of what runs spend stay in tokens ([Limits](limits.md)). The API: `cost` of each day and of each of `top_runs`
+in `GET /api/usage`, `cost` (the run's own) and `budget.spent_cost` (with its helpers) in `GET /runs/{id}/stats`, each
+`{"usd", "priced_usd", "unknown_models", "plan_models", "prices_at"}` with `usd` `null` when unknown.

@@ -193,6 +193,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Configuration](docs/configuration.md)
 - [Development](docs/development.md): the tests, the gate, measuring the agent
 - [Status and known limits](docs/limits.md)
+- [Maturity: what was last proven on the real Mac](docs/maturity.md)
 
 [CONTRIBUTING.md](CONTRIBUTING.md) says how to propose a change, and [CHANGELOG.md](CHANGELOG.md) what changed.
 
@@ -202,8 +203,7 @@ Dot is released under the MIT License ([LICENSE](LICENSE)). The parts it carries
 each beside them: the Inter and Geist Mono fonts (SIL Open Font License, `static/fonts`), the icons, which are Lucide's
 (ISC, and MIT for those Lucide took from Feather, `static/js/LICENSE-Lucide.txt`), the providers' marks
 (`static/icons/providers/LICENSE`), the parts of the appearance settings ported from an MIT-licensed project
-(`static/js/appearance/LICENSE`), the character, a port of bloub (MIT, `static/js/character/LICENSE`), and three.js
-(MIT, `static/vendor/three/LICENSE`), which draws the office of the Agents page.
+(`static/js/appearance/LICENSE`), and the character, a port of bloub (MIT, `static/js/character/LICENSE`).
 
 Report a security problem privately, as [SECURITY.md](SECURITY.md) says, not in a public issue. Dependabot raises
 alerts and fixes for dependencies with a known vulnerability, and each week one pull request per kind of dependency

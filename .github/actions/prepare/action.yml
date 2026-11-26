@@ -59,6 +59,7 @@ runs:
           case "${RUNNER_OS}-${RUNNER_ARCH}" in
             macOS-ARM64) target=aarch64-apple-darwin ;;
             macOS-X64) target=x86_64-apple-darwin ;;
+            Linux-X64) target=x86_64-unknown-linux-musl ;;
             *) echo "::error::no ripgrep build for ${RUNNER_OS} ${RUNNER_ARCH}"; exit 1 ;;
           esac
           version=15.2.0

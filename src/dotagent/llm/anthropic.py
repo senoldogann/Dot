@@ -38,7 +38,7 @@ FAST_MODE_MODELS: frozenset[str] = frozenset({"claude-opus-5-5", "claude-opus-5"
 # The largest page of the model listing.
 _PAGE_SIZE: int = 1000
 _OPTIONS: MessagesOptions = MessagesOptions(
-    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
+    adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None, long_ttl=True
 )
 # The levels of the effort parameter, lowest first.
 _EFFORT_LABELS: tuple[str, ...] = ("low", "medium", "high", "xhigh", "max")

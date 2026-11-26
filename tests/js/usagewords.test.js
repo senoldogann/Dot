@@ -6,14 +6,17 @@ import { test } from "node:test";
 import {
   barShare,
   budgetLine,
+  cacheWords,
   capMillions,
   capTokens,
+  costWords,
   dayLabel,
   dayLine,
   isWorking,
   localDay,
   sinceWords,
   sourceName,
+  sumCosts,
   todayLine,
   topRunLine,
   totalLine,
@@ -148,4 +151,44 @@ test("today against the day's cap, and one of the costliest tasks, in a line", (
   assert.equal(todayLine({ caps: { day_tokens: 0 }, today: 1_200_000 }), "Today 1.2M, no cap");
   assert.equal(topRunLine({ source: "delegate", model: "claude_code:sonnet", steps: 371, tokens: 209_800_000 }), "Helpers · claude_code:sonnet · 371 steps · 209.8M");
   assert.equal(sourceName("work_order"), "work order");
+});
+
+test("the cache says why a task's first step was cold and what its cold later steps came after, and nothing when it found its prompt", () => {
+  const report = { first_cause: "warm", changed: [], cold_steps: [] };
+  assert.equal(cacheWords(null), "None");
+  assert.equal(cacheWords(report), "None");
+  assert.equal(cacheWords({ ...report, first_cause: "new_chat" }), "its first step was cold: a new chat");
+  assert.equal(
+    cacheWords({ ...report, first_cause: "prefix_changed", changed: ["system:Skills", "tools:browser", "system:Team", "system:Environment"] }),
+    "its first step was cold: the instructions changed since the chat's last task · changed: system:Skills, tools:browser, system:Team and 1 more",
+  );
+  const steps = [
+    { step: 3, uncached_tokens: 90_000, cause: "tool_group" },
+    { step: 9, uncached_tokens: 50_000, cause: "tool_group" },
+    { step: 12, uncached_tokens: 40_000, cause: "compaction" },
+  ];
+  assert.equal(
+    cacheWords({ ...report, cold_steps: steps }),
+    "3 later steps read at full price after a tool group turned on, a summary of the chat",
+  );
+});
+
+test("an estimate in dollars is said with what ran on a plan, and a model with no price makes it unknown (item 1856)", () => {
+  const cost = (usd, plan, unknown) => ({ usd, priced_usd: usd ?? 0.5, unknown_models: unknown, plan_models: plan, prices_at: 100 });
+  assert.equal(costWords(null), null);
+  assert.equal(costWords(cost(0.4236, [], [])), "~$0.42");
+  assert.equal(costWords(cost(0.004, [], [])), "~<$0.01");
+  assert.equal(costWords(cost(0, [], [])), "~$0");
+  assert.equal(costWords(cost(12.5, ["claude_code:opus"], [])), "~$12.50 + plan");
+  assert.equal(costWords(cost(0, ["claude_code:opus"], [])), "on a plan");
+  assert.equal(costWords(cost(null, [], ["openai:new"])), "cost unknown");
+  assert.equal(costWords({ ...cost(null, [], ["openai:new"]), prices_at: null }), "cost unknown (no prices yet)");
+  assert.equal(sumCosts([cost(1, [], []), undefined, cost(2, [], [])]).usd, 3);
+  assert.equal(sumCosts([cost(1, [], []), cost(null, [], ["x"])]).usd, null);
+  assert.equal(sumCosts([null, undefined]), null);
+  const day = { day: "2026-11-25", runs: 2, steps: 3, input_tokens: 1_200_000, output_tokens: 30_000, minutes: 200, cost: cost(0.42, [], []) };
+  assert.equal(dayLine(day), "2 tasks · 1.2M in · 30k out · ~$0.42 · 3h 20m");
+  assert.match(totalLine([day, day]), / · ~\$0\.84 · /);
+  const budget = { cap: 0, spent: 2_000_000, spent_cost: cost(1.5, [], []), estimate: null };
+  assert.match(budgetLine(budget), /^With helpers 2\.0M \(~\$1\.50\), no cap/);
 });

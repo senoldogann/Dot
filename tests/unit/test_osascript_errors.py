@@ -1,7 +1,5 @@
 """An osascript failure is read by its error number, which macOS writes the same in every language (item 1216)."""
 
-import shutil
-
 import pytest
 
 from dotagent.core.errors import DesktopError
@@ -22,7 +20,7 @@ def test_a_number_not_known_or_none_at_all_says_nothing_new() -> None:
     assert osascript_error("") is None
 
 
-@pytest.mark.skipif(shutil.which("osascript") is None, reason="needs macOS osascript")
+@pytest.mark.macos
 async def test_a_failing_script_says_the_meaning_of_its_number() -> None:
     with pytest.raises(DesktopError) as raised:
         await run_osascript("AppleScript", 'error "made up" number -2700', (), (), 10.0)

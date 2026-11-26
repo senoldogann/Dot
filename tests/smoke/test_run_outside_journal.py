@@ -124,6 +124,16 @@ async def test_the_api_counts_the_steps_that_ran_outside_the_journal_and_none_of
     # The file the first run wrote is in the journal, so its undo plan has it; the commands are not in any plan.
     assert [edit["tool"] for edit in views["mixed"]["edits"]] == ["write_file"]  # type: ignore[attr-defined]
     assert views["commands"]["edits"] == []
+    # What the runs did by their record (item 1746): the file written, the commands run, no act and no plan.
+    mixed_account: object = views["mixed"]["account"]
+    read_account: object = views["read"]["account"]
+    assert isinstance(mixed_account, dict) and isinstance(read_account, dict)
+    assert (mixed_account["changed_count"], mixed_account["commands"], mixed_account["sent_count"]) == (1, 1, 0)
+    assert mixed_account["open_steps"] == [] and mixed_account["unshown"] == []
+    assert read_account["commands"] == 0
+    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        detail: httpx.Response = await client.get(f"/api/runs/{commands.id}")
+    assert detail.json()["account"]["commands"] == 2
 
 
 async def test_the_card_says_what_ran_outside_the_journal_beside_the_files_and_alone_at_1280_and_390(

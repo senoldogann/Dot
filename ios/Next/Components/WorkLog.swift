@@ -5,27 +5,28 @@ import UIKit
 // The work log of a chat (wave N2, plan §4.1): one-line tool rows, the fold of a finished stretch, the plan as a
 // checklist, the helpers as one group, the asks left in place, how a run ended, and Dot's notes.
 
-/// What the transcript stacks: one item, or consecutive tool calls drawn as one tight block (the reference's 28 pt
-/// pitch, §19: no gap between the rows of a stretch of work).
+/// What the transcript stacks: one item, or consecutive steps (tool calls and the model's thinking) drawn as one tight
+/// block (the reference's 28 pt pitch, §19: no gap between the rows of a stretch of work; item 1769: a thought is a row
+/// of the stretch, not a block of its own).
 enum TranscriptBlock: Identifiable {
     case item(TranscriptItem)
-    case tools([ToolEntry])
+    case steps([TranscriptItem])
 
     var id: String {
         switch self {
         case .item(let item): item.id
-        case .tools(let entries): "tools:" + (entries.first?.id ?? "")
+        case .steps(let rows): "steps:" + (rows.first?.id ?? "")
         }
     }
 
     static func of(_ items: [TranscriptItem]) -> [TranscriptBlock] {
         var blocks: [TranscriptBlock] = []
         for item in items {
-            if case .tool(let entry) = item {
-                if case .tools(let run)? = blocks.last {
-                    blocks[blocks.count - 1] = .tools(run + [entry])
+            if isStep(item) {
+                if case .steps(let run)? = blocks.last {
+                    blocks[blocks.count - 1] = .steps(run + [item])
                 } else {
-                    blocks.append(.tools([entry]))
+                    blocks.append(.steps([item]))
                 }
             } else {
                 blocks.append(.item(item))
@@ -33,16 +34,101 @@ enum TranscriptBlock: Identifiable {
         }
         return blocks
     }
+
+    private static func isStep(_ item: TranscriptItem) -> Bool {
+        switch item {
+        case .tool, .thought: true
+        default: false
+        }
+    }
 }
 
-/// A stretch of tool calls, no gap between them.
-struct ToolRun: View {
-    let entries: [ToolEntry]
+/// One line of a stretch of steps: a step, or consecutive commands said as one "Ran 3 commands" (item 1769, after
+/// another coding agent's work log).
+enum StepGroup: Identifiable, Equatable {
+    case row(TranscriptItem)
+    case commands([ToolEntry])
+
+    var id: String {
+        switch self {
+        case .row(let item): item.id
+        case .commands(let entries): "commands:" + (entries.first?.id ?? "")
+        }
+    }
+
+    /// The lines of `rows`: two or more consecutive commands that all ended well become one line; a command at work or
+    /// one that failed stands alone, so neither is hidden in a fold. Pure.
+    static func of(_ rows: [TranscriptItem]) -> [StepGroup] {
+        var groups: [StepGroup] = []
+        var run: [ToolEntry] = []
+        func flush() {
+            if run.count >= 2 { groups.append(.commands(run)) } else { groups.append(contentsOf: run.map { .row(.tool($0)) }) }
+            run = []
+        }
+        for row in rows {
+            if case .tool(let entry) = row, entry.kind == .command, entry.state == .done {
+                run.append(entry)
+            } else {
+                flush()
+                groups.append(.row(row))
+            }
+        }
+        flush()
+        return groups
+    }
+}
+
+/// A stretch of steps, no gap between them.
+struct StepRun: View {
+    let rows: [TranscriptItem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(entries, id: \.id) { entry in WorkToolRow(entry: entry).id(entry.id) }
+            ForEach(StepGroup.of(rows)) { group in
+                switch group {
+                case .commands(let entries): CommandGroupRow(entries: entries).id(group.id)
+                case .row(.tool(let entry)): WorkToolRow(entry: entry).id(entry.id)
+                case .row(.thought(let id, let text, let live)): ThoughtRow(text: text, live: live).id(id)
+                case .row: EmptyView()
+                }
+            }
         }
+    }
+}
+
+/// Consecutive commands that ended well as one quiet line, "Ran 3 commands", with the terminal's symbol; a tap opens
+/// each of them as its own row (item 1769).
+struct CommandGroupRow: View {
+    let entries: [ToolEntry]
+    @State private var open: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { open.toggle() } label: {
+                HStack(spacing: Space.xs) {
+                    Symbol(name: toolSymbol(.command), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
+                    Text(String(localized: "Ran \(entries.count) commands", comment: "Work log: consecutive commands said as one line; the argument is how many"))
+                        .textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(1)
+                    Spacer(minLength: Space.xs)
+                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
+                }
+                .frame(minHeight: Metric.toolRow)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .haptic(.selection, trigger: open)
+            .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
+            .accessibilityHint(open ? String(localized: "Hides the steps", comment: "VoiceOver hint of an open work-log group") : String(localized: "Shows the steps", comment: "VoiceOver hint of a closed work-log group"))
+            if open {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(entries, id: \.id) { entry in WorkToolRow(entry: entry) }
+                }
+                .padding(.leading, Space.xs)
+                .transition(.opacity)
+            }
+        }
+        .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
     }
 }
 
@@ -50,6 +136,7 @@ struct ToolRun: View {
 /// asked and what it said (monospaced, scrolling past 210 pt) with its screenshots; a long press copies both.
 struct WorkToolRow: View {
     let entry: ToolEntry
+    @AppStorage(PrefKey.terminalFontSize) private var terminalSize: Double = 0
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
@@ -93,7 +180,7 @@ struct WorkToolRow: View {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     if !detail.isEmpty {
                         ScrollView {
-                            Text(detail).textRole(.code).foregroundStyle(Tone.secondary).textSelection(.enabled)
+                            Text(detail).textRole(.code).modifier(MonoSize(points: terminalSize)).foregroundStyle(Tone.secondary).textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
                         }
                         .frame(maxHeight: Metric.toolDetailMax)
@@ -112,7 +199,10 @@ struct WorkToolRow: View {
 
     @ViewBuilder private var line: some View {
         let content: some View = HStack(spacing: Space.xs) {
-            Symbol(name: toolSymbol(entry.kind), context: .tool).frame(width: Metric.iconSlot)
+            Group {
+                if isDotTool(entry) { DotMark() } else { Symbol(name: toolSymbol(entry.kind), context: .tool) }
+            }
+            .frame(width: Metric.iconSlot)
             Text(toolLine(entry)).textRole(.footnote).lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 1)
                 // A path keeps its file name at the end; words keep their start.
                 .truncationMode(entry.kind == .read || entry.kind == .edit || entry.kind == .web ? .middle : .tail)
@@ -165,7 +255,8 @@ struct DaemonImageThumb: View {
         .task(id: name) { image = await model.image(named: name) }
         .sheet(isPresented: $whole) {
             if let image {
-                ScrollView([.horizontal, .vertical]) { Image(uiImage: image).resizable().scaledToFit().frame(minWidth: 320) }
+                ZoomableImage(image: image, label: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"))
+                    .ignoresSafeArea(edges: .bottom)
                     .inspectorSheet(title: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"), close: { whole = false })
             }
         }
@@ -211,7 +302,7 @@ struct WorkFoldView: View {
                     ForEach(TranscriptBlock.of(fold.items)) { block in
                         switch block {
                         case .item(let item): row(item)
-                        case .tools(let entries): ToolRun(entries: entries)
+                        case .steps(let rows): StepRun(rows: rows)
                         }
                     }
                 }
@@ -223,8 +314,36 @@ struct WorkFoldView: View {
     }
 }
 
-/// The run's plan as a checklist card.
+/// The run's plan as a checklist card (the run inspector).
 struct PlanCard: View {
+    let steps: [PlanStep]
+
+    var body: some View {
+        PlanSteps(steps: steps)
+            .padding(Space.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Tone.card, in: rounded(Radius.bubble))
+    }
+}
+
+/// How far a run's plan got, for the plan chip beside the working capsule (item 1880).
+struct PlanProgress: Equatable, Sendable {
+    let done: Int
+    let total: Int
+
+    init(steps: [PlanStep]) {
+        done = steps.filter { $0.status == "done" }.count
+        total = steps.count
+    }
+
+    init(done: Int, total: Int) {
+        self.done = done
+        self.total = total
+    }
+}
+
+/// The run's plan as a checklist: its header line and one row per step.
+struct PlanSteps: View {
     let steps: [PlanStep]
 
     var body: some View {
@@ -245,9 +364,7 @@ struct PlanCard: View {
                 .accessibilityLabel(Text(verbatim: "\(step.text), \(statusWords(step.status))"))
             }
         }
-        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Tone.card, in: rounded(Radius.bubble))
     }
 
     private func glyph(_ status: String) -> String {
@@ -310,116 +427,6 @@ struct DotNoteRow: View {
     }
 }
 
-/// How a run ended other than done: the cause in one line and Try again (plan §4.1 States).
-struct RunEndedCard: View {
-    let status: String
-    let detail: String
-    let retry: (() -> Void)?
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
-            Image(systemName: status == "failed" ? "exclamationmark.triangle" : "stop.circle")
-                .foregroundStyle(status == "failed" ? Tone.failure : Tone.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(title).textRole(.footnote).fontWeight(.medium).foregroundStyle(status == "failed" ? Tone.failure : Tone.text)
-                if !detail.isEmpty { Text(detail).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(3) }
-                if let retry {
-                    Button(String(localized: "Try again", comment: "Under a refused message: sends it again"), action: retry)
-                        .buttonStyle(SecondaryButtonStyle())
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(Space.m)
-        .background(Tone.nested, in: rounded(Radius.bubble))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var title: String {
-        switch status {
-        case "failed": String(localized: "The run failed", comment: "Notice at the end of a failed run")
-        case "cancelled": String(localized: "The run was stopped", comment: "Notice at the end of a stopped run")
-        default: String(localized: "The run ended", comment: "Notice at the end of a run that ended another way")
-        }
-    }
-}
-
-/// The Claude plan's usage limit stopped the run: a neutral card with when it can go on (R-c #9).
-struct UsageLimitCard: View {
-    let resetsAt: Double?
-    let resume: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            Text(String(localized: "The Claude plan's usage limit was reached", comment: "Usage limit card title"))
-                .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
-            Text(line).textRole(.footnote).foregroundStyle(Tone.secondary)
-            Button(String(localized: "Resume now", comment: "Usage limit card: starts the work again now"), action: resume).buttonStyle(SecondaryButtonStyle())
-        }
-        .padding(Space.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Tone.nested, in: rounded(Radius.bubble))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var line: String {
-        guard let resetsAt else { return String(localized: "It resets within a few hours.", comment: "Usage limit card when the plan did not say when") }
-        let clock: String = clockWords(Date(timeIntervalSince1970: resetsAt), format: TimestampFormat.current(.standard), locale: .current)
-        return String(localized: "It resets at \(clock).", comment: "Usage limit card; the argument is the clock time")
-    }
-}
-
-/// The helpers a run started, each with its current step (plan §18, R-e #2): who, what it does now, its state.
-struct HelperGroupCard: View {
-    let helpers: [HelperView]
-    let open: () -> Void
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
-
-    var body: some View {
-        let working: Int = helpers.filter { helperState($0.status).isLive }.count
-        Button(action: open) {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                HStack(spacing: Space.xs) {
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Symbol(name: "person.2", context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
-                    }
-                    Text(String(localized: "\(helpers.count) helpers", comment: "Helper group header, first part; the argument is how many helpers the run started") + " · " + String(localized: "\(working) working", comment: "Helper group header, second part; the argument is how many still work"))
-                        .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary).tabularNumbers()
-                    Spacer(minLength: 0)
-                    Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
-                }
-                ForEach(helpers, id: \.runId) { helper in
-                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
-                        Circle().fill(helperState(helper.status).tone.color).frame(width: 7, height: 7).frame(width: Metric.iconSlot)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(helper.shortTitle).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                            Text(stepWords(helper)).textRole(.label).foregroundStyle(Tone.tertiary).lineLimit(2)
-                        }
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel([helper.shortTitle, helperState(helper.status).word, stepWords(helper)].joined(separator: ", "))
-                }
-            }
-            .padding(Space.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Tone.card, in: rounded(Radius.bubble))
-            .contentShape(rounded(Radius.bubble))
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(String(localized: "Opens the helpers", comment: "VoiceOver hint of the helper group in a chat"))
-    }
-
-    private func stepWords(_ helper: HelperView) -> String {
-        guard helperState(helper.status).isLive else { return helperState(helper.status).word }
-        guard let step = helper.step else { return String(localized: "Starting", comment: "Status word: a run is about to start") }
-        let entry: ToolEntry = ToolEntry(
-            id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [],
-            startedAt: step.at, endedAt: nil)
-        return toolLine(entry)
-    }
-}
-
 /// The footer of a run's final answer (plan §24): copy, the reactions on it and the menu that adds one (docs/runs.md), and
 /// the time the answer came. Quiet ink glyphs of one weight, close together; drawn under the final answer alone.
 struct ReactionsBar: View {
@@ -464,40 +471,71 @@ struct ReactionsBar: View {
     }
 }
 
-/// The model's thinking of a step (Show all, Hide successful, Hide all; never in Zen): "Thinking" with its last lines
-/// while it is written, "Thought" folded once the step is stored; a tap opens the whole of it.
+/// The model's thinking of a step, a row of the stretch of work (items 1769 and 1880): one folded line in every state,
+/// "Thinking" with its shimmer while it is written, its first sentence in the quiet ink once the step is stored; a tap
+/// opens the whole of it in a box that scrolls in itself past 210 pt, the transcript staying where it is.
 struct ThoughtRow: View {
     let text: String
     let live: Bool
     @State private var open: Bool = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
+        VStack(alignment: .leading, spacing: 0) {
             Button { open.toggle() } label: {
                 HStack(spacing: Space.xs) {
-                    Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary)
+                    Symbol(name: "brain", context: .tool).foregroundStyle(Tone.tertiary).frame(width: Metric.iconSlot)
                     if live {
-                        Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.label).modifier(Shimmer())
+                        Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.footnote).modifier(Shimmer())
                     } else {
-                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.label).foregroundStyle(Tone.secondary)
+                        // Only the word once the step is stored (item 1904, the owner): the thinking is read opened.
+                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.footnote).foregroundStyle(Tone.secondary)
                     }
-                    Spacer(minLength: 0)
-                    Symbol(name: open ? "chevron.up" : "chevron.down", context: .chevron).foregroundStyle(Tone.tertiary)
+                    Spacer(minLength: Space.xs)
+                    Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
                 }
                 .frame(minHeight: Metric.toolRow)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .haptic(.selection, trigger: open)
+            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : String(localized: "Thought", comment: "Work log: a step's thinking, folded"))
+            .accessibilityIdentifier("thought.row")
+            .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
-            if open || live {
-                Text(text)
-                    .textRole(.label)
-                    .foregroundStyle(Tone.tertiary)
-                    .lineLimit(open ? nil : 3)
-                    .truncationMode(.head)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
+            if open {
+                ScrollView {
+                    Text(text).textRole(.footnote).foregroundStyle(Tone.secondary).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(Space.s)
+                }
+                .frame(maxHeight: Metric.toolDetailMax)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(Tone.nested, in: rounded(Radius.inner))
+                .defaultScrollAnchor(live ? .bottom : .top)
+                .padding(.leading, Metric.iconSlot + Space.xs)
+                .padding(.bottom, Space.xs)
+                .transition(.opacity)
             }
         }
+        .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
+    }
+}
+
+/// Dot's mark on a row of its own tools (item 1769), as another coding agent marks its own calls with its name: Dot's face in the quiet
+/// ink of the work log, the size of a tool's symbol, scaling with the text.
+struct DotMark: View {
+    @ScaledMetric(relativeTo: .footnote) private var size: CGFloat = 13
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Tone.tertiary)
+            HStack(spacing: size * 0.15) {
+                Capsule().fill(Tone.ground).frame(width: size * 0.12, height: size * 0.24)
+                Capsule().fill(Tone.ground).frame(width: size * 0.12, height: size * 0.24)
+            }
+            .offset(y: -size * 0.02)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 }

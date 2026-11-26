@@ -4,7 +4,8 @@ They exist only in the runs that are sessions of a campaign (the loop leaves the
 nothing but the session's own campaign, which the owner started to keep going: so each is a ``meta`` action of risk
 ``safe``. The targets, the ledger and the plan of the next session shape every session after this one, so writing them
 carries the ``persistence`` flag, as saving a memory note does: once the session has read untrusted content, the policy
-asks first. A claim of the outcome is the goal checker's to judge, after the typed judge when one is on.
+asks first. A claim of the outcome is the goal checker's to judge, after the typed judge when one is on, and after the
+campaign's proof checks (item 1853), which the claim runs first as shell calls of the session, through its gate.
 """
 
 import asyncio
@@ -24,15 +25,38 @@ from dotagent.agent.campaign import (
 from dotagent.agent.goal_chain import goal_checker_with_standby
 from dotagent.agent.judge import ClaimJudgment, claim_refused, claim_state, describe_claim
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_event, render_plan
+from dotagent.agent.proof import (
+    PROOF_CHECKED_EVENT,
+    PROOF_TOOL,
+    ProofOutcome,
+    call_arguments,
+    checked_event_data,
+    claim_refusal,
+    not_run,
+    over_limit,
+    over_limit_text,
+    proof_end,
+    unproven,
+)
 from dotagent.agent.review import GoalChecker, GoalRequest, GoalVerdict, goal_digest, shorten_reason
 from dotagent.agent.verify import RunFacts, checked_facts
+from dotagent.codemode.inner import CAMPAIGN_ACHIEVED_TOOL, NestedCalls, NestedResult
 from dotagent.config import AppConfig
 from dotagent.core.errors import ProviderError, ToolExecutionError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.scheduler.timing import Timing, describe_timing
-from dotagent.store.models import CampaignEntry, CampaignEntryKind, CampaignRecord, EventRecord, RunRecord
+from dotagent.store.models import (
+    MAX_PROOF_CHECKS,
+    MAX_PROOF_TIMEOUT_S,
+    CampaignEntry,
+    CampaignEntryKind,
+    CampaignRecord,
+    EventRecord,
+    ProofCheck,
+    RunRecord,
+)
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, ok
 from dotagent.tools.context import ToolContext
 from dotagent.tools.schedule import tool_timing
@@ -42,15 +66,16 @@ log = get_logger(__name__)
 CAMPAIGN_TARGETS_TOOL: str = "campaign_targets"
 CAMPAIGN_NOTE_TOOL: str = "campaign_note"
 CAMPAIGN_SCHEDULE_TOOL: str = "campaign_schedule"
-CAMPAIGN_ACHIEVED_TOOL: str = "campaign_achieved"
 CAMPAIGN_TOOLS: frozenset[str] = frozenset(
     {CAMPAIGN_TARGETS_TOOL, CAMPAIGN_NOTE_TOOL, CAMPAIGN_SCHEDULE_TOOL, CAMPAIGN_ACHIEVED_TOOL}
 )
 # What the sessions after this one read or follow.
 _SHAPES_LATER_SESSIONS: tuple[Flag, ...] = ("persistence",)
 _TIMEOUT_S: float = 30.0
-# The goal checker makes one model call; its own timeout is the agent's model call timeout.
-_ACHIEVED_TIMEOUT_S: float = 900.0
+# The goal checker makes one model call; its own timeout is the agent's model call timeout. The proof checks run
+# before it, each within its own limit (item 1853, never past [shell] max_timeout_s), so the claim may take as long as
+# the most they could be set to.
+_ACHIEVED_TIMEOUT_S: float = 900.0 + MAX_PROOF_CHECKS * MAX_PROOF_TIMEOUT_S
 # How many of the newest ledger entries the goal checker reads, of which it takes the progress entries.
 _CHECKED_ENTRIES: int = 60
 _SUMMARY_CHARS: int = 300
@@ -295,6 +320,30 @@ async def _checked_request(campaign: CampaignRecord, evidence: str, ctx: ToolCon
     )
 
 
+_NO_SHELL: str = "the session has no shell tool to run it with (its agent leaves it out)"
+
+
+async def _campaign_proof(checks: tuple[ProofCheck, ...], ctx: ToolContext) -> tuple[ProofOutcome, ...]:
+    """Run the campaign's proof checks (item 1853) as shell calls the claim makes, through the executor's nesting: the
+    same gate, sandbox, events and time limit as a call of the session's own."""
+    nested: NestedCalls | None = ctx.nested
+    if nested is None or PROOF_TOOL not in nested.specs():
+        return not_run(checks, _NO_SHELL)
+    max_timeout_s: int = ctx.runtime.config.shell.max_timeout_s
+    over: tuple[ProofCheck, ...] = over_limit(checks, max_timeout_s)
+    if over:
+        return not_run(over, over_limit_text(max_timeout_s))
+    outcomes: list[ProofOutcome] = []
+    for check in checks:
+        result: NestedResult = await nested.call(PROOF_TOOL, call_arguments(check))
+        outcomes.append(
+            ProofOutcome(
+                check=check, end=proof_end(result.is_error, result.refused, result.reached_tool), text=result.text
+            )
+        )
+    return tuple(outcomes)
+
+
 def _achieved_tool() -> RegisteredTool:
     def classify(args: AchievedArgs, ctx: ToolContext) -> ActionInfo:
         return _action(CAMPAIGN_ACHIEVED_TOOL, f"Claim the campaign's outcome: {args.evidence}", ())
@@ -307,6 +356,13 @@ def _achieved_tool() -> RegisteredTool:
             return fail(_NOT_ACTIVE)
         if not campaign.targets:
             return fail("The campaign has no targets yet: record them with campaign_targets, verify them, then claim.")
+        # The proof checks hold the claim before any model judges it (item 1853).
+        if campaign.proofs:
+            proof: tuple[ProofOutcome, ...] = await _campaign_proof(campaign.proofs, ctx)
+            log.info("campaign_proof_checked", campaign_id=campaign.id, ends=[outcome.end for outcome in proof])
+            await ctx.runtime.bus.emit(ctx.run_id, PROOF_CHECKED_EVENT, checked_event_data(proof), True)
+            if unproven(proof):
+                return fail(claim_refusal(proof))
         config: AppConfig = ctx.runtime.config
         checker: GoalChecker = goal_checker_with_standby(
             ctx.runtime.router,
@@ -367,8 +423,8 @@ def _achieved_tool() -> RegisteredTool:
         description=(
             "Claim that the campaign's targets are reached, after you verified them with your own reads in this "
             "session. Call it on its own, after the step that made those reads: the goal checker sees what the "
-            "session's calls did up to the step before. It decides: accepted, the campaign ends; refused, its reason "
-            "says what is missing."
+            "session's calls did up to the step before. The campaign's proof checks run first and must exit 0. It "
+            "decides: accepted, the campaign ends; refused, its reason says what is missing."
         ),
         args_model=AchievedArgs,
         modes=ALL_MODES,

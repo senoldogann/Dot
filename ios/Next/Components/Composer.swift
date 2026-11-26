@@ -23,7 +23,7 @@ struct ComposerAttachment: Identifiable, Equatable {
     let preview: UIImage
 }
 
-/// A model and effort the chip offers.
+/// What the model chip shows: the chat's model and level.
 struct ModelChoice: Hashable, Identifiable {
     let ref: String
     let label: String
@@ -32,8 +32,9 @@ struct ModelChoice: Hashable, Identifiable {
 }
 
 /// The composer's button: an ink disc of 30 pt in a 44 pt target. Its glyph says what a press does (send, queue,
-/// steer, stop, confirm an edit); the other way to send stands in a visible menu on a long press and as a VoiceOver
-/// action (D10).
+/// steer, stop, confirm an edit). While a run works and the draft has words, a long press opens both ways to send it,
+/// Steer now and Queue, the follow-up setting's way checked; a pick sends the draft that way and leaves the setting as
+/// it is. VoiceOver offers both as actions (D10).
 struct ComposerButton: View {
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
@@ -52,17 +53,29 @@ struct ComposerButton: View {
         .disabled(!buttons.enabled)
         .keyboardShortcut(.return, modifiers: .command)
         .contextMenu {
-            if let alternate = buttons.alternate {
-                Button(composerActionWords(alternate), systemImage: glyph(alternate)) { perform(alternate) }
+            if buttons.alternate != nil {
+                followUpChoice(.steer)
+                followUpChoice(.queue)
             }
         }
         .accessibilityLabel(composerActionWords(buttons.primary))
         .accessibilityIdentifier("composer.send")
         .accessibilityActions {
-            if let alternate = buttons.alternate {
-                Button(composerActionWords(alternate)) { perform(alternate) }
+            if buttons.alternate != nil {
+                Button(followUpTitle(.steer)) { perform(.steer) }
+                Button(followUpTitle(.queue)) { perform(.queue) }
             }
         }
+    }
+
+    /// One way to send of the long-press menu: its title, what it does under it, a check on the setting's way.
+    private func followUpChoice(_ way: FollowUp) -> some View {
+        let action: ComposerAction = way == .steer ? .steer : .queue
+        return Toggle(isOn: Binding(get: { buttons.primary == action }, set: { _ in perform(action) })) {
+            Text(followUpTitle(way))
+            Text(followUpDetail(way))
+        }
+        .accessibilityIdentifier("composer.followUp." + way.rawValue)
     }
 
     private func glyph(_ action: ComposerAction) -> String {
@@ -104,6 +117,8 @@ struct ComposerSuggestions: Sendable {
 /// The composer (plan §4.1, R-a §3): a glass pill radius 27; compact at rest with +, the field, the microphone and the
 /// button on one row; expanded with the field above and +, the model · effort chip, the microphone and the button
 /// beneath. Photos, the camera, files and a document scan go on the + menu; `/` offers commands and skills, `@` agents.
+/// The chip opens the chat's settings (PLAN §24); the microphone turns the pill into the recorder (`VoiceRecorderBar`),
+/// whose ✓ puts the words in the field.
 struct ComposerView: View {
     @Binding var text: String
     @Binding var attachments: [ComposerAttachment]
@@ -111,12 +126,13 @@ struct ComposerView: View {
     let buttons: ComposerButtons
     let perform: (ComposerAction) -> Void
     let model: ModelChoice?
-    let models: [String: [ModelChoice]]
-    let chooseModel: ((ModelChoice) -> Void)?
+    /// Opens the chat's settings sheet from the chip; `nil` shows no chip.
+    let openSettings: (() -> Void)?
     let suggestions: ComposerSuggestions
     @FocusState private var isFocused: Bool
-    @State private var dictation: Dictation = Dictation()
-    @State private var dictationBase: String = ""
+    @State private var voice: VoiceInput = VoiceInput()
+    @Environment(AppModel.self) private var app: AppModel
+    @Environment(\.scenePhase) private var scenePhase: ScenePhase
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var picking: Picker?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
@@ -134,10 +150,35 @@ struct ComposerView: View {
         let compact: Bool = layout == .compact
         VStack(alignment: .leading, spacing: Space.xs) {
             suggestionList
-            if case .failed(let words) = dictation.state {
+            if let words = voiceLine {
                 Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).padding(.horizontal, Space.m)
-                    .onTapGesture { dictation.clearFailure() }
+                    .onTapGesture { voice.clearFailure() }
+                    .accessibilityIdentifier("composer.voiceLine")
             }
+            if voice.phase.isActive {
+                VoiceRecorderBar(
+                    levels: voice.levels, startedAt: voice.startedAt, heard: voice.heard, transcribing: voice.phase == .transcribing,
+                    cancel: { voice.cancel() }, confirm: { voice.confirm() }
+                )
+                .padding(.horizontal, Space.xxs)
+                .interactiveGlass(in: rounded(Radius.composer))
+            } else {
+                fieldPill(compact: compact)
+            }
+        }
+        .haptic(.medium, trigger: voice.phase == .recording)
+        .onChange(of: scenePhase) { _, phase in if phase == .background { voice.leftTheScreen() } }
+        .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
+        .modifier(ComposerPickers(picking: $picking, photoItems: $photoItems, add: add))
+    }
+
+    /// The line over the pill: why dictation cannot start, or why the last recording ended early.
+    private var voiceLine: String? {
+        if case .failed(let words) = voice.phase { return words }
+        return voice.notice
+    }
+
+    private func fieldPill(compact: Bool) -> some View {
             VStack(alignment: .leading, spacing: 0) {
                 if !attachments.isEmpty { attachmentStrip }
                 // One field in one place whatever the layout: a field made anew when the composer grows on focus would
@@ -169,8 +210,17 @@ struct ComposerView: View {
             }
             .padding(.horizontal, Space.xxs)
             .interactiveGlass(in: rounded(Radius.composer))
-        }
-        .animation(motionAnimation(.message, reduceMotion: reduceMotion), value: layout)
+    }
+}
+
+/// The + menu's pickers: photos, files, the camera and the scanner.
+private struct ComposerPickers: ViewModifier {
+    @Binding var picking: ComposerView.Picker?
+    @Binding var photoItems: [PhotosPickerItem]
+    let add: (UIImage) -> Void
+
+    func body(content: Content) -> some View {
+        content
         .photosPicker(isPresented: Binding(get: { picking == .photos }, set: { if !$0 { picking = nil } }), selection: $photoItems, maxSelectionCount: 6, matching: .images)
         .onChange(of: photoItems) { _, items in
             Task {
@@ -204,8 +254,10 @@ struct ComposerView: View {
             }
         }
     }
+}
 
-    private func add(_ image: UIImage) {
+extension ComposerView {
+    fileprivate func add(_ image: UIImage) {
         guard let jpeg: Data = image.jpegData(compressionQuality: 0.8) else { return }
         attachments.append(ComposerAttachment(id: UUID(), jpeg: jpeg, preview: image))
     }
@@ -231,56 +283,41 @@ struct ComposerView: View {
         .accessibilityLabel(String(localized: "Attach", comment: "VoiceOver: the composer's button that adds a photo or file"))
     }
 
-    @ViewBuilder private var modelChip: some View {
-        if let model, let chooseModel {
-            Menu {
-                ForEach(models.keys.sorted(), id: \.self) { provider in
-                    Section(provider) {
-                        ForEach(models[provider] ?? []) { choice in
-                            Button {
-                                chooseModel(choice)
-                            } label: {
-                                if choice == model { Label(chipWords(choice), systemImage: "checkmark") } else { Text(chipWords(choice)) }
-                            }
-                        }
-                    }
-                }
-            } label: {
+    @ViewBuilder fileprivate var modelChip: some View {
+        if let model, let openSettings {
+            Button(action: openSettings) {
                 HStack(spacing: Space.xxs) {
                     Text(model.label).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                    if let effort = model.effort { Text(effort.capitalized).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
+                    if let effort = model.effort { Text(effortTitle(effort)).textRole(.footnote).foregroundStyle(Tone.tertiary).lineLimit(1) }
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph)
                 }
                 .padding(.horizontal, Space.xs)
                 .frame(minHeight: Metric.hit)
                 .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel(String(localized: "Model, \(chipWords(model))", comment: "VoiceOver: the composer's model menu; the argument is the model and effort"))
+            .accessibilityHint(String(localized: "Opens the chat's settings", comment: "VoiceOver hint of the composer's model chip"))
+            .accessibilityIdentifier("composer.model")
         }
     }
 
     private func chipWords(_ choice: ModelChoice) -> String {
-        [choice.label, choice.effort?.capitalized].compactMap { $0 }.joined(separator: " · ")
+        [choice.label, choice.effort.map(effortTitle)].compactMap { $0 }.joined(separator: " · ")
     }
 
-    private var micButton: some View {
-        ComposerIconButton(
-            systemImage: dictation.state.isActive ? "waveform" : "mic",
-            label: dictation.state.isActive
-                ? String(localized: "Stop dictating", comment: "VoiceOver: the microphone while it listens")
-                : String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button")
-        ) {
-            if !dictation.state.isActive { dictationBase = text }
-            let written: DictationWritten = DictationWritten()
-            dictation.toggle { heard in
-                guard let next = DictationText.update(current: text, lastWritten: written.text, base: dictationBase, heard: heard) else {
-                    dictation.stop()
-                    return
-                }
-                text = next
-                written.text = next
-            }
+    /// The microphone: the pill becomes the recorder; ✓ adds the words after what was typed.
+    fileprivate var micButton: some View {
+        ComposerIconButton(systemImage: "mic", label: String(localized: "Dictate", comment: "VoiceOver: the composer's microphone button")) {
+            let defaults: UserDefaults = .standard
+            voice.start(
+                VoiceInput.Start(
+                    on: TranscribeOn.current(defaults), mac: app.engine?.api, locale: DictationLanguage.current(defaults).locale(app: Locale.current),
+                    order: MicSlot.read(defaults),
+                    deliver: { words in text = DictationText.merged(base: text, heard: words) },
+                    learned: { port in MicSlot.write(learning(port, into: MicSlot.read(defaults)), defaults) }))
         }
+        .accessibilityIdentifier("composer.mic")
     }
 
     private var attachmentStrip: some View {
@@ -416,24 +453,39 @@ struct DocumentScanner: UIViewControllerRepresentable {
 
 /// What the floating capsule says about the chat's work; a segment exists only while it has something to say.
 struct WorkingSummary: Equatable, Sendable {
+    /// The chat's state in one word with the clock (item 1769: Working, never what the run does, which the
+    /// transcript's live line says).
     let status: ChatStatus?
-    /// What the run does this moment ("Thinking", "Running du -sh ~"), said in the status's place while it works: a sign
-    /// of life in every tool mode, Zen too.
+    /// "Waiting on 2 helpers" in the status's place while the main run only waits for its helpers; `nil` while it takes
+    /// a step of its own ("Working" and the turn's clock).
     let activity: String?
-    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not.
+    /// Since when the run works: the capsule's clock ticks every second from it, whether events come or not; `nil`
+    /// while it waits on its helpers.
     let since: Date?
     let queued: Int
-    let helpers: Int
+    /// The helpers the run started that ended, and all of them ("2/3" in the people segment).
+    let helpersDone: Int
+    let helpersTotal: Int
+    /// The plan of the chat's newest run (item 1880); `nil` when that run keeps none.
+    let plan: PlanProgress?
+    /// The run can be stopped from the capsule.
+    let canStop: Bool
 
-    var isEmpty: Bool { status == nil && queued == 0 && helpers == 0 }
+    var isEmpty: Bool { status == nil && queued == 0 && helpersTotal == 0 && plan == nil }
 }
 
-/// The floating working capsule and the scroll-to-bottom circle in one glass container, so the two merge
-/// (plan §4.1, R-a §3). Each segment is its own 44 pt button; at the accessibility sizes the segments stack.
+/// The working capsule and the scroll-to-bottom circle in one glass container, so the two merge (plan §4.1, R-a §3).
+/// The capsule is one pill for everything about the chat's work, thin dividers between its segments (item 1880, the
+/// owner's reference app): "Working 1m 50s" or "Waiting on 2 helpers" | Stop | Plan 1/5 | queued | helpers done/total.
+/// Each segment is its own button, at least 44 pt each way. It stays one line at the default text size: in words where
+/// they fit, else Stop, the plan and the queue as their glyphs with the numbers and "Working" as its spinner before the
+/// clock (the smallest iPhone with every segment shown). At the accessibility sizes the segments stack, as glyphs.
 struct FloatingWorkingControl: View {
     let summary: WorkingSummary
     let showsScrollToBottom: Bool
     let openStatus: () -> Void
+    let stop: () -> Void
+    let openPlan: () -> Void
     let openQueue: () -> Void
     let openHelpers: () -> Void
     let scrollToBottom: () -> Void
@@ -442,7 +494,18 @@ struct FloatingWorkingControl: View {
     var body: some View {
         GlassEffectContainer(spacing: 12) {
             HStack(spacing: Space.xs) {
-                if !summary.isEmpty { capsule }
+                if !summary.isEmpty {
+                    if compact {
+                        capsule(glyphs: true)
+                    } else {
+                        // One line always: in words where they fit, else Stop, the plan and the queue as their glyphs and
+                        // the status as its spinner and clock (the smallest iPhone with every segment shown).
+                        ViewThatFits(in: .horizontal) {
+                            capsule(glyphs: false)
+                            capsule(glyphs: true)
+                        }
+                    }
+                }
                 if showsScrollToBottom {
                     Button(action: scrollToBottom) {
                         Symbol(name: "chevron.down", context: .toolbar)
@@ -458,21 +521,27 @@ struct FloatingWorkingControl: View {
         }
     }
 
-    private var capsule: some View {
-        let layout: AnyLayout =
-            dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-            : AnyLayout(HStackLayout(spacing: 0))
+    private var compact: Bool { dynamicTypeSize.isAccessibilitySize }
+
+    /// The pill; with `glyphs`, Stop, the plan and the queue are their glyphs with the numbers, "Working" is its spinner
+    /// before the clock, and the segments sit closer.
+    private func capsule(glyphs: Bool) -> some View {
+        let inset: CGFloat = glyphs ? Space.xs : Space.s
+        let layout: AnyLayout = compact ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
         return layout {
             if let status = summary.status {
                 // The status and its clock are drawn every second, whether events come or not: a clock drawn with
-                // the screen froze between events and jumped when they came (the owner's report of 2026-11-25).
-                TimelineView(.periodic(from: .now, by: 1)) { context in
+                // the screen froze between events and jumped when they came (the owner's report of 2026-11-25). The
+                // ticks are counted from the run's start, never from `.now`: a schedule from `.now` began again at
+                // every drawing of the screen, so words streaming faster than once a second held the clock still.
+                TimelineView(.periodic(from: summary.since ?? .distantPast, by: 1)) { context in
                     let clock: String? = summary.since.map { elapsedWords(from: $0, to: context.date) }
-                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", ")) {
+                    segment(action: openStatus, label: [summary.activity ?? status.word, clock].compactMap { $0 }.joined(separator: ", "), inset: inset) {
                         HStack(spacing: Space.xxs + 1) {
                             if let activity = summary.activity {
                                 ActivityWord(text: activity)
+                            } else if glyphs, clock != nil, status == .working {
+                                ProgressView().controlSize(.mini).tint(Tone.secondary)
                             } else {
                                 StatusWord(status: status)
                             }
@@ -484,39 +553,74 @@ struct FloatingWorkingControl: View {
                     .accessibilityIdentifier("capsule.status")
                 }
             }
-            if summary.queued > 0 {
+            if summary.canStop {
                 if summary.status != nil { divider }
-                segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")) {
-                    Label { Text(String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count")).lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
-                        .foregroundStyle(Tone.secondary)
+                segment(action: stop, label: String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), inset: inset) {
+                    if glyphs {
+                        Image(systemName: "stop.fill").textRole(.label).foregroundStyle(Tone.text)
+                    } else {
+                        Text(String(localized: "Stop", comment: "Chat toolbar: stops the run at work")).textRole(.label).fontWeight(.medium)
+                            .foregroundStyle(Tone.text).lineLimit(1).fixedSize()
+                    }
+                }
+                .accessibilityIdentifier("capsule.stop")
+            }
+            if let plan = summary.plan {
+                if summary.status != nil || summary.canStop { divider }
+                segment(
+                    action: openPlan,
+                    label: String(localized: "Plan, \(plan.done) of \(plan.total) steps done", comment: "VoiceOver: the plan chip beside the working capsule; the arguments are the steps done and all steps"),
+                    inset: inset
+                ) {
+                    Label {
+                        Text(verbatim: glyphs ? "\(plan.done)/\(plan.total)" : String(localized: "Plan \(plan.done)/\(plan.total)", comment: "The plan chip beside the working capsule; the arguments are the steps done and all steps"))
+                            .lineLimit(1).fixedSize()
+                    } icon: {
+                        Image(systemName: plan.done == plan.total ? "checklist.checked" : "checklist")
+                    }
+                    .textRole(.label).fontWeight(.medium).tabularNumbers()
+                    .foregroundStyle(Tone.secondary)
+                }
+                .accessibilityIdentifier("capsule.plan")
+            }
+            if summary.queued > 0 {
+                if summary.status != nil || summary.canStop || summary.plan != nil { divider }
+                segment(action: openQueue, label: String(localized: "\(summary.queued) queued", comment: "VoiceOver: the capsule segment of queued messages; the argument is their count"), inset: inset) {
+                    Label { Text(verbatim: "\(summary.queued)").lineLimit(1).fixedSize() } icon: { Image(systemName: "list.number") }.textRole(.label).fontWeight(.medium)
+                        .tabularNumbers().foregroundStyle(Tone.secondary)
                 }
                 .accessibilityIdentifier("capsule.queue")
             }
-            if summary.helpers > 0 {
-                if summary.status != nil || summary.queued > 0 { divider }
-                segment(action: openHelpers, label: String(localized: "\(summary.helpers) helpers working", comment: "VoiceOver: the capsule segment of helpers at work; the argument is their count")) {
-                    Label { Text(verbatim: "\(summary.helpers)") } icon: { Image(systemName: "person.2") }.textRole(.label).fontWeight(.medium)
-                        .foregroundStyle(Tone.secondary)
+            if summary.helpersTotal > 0 {
+                if summary.status != nil || summary.canStop || summary.plan != nil || summary.queued > 0 { divider }
+                segment(
+                    action: openHelpers,
+                    label: String(localized: "Helpers, \(summary.helpersDone) of \(summary.helpersTotal) done", comment: "VoiceOver: the capsule segment of the run's helpers; the arguments are the helpers that ended and all of them"),
+                    inset: inset
+                ) {
+                    Label { Text(verbatim: "\(summary.helpersDone)/\(summary.helpersTotal)").lineLimit(1).fixedSize() } icon: { Image(systemName: "person.2") }
+                        .textRole(.label).fontWeight(.medium).tabularNumbers().foregroundStyle(Tone.secondary)
                 }
+                .accessibilityIdentifier("capsule.helpers")
             }
         }
         .padding(.horizontal, Space.xxs)
-        .interactiveGlass(in: dynamicTypeSize.isAccessibilitySize ? AnyShape(rounded(Radius.bubble)) : AnyShape(Capsule()))
+        .interactiveGlass(in: compact ? AnyShape(rounded(Radius.bubble)) : AnyShape(Capsule()))
     }
 
     @ViewBuilder private var divider: some View {
-        if !dynamicTypeSize.isAccessibilitySize {
+        if !compact {
             Rectangle().fill(Tone.separator).frame(width: 1, height: 14).accessibilityHidden(true)
         }
     }
 
-    private func segment<Label: View>(action: @escaping () -> Void, label: String, @ViewBuilder content: () -> Label)
+    private func segment<Label: View>(action: @escaping () -> Void, label: String, inset: CGFloat, @ViewBuilder content: () -> Label)
         -> some View
     {
         Button(action: action) {
             content()
-                .padding(.horizontal, Space.s)
-                .frame(minHeight: Metric.hit)
+                .padding(.horizontal, inset)
+                .frame(minWidth: Metric.hit, minHeight: Metric.hit)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

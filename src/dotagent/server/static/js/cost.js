@@ -3,12 +3,12 @@
 // where the minutes went (the model, the summaries, the tools, the gate) and what the tokens, the compactions and the
 // delegated runs came to. A task that is still at work says first what it has used so far, its time, its tokens and its
 // steps, and the window of the Claude plan its newest step saw (item 1403): the owner sets no ceiling, so what is
-// spent is what there is to read. `paint(costs)` takes the route's answer as it is; the section says "Counting…" until
+// spent is what there is to read; the dollars are an estimate (item 1856). `paint(costs)` takes the route's answer as it is; the section says "Counting…" until
 // the first one.
 
 import { compact, duration, el } from "./dom.js";
 import { panelSection } from "./panels.js";
-import { budgetLine, usedSoFar } from "./usagewords.js";
+import { budgetLine, cacheWords, costWords, usedSoFar } from "./usagewords.js";
 
 const HINTS = {
   sofar: "What this task has used since it began: its time, what was sent to the model and what it wrote, and its steps",
@@ -20,7 +20,9 @@ const HINTS = {
   gate: "The part of that time spent waiting for your approval or your answer",
   steps: "How many times Dot went back to the model",
   input: "What was sent to the model in all its calls, and the share its service had ready from before",
+  cache: "Why the service did not have the task's prompt ready from before, where it did not: a new chat, a change in the instructions, a pause, a tool group turned on",
   output: "What the model wrote",
+  dollars: "An estimate of this task's own tokens in dollars, call by call at the prices of the public list models.dev; a subscription such as your Claude plan has no price per token, and a model the list has no price for makes it unknown",
   compactions: "How often the older part of the chat was summed up to make room",
   searches: "The web searches that came back, by the search service that answered (the Anthropic one costs one cent a search)",
   delegated: "The tasks this task handed to helpers and how long it waited for them",
@@ -66,7 +68,9 @@ export function createCostCard() {
       ["Waiting for you", spent(costs.waited_s, total), HINTS.gate],
       ["Steps", String(stats.steps), HINTS.steps],
       ["Usage in", `${compact(stats.input_tokens)}${cached}`, HINTS.input],
+      ["Cache misses", cacheWords(costs.cache), HINTS.cache],
       ["Usage out", compact(stats.output_tokens), HINTS.output],
+      ["Cost", costWords(costs.cost) ?? "None", HINTS.dollars],
       ["Chat summaries", compactions, HINTS.compactions],
       ["Tasks given to helpers", delegated, HINTS.delegated],
       ["Searches", searches, HINTS.searches],

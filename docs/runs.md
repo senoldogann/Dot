@@ -43,8 +43,10 @@ the column of the steps' marks, its words on the answer's lane (item 1182), and 
 words whether calls follow them, so what they are is known while they stream only where the run's own rules say a
 reply with no call is not the answer. In Dot's own loop, once a task or research run used a tool, short of its
 limit and of the last time it is told to finish, they are an update from the first word and stream folded with the steps (item 1162; 443 of 498 steps with words
-in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on Claude Code or
-OpenCode, whose last reply is the answer when it calls no finish (45 of 68 of the owner's Claude Code tasks in a week),
+in the owner's week went on to calls). Elsewhere they may still be the answer: every step of a task on
+OpenCode, whose last reply is the answer when it calls no finish, and of a task on Claude Code, whose last reply is the
+answer once it was told to finish as many times as Dot's own loop tells it (item 1694; 45 of 68 of the owner's Claude
+Code tasks in a week ended with no finish before),
 and a first step. Those stream in sight (item 1166), drawn as the message they most often stay (item 1182: drawn as a
 quiet note, they grew half again in height at the step's end), and their step's end makes them the message when
 it calls nothing, or nothing but finish, or folds them with the steps; before item 1162 they streamed as a message and
@@ -132,7 +134,15 @@ back, the count or the line of output, or what the page showed. A mark without i
 evidence, and a rewritten plan that keeps a done step keeps its evidence; a failed or skipped step may carry what
 happened. A step moves as the work does: a done step may be opened again (pending or in progress), a failed or
 skipped one tried again or marked done with its evidence, but a done step is not marked failed or skipped; the plan is
-rewritten for that. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check. A
+rewritten for that. The evidence stands under the step in the web UI, in every note that carries the plan and in the goal check.
+Dot also judges a step marked done by the run's own record, not by its words (item 1745): by the tool results of the
+time the step was open (from the first plan of its newest open stretch; from the run's start for a step written done at
+once). It is **shown** when one of them shows anything (the step keeps the ids of the newest three calls, `shown_by`),
+**unverified** when the newest browser or desktop act of that time left a step that was not seen to hold and no read,
+look or command came after it, and **none** when no tool result of that time shows anything. The mark is kept either
+way; one that is not shown reads `[done, not verified]` in the plan the model reads and "not verified" beside the step
+in the web UI's plan, its result says why and to mark it done again once a look shows it (a mark judges it again),
+and the run's account lists it. A step a helper's report closed is not judged. A
 step that must wait for others names them (`depends_on`, step numbers; a cycle or a number outside the plan is refused),
 the plan reads `(after 1, 2)` and the web UI shows the same, and the result of every plan change says which steps are
 ready now (open, waiting for nothing open or failed) and which are held by a failed step. Steps that are ready together
@@ -255,7 +265,11 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   this: its turn ends with its reply.
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
   nudged towards `finish`; after `finish_nudges` nudges in a row the reply itself becomes the result. A step with tool
-  calls starts the count again, so a status line written between tool steps does not end the run.
+  calls starts the count again, so a status line written between tool steps does not end the run. A run on your
+  Claude plan ends the same way (item 1694): a turn of Claude Code that ends after the model worked without calling
+  `finish` is answered with the same nudge, a `finish` with plan steps open with the same reminder, and in goal mode
+  its `finish` goes to the same goal check, read from Dot's record of its calls, which settles it or sends it back to
+  work with its reason, `goal_patience` times; its lessons are drawn from that record as for Dot's own runs.
 - A reply the model service cut short (at its output limit, or for another abnormal reason it gave) is never taken
   as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or give the
   complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in a row the
@@ -270,9 +284,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   `finish` must come last, the calls after it run as any call does, and the model calls `finish` again once it has read
   their results (item 685).
 - A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
-  conversation the model is stopped again (item 437). The run fails at once on its own model, saying that the filter
-  stopped it and that another model would answer (item 1225: a run changes its model only when its credits or limits
-  are spent, see [Helpers and standby](models.md#models-and-providers)); the model is not paused for other runs.
+  conversation the model is stopped again (item 437). The run moves to its first standby model that can take it over,
+  as for spent credits (item 1889), and replies that stay empty after the nudges do the same; with none left it fails
+  on its own model, saying that the filter stopped it and that another model would answer (see [Helpers and
+  standby](models.md#models-and-providers)); the model is not paused for other runs. A final answer that declines the
+  task is not a technical block: it is asked again once with the task's grounds when the task is in scope, then the
+  run ends with the model's words and its page offers **Restart on…** (see the same page).
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer. A run that failed so is stored `failed`, but
   its page says "Waiting on you", not "The task failed", and the line that offers Continue says that a message below
@@ -316,7 +333,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   failed with that event too, so a page that showed it queued sees it end. A run that a crashed daemon left behind is
   marked as failed the next time Dot starts, as ended at its last event (the runs it delegated before it), and so is one
   that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be resumed, and
-  so can a run that a shutdown of the daemon cut off. A schedule's run that either cut off is not resumed on its own:
+  so can a run that a shutdown of the daemon cut off; a run of the pages that the daemon's restart, shutdown or crash
+  cut off goes on by itself when it starts again, unless what was cut may have paid, sent or posted (item 1854, see
+  [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). A schedule's run that either cut off is not resumed on its own:
   the scheduler starts it once more as a new run of the schedule, unless it sent something out (item 1206, see
   [Schedules](memory-and-schedules.md)); that run's page shows a line saying it is a try, with the way to the run it
   tries again. A queue held because the daemon crashed stays held while that
@@ -634,8 +653,8 @@ a background command's note), whose 👍 would stand on words you never wrote; a
 | Vault           | `vault_contacts` (item 621): the contact details you saved in Settings › Vault and the billing address of each card, for a run to type where a form asks; it never shows a password, a card number, an expiry or a security code (a card is kept, and no tool of a run fills it) |
 | Meetings        | `meeting_join`, `meeting_read`, `meeting_post`, `meeting_leave` (item 1138): notes of the owner's Google Meet call, answers to whoever speaks to Dot there (item 1150); a task's post asks the owner every time ([Meetings](meetings.md)) |
 | Video           | `watch_video` (item 1212, tool group `video`): a video file or a link, as frames with their moments and a transcript by the minute ([Watching videos](video.md)) |
-| Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` ([Recon](recon.md)) |
-| Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts`, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
+| Recon           | `recon` (item 776): the addresses, TLS certificate, HTTP headers and technology of a site, and with `depth = "ports"` the open ports of a host in `[recon] owned_hosts` or a registered scope ([Recon](recon.md)) |
+| Security scan   | `security_scan` (item 781): the forms of a page on a host in `[recon] owned_hosts` or a registered scope, tried with read-only SQLi, XSS, login-bypass and default-credential payloads ([Security scan](security.md)) |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | Phone           | while `[phone] enabled` (item 1196): `phone_status`, whether the owner's iPhone answers over WebDriverAgent and is locked ([Dot and your iPhone](phone-control.md)) |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
@@ -822,7 +841,14 @@ small script of Dot's gives the tags from (each tag keeps `alt` and its other at
 place of its `src`), so that an icon in each row of a thousand is in every row and its bytes are in the page once; a
 picture named fewer times, or by a tag with a `srcset`, is written where it is named. Each file is found, read and
 encoded once however often the page names it. Writing the files in has ten seconds (a page that names files by the
-thousands is looked at for that long): after it the rest of the page is shown as written, and the answer says so. The
+thousands is looked at for that long): after it the rest of the page is shown as written, and the answer says so. A
+page that names a picture, a sound or a video by a web address (`http:`, `https:`, `//host`: in a tag, a `srcset` or
+its icon) is refused and not kept, with those addresses and how to write them in, since its policy loads them only from
+`data:` and `blob:` and the owner would see a broken picture or an empty player (item 1721); what its styles name (a
+sheet or a font of another host than the libraries', a background) is not refused, as the page is drawn without it. A page longer than 500,000 characters is refused with its length and how to make it shorter (fewer
+pixels, JPEG or WebP, a video as a few frames, a chart from its data, or pages of their own): a file named by its path is
+written in as base64 too, so it takes as much room. The pages of one step are shown one after the other in the order of
+the calls, so they stand in the conversation in that order (item 1721). The
 tool's answer gives the page's address on this Mac (`/pages/<id>`), which the run's browser may open to see what it
 showed (item 601, [Browser](browser-and-computer-use.md)).
 
@@ -950,7 +976,7 @@ the recipients before you send it again, or they get it twice. A second press, h
 draft taken (409). A draft the daemon was handing over when it stopped is marked "Not sent" at its next
 start, as whether it went out is not known: look in Mail's Sent mailbox or the conversation in Messages before you send
 it again. Drafts are kept in the `drafts` table and go with their chat, or with the events of their run when those age
-out, once they are sent or discarded: a draft that waits, failed or is being sent stays (item 686). The API: `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
+out, once they are sent or discarded: a draft that waits, failed or is being sent stays (item 686). The API: `GET /api/drafts` (the drafts that wait for you, newest first, a failed send among them: the iPhone app's Activity lists them as Ready, item 1825), `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
 go; a message has no cc and no subject) and `POST /api/drafts/{id}/discard`. The scripts were not run against Mail or
 Messages themselves, which would send for real: the tests compile them, and give them to a stand-in of `osascript` that
 writes down what it was handed.
