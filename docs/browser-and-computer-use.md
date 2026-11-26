@@ -493,7 +493,10 @@ Both modes share what follows.
   site and username alone. It fills only on the login's own site; on another page the refusal sends the run to the
   login's own site to fill there, and when that site sends it back to a page the login does not name
   (`account.apple.com`, where App Store Connect signs in), it does not fill and tells you so in one line; whether the
-  login should name that page too is yours to decide (item 1208); a field in a frame of another site (App Store
+  login should name that page too is yours to decide (item 1208), and the line says the one step that does it if you
+  know the page as the site's own (item 1958): in Dot's vault, which keeps one website a login, a login of its own
+  for that host with the same username and password (Settings › Vault); in 1Password, the host added to the item's
+  websites. A run never adds a host to a login; a field in a frame of another site (App Store
   Connect's own sign-in page holds its form in a frame of `idmsa.apple.com`) gets nothing either, and the refusal
   names the frame's host and has the run tell you so in one line, rather than try the fill another way (item 1342);
   never a password or a code in your own Chrome
