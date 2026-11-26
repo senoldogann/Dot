@@ -28,7 +28,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.scheduler.history import HISTORY_LEAD, HISTORY_OPEN
+from dotagent.scheduler.history import CHAT_LEAD, CHAT_OPEN, HISTORY_LEAD, HISTORY_OPEN
 from dotagent.scheduler.plans import ScheduleRequest, create_schedule
 from dotagent.scheduler.runner import Scheduler
 from dotagent.server.app import create_app
@@ -241,9 +241,12 @@ async def test_with_the_same_chat_the_second_firing_goes_on_in_the_first_ones_ch
     first, second = await _two_firings(runtime, lister, "Listings in one chat", True, _tainted)
     assert (first.status, second.status) == ("done", "done"), (first.result, second.result)
     assert first.thread_id == second.thread_id
-    # The second run reads the first one's conversation, its answer among it, and no digest.
-    assert lister.opened == [GOAL, GOAL]
-    assert "Found 1 new listings." in lister.read[1] and HISTORY_OPEN not in lister.read[1]
+    # The second run reads what was said in the first one's chat, its answer among it, and no digest (item 1950).
+    assert lister.opened[0] == GOAL and CHAT_OPEN not in lister.read[0]
+    opening: str = lister.opened[1]
+    assert opening.startswith(f"{CHAT_LEAD}\n{CHAT_OPEN}\n"), opening
+    assert '- you: "Found 1 new listings."' in opening, opening
+    assert f"\n{GOAL}\n" in lister.read[1] and HISTORY_OPEN not in lister.read[1]
     assert "Found 1 new listings." not in lister.read[0]
     # It reads the first one's words without a message of the owner, so it starts as tainted as that run ended.
     assert await _started_tainted(runtime, second)
