@@ -112,7 +112,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
    the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
-   after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
+   after the last one, answers that stream in (a file an answer names is a chip of its name and size that opens a
+   preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open on Mac, Share and Save
+   to Files; its web links gather in one chip of their sites' own icons that opens each in Safari's in-app view, item
+   1935), the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of

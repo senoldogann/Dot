@@ -352,7 +352,7 @@ struct ChatScreen: View {
             DotNoteRow(text: text)
         case .answer(let id, let text, let writing, let endedAt):
             VStack(alignment: .leading, spacing: Space.xxs) {
-                AnswerView(markdown: text, writing: writing)
+                AnswerBody(markdown: text, writing: writing)
                 // The footer is the final answer's alone, once the run ended (plan §24): none under passing words.
                 if let endedAt, let target = chat.flatMap({ reactionTarget(of: id, in: $0) }) {
                     ReactionsBar(

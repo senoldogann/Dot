@@ -244,6 +244,13 @@
                     #"{"programs":[{"name":"Claude Code","command":"claude","path":"/opt/homebrew/bin/claude","version":"2.1.331","support":"supported","why":"measured with Dot (items 1580 to 1582)"},{"name":"OpenCode","command":"opencode","path":"/opt/homebrew/bin/opencode","version":"1.19.5","support":"unknown","why":"Dot keeps no list of the OpenCode versions it was measured on"}]}"#
                 )
             case ("PUT", "/api/agent/resume"): return (200, #"{"resume":"off","resume_within_s":3600}"#)
+            // A file an answer names (backlog LF1): its facts and text, and its open on the Mac.
+            case ("GET", "/api/files/preview"):
+                return (
+                    200,
+                    #"{"path":"/Users/owner/Desktop/ci-notes.md","name":"ci-notes.md","size":2150,"modified":\#(now - 600),"opens":true,"preview":{"kind":"text","text":"CI notes\n\nNode 22 is pinned on CI.\n","cut":false}}"#
+                )
+            case ("POST", "/api/files/open"): return (204, "")
             default: return CampaignFixture.answer(method: method, path: path) ?? (404, #"{"detail":"Not Found"}"#)
             }
         }

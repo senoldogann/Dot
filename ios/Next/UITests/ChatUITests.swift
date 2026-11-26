@@ -112,6 +112,48 @@ final class ChatUITests: XCTestCase {
         add(sheet)
     }
 
+    /// Backlog LF1: an answer's file is a chip of its name and size that opens a preview sheet with Open on Mac, and
+    /// its links gather in one "2 sources" chip that unfolds into a row per site, each with Copy link on a long press.
+    func testAnAnswersFilesAndLinksOpenInPlace() {
+        let app: XCUIApplication = launch("n2-chat")
+        let file: XCUIElement = app.buttons["answer.file"].firstMatch
+        let sources: XCUIElement = app.buttons["answer.sources"].firstMatch
+        for _ in 0..<8 where !(file.exists && file.isHittable && sources.exists && sources.isHittable) {
+            app.swipeDown()
+        }
+        XCTAssertTrue(file.waitForExistence(timeout: 5) && sources.exists)
+        XCTAssertTrue(file.label.contains("ci-notes.md"), file.label)
+        XCTAssertTrue(file.label.contains("KB"), "the size the Mac said: \(file.label)")
+        XCTAssertTrue(sources.label.contains("2 sources"), sources.label)
+        let measured: String = "file \(file.frame); sources \(sources.frame)"
+        add(XCTAttachment(string: measured))
+        XCTAssertGreaterThanOrEqual(file.frame.height, 44, measured)
+        XCTAssertGreaterThanOrEqual(sources.frame.height, 44, measured)
+        XCTAssertEqual(file.frame.minX, sources.frame.minX, accuracy: 1, "one left edge: \(measured)")
+        sources.tap()
+        let rows: XCUIElementQuery = app.buttons.matching(identifier: "answer.source")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows.element(boundBy: 0).label, "github.com")
+        XCTAssertEqual(rows.element(boundBy: 1).label, "nodejs.org")
+        let unfolded: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        unfolded.name = "answer-sources"
+        unfolded.lifetime = .keepAlways
+        add(unfolded)
+        rows.element(boundBy: 1).press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Copy link"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Open in Safari"].exists && app.buttons["Share"].exists)
+        app.buttons["Copy link"].tap()
+        file.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Node 22 is pinned on CI.")).firstMatch.waitForExistence(timeout: 5))
+        let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheet.name = "answer-file-sheet"
+        sheet.lifetime = .keepAlways
+        add(sheet)
+        app.buttons["file.openOnMac"].tap()
+        XCTAssertTrue(app.staticTexts["Opened on your Mac."].waitForExistence(timeout: 5))
+    }
+
     /// Item 1880: the helpers are no card in the stream; the capsule's people segment opens the Agents sheet, where a
     /// working helper's row says what it does in plain words beside its state, clock and model.
     func testTheHelpersLiveBehindTheCapsuleNotInTheStream() {
