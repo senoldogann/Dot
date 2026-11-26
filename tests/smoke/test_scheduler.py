@@ -54,6 +54,7 @@ from dotagent.scheduler.plans import (
     enable_schedule,
 )
 from dotagent.scheduler.runner import (
+    BUSY_STATUS,
     CATCH_UP_GAP_S,
     FAILED_TICKS_TO_END,
     Scheduler,
@@ -62,6 +63,7 @@ from dotagent.scheduler.runner import (
     missed_status,
 )
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
+from dotagent.store.db import Store
 from dotagent.store.models import (
     NO_PICKS,
     CampaignRecord,
@@ -1357,54 +1359,124 @@ class _ChatBusy(_Starts):
         raise RunConflict("a run is already active on this thread", {"thread_id": "thr_busy"})
 
 
-async def test_a_recurring_firing_whose_chat_is_busy_is_skipped_not_failed(runtime: Runtime) -> None:
+async def test_a_firing_whose_chat_turns_busy_as_it_starts_waits_due_and_starts_when_the_chat_is_free(
+    runtime: Runtime,
+) -> None:
     """Item 723: the owner's LinkedIn schedule read "failed to start: a run is already active on this thread", grey,
-    when its chat was busy with the owner's own message. A recurring schedule's firing is skipped then, saying why, and
-    counts as no failure; it goes on to its next time."""
+    when its chat was busy with the owner's own message. Item 1951: the firing is no failure and no skip either (66 of
+    them in a week, the weekly ones lost): the claim is taken back, so it is still due, says it waits, and starts its
+    run, once, when the chat is free."""
     record: ScheduleRecord = await _schedule(runtime, _cron("Busy chat", "*/5 * * * *"))
     due: float = _planned(record)
-    scheduler: Scheduler = Scheduler(runtime, _ChatBusy(runtime))
-    await scheduler.tick(due + 1)
-    after: ScheduleRecord = await runtime.store.get_schedule(record.id)
-    assert after.last_status == "skipped: a run is already active on this thread"
-    assert after.enabled and after.next_run_at is not None and after.next_run_at > due
+    await Scheduler(runtime, _ChatBusy(runtime)).tick(due + 1)
+    waiting: ScheduleRecord = await runtime.store.get_schedule(record.id)
+    assert waiting.last_status == BUSY_STATUS
+    assert waiting.enabled and waiting.next_run_at == due and waiting.skipped_in_row == 0
     assert await firing_failure(runtime.store, record.id) is None
-    assert after.skipped_in_row == 1
+    runs: Scheduler = Scheduler(runtime, _Starts(runtime))
+    try:
+        await runs.tick(due + 2)
+        finished: ScheduleRecord = await _until_over(runtime, record.id)
+    finally:
+        await runs.drain()
+    assert finished.last_status == "done" and finished.next_run_at is not None and finished.next_run_at > due
+    assert len(await _runs_in(runtime, finished)) == 1
+
+
+async def test_firings_that_come_due_behind_a_run_in_their_chat_queue_as_one_and_start_when_it_ends(
+    runtime: Runtime,
+) -> None:
+    """Item 1951: schedules sharing a chat skipped each other. A firing due while a run works in the chat it goes on in
+    starts nothing and stays due; the firings that come due meanwhile collapse into it (one waits, never a pile); it
+    starts, once, at the first tick after that run ended; and a schedule that makes its chat each time waits for
+    nobody."""
+    own: ScheduleRequest = _cron("Behind a run", "*/5 * * * *").model_copy(
+        update={"options": UNSET_OPTIONS.model_copy(update={"same_chat": True})}
+    )
+    record: ScheduleRecord = await _schedule(runtime, own)
+    due: float = _planned(record)
+    store: Store = runtime.store
+    thread: ThreadRecord = await store.create_thread("Shared chat", SCHEDULE_SOURCE)
+    other: RunRecord = await store.create_run(
+        thread.id, "Another schedule's task", "research", f"ollama:{MODEL}", None, SCHEDULE_SOURCE, "medium",
+        "standard", None, "ask", False, None, None, None,
+    )  # fmt: skip
+    await store.record_schedule_hand_run(record.id, due - 600, thread.id, other.id)
+    assert await store.chat_has_working_run(thread.id)
+    manager: _Starts = _Starts(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    try:
+        for ticked in (due + 1, due + 301, due + 601):
+            await scheduler.tick(ticked)
+            waiting: ScheduleRecord = await store.get_schedule(record.id)
+            assert (waiting.last_status, waiting.next_run_at, waiting.skipped_in_row) == (BUSY_STATUS, due, 0)
+        assert manager.started == []
+        await store.finish_run(other.id, "done", "pong")
+        await scheduler.tick(due + 602)
+        finished: ScheduleRecord = await _until_over(runtime, record.id)
+    finally:
+        await scheduler.drain()
+    assert len(manager.started) == 1
+    assert finished.last_status == "done" and finished.next_run_at is not None and finished.next_run_at > due + 602
+    assert finished.thread_id == thread.id
+
+
+async def test_a_schedule_that_makes_its_chat_each_time_does_not_wait_for_the_chat_of_its_last_firing(
+    runtime: Runtime,
+) -> None:
+    """Item 1951: only a firing that goes on in a chat waits for a run in it."""
+    record: ScheduleRecord = await _schedule(runtime, _cron("Own chat", "*/5 * * * *"))
+    due: float = _planned(record)
+    store: Store = runtime.store
+    thread: ThreadRecord = await store.create_thread("Last firing", SCHEDULE_SOURCE)
+    working: RunRecord = await store.create_run(
+        thread.id, "The owner's message", "research", f"ollama:{MODEL}", None, "ui", "medium",
+        "standard", None, "ask", False, None, None, None,
+    )  # fmt: skip
+    await store.record_schedule_hand_run(record.id, due - 600, thread.id, working.id)
+    manager: _Starts = _Starts(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    try:
+        await scheduler.tick(due + 1)
+        finished: ScheduleRecord = await _until_over(runtime, record.id)
+    finally:
+        await scheduler.drain()
+    assert len(manager.started) == 1 and finished.thread_id != thread.id
 
 
 async def test_firings_skipped_in_a_row_are_counted_and_the_first_that_starts_a_run_clears_the_count(
     runtime: Runtime,
 ) -> None:
-    """Item 1401 (the audit's finding 5): the PR-merge loop was skipped 27 times in a day for a busy chat and the only
-    trace was its last status. The schedule counts the firings skipped one after the other, a busy chat's and any other
-    skip's, and the first firing that starts a run ends the count."""
-    record: ScheduleRecord = await _schedule(runtime, _cron("Busy chat", "*/5 * * * *"))
-    busy: Scheduler = Scheduler(runtime, _ChatBusy(runtime))
+    """Item 1401 (the audit's finding 5): the PR-merge loop was skipped 27 times in a day and the only trace was its
+    last status. The schedule counts the firings skipped one after the other, whatever the reason (a busy chat's is
+    none since item 1951: that firing waits), and the first firing that starts a run ends the count."""
+    record: ScheduleRecord = await _schedule(runtime, _cron("Skipped", "*/5 * * * *"))
+    stopped: Scheduler = Scheduler(runtime, _Starts(runtime))
     now: float = _planned(record)
-    for expected in (1, 2, 3):
-        await busy.tick(now + 1)
-        skipped: ScheduleRecord = await runtime.store.get_schedule(record.id)
-        assert (skipped.skipped_in_row, skipped.last_status.startswith("skipped: ")) == (expected, True)
-        now = _planned(skipped)
-    # Another kind of skip joins the same row: the emergency stop's.
     stop: Path = failsafe_path()
-    await asyncio.to_thread(stop.touch)
-    try:
-        await busy.tick(now + 1)
-    finally:
-        await asyncio.to_thread(stop.unlink)
-    held: ScheduleRecord = await runtime.store.get_schedule(record.id)
-    assert (held.skipped_in_row, held.last_status) == (4, "skipped: the emergency stop is engaged")
+    for expected in (1, 2, 3):
+        await asyncio.to_thread(stop.touch)
+        try:
+            await stopped.tick(now + 1)
+        finally:
+            await asyncio.to_thread(stop.unlink)
+        skipped: ScheduleRecord = await runtime.store.get_schedule(record.id)
+        assert (skipped.skipped_in_row, skipped.last_status) == (expected, "skipped: the emergency stop is engaged")
+        now = _planned(skipped)
     # A firing that fails to start is no skip: it breaks the row (a count beside "failed to start" would be a lie).
     broken_models: ModelsConfig = runtime.config.models.model_copy(update={"main": "nonsense"})
     broken: Runtime = dataclasses.replace(runtime, config=runtime.config.model_copy(update={"models": broken_models}))
-    await Scheduler(broken, RunManager(broken)).tick(_planned(held) + 1)
+    await Scheduler(broken, RunManager(broken)).tick(now + 1)
     failed: ScheduleRecord = await runtime.store.get_schedule(record.id)
     assert failed.last_status.startswith("failed to start: ") and failed.skipped_in_row == 0
-    await busy.tick(_planned(failed) + 1)
+    await asyncio.to_thread(stop.touch)
+    try:
+        await stopped.tick(_planned(failed) + 1)
+    finally:
+        await asyncio.to_thread(stop.unlink)
     again: ScheduleRecord = await runtime.store.get_schedule(record.id)
     assert (again.skipped_in_row, again.last_status.startswith("skipped: ")) == (1, True)
-    held = again
+    held: ScheduleRecord = again
     # The chat is free: the firing starts its run, and the count is over whether or not the run has ended.
     runs: Scheduler = Scheduler(runtime, _Starts(runtime))
     try:

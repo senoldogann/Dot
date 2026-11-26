@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1951](1951.md) | no status |  | A schedule whose chat is busy waits for it, due, instead of skipping the firing |
 | [1950](1950.md) | no status |  | A schedule that goes on in its chat reads what was said there, not every step of its earlier runs |
 | [1941](1941.md) | done | 2026-11-26 | A restart whose load launchd refuses tries again with waits that grow |
 | [1940](1940.md) | done | 2026-11-26 | An OpenCode run that hangs ends: a silence watch, and the time limit kept by the clock |

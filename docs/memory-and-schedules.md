@@ -613,12 +613,16 @@ earlier runs.
 - Saving a schedule's form keeps it switched on or off as it is then, unless you moved the form's own switch (item
   723): the form sent the switch as it was when it opened, so a schedule switched on in the list meanwhile went off
   again (`PATCH /api/schedules/{id}` without `enabled` keeps it as it is).
-- A repeating schedule whose chat is busy when it comes due (with "the same chat", your message in it still being
-  worked on) skips that firing, saying "skipped: a run is already active on this thread" in amber, and counts no
-  failure (item 723). A firing that started no run for another reason says "failed to start", in red.
-- A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a busy chat's,
-  a task still going, a paused agent's, the emergency stop's and a late one, as the loop that merges pull requests was
-  skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
+- A schedule whose chat has a run at work when it comes due (with "the same chat": your message in it still being worked
+  on, or another schedule's task in the same chat) does not skip that firing: it waits, due, saying "waiting: a run is
+  working in its chat", and starts at the first tick after that run ended (item 1951; item 723 had it skipped, 66 times in
+  a week, the weekly ones lost). One firing waits at most: those that come due meanwhile collapse into it, as firings
+  missed while Dot was off do, and one that waits past `catch_up_s` is skipped as one that late is. It is no failure, and a
+  firing in a chat of its own never waits for another. A firing that started no run for another reason says "failed to
+  start", in red.
+- A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a task still
+  going, a paused agent's, the emergency stop's and a late one (a firing that waits for its chat is none), as the loop
+  that merges pull requests was skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
   with Run now) or firing that fails to start ends the count, and switching the schedule on again or changing it starts
   it afresh. From two on, and while the last status is a skip, its row on the Schedules page and its line in a chat's
   Automations say "Skipped 5 in a row" beside the last status, and `dotx schedule list` and the model's `schedule_list`
