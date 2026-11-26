@@ -102,4 +102,13 @@ final class ChatWordsTests: XCTestCase {
         let other: ToolEntry = ToolEntry(id: "o", tool: "notify", kind: .other, target: "", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1)
         XCTAssertEqual(toolGroupWords([other, search], locale: english), "Used 1 tool and searched the web 1 time")
     }
+
+    /// Item 1932: a line that waits on the owner or for a stop is still; only work shimmers (the asks scene held the
+    /// phone at 100 % CPU redrawing "Waiting for you" thirty to sixty times a second).
+    func testOnlyWorkShimmers() {
+        XCTAssertFalse(workLineMoves(.waitingForYou))
+        XCTAssertFalse(workLineMoves(.stopping))
+        XCTAssertTrue(workLineMoves(.thinking))
+        XCTAssertTrue(workLineMoves(.typing))
+    }
 }

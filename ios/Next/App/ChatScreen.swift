@@ -8,6 +8,34 @@ enum ChatScrollMemory {
     static var anchors: [String: String] = [:]
 }
 
+/// The chat screen's drawings, counted by reference (writing it draws nothing again). Debug builds with
+/// `-DotNextRenderMeter 1` show the count to the UI tests, which check that a scene settles (item 1932).
+@MainActor
+final class RenderMeter {
+    private(set) var count: Int = 0
+
+    func counted() -> Int {
+        count += 1
+        return count
+    }
+
+    static var shown: Bool {
+        #if DEBUG
+            UserDefaults.standard.bool(forKey: "DotNextRenderMeter")
+        #else
+            false
+        #endif
+    }
+}
+
+/// What stands at a chat's end: its last row, and the line under it that says a run starts or works. The chat follows
+/// a change of it, never a change of its height (item 1932).
+struct ChatEnd: Equatable {
+    let last: TranscriptItem?
+    let starting: Bool
+    let run: String?
+}
+
 /// The row of a chat that came into sight last, kept by reference: writing it draws nothing again (item 1848).
 @MainActor
 final class ReadingMark {
@@ -42,6 +70,8 @@ struct ChatScreen: View {
     @State private var ownerScrolls: Bool = false
     @State private var showsJump: Bool = false
     @State private var reading: ReadingMark = ReadingMark()
+    /// How many times the screen was drawn, for the debug render meter (item 1932).
+    @State private var renders: RenderMeter = RenderMeter()
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
     /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
@@ -119,6 +149,7 @@ struct ChatScreen: View {
     }
 
     var body: some View {
+        let drawings: Int = renders.counted()
         let items: [TranscriptItem] = builtItems
         return content(items)
             .background(Tone.ground)
@@ -127,6 +158,11 @@ struct ChatScreen: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $openedHelper) { helperThread in
                 ChatScreen(thread: helperThread, initialPanel: nil, editsFirstQueued: false)
+            }
+            .overlay(alignment: .topLeading) {
+                if RenderMeter.shown {
+                    Text(verbatim: "\(drawings)").font(.system(size: 1)).opacity(0.01).accessibilityIdentifier("debug.renders")
+                }
             }
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
             .toolbar { chrome }
@@ -166,6 +202,18 @@ struct ChatScreen: View {
     }
 
     // MARK: The transcript
+
+    /// Shows the chat's end while the owner is there: a few scrolls over half a second, then none. The lazy stack learns
+    /// the true heights of the rows a scroll brings into sight, so one scroll lands short of the end; the later passes
+    /// reach it, and the follow ends there instead of chasing every height change (item 1932). The first pass waits for
+    /// the next turn of the main actor, after the new words are laid out, so they never stand under the composer.
+    private func showEnd() async {
+        for pause in [0, 60, 150, 300] {
+            do { try await Task.sleep(for: .milliseconds(pause)) } catch { return }
+            guard pinned, !ownerScrolls else { return }
+            position.scrollTo(edge: .bottom)
+        }
+    }
 
     @ViewBuilder private func content(_ items: [TranscriptItem]) -> some View {
         if chat?.freshness == .deleted, items.isEmpty {
@@ -214,9 +262,10 @@ struct ChatScreen: View {
                 }
                 if let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
                     // An ask that waits on the owner is the dock's, never this line's.
-                    if now != .waitingForYou, !stopping, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
+                    if !stopping, now != .waitingForYou, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
                         // While the run waits on something, one quiet line says on what in every mode (item 1909); Stop
-                        // is the pill's, so the line offers only Details.
+                        // is the pill's, so the line offers only Details. An ask of the owner's comes first: the run
+                        // waits on them, not on its command, and the line says so (item 1932).
                         WaitingLine(words: waiting, details: { panel = .inspector })
                     } else if linesTheWork || now == .queued || now == .typing {
                         // With the steps shown too, while the run has no row to show yet (it waits to start, or its model
@@ -251,9 +300,12 @@ struct ChatScreen: View {
         } action: { _, atEnd in
             if atEnd { pinned = true } else if ownerScrolls { pinned = false }
         }
-        // Once the new words are laid out (never before, which left them under the composer), the end is shown.
-        .onScrollGeometryChange(for: Double.self) { geometry in Double(geometry.contentSize.height) } action: { _, _ in
-            if pinned, !ownerScrolls { position.scrollTo(edge: .bottom) }
+        // New words are followed when the transcript's end changes, never when its height does (item 1932): a lazy
+        // stack estimates the rows out of sight, so its height moves as rows come into sight, and following each move
+        // scrolled, which brought other rows into sight, which moved the height again, without end (the asks scene
+        // held the phone at 100 % CPU). A newer end cancels the older one's passes.
+        .task(id: ChatEnd(last: items.last, starting: startingSince != nil, run: activeRun?.id)) {
+            await showEnd()
         }
         .task(id: pinned) {
             // The jump button comes after a short pause, so it does not flicker while words stream (debounced).
@@ -270,7 +322,7 @@ struct ChatScreen: View {
                 pinned = false
                 position.scrollTo(id: anchor, anchor: .top)
             } else {
-                position.scrollTo(edge: .bottom)
+                await showEnd()
             }
         }
         .safeAreaInset(edge: .bottom) { bottom(items) }
@@ -310,7 +362,7 @@ struct ChatScreen: View {
             DotNoteRow(text: text)
         case .answer(let id, let text, let writing, let endedAt):
             VStack(alignment: .leading, spacing: Space.xxs) {
-                AnswerView(markdown: text, writing: writing)
+                AnswerBody(markdown: text, writing: writing)
                 // The footer is the final answer's alone, once the run ended (plan §24): none under passing words.
                 if let endedAt, let target = chat.flatMap({ reactionTarget(of: id, in: $0) }) {
                     ReactionsBar(

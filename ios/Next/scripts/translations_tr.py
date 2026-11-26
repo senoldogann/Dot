@@ -1,8 +1,6 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
-# "This chat" sheet, plain (item 1922)
-TR.update({"Provider": "Sağlayıcı"})
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
 extracts them (`%@` a text argument, `%lld` a count).
@@ -1489,3 +1487,36 @@ EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
 
 # New chat as a pushed chat (item 1916).
 TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})
+
+# Links and files under an answer (backlog LF1).
+TR.update(
+    {
+        "%lld sources": "%lld kaynak",
+        "Unfolded": "Açık",
+        "Opens the page": "Sayfayı açar",
+        "Copy link": "Bağlantıyı kopyala",
+        "Open in Safari": "Safari'de aç",
+        "Share": "Paylaş",
+        "Shows the file": "Dosyayı gösterir",
+        "File": "Dosya",
+        "Loading the file": "Dosya yükleniyor",
+        "The file cannot be shown": "Dosya gösterilemiyor",
+        "Only the start of the file shows here; open it on the Mac for the rest.": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç.",
+        "Size": "Boyut",
+        "Changed": "Değişti",
+        "Where": "Konum",
+        "Open on Mac": "Mac'te aç",
+        "Save to Files": "Dosyalar'a kaydet",
+        "Opened on your Mac.": "Mac'inde açıldı.",
+        "The phone cannot draw this image.": "Telefon bu görseli çizemiyor.",
+        "The phone shows this kind of file by its facts; open it on the Mac to read it.": "Telefon bu tür dosyanın yalnızca bilgilerini gösterir; okumak için Mac'te aç.",
+        "The file is too large for the phone; open it on the Mac.": "Dosya telefon için çok büyük; Mac'te aç.",
+        "Not on your Mac": "Mac'inde yok",
+        "Not shown from this place": "Bu konumdan gösterilmiyor",
+        "the chat's file panel": "sohbetin dosya paneli",
+    }
+)
+EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
+
+# "This chat" sheet, plain (item 1922)
+TR.update({"Provider": "Sağlayıcı"})
