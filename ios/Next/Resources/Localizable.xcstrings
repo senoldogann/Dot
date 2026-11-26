@@ -78,6 +78,17 @@
         }
       }
     },
+    "%@ is %@. The limit is 200 MiB for a video or a sound.": {
+      "comment": "Composer attachment error; arguments are file name and size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ boyutu %@. Video veya ses için sınır 200 MiB."
+          }
+        }
+      }
+    },
     "%@ is not a Tailscale address. It ends in .ts.net; Settings › Phone on the Mac shows it.": {
       "comment": "Pairing error: the address is not under ts.net; the argument is the host",
       "localizations": {
@@ -6837,13 +6848,13 @@
         }
       }
     },
-    "Model, %@": {
-      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
+    "Model: %@": {
+      "comment": "VoiceOver: the composer's model button; the argument is the model and effort",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Model, %@"
+            "value": "Model: %@"
           }
         }
       }
@@ -8509,13 +8520,13 @@
         }
       }
     },
-    "Over the 20 MiB limit": {
+    "Over the 200 MiB limit": {
       "comment": "On a video chip when the exported video is still too big",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "20 MiB sınırını aşıyor"
+            "value": "200 MiB sınırını aşıyor"
           }
         }
       }

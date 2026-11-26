@@ -592,7 +592,11 @@ async function ask(method, path, body, signal, outcome) {
   await proven();
   const headers = authHeaders();
   let payload;
-  if (body !== null) {
+  if (body instanceof Blob) {
+    // A file goes as it is, read from the disk by the browser as it sends (item 1933), not into a string of the page.
+    headers["Content-Type"] = body.type === "" ? "application/octet-stream" : body.type;
+    payload = body;
+  } else if (body !== null) {
     headers["Content-Type"] = "application/json";
     payload = JSON.stringify(body);
   }

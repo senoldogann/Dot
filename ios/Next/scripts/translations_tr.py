@@ -16,11 +16,12 @@ TR: dict[str, str] = {
     "OK": "Tamam",
     "Photos and videos": "Fotoğraflar ve videolar",
     "Trim video": "Videoyu kırp",
-    "Over the 20 MiB limit": "20 MiB sınırını aşıyor",
+    "Over the 200 MiB limit": "200 MiB sınırını aşıyor",
     "Preparing attachments…": "Ekler hazırlanıyor…",
     "Could not add attachment": "Ek eklenemedi",
     "At most 10 attachments can go with a message.": "Bir mesajla en fazla 10 ek gönderebilirsiniz.",
     "%@ is %@. The limit is 20 MiB per attachment.": "%@ boyutu %@. Ek başına sınır 20 MiB.",
+    "%@ is %@. The limit is 200 MiB for a video or a sound.": "%@ boyutu %@. Video veya ses için sınır 200 MiB.",
     "Could not prepare %@ as a video.": "%@ video olarak hazırlanamadı.",
     "Could not read %@. Choose a file.": "%@ okunamadı. Bir dosya seçin.",
     "The image could not be read.": "Görüntü okunamadı.",
@@ -358,7 +359,6 @@ TR: dict[str, str] = {
     "Looked at the screen": "Ekrana baktı",
     "Memory": "Bellek",
     "Message Dot": "Dot'a yaz",
-    "Model, %@": "Model, %@",
     "Models": "Modeller",
     "Mon": "Pzt",
     "Needs you": "Seni bekliyor",
@@ -1523,6 +1523,9 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
+
+# The composer's model chip as the provider's mark (item 1924).
+TR.update({"Model: %@": "Model: %@"})
 
 # New chat as a pushed chat (item 1916).
 TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})

@@ -13,12 +13,14 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1937](1937.md) | done | 2026-11-26 | The night's update syncs the environment to main's lock before it restarts |
 | [1936](1936.md) | done | 2026-11-26 | A red night of the browser suite keeps main red |
 | [1935](1935.md) | done | 2026-11-26 | DotNext opens an answer's links and files in place |
+| [1933](1933.md) | done | 2026-11-26 | A phone's video is sent by target bitrate and streamed to disk, so a quarter of an hour fits |
 | [1932](1932.md) | done | 2026-11-26 | DotNext's chat settles when nothing happens: the asks scene no longer holds the phone at 100% CPU |
 | [1930](1930.md) | done | 2026-11-26 | DotNext attaches videos and files from the composer |
 | [1929](1929.md) | done | 2026-11-26 | Check goals and helper results on a model of another family |
 | [1928](1928.md) | done | 2026-11-26 | Route new runs and helpers by task kind |
 | [1927](1927.md) | done | 2026-11-26 | DotNext says "Pending" under the owner's message until the Mac took it |
 | [1926](1926.md) | done | 2026-11-26 | DotNext's live streaming is light on the iPhone's battery and data, measured before and after, and the app's own performance record goes to the owner's Mac |
+| [1924](1924.md) | done | 2026-11-26 | DotNext's composer is one capsule with the model as its provider's mark |
 | [1923](1923.md) | done | 2026-11-26 | DotNext's open chat never changes by itself when a newer chat of the bot comes |
 | [1922](1922.md) | done | 2026-11-26 | DotNext's "This chat" sheet is plain and compact |
 | [1921](1921.md) | done | 2026-11-26 | DotNext opens and closes a work-log row without a hitch |
