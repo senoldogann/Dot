@@ -177,7 +177,10 @@ SYSTEM_BUDGET_TOKENS: int = 9_200
 # Raised by 300 for `add_proof` of item 1853, a check that must exit 0 before the run is done (23,685 measured).
 # Raised by 100 for the scope words of `recon` and `security_scan` (item 1887): 23,768 measured on the gate's runner.
 # Raised by 350 for `generate_image` of item 1969 above (24,173 measured).
-TOOLS_BUDGET_TOKENS: int = 24_200
+# Raised by 100 for item 1953 (a helper ends at its open pull request, and its checks are watched in the background):
+# the sentence of `delegate` that says so and `gh pr checks <number> --watch` in the shell tools' background hint, which
+# the run review of 2026-11-26 measured against 382 polling calls and 9.27 hours of 37 helper runs (24,257 measured).
+TOOLS_BUDGET_TOKENS: int = 24_300
 
 
 async def _first_parts(config: AppConfig) -> ContextParts:
