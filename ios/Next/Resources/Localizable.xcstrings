@@ -363,7 +363,7 @@
       }
     },
     "%lld of %lld": {
-      "comment": "Ask dock: which ask is shown; the arguments are its place and the count",
+      "comment": "Ask dock: which ask is shown; the arguments are its place and the count\nFind in chat: which find is shown of how many",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -566,6 +566,17 @@
         }
       }
     },
+    "%lld unread": {
+      "comment": "Home: the pill that jumps to the next unread bot; the argument is how many",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld okunmamış"
+          }
+        }
+      }
+    },
     "%lld without asking": {
       "comment": "Away card: decisions the mode that asks only to pay or send let through",
       "localizations": {
@@ -705,6 +716,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "8 harf ve rakam; 10 dakika ve bir kez geçerli."
+          }
+        }
+      }
+    },
+    "A bot needs a name.": {
+      "comment": "New bot: the name was left empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir botun adı olmalı."
           }
         }
       }
@@ -918,6 +940,17 @@
         }
       }
     },
+    "Activity comes in the next version": {
+      "comment": "Activity page: placeholder until the view is built",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Etkinlik bir sonraki sürümde geliyor"
+          }
+        }
+      }
+    },
     "Add": {
       "comment": "Own initiative: adds a thing to the list",
       "localizations": {
@@ -1018,23 +1051,12 @@
       }
     },
     "Agents": {
-      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nSettings section: models, schedules, rules, memory\nTab bar: the agents and teams tab\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
+      "comment": "Chat header quick panel: the chat's helpers\nComponent gallery (debug builds): a heading or sample text\nTitle of the agents list\nTitle of the sheet of a chat's helpers\nWhere on the Mac: the Agents page",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Ajanlar"
-          }
-        }
-      }
-    },
-    "Agents and teams": {
-      "comment": "Settings row: the web page of agents, teams and handoffs",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajanlar ve ekipler"
           }
         }
       }
@@ -1046,17 +1068,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan ajanlar"
-          }
-        }
-      }
-    },
-    "Agents come in a later version": {
-      "comment": "Agents tab: empty state until the agents wave",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajanlar sonraki bir sürümde gelecek"
           }
         }
       }
@@ -1090,6 +1101,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tüm eylemler"
+          }
+        }
+      }
+    },
+    "All chats": {
+      "comment": "Bot profile: opens every chat of the bot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm sohbetler"
           }
         }
       }
@@ -1259,6 +1281,17 @@
         }
       }
     },
+    "Approval mode and rules": {
+      "comment": "Settings: the line under Permissions",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onay modu ve kurallar"
+          }
+        }
+      }
+    },
     "Approval needed": {
       "comment": "Ask dock title: an approval",
       "localizations": {
@@ -1347,6 +1380,17 @@
         }
       }
     },
+    "Ask %@": {
+      "comment": "Placeholder of the composer in a bot's chat; the argument is the bot's name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ adlı bota sor"
+          }
+        }
+      }
+    },
     "Ask Dot for a big job and it hands parts to them. New agents are made on your Mac.": {
       "comment": "Agents: what agents are for",
       "localizations": {
@@ -1431,6 +1475,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbeti silmeden önce sor"
+          }
+        }
+      }
+    },
+    "Ask it in a chat to do something on a rhythm.": {
+      "comment": "Bot profile: how a routine is made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir sohbette ondan bir işi belli aralıklarla yapmasını iste."
           }
         }
       }
@@ -1556,6 +1611,35 @@
         }
       }
     },
+    "Back, %lld bots unread": {
+      "comment": "VoiceOver: the back button of a bot's chat with the other bots' unread count",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Back, %lld bot unread"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Back, %lld bots unread"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geri, %lld botta okunmamış var"
+          }
+        }
+      }
+    },
     "Background work": {
       "comment": "Title of the sheet of what still works for a chat",
       "localizations": {
@@ -1607,6 +1691,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gelecek hafta için dişçiden randevu al, olabilirse öğleden sonra; bir şey ödemeden önce fiyatı söyle."
+          }
+        }
+      }
+    },
+    "Bot": {
+      "comment": "Settings section: how Dot and the bots work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bot"
+          }
+        }
+      }
+    },
+    "Bots": {
+      "comment": "Title of the home: the list of bots",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botlar"
           }
         }
       }
@@ -1787,6 +1893,17 @@
         }
       }
     },
+    "Change them on your Mac.": {
+      "comment": "Bot profile: instructions are edited on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde değiştir."
+          }
+        }
+      }
+    },
     "Changed on your Mac.": {
       "comment": "Agents: instructions are edited on the Mac",
       "localizations": {
@@ -1854,7 +1971,7 @@
       }
     },
     "Chats": {
-      "comment": "Tab bar: the chats tab\nTitle of the chat list",
+      "comment": "Title of the chat list",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2261,7 +2378,7 @@
       }
     },
     "Connect apps": {
-      "comment": "Title of the Connect apps sheet",
+      "comment": "Home: opens the sheet that connects apps\nTitle of the Connect apps sheet",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2334,17 +2451,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bağlantı"
-          }
-        }
-      }
-    },
-    "Connections": {
-      "comment": "Settings section: the Mac, notifications, this phone",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bağlantılar"
           }
         }
       }
@@ -2433,6 +2539,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtı kopyala"
+          }
+        }
+      }
+    },
+    "Create": {
+      "comment": "New bot: makes it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oluştur"
           }
         }
       }
@@ -2598,6 +2715,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sil"
+          }
+        }
+      }
+    },
+    "Delete %@?": {
+      "comment": "Confirmation of deleting a bot; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ silinsin mi?"
           }
         }
       }
@@ -2962,7 +3090,7 @@
       }
     },
     "Done": {
-      "comment": "Chat settings toolbar: keeps the picks\nStatus word: the run finished",
+      "comment": "Chat settings toolbar: keeps the picks\nFind in chat: closes the bar\nStatus word: the run finished",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3332,6 +3460,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un tarayıcısı"
+          }
+        }
+      }
+    },
+    "Dot's computer": {
+      "comment": "Settings row: the paired Mac Dot works on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un bilgisayarı"
           }
         }
       }
@@ -3897,6 +4036,17 @@
         }
       }
     },
+    "Files and pages of its latest chat": {
+      "comment": "Bot profile: what the Library row opens",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son sohbetinin dosyaları ve sayfaları"
+          }
+        }
+      }
+    },
     "Files of this chat": {
       "comment": "Composer picker header: the files this chat's runs changed",
       "localizations": {
@@ -3970,6 +4120,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardım bul"
+          }
+        }
+      }
+    },
+    "Find in chat": {
+      "comment": "Bot chat menu: searches the open chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbette bul"
           }
         }
       }
@@ -4598,7 +4759,7 @@
       }
     },
     "Instructions": {
-      "comment": "Agents: an agent's instructions",
+      "comment": "Agents: an agent's instructions\nBot profile: what the agent was told to do",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4637,6 +4798,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'indeki çöp kutusuna gider; bir süre oradan geri getirilebilir."
+          }
+        }
+      }
+    },
+    "It greets you in its chat and asks what you want first.": {
+      "comment": "New bot: what happens once it is made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetinde seni selamlar ve önce ne istediğini sorar."
           }
         }
       }
@@ -4696,6 +4868,17 @@
         }
       }
     },
+    "It was deleted on your Mac or another device; its chats are with Dot.": {
+      "comment": "A bot's chat when the bot was deleted: detail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde ya da başka bir cihazda silindi; sohbetleri Dot'ta."
+          }
+        }
+      }
+    },
     "It was signed without its app group. Install a build signed for Dot Next.": {
       "comment": "Detail when the app group of the app is missing",
       "localizations": {
@@ -4725,6 +4908,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanı duraklatıldı"
+          }
+        }
+      }
+    },
+    "Its chats stay, as Dot's. Its face, role and instructions go, and its schedules are switched off.": {
+      "comment": "Confirmation of deleting a bot: what happens",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetleri Dot'un olarak kalır. Yüzü, rolü ve talimatları silinir; zamanlanmış görevleri kapatılır."
           }
         }
       }
@@ -4769,6 +4963,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "İşleri %@ onay kipinde başlar."
+          }
+        }
+      }
+    },
+    "Its unread chats are not counted on the home.": {
+      "comment": "Bot profile: what Mute does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Okunmamış sohbetleri ana ekranda sayılmaz."
           }
         }
       }
@@ -4923,6 +5128,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bırakıldı"
+          }
+        }
+      }
+    },
+    "Library": {
+      "comment": "Bot chat menu: the files and pages this bot made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kitaplık"
           }
         }
       }
@@ -5112,7 +5328,7 @@
       }
     },
     "Main model": {
-      "comment": "Models: the main model",
+      "comment": "Bot profile: an agent on the configured main model\nModels: the main model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5129,6 +5345,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bakım"
+          }
+        }
+      }
+    },
+    "Make a bot with + to give a job its own chat.": {
+      "comment": "Home: the hint when the owner has no agent yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir işe kendi sohbetini vermek için + ile bot oluştur."
           }
         }
       }
@@ -5178,7 +5405,7 @@
       }
     },
     "Mark as read": {
-      "comment": "Away card: moves the moment on for every device",
+      "comment": "Away card: moves the moment on for every device\nHome: marks every chat of a bot read",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5276,6 +5503,28 @@
         }
       }
     },
+    "Messages": {
+      "comment": "Home search: finds in what the chats say",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlar"
+          }
+        }
+      }
+    },
+    "Messages could not be searched: %@": {
+      "comment": "Home search: the Mac's search of messages failed; the argument is why",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlarda aranamadı: %@"
+          }
+        }
+      }
+    },
     "Messages, labels, and headings scale with this size.": {
       "comment": "Appearance: under the preview sentence",
       "localizations": {
@@ -5310,7 +5559,7 @@
       }
     },
     "Model": {
-      "comment": "Schedule create: the model",
+      "comment": "Bot profile: the bot's model\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5360,6 +5609,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pzt"
+          }
+        }
+      }
+    },
+    "More": {
+      "comment": "VoiceOver: the ⋯ menu of a bot's chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diğer"
           }
         }
       }
@@ -5441,6 +5701,17 @@
         }
       }
     },
+    "Mute": {
+      "comment": "Home: a bot's unread chats are not counted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sessize al"
+          }
+        }
+      }
+    },
     "Name": {
       "comment": "Rename alert: the field of the chat's new name\nSchedule edit: the name\nThis Mac: the Mac's name",
       "localizations": {
@@ -5507,6 +5778,17 @@
         }
       }
     },
+    "New bot": {
+      "comment": "Home: makes a new bot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni bot"
+          }
+        }
+      }
+    },
     "New chat": {
       "comment": "Chat list toolbar: starts a new chat\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -5536,6 +5818,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni modeller Modeller açılınca görünür: Dot o an her sağlayıcıya sorar. Dot bir sağlayıcının programını kendi başına asla güncellemez; Claude Code kendini günceller."
+          }
+        }
+      }
+    },
+    "Next": {
+      "comment": "Find in chat: the find after",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki"
           }
         }
       }
@@ -5661,6 +5954,17 @@
         }
       }
     },
+    "No chat yet": {
+      "comment": "Home: a bot that has no chat",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz sohbet yok"
+          }
+        }
+      }
+    },
     "No chats yet": {
       "comment": "Chat list empty state title\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -5738,6 +6042,17 @@
         }
       }
     },
+    "No routine": {
+      "comment": "Bot profile: the bot has no scheduled task",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutin yok"
+          }
+        }
+      }
+    },
     "No scheduled tasks": {
       "comment": "Schedules: empty",
       "localizations": {
@@ -5767,6 +6082,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kimse zamanında yanıtlamadı"
+          }
+        }
+      }
+    },
+    "None": {
+      "comment": "Find in chat: no block holds the words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yok"
           }
         }
       }
@@ -5987,6 +6313,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz bağlı bir şey yok"
+          }
+        }
+      }
+    },
+    "Nothing found": {
+      "comment": "Home search: no bot, chat or message holds the words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiçbir şey bulunamadı"
           }
         }
       }
@@ -6409,17 +6746,6 @@
         }
       }
     },
-    "Open agents and teams": {
-      "comment": "Agents tab: opens the web page of agents",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ajanları ve ekipleri aç"
-          }
-        }
-      }
-    },
     "Open iOS Settings": {
       "comment": "Opens the app's page in iOS Settings",
       "localizations": {
@@ -6482,6 +6808,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'in canlı ekranını açar; sen açana kadar hiçbir şey oynamaz."
+          }
+        }
+      }
+    },
+    "Opens the bot's profile": {
+      "comment": "VoiceOver hint of the pill in a bot's chat header",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botun profilini açar"
           }
         }
       }
@@ -6740,6 +7077,17 @@
         }
       }
     },
+    "Permissions": {
+      "comment": "Settings row: the approval mode and the rules",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzinler"
+          }
+        }
+      }
+    },
     "Photo": {
       "comment": "VoiceOver: a photo added to the message",
       "localizations": {
@@ -6773,13 +7121,13 @@
         }
       }
     },
-    "Pick a chat on the left, or start a new one.": {
-      "comment": "iPad detail column when no chat is selected",
+    "Pick a bot on the left, or make a new one.": {
+      "comment": "iPad detail column when no bot is selected",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Soldan bir sohbet seç ya da yenisini başlat."
+            "value": "Soldan bir bot seç ya da yenisini oluştur."
           }
         }
       }
@@ -6912,6 +7260,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir komutun çıktısının önizlemesi"
+          }
+        }
+      }
+    },
+    "Previous": {
+      "comment": "Find in chat: the find before",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Önceki"
           }
         }
       }
@@ -7539,6 +7898,17 @@
         }
       }
     },
+    "Researcher, Editor, Trader…": {
+      "comment": "New bot: example names in the name field",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Araştırmacı, Editör, Yatırımcı…"
+          }
+        }
+      }
+    },
     "Resets %@": {
       "comment": "Usage: when a plan window resets",
       "localizations": {
@@ -7612,6 +7982,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rol"
+          }
+        }
+      }
+    },
+    "Routines": {
+      "comment": "Bot profile: the bot's scheduled tasks",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rutinler"
           }
         }
       }
@@ -7881,7 +8262,7 @@
       }
     },
     "Search": {
-      "comment": "Memory: the search section",
+      "comment": "Home: the search of bots, chats and messages\nMemory: the search section",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7920,6 +8301,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Notlarda ara"
+          }
+        }
+      }
+    },
+    "Search plugins": {
+      "comment": "Settings: the line under Connect apps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklenti ara"
           }
         }
       }
@@ -8266,7 +8658,7 @@
       }
     },
     "Settings": {
-      "comment": "Tab bar: the settings tab\nTitle of the settings tab",
+      "comment": "Title of the settings tab",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8408,6 +8800,17 @@
         }
       }
     },
+    "Share as template…": {
+      "comment": "Bot chat menu: shares the agent as a file others can import",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şablon olarak paylaş…"
+          }
+        }
+      }
+    },
     "Short one": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -8543,6 +8946,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un sorduklarını göster"
+          }
+        }
+      }
+    },
+    "Shows all of it": {
+      "comment": "VoiceOver hint: the instructions unfold",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamamını gösterir"
           }
         }
       }
@@ -8697,6 +9111,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Standart"
+          }
+        }
+      }
+    },
+    "Start a chat": {
+      "comment": "A bot with no chat yet: starts one",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet başlat"
           }
         }
       }
@@ -9835,6 +10260,17 @@
         }
       }
     },
+    "This bot is gone": {
+      "comment": "A bot's chat when the bot was deleted",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu bot artık yok"
+          }
+        }
+      }
+    },
     "This build cannot keep anything": {
       "comment": "Shown when the app group of the app is missing",
       "localizations": {
@@ -10242,6 +10678,17 @@
         }
       }
     },
+    "Unmute": {
+      "comment": "Home: a bot's unread count counts again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesini aç"
+          }
+        }
+      }
+    },
     "Unpin": {
       "comment": "Swipe and context action on a pinned chat",
       "localizations": {
@@ -10253,13 +10700,13 @@
         }
       }
     },
-    "Until then your agents and teams open from your Mac's own page.": {
-      "comment": "Agents tab: empty state detail with the web page",
+    "Unread": {
+      "comment": "VoiceOver: a bot has unread chats",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "O zamana kadar ajanların ve ekiplerin Mac'inin kendi sayfasından açılır."
+            "value": "Okunmamış"
           }
         }
       }
@@ -10458,6 +10905,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sürüm"
+          }
+        }
+      }
+    },
+    "View profile": {
+      "comment": "Bot chat menu: opens the bot's profile",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profili görüntüle"
           }
         }
       }
@@ -10678,6 +11136,17 @@
         }
       }
     },
+    "Watch my inbox each morning and tell me what needs an answer": {
+      "comment": "New bot: an example job",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her sabah gelen kutumu izle ve neyin yanıt beklediğini söyle"
+          }
+        }
+      }
+    },
     "Watch the Mac": {
       "comment": "Activity tab row: opens the Mac's live screen",
       "localizations": {
@@ -10755,6 +11224,17 @@
         }
       }
     },
+    "What %@ did": {
+      "comment": "Bot profile: the Activity row of an agent; the argument is its name",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ne yaptı"
+          }
+        }
+      }
+    },
     "What Dot does": {
       "comment": "Schedule edit: the goal",
       "localizations": {
@@ -10762,6 +11242,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un yapacağı"
+          }
+        }
+      }
+    },
+    "What Dot does on its own (schedules, helpers, drafts that wait) will show here.": {
+      "comment": "Activity page: what it will show",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek."
           }
         }
       }
@@ -10806,6 +11297,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Neler yapabilir"
+          }
+        }
+      }
+    },
+    "What should it do?": {
+      "comment": "New bot: the field of the bot's job",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne yapmalı?"
           }
         }
       }
@@ -11151,6 +11653,17 @@
         }
       }
     },
+    "You": {
+      "comment": "Settings: the owner's card before their name is read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen"
+          }
+        }
+      }
+    },
     "You approve every change: files, commands, clicks, messages": {
       "comment": "Approval mode supervised, its hint",
       "localizations": {
@@ -11196,7 +11709,7 @@
       }
     },
     "Your Mac": {
-      "comment": "Maintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name",
+      "comment": "Dot's profile: the section of the Mac\nMaintenance section: the paired Mac\nSettings › Voice: the paired Mac when it has no name",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11752,6 +12265,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "atlandı"
+          }
+        }
+      }
+    },
+    "the Agents page": {
+      "comment": "Where on the Mac: the web app's page of agents (after 'Open on the Mac:')",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajanlar sayfası"
           }
         }
       }

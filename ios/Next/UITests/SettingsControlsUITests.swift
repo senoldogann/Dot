@@ -67,7 +67,8 @@ final class SettingsControlsUITests: XCTestCase {
                 if app.buttons["Discard"].waitForExistence(timeout: 1) { app.buttons["Discard"].tap() }
                 // A sheet that is still closing swallows the next push.
                 sleep(1)
-            } else if app.navigationBars.buttons["Close"].exists {
+            } else if title != "Settings", app.navigationBars.buttons["Close"].exists {
+                // The settings sheet's own ✕ closes the sheet: only a sheet over it is closed here.
                 app.navigationBars.buttons["Close"].tap()
             } else if app.menuItems.firstMatch.exists || app.collectionViews["menu"].exists {
                 app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
@@ -81,8 +82,9 @@ final class SettingsControlsUITests: XCTestCase {
     }
 
     func testEveryRowOfSettingsOpensItsPage() {
-        let rows: [String] = controls(skipping: [])
-        XCTAssertGreaterThan(rows.count, 20, "the rows of Settings: \(rows)")
+        // Connect apps opens a sheet of its own over the settings (checked below), not a page of the stack.
+        let rows: [String] = controls(skipping: ["Connect apps, Search plugins"])
+        XCTAssertGreaterThan(rows.count, 14, "the rows of Settings: \(rows)")
         for row in rows {
             let target: XCUIElement = element(row)
             target.tap()
@@ -91,17 +93,22 @@ final class SettingsControlsUITests: XCTestCase {
             restore(to: "Settings")
             XCTAssertEqual(title, "Settings", "back from \(row)")
         }
+        element("Connect apps, Search plugins").tap()
+        XCTAssertTrue(app.navigationBars["Connect apps"].waitForExistence(timeout: 5), "Connect apps opens its sheet")
+        app.navigationBars["Connect apps"].buttons["Close"].tap()
     }
 
     /// Every control of each native page.
     func testEveryControlOfTheNativePagesDoesSomething() {
-        let pages: [String] = [
-            "This Mac", "Notifications", "General", "Appearance", "Chat", "Models", "Usage limits and caps", "Scheduled tasks", "Rules", "Memory", "Agents",
-            "Health and version", "Usage",
+        // Each row of the settings sheet (PLAN §27) and the title of its page.
+        let pages: [(String, String)] = [
+            ("Dot's computer", "This Mac"), ("Notifications", "Notifications"), ("General", "General"), ("Appearance", "Appearance"), ("Chat", "Chat"),
+            ("Models", "Models"), ("Usage limits and caps", "Usage limits and caps"), ("Scheduled tasks", "Scheduled tasks"), ("Permissions", "Rules"),
+            ("Memory", "Memory"), ("Agents", "Agents"), ("Health and version", "Health and version"), ("Usage", "Usage"),
         ]
         var dead: [String] = []
-        for page in pages {
-            let row: XCUIElement = app.scrollViews.firstMatch.buttons.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", page, page + ",")).firstMatch
+        for (label, page) in pages {
+            let row: XCUIElement = app.scrollViews.firstMatch.buttons.matching(NSPredicate(format: "label == %@ OR label BEGINSWITH %@", label, label + ",")).firstMatch
             for _ in 0..<8 where !(row.exists && row.isHittable) { app.scrollViews.firstMatch.swipeUp() }
             row.tap()
             XCTAssertTrue(app.navigationBars[page].waitForExistence(timeout: 5), "page \(page)")

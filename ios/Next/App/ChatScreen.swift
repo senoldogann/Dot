@@ -54,6 +54,11 @@ struct ChatScreen: View {
     @Environment(\.horizontalSizeClass) private var sizeClass: UserInterfaceSizeClass?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
     @Environment(\.locale) private var locale: Locale
+    /// The bot this chat belongs to (PLAN §27): its header and "Ask <name>"; `nil` for a plain chat.
+    @Environment(\.botChat) private var botChat: BotChat?
+    /// Find in chat (the bot menu's): the words looked for and which find is shown; `nil` while the bar is closed.
+    @State private var finding: String?
+    @State private var findIndex: Int = 0
 
     private var chat: ChatProjection? { model.chats[thread] }
     private var view: ThreadView? { chat?.view }
@@ -108,10 +113,10 @@ struct ChatScreen: View {
         return content(items)
             .background(Tone.ground)
             .navigationTitle(view?.thread.title ?? model.list.rows.first { $0.summary.id == thread }?.summary.title ?? model.firstWords(of: thread) ?? "")
-            .navigationSubtitle(subtitle)
+            .navigationSubtitle(botChat == nil ? subtitle : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(sizeClass == .regular ? .automatic : .hidden, for: .tabBar)
-            .toolbar { header }
+            .toolbar { chrome }
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
             .onAppear {
@@ -237,6 +242,27 @@ struct ChatScreen: View {
             }
         }
         .safeAreaInset(edge: .bottom) { bottom(items) }
+        .safeAreaInset(edge: .top) {
+            if let finding {
+                let found: [String] = findMatches(items, words: finding)
+                FindBar(
+                    words: Binding(get: { self.finding ?? "" }, set: { self.finding = $0; findIndex = 0 }), index: findIndex, count: found.count,
+                    step: { delta in
+                        guard !found.isEmpty else { return }
+                        findIndex = (findIndex + delta + found.count) % found.count
+                        pinned = false
+                        position.scrollTo(id: found[findIndex], anchor: .center)
+                    },
+                    close: { self.finding = nil }
+                )
+                .onChange(of: found.first) { _, first in
+                    if let first {
+                        pinned = false
+                        position.scrollTo(id: first, anchor: .center)
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder private func row(_ item: TranscriptItem) -> some View {
@@ -343,7 +369,7 @@ struct ChatScreen: View {
                     text: edit == nil ? $draft : Binding(get: { edit?.text ?? "" }, set: { edit?.text = $0 }),
                     attachments: $attachments,
                     placeholder: activeRun == nil
-                        ? String(localized: "Message Dot", comment: "Placeholder of the composer")
+                        ? botChat.map { askPlaceholder($0.record.name) } ?? String(localized: "Message Dot", comment: "Placeholder of the composer")
                         : followUp == .queue
                             ? String(localized: "Queue a message", comment: "Placeholder of the composer while a run works and follow-ups queue")
                             : String(localized: "Tell the running task", comment: "Placeholder of the composer while a run works and follow-ups steer"),
@@ -438,7 +464,7 @@ struct ChatScreen: View {
     private var catalog: ComposerCatalog {
         ComposerCatalog(
             skills: (model.palette?.skills ?? []).map { PickerItem(kind: .skill, token: "/" + $0.name, name: $0.name, detail: $0.description) },
-            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role ?? "") },
+            agents: model.agents.map { PickerItem(kind: .agent, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: $0.record.role) },
             teams: model.teams.map { PickerItem(kind: .team, token: "@" + $0.record.name.replacingOccurrences(of: " ", with: "-"), name: $0.record.name, detail: "") },
             chats: model.list.ordered.filter { $0.summary.id != thread }.prefix(30).map { row in
                 PickerItem(kind: .chat, token: "@\"" + row.summary.title + "\"", name: row.summary.title, detail: rowTime(row.summary.latestCreatedAt, now: .now))
@@ -522,6 +548,25 @@ struct ChatScreen: View {
     }
 
     // MARK: Header
+
+    /// A bot's header in a bot's chat, the plain chat's otherwise.
+    @ToolbarContentBuilder private var chrome: some ToolbarContent {
+        if let botChat {
+            BotHeader(
+                chat: botChat,
+                subtitle: chat.flatMap {
+                    freshnessLine(
+                        freshness: $0.freshness, transport: model.transport, savedAt: model.savedAt[thread], workingAt: model.workingAt[thread],
+                        now: .now)
+                },
+                find: {
+                    findIndex = 0
+                    finding = ""
+                }, library: { panel = .files })
+        } else {
+            header
+        }
+    }
 
     @ToolbarContentBuilder private var header: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {

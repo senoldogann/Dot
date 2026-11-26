@@ -21,7 +21,7 @@ final class ChatStartTests: XCTestCase {
             directory: folder, api: daemon.api(), link: LinkWatcher(initial: .up), clock: ManualClock(at: 1_800_000_000),
             policy: RetryPolicy(attempts: 1, base: 1, cap: 1, budget: 1), jitter: { 0 }, maySend: { _ in true })
         let outcomes: AsyncStream<OutboxOutcome> = await outbox.outcomes()
-        try await outbox.enqueue(.newChat(text: "Plan the trip", images: [], uploaded: [], start: start), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.newChat(text: "Plan the trip", images: [], uploaded: [], start: start, agent: nil), id: newMessageKey(), images: [])
         for await _ in outcomes { break }
         let body: Data = try XCTUnwrap(daemon.bodies("POST", "/api/runs").last)
         return try JSONDecoder().decode([String: JSONValue].self, from: body)
@@ -54,7 +54,7 @@ final class ChatStartTests: XCTestCase {
         let kept: Data = Data(
             #"{"id":"k1","action":{"newChat":{"text":"hi","images":[],"uploaded":[]}},"kind":"run","createdAt":1,"attempts":0,"phase":"waiting"}"#.utf8)
         let item: OutboxItem = try JSONDecoder().decode(OutboxItem.self, from: kept)
-        XCTAssertEqual(item.action, .newChat(text: "hi", images: [], uploaded: [], start: nil))
+        XCTAssertEqual(item.action, .newChat(text: "hi", images: [], uploaded: [], start: nil, agent: nil))
     }
 
     func testTheChoicesChangeOneThingAtATime() {

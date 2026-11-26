@@ -306,8 +306,10 @@ private func runItems(
     let opening: TranscriptItem =
         run.source == "helper_report" ? .note(id: "u:\(run.id)", text: run.goal) : .owner(id: "u:\(run.id)", text: run.goal, delivery: nil)
     // A run that follows the owner's reaction (item 844) draws no message of the owner's: the reaction stands on its message.
+    // Nor does an agent's first meeting (item 993, source `welcome`): its goal is Dot's words to the agent, and the agent
+    // speaks first (item 1881).
     var items: [Built] =
-        run.followsReaction != nil
+        run.followsReaction != nil || run.source == "welcome"
         ? [] : [Built(item: opening, category: run.source == "helper_report" ? .note : .owner, start: run.createdAt, end: run.createdAt)]
     var calls: [String: Int] = [:]
     var asks: [String: Int] = [:]

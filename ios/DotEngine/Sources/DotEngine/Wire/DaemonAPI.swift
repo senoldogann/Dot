@@ -191,7 +191,10 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
     public let goalMode: Bool?
     public let planFirst: Bool
 
-    public init(goal: String, key: String, attachments: [String], start: ChatStart) {
+    /// The agent the chat is with; `nil` (left out of the body) for Dot.
+    public let agentId: String?
+
+    public init(goal: String, key: String, attachments: [String], start: ChatStart, agentId: String?) {
         self.goal = goal
         self.key = key
         self.attachments = attachments
@@ -203,10 +206,12 @@ public struct NewChatMessage: Codable, Sendable, Hashable {
         self.approvals = start.choices.approvals
         self.goalMode = start.choices.goalMode
         self.planFirst = start.planFirst
+        self.agentId = agentId
     }
 
     enum CodingKeys: String, CodingKey {
         case goal, key, attachments, mode, standing, model, effort, speed, approvals
+        case agentId = "agent_id"
         case goalMode = "goal_mode"
         case planFirst = "plan_first"
     }

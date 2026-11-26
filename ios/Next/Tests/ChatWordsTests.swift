@@ -23,6 +23,19 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertEqual(foldWords(fold, locale: english), "Worked for 2m 14s", "how long only, no counts (item 1904)")
     }
 
+    func testFindInChatSearchesTheWordsOfTheChatNotTheToolOutput() {
+        let items: [TranscriptItem] = [
+            .owner(id: "u:1", text: "Book the garage", delivery: nil),
+            .tool(ToolEntry(id: "t:1", tool: "shell", kind: .command, target: "garage", args: "", output: "garage", state: .done, images: [], startedAt: 0, endedAt: 1)),
+            .answer(id: "a:1", text: "The GARAGE is booked", writing: false, endedAt: 2),
+        ]
+        XCTAssertEqual(findMatches(items, words: "garage"), ["u:1", "a:1"], "case does not matter; a tool's output is not searched")
+        XCTAssertEqual(findMatches(items, words: "  "), [], "empty words find nothing")
+        let fold: WorkFold = WorkFold(
+            id: "f:run_a", seconds: 12, tally: WorkTally(counts: [:], failed: 0), items: [.thought(id: "th:1", text: "Which garage is open on Friday", live: false)])
+        XCTAssertEqual(findMatches([.work(fold)], words: "friday"), ["f:run_a"], "a finished run's folded thought is found, at its fold")
+    }
+
     func testConsecutiveStepsStackAsOneTightBlock() {
         let tool: (String) -> TranscriptItem = { id in
             .tool(ToolEntry(id: id, tool: "shell", kind: .command, target: "ls", args: "", output: "", state: .done, images: [], startedAt: 0, endedAt: 1))

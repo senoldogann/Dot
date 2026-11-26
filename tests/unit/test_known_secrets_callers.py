@@ -115,6 +115,8 @@ EXPECTED: dict[str, tuple[bool, ...]] = {
     "tools/search_chats.py:_find": (True,),
     "tools/search_chats.py:_around": (True,),
     "tools/search_chats.py:_read": (True,),
+    # The phone's home search (item 1882) masks its snippets as the search_chats tool does.
+    "server/routes_threads.py:threads_router.search_threads": (True,),
     # A record read back by its id (item 924) is masked as a chat read is.
     "tools/recall.py:_recall_tool.run": (True,),
     "agent/reactions.py:_holds_a_secret": (False,),

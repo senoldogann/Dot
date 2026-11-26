@@ -36,7 +36,7 @@ final class SyncTests: XCTestCase {
     func testANewChatsThreadAndWordsAreKeptWhenTheListHasItsRowFirst() async throws {
         await rig.supervisor.start()
         _ = try await snapshot(of: rig.store, "the list is live") { $0.list.freshness == .live && $0.list.rows.contains { $0.summary.id == "thr_1" } }
-        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: [], start: nil), createdAt: 1)
+        let item: OutboxItem = OutboxItem(id: "key_new", action: .newChat(text: "Book the dentist", images: [], uploaded: [], start: nil, agent: nil), createdAt: 1)
         let run: RunRecord = RunRecord(
             id: "run_1", threadId: "thr_1", goal: "Book the dentist", mode: "task", model: "m", status: "running", createdAt: 1, finishedAt: nil,
             result: "", parentRunId: nil, source: "phone", effort: nil, inputTokens: nil, outputTokens: nil, approvals: nil, followsReaction: nil)
@@ -387,7 +387,7 @@ final class SyncTests: XCTestCase {
         rig.link.report(.down)
         _ = try await rig.engine.send("Thursday afternoon please", thread: "thr_1", photos: [Data("a photo".utf8)], picks: .none)
         _ = try await rig.engine.perform(.pin(thread: "thr_2", pinned: true))
-        _ = try await rig.engine.startChat("Plan the trip to Oulu", photos: [], start: .daemons)
+        _ = try await rig.engine.startChat("Plan the trip to Oulu", photos: [], start: .daemons, agent: nil)
         await rig.supervisor.enterBackground()
         await rig.supervisor.stop()
 
