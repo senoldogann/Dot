@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
 
 from dotagent.core.errors import ToolInputError
@@ -78,14 +78,46 @@ def test_valid_scatter_accepts_numeric_x_values() -> None:
     assert chart.series[0].values == (0, 1)
 
 
-@pytest.mark.parametrize("path", ["/etc/hosts", "../outside.png", "mark.svg", "missing.png"])
-def test_an_image_that_is_not_a_workspace_raster_is_refused(tmp_path: Path, path: str) -> None:
-    (tmp_path / "mark.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
-    with pytest.raises((ToolInputError, OSError, ValueError, SyntaxError)):
-        _image_data(WorkspaceImage(path=path, alt="A mark"), tmp_path, (), ())
+def _workspace_with_pngs(base: Path) -> Path:
+    """A workspace holding a real PNG at ``dot.png``, ``crawl/page.png`` and ``mcp-results/answer.png``, and one beside
+    it in ``outside/``: every refusal below is of a real raster, so only the path rules can refuse it."""
+    workspace: Path = base / "ws"
+    for folder in (workspace, workspace / "crawl", workspace / "mcp-results", base / "outside"):
+        folder.mkdir(parents=True)
+    for target in (
+        workspace / "dot.png",
+        workspace / "crawl" / "page.png",
+        workspace / "mcp-results" / "answer.png",
+        base / "outside" / "dot.png",
+    ):
+        Image.new("RGB", (2, 2)).save(target)
+    return workspace
 
 
 def test_a_workspace_png_is_read_with_its_media_type(tmp_path: Path) -> None:
-    Image.new("RGB", (2, 2)).save(tmp_path / "dot.png")
-    data: ImageData = _image_data(WorkspaceImage(path="dot.png", alt="A dot"), tmp_path, (), ())
+    workspace: Path = _workspace_with_pngs(tmp_path)
+    data: ImageData = _image_data(WorkspaceImage(path="dot.png", alt="A dot"), workspace, (), ())
     assert data.media_type == "image/png"
+
+
+@pytest.mark.parametrize("where", ["absolute", "outside", "crawl", "mcp-results"])
+def test_a_raster_outside_the_runs_own_files_is_refused_by_its_path(tmp_path: Path, where: str) -> None:
+    workspace: Path = _workspace_with_pngs(tmp_path)
+    path: str = {
+        "absolute": str(workspace / "dot.png"),
+        "outside": "../outside/dot.png",
+        "crawl": "crawl/page.png",
+        "mcp-results": "mcp-results/answer.png",
+    }[where]
+    with pytest.raises(ToolInputError, match="raster files you made in the workspace"):
+        _image_data(WorkspaceImage(path=path, alt="A dot"), workspace, (), ())
+
+
+def test_a_link_out_of_the_workspace_and_a_svg_are_refused(tmp_path: Path) -> None:
+    workspace: Path = _workspace_with_pngs(tmp_path)
+    (workspace / "link.png").symlink_to(tmp_path / "outside" / "dot.png")
+    (workspace / "mark.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+    with pytest.raises(ToolInputError, match="raster files you made in the workspace"):
+        _image_data(WorkspaceImage(path="link.png", alt="A link"), workspace, (), ())
+    with pytest.raises(UnidentifiedImageError):
+        _image_data(WorkspaceImage(path="mark.svg", alt="A mark"), workspace, (), ())

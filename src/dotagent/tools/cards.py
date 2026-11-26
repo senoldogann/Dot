@@ -228,7 +228,8 @@ def build_cards_tool() -> RegisteredTool:
             "Draw a chart, table, choice or image gallery, or show post drafts in the conversation. "
             "Group draft alternatives in one call. Post drafts are previews only. "
             "Use draft_message for sendable email and iMessage drafts. "
-            "Images must be raster files you made in the workspace."
+            "Images must be raster files you made in the workspace. "
+            "The web UI draws cards; the phone's app and the channels do not yet, so say what matters in your answer."
         ),
         args_model=ShowCardsArgs,
         modes=ALL_MODES,
