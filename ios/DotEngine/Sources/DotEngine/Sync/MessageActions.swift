@@ -64,7 +64,7 @@ public struct EndOffer: Equatable, Sendable {
 /// `newest` is the chat's newest run as the view gives it; `run` the run the card ends.
 public func endOffer(run: RunRecord, newest: RunDetail?, chatWorking: Bool) -> EndOffer {
     let isNewest: Bool = newest?.run.id == run.id
-    let resume: Bool = isNewest && !chatWorking && newest?.resumable == true && run.endReason != modelRefused
+    let resume: Bool = isNewest && !chatWorking && newest?.resumable == true && newest?.run.endReason != modelRefused
     let retry: Bool = ownerMessageOffer(run: run, chatWorking: chatWorking).canRewind
     return EndOffer(resume: resume, retry: retry, cutOff: isNewest ? newest?.cutOff : nil)
 }
