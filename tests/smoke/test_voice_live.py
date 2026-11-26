@@ -12,12 +12,14 @@ import difflib
 import os
 import re
 import shutil
+import struct
 import subprocess
 import time
 import wave
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
 from dotagent.core.errors import VoiceError
 from dotagent.voice.helper import Transcriber
@@ -114,3 +116,61 @@ async def test_the_real_program_says_what_it_cannot_write_down(tmp_path: Path) -
     assert unsupported.value.context["code"] == "unsupported-language"
     # A silence is no error: it is written down as nothing.
     assert (await _streamed(transcriber, bytes(RECORDING_RATE * 2 * 2), "en-US"))[0] == ""
+
+
+class ConversationMeasurement(BaseModel):
+    phase: str
+    tail_ms: int
+    text: str
+    first_signal_ms: float
+    end_to_signal_ms: float
+
+
+@pytest.fixture(scope="module")
+def conversation_probe(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Compile once, then start a fresh process for each locale."""
+    with pytest.MonkeyPatch.context() as environment:
+        environment.delenv("DOT_SWIFTC", raising=False)
+        toolchain = look_for_compiler()
+    if toolchain.compiler is None:
+        pytest.skip(f"this Mac cannot build the voice conversation probe: {toolchain.why}")
+    source = Path(__file__).with_name("voice_conversation_probe.swift")
+    program = tmp_path_factory.mktemp("conversation-probe") / "voice-conversation-probe"
+    told = [] if toolchain.sdk is None else ["-sdk", str(toolchain.sdk)]
+    subprocess.run(
+        [str(toolchain.compiler), *told, "-parse-as-library", str(source), "-o", str(program)],
+        check=True,
+        timeout=180,
+    )
+    return program
+
+
+@pytest.mark.parametrize(("voice", "language", "sentence"), _SENTENCES)
+async def test_voice_conversation_probe(
+    conversation_probe: Path, voice: str, language: str, sentence: str, tmp_path: Path
+) -> None:
+    """Feed paced synthetic speech to real STT and render a fixed reply with real TTS."""
+    pcm = _said(voice, sentence, tmp_path)
+    # Cut the voice's own trailing silence at the last sample above -54 dBFS, so a zero-tail trial is meaningful.
+    audible = [index for index, (sample,) in enumerate(struct.iter_unpack("<h", pcm)) if abs(sample) >= 64]
+    assert audible
+    fixture = tmp_path / "speech.pcm"
+    fixture.write_bytes(pcm[: (audible[-1] + 1) * 2])
+    result = await asyncio.to_thread(
+        subprocess.run,
+        [str(conversation_probe), language, str(fixture)],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    print(result.stdout, end="")
+    measurements = [ConversationMeasurement.model_validate_json(line) for line in result.stdout.splitlines()]
+    assert [(row.phase, row.tail_ms) for row in measurements] == [("first-use", 800)] + [
+        ("prepared", tail) for _ in range(3) for tail in (0, 200, 800)
+    ]
+    expected = _words(sentence)[-1]
+    for row in measurements:
+        assert 0 < row.first_signal_ms <= row.end_to_signal_ms
+        # The last word survives with no synthetic tail too: the end of each turn's input finalizes the analyzer.
+        assert _words(row.text)[-1:] == [expected], row

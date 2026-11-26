@@ -71,13 +71,33 @@ func scheduleLine(_ schedule: ScheduleView, now: Date, locale: Locale) -> String
     return parts.joined(separator: " · ")
 }
 
+/// Whose schedules a page of them shows: all, Dot's own (those of no agent) or one agent's (a bot's Routines).
+enum ScheduleScope: Equatable, Sendable {
+    case all
+    case dot
+    case agent(String)
+
+    func holds(_ schedule: ScheduleView) -> Bool {
+        switch self {
+        case .all: true
+        case .dot: schedule.agent == nil
+        case .agent(let id): schedule.agent?.id == id
+        }
+    }
+
+    /// The agent a schedule made on the page is for, `nil` for Dot's and for the page of all.
+    var newAgentId: String? {
+        if case .agent(let id) = self { return id }
+        return nil
+    }
+}
+
 /// Settings › Agents › Scheduled tasks (the owner's reference shot): each with its rhythm, its next or last run and its
 /// switch on the row, so which run and which wait is seen at once; its menu edits it, runs it now, opens its history or
 /// deletes it; + makes a new one.
 struct SchedulesPage: View {
     let editsFirst: Bool
-    /// The agent whose schedules alone are shown (a bot's Routines); `nil` shows every schedule.
-    let agentId: String?
+    let scope: ScheduleScope
     @Environment(AppModel.self) private var model: AppModel
     @State private var state: Loadable<[ScheduleView]> = .loading
     @State private var editing: ScheduleView?
@@ -131,11 +151,11 @@ struct SchedulesPage: View {
             }
         }
         .sheet(isPresented: $creating) {
-            ScheduleCreateSheet(agentId: agentId) { body in
+            ScheduleCreateSheet(agentId: scope.newAgentId) { body in
                 switch await model.write({ api throws(DaemonRequestError) in try await api.createSchedule(body) }) {
                 case .success(let made):
                     // A bot's Routines show only its own: one made for another agent goes to that agent's list.
-                    if agentId == nil || made.agent?.id == agentId { state = .loaded((state.value ?? []) + [made]) }
+                    if scope.holds(made) { state = .loaded((state.value ?? []) + [made]) }
                     problem = nil
                     return nil
                 case .failure(let box): return box.failure
@@ -192,13 +212,12 @@ struct SchedulesPage: View {
     }
 
     private func load() async {
-        let agentId: String? = agentId
         let read: Loadable<[ScheduleView]> = await model.read { api throws(DaemonRequestError) in try await api.schedules() }
-        guard let agentId, case .loaded(let all) = read else {
+        guard case .loaded(let all) = read else {
             state = read
             return
         }
-        state = .loaded(all.filter { $0.agent?.id == agentId })
+        state = .loaded(all.filter(scope.holds))
     }
 
     private func replace(_ saved: ScheduleView) {

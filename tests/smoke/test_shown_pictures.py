@@ -20,6 +20,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment,
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import ModelInfo
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
@@ -55,6 +56,13 @@ _TURNS: list[ScriptedTurn] = [
 ]
 
 
+class _SeeingProvider(ScriptedProvider):
+    """The scripted model, which takes images: a run that gets a picture back is not sent to the vision model."""
+
+    async def model_info(self, model: str) -> ModelInfo:
+        return (await super().model_info(model)).model_copy(update={"vision": True})
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def login_env() -> dict[str, str]:
     return await read_login_env(load_default_config().shell.login_env_timeout_s, ())
@@ -65,7 +73,7 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[RunManager, 
     """The daemon in the home of the environment, whose model plays ``_TURNS``, served at the address it yields."""
     runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
     try:
-        await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _TURNS))
+        await runtime.router.register(_PROVIDER, _SeeingProvider(_PROVIDER, _TURNS))
         manager: RunManager = RunManager(runtime)
         stopping: asyncio.Event = asyncio.Event()
         listener = bind_listener("127.0.0.1", 0)
@@ -118,8 +126,7 @@ async def test_a_picture_a_run_makes_shows_once_as_its_card_and_not_also_as_a_th
                 await expect(card).to_have_count(1)
                 picture: Locator = card.locator("img.shown-picture-image")
                 await expect(picture).to_have_count(1)
-                await expect(picture).to_have_js_property("complete", True)
-                assert await picture.evaluate("(image) => image.naturalWidth") == 640
+                await expect(picture).to_have_js_property("naturalWidth", 640)
                 # The one picture of the run on the page: the tool's row holds no thumbnail of it, and no screen of
                 # Dot's computer is made of it.
                 await expect(page.locator(".shot")).to_have_count(0)

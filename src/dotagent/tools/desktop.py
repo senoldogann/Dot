@@ -265,6 +265,22 @@ def _screen_result(text: str) -> ToolResult:
     return mark_untrusted(ok(text))
 
 
+# Safari's bundle, whose pages the safari_* tools read and act on by their elements (item 1960).
+_SAFARI_BUNDLE: str = "com.apple.Safari"
+SAFARI_PAGES: str = (
+    "Safari's pages: safari_read and safari_act read and act on the page in the tab by its elements (refs s12), "
+    "inside the page and without the pointer, far faster than the window's elements; keep the desktop tools for "
+    "Safari's own windows (its AutoFill, a password sheet, a dialog of Safari's)."
+)
+
+
+def _with_safari_note(text: str, app: AppView | None) -> str:
+    """``text`` with the line that sends a run in Safari to its page tools, when the application is Safari."""
+    if app is None or app.bundle_id != _SAFARI_BUNDLE:
+        return text
+    return f"{SAFARI_PAGES}\n{text}"
+
+
 def _ref_of(raw: str) -> int:
     try:
         return parse_ref(raw)
@@ -368,7 +384,7 @@ def _open_app_tool() -> RegisteredTool:
             snapshot_budget(ctx.runtime.config, ctx.output_chars),
             authorized.bundle,
         )
-        return _screen_result(render_opened_app(opened, _nonce()))
+        return _screen_result(_with_safari_note(render_opened_app(opened, _nonce()), opened.app))
 
     return make_path_tool(
         name="desktop_open_app",
@@ -417,7 +433,7 @@ def _snapshot_tool() -> RegisteredTool:
             scope=args.scope, ref=ref, query=args.query, full=args.full, max_chars=budget, skeleton=args.skeleton
         )
         view: SnapshotView = await ctx.runtime.desktop.snapshot(ctx.thread_id, args.app, request)
-        return _screen_result(render_snapshot(view, _nonce()))
+        return _screen_result(_with_safari_note(render_snapshot(view, _nonce()), view.app))
 
     return make_tool(
         name="desktop_snapshot",
@@ -635,7 +651,9 @@ def _act_tool() -> RegisteredTool:
         outcome, waits = await act_when_away(ctx, batch)
         source: str = outcome.view.app.name if outcome.view is not None else (args.app or "application")
         note: str = "\n".join(part for part in (batch_cut_note(len(args.steps), limit), *waits) if part)
-        rendered: str = render_act_outcome(outcome, source, _nonce())
+        rendered: str = _with_safari_note(
+            render_act_outcome(outcome, source, _nonce()), outcome.view.app if outcome.view is not None else None
+        )
         # What the steps came to, counted, goes with the result for the run's account (item 1744).
         return _screen_result(f"{note}\n{rendered}" if note else rendered).model_copy(
             update={"tally": tally_of(outcome.steps)}
@@ -654,8 +672,10 @@ def _act_tool() -> RegisteredTool:
             "chooses a menu bar item by its path; scroll moves an area (give it a ref); drag, double_click, "
             "right_click (its menu then appears in the snapshot), hover, wait, and activate (switch to another "
             "application). Batch the steps you can predict, such as filling a form and pressing its button. The "
-            "result shows what each step did and how the window changed, and what Dot checked of it: the field read "
-            "back after set_value, type and paste, and expect_text where you gave one. Done means the step was sent; "
+            "result shows what each step did and the window after the steps, and what Dot checked of it: the field "
+            "read back after set_value, type and paste, and expect_text where you gave one; it is the look you need, "
+            "so take no desktop_snapshot or screenshot after it unless a step is uncertain or what you need is drawn "
+            "rather than listed. Done means the step was sent; "
             "verified means Dot saw its result; not checked means only that it was sent; uncertain means it was sent "
             "and its result was not seen, so look before sending it again. Passwords, codes and card numbers go into "
             "secure fields only as your instructions on secrets say: otherwise Dot refuses the step. While the owner "

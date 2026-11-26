@@ -92,7 +92,7 @@ def single_action_streak(streak: int, previous: SingleAction | None, current: Si
 
 def single_action_steer(action: SingleAction) -> str:
     """The note that steers a run toward batches, after :data:`SINGLE_ACTION_STEPS` single-action steps in a row."""
-    where: str = "this page" if action.tool == "browser_act" else "this application"
+    where: str = "this page" if action.tool in ("browser_act", "safari_act") else "this application"
     return (
         f"[{SINGLE_ACTION_STEPS} steps in a row acted with one step each on {where} ({redact_secrets(action.target)}). "
         f"Each {action.tool} call costs a model round trip; batch the steps you can predict without a new look "

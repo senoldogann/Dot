@@ -1,7 +1,5 @@
 """Pre-approved spending (item 33): amounts read from labels and pages, the caps, and the policy's decision."""
 
-from types import SimpleNamespace
-
 import pytest
 
 from dotagent.browser.safety import assess_step, dialog_is_financial, payment_steps
@@ -20,7 +18,7 @@ from dotagent.policy.spend import (
 )
 from dotagent.policy.types import ActionInfo, Amount, Decision
 from dotagent.store.models import RuleRecord
-from dotagent.tools.browser import _payment_amount
+from dotagent.tools.browser import _largest_amount
 
 CAPS: dict[str, SpendCap] = {"shop.example": SpendCap(per_purchase=20.0, per_day=30.0)}
 URL: str = "https://www.shop.example/checkout"
@@ -244,24 +242,17 @@ def test_a_rule_of_the_owners_that_hands_a_payment_off_holds_over_the_allowance(
     assert decide(_payment(amount), "task", False, "aggressive", [asking], allowance) is allowance
 
 
-async def test_a_payment_steps_amount_is_the_largest_its_labels_and_its_page_name() -> None:
+def test_a_payment_steps_amount_is_the_largest_its_labels_and_its_page_name() -> None:
     """A coupon or a basket line in the same batch cannot stand for the payment (item 385): the largest amount of the
-    labels and of the page's total is the one the caps read."""
-    page: SimpleNamespace = SimpleNamespace(text="Basket\nOrder total: €499.00")
-
-    async def read_text(thread_id: str, ref: None, offset: int, limit: int) -> SimpleNamespace:
-        return page
-
-    ctx: SimpleNamespace = SimpleNamespace(thread_id="thread_1", browser=SimpleNamespace(read_text=read_text))
+    labels and of the page's total is the one the caps read, for Chrome's batch and Safari's alike (item 1959)."""
     labels: list[Element | None] = [
         Element(role="button", name="Apply −€5 coupon"),
         None,
         Element(role="button", name="Pay €480.00"),
     ]
-    assert await _payment_amount(ctx, labels) == Amount(value=499.0, currency="€")  # type: ignore[arg-type]
-    page.text = "Nothing to pay here"
-    assert await _payment_amount(ctx, labels) == Amount(value=480.0, currency="€")  # type: ignore[arg-type]
-    assert await _payment_amount(ctx, [None]) is None  # type: ignore[arg-type]
+    assert _largest_amount(labels, "Basket\nOrder total: €499.00") == Amount(value=499.0, currency="€")
+    assert _largest_amount(labels, "Nothing to pay here") == Amount(value=480.0, currency="€")
+    assert _largest_amount([None], "Nothing to pay here") is None
 
 
 def test_the_payment_steps_of_a_batch_are_the_clicks_that_pay_not_the_typing_into_a_card_field() -> None:

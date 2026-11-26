@@ -85,7 +85,7 @@ MODEL: _Recorder = _Recorder()
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"'
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\nfast = "{SCRIPTED_MODEL}"'
         "\n\n[memory]\nembed_enabled = false\n\n[agent]"
         "\ngoal_mode = false",
         encoding="utf-8",
@@ -643,7 +643,8 @@ async def test_an_agent_just_made_meets_the_owner_in_its_first_chat_once(
     run = met.json()
     assert (run["agent_id"], run["source"], run["mode"]) == (agent_id, "welcome", "chat")
     assert "Scout, Finds and checks sources" in run["goal"] and "in Turkish" in run["goal"]
-    assert "ask_user" in run["goal"]
+    assert "ask_user" not in run["goal"] and "Call no tool" in run["goal"]
+    assert run["model"] == runtime.roles.fast()
     # Dot's words around a name and a role a run may have written are no instruction of the owner's (the pre-push
     # review), and the chat is named after the agent.
     assert run["goal"] not in manager.instructions_of(run["id"])
@@ -655,6 +656,20 @@ async def test_an_agent_just_made_meets_the_owner_in_its_first_chat_once(
     assert (await client.post("/api/agents/dot/welcome", json={"language": "Turkish"})).status_code == 422
     assert (await client.post(f"/api/agents/{agent_id}/welcome", json={"language": ""})).status_code == 422
     assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
+
+
+async def test_the_first_meeting_of_an_agent_with_its_own_reasoning_level_still_starts(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 1962's review: the meeting runs on the fast model, which need not offer the level the agent was made with,
+    so the agent's level is left off it; the agent must greet, not be refused."""
+    agent = await runtime.store.create_agent("Scribe", "Writes", "Be brief.", "", "high", None, (), None, None)
+    MODEL.script = ScriptedProvider(_PROVIDER, [FINISH])
+    met = await client.post(f"/api/agents/{agent.id}/welcome", json={"language": "Turkish"})
+    assert met.status_code == 201, met.text
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(met.json()["id"])
+    assert (await client.delete(f"/api/agents/{agent.id}")).status_code == 204
 
 
 @pytest.mark.browser

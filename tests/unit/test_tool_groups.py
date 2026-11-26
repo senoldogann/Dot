@@ -298,9 +298,9 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "(watch_video)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",
-        "- desktop: the Mac's applications, windows, clipboard and AppleScript (desktop_apps, desktop_open_app, "
-        "desktop_snapshot, desktop_screenshot, desktop_act, desktop_read, desktop_clipboard_read, "
-        "desktop_clipboard_write, apple_script)",
+        "- desktop: the Mac's applications, windows, clipboard and AppleScript, and the pages of the owner's own "
+        "Safari (desktop_apps, desktop_open_app, desktop_snapshot, desktop_screenshot, desktop_act, desktop_read, "
+        "desktop_clipboard_read, desktop_clipboard_write, apple_script, safari_open, safari_read, safari_act)",
     ]
 
 
