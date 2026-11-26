@@ -12,7 +12,14 @@ from fastapi.responses import StreamingResponse
 
 from dotagent.agent.account import RunAccount, result_fact, run_account
 from dotagent.agent.aside import AsideAnswer, answer_aside
-from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_attachments, store_attachment
+from dotagent.agent.attachments import (
+    AttachedFile,
+    StoredAttachment,
+    load_attachments,
+    store_attachment,
+    store_attachment_stream,
+    upload_limit,
+)
 from dotagent.agent.budget import loosens, run_budget
 from dotagent.agent.campaign import session_number
 from dotagent.agent.held_secrets import SECRET_SEVERITY, HeldSecret, forget_secret, save_secret
@@ -73,6 +80,7 @@ from dotagent.server.views import (
     ActivityView,
     ApprovalsQuery,
     AsideRequest,
+    AttachmentStreamQuery,
     AttachmentUpload,
     AwayMark,
     AwayQuery,
@@ -537,6 +545,20 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         floor: int = floor_bytes(ctx.runtime.config.store.min_free_gb)
         await asyncio.to_thread(ensure_space, ctx.runtime.workspace, len(data), floor, "the uploaded file")
         return await asyncio.to_thread(store_attachment, ctx.runtime.workspace, request.name, request.media_type, data)
+
+    @router.put("/attachments/stream", status_code=201)
+    async def upload_attachment_stream(
+        request: Request, query: Annotated[AttachmentStreamQuery, Query()]
+    ) -> StoredAttachment:
+        """Keep a file sent as the raw body, written to disk as it arrives, for a video or a large file (item 1933); a
+        body cut short leaves nothing. Named by ``name`` and ``media_type`` in the query. A disk nearly full refuses it
+        before a byte is written (item 1938): for the length the sender declared, else for the most its kind may be."""
+        limit: int = upload_limit(query.name, query.media_type)
+        declared: str | None = request.headers.get("content-length")
+        needed: int = min(int(declared), limit) if declared is not None and declared.isdigit() else limit
+        floor: int = floor_bytes(ctx.runtime.config.store.min_free_gb)
+        await asyncio.to_thread(ensure_space, ctx.runtime.workspace, needed, floor, "the uploaded file")
+        return await store_attachment_stream(ctx.runtime.workspace, query.name, query.media_type, request.stream())
 
     @router.post("/runs/{run_id}/btw")
     async def ask_aside(run_id: str, request: AsideRequest) -> AsideAnswer:
