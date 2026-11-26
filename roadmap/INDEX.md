@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1969](1969.md) | done | 2026-11-26 | Dot makes pictures: `generate_image` draws a logo, diagram or card in its own browser, or asks Google's picture model for a photo, with no key of its own |
 | [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
 | [1963](1963.md) | done | 2026-11-26 | DotNext's bot profile is Grok's: avatar, name and Edit, Library and Computer, Configure the bot, Notifications |
 | [1962](1962.md) | done | 2026-11-26 | A new bot opens its first chat with a message of its own, within seconds |

@@ -52,6 +52,8 @@ type CallPurpose = Literal[
     "offer",
     # The notes of a meeting Dot is in (item 1138), written by a call with no tool but its answer's.
     "meeting",
+    # A picture made by a picture model (``generate_image``'s photo path): its tokens are the picture's.
+    "image",
 ]
 
 CALL_EVENT: str = "model_call"
