@@ -108,7 +108,11 @@ class Table(FrozenModel):
 class Choice(FrozenModel):
     kind: Literal["choice"]
     prompt: Label
-    options: tuple[ChoiceText, ...] = Field(min_length=2, max_length=6, description="Visible answers, sent as written.")
+    options: tuple[ChoiceText, ...] = Field(
+        min_length=2,
+        max_length=6,
+        description="Visible answers; a tap writes one into the owner's message box for them to send.",
+    )
 
     @model_validator(mode="after")
     def _distinct(self) -> Self:

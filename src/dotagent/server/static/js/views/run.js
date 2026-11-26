@@ -2220,7 +2220,7 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
       return;
     }
     const { text, preserveDraft } = /** @type {CustomEvent<{ text: string, preserveDraft?: boolean }>} */ (event).detail;
-    if (preserveDraft === true && input.value !== "") {
+    if (preserveDraft === true && input.value.trim() !== "") {
       toast("error", "Finish the message in the composer first.");
     } else {
       frame.fill(text);
