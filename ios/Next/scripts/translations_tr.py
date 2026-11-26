@@ -1592,3 +1592,13 @@ TR.update(
         "Violet": "Mor",
     }
 )
+
+# The stream's helpers group (item 1957).
+TR.update(
+    {
+        "%lld stopping": "%lld durduruluyor",
+        "%lld waiting on you": "%lld seni bekliyor",
+        "Hides the helpers": "Yardımcıları gizler",
+        "Shows each helper": "Her yardımcıyı gösterir",
+    }
+)

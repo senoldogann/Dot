@@ -36,7 +36,7 @@ diagnostics' counts, and the app's counters of each time it was open, `App/PerfC
 alone (`POST /api/phone/metrics`, sent when the app opens) and Settings › Maintenance shows its last seven days. A step's thinking is
 one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
 helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
-no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
+no plan card (item 1880), and a run's helpers are one group row whose tap opens a card of each (item 1957). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
@@ -132,7 +132,8 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
 ## Decisions taken in N0
 
 - **No hue.** The ink is the only accent (send, switches, links underlined, selection, the unread dot); amber only for
-  what waits on the owner, red only for a failure. No surface has a stroke.
+  what waits on the owner, red only for a failure, blue (`live`) only for a helper at work in the stream's helpers
+  group (item 1957). No surface has a stroke.
 - **The switch** is drawn (`InkSwitchStyle`): the system's white thumb disappears on a light ink track in the dark look.
 - **iPad**: no tab bar (PLAN §27); a compact width is the home with a bot's chat pushed, a regular width a split view
   (the home as the sidebar, the chat as the detail) with the same selection, so collapsing keeps the open chat. Grouped pages are at most

@@ -103,9 +103,13 @@ func helperState(_ status: String) -> HelperState {
     }
 }
 
-/// "Provider · model · effort", the daemon's words.
-func engineLine(_ helper: HelperView) -> String {
-    [helper.provider, helper.model, helper.effort].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+/// "Provider · model · effort" in words ("Claude Code · Opus 5.5 · High"): the provider's and the level's names, the
+/// model's label from the daemon's list (its id when the list does not hold it). Pure.
+func engineLine(_ helper: HelperView, models: [ProviderModels]) -> String {
+    let ref: String = helper.provider + ":" + helper.model
+    let label: String = models.flatMap(\.models).first { $0.ref == ref }?.label ?? helper.model
+    return [providerTitle(helper.provider), label, helper.effort.map(effortTitle)].compactMap { $0 }.filter { !$0.isEmpty }
+        .joined(separator: " · ")
 }
 
 // MARK: The chat list
@@ -769,7 +773,7 @@ struct LiveAgentsSheet: View {
         if stopping.contains(helper.runId), state.isLive { state = .stopping }
         return HelperRun(
             id: helper.runId, title: helper.shortTitle, state: state, startedAt: Date(timeIntervalSince1970: helper.startedAt),
-            endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper),
+            endedAt: helper.finishedAt.map { Date(timeIntervalSince1970: $0) }, engine: engineLine(helper, models: model.models),
             doing: helper.step.map { stepWords(tool: $0.tool, target: $0.target) } ?? (state.isLive ? ChatStatus.starting.word : nil))
     }
 }

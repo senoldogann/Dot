@@ -48,7 +48,9 @@ enum PaletteVariant: String, CaseIterable, Sendable {
 ///   No surface has a stroke.
 /// - Ink: `text`, `secondary`, `tertiary` (every one ≥ 4.5:1 on every surface), `glyph` (chevrons and decorative
 ///   symbols, ≥ 3:1). The primary action is the ink itself (`action` with `onAction` on it): there is no accent hue.
-/// - Colour means two things only: `warn` (amber) = waits on you, `failure` (red) = failed.
+/// - Colour means three things only: `warn` (amber) = waits on you, `failure` (red) = failed, `live` (blue) = a helper
+///   at work, in the stream's helpers group only (item 1957, the owner's reference of another coding agent's
+///   subagents); the run's own work stays in the ink.
 struct Palette: Equatable, Sendable {
     let ground: RGB
     let card: RGB
@@ -64,6 +66,7 @@ struct Palette: Equatable, Sendable {
     let warn: RGB
     let warnFill: RGB
     let failure: RGB
+    let live: RGB
     /// The opacity of `text` for a hairline in a dense list (≤ 6 %, plan §3); the only line the app draws.
     let separatorOpacity: Double
 
@@ -82,7 +85,7 @@ struct Palette: Equatable, Sendable {
         text: RGB(hex: 0xF5F5F5), secondary: RGB(hex: 0xB0B0B0), tertiary: RGB(hex: 0x989898),
         glyph: RGB(hex: 0x808080), action: RGB(hex: 0xF5F5F5), onAction: RGB(hex: 0x121212),
         warn: RGB(hex: 0xF2BC4E), warnFill: RGB(hex: 0x3A2D10), failure: RGB(hex: 0xEE8480),
-        separatorOpacity: 0.06)
+        live: RGB(hex: 0x5AB0F0), separatorOpacity: 0.06)
 
     /// Not the dark look inverted: a light grey ground with white cards above it, so a card is never darker than its
     /// ground and the groups read as tonal panels (review S3: white on the reference's light ground is 1.03:1).
@@ -92,7 +95,7 @@ struct Palette: Equatable, Sendable {
         text: RGB(hex: 0x0D0D0D), secondary: RGB(hex: 0x4A4A4A), tertiary: RGB(hex: 0x636363),
         glyph: RGB(hex: 0x7A7A7A), action: RGB(hex: 0x0D0D0D), onAction: RGB(hex: 0xFFFFFF),
         warn: RGB(hex: 0x7A4500), warnFill: RGB(hex: 0xF6E8CC), failure: RGB(hex: 0xB42318),
-        separatorOpacity: 0.06)
+        live: RGB(hex: 0x0A5FB8), separatorOpacity: 0.06)
 
     /// Increase Contrast: the quiet tiers move toward the words, the surfaces spread a little further apart.
     static let darkIncreased: Palette = Palette(
@@ -101,7 +104,7 @@ struct Palette: Equatable, Sendable {
         text: RGB(hex: 0xFFFFFF), secondary: RGB(hex: 0xD0D0D0), tertiary: RGB(hex: 0xB8B8B8),
         glyph: RGB(hex: 0x9C9C9C), action: RGB(hex: 0xFFFFFF), onAction: RGB(hex: 0x000000),
         warn: RGB(hex: 0xFFC961), warnFill: RGB(hex: 0x3A2D10), failure: RGB(hex: 0xFF9A96),
-        separatorOpacity: 0.14)
+        live: RGB(hex: 0x8CCBFF), separatorOpacity: 0.14)
 
     static let lightIncreased: Palette = Palette(
         ground: RGB(hex: 0xEBEBEB), card: RGB(hex: 0xFFFFFF), nested: RGB(hex: 0xDEDEE0),
@@ -109,7 +112,7 @@ struct Palette: Equatable, Sendable {
         text: RGB(hex: 0x000000), secondary: RGB(hex: 0x2E2E2E), tertiary: RGB(hex: 0x454545),
         glyph: RGB(hex: 0x5C5C5C), action: RGB(hex: 0x000000), onAction: RGB(hex: 0xFFFFFF),
         warn: RGB(hex: 0x5E3500), warnFill: RGB(hex: 0xF6E8CC), failure: RGB(hex: 0x8F1B12),
-        separatorOpacity: 0.14)
+        live: RGB(hex: 0x004A94), separatorOpacity: 0.14)
 }
 
 /// One measured pair: an ink over the surface it may be drawn on.
@@ -138,7 +141,7 @@ enum ContrastAudit {
         ]
         let texts: [(String, RGB)] = [
             ("text", palette.text), ("secondary", palette.secondary), ("tertiary", palette.tertiary),
-            ("warn", palette.warn), ("failure", palette.failure),
+            ("warn", palette.warn), ("failure", palette.failure), ("live", palette.live),
         ]
         let glyphs: [(String, RGB)] = [("glyph", palette.glyph), ("action", palette.action)]
         var result: [ContrastPair] = []

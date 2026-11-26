@@ -111,4 +111,25 @@ final class ChatWordsTests: XCTestCase {
         XCTAssertTrue(workLineMoves(.thinking))
         XCTAssertTrue(workLineMoves(.typing))
     }
+
+    /// Item 1957: the helpers group says what works first, then what waits, then what ended, and keeps its clock running
+    /// while one helper works; once all ended it stops at the last end.
+    func testTheHelpersGroupTalliesAndSpan() {
+        XCTAssertEqual(
+            helperTallies([.done, .working, .failed, .working]),
+            [HelperTally(state: .working, count: 2), HelperTally(state: .failed, count: 1), HelperTally(state: .done, count: 1)])
+        XCTAssertEqual(helperTallies([]), [])
+        func helper(_ id: String, _ status: String, _ start: Double, _ end: Double?) -> HelperView {
+            HelperView(
+                runId: id, parentRunId: "r", threadId: "t" + id, agentId: nil, title: id, status: status, startedAt: start,
+                finishedAt: end, provider: "claude_code", model: "opus", effort: "high", step: nil, blocking: false, stop: "")
+        }
+        let live: (start: Date, end: Date?) = helperGroupSpan([helper("a", "done", 100, 160), helper("b", "running", 90, nil)])
+        XCTAssertEqual(live.start.timeIntervalSince1970, 90)
+        XCTAssertNil(live.end, "a helper works: the clock runs")
+        let ended: (start: Date, end: Date?) = helperGroupSpan([helper("a", "done", 100, 160), helper("b", "failed", 90, 200)])
+        XCTAssertEqual(ended.end?.timeIntervalSince1970, 200)
+        let options: [ProviderModels] = [ProviderModels(provider: "claude_code", models: [], error: nil)]
+        XCTAssertEqual(engineLine(helper("a", "done", 0, 1), models: options), "Claude Code · opus · " + effortTitle("high"), "the model's id when the list does not hold it")
+    }
 }
