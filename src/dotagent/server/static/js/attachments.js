@@ -5,7 +5,7 @@ import { api, blobUrl } from "./api.js";
 import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
-import { splitQuote } from "./quotebutton.js";
+import { quotedFilesMessage, splitQuote } from "./quotebutton.js";
 import { smallerPicture } from "./shrink.js";
 import { toast } from "./ui.js";
 
@@ -521,13 +521,9 @@ function wordsForFiles(attachments) {
  * empty send with nothing in it is no message at all. */
 export function messageText(text, attachments) {
   // A quote alone (item 1972) is no message: the words after it decide.
-  const { quote, words: typed } = splitQuote(text);
-  const words = typed.trim() === "" ? "" : text.trim();
-  if (words === "" && attachments.count() > 0) {
-    // Files alone go with their line, and with the quote they were sent under.
-    return quote === null ? wordsForFiles(attachments) : `${text.trim()}\n\n${wordsForFiles(attachments)}`;
-  }
-  return words;
+  const words = splitQuote(text).words.trim() === "" ? "" : text.trim();
+  // Files alone go with their line, and with the quote they were sent under.
+  return words === "" && attachments.count() > 0 ? quotedFilesMessage(text, wordsForFiles(attachments)) : words;
 }
 
 /** Whether a message may go now; says why not when files are still uploading or failed. */

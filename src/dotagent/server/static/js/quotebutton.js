@@ -28,14 +28,17 @@ export function quoteInto(draft, words) {
   }
   const cut = joined.length > QUOTE_CHARS ? `${joined.slice(0, QUOTE_CHARS - 1)}…` : joined;
   const block = cut.split("\n").map((line) => (line === "" ? ">" : `> ${line}`)).join("\n");
-  const rest = draft.split("\n");
-  while (rest.length > 0 && rest[0].startsWith(">")) {
-    rest.shift();
-  }
-  if (rest.length > 0 && rest[0] === "") {
-    rest.shift();
-  }
-  return `${block}\n\n${rest.join("\n")}`;
+  // Only a quote this module wrote is replaced; words that merely start with ">" stay.
+  return `${block}\n\n${splitQuote(draft).words}`;
+}
+
+/**
+ * The text of a message of files with no words: the files' line, under the quote the box held, if any.
+ * @param {string} text what the box held
+ * @param {string} filesLine the line that stands for the files
+ */
+export function quotedFilesMessage(text, filesLine) {
+  return splitQuote(text).quote === null ? filesLine : `${text.trim()}\n\n${filesLine}`;
 }
 
 /**

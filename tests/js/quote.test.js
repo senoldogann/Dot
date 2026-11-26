@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { quoteInto, splitQuote } from "../../src/dotagent/server/static/js/quotebutton.js";
+import { quoteInto, quotedFilesMessage, splitQuote } from "../../src/dotagent/server/static/js/quotebutton.js";
 
 test("a quote starts the draft, each line behind > and a blank line after it", () => {
   assert.equal(quoteInto("", "First line\nSecond line"), "> First line\n> Second line\n\n");
@@ -31,4 +31,12 @@ test("words that only start with > are words, and a quote is the block with a bl
   assert.deepEqual(splitQuote(">= 5\nand more"), { quote: null, words: ">= 5\nand more" });
   assert.deepEqual(splitQuote("> a\n> b"), { quote: null, words: "> a\n> b" });
   assert.deepEqual(splitQuote("> a\n\nmy words"), { quote: "a", words: "my words" });
+});
+
+test("a quote leaves typed words that start with > alone, and files with no words keep the quote", () => {
+  assert.equal(quoteInto(">3 files please", "Hello"), "> Hello\n\n>3 files please");
+  assert.equal(quoteInto(">= 5\nand more", "Hi"), "> Hi\n\n>= 5\nand more");
+  assert.equal(quotedFilesMessage("> One\n\n", "See the attached file."), "> One\n\nSee the attached file.");
+  assert.equal(quotedFilesMessage("", "See the attached file."), "See the attached file.");
+  assert.equal(quotedFilesMessage(">3 files", "See the attached file."), "See the attached file.");
 });
