@@ -31,7 +31,7 @@ from dotagent.llm.ollama import num_ctx_for, parse_model_details
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY, ModelInfo
 from dotagent.store.db import Store
 from dotagent.store.models import RunRecord
-from dotagent.store.stats import ModelProfile, read_model_profile
+from dotagent.store.stats import ModelProfile, RunEventCounts, read_model_profile, read_profile_runs, read_run_counts
 from dotagent.tools.desktop import snapshot_budget
 
 # The packaged defaults: context_tokens "most", tool_output_chars 12 000, scaffold "fixed", profile_min_calls 50,
@@ -296,3 +296,39 @@ def test_a_profile_and_the_scaffold_of_the_next_run_are_rendered_in_plain_words(
         "  tier weak: set by hand in [agent] tiers",
         "  reminded of the goal every 6 steps in task and research runs",
     ]
+
+
+async def test_the_store_reads_again_only_the_runs_whose_events_changed(
+    database: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1918: a profile read at every run's start reads the events of a finished run once, and again only when a
+    run finished since or its events changed; what it gives is what a whole read gives."""
+    read: list[list[str]] = []
+
+    def counting(path: Path, model: str, run_ids: list[str]) -> dict[str, RunEventCounts]:
+        read.append(list(run_ids))
+        return read_run_counts(path, model, run_ids)
+
+    monkeypatch.setattr("dotagent.store.db.read_run_counts", counting)
+    store: Store = await Store.open(database, tmp_path / "screenshots")
+    try:
+        first: ModelProfile = await store.model_profile("ollama:a", 30)
+        again: ModelProfile = await store.model_profile("ollama:a", 30)
+        whole_first: ModelProfile = read_model_profile(database, "ollama:a", 30)
+        older: str = read_profile_runs(database, "ollama:a", 30)[-1].id
+        thread_id: str = (await store.get_run(older)).thread_id
+        later: RunRecord = await _run(store, thread_id, "ollama:a", [("stall", {"warnings": 1})])
+        await store.finish_run(later.id, "done", "answer")
+        after_a_run: ModelProfile = await store.model_profile("ollama:a", 30)
+        whole_after_a_run: ModelProfile = read_model_profile(database, "ollama:a", 30)
+        await store.add_event(older, "compacted", {"compaction": 2})
+        after_an_event: ModelProfile = await store.model_profile("ollama:a", 30)
+        whole_after_an_event: ModelProfile = read_model_profile(database, "ollama:a", 30)
+    finally:
+        await store.close()
+    assert first == again == whole_first
+    assert (first.runs, after_a_run.runs, after_a_run.stalls) == (2, 3, 2)
+    assert after_a_run == whole_after_a_run
+    assert after_an_event == whole_after_an_event
+    assert after_an_event.compactions == 2
+    assert [len(read[0]), *read[1:]] == [2, [], [later.id], [older]]

@@ -2,6 +2,7 @@
 another agent's maker wrote may have none (:func:`parse_others_skill`, item 1723)."""
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -12,6 +13,9 @@ from dotagent.skills.icons import skill_icon
 from dotagent.skills.types import DESCRIPTION_CHARS, SKILL_NAME_PATTERN, Skill, SkillFrontmatter
 
 _DELIMITER: str = "---"
+# The frontmatters read last, by file and text (item 1918): every run's start reads every skill again, and parsing their
+# YAML took most of a second with a few hundred skills. A text that changed is read anew; an error is never kept.
+_FRONTMATTERS_KEPT: int = 2048
 
 
 _HEADING: re.Pattern[str] = re.compile(r"^#{1,6}(\s+|$)")
@@ -41,7 +45,9 @@ def split_frontmatter(path: Path, text: str) -> tuple[str, str]:
     raise SkillError("the frontmatter of SKILL.md is not closed by a --- line", {"path": str(path)})
 
 
+@lru_cache(maxsize=_FRONTMATTERS_KEPT)
 def parse_frontmatter(path: Path, yaml_text: str) -> SkillFrontmatter:
+    """The frontmatter ``yaml_text`` of the SKILL.md at ``path``, kept for the same file and text (it is frozen)."""
     try:
         loaded: object = yaml.safe_load(yaml_text)
     except yaml.YAMLError as exc:
