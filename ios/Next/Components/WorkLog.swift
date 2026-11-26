@@ -601,8 +601,10 @@ struct HelperGroupRow: View {
     let open: (String) -> Void
     @State private var expanded: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
+        let large: Bool = dynamicTypeSize.isAccessibilitySize
         let states: [HelperState] = lines.map { helperState($0.helper.status) }
         let tallies: [HelperTally] = helperTallies(states)
         let span: (start: Date, end: Date?) = helperGroupSpan(lines.map(\.helper))
@@ -613,12 +615,15 @@ struct HelperGroupRow: View {
             } label: {
                 HStack(spacing: Space.s) {
                     ProviderMarks(providers: lines.map(\.helper.provider))
+                    // At the accessibility sizes the words wrap whole and the clock stands under them: beside them it
+                    // cut "2 helpers" to "2 hel…".
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(title).textRole(.footnote).foregroundStyle(Tone.text).lineLimit(1)
-                        Text(talliesText(tallies)).textRole(.label).lineLimit(2)
+                        Text(title).textRole(.footnote).foregroundStyle(Tone.text).lineLimit(large ? nil : 1)
+                        Text(talliesText(tallies)).textRole(.label).lineLimit(large ? nil : 2)
+                        if large { HelperClock(start: span.start, end: span.end) }
                     }
                     Spacer(minLength: Space.xs)
-                    HelperClock(start: span.start, end: span.end)
+                    if !large { HelperClock(start: span.start, end: span.end) }
                     Symbol(name: expanded ? "chevron.up" : "chevron.down", context: .chevron).foregroundStyle(Tone.glyph)
                 }
                 .frame(minHeight: Metric.hit)

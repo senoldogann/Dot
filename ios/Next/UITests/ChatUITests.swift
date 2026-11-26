@@ -382,12 +382,21 @@ final class ChatUITests: XCTestCase {
     func testTheHelpersGroupHoldsAtAX3InTurkishAndDark() {
         let app: XCUIApplication = XCUIApplication()
         app.launchArguments = [
-            "-DotNextScene", "n2-chat", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-AppleInterfaceStyle", "Dark",
+            "-DotNextScene", "n2-chat", "-AppleLanguages", "(tr)", "-AppleLocale", "tr_TR", "-colorScheme", "dark",
             "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL",
         ]
         app.launch()
         let group: XCUIElement = app.buttons["helpers.group"]
-        for _ in 0..<8 where !group.isHittable { app.swipeUp() }
+        // Brought to the middle of the screen by its frame, in short drags: `isHittable` of a row out of sight fails the
+        // test on GitHub's runner ("Activation point invalid"), and at AX sizes a row near an edge sits under the
+        // navigation bar or the composer, where a tap does not reach it.
+        let window: CGRect = app.windows.firstMatch.frame
+        let middle: ClosedRange<CGFloat> = (window.minY + window.height * 0.25)...(window.minY + window.height * 0.6)
+        let centre: XCUICoordinate = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        for _ in 0..<16 where !(group.exists && middle.contains(group.frame.midY)) {
+            let down: Bool = group.exists && group.frame.midY < middle.lowerBound
+            centre.press(forDuration: 0.05, thenDragTo: centre.withOffset(CGVector(dx: 0, dy: down ? 220 : -220)))
+        }
         XCTAssertTrue(group.waitForExistence(timeout: 10))
         XCTAssertTrue(group.label.hasPrefix("2 yardımcı"), group.label)
         group.tap()
