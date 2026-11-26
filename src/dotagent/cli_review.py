@@ -2,12 +2,30 @@
 (:mod:`dotagent.code_review`), so that the hook parses no TOML."""
 
 import sys
+import time
 from pathlib import Path
 
 from dotagent.cli_commands import Command, ReviewPlanCommand
-from dotagent.code_review import ReviewPlan, human_paths, plan_text, review_plan, touches_human_path
+from dotagent.code_review import ReviewPlan, human_paths, plan_is_spent, plan_text, review_plan, touches_human_path
 from dotagent.config import load_user_config
 from dotagent.core.errors import InvalidValueError
+from dotagent.core.paths import db_path
+from dotagent.store.stats import PlanWindowSeen, newest_plan_windows
+
+# How far back the plan's five-hour window is read from: what a step recorded since then (the window and a margin).
+_WINDOW_LOOKBACK_S: float = 6 * 3600.0
+_FIVE_HOUR: str = "five_hour"
+
+
+def five_hour_window_spent(database: Path, now: float) -> bool:
+    """Whether the Claude plan's five-hour window, as the newest step of the owner's runs recorded it, is used as far as
+    a review may take it (:func:`dotagent.code_review.plan_is_spent`). Nothing recorded, or no store yet, is a window
+    nobody has seen used: the review goes on as chosen."""
+    if not database.exists():
+        return False
+    windows: tuple[PlanWindowSeen, ...] = newest_plan_windows(database, now - _WINDOW_LOOKBACK_S)
+    seen: PlanWindowSeen | None = next((window for window in windows if window.kind == _FIVE_HOUR), None)
+    return seen is not None and plan_is_spent(seen.status, seen.utilization, seen.resets_at, now)
 
 
 def cmd_review_plan(command: ReviewPlanCommand) -> int:
@@ -16,7 +34,12 @@ def cmd_review_plan(command: ReviewPlanCommand) -> int:
         paths: tuple[str, ...] = human_paths(Path(command.guide).read_text())
     except ValueError as exc:
         raise InvalidValueError(str(exc), {"guide": command.guide}) from exc
-    plan: ReviewPlan = review_plan(load_user_config().code_review, command.lines, touches_human_path(changed, paths))
+    plan: ReviewPlan = review_plan(
+        load_user_config().code_review,
+        command.lines,
+        touches_human_path(changed, paths),
+        five_hour_window_spent(db_path(), time.time()),
+    )
     sys.stdout.write(plan_text(plan))
     return 0
 

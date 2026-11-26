@@ -691,7 +691,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), and a wait or a count asked past its
+ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
+the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
 60 s; `memory_search`'s `limit`, 20), never a bound that keeps an action safe. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
@@ -890,6 +892,15 @@ other than Ctrl-C, Ctrl-U) leaves a line Dot cannot tell, and running it asks; o
 in another directory, so later lines are judged from the home folder. A chat keeps at most `[shell] terminal_sessions`
 sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` without use (30 minutes) and all of them
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
+
+**A helper does not wait for a pull request's checks (item 1953).** A run another run started (its parent waits for its
+answer) is told to end as soon as its pull request is pushed and open: its answer names the address and says the
+checks are pending, and it runs no `gh pr checks` loop, no `sleep` and no `wait_until` on them. Over a week on the
+owner's Mac, 382 shell calls of that kind took 9.3 of the 29 hours of the helpers' shell time, in 37 of 76 helper
+runs, and each poll of a Claude Code helper read its whole context again. The parent, which has a chat, starts
+`gh pr checks <number> --watch` with `terminal_open` and `background` (the shell's and the delegate tool's descriptions
+say so) and ends its run or goes on; the chat is told when the command ends, and a run reads the checks then, as for
+any command in the background. This asks the owner nothing and changes no policy: it is words in two prompts.
 
 `wait_until` (item 887, after OpenMausBot's waits) waits for something to happen, checked in code, with no model turn
 spent on the wait. It names one condition:

@@ -390,7 +390,12 @@ dated final answers of the schedule's last ended runs (`[scheduler] history_runs
 so the run builds on them instead of doing the same work again (item 257). The chat shows the goal alone, and the run's
 reviewer takes only the goal as your words; a one-time schedule that fires late says when it was due in that first
 message too. With `same_chat` a firing goes on in the chat of the one before (a new one when you deleted it), where the
-run reads their conversation instead of the digest. Either way it reads earlier runs' words without a message of yours,
+run reads what was said in it instead of the digest: your messages and the final answers of the earlier runs, newest first
+up to `history_chars` characters in one message (the newest answer up to half of them, an older line 600), and not the
+tool calls, their results, the thinking or the screenshots of those runs, which the chat keeps and the run no longer reads
+(item 1950: a client-mail check every two hours carried some 70 k tokens of them into each firing, for answers of a few
+hundred characters). A goal the chat repeats word for word is kept as its last copy only, and Dot's own notes in the
+chat (a command's end, a helper's report) and the opening of an earlier firing are left out. Either way it reads earlier runs' words without a message of yours,
 so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest counts
 the firings since item 257: a firing from before names no schedule. The agent can create schedules too
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
@@ -609,12 +614,16 @@ earlier runs.
 - Saving a schedule's form keeps it switched on or off as it is then, unless you moved the form's own switch (item
   723): the form sent the switch as it was when it opened, so a schedule switched on in the list meanwhile went off
   again (`PATCH /api/schedules/{id}` without `enabled` keeps it as it is).
-- A repeating schedule whose chat is busy when it comes due (with "the same chat", your message in it still being
-  worked on) skips that firing, saying "skipped: a run is already active on this thread" in amber, and counts no
-  failure (item 723). A firing that started no run for another reason says "failed to start", in red.
-- A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a busy chat's,
-  a task still going, a paused agent's, the emergency stop's and a late one, as the loop that merges pull requests was
-  skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
+- A schedule whose chat has a run at work when it comes due (with "the same chat": your message in it still being worked
+  on, or another schedule's task in the same chat) does not skip that firing: it waits, due, saying "waiting: a run is
+  working in its chat", and starts at the first tick after that run ended (item 1951; item 723 had it skipped, 66 times in
+  a week, the weekly ones lost). One firing waits at most: those that come due meanwhile collapse into it, as firings
+  missed while Dot was off do, and one that waits past `catch_up_s` is skipped as one that late is. It is no failure, and a
+  firing in a chat of its own never waits for another. A firing that started no run for another reason says "failed to
+  start", in red.
+- A schedule counts the firings skipped one after the other (item 1401, `skipped_in_row` in its record): a task still
+  going, a paused agent's, the emergency stop's and a late one (a firing that waits for its chat is none), as the loop
+  that merges pull requests was skipped 27 times in a day with no trace but its last status. The first task that starts (a firing's, or one you start
   with Run now) or firing that fails to start ends the count, and switching the schedule on again or changing it starts
   it afresh. From two on, and while the last status is a skip, its row on the Schedules page and its line in a chat's
   Automations say "Skipped 5 in a row" beside the last status, and `dotx schedule list` and the model's `schedule_list`

@@ -20,7 +20,7 @@ import sqlite3
 import struct
 import tempfile
 import time
-from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterable, Sequence
 from pathlib import Path
 from typing import Concatenate, Literal, cast, get_args
 
@@ -3913,6 +3913,15 @@ class Store:
         )
         return [_run(row) for row in rows]
 
+    async def chat_has_working_run(self, thread_id: str) -> bool:
+        """Whether a run of the chat ``thread_id`` (not a helper's, which works in a chat of its own) is at work: the
+        runs that start a run in that chat are refused while it is (item 1951)."""
+        row = await self._one(
+            f"SELECT 1 FROM runs WHERE thread_id = ? AND parent_run_id IS NULL AND status IN ({_WORKING_SQL}) LIMIT 1",
+            (thread_id,),
+        )
+        return row is not None
+
     # ----- while you were away (items 466 and 1424) -------------------------------------------------------------------
 
     async def unattended_runs(self, rule: AwayRule, since: float, limit: int) -> list[UnattendedRun]:
@@ -7678,6 +7687,29 @@ class Store:
         )
         return [_run(row) for row in rows]
 
+    async def chat_has_run_after(self, thread_id: str, after: float, sources: Collection[str]) -> bool:
+        """Whether a run of one of ``sources`` began in the chat ``thread_id`` after ``after`` (item 1952: the owner
+        wrote in the chat of the run that waits on them, however many firings came after their message)."""
+        marks: str = ",".join("?" * len(sources))
+        row = await self._one(
+            f"SELECT 1 FROM runs WHERE thread_id = ? AND created_at > ? AND rewound_at IS NULL AND source IN ({marks})"
+            " LIMIT 1",
+            (thread_id, after, *sources),
+        )
+        return row is not None
+
+    async def schedule_run_marked(self, schedule_id: str, source: str, since: float, mark: str) -> RunRecord | None:
+        """The newest run of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id`` that ended done
+        and began at or after ``since``, whose result holds ``mark``; ``None`` when there is none. One row is read,
+        whatever the schedule fired since (item 1952: the run that waits on the owner)."""
+        rows = await self._all(
+            "SELECT r.* FROM runs r JOIN threads t ON t.id = r.thread_id"
+            " WHERE t.schedule_id = ? AND r.source = ? AND r.parent_run_id IS NULL AND r.status = 'done'"
+            " AND r.created_at >= ? AND instr(r.result, ?) > 0 ORDER BY r.created_at DESC LIMIT 1",
+            (schedule_id, source, since, mark),
+        )
+        return _run(rows[0]) if rows else None
+
     @_writing
     async def keep_schedule_due(self, schedule_id: str, next_run_at: float, fired_at: float) -> None:
         """A one-time firing at ``fired_at`` whose run did not start: due again at ``next_run_at`` and switched on, as
@@ -7689,6 +7721,29 @@ class Store:
             (next_run_at, schedule_id, fired_at),
         )
         await self._db.commit()
+
+    @_writing
+    async def release_schedule_fire(self, found: ScheduleRecord, fired_at: float, next_run_at: float | None) -> bool:
+        """Take back a firing :meth:`claim_schedule_fire` wrote at ``fired_at`` whose run could not start because a run
+        works in the chat it goes on in (item 1951): the schedule is due again at the time it was read due at, with the
+        last firing, chat and status it had (``found``, as the claim read it), so that it fires when the chat is free
+        and none is lost or repeated. Only while the claim stands untouched: an edit, a switch or a firing since is
+        kept. Whether the firing was taken back."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE schedules SET last_run_at = ?, next_run_at = ?, thread_id = ?, last_status = ?, enabled = 1"
+            " WHERE id = ? AND last_run_at = ? AND next_run_at IS ? AND last_status = 'starting'",
+            (
+                found.last_run_at,
+                found.next_run_at,
+                found.thread_id,
+                found.last_status,
+                found.id,
+                fired_at,
+                next_run_at,
+            ),
+        )
+        await self._db.commit()
+        return cursor.rowcount > 0
 
     @_writing
     async def record_schedule_skip(self, schedule_id: str, due: float, next_run_at: float | None, status: str) -> bool:

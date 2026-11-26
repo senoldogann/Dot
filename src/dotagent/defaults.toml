@@ -1165,8 +1165,10 @@ max_schedules = 50
 # own; the last five, item 291) and in how many characters at most.
 history_runs = 5
 history_chars = 4000
-# Whether a firing goes on in the chat of the one before (its run reads their conversation, not the digest)
-# instead of a new chat; a schedule may choose its own.
+# Whether a firing goes on in the chat of the one before instead of a new chat; a schedule may choose its own. Its run
+# reads what was said in that chat (the owner's messages and the final answers, in as many characters as history_chars,
+# not every step of the earlier runs; item 1950), and a firing whose chat has a run at work waits, due, for it (item
+# 1951).
 same_chat = false
 # How many of a repeating schedule's runs in a row may end failed before it is switched off and you are told (item 458;
 # 0 = never, as before; a schedule may choose its own). A run cancelled counts neither way, and one done starts again.
