@@ -2,9 +2,9 @@ import DotEngine
 import SwiftUI
 import UIKit
 
-/// The iPad decision of wave N0 (review S9): the tab bar stays the top level on every width; inside a tab, compact width
-/// is a stack (list → pushed detail) and regular width a split view (list sidebar, independent detail). The selection is
-/// one value, so collapsing to compact keeps the open chat pushed.
+/// The iPad decision (review S9, PLAN §27): compact width is a stack (the home → a pushed bot's chat) and regular width a
+/// split view (the home as the sidebar, the chat as the detail). The selection is one value, so collapsing to compact
+/// keeps the open chat pushed.
 struct AdaptiveSplit<Item: Hashable, Sidebar: View, Detail: View, Placeholder: View>: View {
     @Binding var selection: Item?
     @ViewBuilder let sidebar: () -> Sidebar
@@ -48,29 +48,3 @@ enum ChatPanel: String, Identifiable, Sendable {
 
     var id: String { rawValue }
 }
-
-// MARK: Agents
-
-struct AgentsTab: View {
-    @State private var opensWeb: Bool = false
-
-    var body: some View {
-        NavigationStack {
-            EmptyState(
-                title: String(localized: "Agents come in a later version", comment: "Agents tab: empty state until the agents wave"), systemImage: "person.2",
-                detail: String(localized: "Until then your agents and teams open from your Mac's own page.", comment: "Agents tab: empty state detail with the web page"),
-                actionTitle: String(localized: "Open agents and teams", comment: "Agents tab: opens the web page of agents"), action: { opensWeb = true }
-            )
-            .navigationDestination(isPresented: $opensWeb) {
-                WebSettingsPage(target: WebSettingsPage.Target(tab: "/agents", title: String(localized: "Agents and teams", comment: "Settings row: the web page of agents, teams and handoffs")))
-            }
-            .background(Tone.ground)
-            .navigationTitle(String(localized: "Agents", comment: "Title of the agents list"))
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-
-// MARK: Activity
-
-// The Activity tab is `Activity/ActivityHome.swift` (item 1826).

@@ -10,9 +10,9 @@ final class SettingsUITests: XCTestCase {
         return app
     }
 
-    func testSearchingApprovalsFindsRulesAndOpensIt() {
+    func testSearchingApprovalsFindsPermissionsAndOpensIt() {
         let app: XCUIApplication = launch("settings-search")
-        let rules: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Rules")).firstMatch
+        let rules: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Permissions")).firstMatch
         XCTAssertTrue(rules.waitForExistence(timeout: 10))
         rules.tap()
         XCTAssertTrue(app.staticTexts["Tasks start in"].waitForExistence(timeout: 5), "the approval mode of the fixture daemon")

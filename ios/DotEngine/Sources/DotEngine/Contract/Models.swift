@@ -602,11 +602,6 @@ public struct NamedRecord: Codable, Sendable, Hashable {
     public let role: String?
 }
 
-/// An agent or a team as `/api/agents` and `/api/teams` list them, the part the `@` menu reads.
-public struct AgentSummary: Codable, Sendable, Hashable {
-    public let record: NamedRecord
-}
-
 public struct TeamSummary: Codable, Sendable, Hashable {
     public let record: NamedRecord
 }

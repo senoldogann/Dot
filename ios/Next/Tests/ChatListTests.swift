@@ -42,5 +42,11 @@ final class ChatListTests: XCTestCase {
         XCTAssertTrue(ChatListScope.bot(agent: nil).holds(dots))
         XCTAssertFalse(ChatListScope.bot(agent: nil).holds(agents))
         XCTAssertTrue(ChatListScope.bot(agent: "agt_1").holds(agents))
+        let campaign: ThreadRow = try row("c", status: "done", asks: 0, pinned: false, actor: "camp_1")
+        let dotsAsTheHomeCounts: ChatListScope = .chats(of: ["a", "c"], agent: nil)
+        XCTAssertTrue(dotsAsTheHomeCounts.holds(campaign), "a campaign's chat is Dot's, as on the home")
+        XCTAssertFalse(dotsAsTheHomeCounts.holds(agents))
+        XCTAssertNil(dotsAsTheHomeCounts.agent)
+        XCTAssertEqual(ChatListScope.chats(of: [], agent: "agt_1").agent, "agt_1", "the pencil starts a chat with the bot")
     }
 }

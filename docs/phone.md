@@ -101,8 +101,11 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    the phone is removed, as its APNs device does; one made with the Mac's token belongs to none and stays. Settings ›
    General › Notifications off drops the subscription.
 
-4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now) is a native SwiftUI app over the daemon's own
-   API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
+4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
+   Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
+   per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
+   own header and menu, its profile, and one settings sheet from the owner's initials) is a native SwiftUI app over the
+   daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
@@ -631,6 +634,7 @@ paired`) and nothing is kept for it.
 | `GET /api/threads/stream` | any token | 1686 | the list's event stream |
 | `GET /api/threads/{id}/view?tail=&before=` | any token | 1686 | 200, the chat at its revision |
 | `GET /api/threads/{id}/stream?cursors=` | any token | 1686 | the chat's event stream |
+| `GET /api/threads/search?q=&limit=` | any token | 1882 | 200, finds in what the chats say |
 
 What changed in calls and replies that were there before: **every alert push carries `aps.badge`**, how many things
 wait on you (item 1422; [below](#what-the-daemon-pushes-to-the-app)); `GET /api/away` lists more runs and says each run's
@@ -1051,6 +1055,15 @@ broken (the older streams keep 15 s). A client is live once it read the view aft
 daemon tells a moved revision within half a second of the write (it reads the moved revisions every 0.5 s, as it relays
 `dotx` runs). A daemon from before these calls answers them 404: the app says to update Dot on the Mac.
 
+### GET /api/threads/search
+
+The home's search of the iPhone app (item 1882) looks in what the chats say: `q` (1 to 200 characters) and `limit` (1 to
+50, 20 when left out). The answer is a list, best first, of `{"thread_id", "seq", "kind", "ref", "snippet"}`: `kind`
+`m` is a message of the chat's history (`ref` the role that said it, `seq` its place), `r` the answer of a run (`ref`
+the run's id, `seq` -1); `snippet` holds the words around the match with the matched words in `[...]`, and a secret
+Dot holds is masked in it where the snippet holds it whole (a match inside a value, or a snippet cut through one, can
+leave a part unmasked, as the chat's own view shows the words unmasked to the same key). Words are folded as the index folds them (case, accents, the Turkish dotted and dotless i);
+words that fold to nothing find nothing, and an empty `q` is a 422. A tool's output is not in the index.
 **Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
 `store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and
 a reset of Dot (a new, empty home) changes. Revisions are the database's, so a reset one starts them again below what a

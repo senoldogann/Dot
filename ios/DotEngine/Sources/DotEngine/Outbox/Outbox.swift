@@ -111,7 +111,7 @@ public actor Outbox {
             case .message(let thread, let text, _, _, let picks): names.isEmpty ? action : .message(thread: thread, text: text, images: names, uploaded: [], picks: picks)
             case .steer(let run, let thread, let text, _, _):
                 names.isEmpty ? action : .steer(run: run, thread: thread, text: text, images: names, uploaded: [])
-            case .newChat(let text, _, _, let start): names.isEmpty ? action : .newChat(text: text, images: names, uploaded: [], start: start)
+            case .newChat(let text, _, _, let start, let agent): names.isEmpty ? action : .newChat(text: text, images: names, uploaded: [], start: start, agent: agent)
             default: action
             }
         items.append(OutboxItem(id: id, action: kept, createdAt: clock.now()))
@@ -189,7 +189,7 @@ public actor Outbox {
             switch action {
             case .message(let thread, let text, _, _, let picks): .message(thread: thread, text: text, images: renamed, uploaded: [], picks: picks)
             case .steer(let run, let thread, let text, _, _): .steer(run: run, thread: thread, text: text, images: renamed, uploaded: [])
-            case .newChat(let text, _, _, let start): .newChat(text: text, images: renamed, uploaded: [], start: start)
+            case .newChat(let text, _, _, let start, let agent): .newChat(text: text, images: renamed, uploaded: [], start: start, agent: agent)
             default: action
             }
         return OutboxItem(id: key, action: next, createdAt: clock.now())
@@ -319,9 +319,10 @@ public actor Outbox {
             let ids: [String] = try await upload(item)
             try await api.steer(SteerMessage(text: text, key: item.id, attachments: ids), run: run)
             return .steered(item)
-        case .newChat(let text, _, _, let start):
+        case .newChat(let text, _, _, let start, let agent):
             let ids: [String] = try await upload(item)
-            return .started(item, run: try await api.startChat(NewChatMessage(goal: text, key: item.id, attachments: ids, start: start ?? .daemons)))
+            return .started(
+                item, run: try await api.startChat(NewChatMessage(goal: text, key: item.id, attachments: ids, start: start ?? .daemons, agentId: agent)))
         case .decision(let approval, _, _, let approve, let note, let remember):
             do {
                 return .answered(item, status: try await api.decide(approval: approval, approve: approve, note: note, remember: remember).status)
@@ -388,7 +389,7 @@ public actor Outbox {
     private func upload(_ item: OutboxItem) async throws(DaemonRequestError) -> [String] {
         var uploaded: [String] =
             switch item.action {
-            case .message(_, _, _, let ids, _), .steer(_, _, _, _, let ids), .newChat(_, _, let ids, _): ids
+            case .message(_, _, _, let ids, _), .steer(_, _, _, _, let ids), .newChat(_, _, let ids, _, _): ids
             default: []
             }
         for (number, name) in item.images.enumerated() where number >= uploaded.count {

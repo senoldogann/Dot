@@ -111,17 +111,19 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
   empty and loading states, notices, the toast with Undo, sheets (inspector: ✕ only; edit: ✕ and ✓), the composer shell,
   the floating working capsule with the scroll-to-bottom circle, the transcript pieces (bubble, answer, code block, tool
   call row and group, helper group, speaker line), helper and background-work rows and their sheets.
-- `App/`: the shell (four tabs), the placeholder screens, the gallery, sample content.
+- `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
+  `BotProfile.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
+  on a throwaway daemon.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
 
 ## Decisions taken in N0
 
-- **No hue.** The ink is the only accent (send, switches, tab tint, links underlined, selection); amber only for what
-  waits on the owner (also the Chats badge), red only for a failure. No surface has a stroke.
+- **No hue.** The ink is the only accent (send, switches, links underlined, selection, the unread dot); amber only for
+  what waits on the owner, red only for a failure. No surface has a stroke.
 - **The switch** is drawn (`InkSwitchStyle`): the system's white thumb disappears on a light ink track in the dark look.
-- **iPad**: the tab bar stays the top level on every width; inside Chats and Agents a compact width is a stack and a
-  regular width a split view with the same selection, so collapsing keeps the open item. Grouped pages are at most
+- **iPad**: no tab bar (PLAN §27); a compact width is the home with a bot's chat pushed, a regular width a split view
+  (the home as the sidebar, the chat as the detail) with the same selection, so collapsing keeps the open chat. Grouped pages are at most
   700 pt wide; prose in a chat is measured to 68 characters of the body font (`ProseColumn`, tested to stay in 60-75).
 - **Density**: tool calls are 28 pt rows under a 44 pt group disclosure; a row is a full-width target 28 pt tall (an
   open question for the owner's review on the phone).
@@ -229,7 +231,7 @@ and approvals picked in its settings (a real model, `claude_code:haiku` by defau
 ## Screenshots
 
 `scripts/shots.sh <DotNext.app> <out dir> "tr en" <booted simulator udid>...` captures every scene (the gallery pages,
-the tabs, the chat and its sheets) in light and dark, at Large and AX3. The debug build opens a scene with
+the home, the chat and its sheets) in light and dark, at Large and AX3. The debug build opens a scene with
 `-DotNextScene <name>` (`LaunchScene.names`) and writes `Library/Caches/dotnext-ready.txt` once it is drawn; the script
 waits for that file before each capture.
 
