@@ -10,7 +10,7 @@ import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles, sentPictures } from "./attachments.js";
 import { memoryChange } from "./contextpanel.js";
 import { stillAsks } from "./openasks.js";
-import { clip, clock, compact, dateTime, duration, el, repeatsAnswer, setText } from "./dom.js";
+import { clip, clock, compact, dateTime, duration, el, modelName, repeatsAnswer, setText } from "./dom.js";
 import { t, tCount, uiLocale } from "./i18n.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
@@ -1799,6 +1799,18 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       scope.panel.helper.model = data.to;
     },
 
+    // The run's model declined its task and was given the task's grounds once, openly (item 1889): the program's scope,
+    // the owner's words.
+    refusal_asked_again(scope, record) {
+      note(scope, record.ts, "help", t("timeline.refusalAskedAgain", { model: modelName(String(record.data.model)) }), "warn");
+    },
+
+    // The run's model held to its refusal: the run ends with its words, and the line over the composer offers a
+    // restart on a model the owner picks (item 1889).
+    model_refused(scope, record) {
+      note(scope, record.ts, "alert", t("timeline.modelRefused", { model: modelName(String(record.data.model)) }), "bad");
+    },
+
     // The run's model could not be reached (`error`: the connection broke or timed out, or its server failed with a
     // status that retrying gets past), or its quota or rate is spent (`spent` says which, item 713): the run
     // asks step `step` again in `retry_in_s` seconds, and keeps asking until `until` ([agent] model_wait_s, or
@@ -1833,6 +1845,22 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       const data = record.data;
       scope.unreachable = null;
       note(scope, record.ts, "refresh", t("timeline.modelBack", { model: data.model, took: duration(data.waited_s) }), "");
+    },
+
+    // A step of desktop_act needs the Mac's own pointer or keyboard while the owner is at the Mac (item 1890): the
+    // batch waits from step `step` until nobody has touched them for `away_after_s`, at most until `until`;
+    // `came_back` says that Dot had them and let go when the owner came back. `desktop_away` ends the wait: `end` is
+    // away (the batch goes on), limit (the owner stayed) or owner (they wrote to the run), after `waited_s`.
+    desktop_waiting_away(scope, record) {
+      const data = record.data;
+      const words = { step: data.step, after: duration(data.away_after_s), until: clock(data.until) };
+      note(scope, record.ts, "pointer", t(data.came_back ? "timeline.awayCameBack" : "timeline.awayWaiting", words), "");
+    },
+    desktop_away(scope, record) {
+      const data = record.data;
+      const words = { step: data.step, took: duration(data.waited_s) };
+      const key = data.end === "away" ? "timeline.awayGone" : data.end === "owner" ? "timeline.awayOwnerWrote" : "timeline.awayGaveUp";
+      note(scope, record.ts, "pointer", t(key, words), "");
     },
 
     // The schedule that started this run had a reasoning level (`asked`) its model does not offer, and keeps the one the

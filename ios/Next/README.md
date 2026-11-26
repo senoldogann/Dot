@@ -80,6 +80,13 @@ the daemon's notice of where to end it. While the daemon says a service waits, o
 reads again every five seconds, so "Finish on your Mac" turns into Connected with no pull to refresh; it stops with the
 sheet.
 No "For you" section: the daemon gives no suggestion for services.
+The Activity tab (`Activity/`, item 1826) reads what Dot did on its own: "while you were away" with Mark as read for
+every device, the drafts that wait (Send and Discard, each asked first), the proposals of Self-improvement (Use, Set
+aside), what waits, works, is due, ended or was learned today (a row opens its chat), and the morning brief, the evening
+check-in, Dot's own initiative and the watchers with their switches; their setup stays on the Mac (PLAN §26).
+`scripts/e2e_activity.sh <simulator udid> <derived data> <shots dir>` runs `ActivityLiveUITests` against a throwaway
+daemon seeded with `e2e_daemon.py --seed-activity`, exports its light and dark shots and reads on the daemon's side what
+each tap wrote; it never sends a draft (a send goes through the Mac's own Mail or Messages).
 
 ## The engine: `ios/DotEngine`
 
@@ -87,7 +94,9 @@ A Swift package (iOS 26 and macOS 26; Foundation, Network, Security only: no UIK
 `Contract/` (the daemon's sync contract, `docs/phone.md` "A chat kept in sync"), `Wire/` (HTTP, SSE parser, host,
 retry policy), `Sync/` (the pure reducers of a chat and the list, frames, delivery states, the transcript filter, the
 clock, the link), `Store/` (`SyncStore`, `Supervisor`, `Engine`), `Outbox/` (moved from the old app), `Cache/`
-(`v2/` of the app group), `Pairing/` (typed code, Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
+(`v2/` of the app group, kept with the daemon it came from: a reset Dot, another `store_id`, drops it and the outbox's doings
+for the old chats, their words kept in the new chat's draft; `docs/phone.md` "Which daemon"), `Pairing/` (typed code,
+Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
 the DotNext scheme runs them on the simulator too. The tests never sleep: `ManualClock` is moved by hand, and
 `FakeDaemon` (a `URLProtocol`) speaks the contract and misbehaves as a test says.
 

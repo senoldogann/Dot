@@ -23,8 +23,10 @@ public actor Outbox {
     private let clock: any EngineClock
     private let policy: RetryPolicy
     private let jitter: @Sendable () -> Double
-    /// Whether a new chat may be sent now: only while the list is live (R-b §8 #8), so it never lands on a stale list.
-    private let mayStartChat: @Sendable () async -> Bool
+    /// Whether a doing may be sent now: nothing before the daemon was heard in the session (a doing for a reset daemon's
+    /// old chats must never reach the new one, whichever path started the sending), and a new chat only while the list
+    /// is live (R-b §8 #8), so it never lands on a stale list. A doing held is looked at again after 5 s or a nudge.
+    private let maySend: @Sendable (OutboxItem.Action) async -> Bool
     private let waker: Waker = Waker()
     private var items: [OutboxItem]
     private var draining: Task<Void, Never>?
@@ -36,7 +38,7 @@ public actor Outbox {
     /// What the disk holds is read here; an item that was being sent when the app ended is waiting again.
     public init(
         directory: URL, api: DaemonAPI, link: LinkWatcher, clock: any EngineClock, policy: RetryPolicy,
-        jitter: @escaping @Sendable () -> Double, mayStartChat: @escaping @Sendable () async -> Bool
+        jitter: @escaping @Sendable () -> Double, maySend: @escaping @Sendable (OutboxItem.Action) async -> Bool
     ) {
         self.directory = directory
         self.file = directory.appending(path: "outbox.json")
@@ -46,7 +48,7 @@ public actor Outbox {
         self.clock = clock
         self.policy = policy
         self.jitter = jitter
-        self.mayStartChat = mayStartChat
+        self.maySend = maySend
         var loaded: [OutboxItem] = Self.read(file)
         for at in loaded.indices where loaded[at].phase == .sending { loaded[at].phase = .waiting }
         self.items = loaded
@@ -125,6 +127,21 @@ public actor Outbox {
         removePhotos(of: removed)
         save()
         return (removed, photos)
+    }
+
+    /// The messages a reset would leave unsent (`DaemonRules.afterReset`), read without dropping them: they are kept
+    /// for the owner before the outbox lets them go.
+    public func unsentForReset() -> [UnsentWords] { DaemonRules.afterReset(items).unsent }
+
+    /// The Mac's Dot was reset (`DaemonRules.afterReset`): drops every doing for a chat or a run of the old daemon, with
+    /// its photos. An answer to one already on its way finds nothing to finish.
+    public func dropForReset() {
+        let (kept, dropped, _): ([OutboxItem], [OutboxItem], [UnsentWords]) = DaemonRules.afterReset(items)
+        guard !dropped.isEmpty || kept != items else { return }
+        for item in dropped { removePhotos(of: item) }
+        items = kept
+        save()
+        logger.notice("outbox dropped for a reset count=\(dropped.count) kept=\(kept.count)")
     }
 
     /// Tries now: the wait is cut short, and a doing that failed for good is tried again (a message too old to be sent as
@@ -218,7 +235,7 @@ public actor Outbox {
                 await waker.wait(seconds: 30, clock: clock, seen: seen)
                 continue
             }
-            if case .newChat = items[at].action, !(await mayStartChat()) {
+            if !(await maySend(items[at].action)) {
                 await waker.wait(seconds: 5, clock: clock, seen: seen)
                 continue
             }

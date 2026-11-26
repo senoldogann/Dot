@@ -11,6 +11,8 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 next=$(dirname "$here")
 derived=${1:?usage: check_strings.sh <derived data folder>}
+# The Turkish table is Python the translator workflow imports: a broken one fails here, not at the next regeneration.
+python3 -c "import sys; sys.path.insert(0, sys.argv[1]); import translations_tr" "$here" || { echo "translations_tr.py does not import" >&2; exit 2; }
 work=$(mktemp -d)
 data=$(find "$derived" -path '*DotNext.build*' -name '*.stringsdata' ! -name 'ExtractedAppShortcuts*')
 [ -n "$data" ] || { echo "no .stringsdata under $derived: build DotNext first" >&2; exit 2; }
@@ -23,7 +25,7 @@ if ! xcrun xcstringstool sync "$work/Localizable.xcstrings" --stringsdata $data 
 fi
 # Raw literals in SwiftUI calls bypass the comment rule: every UI string goes through String(localized:comment:).
 raw=$(grep -rnE '(Text|Button|Label|Tab|navigationTitle|accessibilityLabel|accessibilityHint|confirmationDialog)\("[^"]*[A-Za-z]' \
-    "$next/App" "$next/Components" "$next/Design" "$next/Settings" | grep -v 'Text(verbatim:' || true)
+    "$next/App" "$next/Activity" "$next/Components" "$next/Design" "$next/Settings" | grep -v 'Text(verbatim:' || true)
 python3 - "$next/Resources/Localizable.xcstrings" "$work/Localizable.xcstrings" "$raw" <<'PY'
 import json, sys
 committed = json.load(open(sys.argv[1], encoding="utf-8"))["strings"]

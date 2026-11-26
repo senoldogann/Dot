@@ -8515,6 +8515,15 @@ dialog.message-sheet::backdrop {
   display: inline;
 }
 
+/* Restart on…, for a run whose model declined its task (item 1889): the model menu opens from the line's button. */
+.refused-line {
+  position: relative;
+}
+
+.refused-line > .icon {
+  color: var(--bad);
+}
+
 /* The queue of a chat (item 148): a sheet that rises from behind the top of the composer, its lower
    edge under the frame's round corners; the frame is drawn over it. */
 .queue {

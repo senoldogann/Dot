@@ -8,7 +8,7 @@ keeps too; so does it the model that looks for work on Dot's own initiative (``[
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
-from dotagent.config import HarnessConfig, ModelReference, ModelsConfig
+from dotagent.config import HarnessConfig, ModelReference, ModelsConfig, TaskKind
 from dotagent.core.logs import get_logger
 
 log = get_logger(__name__)
@@ -41,6 +41,7 @@ class ModelRoles:
             "vision": models.vision,
         }
         self._standby: tuple[ModelReference, ...] = tuple(models.standby)
+        self._kinds: dict[TaskKind, ModelReference] = dict(models.kinds)
         self._look: str = look
         self._learning: dict[LearningRole, str] = {role: learning[role] for role in LEARNING_ROLES}
 
@@ -56,6 +57,19 @@ class ModelRoles:
     def standby(self) -> tuple[ModelReference, ...]:
         """The models a run moves to, in their order, when its own model cannot answer (``[models] standby``)."""
         return self._standby
+
+    def kind_model(self, kind: TaskKind) -> str:
+        """The model a run of ``kind`` starts on when none is chosen for it (``[models] kinds``, item 1889); "" for
+        none, the run then starting on the default model."""
+        return self._kinds.get(kind, "")
+
+    def choose_kind(self, kind: TaskKind, model: str) -> None:
+        """Have a run of ``kind`` start on ``model`` ("" for the default one) from the next such run on (item 1889)."""
+        if model == "":
+            self._kinds.pop(kind, None)
+        else:
+            self._kinds[kind] = model
+        log.info("kind_model_set", kind=kind, model=model)
 
     def look(self) -> str:
         """The model of the run that looks for work on Dot's own initiative (``[initiative] look_model``); "" is the
@@ -108,5 +122,6 @@ class ModelRoles:
                 "review": self.review(),
                 "vision": self.vision(),
                 "standby": list(self._standby),
+                "kinds": dict(self._kinds),
             }
         )

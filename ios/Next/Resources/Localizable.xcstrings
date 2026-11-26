@@ -34,6 +34,28 @@
         }
       }
     },
+    "%@ is off.": {
+      "comment": "Watchers: one was switched off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ kapalı."
+          }
+        }
+      }
+    },
+    "%@ is on.": {
+      "comment": "Watchers: one was switched on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ açık."
+          }
+        }
+      }
+    },
     "%@ on": {
       "comment": "VoiceOver: a schedule's switch; the argument is its name",
       "localizations": {
@@ -78,6 +100,17 @@
         }
       }
     },
+    "%@; %lld denied": {
+      "comment": "Away card: who decided, then how many of the decisions said no",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@; %lld reddedildi"
+          }
+        }
+      }
+    },
     "%lld actions": {
       "comment": "Agents: a number of tools",
       "localizations": {
@@ -107,6 +140,46 @@
         }
       }
     },
+    "%lld by the reviewer": {
+      "comment": "Away card: decisions the review model made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tanesi inceleyici tarafından"
+          }
+        }
+      }
+    },
+    "%lld campaign sessions": {
+      "comment": "Away card: sessions of campaigns that ran",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld campaign session"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld campaign sessions"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kampanya oturumu"
+          }
+        }
+      }
+    },
     "%lld characters a line": {
       "comment": "Appearance: a reading width's measure",
       "localizations": {
@@ -125,6 +198,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld bağlı"
+          }
+        }
+      }
+    },
+    "%lld decisions made for you (%@)": {
+      "comment": "Away card: approvals answered for the owner, then who answered them",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld decision made for you (%@)"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld decisions made for you (%@)"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "senin yerine %lld karar verildi (%@)"
+          }
+        }
+      }
+    },
+    "%lld done": {
+      "comment": "Away card: tasks that ended done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld bitti"
+          }
+        }
+      }
+    },
+    "%lld drafts wait for you": {
+      "comment": "Away card: drafts the runs wrote that wait for the owner",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld draft waits for you"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld drafts wait for you"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld taslak seni bekliyor"
+          }
+        }
+      }
+    },
+    "%lld failed": {
+      "comment": "Away card: tasks that failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld başarısız"
           }
         }
       }
@@ -169,6 +322,35 @@
         }
       }
     },
+    "%lld minutes before an event": {
+      "comment": "Watcher: how long before an event a calendar watcher tells",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld minute before an event"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld minutes before an event"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bir etkinlikten %lld dakika önce"
+          }
+        }
+      }
+    },
     "%lld notes": {
       "comment": "Memory: the number of notes\nMemory: the number of search hits",
       "localizations": {
@@ -187,6 +369,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld / %lld"
+          }
+        }
+      }
+    },
+    "%lld of %lld on": {
+      "comment": "Activity: how many watchers are switched on, of all",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld / %lld açık"
           }
         }
       }
@@ -246,6 +439,35 @@
         }
       }
     },
+    "%lld steps": {
+      "comment": "Activity: how many steps a task took",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld step"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld steps"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld adım"
+          }
+        }
+      }
+    },
     "%lld steps could not be shown": {
       "comment": "Notice in a chat: frames the app could not read; the argument is how many",
       "localizations": {
@@ -286,6 +508,86 @@
         }
       }
     },
+    "%lld stopped": {
+      "comment": "Away card: tasks that were stopped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld durduruldu"
+          }
+        }
+      }
+    },
+    "%lld tasks: %@": {
+      "comment": "Away card: how many tasks Dot did on its own, then how they went",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld task: %@"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tasks: %@"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld iş: %@"
+          }
+        }
+      }
+    },
+    "%lld told this hour": {
+      "comment": "Watcher: tells in the last hour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bu saat %lld haber"
+          }
+        }
+      }
+    },
+    "%lld tries": {
+      "comment": "Own initiative: how many times Dot tried a thing",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld try"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tries"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld deneme"
+          }
+        }
+      }
+    },
     "%lld unread": {
       "comment": "Home: the pill that jumps to the next unread bot; the argument is how many",
       "localizations": {
@@ -308,8 +610,19 @@
         }
       }
     },
+    "%lld without asking": {
+      "comment": "Away card: decisions the mode that asks only to pay or send let through",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tanesi sormadan"
+          }
+        }
+      }
+    },
     "%lld working": {
-      "comment": "Helper group header, second part; the argument is how many still work",
+      "comment": "Away card: tasks still at work\nHelper group header, second part; the argument is how many still work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -495,6 +808,28 @@
         }
       }
     },
+    "A helper of another task": {
+      "comment": "Activity: a run another run delegated",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Başka bir işin yardımcısı"
+          }
+        }
+      }
+    },
+    "A lesson": {
+      "comment": "Activity: a lesson Dot wrote today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir ders"
+          }
+        }
+      }
+    },
     "A light tap when you copy, swipe or send, and when an answer comes": {
       "comment": "Chat settings: what haptics do",
       "localizations": {
@@ -502,6 +837,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kopyalarken, kaydırırken ya da gönderirken ve bir yanıt geldiğinde hafif bir dokunuş"
+          }
+        }
+      }
+    },
+    "A line may come from content others can write: %@. Read it before you use it.": {
+      "comment": "Self-improvement: why a version may come from outside content",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir satır başkalarının yazabildiği içerikten gelmiş olabilir: %@. Kullanmadan önce oku."
           }
         }
       }
@@ -583,6 +929,17 @@
         }
       }
     },
+    "A session of a campaign": {
+      "comment": "Activity: a run that is a campaign's session",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir kampanyanın oturumu"
+          }
+        }
+      }
+    },
     "A task past a cap pauses and asks you to continue or stop, in every mode. From a phone you can lower or set a cap; raising one or taking one off is done on the Mac.": {
       "comment": "Caps: footer, what a cap does and what a phone may do",
       "localizations": {
@@ -639,7 +996,7 @@
       }
     },
     "Activity": {
-      "comment": "Tab bar: what Dot did while the owner was away",
+      "comment": "Tab bar: what Dot did while the owner was away\nTitle of the activity tab",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -656,6 +1013,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Etkinlik bir sonraki sürümde geliyor"
+          }
+        }
+      }
+    },
+    "Add": {
+      "comment": "Own initiative: adds a thing to the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ekle"
           }
         }
       }
@@ -682,6 +1050,17 @@
         }
       }
     },
+    "Add to the list": {
+      "comment": "Own initiative: the field of a new thing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listeye ekle"
+          }
+        }
+      }
+    },
     "Add to-do": {
       "comment": "Tool row of Dot's own tool: a to-do added",
       "localizations": {
@@ -700,6 +1079,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Adres"
+          }
+        }
+      }
+    },
+    "Again": {
+      "comment": "Own initiative: puts a thing that was let go back on the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden"
           }
         }
       }
@@ -1210,6 +1600,17 @@
         }
       }
     },
+    "At %@": {
+      "comment": "Activity: when a schedule fires later today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saat %@"
+          }
+        }
+      }
+    },
     "Attach": {
       "comment": "VoiceOver: the composer's button that adds a photo or file",
       "localizations": {
@@ -1250,6 +1651,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Düzenlemeleri kabul et"
+          }
+        }
+      }
+    },
+    "Back on the list.": {
+      "comment": "Own initiative: a thing was put back",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden listede."
           }
         }
       }
@@ -1437,6 +1849,17 @@
         }
       }
     },
+    "Calendar": {
+      "comment": "Watcher kind: an event about to start",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takvim"
+          }
+        }
+      }
+    },
     "Calendar for week 49; free: Tue 10:00, Thu 15:30": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -1521,6 +1944,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Katalog"
+          }
+        }
+      }
+    },
+    "Cc %@": {
+      "comment": "Draft: its copies",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilgi %@"
           }
         }
       }
@@ -1873,6 +2307,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Renk ve yazı"
+          }
+        }
+      }
+    },
+    "Combined by Dot": {
+      "comment": "Self-improvement: a version Dot combined from others",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot birleştirdi"
           }
         }
       }
@@ -2611,6 +3056,17 @@
         }
       }
     },
+    "Discard this draft?": {
+      "comment": "Draft: asks before discarding",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu taslak atılsın mı?"
+          }
+        }
+      }
+    },
     "Discard your changes?": {
       "comment": "Edit sheet: cancel with unsaved changes",
       "localizations": {
@@ -2684,6 +3140,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot ile çalışmıyor"
+          }
+        }
+      }
+    },
+    "Doing now": {
+      "comment": "Own initiative: a thing being done",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi yapıyor"
           }
         }
       }
@@ -2875,6 +3342,17 @@
         }
       }
     },
+    "Dot comes to you": {
+      "comment": "Activity: the brief, the check-in, its own initiative and the watchers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sana gelir"
+          }
+        }
+      }
+    },
     "Dot is asking you": {
       "comment": "Ask dock title: a question",
       "localizations": {
@@ -2893,6 +3371,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot bir Mac ile eşleşmemiş. Ayarlar › Ses'te Bu cihaz'ı seç."
+          }
+        }
+      }
+    },
+    "Dot learns from its own tasks how to work better on this Mac; you choose the habits and tips it follows.": {
+      "comment": "Activity: what the proposals of Self-improvement are",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot kendi işlerinden bu Mac'te nasıl daha iyi çalışacağını öğrenir; izleyeceği alışkanlıkları ve ipuçlarını sen seçersin."
           }
         }
       }
@@ -2919,6 +3408,17 @@
         }
       }
     },
+    "Dot no longer works on its own.": {
+      "comment": "Own initiative: switched off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot artık kendi başına çalışmıyor."
+          }
+        }
+      }
+    },
     "Dot on the Mac": {
       "comment": "Diagnosis hop: Dot's daemon answers\nSystem section: the daemon",
       "localizations": {
@@ -2926,6 +3426,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'teki Dot"
+          }
+        }
+      }
+    },
+    "Dot tells you on your phone and in the chat Watchers. Their choices are changed on your Mac.": {
+      "comment": "Watchers: how Dot tells, and where they are changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot sana telefonunda ve Watchers sohbetinde haber verir. Seçenekleri Mac'inde değiştirilir."
           }
         }
       }
@@ -2992,6 +3503,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot kendi yüzünü taşır; diğer ajanlar yalın bir daire."
+          }
+        }
+      }
+    },
+    "Dot works on its own while the Mac is idle.": {
+      "comment": "Own initiative: switched on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac boştayken Dot kendi başına çalışır."
           }
         }
       }
@@ -3063,6 +3585,28 @@
         }
       }
     },
+    "Dot's proposal": {
+      "comment": "Self-improvement: the sheet of one proposal",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un önerisi"
+          }
+        }
+      }
+    },
+    "Dot's proposals": {
+      "comment": "Activity: the versions of habits Self-improvement proposed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un önerileri"
+          }
+        }
+      }
+    },
     "Dot's setting": {
       "comment": "Chat settings: the approval mode configured on the Mac",
       "localizations": {
@@ -3092,6 +3636,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışmıyor"
+          }
+        }
+      }
+    },
+    "Draft discarded.": {
+      "comment": "Draft: it was dropped",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taslak atıldı."
           }
         }
       }
@@ -3136,6 +3691,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yapılacağı bırak"
+          }
+        }
+      }
+    },
+    "Earlier today": {
+      "comment": "Activity: the runs that ended today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün daha önce"
           }
         }
       }
@@ -3290,6 +3856,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kodu gir"
+          }
+        }
+      }
+    },
+    "Evening check-in": {
+      "comment": "Activity: what Dot writes at the end of the day",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akşam değerlendirmesi"
+          }
+        }
+      }
+    },
+    "Evening check-in on, %@.": {
+      "comment": "Check-in: switched on; the argument says when",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akşam değerlendirmesi açık, %@."
+          }
+        }
+      }
+    },
+    "Evening check-in switched off.": {
+      "comment": "Check-in: switched off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Akşam değerlendirmesi kapatıldı."
           }
         }
       }
@@ -3841,7 +4440,7 @@
       }
     },
     "From outside content": {
-      "comment": "Memory proposal: the run had read outside content",
+      "comment": "Memory proposal: the run had read outside content\nSelf-improvement: a line may come from content others can write",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -3869,6 +4468,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Genel"
+          }
+        }
+      }
+    },
+    "GitHub": {
+      "comment": "Watcher kind: GitHub notifications",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub"
           }
         }
       }
@@ -3917,6 +4527,17 @@
         }
       }
     },
+    "Habits": {
+      "comment": "Self-improvement: how Dot works",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alışkanlıklar"
+          }
+        }
+      }
+    },
     "Handing a part to a subagent": {
       "comment": "Work line: work handed to a helper",
       "localizations": {
@@ -3946,6 +4567,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Metin akarken titreşim"
+          }
+        }
+      }
+    },
+    "Has not looked yet": {
+      "comment": "Watcher: it never looked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz bakmadı"
           }
         }
       }
@@ -4148,6 +4780,17 @@
         }
       }
     },
+    "In use: the tasks that start from now on follow it.": {
+      "comment": "Self-improvement: a version was put in use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullanımda: bundan sonra başlayan işler bunu izler."
+          }
+        }
+      }
+    },
     "Ink": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -4236,6 +4879,17 @@
         }
       }
     },
+    "It has not looked yet: %@": {
+      "comment": "Watcher: why its first look failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz bakmadı: %@"
+          }
+        }
+      }
+    },
     "It resets at %@.": {
       "comment": "Usage limit card; the argument is the clock time",
       "localizations": {
@@ -4254,6 +4908,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Birkaç saat içinde sıfırlanır."
+          }
+        }
+      }
+    },
+    "It stays, for the record and to come back to.": {
+      "comment": "Self-improvement: what setting a version aside does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kayıt için ve geri dönmek için kalır."
           }
         }
       }
@@ -4320,6 +4985,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbetleri Dot'un olarak kalır. Yüzü, rolü ve talimatları silinir; zamanlanmış görevleri kapatılır."
+          }
+        }
+      }
+    },
+    "Its last look failed: %@": {
+      "comment": "Watcher: why its last look failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son bakışı başarısız oldu: %@"
+          }
+        }
+      }
+    },
+    "Its list": {
+      "comment": "Own initiative: the list of what Dot means to do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listesi"
+          }
+        }
+      }
+    },
+    "Its tasks ask you only before a message, a post or a release.": {
+      "comment": "Own initiative: the mode its tasks start in is yolo",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İşleri sana yalnızca bir mesaj, bir gönderi ya da bir yayından önce sorar."
+          }
+        }
+      }
+    },
+    "Its tasks start in the %@ approval mode.": {
+      "comment": "Own initiative: the approval mode its tasks start in",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İşleri %@ onay kipinde başlar."
           }
         }
       }
@@ -4434,6 +5143,17 @@
         }
       }
     },
+    "Later today": {
+      "comment": "Activity: the schedules and campaign sessions due before the day ends",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün daha sonra"
+          }
+        }
+      }
+    },
     "Leads every task": {
       "comment": "Agents: Dot's line",
       "localizations": {
@@ -4445,6 +5165,17 @@
         }
       }
     },
+    "Learned today": {
+      "comment": "Activity: the lessons and the journal written today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün öğrenilenler"
+          }
+        }
+      }
+    },
     "Lesson 2 of 5: proposals go down, sizes come up.": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -4452,6 +5183,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ders 2/5: öneriler aşağı iner, boyutlar yukarı çıkar."
+          }
+        }
+      }
+    },
+    "Let go": {
+      "comment": "Own initiative: a thing taken off the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bırakıldı"
           }
         }
       }
@@ -4544,6 +5286,17 @@
         }
       }
     },
+    "Looked %@": {
+      "comment": "Watcher: when it last looked (relative, e.g. '5 min ago')",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baktı: %@"
+          }
+        }
+      }
+    },
     "Looked at the screen": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -4551,6 +5304,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ekrana baktı"
+          }
+        }
+      }
+    },
+    "Looks every %lld minutes": {
+      "comment": "Watcher: how often it looks",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Looks every minute"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Looks every %lld minutes"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her %lld dakikada bir bakar"
           }
         }
       }
@@ -4596,6 +5378,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac uygulaması"
+          }
+        }
+      }
+    },
+    "Mail": {
+      "comment": "Draft: an email",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-posta"
           }
         }
       }
@@ -4678,12 +5471,12 @@
       }
     },
     "Mark as read": {
-      "comment": "Home: marks every chat of a bot read",
+      "comment": "Away card: moves the moment on for every device\nHome: marks every chat of a bot read",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Okundu olarak işaretle"
+            "value": "Okundu say"
           }
         }
       }
@@ -4739,6 +5532,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bellek"
+          }
+        }
+      }
+    },
+    "Message": {
+      "comment": "Draft: an iMessage",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj"
           }
         }
       }
@@ -4897,6 +5701,50 @@
         }
       }
     },
+    "Morning brief": {
+      "comment": "Activity: the brief Dot writes each morning",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabah özeti"
+          }
+        }
+      }
+    },
+    "Morning brief on, %@.": {
+      "comment": "Brief: switched on; the argument says when",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabah özeti açık, %@."
+          }
+        }
+      }
+    },
+    "Morning brief switched off.": {
+      "comment": "Brief: switched off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sabah özeti kapatıldı."
+          }
+        }
+      }
+    },
+    "Most decisions made for you": {
+      "comment": "Away card: the runs with the most approvals answered for the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Senin yerine en çok karar verilenler"
+          }
+        }
+      }
+    },
     "Move down": {
       "comment": "VoiceOver action: moves a queued message one place later",
       "localizations": {
@@ -4985,6 +5833,17 @@
         }
       }
     },
+    "New": {
+      "comment": "Self-improvement: a version nobody tried yet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni"
+          }
+        }
+      }
+    },
     "New bot": {
       "comment": "Home: makes a new bot",
       "localizations": {
@@ -5003,6 +5862,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yeni sohbet"
+          }
+        }
+      }
+    },
+    "New mail": {
+      "comment": "Watcher kind: new mail in a signed-in account",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni e-posta"
           }
         }
       }
@@ -5029,6 +5899,17 @@
         }
       }
     },
+    "Next %@": {
+      "comment": "Brief: when it is written next",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki %@"
+          }
+        }
+      }
+    },
     "Next ask": {
       "comment": "Ask dock: shows the ask after",
       "localizations": {
@@ -5047,6 +5928,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sonraki çalışma %@"
+          }
+        }
+      }
+    },
+    "Next session at %@": {
+      "comment": "Activity: when a campaign's next session starts",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sonraki oturum saat %@"
           }
         }
       }
@@ -5238,6 +6130,17 @@
         }
       }
     },
+    "No watchers": {
+      "comment": "Watchers: none",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzleyici yok"
+          }
+        }
+      }
+    },
     "Nobody answered in time": {
       "comment": "Ask dock: the ask expired",
       "localizations": {
@@ -5267,6 +6170,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bekleyen yok. Bir görev senin yazdığın bir notu değiştirmek istediğinde burada bekler."
+          }
+        }
+      }
+    },
+    "None yet: make one on your Mac": {
+      "comment": "Activity: no watcher; they are made on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz yok: Mac'inde bir tane oluştur"
           }
         }
       }
@@ -5338,7 +6252,7 @@
       }
     },
     "Not sent: %@": {
-      "comment": "Under an owner's message the Mac refused; the argument is the Mac's own words",
+      "comment": "Draft: the application refused the send; its words\nUnder an owner's message the Mac refused; the argument is the Mac's own words",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -5436,6 +6350,17 @@
         }
       }
     },
+    "Nothing": {
+      "comment": "Self-improvement: a text of a version that is empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hiçbir şey"
+          }
+        }
+      }
+    },
     "Nothing answers. The Mac may sleep, be off, or have Tailscale off.": {
       "comment": "Diagnosis: the Mac does not answer",
       "localizations": {
@@ -5469,6 +6394,28 @@
         }
       }
     },
+    "Nothing goes out until you send it.": {
+      "comment": "Activity: what a draft does until the owner sends it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen göndermeden hiçbir şey çıkmaz."
+          }
+        }
+      }
+    },
+    "Nothing in motion today": {
+      "comment": "Activity: no run works, waits, ended or is due today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bugün hareket eden bir şey yok"
+          }
+        }
+      }
+    },
     "Nothing of this chat is saved on this phone yet. It loads once the phone reaches your Mac.": {
       "comment": "Empty chat when offline with nothing saved",
       "localizations": {
@@ -5476,6 +6423,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu sohbetten bu telefonda henüz bir şey kayıtlı değil. Telefon Mac'ine ulaşınca yüklenir."
+          }
+        }
+      }
+    },
+    "Nothing on the list yet.": {
+      "comment": "Own initiative: the list is empty",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listede henüz bir şey yok."
           }
         }
       }
@@ -5612,6 +6570,17 @@
         }
       }
     },
+    "Off: what got done, what waits for you and the next step": {
+      "comment": "Evening check-in: what it writes, while it is off",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı: neyin yapıldığı, neyin seni beklediği ve sonraki adım"
+          }
+        }
+      }
+    },
     "Offline": {
       "comment": "Chat subtitle: the phone has no link",
       "localizations": {
@@ -5667,6 +6636,17 @@
         }
       }
     },
+    "On Dot's list.": {
+      "comment": "Own initiative: a thing was added",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un listesinde."
+          }
+        }
+      }
+    },
     "On iPad and other wide windows; a phone uses its whole width.": {
       "comment": "Appearance: footer of the reading width",
       "localizations": {
@@ -5674,6 +6654,72 @@
           "stringUnit": {
             "state": "translated",
             "value": "iPad'de ve diğer geniş pencerelerde; telefon tüm genişliği kullanır."
+          }
+        }
+      }
+    },
+    "On its own": {
+      "comment": "Activity: Dot's own initiative while the Mac is idle",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kendi başına"
+          }
+        }
+      }
+    },
+    "On weekdays it starts nothing from %@ to %@, the provider's dearer hours, but a thing marked [URGENT].": {
+      "comment": "Own initiative: the weekday hours its tasks wait in, in the phone's time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hafta içi %@ ile %@ arasında, sağlayıcının pahalı saatlerinde, [URGENT] işaretli bir şey dışında hiçbir şey başlatmaz."
+          }
+        }
+      }
+    },
+    "On your Mac, Settings › Scheduled tasks › Watchers makes one: Dot then tells you when a mail, an event or a GitHub notification you care about comes.": {
+      "comment": "Watchers: where one is made",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde Ayarlar › Zamanlanmış görevler › İzleyiciler bir tane oluşturur: sonra Dot, önemsediğin bir e-posta, etkinlik ya da GitHub bildirimi geldiğinde sana haber verir."
+          }
+        }
+      }
+    },
+    "On · %lld to do": {
+      "comment": "Own initiative: on, with things on its list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık · %lld yapılacak"
+          }
+        }
+      }
+    },
+    "On · nothing to do": {
+      "comment": "Own initiative: on, with nothing on its list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık · yapılacak bir şey yok"
+          }
+        }
+      }
+    },
+    "On, at times set on your Mac": {
+      "comment": "Morning brief: its schedule runs at times the phone cannot show",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık, Mac'inde ayarlanan saatlerde"
           }
         }
       }
@@ -5777,6 +6823,39 @@
         }
       }
     },
+    "Open its chat": {
+      "comment": "Draft: opens the chat of the run that wrote it",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbetini aç"
+          }
+        }
+      }
+    },
+    "Open the last brief": {
+      "comment": "Brief: opens the chat of the last one",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son özeti aç"
+          }
+        }
+      }
+    },
+    "Open the last check-in": {
+      "comment": "Check-in: opens the chat of the last one",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son değerlendirmeyi aç"
+          }
+        }
+      }
+    },
     "Opened the clinic's booking page": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -5784,6 +6863,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kliniğin randevu sayfasını açtı"
+          }
+        }
+      }
+    },
+    "Opens the Mac's live screen; nothing plays until you open it.": {
+      "comment": "Activity tab: footer under Watch the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'in canlı ekranını açar; sen açana kadar hiçbir şey oynamaz."
           }
         }
       }
@@ -6086,6 +7176,17 @@
         }
       }
     },
+    "Photos of unsent messages were not kept.": {
+      "comment": "Chat list notice after a reset: the photos of the messages that were not sent are gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilemeyen mesajların fotoğrafları saklanmadı."
+          }
+        }
+      }
+    },
     "Pick a bot on the left, or make a new one.": {
       "comment": "iPad detail column when no bot is selected",
       "localizations": {
@@ -6295,6 +7396,17 @@
         }
       }
     },
+    "Proposed by Dot": {
+      "comment": "Self-improvement: a version Dot proposed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot önerdi"
+          }
+        }
+      }
+    },
     "Proposed changes": {
       "comment": "Memory: runs' rewrites of the owner's notes",
       "localizations": {
@@ -6313,6 +7425,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sağlayıcı programları"
+          }
+        }
+      }
+    },
+    "Put %@ back on the list": {
+      "comment": "VoiceOver: puts a thing back on Dot's list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ öğesini listeye geri koy"
           }
         }
       }
@@ -6643,6 +7766,17 @@
         }
       }
     },
+    "Ready": {
+      "comment": "Activity: the drafts that wait for the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hazır"
+          }
+        }
+      }
+    },
     "Reasoning": {
       "comment": "Chat settings row: the model's reasoning level\nModel picker: the level of reasoning",
       "localizations": {
@@ -6720,6 +7854,28 @@
         }
       }
     },
+    "Refused": {
+      "comment": "Self-improvement: the checks refuse the version's text",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reddedildi"
+          }
+        }
+      }
+    },
+    "Refused: %@. A version like this is not put in use.": {
+      "comment": "Self-improvement: the checks refuse the version; their words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reddedildi: %@. Böyle bir sürüm kullanıma alınmaz."
+          }
+        }
+      }
+    },
     "Release the stop": {
       "comment": "Settings: lets Dot work again after the emergency stop",
       "localizations": {
@@ -6732,7 +7888,7 @@
       }
     },
     "Remove": {
-      "comment": "Queue sheet: removes a queued message",
+      "comment": "Own initiative: takes a thing off the list\nQueue sheet: removes a queued message",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7337,7 +8493,7 @@
       }
     },
     "Send": {
-      "comment": "VoiceOver: the composer's send button",
+      "comment": "Draft: sends it\nVoiceOver: the composer's send button",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7369,6 +8525,17 @@
         }
       }
     },
+    "Send failed": {
+      "comment": "Draft: its last send failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilemedi"
+          }
+        }
+      }
+    },
     "Send now": {
       "comment": "Queue sheet: sends a queued message into the running task now",
       "localizations": {
@@ -7387,6 +8554,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çalışan göreve şimdi gönder"
+          }
+        }
+      }
+    },
+    "Send this to %@ now?": {
+      "comment": "Draft: asks before sending; the argument is the recipients",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu şimdi %@ adresine gönderilsin mi?"
+          }
+        }
+      }
+    },
+    "Send with Mail": {
+      "comment": "Draft: sends the mail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mail ile gönder"
+          }
+        }
+      }
+    },
+    "Send with Messages": {
+      "comment": "Draft: sends the message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesajlar ile gönder"
           }
         }
       }
@@ -7457,6 +8657,17 @@
         }
       }
     },
+    "Sent.": {
+      "comment": "Draft: it went out",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderildi."
+          }
+        }
+      }
+    },
     "Served over HTTPS": {
       "comment": "This Mac: Dot is served on the tailnet",
       "localizations": {
@@ -7464,6 +8675,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "HTTPS üzerinden sunuluyor"
+          }
+        }
+      }
+    },
+    "Set aside": {
+      "comment": "Self-improvement: sets a version aside",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kenara koy"
+          }
+        }
+      }
+    },
+    "Set aside.": {
+      "comment": "Self-improvement: a version was set aside",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kenara kondu."
+          }
+        }
+      }
+    },
+    "Set this version aside?": {
+      "comment": "Self-improvement: asks before setting a version aside",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sürüm kenara konsun mu?"
           }
         }
       }
@@ -7662,6 +8906,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ modelini göster"
+          }
+        }
+      }
+    },
+    "Show %lld more": {
+      "comment": "Away card: shows the rest of its lists",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show %lld more"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Show %lld more"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld tane daha göster"
           }
         }
       }
@@ -7875,6 +9148,17 @@
         }
       }
     },
+    "Something Dot can do for you on its own": {
+      "comment": "Own initiative: the placeholder of a new thing",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un senin için kendi başına yapabileceği bir şey"
+          }
+        }
+      }
+    },
     "Speech recognition is off for Dot. Turn it on in Settings › Dot Next › Speech Recognition.": {
       "comment": "Composer: dictation cannot start, speech permission denied",
       "localizations": {
@@ -7948,6 +9232,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Başlıyor"
+          }
+        }
+      }
+    },
+    "Starts a task": {
+      "comment": "Watcher: it starts a task of the owner's goal for what came in",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir iş başlatır"
           }
         }
       }
@@ -8063,7 +9358,7 @@
       }
     },
     "Stopped": {
-      "comment": "Helper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
+      "comment": "Activity: a run of Dot's own that was stopped\nHelper state: the helper ended because the owner stopped it\nHelper state: the helper was stopped",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8113,6 +9408,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alt ajan"
+          }
+        }
+      }
+    },
+    "Subject": {
+      "comment": "Draft: the subject of a mail",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konu"
           }
         }
       }
@@ -8290,6 +9596,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu iPhone'daki Tailscale"
+          }
+        }
+      }
+    },
+    "Take %@ off the list": {
+      "comment": "VoiceOver: removes a thing from Dot's list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ öğesini listeden çıkar"
+          }
+        }
+      }
+    },
+    "Taken off the list.": {
+      "comment": "Own initiative: a thing was removed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listeden çıkarıldı."
           }
         }
       }
@@ -8657,6 +9985,17 @@
         }
       }
     },
+    "The journal": {
+      "comment": "Activity: the journal note Dot wrote today",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Günlük"
+          }
+        }
+      }
+    },
     "The key could not be kept on this phone.": {
       "comment": "Pairing error: the Keychain refused to keep the key",
       "localizations": {
@@ -8800,6 +10139,28 @@
         }
       }
     },
+    "The reflection": {
+      "comment": "Activity: today's reflection",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değerlendirme"
+          }
+        }
+      }
+    },
+    "The reflection failed": {
+      "comment": "Activity: today's reflection failed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değerlendirme başarısız oldu"
+          }
+        }
+      }
+    },
     "The run ended": {
       "comment": "Notice at the end of a run that ended another way",
       "localizations": {
@@ -8855,6 +10216,17 @@
         }
       }
     },
+    "The tasks that start from now on follow it.": {
+      "comment": "Self-improvement: what using a version does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundan sonra başlayan işler bunu izler."
+          }
+        }
+      }
+    },
     "The test failed because the tokenizer read past the end of an **unterminated string**. I stopped the loop at the last character and kept the error the parser already raises; see [the failing case](https://example.invalid/case) and the change below.": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -8862,6 +10234,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Test, belirteçleyici **kapanmamış bir dizenin** sonunu aştığı için başarısız oldu. Döngüyü son karakterde durdurdum ve ayrıştırıcının zaten verdiği hatayı korudum; [başarısız örneğe](https://example.invalid/case) ve aşağıdaki değişikliğe bak."
+          }
+        }
+      }
+    },
+    "Their times and choices are set on your Mac.": {
+      "comment": "Activity: where the brief's time and the watchers' choices are set",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saatleri ve seçenekleri Mac'inde ayarlanır."
           }
         }
       }
@@ -8998,6 +10381,17 @@
         }
       }
     },
+    "This draft was answered elsewhere.": {
+      "comment": "Draft: it was sent or discarded on another screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu taslak başka bir yerde yanıtlandı."
+          }
+        }
+      }
+    },
     "This iPhone's network": {
       "comment": "Diagnosis hop: the phone's own Wi-Fi or cellular link",
       "localizations": {
@@ -9075,6 +10469,39 @@
         }
       }
     },
+    "Tips": {
+      "comment": "Self-improvement: what this Mac and its apps want",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İpuçları"
+          }
+        }
+      }
+    },
+    "To %@": {
+      "comment": "Draft: its recipients",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alıcı: %@"
+          }
+        }
+      }
+    },
+    "To do": {
+      "comment": "Own initiative: a thing to do",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yapılacak"
+          }
+        }
+      }
+    },
     "To make a new code or remove a phone: open on the Mac Settings › Phone. A phone's key cannot do either.": {
       "comment": "This Mac: footer under the key: the Mac's continuation",
       "localizations": {
@@ -9098,7 +10525,7 @@
       }
     },
     "Today": {
-      "comment": "Caps section: today's tokens",
+      "comment": "Activity: the section of today's runs\nCaps section: today's tokens",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9192,6 +10619,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Konuşma"
+          }
+        }
+      }
+    },
+    "Tried": {
+      "comment": "Self-improvement: a version the nightly loop tried",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denendi"
           }
         }
       }
@@ -9472,7 +10910,29 @@
       }
     },
     "Use": {
-      "comment": "Memory proposal: take the run's words",
+      "comment": "Memory proposal: take the run's words\nSelf-improvement: puts a version in use",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kullan"
+          }
+        }
+      }
+    },
+    "Use a version written from outside content?": {
+      "comment": "Self-improvement: asks before using a version from outside content",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dış içerikten yazılmış bir sürüm kullanılsın mı?"
+          }
+        }
+      }
+    },
+    "Use it": {
+      "comment": "Self-improvement: confirms using a version",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9698,6 +11158,17 @@
         }
       }
     },
+    "Waits for your answer": {
+      "comment": "Activity: a question a task waits for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yanıtını bekliyor"
+          }
+        }
+      }
+    },
     "Waits for your answer about the deposit": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {
@@ -9705,6 +11176,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapora için yanıtını bekliyor"
+          }
+        }
+      }
+    },
+    "Waits for your yes": {
+      "comment": "Activity: an approval a task waits for",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onayını bekliyor"
           }
         }
       }
@@ -9738,6 +11220,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'i izle"
+          }
+        }
+      }
+    },
+    "Watchers": {
+      "comment": "Activity: what Dot keeps an eye on for the owner",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İzleyiciler"
           }
         }
       }
@@ -9830,6 +11323,28 @@
         }
       }
     },
+    "What Dot does on its own shows here.": {
+      "comment": "Activity: what fills the list",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un kendi başına yaptıkları burada görünür."
+          }
+        }
+      }
+    },
+    "What Dot finds in a mail or a page while at it is handled as untrusted: what would reach others asks you first.": {
+      "comment": "Own initiative: how content others wrote is handled",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot'un bu sırada bir e-postada ya da sayfada bulduğu şey güvenilmez sayılır: başkalarına ulaşacak olan önce sana sorulur."
+          }
+        }
+      }
+    },
     "What it acts on": {
       "comment": "Ask dock: the header of the box with the command or path",
       "localizations": {
@@ -9885,6 +11400,28 @@
         }
       }
     },
+    "While the Mac is idle, Dot does on its own what is on this list, each in a chat of its own; with nothing on it, it looks for work that helps you now and then.": {
+      "comment": "Own initiative: what the switch does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac boştayken Dot bu listedekileri, her birini kendi sohbetinde, kendi başına yapar; liste boşsa ara sıra sana yardımcı olacak iş arar."
+          }
+        }
+      }
+    },
+    "While you were away": {
+      "comment": "Activity: the card of what Dot did on its own",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen yokken"
+          }
+        }
+      }
+    },
     "Why does the parser test fail only on CI?": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -9929,6 +11466,17 @@
         }
       }
     },
+    "Words": {
+      "comment": "Draft: the body of a mail or a message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metin"
+          }
+        }
+      }
+    },
     "Work log · medium": {
       "comment": "Symbol sample sheet: a context and the symbol weight used there",
       "localizations": {
@@ -9936,6 +11484,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "İş günlüğü · orta"
+          }
+        }
+      }
+    },
+    "Work on its own while the Mac is idle": {
+      "comment": "Own initiative: the switch",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac boştayken kendi başına çalış"
           }
         }
       }
@@ -10039,6 +11598,17 @@
         }
       }
     },
+    "Write one now": {
+      "comment": "Brief: writes a brief at once",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi bir tane yaz"
+          }
+        }
+      }
+    },
     "Write to a chat": {
       "comment": "Tool row of Dot's own tool: words sent to another chat",
       "localizations": {
@@ -10061,6 +11631,17 @@
         }
       }
     },
+    "Writing a brief now.": {
+      "comment": "Brief: a brief is being written at once",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şimdi bir özet yazılıyor."
+          }
+        }
+      }
+    },
     "Writing a file": {
       "comment": "Work line: a file written",
       "localizations": {
@@ -10079,6 +11660,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yazıya dökülüyor…"
+          }
+        }
+      }
+    },
+    "Written by you": {
+      "comment": "Self-improvement: a version the owner wrote",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sen yazdın"
           }
         }
       }
@@ -10156,6 +11748,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Her değişikliği sen onaylarsın: dosyalar, komutlar, tıklamalar, mesajlar."
+          }
+        }
+      }
+    },
+    "You have its browser": {
+      "comment": "Activity: a task whose browser the owner took over",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tarayıcısı sende"
           }
         }
       }
@@ -10303,6 +11906,17 @@
         }
       }
     },
+    "Your Mac's Dot was reset; the old chats are gone from this phone.": {
+      "comment": "Chat list notice: the Mac's Dot was reset and its old chats left the phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot sıfırlandı; eski sohbetler artık bu telefonda yok."
+          }
+        }
+      }
+    },
     "Your Mac's address": {
       "comment": "Pairing screen section: the Mac's address",
       "localizations": {
@@ -10358,6 +11972,17 @@
         }
       }
     },
+    "Your check": {
+      "comment": "Watcher kind: a check file of the owner's, run without a model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrolün"
+          }
+        }
+      }
+    },
     "Your name": {
       "comment": "General: the owner's name",
       "localizations": {
@@ -10387,6 +12012,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Günde senin görevlerin"
+          }
+        }
+      }
+    },
+    "Your unsent words wait in New chat.": {
+      "comment": "Chat list notice after a reset: the words that were not sent are the new chat's draft",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilemeyen sözlerin Yeni sohbet'te seni bekliyor."
           }
         }
       }
@@ -10611,6 +12247,17 @@
         }
       }
     },
+    "macOS does not say how long the Mac has been idle, so Dot starts nothing on its own. The daemon's log on the Mac has why.": {
+      "comment": "Own initiative: the Mac's idle time cannot be read",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS, Mac'in ne kadar süredir boşta olduğunu söylemiyor; bu yüzden Dot kendi başına hiçbir şey başlatmıyor. Nedeni Mac'teki daemon günlüğünde."
+          }
+        }
+      }
+    },
     "model main review vision code review": {
       "comment": "Settings search synonyms of Models (space separated)",
       "localizations": {
@@ -10805,6 +12452,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajanlar sayfası"
+          }
+        }
+      }
+    },
+    "the web app's Home and Settings › Scheduled tasks": {
+      "comment": "Where on the Mac: the activity, the brief, the watchers",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "web uygulamasının Ana sayfası ve Ayarlar › Zamanlanmış görevler"
           }
         }
       }

@@ -19,7 +19,7 @@ final class ChatStartTests: XCTestCase {
     private func sentRun(_ start: ChatStart?) async throws -> [String: JSONValue] {
         let outbox: Outbox = Outbox(
             directory: folder, api: daemon.api(), link: LinkWatcher(initial: .up), clock: ManualClock(at: 1_800_000_000),
-            policy: RetryPolicy(attempts: 1, base: 1, cap: 1, budget: 1), jitter: { 0 }, mayStartChat: { true })
+            policy: RetryPolicy(attempts: 1, base: 1, cap: 1, budget: 1), jitter: { 0 }, maySend: { _ in true })
         let outcomes: AsyncStream<OutboxOutcome> = await outbox.outcomes()
         try await outbox.enqueue(.newChat(text: "Plan the trip", images: [], uploaded: [], start: start, agent: nil), id: newMessageKey(), images: [])
         for await _ in outcomes { break }

@@ -27,6 +27,8 @@ final class FakeDaemon: @unchecked Sendable {
 
     let host: DaemonHost
     let version: String
+    /// The id of its database: each fake daemon is a database of its own, as a reset Dot is.
+    let store: String = "store_\(UUID().uuidString.prefix(8).lowercased())"
     private let lock: NSLock = NSLock()
     private var chats: [String: Chat] = [:]
     private var runs: [String: RunRecord] = [:]
@@ -356,7 +358,7 @@ final class FakeDaemon: @unchecked Sendable {
         if old, path == "/api/threads/view" || path.hasSuffix("/stream") || path.hasSuffix("/view") { return Self.refused(404, "Not Found") }
         if method == "GET", let found: [String] = Self.match(parts, ["api", "status"]) {
             _ = found
-            return Reply(status: 200, body: Self.json(DaemonStatus(version: version)), stream: false, lost: false)
+            return Reply(status: 200, body: Self.json(DaemonStatus(version: version, storeId: store)), stream: false, lost: false)
         }
         if method == "GET", let found: [String] = Self.match(parts, ["api", "threads", "view"]) {
             _ = found
@@ -379,6 +381,9 @@ final class FakeDaemon: @unchecked Sendable {
         if method == "POST", let found: [String] = Self.match(parts, ["api", "threads", "*", "queue"]) {
             let thread: String = found[0]
             return queue(thread: thread, body: body)
+        }
+        if method == "POST", Self.match(parts, ["api", "runs"]) != nil {
+            return startChat(body: body)
         }
         if method == "POST", let found: [String] = Self.match(parts, ["api", "runs", "*", "steer"]) {
             let run: String = found[0]
@@ -509,6 +514,27 @@ final class FakeDaemon: @unchecked Sendable {
             QueueView(held: chats[thread]?.held ?? false, messages: chats[thread]?.queue ?? [], besideRunId: nil, besideThreadId: nil)
         }
         return Reply(status: 201, body: Self.json(view), stream: false, lost: false)
+    }
+
+    /// A new chat (`POST /api/runs`): a chat of its own and its first run, started once per key.
+    private func startChat(body: Data?) -> Reply {
+        guard let message: NewChatMessage = try? JSONDecoder().decode(NewChatMessage.self, from: body ?? Data()) else {
+            return Self.refused(422, "bad body")
+        }
+        let (first, number): (Bool, Int) = lock.withLock {
+            if let known: String = keys["run:\(message.key)"], let made: Int = Int(known) { return (false, made) }
+            nextId += 1
+            keys["run:\(message.key)"] = String(nextId)
+            return (true, nextId)
+        }
+        if first {
+            acceptedTexts.append(message.goal)
+            addChat("thr_c\(number)", title: message.goal)
+            addRun("run_c\(number)", thread: "thr_c\(number)", goal: message.goal, status: "running", parent: nil)
+        }
+        let record: RunRecord? = lock.withLock { runs["run_c\(number)"] }
+        guard let record else { return Self.refused(500, "the run was not made") }
+        return Reply(status: 201, body: Self.json(record), stream: false, lost: false)
     }
 
     private func steer(run: String, body: Data?) -> Reply {

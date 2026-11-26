@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Callable, Coroutine, Iterator, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Coroutine, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -243,13 +243,18 @@ class _PausedClock:
         self._spent: _GateTime = spent
 
     async def authorize(self, info: ActionInfo) -> str:
+        return await self.off_clock(self._inner.authorize(info))
+
+    async def off_clock[T](self, waiting: Awaitable[T]) -> T:
+        """Await ``waiting`` with the tool's clock stopped (item 1890): the owner's answer, or a batch of desktop steps
+        that waits for them to step away."""
         loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
         deadline: float | None = self._scope.when()
         remaining: float | None = None if deadline is None else max(deadline - loop.time(), 0.0)
         self._scope.reschedule(None)
         asked_at: float = time.monotonic()
         try:
-            return await self._inner.authorize(info)
+            return await waiting
         finally:
             self._spent.seconds += time.monotonic() - asked_at
             self._scope.reschedule(None if remaining is None else loop.time() + remaining)
@@ -401,8 +406,9 @@ async def _run_checked(
             try:
                 with in_tool.attempt(at_gate):
                     async with asyncio.timeout(tool.timeout_s) as scope:
+                        paused: _PausedClock = _PausedClock(ctx.gate, scope, at_gate)
                         result: ToolResult = await prepared.run(
-                            replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate), nested=nesting)
+                            replace(ctx, gate=paused, nested=nesting, off_clock=paused.off_clock)
                         )
             except (RunCancelled, FailSafeTriggered):
                 raise

@@ -23,7 +23,10 @@ contract, and `tests/unit/test_freedom_contract.py` is what makes it executable.
 **Freedom costs no speed.** The gate of such a run is one policy decision and one record; it awaits no answer and no kept
 step (the pace the owner set for a site, which spaces the public actions of the browser, is the one wait left, and is
 theirs), and a call's `tool_result` event keeps `waited_s`, the time it spent at the gate. A change that puts a wait in
-that path breaks the contract as an ask does.
+that path breaks the contract as an ask does. Outside the gate, a desktop step that would take the Mac's own pointer or
+keyboard while the owner is at the Mac waits for them to step away (item 1890, the owner's own rule of 2026-11-25,
+`[desktop] input_only_when_away`): it asks nothing, in every mode, and is in
+[Browser and computer use](browser-and-computer-use.md).
 
 ## The exceptions, with the code that makes each
 
