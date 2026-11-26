@@ -496,6 +496,25 @@ final class SeenTests: XCTestCase {
         _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
     }
 
+    /// A switch back to a chat before its old screen went (item 1913): the old screen's close, arriving after the new
+    /// one's open, must not close the chat the owner is reading; it is still marked seen when its run ends.
+    func testAChatShownTwiceStaysOpenUntilBothLeave() async throws {
+        await rig.supervisor.start()
+        await rig.supervisor.openChat("thr_1")
+        await rig.supervisor.openChat("thr_1")
+        _ = try await snapshot(of: rig.store, "the row is read") { seenRow($0)?.summary.unread == false }
+        await rig.supervisor.closeChat("thr_1")
+        let before: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        let daemon: FakeDaemon = daemon
+        _ = try await snapshot(of: rig.store, "the chat still on screen is read again") { _ in daemon.count("PATCH", "/api/threads/thr_1") > before }
+        await rig.supervisor.closeChat("thr_1")
+        let after: Int = daemon.count("PATCH", "/api/threads/thr_1")
+        daemon.markUnread("thr_1")
+        _ = try await snapshot(of: rig.store, "once both left it keeps its unread") { seenRow($0)?.summary.unread == true }
+        XCTAssertEqual(daemon.count("PATCH", "/api/threads/thr_1"), after)
+    }
+
     func testAClosedChatIsNotMarkedSeen() async throws {
         await rig.supervisor.start()
         await rig.supervisor.openChat("thr_1")

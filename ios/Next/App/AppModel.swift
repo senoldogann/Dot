@@ -91,6 +91,10 @@ final class AppModel {
     /// The draft of the new chat's composer, kept like a chat's (a chat's id is the daemon's `thr_…`, never this).
     static let newChatDraft: String = "new-chat"
 
+    /// The draft of a new chat with `agent` (`nil`: Dot), each bot its own (item 1914: one draft for every bot put the
+    /// words half-written to one bot in a new chat with another, sent to it).
+    static func newChatDraft(agent: String?) -> String { agent.map { "\(newChatDraft).\($0)" } ?? newChatDraft }
+
     /// The reset whose words were put in the new chat's draft (its `at`), kept with the draft so that a kill before the
     /// engine heard of it does not put them there twice.
     private static let rescuedKey: String = "resetRescuedAt"
@@ -101,7 +105,7 @@ final class AppModel {
         guard let engine else { return }
         let defaults: UserDefaults = UserDefaults.standard
         let newChatKey: String = "draft.\(Self.newChatDraft)"
-        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && $0 != newChatKey }.sorted()
+        let oldKeys: [String] = defaults.dictionaryRepresentation().keys.filter { $0.hasPrefix("draft.") && !$0.hasPrefix(newChatKey) }.sorted()
         let oldDrafts: [String] = oldKeys.compactMap { defaults.string(forKey: $0) }
         keep(draft: DaemonRules.draft(keeping: draft(of: Self.newChatDraft), adding: fresh.words + oldDrafts), of: Self.newChatDraft)
         for key in oldKeys { defaults.removeObject(forKey: key) }
