@@ -675,7 +675,8 @@ the file tools change goes into the undo journal, shows in Changes and can be un
 a file's size and a run's copies, under [Autonomy](autonomy.md)), and what a command writes does not. Nothing stops a
 command from writing a file. `edit_file` also reads its texts by
 the names other agents' edit tools give them (`old_text` and `new_text`, `old_string` and `new_string`; item 879:
-a model on the owner's Mac sent them 17 times in two days, each call refused), `search_files` reads its `pattern` as
+a model on the owner's Mac sent them 17 times in two days, each call refused), `write_file` reads its `content` as
+`file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
 ripgrep's own (item 1283), and a wait or a count asked past its
