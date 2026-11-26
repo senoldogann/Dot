@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1908](1908.md) | done | 2026-11-26 | The reset test of item 1893 waits on what it reads |
+| [1907](1907.md) | done | 2026-11-26 | DotNext's Settings › Models holds every model setting of the Mac's page |
 | [1906](1906.md) | done | 2026-11-26 | DotNext's chat settings show recent models and options as plain rows |
 | [1905](1905.md) | done | 2026-11-26 | DotNext marks an opened chat seen, so it leaves "unread" in the list |
 | [1904](1904.md) | done | 2026-11-26 | DotNext shows a screenshot whole and zoomable, a failed run as one plain row, a fold without counts, a stored thought as its word alone, and its waiting states centred |

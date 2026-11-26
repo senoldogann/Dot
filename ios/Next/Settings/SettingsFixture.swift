@@ -183,7 +183,14 @@
             case ("GET", "/api/phone/push-settings"), ("PUT", "/api/phone/push-settings"):
                 return (200, #"{"needs_you":true,"ready":true,"done":false}"#)
             case ("GET", "/api/models"): return (200, models)
-            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"): return (200, modelsConfig)
+            case ("POST", "/api/models/main"), ("POST", "/api/models/roles"), ("PUT", "/api/models/kinds"), ("PUT", "/api/models/standby"):
+                return (200, modelsConfig)
+            case ("GET", "/api/models/learning"), ("PUT", "/api/models/learning"):
+                return (200, #"{"proposer":"","composer":"claude_code:opus","selector":"","experience":"","review":"claude_code:opus"}"#)
+            case ("GET", "/api/initiative"), ("PUT", "/api/initiative/look-model"):
+                return (200, #"{"enabled":true,"look_model":"","items":[]}"#)
+            case ("GET", "/api/repair"), ("PUT", "/api/repair/worker"):
+                return (200, #"{"worker":{"model":"opus","effort":"high","fast":false},"worker_lost":false}"#)
             case ("GET", "/api/code-review"):
                 return (
                     200,
@@ -291,7 +298,7 @@
         }
 
         private var modelsConfig: String {
-            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{}}"#
+            #"{"main":"claude_code:sonnet","vision":"claude_code:sonnet","fast":"opencode_go:deepseek-v4.1-flash","review":"claude_code:opus","search":"","effort":"medium","helpers":[],"standby":["ollama:gemma4:cloud"],"helper_cooldown_s":60,"context":{},"kinds":{"security":"claude_code:opus"}}"#
         }
 
         private func status(engaged: Bool) -> String {

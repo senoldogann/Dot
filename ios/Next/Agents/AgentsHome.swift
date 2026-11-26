@@ -84,7 +84,8 @@ struct AgentProfilePage: View {
                     Button {
                         picking = ModelPick(
                             id: "agent.model", title: String(localized: "Model", comment: "Schedule create: the model"), current: record.model, effort: nil,
-                            candidates: modelCandidates(options, for: .main)
+                            candidates: modelCandidates(options, for: .main),
+                            none: String(localized: "Default model", comment: "Agents: an agent on Dot's default model")
                         ) { ref, _ in await setModel(record, ref) }
                     } label: {
                         ListRow(
