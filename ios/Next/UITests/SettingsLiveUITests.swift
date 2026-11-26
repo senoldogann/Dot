@@ -29,7 +29,7 @@ final class SettingsLiveUITests: XCTestCase {
 
     func testEveryPageThatWritesWritesToTheMac() throws {
         let app: XCUIApplication = try launch()
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
 
         // This Mac: every hop passes and the daemon proved it holds the key.
         open(app, "This Mac")
@@ -83,10 +83,10 @@ final class SettingsLiveUITests: XCTestCase {
         let review: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Code review model")).firstMatch
         XCTAssertTrue(review.waitForExistence(timeout: 10))
         review.tap()
-        let reasoning: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reasoning")).firstMatch
-        for _ in 0..<6 where !reasoning.isHittable { app.swipeUp() }
-        reasoning.tap()
-        app.buttons["High"].tap()
+        // The level is a segment of the model catalog's picker (one picker for the app, item 1801).
+        let high: XCUIElement = app.buttons["High"]
+        for _ in 0..<6 where !high.isHittable { app.swipeUp() }
+        high.tap()
         app.buttons["Save"].tap()
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "High")).firstMatch.waitForExistence(timeout: 10))
         back(app)
@@ -157,14 +157,5 @@ final class SettingsLiveUITests: XCTestCase {
             app.buttons["Cancel"].tap()
         }
         back(app)
-
-        // The emergency stop, then its release.
-        app.swipeDown()
-        app.buttons["Emergency stop"].tap()
-        app.buttons["Stop everything"].tap()
-        let release: XCUIElement = app.buttons["Release the stop"]
-        XCTAssertTrue(release.waitForExistence(timeout: 10))
-        release.tap()
-        XCTAssertTrue(app.buttons["Emergency stop"].waitForExistence(timeout: 10))
     }
 }

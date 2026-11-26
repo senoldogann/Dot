@@ -61,7 +61,11 @@ settings are on your Mac"), and no row of it opens the web app (item 1791). The 
 on the Mac, and a connected app, 1Password's token or an official sign-in is taken back with Disconnect; adding a
 connected app, a sign-in or a key is done on the Mac. Its **Maintenance** shows Dot's version and
 the provider programs' (Claude Code, OpenCode) against the versions Dot was measured on, and **Continue after restart**,
-which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). The same by hand:
+which is `[agent] resume` (item 1790; `PUT /api/agent/resume`). Dot Next's composer records your voice (item 1802): the
+microphone turns it into a recorder (✕, a live waveform, a clock, ✓) and ✓ puts the words in the box; they are written
+down on the iPhone (Apple's Speech, on the device: no audio leaves the phone) or, when you choose it in its Settings ›
+Voice, on your Mac (`/api/voice/streams`, as the web page does). Settings › Voice also orders the microphones voice input
+takes (a wired or Bluetooth one is named the first time it is used). The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.

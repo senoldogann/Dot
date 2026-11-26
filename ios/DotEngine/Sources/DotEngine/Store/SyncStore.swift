@@ -30,12 +30,15 @@ public struct EngineSnapshot: Sendable, Equatable {
     /// The chats this phone started, by the outbox key of their first message: the thread the daemon named for each
     /// (item 1849), kept for the session.
     public var startedChats: [String: String]
+    /// The chats whose delete the daemon refused (a run or a helper of theirs at work, 409), with its words: the list
+    /// says so, as the outbox drops a refused doing (item 1800).
+    public var refusedDeletes: [String: String]
     /// The Mac's Dot was reset and the owner was not told yet (the old chats left this phone).
     public var reset: DaemonReset?
 
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
-        workingAt: [:], startedChats: [:], reset: nil)
+        workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil)
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -367,6 +370,11 @@ public actor SyncStore {
     }
 
     public func outcome(_ outcome: OutboxOutcome) {
+        if case .refused(let item, let failure) = outcome, case .delete(let thread) = item.action {
+            state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" }
+            publish()
+            return
+        }
         let key: String? =
             switch outcome {
             case .delivered(let item, _), .steered(let item), .started(let item, _): item.id
@@ -384,6 +392,13 @@ public actor SyncStore {
             changed = true
         }
         if changed { publish() }
+    }
+
+    /// The list told the owner of the refused deletes: they are let go.
+    public func forgetRefusedDeletes() {
+        guard !state.refusedDeletes.isEmpty else { return }
+        state.refusedDeletes = [:]
+        publish()
     }
 
     /// Drops the overlay of a message the chat now shows in its own place.

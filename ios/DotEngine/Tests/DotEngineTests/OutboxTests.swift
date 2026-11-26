@@ -218,7 +218,7 @@ final class OutboxTests: XCTestCase {
     func testANewChatWaitsUntilTheListIsLive() async throws {
         let live: Flag = Flag()
         let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { live.value })
-        try await outbox.enqueue(.newChat(text: "A new chat", images: [], uploaded: []), id: newMessageKey(), images: [])
+        try await outbox.enqueue(.newChat(text: "A new chat", images: [], uploaded: [], start: nil), id: newMessageKey(), images: [])
         try await clock.advancePastSleep(of: 5, count: 1, since: 0)
         XCTAssertEqual(daemon.count("POST", "/api/runs"), 0, "not sent onto a list that is not live")
         let kind: SendingKind? = await outbox.current.first?.kind
@@ -277,5 +277,25 @@ final class Flag: @unchecked Sendable {
     var value: Bool {
         get { lock.withLock { on } }
         set { lock.withLock { on = newValue } }
+    }
+}
+
+/// A delete the daemon refuses (a chat with a run or a helper at work, 409) is kept in the snapshot for the list to say
+/// (item 1800): the outbox drops a refused doing and would otherwise tell nobody.
+final class RefusedDeleteTests: XCTestCase {
+    func testARefusedDeleteIsKeptUntilTheListToldIt() async throws {
+        let folder: URL = scratchFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store: SyncStore = SyncStore(cache: SyncCache(folder: folder), clock: ManualClock(at: 1_800_000_000))
+        let item: OutboxItem = OutboxItem(id: "k1", action: .delete(thread: "thr_busy"), createdAt: 1)
+        await store.outcome(.refused(item, failure: .refused(code: 409, detail: "a run of the chat is at work")))
+        let refused: [String: String] = await store.snapshot.refusedDeletes
+        XCTAssertEqual(refused, ["thr_busy": "a run of the chat is at work"])
+        await store.outcome(.done(OutboxItem(id: "k2", action: .delete(thread: "thr_free"), createdAt: 1)))
+        let still: [String: String] = await store.snapshot.refusedDeletes
+        XCTAssertEqual(still.keys.sorted(), ["thr_busy"], "a delete that went through is not one")
+        await store.forgetRefusedDeletes()
+        let after: [String: String] = await store.snapshot.refusedDeletes
+        XCTAssertEqual(after, [:])
     }
 }

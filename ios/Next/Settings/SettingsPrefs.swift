@@ -10,7 +10,6 @@ enum PrefKey {
     static let followUp: String = "followUp"
     static let readingWidth: String = "readingWidth"
     static let timestampFormat: String = "timestampFormat"
-    static let confirmStop: String = "confirmStop"
     static let confirmDelete: String = "confirmDelete"
     static let haptics: String = "haptics"
     static let dictationLanguage: String = "dictationLanguage"

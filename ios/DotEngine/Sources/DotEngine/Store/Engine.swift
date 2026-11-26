@@ -42,9 +42,9 @@ public struct Engine: Sendable {
         return key
     }
 
-    public func startChat(_ text: String, photos: [Data]) async throws -> String {
+    public func startChat(_ text: String, photos: [Data], start: ChatStart) async throws -> String {
         let key: String = newMessageKey()
-        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: []), id: key, images: photos)
+        try await outbox.enqueue(.newChat(text: text, images: [], uploaded: [], start: start), id: key, images: photos)
         return key
     }
 
