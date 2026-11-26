@@ -45,6 +45,13 @@ struct BotRoute: Hashable, Sendable {
     let thread: String?
 }
 
+/// The chat a bot's screen shows (pure): the one chosen in its profile or begun in it, else the route's, else the one
+/// it showed first and holds, the first of them not deleted; the bot's latest only when it holds none (item 1923: the
+/// open chat changes only by the owner's hand, never because a newer chat of the bot came).
+func botChatThread(chosen: String?, route: String?, held: String?, latest: String?, deleted: (String) -> Bool) -> String? {
+    [chosen, route, held].compactMap { $0 }.first { !deleted($0) } ?? latest
+}
+
 /// A bot's chat with its header, its profile pushed from the pill, and the menu's sheets and confirmations.
 struct BotChatScreen: View {
     let route: BotRoute
@@ -61,6 +68,9 @@ struct BotChatScreen: View {
     @State private var problem: SettingsFailure?
     /// A chat chosen in the profile, in place of the route's.
     @State private var chosen: String?
+    /// The chat the screen showed first when the route named none (the bot's latest then), held so that a newer chat
+    /// of the bot (a code review Dot starts, a chat begun on the Mac) never takes its place by itself (item 1923).
+    @State private var held: String?
 
     private var bot: Bot? { model.bots.first { $0.id == route.bot } }
 
@@ -77,6 +87,9 @@ struct BotChatScreen: View {
                                 showsProfile = false
                             }).environment(\.botChat, header(bot)) }
                     .navigationDestination(isPresented: $composing) { PushedNewChat(botId: bot.id, header: header(bot)) }
+                    // The chat shown first is held from the moment the screen appears, before its chat's own screen does
+                    // (item 1923's review: a newer chat landing in between must not be the one held).
+                    .onAppear { if chosen == nil, route.thread == nil, held == nil { held = bot.latest?.summary.id } }
                     // A new chat opened under its outbox key becomes the real chat, in place, once the daemon names it.
                     .onChange(of: chosen.flatMap { model.startedChats[$0] }) { _, thread in if let thread { chosen = thread } }
                     .sheet(item: $sharing) { file in ShareSheet(items: [file.url]).presentationDetents([.medium, .large]) }
@@ -119,13 +132,14 @@ struct BotChatScreen: View {
     }
 
     @ViewBuilder private func content(_ bot: Bot) -> some View {
-        // A chosen chat deleted meanwhile (from the profile) gives way to the bot's latest.
-        let picked: String? = (chosen ?? route.thread).flatMap { model.chats[$0]?.freshness == .deleted ? nil : $0 }
-        if let key = picked, model.startingChats[key] != nil {
+        let shown: String? = botChatThread(
+            chosen: chosen, route: route.thread, held: held, latest: bot.latest?.summary.id, deleted: { model.chats[$0]?.freshness == .deleted })
+        if let key = shown, model.startingChats[key] != nil {
             StartingChat(key: key)
-        } else if let thread = picked ?? bot.latest?.summary.id {
+        } else if let thread = shown {
             ChatScreen(thread: thread, initialPanel: nil, editsFirstQueued: false)
                 .id(thread)
+                .onAppear { if chosen == nil, route.thread == nil, held != thread { held = thread } }
         } else {
             // A bot with no chat yet: the new chat in place; its first message opens the chat, as a pushed one does.
             BotNewChat(botId: bot.id, opened: { chosen = $0 })
