@@ -54,7 +54,8 @@ changed from the phone too: item 1770, a §24 picker sheet), Usage limits and ca
 the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last run, paused, failed; a
 switch on each row; edit, run now, delete), Rules (the approval mode tasks start in and what asks in it; free mode,
 switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every note to read, edit or
-forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and version, Usage,
+forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Campaigns (state, goal, last progress; a campaign's questions, notes and recent sessions; Stop, which asks, Resume and
+Mark achieved as the daemon takes them), Health and version, Usage,
 Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the computer stays on
 the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no Settings row opens
 the web app; the phone does not engage the emergency stop (the Mac's failsafe does), and while it holds Settings says
@@ -80,6 +81,13 @@ the daemon's notice of where to end it. While the daemon says a service waits, o
 reads again every five seconds, so "Finish on your Mac" turns into Connected with no pull to refresh; it stops with the
 sheet.
 No "For you" section: the daemon gives no suggestion for services.
+The Activity tab (`Activity/`, item 1826) reads what Dot did on its own: "while you were away" with Mark as read for
+every device, the drafts that wait (Send and Discard, each asked first), the proposals of Self-improvement (Use, Set
+aside), what waits, works, is due, ended or was learned today (a row opens its chat), and the morning brief, the evening
+check-in, Dot's own initiative and the watchers with their switches; their setup stays on the Mac (PLAN §26).
+`scripts/e2e_activity.sh <simulator udid> <derived data> <shots dir>` runs `ActivityLiveUITests` against a throwaway
+daemon seeded with `e2e_daemon.py --seed-activity`, exports its light and dark shots and reads on the daemon's side what
+each tap wrote; it never sends a draft (a send goes through the Mac's own Mail or Messages).
 
 ## The engine: `ios/DotEngine`
 
@@ -87,7 +95,9 @@ A Swift package (iOS 26 and macOS 26; Foundation, Network, Security only: no UIK
 `Contract/` (the daemon's sync contract, `docs/phone.md` "A chat kept in sync"), `Wire/` (HTTP, SSE parser, host,
 retry policy), `Sync/` (the pure reducers of a chat and the list, frames, delivery states, the transcript filter, the
 clock, the link), `Store/` (`SyncStore`, `Supervisor`, `Engine`), `Outbox/` (moved from the old app), `Cache/`
-(`v2/` of the app group), `Pairing/` (typed code, Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
+(`v2/` of the app group, kept with the daemon it came from: a reset Dot, another `store_id`, drops it and the outbox's doings
+for the old chats, their words kept in the new chat's draft; `docs/phone.md` "Which daemon"), `Pairing/` (typed code,
+Keychain). `swift test` in `ios/DotEngine` runs its tests on the Mac;
 the DotNext scheme runs them on the simulator too. The tests never sleep: `ManualClock` is moved by hand, and
 `FakeDaemon` (a `URLProtocol`) speaks the contract and misbehaves as a test says.
 
@@ -102,17 +112,19 @@ the DotNext scheme runs them on the simulator too. The tests never sleep: `Manua
   empty and loading states, notices, the toast with Undo, sheets (inspector: ✕ only; edit: ✕ and ✓), the composer shell,
   the floating working capsule with the scroll-to-bottom circle, the transcript pieces (bubble, answer, code block, tool
   call row and group, helper group, speaker line), helper and background-work rows and their sheets.
-- `App/`: the shell (four tabs), the placeholder screens, the gallery, sample content.
+- `App/`: the shell (the home of bots, PLAN §27: `Home.swift`, a bot's chat `BotChat.swift`, its profile
+  `BotProfile.swift`, faces `BotFace.swift`), the gallery, sample content. `scripts/e2e_bots.sh` runs `BotsLiveUITests`
+  on a throwaway daemon.
 - `Resources/`: the asset catalog (app icon, accent = the ink) and `Localizable.xcstrings`.
 - `Tests/`: `DotNextTests`. `scripts/`: the icon, the strings check, the screenshot harness.
 
 ## Decisions taken in N0
 
-- **No hue.** The ink is the only accent (send, switches, tab tint, links underlined, selection); amber only for what
-  waits on the owner (also the Chats badge), red only for a failure. No surface has a stroke.
+- **No hue.** The ink is the only accent (send, switches, links underlined, selection, the unread dot); amber only for
+  what waits on the owner, red only for a failure. No surface has a stroke.
 - **The switch** is drawn (`InkSwitchStyle`): the system's white thumb disappears on a light ink track in the dark look.
-- **iPad**: the tab bar stays the top level on every width; inside Chats and Agents a compact width is a stack and a
-  regular width a split view with the same selection, so collapsing keeps the open item. Grouped pages are at most
+- **iPad**: no tab bar (PLAN §27); a compact width is the home with a bot's chat pushed, a regular width a split view
+  (the home as the sidebar, the chat as the detail) with the same selection, so collapsing keeps the open chat. Grouped pages are at most
   700 pt wide; prose in a chat is measured to 68 characters of the body font (`ProseColumn`, tested to stay in 60-75).
 - **Density**: tool calls are 28 pt rows under a 44 pt group disclosure; a row is a full-width target 28 pt tall (an
   open question for the owner's review on the phone).
@@ -144,10 +156,11 @@ Next/scripts/check_strings.sh /tmp/dotnext-dd
 takes 16-27 minutes on the runner, so each has a part of its own), `e2e` (`scripts/e2e_settings.sh` against a
 throwaway daemon of the same commit), and `ios`, which passes only when all of them did.
 
-- A pull request that changes `ios/**` runs `engine`, `build` and `tests (chat)` (about 20 minutes).
-- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs on a push to `main`, every night,
-  when asked (`gh workflow run ios.yml --ref <branch>`), and on a pull request with the label `ios-full`
-  (`gh pr edit <pr> --add-label ios-full`; adding it starts the run).
+- A pull request runs none of it (item 1886: the five macOS runners were what pull requests waited on). The push to
+  `main` that merges one, when it changes `ios/**`, runs `engine`, `build` and `tests (chat)` (about 20 minutes); a
+  failure there opens the issue "main is red on macOS" (`scripts/main_macos_green.py`).
+- The whole run (`tests (controls)`, `tests (rows)` and `e2e` too, about an hour) runs every night and when asked:
+  `gh workflow run ios.yml --ref <branch>` runs it on a branch before its pull request merges.
 - A run holds two macOS runners at most, so that three of the account's five stay free for the gate.
 - A test that fails, unit or UI, runs once more (`-retry-tests-on-failure`; `e2e` runs its whole script once more): a
   fresh runner's simulator sometimes fails to launch the app or start the test runner. A test that fails twice fails
@@ -189,6 +202,15 @@ runs `StreamingLiveUITests` on such a daemon: a new chat stays open when its fir
 by the debug frame meter (`-DotNextFrameMeter 1`: frames, hitches, frames over 16.7 ms, hitch time per second, one line
 per run in `Library/Caches/dotnext-frames.txt`).
 
+## A chat's message actions and the inspector, end to end
+
+`scripts/e2e_chat_actions.sh <udid> <derived data> <shots folder>` (inside the Xcode lock) makes six chats on a
+throwaway daemon with the script words `write:` (a file the inspector can undo), `draft:` (a draft card), `bg:` (a
+command in the background), `fail:`, `helper:` and a plain one, then `ChatActionsLiveUITests` walks them in the dark
+look (shots only) and the light look (Edit from here, Retry and Continue, the draft's edit and Discard, Undo, Write a
+recap, Stop, a helper's chat); the script reads on the daemon's side what each tap did. `e2e_daemon.py --model
+claude_code:haiku` runs the same daemon on a real model.
+
 ## The chat's fixtures
 
 Debug builds draw the real chat screen from a fixture with no daemon (`App/Fixtures.swift`, decoded from the contract's
@@ -202,7 +224,7 @@ JSON): `-DotNextScene n2-chat`, `n2-asks`, `n2-secret`, `n2-handoff`, `n2-queue`
 Debug builds draw Settings on a daemon served from memory through a `URLProtocol` (`Settings/SettingsFixture.swift`,
 the routes' own JSON): `-DotNextScene settings-home`, `settings-search`, `settings-mac`, `settings-notifications`,
 `settings-general`, `settings-appearance`, `settings-chat`, `settings-voice`, `settings-models`, `settings-caps`, `settings-caps-refused`,
-`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`,
+`settings-schedules`, `settings-schedule-edit`, `settings-rules`, `settings-memory`, `settings-system`, `settings-campaigns`, `settings-campaign`,
 `settings-stopped`, `settings-offline`, `settings-key-refused`, `settings-old-daemon`, `settings-web`,
 `settings-connect-apps`, `settings-connect-apps-detail`, `settings-connect-apps-offline`, `pairing`, `pairing-link`. `UITests/SettingsUITests.swift` runs on them, and `SettingsControlsUITests.swift` taps every row of
 Settings and every control of each native page and fails on one after which nothing changed.
@@ -219,7 +241,7 @@ and approvals picked in its settings (a real model, `claude_code:haiku` by defau
 ## Screenshots
 
 `scripts/shots.sh <DotNext.app> <out dir> "tr en" <booted simulator udid>...` captures every scene (the gallery pages,
-the tabs, the chat and its sheets) in light and dark, at Large and AX3. The debug build opens a scene with
+the home, the chat and its sheets) in light and dark, at Large and AX3. The debug build opens a scene with
 `-DotNextScene <name>` (`LaunchScene.names`) and writes `Library/Caches/dotnext-ready.txt` once it is drawn; the script
 waits for that file before each capture.
 

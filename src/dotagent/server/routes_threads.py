@@ -2,6 +2,7 @@
 pinning one from its menu (item 130), keeping what its composer chose (item 199), the helpers its runs started
 (item 227), and its terminal sessions (item 229)."""
 
+import asyncio
 import time
 from typing import Annotated
 
@@ -9,8 +10,11 @@ from fastapi import APIRouter, Query
 from starlette.responses import StreamingResponse
 
 from dotagent.core.errors import ConfigError, NotFoundError
+from dotagent.core.text import redact_known
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
+from dotagent.memory.words import search_terms
 from dotagent.notify.tell_ledger import mark_opened
+from dotagent.secrets import known_secrets
 from dotagent.server.context import ServerContext
 from dotagent.server.stream import event_stream
 from dotagent.server.thread_sync import (
@@ -28,6 +32,7 @@ from dotagent.server.thread_sync import (
     threads_view,
 )
 from dotagent.server.views import (
+    ChatSearchQuery,
     DeletedThreads,
     DeleteThreadsRequest,
     HelpersQuery,
@@ -36,7 +41,7 @@ from dotagent.server.views import (
     ThreadsQuery,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import RunRecord, ThreadSummary
+from dotagent.store.models import ChatHit, RunRecord, ThreadSummary
 
 
 def threads_router(ctx: ServerContext) -> APIRouter:
@@ -52,6 +57,19 @@ def threads_router(ctx: ServerContext) -> APIRouter:
     async def view_threads(query: Annotated[ThreadsViewQuery, Query()]) -> ThreadsView:
         """The chats with their revisions and asks (item 1686, :mod:`dotagent.server.thread_sync`)."""
         return await threads_view(ctx, query.limit)
+
+    @router.get("/threads/search")
+    async def search_threads(query: Annotated[ChatSearchQuery, Query()]) -> list[ChatHit]:
+        """What the chats say that holds any of the words of ``q`` (item 1882, the phone's home search), best first, at
+        most ``limit``: a message of a chat's history or a run's answer, with the words around the match (the index of
+        item 1740). A secret Dot holds is masked in a snippet, as the ``search_chats`` tool masks it. Words that fold to
+        nothing find nothing."""
+        terms: tuple[str, ...] = search_terms(query.q)
+        hits: list[ChatHit] = await store.search_chat_text(terms, query.limit)
+        if not hits:
+            return []
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=True)
+        return [hit.model_copy(update={"snippet": redact_known(hit.snippet, held)}) for hit in hits]
 
     @router.get("/threads/stream")
     async def stream_threads() -> StreamingResponse:

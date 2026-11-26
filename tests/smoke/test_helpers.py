@@ -17,6 +17,7 @@ import pytest_asyncio
 from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.helpers import HELPER_UNAVAILABLE_EVENT, MODEL_SWITCHED_EVENT
 from dotagent.agent.manager import RunManager
+from dotagent.agent.refusal import MODEL_REFUSED_EVENT, REFUSAL_ASKED_AGAIN_EVENT
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import ProviderQuotaError
 from dotagent.core.types import FrozenModel, JsonObject
@@ -26,7 +27,9 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply, Usage
+from dotagent.proactive import INITIATIVE_SOURCE
 from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.store.endings import PREFIX_MODEL_REFUSED, RESULT_EMPTY_REPLIES
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_TOOL
@@ -36,6 +39,8 @@ from dotagent.tools.shell import read_login_env
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 GOAL: str = "Pick a file format for the export of the contacts."
+# A refusal of the task, in the words a model writes one.
+REFUSED: str = "I'm sorry, but I can't help with that."
 HELPER: str = "anthropic:scripted-helper"
 SPENT_MAIN: str = "anthropic:scripted-spent"
 SPENT_OTHER: str = "anthropic:scripted-spent-too"
@@ -499,9 +504,9 @@ async def test_without_a_standby_model_the_run_fails_with_the_error_of_its_model
     assert played.record.model == SPENT_MAIN
 
 
-async def test_a_reply_its_content_filter_stops_ends_the_run_on_its_own_model(login_env: dict[str, str]) -> None:
-    """A run changes its model only when its credits or limits are spent (item 1225): a filter's stop ends it saying
-    so, a standby model named or not, and the same conversation is not sent again."""
+async def test_a_reply_its_content_filter_stops_moves_the_run_to_its_standby_model(login_env: dict[str, str]) -> None:
+    """A filter's stop is a technical block, not the model's judgement (item 1889): the run moves to its standby model,
+    as for a spent quota, and the filtering model is not sent the same conversation again."""
     filtering: FilteringProvider = FilteringProvider(ScriptedProvider("anthropic", []), 0)
     standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
     async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": filtering, "ollama": standby}) as (
@@ -509,17 +514,24 @@ async def test_a_reply_its_content_filter_stops_ends_the_run_on_its_own_model(lo
         runs,
     ):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
-    assert (played.record.status, played.record.model) == ("failed", SPENT_MAIN), played.record
-    assert "content filter" in played.record.result
-    assert played.data(MODEL_SWITCHED_EVENT) == ()
-    assert (len(filtering.requests), standby.requests) == (1, [])
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert played.record.model == SCRIPTED_MODEL
+    assert played.data(MODEL_SWITCHED_EVENT) == (
+        {
+            "from": SPENT_MAIN,
+            "to": SCRIPTED_MODEL,
+            "reason": "its service's content filter stopped the reply",
+            "step": 1,
+        },
+    )
+    assert len(filtering.requests) == 1
 
 
-async def test_a_model_that_answers_with_nothing_again_and_again_ends_the_run_on_its_own_model(
+async def test_a_model_that_answers_with_nothing_again_and_again_moves_the_run_to_its_standby_model(
     login_env: dict[str, str],
 ) -> None:
-    """Item 789: a model that answers with nothing as many times as a run is nudged ends the run ("The model returned
-    empty replies"), a standby model named or not (item 1225)."""
+    """Item 789 ends a run whose model answers with nothing as many times as it is nudged; with a standby model named,
+    the run moves there instead and finishes (item 1889)."""
     empty: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_says("")] * 5))
     standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
     async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": empty, "ollama": standby}) as (
@@ -527,20 +539,36 @@ async def test_a_model_that_answers_with_nothing_again_and_again_ends_the_run_on
         runs,
     ):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
-    assert (played.record.status, played.record.model) == ("failed", SPENT_MAIN), played.record
-    assert played.data(MODEL_SWITCHED_EVENT) == ()
-    assert standby.requests == []
+    assert (played.record.status, played.record.model) == ("done", SCRIPTED_MODEL), played.record
+    [switched] = played.data(MODEL_SWITCHED_EVENT)
+    assert (switched["from"], switched["to"], switched["reason"]) == (
+        SPENT_MAIN,
+        SCRIPTED_MODEL,
+        "its replies stayed empty",
+    )
+    assert len(standby.requests) == 1
 
 
-async def test_a_model_that_declines_the_goal_ends_the_run_with_its_answer_on_its_own_model(
+async def test_a_model_that_answers_with_nothing_again_and_again_ends_the_run_when_no_standby_model_is_left(
     login_env: dict[str, str],
 ) -> None:
-    """A refusal is the model's answer, not a spent credit: the run ends with it, and no standby model is asked (item
-    1225, the owner's word of 2026-11-19, which undoes items 980 and 983's move)."""
+    empty: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_says("")] * 5))
+    async with _session(_config([], [], 5), login_env, {"anthropic": empty}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.result) == ("failed", RESULT_EMPTY_REPLIES), played.record
+    assert played.data(MODEL_SWITCHED_EVENT) == ()
+
+
+async def test_a_declined_task_of_the_owners_is_asked_once_with_its_grounds_and_then_ends_with_the_models_words(
+    login_env: dict[str, str],
+) -> None:
+    """Item 1889: a refusal is the model's judgement. The owner's own task is asked again once, with the note that
+    gives its grounds; a second no ends the run with the model's words, on its own model, and no standby model is
+    asked."""
     declined: ScriptedTurn = _turn(
         ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "I cannot do this.", "success": False})
     )
-    declining: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [declined]))
+    declining: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [declined, _says(REFUSED)]))
     standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
     async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": declining, "ollama": standby}) as (
         runtime,
@@ -548,9 +576,44 @@ async def test_a_model_that_declines_the_goal_ends_the_run_with_its_answer_on_it
     ):
         played: Played = await _play(runtime, runs, SPENT_MAIN, None)
     assert (played.record.status, played.record.model) == ("failed", SPENT_MAIN), played.record
-    assert "I cannot do this." in played.record.result
+    assert played.record.result == f"{PREFIX_MODEL_REFUSED} ({SPENT_MAIN}). Its words:\n\n{REFUSED}"
+    assert played.record.end_reason == "model_refused"
+    assert played.data(REFUSAL_ASKED_AGAIN_EVENT) == ({"model": SPENT_MAIN, "hosts": [], "owner_words": True},)
+    assert played.data(MODEL_REFUSED_EVENT) == ({"model": SPENT_MAIN, "words": REFUSED},)
     assert played.data(MODEL_SWITCHED_EVENT) == ()
     assert standby.requests == []
+    assert len(declining.requests) == 2
+    note: str = declining.requests[1].messages[-1].content
+    assert note.startswith("[system note] Your last reply declined the task.")
+    assert f'The task is the owner\'s own words, sent by them: "{GOAL}"' in note
+    assert "not exploiting them" in note and "If you still decline, say so plainly" in note
+
+
+async def test_a_declined_task_asked_again_goes_on_when_the_model_takes_it(login_env: dict[str, str]) -> None:
+    declining: RecordingProvider = RecordingProvider(
+        ScriptedProvider("anthropic", [_says(REFUSED), _finish("CSV: a spreadsheet opens it.")])
+    )
+    async with _session(_config([], [], 5), login_env, {"anthropic": declining}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.result) == ("done", "CSV: a spreadsheet opens it."), played.record
+    assert len(played.data(REFUSAL_ASKED_AGAIN_EVENT)) == 1
+    assert played.data(MODEL_REFUSED_EVENT) == ()
+
+
+async def test_a_declined_task_dot_began_itself_ends_at_once(login_env: dict[str, str]) -> None:
+    """A run that is not the owner's words and names no scoped host has no grounds to give: its refusal stands at
+    once, with no note."""
+    declining: RecordingProvider = RecordingProvider(ScriptedProvider("anthropic", [_says(REFUSED)]))
+    async with _session(_config([], [], 5), login_env, {"anthropic": declining}) as (runtime, runs):
+        run: RunRecord = await runs.start(
+            GOAL, "task", SPENT_MAIN, None, INITIATIVE_SOURCE, None, None, "standard", None, "ask", False, ()
+        )
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            record: RunRecord = await runs.wait(run.id)
+        events: tuple[EventRecord, ...] = tuple(await runtime.store.list_events(record.id, 0, _MAX_EVENTS))
+    assert (record.status, record.end_reason) == ("failed", "model_refused"), record
+    assert [event.kind for event in events if event.kind == REFUSAL_ASKED_AGAIN_EVENT] == []
+    assert len(declining.requests) == 1
 
 
 async def test_a_reply_its_content_filter_stops_ends_the_run_saying_so_when_no_standby_model_is_left(

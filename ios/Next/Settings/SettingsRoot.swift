@@ -1,23 +1,27 @@
 import DotEngine
 import SwiftUI
 
-/// The Settings tab (PLAN §4.4, the reference's structure with Dot's pages; UI-STANDARD 14:25): while the Mac's
-/// emergency stop holds, a notice with its release at the top, then Connections, the phone's own preferences, Agents,
-/// System, and one quiet footnote: what is set up at the computer is the Mac's (PLAN §26), so no row opens the web app.
-/// A search with synonyms finds any page.
-struct SettingsTab: View {
+/// The one settings sheet (PLAN §27), opened from the owner's initials on the home: grouped cards in the order of the
+/// owner's reference, the native pages inside; what belongs to the Mac stays there (§26). A search with synonyms finds
+/// any page.
+struct SettingsSheet: View {
     @Environment(AppModel.self) private var model: AppModel
     @State private var path: [SettingsPage]
     @State private var query: String
     @State private var failsafe: Loadable<FailsafeState> = .loading
     @State private var stopProblem: SettingsFailure?
     @State private var releasing: Bool = false
+    @State private var owner: String = ""
+    /// Why the owner's name could not be read (the card then says "You").
+    @State private var ownerProblem: SettingsFailure?
     @State private var connectApps: ConnectAppsOpening
 
     let start: SettingsStart
+    let close: () -> Void
 
-    init(start: SettingsStart) {
+    init(start: SettingsStart, close: @escaping () -> Void) {
         self.start = start
+        self.close = close
         _path = State(initialValue: start.path)
         _query = State(initialValue: start.query)
         _connectApps = State(initialValue: start.connectApps)
@@ -28,44 +32,75 @@ struct SettingsTab: View {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty { root } else { results }
             }
-            .navigationDestination(for: SettingsPage.self) { page in destination(page) }
+            .navigationDestination(for: SettingsPage.self) { page in SettingsDestination(page: page, start: start) }
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: String(localized: "Search settings", comment: "Settings: the search field's placeholder"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(String(localized: "Close", comment: "Sheet toolbar: closes an inspector sheet"), systemImage: "xmark", role: .close, action: close)
+                        .accessibilityIdentifier("settings.close")
+                }
+            }
         }
         .task { failsafe = await model.read { api throws(DaemonRequestError) in try await api.failsafe() } }
+        .task { await readOwner() }
         .sheet(isPresented: Binding(get: { connectApps != .closed }, set: { if !$0 { connectApps = .closed } })) {
             ConnectAppsSheet(opensDetail: connectApps.detail)
         }
     }
 
+    private func readOwner() async {
+        switch await model.read({ api throws(DaemonRequestError) in try await api.assistant() }) {
+        case .loaded(let assistant):
+            owner = assistant.owner
+            ownerProblem = nil
+        case .failed(let failure): ownerProblem = failure
+        case .loading: break
+        }
+    }
+
     // MARK: The root list
 
+    /// The one settings sheet of the owner's initials (PLAN §27): the owner and what the work uses, Connect apps, the
+    /// bot's own settings, the phone's preferences, the system, and a footnote that the rest is on the Mac.
     private var root: some View {
         SettingsScroll(title: String(localized: "Settings", comment: "Title of the settings tab")) {
-            stopBlock
-            GroupedSection(header: String(localized: "Connections", comment: "Settings section: the Mac, notifications, this phone"), footer: nil) {
-                PageRow(page: .mac, systemImage: "desktopcomputer", title: String(localized: "This Mac", comment: "Settings row: the paired Mac"), description: nil, detail: transportWord(model.transport))
-                PageRow(page: .notifications, systemImage: "bell", title: String(localized: "Notifications", comment: "Settings row"), description: nil, detail: nil)
+            if let ownerProblem {
+                FailureBanner(failure: ownerProblem, macPlace: String(localized: "Settings › General", comment: "Where on the Mac: the General page"), retry: { Task { await readOwner() } })
             }
             GroupedSection(header: nil, footer: nil) {
-                PageRow(page: .general, systemImage: "gearshape", title: String(localized: "General", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .general, systemImage: "person.crop.circle", title: owner.isEmpty ? String(localized: "You", comment: "Settings: the owner's card before their name is read") : owner, description: model.macName, detail: nil)
+                PageRow(page: .usage, systemImage: "chart.bar", title: String(localized: "Usage", comment: "Settings row: the tokens of the last days"), description: nil, detail: nil)
+                PageRow(page: .caps, systemImage: "gauge.with.dots.needle.33percent", title: String(localized: "Usage limits and caps", comment: "Settings row: the plan's windows and the caps of what tasks spend"), description: nil, detail: nil)
+            }
+            GroupedSection(header: nil, footer: nil) {
+                Button { connectApps = .list } label: {
+                    ListRow(
+                        systemImage: "square.grid.2x2", title: String(localized: "Connect apps", comment: "Home: opens the sheet that connects apps"),
+                        description: String(localized: "Search plugins", comment: "Settings: the line under Connect apps"), accessory: .chevron)
+                }
+                .buttonStyle(RowPressStyle())
+            }
+            GroupedSection(header: String(localized: "Bot", comment: "Settings section: how Dot and the bots work"), footer: nil) {
+                PageRow(page: .rules, systemImage: "lock.shield", title: String(localized: "Permissions", comment: "Settings row: the approval mode and the rules"), description: String(localized: "Approval mode and rules", comment: "Settings: the line under Permissions"), detail: nil)
+                PageRow(page: .mac, systemImage: "desktopcomputer", title: String(localized: "Dot's computer", comment: "Settings row: the paired Mac Dot works on"), description: nil, detail: transportWord(model.transport))
+                PageRow(page: .schedules, systemImage: "clock", title: String(localized: "Scheduled tasks", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
+                PageRow(page: .campaigns, systemImage: "target", title: String(localized: "Campaigns", comment: "Settings row: goals Dot keeps working on"), description: nil, detail: nil)
+            }
+            GroupedSection(header: nil, footer: nil) {
+                PageRow(page: .models, systemImage: "cpu", title: String(localized: "Models", comment: "Settings row"), description: nil, detail: nil)
+                PageRow(page: .notifications, systemImage: "bell", title: String(localized: "Notifications", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .appearance, systemImage: "paintbrush", title: String(localized: "Appearance", comment: "Settings row"), description: nil, detail: nil)
                 PageRow(page: .chat, systemImage: "bubble.left.and.bubble.right", title: String(localized: "Chat", comment: "Settings row: chat preferences"), description: nil, detail: nil)
                 PageRow(page: .voice, systemImage: "waveform", title: String(localized: "Voice", comment: "Settings row: voice typing"), description: nil, detail: nil)
+                PageRow(page: .general, systemImage: "gearshape", title: String(localized: "General", comment: "Settings row"), description: nil, detail: nil)
             }
-            GroupedSection(header: String(localized: "Agents", comment: "Settings section: models, schedules, rules, memory"), footer: nil) {
-                PageRow(page: .models, systemImage: "cpu", title: String(localized: "Models", comment: "Settings row"), description: nil, detail: nil)
-                PageRow(page: .caps, systemImage: "gauge.with.dots.needle.33percent", title: String(localized: "Usage limits and caps", comment: "Settings row: the plan's windows and the caps of what tasks spend"), description: nil, detail: nil)
-                PageRow(page: .schedules, systemImage: "clock", title: String(localized: "Scheduled tasks", comment: "Settings row"), description: nil, detail: nil)
-                PageRow(page: .rules, systemImage: "lock.shield", title: String(localized: "Rules", comment: "Settings row: what Dot may do without asking"), description: nil, detail: nil)
-                PageRow(page: .memory, systemImage: "brain", title: String(localized: "Memory", comment: "Settings row"), description: nil, detail: nil)
-                PageRow(page: .agents, systemImage: "person.2", title: String(localized: "Agents", comment: "Title of the agents list"), description: nil, detail: nil)
-            }
-            GroupedSection(header: nil, footer: nil) { connectAppsRow }
             GroupedSection(header: String(localized: "System", comment: "Settings section: health, version"), footer: nil) {
-                PageRow(page: .system, systemImage: "heart.text.square", title: String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), description: nil, detail: nil)
-                PageRow(page: .usage, systemImage: "chart.bar", title: String(localized: "Usage", comment: "Settings row: the tokens of the last days"), description: nil, detail: nil)
                 PageRow(page: .maintenance, systemImage: "arrow.triangle.2.circlepath", title: String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), description: nil, detail: nil)
+                PageRow(page: .system, systemImage: "heart.text.square", title: String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), description: nil, detail: nil)
             }
+            stopBlock
             Text(String(localized: "More settings are on your Mac.", comment: "Settings: the quiet footnote at the end; what is set up at the computer is done on the Mac"))
                 .textRole(.footnote).foregroundStyle(Tone.tertiary)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -106,13 +141,6 @@ struct SettingsTab: View {
 
     /// The row that opens Connect apps (item 1862, PLAN §27, which overrides §26's cut of Connectors), until the settings
     /// sheet of PLAN §27 carries it.
-    private var connectAppsRow: some View {
-        Button { connectApps = .list } label: {
-            ListRow(systemImage: "powerplug", title: String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), description: nil, accessory: .chevron)
-        }
-        .buttonStyle(RowPressStyle())
-    }
-
     // MARK: Search
 
     private var results: some View {
@@ -143,9 +171,14 @@ struct SettingsTab: View {
         }
     }
 
-    // MARK: Pages
+}
 
-    @ViewBuilder private func destination(_ page: SettingsPage) -> some View {
+/// The page of a Settings row, wherever a stack opens it (the settings sheet, a bot's profile).
+struct SettingsDestination: View {
+    let page: SettingsPage
+    let start: SettingsStart
+
+    var body: some View {
         switch page {
         case .mac: MacPage()
         case .notifications: NotificationsPage()
@@ -162,6 +195,8 @@ struct SettingsTab: View {
         case .system: SystemPage()
         case .usage: UsagePage()
         case .maintenance: MaintenancePage()
+        case .campaigns: CampaignsPage()
+        case .campaign(let id): CampaignPage(id: id)
         case .connectApps: EmptyView()
         }
     }
@@ -203,18 +238,18 @@ func transportWord(_ transport: Transport) -> String {
 /// Every place the search finds, with the page it opens: the native pages, each with synonyms in English (whatever the
 /// app's language, as the web's words) and in the app's language.
 func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
-    let agents: String = String(localized: "Agents", comment: "Settings section: models, schedules, rules, memory")
-    let connections: String = String(localized: "Connections", comment: "Settings section: the Mac, notifications, this phone")
+    // Each entry's path is the group it stands in on the sheet; the unheaded groups have none.
+    let agents: String = String(localized: "Bot", comment: "Settings section: how Dot and the bots work")
     let system: String = String(localized: "System", comment: "Settings section: health, version")
     func entry(_ id: String, _ title: String, _ path: String, _ english: String, _ local: String, _ page: SettingsPage) -> (SettingsEntry, SettingsPage) {
         (SettingsEntry(id: id, title: title, path: path, synonyms: [english, local]), page)
     }
-    let all: [(SettingsEntry, SettingsPage)] = [
+    var all: [(SettingsEntry, SettingsPage)] = [
         entry(
-            "mac", String(localized: "This Mac", comment: "Settings row: the paired Mac"), connections, "connection tailscale address key pair diagnose network status proof",
+            "mac", String(localized: "Dot's computer", comment: "Settings row: the paired Mac Dot works on"), agents, "this mac connection tailscale address key pair diagnose network status proof",
             String(localized: "connection tailscale address key pair diagnose network", comment: "Settings search synonyms of This Mac (space separated)"), .mac),
         entry(
-            "notifications", String(localized: "Notifications", comment: "Settings row"), connections, "push alerts banner needs you done ready",
+            "notifications", String(localized: "Notifications", comment: "Settings row"), "", "push alerts banner needs you done ready",
             String(localized: "push alerts banner", comment: "Settings search synonyms of Notifications (space separated)"), .notifications),
         entry(
             "general", String(localized: "General", comment: "Settings row"), "", "name language timestamps clock follow-up queue steer confirmations voice dictation",
@@ -229,16 +264,16 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "voice", String(localized: "Voice", comment: "Settings row: voice typing"), "", "voice dictation microphone transcribe speech bluetooth airpods carplay",
             String(localized: "voice dictation microphone transcribe speech", comment: "Settings search synonyms of Voice (space separated)"), .voice),
         entry(
-            "models", String(localized: "Models", comment: "Settings row"), agents, "model llm main review vision fast code review fallback provider",
+            "models", String(localized: "Models", comment: "Settings row"), "", "model llm main review vision fast code review fallback provider",
             String(localized: "model main review vision code review", comment: "Settings search synonyms of Models (space separated)"), .models),
         entry(
-            "caps", String(localized: "Usage limits and caps", comment: "Settings row: the plan's windows and the caps of what tasks spend"), agents,
+            "caps", String(localized: "Usage limits and caps", comment: "Settings row: the plan's windows and the caps of what tasks spend"), "",
             "budget cost spend tokens limit cap plan window", String(localized: "budget cost spend tokens limit", comment: "Settings search synonyms of the caps (space separated)"), .caps),
         entry(
             "schedules", String(localized: "Scheduled tasks", comment: "Settings row"), agents, "schedules cron repeat morning brief loops automations",
             String(localized: "schedules repeat morning brief", comment: "Settings search synonyms of Scheduled tasks (space separated)"), .schedules),
         entry(
-            "rules", String(localized: "Rules", comment: "Settings row: what Dot may do without asking"), agents, "permissions approvals policy ask safety allow deny",
+            "rules", String(localized: "Permissions", comment: "Settings row: the approval mode and the rules"), agents, "rules permissions approvals policy ask safety allow deny",
             String(localized: "permissions approvals policy ask safety", comment: "Settings search synonyms of Rules (space separated)"), .rules),
         entry(
             "memory", String(localized: "Memory", comment: "Settings row"), agents, "notes remember lessons search proposals",
@@ -250,7 +285,7 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "system", String(localized: "Health and version", comment: "Settings row: the daemon's health, version, emergency stop"), system,
             "daemon health emergency stop version uptime failsafe", String(localized: "health emergency stop version", comment: "Settings search synonyms of System (space separated)"), .system),
         entry(
-            "usage", String(localized: "Usage", comment: "Settings row: the tokens of the last days"), system, "usage tokens days stats",
+            "usage", String(localized: "Usage", comment: "Settings row: the tokens of the last days"), "", "usage tokens days stats",
             String(localized: "usage tokens days", comment: "Settings search synonyms of Usage (space separated)"), .usage),
         entry(
             "maintenance", String(localized: "Maintenance", comment: "Settings row: updates and what happens after a restart"), system,
@@ -260,5 +295,6 @@ func settingsIndex() -> [(SettingsEntry, SettingsPage)] {
             "connect-apps", String(localized: "Connect apps", comment: "Title of the Connect apps sheet"), "", "connectors connect apps services mcp accounts google github slack notion plugins",
             String(localized: "connectors apps services accounts", comment: "Settings search synonyms of Connect apps (space separated)"), .connectApps),
     ]
+    all.append(campaignsIndexEntry())
     return all
 }

@@ -31,8 +31,8 @@ final class SettingsLiveUITests: XCTestCase {
         let app: XCUIApplication = try launch()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 15))
 
-        // This Mac: every hop passes and the daemon proved it holds the key.
-        open(app, "This Mac")
+        // Dot's computer (the This Mac page): every hop passes and the daemon proved it holds the key.
+        open(app, "Dot's computer")
         XCTAssertTrue(app.staticTexts["Your Mac proved it holds this phone's key."].waitForExistence(timeout: 15))
         back(app)
 
@@ -127,6 +127,28 @@ final class SettingsLiveUITests: XCTestCase {
         chat.tap()
         sleep(3)
         back(app)
+        back(app)
+        back(app)
+
+        // Campaigns: the seeded campaign is stopped (it asks first), then resumed (item 1895).
+        open(app, "Campaigns")
+        let campaign: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "E2E campaign")).firstMatch
+        XCTAssertTrue(campaign.waitForExistence(timeout: 10))
+        campaign.tap()
+        let stop: XCUIElement = app.buttons["Stop"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !stop.isHittable { app.swipeUp() }
+        stop.tap()
+        XCTAssertTrue(app.staticTexts["Stop this campaign?"].waitForExistence(timeout: 5), "Stop asks first")
+        // The dialog's own Stop: the page's row lies under the dialog and cannot be tapped.
+        let confirm: XCUIElement? = app.buttons.matching(identifier: "Stop").allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(confirm, "the dialog's Stop")
+        confirm?.tap()
+        let resume: XCUIElement = app.buttons["Resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 10), "stopped")
+        XCTAssertTrue(app.staticTexts["Stopped"].exists)
+        resume.tap()
+        XCTAssertTrue(app.buttons["Stop"].waitForExistence(timeout: 10), "resumed")
         back(app)
         back(app)
 

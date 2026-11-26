@@ -1510,6 +1510,8 @@ _ADDED_APPROVAL_COLUMNS: tuple[tuple[str, str], ...] = (
     ("scope_thread_id", "TEXT"),
     ("scope_campaign_id", "TEXT"),
 )
+# The kv key of the database's own id (:meth:`Store.store_id`).
+STORE_ID_KEY: str = "store_id"
 # The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
 DOT_LOOK_KEY: str = "look:dot"
 
@@ -2134,10 +2136,11 @@ class Store:
         return {str(row["chat"]): int(row["asks"]) for row in rows}
 
     async def thread_drafts(self, thread_id: str) -> list[DraftRecord]:
-        """The drafts waiting for the owner that the chat's runs and their helpers wrote, oldest first."""
+        """The drafts waiting for the owner that the chat's runs and their helpers wrote, oldest first: those that wait
+        and those whose last send failed, which still take Send or Discard (``drafts.service``)."""
         rows: list[aiosqlite.Row] = await self._all(
             "SELECT drafts.* FROM drafts JOIN runs AS ran ON ran.id = drafts.run_id"
-            " LEFT JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE drafts.status = 'pending'"
+            " LEFT JOIN runs AS parent ON parent.id = ran.parent_run_id WHERE drafts.status IN ('waiting', 'failed')"
             " AND (ran.thread_id = ? OR parent.thread_id = ?) ORDER BY drafts.created_at",
             (thread_id, thread_id),
         )
@@ -2168,6 +2171,19 @@ class Store:
         await self._db.execute(counter)
         await self._db.execute(chats, (thread_id,))
         await self._db.commit()
+
+    # ----- the store's own id -----------------------------------------------------------------
+
+    async def store_id(self) -> str:
+        """The id this database was given the first time it was asked (``kv`` key :data:`STORE_ID_KEY`), the same for
+        as long as the database lives: a restart or an update of Dot keeps it, a reset (a new, empty Dot home) has
+        another. A phone keeps it beside its copy of the chats and drops that copy when it changes (``GET /api/status``,
+        ``store_id``). Read once, written only the first time."""
+        found: str | None = await self.kv_get(STORE_ID_KEY)
+        if found is not None:
+            return found
+        made: str = new_id("store")
+        return await self.kv_update(STORE_ID_KEY, lambda current: made if current is None else current)
 
     # ----- key/value -----------------------------------------------------------------------
 

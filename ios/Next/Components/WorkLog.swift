@@ -255,7 +255,8 @@ struct DaemonImageThumb: View {
         .task(id: name) { image = await model.image(named: name) }
         .sheet(isPresented: $whole) {
             if let image {
-                ScrollView([.horizontal, .vertical]) { Image(uiImage: image).resizable().scaledToFit().frame(minWidth: 320) }
+                ZoomableImage(image: image, label: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"))
+                    .ignoresSafeArea(edges: .bottom)
                     .inspectorSheet(title: String(localized: "Screenshot", comment: "VoiceOver: a screenshot a tool step returned"), close: { whole = false })
             }
         }
@@ -426,65 +427,6 @@ struct DotNoteRow: View {
     }
 }
 
-/// How a run ended other than done: the cause in one line and Try again (plan §4.1 States).
-struct RunEndedCard: View {
-    let status: String
-    let detail: String
-    let retry: (() -> Void)?
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
-            Image(systemName: status == "failed" ? "exclamationmark.triangle" : "stop.circle")
-                .foregroundStyle(status == "failed" ? Tone.failure : Tone.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Space.xs) {
-                Text(title).textRole(.footnote).fontWeight(.medium).foregroundStyle(status == "failed" ? Tone.failure : Tone.text)
-                if !detail.isEmpty { Text(detail).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(3) }
-                if let retry {
-                    Button(String(localized: "Try again", comment: "Under a refused message: sends it again"), action: retry)
-                        .buttonStyle(SecondaryButtonStyle())
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(Space.m)
-        .background(Tone.nested, in: rounded(Radius.bubble))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var title: String {
-        switch status {
-        case "failed": String(localized: "The run failed", comment: "Notice at the end of a failed run")
-        case "cancelled": String(localized: "The run was stopped", comment: "Notice at the end of a stopped run")
-        default: String(localized: "The run ended", comment: "Notice at the end of a run that ended another way")
-        }
-    }
-}
-
-/// The Claude plan's usage limit stopped the run: a neutral card with when it can go on (R-c #9).
-struct UsageLimitCard: View {
-    let resetsAt: Double?
-    let resume: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            Text(String(localized: "The Claude plan's usage limit was reached", comment: "Usage limit card title"))
-                .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text)
-            Text(line).textRole(.footnote).foregroundStyle(Tone.secondary)
-            Button(String(localized: "Resume now", comment: "Usage limit card: starts the work again now"), action: resume).buttonStyle(SecondaryButtonStyle())
-        }
-        .padding(Space.m)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Tone.nested, in: rounded(Radius.bubble))
-        .accessibilityElement(children: .combine)
-    }
-
-    private var line: String {
-        guard let resetsAt else { return String(localized: "It resets within a few hours.", comment: "Usage limit card when the plan did not say when") }
-        let clock: String = clockWords(Date(timeIntervalSince1970: resetsAt), format: TimestampFormat.current(.standard), locale: .current)
-        return String(localized: "It resets at \(clock).", comment: "Usage limit card; the argument is the clock time")
-    }
-}
-
 /// The footer of a run's final answer (plan §24): copy, the reactions on it and the menu that adds one (docs/runs.md), and
 /// the time the answer came. Quiet ink glyphs of one weight, close together; drawn under the final answer alone.
 struct ReactionsBar: View {
@@ -537,7 +479,6 @@ struct ThoughtRow: View {
     let live: Bool
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -547,9 +488,8 @@ struct ThoughtRow: View {
                     if live {
                         Text(String(localized: "Thinking", comment: "Capsule: the run's model is thinking")).textRole(.footnote).modifier(Shimmer())
                     } else {
-                        Text(thoughtHeadline(text)).textRole(.footnote).foregroundStyle(Tone.secondary)
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 6 : 3)
-                            .multilineTextAlignment(.leading)
+                        // Only the word once the step is stored (item 1904, the owner): the thinking is read opened.
+                        Text(String(localized: "Thought", comment: "Work log: a step's thinking, folded")).textRole(.footnote).foregroundStyle(Tone.secondary)
                     }
                     Spacer(minLength: Space.xs)
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
@@ -559,7 +499,8 @@ struct ThoughtRow: View {
             }
             .buttonStyle(.plain)
             .haptic(.selection, trigger: open)
-            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : thoughtHeadline(text))
+            .accessibilityLabel(live ? String(localized: "Thinking", comment: "Capsule: the run's model is thinking") : String(localized: "Thought", comment: "Work log: a step's thinking, folded"))
+            .accessibilityIdentifier("thought.row")
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(String(localized: "Shows the whole thinking", comment: "VoiceOver hint of a thinking row"))
             if open {
@@ -578,22 +519,6 @@ struct ThoughtRow: View {
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)
     }
-}
-
-/// A thought's first sentence, its markdown marks taken out: the line a stored thought shows folded ("**Checking the
-/// diff.** Then…" reads "Checking the diff."). The words as they are when they make no sentence.
-func thoughtHeadline(_ text: String) -> String {
-    let plain: String = text.replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "")
-        .replacingOccurrences(of: "`", with: "").replacingOccurrences(of: "#", with: "")
-    let line: String = plain.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
-    // A sentence ends at . ! or ? before a space or the end of the line, so "3.14" or "v2.1" does not cut it.
-    var index: String.Index = line.startIndex
-    while index < line.endIndex {
-        let next: String.Index = line.index(after: index)
-        if ".!?".contains(line[index]), next == line.endIndex || line[next].isWhitespace { return String(line[...index]) }
-        index = next
-    }
-    return line
 }
 
 /// Dot's mark on a row of its own tools (item 1769), as another coding agent marks its own calls with its name: Dot's face in the quiet

@@ -45,6 +45,8 @@ public actor Supervisor {
     private var lastLink: LinkState
     private var halted: Bool = false
     private var watchers: [Task<Void, Never>] = []
+    /// The revision of each open chat's row it was last marked seen at (item 1905).
+    private var seenSent: [String: Int] = [:]
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "supervisor")
 
     public init(api: DaemonAPI, store: SyncStore, outbox: Outbox, link: LinkWatcher, clock: any EngineClock, jitter: @escaping @Sendable () -> Double) {
@@ -59,7 +61,7 @@ public actor Supervisor {
 
     // MARK: Life
 
-    /// Starts the list's stream, the outbox and the watch on the link.
+    /// Starts the list's stream, the outbox (which sends nothing before the daemon was heard) and the watch on the link.
     public func start() async {
         guard loops[.list] == nil else { return }
         let outbox: Outbox = outbox
@@ -88,6 +90,7 @@ public actor Supervisor {
     /// Opens a chat: its picture from the cache, its stream and its view.
     public func openChat(_ thread: String) async {
         await store.chatOpened(thread)
+        await seeOpenChats()
         guard loops[.chat(thread)] == nil else { return }
         run(.chat(thread))
     }
@@ -108,6 +111,7 @@ public actor Supervisor {
         let away: Double = backgroundAt.map { clock.now() - $0 } ?? 0
         backgroundAt = nil
         await outbox.start()
+        await seeOpenChats()
         if away >= StreamRules.resubscribeAfter {
             replaceAll()
         } else {
@@ -201,7 +205,15 @@ public actor Supervisor {
         case .list:
             do {
                 let status: DaemonStatus = try await api.status()
-                await store.daemon(version: status.version)
+                if await store.change(to: status.identity) == .reset {
+                    // The unsent messages are kept for the owner first, then the outbox lets go of its doings for the old
+                    // daemon's chats, then the new daemon is taken as the copies' (and the outbox may send): a kill at any
+                    // point finds the reset again, and nothing is told twice.
+                    await store.told(resetWith: await outbox.unsentForReset())
+                    await outbox.dropForReset()
+                }
+                await store.daemon(status.identity)
+                await outbox.nudge()
             } catch {
                 if let ending: Ending = await halt(on: error) { return ending }
                 return .ended(upFor: 0)
@@ -324,7 +336,9 @@ public actor Supervisor {
 
     private func apply(_ frame: StreamFrame, key: Key, connection: Int) async {
         switch key {
-        case .list: perform(await store.listFrame(frame, connection: connection))
+        case .list:
+            perform(await store.listFrame(frame, connection: connection))
+            await seeOpenChats()
         case .chat(let thread): perform(await store.chatFrame(thread, frame, connection: connection))
         }
     }
@@ -346,10 +360,35 @@ public actor Supervisor {
         }
     }
 
+    /// Marks seen on the Mac the chats open on the phone whose row says unread (`PATCH {seen: true}`, as the web's
+    /// sidebar does), so they leave "unread" in the list; never while the app is away from the screen. A mark that fails
+    /// is tried again at the list's next look.
+    private func seeOpenChats() async {
+        guard backgroundAt == nil else { return }
+        let picture: EngineSnapshot = await store.snapshot
+        for row in chatsToMarkSeen(rows: picture.list.rows, open: Set(picture.chats.keys), sent: seenSent) {
+            let thread: String = row.summary.id
+            seenSent[thread] = row.revision
+            Task {
+                do throws(DaemonRequestError) {
+                    try await api.markSeen(thread: thread)
+                } catch {
+                    logger.warning("a chat could not be marked seen thread=\(thread, privacy: .public) error=\(error.description, privacy: .public)")
+                    self.forgetSeen(thread)
+                }
+            }
+        }
+    }
+
+    private func forgetSeen(_ thread: String) { seenSent[thread] = nil }
+
     private func readList() async {
         let connection: Int = await store.listAsked()
         do {
             perform(await store.listLoaded(try await api.threadsView(), connection: connection))
+            await seeOpenChats()
+            // A new chat waits for a live list: it goes now rather than at its next look.
+            if await store.listIsLive { await outbox.nudge() }
         } catch {
             logger.warning("list read failed error=\(error.description, privacy: .public)")
             await store.listFailed()

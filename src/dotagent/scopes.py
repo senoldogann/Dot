@@ -23,7 +23,10 @@ from pydantic import ValidationError
 from dotagent.config import ReconAuthority, ReconConfig, ReconScope
 from dotagent.core.errors import ConfigError
 from dotagent.core.files import write_whole
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import dot_home
+
+log = get_logger(__name__)
 
 
 class ScopesFileError(ConfigError):
@@ -47,24 +50,9 @@ def scopes_path() -> Path:
     return dot_home() / "scopes.toml"
 
 
-def load_scopes(path: Path | None = None) -> tuple[ReconScope, ...]:
-    """The scopes held in ``path`` (or in :func:`scopes_path`), in the order they were added; empty when the file is
-    not there yet."""
-    file: Path = path if path is not None else scopes_path()
-    try:
-        stamp = file.stat()
-    except FileNotFoundError:
-        return ()
-    except OSError as exc:
-        raise ScopesFileError(f"{file} cannot be read ({exc})", {"file": str(file)}) from exc
-    key: tuple[str, float, int] = (str(file), stamp.st_mtime, stamp.st_size)
-    held: tuple[ReconScope, ...] | None = _read.get(key)
-    if held is not None:
-        return held
-    try:
-        text: str = file.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise ScopesFileError(f"{file} cannot be read as UTF-8 text ({exc})", {"file": str(file)}) from exc
+def _parsed(text: str, file: Path) -> tuple[ReconScope, ...]:
+    """The scopes ``text``, the contents of ``file``, holds; :class:`ScopesFileError` naming ``file`` when it is not
+    TOML or an entry is not a valid scope."""
     try:
         raw: dict[str, object] = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
@@ -94,15 +82,46 @@ def load_scopes(path: Path | None = None) -> tuple[ReconScope, ...]:
             )
         except ValidationError as exc:
             raise ScopesFileError(f"{file}: scope {index} is not a valid scope: {exc}", {"file": str(file)}) from exc
-    value: tuple[ReconScope, ...] = tuple(entries)
+    return tuple(entries)
+
+
+def load_scopes(path: Path | None = None) -> tuple[ReconScope, ...]:
+    """The scopes held in ``path`` (or in :func:`scopes_path`), in the order they were added; empty when the file is
+    not there yet."""
+    file: Path = path if path is not None else scopes_path()
+    try:
+        stamp = file.stat()
+    except FileNotFoundError:
+        return ()
+    except OSError as exc:
+        raise ScopesFileError(f"{file} cannot be read ({exc})", {"file": str(file)}) from exc
+    key: tuple[str, float, int] = (str(file), stamp.st_mtime, stamp.st_size)
+    held: tuple[ReconScope, ...] | None = _read.get(key)
+    if held is not None:
+        return held
+    try:
+        text: str = file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ScopesFileError(f"{file} cannot be read as UTF-8 text ({exc})", {"file": str(file)}) from exc
+    value: tuple[ReconScope, ...] = _parsed(text, file)
     _read.clear()
     _read[key] = value
     return value
 
 
+# The escapes a TOML basic string has for the characters it cannot hold as they are.
+_ESCAPES: dict[str, str] = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t", "\b": "\\b", "\f": "\\f"}
+
+
 def _quoted(text: str) -> str:
-    """``text`` as a TOML basic string."""
-    escaped: str = text.replace("\\", "\\\\").replace('"', '\\"')
+    """``text`` as a TOML basic string: a backslash, a quote and every control character escaped, so that a program's
+    rules of several lines are read back as they were written."""
+    escaped: str = "".join(
+        _ESCAPES.get(
+            character, f"\\u{ord(character):04X}" if ord(character) < 0x20 or ord(character) == 0x7F else character
+        )
+        for character in text
+    )
     return f'"{escaped}"'
 
 
@@ -120,8 +139,15 @@ def save_scopes(scopes: tuple[ReconScope, ...], path: Path | None = None) -> Pat
         if scope.note:
             lines.append(f"note = {_quoted(scope.note)}\n")
         lines.append("\n")
+    text: str = "".join(lines)
+    # The text is read back before it replaces the file, so that a scope reported added is one the gate can read and a
+    # text that would not be leaves the scopes held as they were.
+    if _parsed(text, file) != scopes:
+        raise ScopesFileError(
+            f"{file} would not read back as the scopes given; nothing was written", {"file": str(file)}
+        )
     file.parent.mkdir(parents=True, exist_ok=True)
-    write_whole(file, "".join(lines))
+    write_whole(file, text)
     return file
 
 
@@ -158,6 +184,18 @@ def remove_scope(program: str, path: Path | None = None) -> bool:
         return False
     save_scopes(tuple(kept), path)
     return True
+
+
+def authorising_if_readable(host: str, recon: ReconConfig) -> ReconAuthority | None:
+    """:func:`authorising`, where a scope only adds context to work that does not depend on it (item 1889: the grounds
+    of a refusal, the model a security task starts on): a ``scopes.toml`` that cannot be read covers no host there,
+    and the warning names the file and what is wrong. The port scan and ``security_scan`` call :func:`authorising`
+    and stop on it."""
+    try:
+        return authorising(host, recon)
+    except ScopesFileError as error:
+        log.warning("scopes_unreadable", host=host, error=error.message, context=error.context)
+        return None
 
 
 def authorising(host: str, recon: ReconConfig) -> ReconAuthority | None:

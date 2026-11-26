@@ -132,6 +132,7 @@ from dotagent.agent.progress import (
     stop_result,
 )
 from dotagent.agent.prompt import (
+    OWNER_SOURCES,
     AgentBrief,
     PromptInputs,
     TeamBrief,
@@ -166,6 +167,14 @@ from dotagent.agent.proof import (
     with_proof_note,
 )
 from dotagent.agent.reaction_words import HOLD_ENDED_EVENT, HOLD_EVENT, hold_lapsed_text
+from dotagent.agent.refusal import (
+    MODEL_REFUSED_EVENT,
+    REFUSAL_ASKED_AGAIN_EVENT,
+    RefusalGrounds,
+    grounds_note,
+    looks_like_refusal,
+    refusal_grounds,
+)
 from dotagent.agent.restating import restates
 from dotagent.agent.resume import RESUME_SOURCE, RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
@@ -221,7 +230,8 @@ from dotagent.agent.vision import text_for_blind_model
 from dotagent.assistant import AssistantView, called_lines, owner_name_lines
 from dotagent.browser.devtools import devtools_address
 from dotagent.browser.session import BrowserSession
-from dotagent.config import AgentConfig
+from dotagent.channels.types import TITLES
+from dotagent.config import AgentConfig, ReconConfig
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -229,6 +239,7 @@ from dotagent.core.errors import (
     MissingSecretError,
     NotFoundError,
     ProviderCreditError,
+    ProviderEmptyError,
     ProviderError,
     ProviderFilterError,
     ProviderQuotaError,
@@ -297,11 +308,18 @@ from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import schedule_timing
 from dotagent.scheduler.timing import format_local
+from dotagent.scopes import authorising_if_readable
 from dotagent.secrets import known_secrets
 from dotagent.server import REVIEW_SOURCE
 from dotagent.skills.catalog import load_skills, playbook_root, unreported
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
-from dotagent.store.endings import GOAL_CHECK_MARK, GOAL_CHECK_UNAVAILABLE, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
+from dotagent.store.endings import (
+    GOAL_CHECK_MARK,
+    GOAL_CHECK_UNAVAILABLE,
+    PREFIX_CUT_SHORT,
+    PREFIX_MODEL_REFUSED,
+    RESULT_EMPTY_REPLIES,
+)
 from dotagent.store.models import (
     NO_PICKS,
     AgentRecord,
@@ -2515,10 +2533,16 @@ def _fit_tools(
 
 
 def _cannot_answer(error: Exception) -> str | None:
-    """Why the run moves to a standby model: its provider's credits, usage window, quota or rate are spent, the one
-    reason a run changes its model (the owner's word, 2026-11-19, item 1225). A refusal, a content filter's stop, empty
-    replies, a refused or missing key and a model its plan lacks move it nowhere: the run ends saying why, and a run
-    that needs the owner asks them first. ``None`` for those, and for any other error."""
+    """Why the run moves to a standby model: its provider's credits, usage window, quota or rate are spent (the owner's
+    word, 2026-11-19, item 1225), or a technical block stopped its model: its service's content filter stopped the
+    reply, or the replies stayed empty (the owner's word, 2026-11-25, item 1889). A refusal of the task, a refused or
+    missing key and a model its plan lacks move it nowhere: the run ends saying why (a refusal with the model's words
+    and the owner's restart on a model they pick, :func:`_refusal_turn`), and a run that needs the owner asks them
+    first. ``None`` for those, and for any other error."""
+    if isinstance(error, ProviderFilterError):
+        return "its service's content filter stopped the reply"
+    if isinstance(error, ProviderEmptyError):
+        return "its replies stayed empty"
     if isinstance(error, ProviderCreditError | ProviderWindowError | ProviderRateLimitError):
         return unavailable_reason(error)
     if isinstance(error, ProviderQuotaError) and error.status != 402:
@@ -2535,6 +2559,50 @@ def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
         "this conversation it stops it again: choose another model for this chat",
         {"model": model, "input_tokens": reply.usage.input_tokens, "output_tokens": reply.usage.output_tokens},
     )
+
+
+def _owners_words(run: RunRecord) -> bool:
+    """Whether the goal of ``run`` is the owner's own words: a run they started with a message in the app, with ``dotx
+    run`` or from their phone, not a part another run handed on nor Dot's words for a reaction."""
+    return (
+        (run.source in OWNER_SOURCES or run.source in TITLES)
+        and run.parent_run_id is None
+        and run.follows_reaction is None
+    )
+
+
+async def _refusal_turn(agent: AgentRun, ref: ModelRef, text: str, asked: bool) -> str | RunOutcome | None:
+    """What a final answer ``text`` of the model ``ref`` that may decline the task leads to (item 1889): ``None`` when
+    it does not decline it; the note that asks the same model again, once (``asked`` says it was), when the task is in
+    scope (:func:`~dotagent.agent.refusal.refusal_grounds`); otherwise the run's end, failed with the model's own
+    words, which no note argues with and no other model takes over: the owner restarts the task on a model they pick
+    from the run's page."""
+    if not looks_like_refusal(text):
+        return None
+    run: RunRecord = agent.run
+    if not asked:
+        recon: ReconConfig = agent.runtime.config.recon
+        grounds: RefusalGrounds | None = refusal_grounds(
+            run.goal, _owners_words(run), lambda name: authorising_if_readable(name, recon)
+        )
+        if grounds is not None:
+            log.info("refusal_asked_again", run_id=run.id, model=ref.label, scoped=len(grounds.hosts))
+            await agent.runtime.bus.emit(
+                run.id,
+                REFUSAL_ASKED_AGAIN_EVENT,
+                {
+                    "model": ref.label,
+                    "hosts": [scoped.host for scoped in grounds.hosts],
+                    "owner_words": bool(grounds.owner_words),
+                },
+                True,
+            )
+            return grounds_note(grounds)
+    log.warning("model_refused", run_id=run.id, model=ref.label, asked_again=asked)
+    await agent.runtime.bus.emit(
+        run.id, MODEL_REFUSED_EVENT, {"model": ref.label, "words": truncate_middle(text, 2000)}, True
+    )
+    return RunOutcome(status="failed", result=f"{PREFIX_MODEL_REFUSED} ({ref.label}). Its words:\n\n{text}", needs="")
 
 
 async def _to_standby(
@@ -3051,6 +3119,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if opening.resumed is not None and opening.resumed.ladder == "restored":
         restored = await load_loop_state(runtime.store, opening.resumed.from_run_id)
     nudges: int = 0 if restored is None else restored.nudges
+    # Whether the run's model was asked again, once, with the grounds of a task it declined (item 1889).
+    refusal_asked: bool = False if restored is None else restored.refusal_asked
     sent_back: int = 0 if restored is None else restored.sent_back
     # How many times a finish was sent back because the plan still had open steps. It is not one reminder: the finish
     # does not end the run while steps are open, until stall_limit reminders, and then the goal check or the progress
@@ -3092,6 +3162,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 sent_back=sent_back,
                 plan_reminders=plan_reminders,
                 plan_handed=plan_handed,
+                refusal_asked=refusal_asked,
             ),
         )
 
@@ -3304,6 +3375,18 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             if filtered is not None:
                 log.warning("reply_filtered", run_id=run.id, step=steps, model=step_ref.label, finish=reply.raw_finish)
                 raise filtered
+            # Empty again and again after the nudges: a technical block, which moves the run to a standby model, as a
+            # filter's stop does (item 1889); with none left the run ends saying so.
+            if (
+                past_limit is None
+                and not reply.tool_calls
+                and not reply.text.strip()
+                and reply.finish not in _CUT_SHORT
+                and nudges >= config.finish_nudges
+            ):
+                raise ProviderEmptyError(
+                    RESULT_EMPTY_REPLIES, {"model": step_ref.label, "step": steps, "nudges": nudges}
+                )
         except (ProviderError, MissingSecretError) as error:
             if routed is not None:
                 # The routed model could not answer: the step is asked again on the run's own model.
@@ -3324,6 +3407,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 steps -= 1
                 continue
             standby: _Standby | None = await _to_standby(agent, ref, error, left, system, specs, steps)
+            if standby is None and isinstance(error, ProviderEmptyError):
+                return run_end(
+                    agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
+                )
             if standby is None:
                 # A spent quota or rate waits for [agent] quota_wait_s (item 713), a model out of reach for
                 # model_wait_s; spent credits and any other error end the run.
@@ -3417,6 +3504,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 standby.scaffold,
             )
             left = left | {ref.label}
+            if isinstance(error, ProviderEmptyError):
+                # The new model is nudged as the old one was before it is called empty.
+                nudges = 0
             # A step is routed to none of the models the run has worked on: one that stopped answering, or the one it
             # is on now (the outside audit of 2026-10-17, R3).
             candidates = still_routable(candidates, left)
@@ -3572,6 +3662,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 )
                 if arrival is not None:
                     history.append(await _stored_note(agent, arrival))
+            refused_turn: str | RunOutcome | None = (
+                await _refusal_turn(agent, ref, _finish_result(finished).result, refusal_asked)
+                if finished is not None and past_limit is None
+                else None
+            )
+            if isinstance(refused_turn, str):
+                refusal_asked = True
+                history.append(await _stored_note(agent, refused_turn))
+                continue
+            if refused_turn is not None:
+                return run_end(agent, history, goal, refused_turn, facts)
             if finished is not None:
                 ended = _finish_result(finished)
                 unread = _failed_before_finish(outcomes, finished)
@@ -3657,8 +3758,17 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 continue
         else:
             answered: bool = bool(reply.text.strip())
+            said_no: str | RunOutcome | None = (
+                await _refusal_turn(agent, ref, reply.text, refusal_asked) if answered and past_limit is None else None
+            )
             if past_limit is not None:
                 return run_end(agent, history, goal, await _limit_end(agent, past_limit, ledger, reply.text), facts)
+            elif isinstance(said_no, str):
+                refusal_asked = True
+                history.append(await _stored_note(agent, said_no))
+                continue
+            elif said_no is not None:
+                return run_end(agent, history, goal, said_no, facts)
             elif reply.finish in _CUT_SHORT and nudges >= config.finish_nudges:
                 return run_end(agent, history, goal, _cut_short_end(reply), facts)
             elif reply.finish in _CUT_SHORT:
@@ -3667,11 +3777,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 continue
             elif answered and (run.mode == "chat" or not used_tools or nudges >= config.finish_nudges):
                 ended = RunOutcome(status="done", result=reply.text, needs="")
-            elif nudges >= config.finish_nudges:
-                # Empty again and again: the run ends, on no other model (item 1225).
-                return run_end(
-                    agent, history, goal, RunOutcome(status="failed", result=RESULT_EMPTY_REPLIES, needs=""), facts
-                )
             else:
                 nudges += 1
                 if answered:
