@@ -890,6 +890,7 @@ TR: dict[str, str] = {
     'View profile': 'Profili görüntüle',
     'Watch my inbox each morning and tell me what needs an answer': 'Her sabah gelen kutumu izle ve neyin yanıt beklediğini söyle',
     'What %@ did': '%@ ne yaptı',
+    'All chats': 'Tüm sohbetler',
     'the Agents page': 'Ajanlar sayfası',
     'Activity comes in the next version': 'Etkinlik bir sonraki sürümde geliyor',
     'What Dot does on its own (schedules, helpers, drafts that wait) will show here.': "Dot'un kendi başına yaptıkları (zamanlanmış görevler, yardımcılar, bekleyen taslaklar) burada görünecek.",

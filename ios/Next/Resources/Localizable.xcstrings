@@ -781,6 +781,17 @@
         }
       }
     },
+    "All chats": {
+      "comment": "Bot profile: opens every chat of the bot",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tüm sohbetler"
+          }
+        }
+      }
+    },
     "All models": {
       "comment": "Chat settings filter: every model",
       "localizations": {

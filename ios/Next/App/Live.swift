@@ -113,11 +113,23 @@ func engineLine(_ helper: HelperView) -> String {
 enum ChatListScope: Equatable, Sendable {
     case all
     case bot(agent: String?)
+    /// A bot's chats as the home counts them (`bots(...)`: Dot's are every chat no known agent wears, a campaign's and a
+    /// team's among them), by id; `agent` is whose chat the pencil starts (`nil`: Dot's).
+    case chats(of: Set<String>, agent: String?)
 
     func holds(_ row: ThreadRow) -> Bool {
         switch self {
         case .all: true
         case .bot(let agent): row.summary.actorId == agent
+        case .chats(let ids, _): ids.contains(row.summary.id)
+        }
+    }
+
+    /// The agent whose chat the list's pencil starts.
+    var agent: String? {
+        switch self {
+        case .all: nil
+        case .bot(let agent), .chats(_, let agent): agent
         }
     }
 }
@@ -175,7 +187,7 @@ struct ChatListView: View {
         }
         .sheet(isPresented: $composing) {
             NewChatSheet(
-                agent: nil, close: { composing = false },
+                agent: scopedAgent, close: { composing = false },
                 opened: { key in
                     composing = false
                     selection = key
@@ -189,6 +201,12 @@ struct ChatListView: View {
                 systemImage: "exclamationmark.triangle", actionTitle: nil)
             model.forgetRefusedDeletes()
         }
+    }
+
+    /// The agent a bot's list belongs to, whose chat the pencil starts (Dot's and the whole list's: none).
+    private var scopedAgent: AgentRecord? {
+        guard let agent = scope.agent else { return nil }
+        return model.agents.first { $0.record.id == agent }?.record
     }
 
     /// The checked chats the list shows now: a check hidden by the search or gone from the list is not acted on.

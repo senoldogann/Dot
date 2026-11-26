@@ -116,7 +116,8 @@ struct BotProfile: View {
             if bot.chats.isEmpty {
                 ListRow(systemImage: nil, title: String(localized: "No chat yet", comment: "Home: a bot that has no chat"), description: nil, accessory: .none)
             }
-            ForEach(bot.chats, id: \.summary.id) { row in
+            // The newest three here; every chat, with Pinned, search and Select (pin or delete several), on its own page.
+            ForEach(bot.chats.prefix(3), id: \.summary.id) { row in
                 Button { open(row.summary.id) } label: {
                     ListRow(
                         systemImage: row.summary.pinnedAt != nil ? "pin" : nil, title: row.summary.title,
@@ -136,6 +137,12 @@ struct BotProfile: View {
                         if confirmDelete { deletingChat = row } else { model.perform(.delete(thread: row.summary.id)) }
                     }
                 }
+            }
+            if !bot.chats.isEmpty {
+                NavigationRow(
+                    systemImage: "bubble.left.and.bubble.right", title: String(localized: "All chats", comment: "Bot profile: opens every chat of the bot"),
+                    description: nil, detail: nil
+                ) { BotChatsPage(scope: .chats(of: Set(bot.chats.map(\.summary.id)), agent: bot.isDot ? nil : bot.id), open: open) }
             }
         }
     }
@@ -286,6 +293,19 @@ struct AgentModelPage: View {
             }
             saving = false
         }
+    }
+}
+
+/// Every chat of a bot as the chat list draws it (`ChatListView`, items 1800-1802: Pinned, search, Select with Pin and
+/// Delete for several); a chat tapped opens in the bot's chat screen.
+struct BotChatsPage: View {
+    let scope: ChatListScope
+    let open: (String) -> Void
+    @State private var selection: String?
+
+    var body: some View {
+        ChatListView(scope: scope, selection: $selection)
+            .onChange(of: selection) { _, thread in if let thread { open(thread) } }
     }
 }
 
