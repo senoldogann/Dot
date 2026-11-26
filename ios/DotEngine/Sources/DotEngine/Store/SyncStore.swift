@@ -14,6 +14,19 @@ public enum Transport: Sendable, Equatable {
     case daemonTooOld
 }
 
+/// The chats a delete in the outbox is on its way for (pure): one waiting or being sent, not one the daemon refused.
+public func deletesUnderWay(_ outbox: [OutboxItem]) -> Set<String> {
+    var threads: Set<String> = []
+    for item in outbox where item.phase != .failed {
+        switch item.action {
+        case .delete(let thread): threads.insert(thread)
+        case .deleteChats(let many): threads.formUnion(many)
+        default: break
+        }
+    }
+    return threads
+}
+
 /// Everything the screens draw, at one moment.
 public struct EngineSnapshot: Sendable, Equatable {
     public var list: ListProjection
@@ -42,6 +55,15 @@ public struct EngineSnapshot: Sendable, Equatable {
     public static let empty: EngineSnapshot = EngineSnapshot(
         list: ListProjection(), chats: [:], outbox: [], accepted: [:], transport: .connecting, online: true, savedAt: [:],
         workingAt: [:], startedChats: [:], refusedDeletes: [:], reset: nil, heard: 0)
+
+    /// The list as the screens draw it: the chats a delete of this phone is on its way for are hidden at once (item 1964),
+    /// and come back if the daemon refuses it.
+    public var shownList: ListProjection { list.hiding(deletesUnderWay(outbox)) }
+
+    /// The chats gone or going: those the list was told were deleted (here, on the Mac or on another phone) and those a
+    /// delete of this phone is on its way for. A screen that holds a chat read elsewhere (a bot's home chat, read with the
+    /// agents) drops it by this (item 1965).
+    public var goneChats: Set<String> { Set(list.deleted.keys).union(deletesUnderWay(outbox)) }
 
     /// The outbox's and the accepted messages of a chat, oldest first, with where each stands: the overlay of the
     /// transcript (R-b §8 #9).
@@ -379,6 +401,27 @@ public actor SyncStore {
             state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" }
             publish()
             return
+        }
+        if case .refused(let item, let failure) = outcome, case .deleteChats(let threads) = item.action {
+            // Nothing went (the daemon deletes all or none): every chat shows again, each with the daemon's words.
+            for thread in threads { state.refusedDeletes[thread] = if case .refused(_, let detail) = failure { detail } else { "" } }
+            publish()
+            return
+        }
+        if case .done(let item) = outcome {
+            let went: [String] =
+                switch item.action {
+                case .delete(let thread): [thread]
+                case .deleteChats(let threads): threads
+                default: []
+                }
+            if !went.isEmpty {
+                // The Mac deleted them: they stay out of the list from now, not only once its notice comes on the stream
+                // (the review of item 1964: between the answer and the notice they came back).
+                state.list = ListReducer.deletedHere(state.list, threads: went)
+                publish()
+                return
+            }
         }
         let key: String? =
             switch outcome {

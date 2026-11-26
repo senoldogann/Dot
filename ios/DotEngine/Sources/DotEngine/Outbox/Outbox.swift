@@ -426,6 +426,9 @@ public actor Outbox {
         case .delete(let thread):
             try await api.delete(threads: [thread])
             return .done(item)
+        case .deleteChats(let threads):
+            try await api.delete(threads: threads)
+            return .done(item)
         case .react(let run, _, let message, let reaction, let on):
             do {
                 if on { try await api.react(run: run, message: message, reaction: reaction) } else { try await api.unreact(run: run, message: message, reaction: reaction) }

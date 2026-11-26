@@ -381,6 +381,30 @@ final class Flag: @unchecked Sendable {
 /// A delete the daemon refuses (a chat with a run or a helper at work, 409) is kept in the snapshot for the list to say
 /// (item 1800): the outbox drops a refused doing and would otherwise tell nobody.
 final class RefusedDeleteTests: XCTestCase {
+    /// The review of item 1964: the Mac answered the delete before its notice came on the list's stream (or with the
+    /// stream down): the chats stay out of the list, and a read of the list from before does not bring them back.
+    func testChatsTheMacDeletedStayOutOfTheListBeforeItsNotice() async throws {
+        let folder: URL = scratchFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let store: SyncStore = SyncStore(cache: SyncCache(folder: folder), clock: ManualClock(at: 1_800_000_000))
+        let row: (String) -> ThreadRow = { id in
+            ThreadRow(
+                summary: ThreadSummary(
+                    id: id, title: id, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: nil, runCount: 1, latestRunId: "r",
+                    latestStatus: "done", latestCreatedAt: 1, unread: false, actorId: nil, lastMessage: "", lastRole: "user"),
+                revision: 4, asks: 0, helpers: 0, background: [])
+        }
+        let before: ListProjection = ListProjection.drawn(rows: [row("thr_a"), row("thr_b"), row("thr_c")])
+        let after: ListProjection = ListReducer.deletedHere(before, threads: ["thr_a", "thr_b"])
+        XCTAssertEqual(after.rows.map(\.summary.id), ["thr_c"])
+        let stale: ListProjection = ListReducer.loaded(
+            ListReducer.asked(after), view: ThreadsView(revision: 5, threads: [row("thr_a"), row("thr_b"), row("thr_c")]), connection: after.marks.connection).0
+        XCTAssertEqual(stale.rows.map(\.summary.id), ["thr_c"], "a read from before the deletion does not bring them back")
+        await store.outcome(.done(OutboxItem(id: "k1", action: .deleteChats(threads: ["thr_a"]), createdAt: 1)))
+        let told: [String: Int] = await store.snapshot.list.deleted
+        XCTAssertNotNil(told["thr_a"], "the store holds it deleted as soon as the Mac answered")
+    }
+
     func testARefusedDeleteIsKeptUntilTheListToldIt() async throws {
         let folder: URL = scratchFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
