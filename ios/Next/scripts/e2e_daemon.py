@@ -5,6 +5,8 @@ that replies by a script instead of a service, so no model is called and nothing
 choose the script:
 
 - "helper: ...": the run starts a helper (``delegate``, wait false) that waits 90 s, then ends;
+- "waithelper: ...": a helper that waits 5 min, which the run waits on (``delegate``, wait true), so its row says so
+  (item 1920);
 - "wait: ...": the run waits 2 min in ``wait_until`` (a steer meanwhile shows "read after this step", and ends it);
 - "slow: ...": the reply takes 8 s (a run at work, for the queue);
 - "hold: ...": the daemon takes the phone's sending of the message only after 3 s (it shows pending meanwhile);
@@ -222,12 +224,24 @@ class ScriptProvider:
                     arguments={"goal": "wait for the test, then say done", "wait": False},
                 ),
             )
-        elif latest.startswith("wait for the test"):
+        elif latest.startswith("waithelper:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="delegate",
+                    arguments={"goal": "wait for the test, a long one, then say done", "wait": True},
+                ),
+            )
+        elif "wait for the test" in latest:
             calls = (
                 ToolCall(
                     id=f"call_{self._calls}",
                     name="wait_until",
-                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
+                    arguments={
+                        "command": "test -f /nonexistent-dotnext",
+                        "every_s": 5,
+                        "within_minutes": 5 if "a long one" in latest else 1.5,
+                    },
                 ),
             )
         elif latest.startswith("browse:"):

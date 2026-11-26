@@ -237,7 +237,7 @@ final class ReducerTests: XCTestCase {
                 summary: ThreadSummary(
                     id: id, title: id, source: "ui", createdAt: 1, updatedAt: 1, pinnedAt: nil, runCount: 1, latestRunId: "r",
                     latestStatus: "done", latestCreatedAt: 1, unread: false, actorId: nil, lastMessage: "", lastRole: "user"),
-                revision: revision, asks: 0)
+                revision: revision, asks: 0, helpers: 0, background: [])
         }
         var (list, _): (ListProjection, [ListEffect]) = ListReducer.opening(ListProjection())
         let connection: Int = list.marks.connection

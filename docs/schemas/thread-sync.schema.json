@@ -2573,10 +2573,21 @@
     },
     "ThreadRow": {
       "additionalProperties": false,
-      "description": "A chat of the list, its revision and how many asks wait in it (a helper's among them).",
+      "description": "A chat of the list, its revision and how many asks wait in it (a helper's among them); ``helpers``, how many of\nits helpers its run waits on, at work; ``background``, what works for it with no run of it waiting (its view's\n:class:`BackgroundWork`), so that a row says it waits on helpers or on that work (item 1920). A helper's start and\nend, one let go, a background command and a loop each move the chat's revision, so the list's refresh tells them.",
       "properties": {
         "asks": {
           "title": "Asks",
+          "type": "integer"
+        },
+        "background": {
+          "items": {
+            "$ref": "#/$defs/BackgroundWork"
+          },
+          "title": "Background",
+          "type": "array"
+        },
+        "helpers": {
+          "title": "Helpers",
           "type": "integer"
         },
         "revision": {
@@ -2590,7 +2601,9 @@
       "required": [
         "summary",
         "revision",
-        "asks"
+        "asks",
+        "helpers",
+        "background"
       ],
       "title": "ThreadRow",
       "type": "object"
