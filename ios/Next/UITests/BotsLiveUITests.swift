@@ -50,6 +50,46 @@ final class BotsLiveUITests: XCTestCase {
         XCTAssertTrue(app.buttons["settings.close"].waitForExistence(timeout: 30), "the avatar button opens the settings sheet")
     }
 
+    /// Starts a chat with Dot on the throwaway daemon, as the Mac or a code review would (`POST /api/runs`).
+    private func startDotChat(_ goal: String) throws {
+        let environment: [String: String] = ProcessInfo.processInfo.environment
+        let host: String = try XCTUnwrap(environment["DOTNEXT_E2E_HOST"])
+        let key: String = try XCTUnwrap(environment["DOTNEXT_E2E_KEY"])
+        var request: URLRequest = URLRequest(url: try XCTUnwrap(URL(string: host + "/api/runs")))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "goal": goal, "key": "k-\(UUID().uuidString)", "attachments": [String](), "mode": "task", "standing": false, "speed": "standard",
+            "plan_first": false,
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let done: XCTestExpectation = expectation(description: "the daemon took the chat")
+        nonisolated(unsafe) var status: Int = 0
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        XCTAssertTrue((200..<300).contains(status), "POST /api/runs: \(status)")
+    }
+
+    /// The owner's build 6 (item 1923): while they read one of Dot's chats, a code review started a new chat under Dot
+    /// and the open screen jumped to it. A newer chat of the bot only shows in the list; the open one stays.
+    func testANewChatOfDotNeverReplacesTheOneOpen() throws {
+        try startDotChat("hello: the chat the owner reads")
+        let app: XCUIApplication = try launch()
+        let dot: XCUIElement = app.buttons["home.bot.dot"]
+        XCTAssertTrue(dot.waitForExistence(timeout: 60))
+        dot.tap()
+        let reading: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'the chat the owner reads'")).firstMatch
+        XCTAssertTrue(reading.waitForExistence(timeout: 30), "Dot's chat opens")
+        try startDotChat("hello: a newer chat that starts meanwhile")
+        let newer: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'a newer chat that starts meanwhile'")).firstMatch
+        XCTAssertFalse(newer.waitForExistence(timeout: 12), "the newer chat does not take the screen")
+        XCTAssertTrue(reading.exists, "the chat the owner reads stays open")
+    }
+
     func testABotMadeFromTheHomeGreetsAndItsMenuProfileAndTheSettingsSheetOpen() throws {
         let app: XCUIApplication = try launch()
         XCTAssertTrue(app.buttons["home.bot.dot"].waitForExistence(timeout: 20), "Dot, featured on the home")

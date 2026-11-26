@@ -109,7 +109,8 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    own header and menu, its profile, and one settings sheet from an avatar button; a bot's unread mark counts the
    chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
    hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
-   item 1912; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
+   item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
+   the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
