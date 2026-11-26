@@ -401,9 +401,13 @@ final class SyncTests: XCTestCase {
         let sleeps: Int = after.clock.askedCount
         await after.supervisor.start()
         try await after.engine.perform(.stop(run: "run_1", thread: "thr_1"))
+        // Both waits are asked before anything is read: the outbox's hold (its own task) and the supervisor's reconnect
+        // wait, which comes only after the refused status was asked. Waiting on the hold alone raced the status read.
+        let retry: Double = reconnectWait(attempt: 1, jitter: 0)
         try await after.clock.waitForSleep(of: 5, count: 1, since: sleeps)
+        try await after.clock.waitForSleep(of: retry, count: 1, since: sleeps)
         XCTAssertEqual(reset.requests.map(\.path), ["/api/status"], "nothing is sent before the daemon is heard")
-        try await after.clock.advancePastSleep(of: reconnectWait(attempt: 1, jitter: 0), count: 1, since: sleeps)
+        after.clock.advance(retry)
         let live: EngineSnapshot = try await snapshot(of: after.store, "the reset daemon's list is live and the new chat sent") {
             $0.list.freshness == .live && $0.outbox.isEmpty && $0.reset != nil
         }
