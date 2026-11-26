@@ -1027,8 +1027,9 @@ and updates when a new one arrives. Both show the capture time.
 ## Delegation
 
 `delegate(goal, model?, step?, wait?)` hands a sub-goal to a separate run with a conversation of its own and returns
-its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
-helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)).
+its result, so a long investigation does not fill the parent's context. The helper takes the model named by `model`
+when that model can answer. With no explicit choice, [Task models](models.md#models-and-providers) can select a model
+for the brief. The parent's current model is the default for an unmapped brief.
 Several calls in one turn run side by side (up to `parallel_tools`; a group chat's lead sends its agents their parts all
 at once, as many as the team has, up to eight, when its reply's calls all send parts, item 831), which is how a plan's
 independent steps run at the same time; `step` names the plan step the part is, and the report closes it (see the plan

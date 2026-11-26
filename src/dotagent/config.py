@@ -16,7 +16,8 @@ from dotagent.core.errors import ConfigError
 from dotagent.core.learned_text import LINE_BREAKS, hidden_character
 from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.llm.types import KNOWN_PROVIDERS, Effort, split_model_ref
+from dotagent.llm.families import model_family
+from dotagent.llm.types import KNOWN_PROVIDERS, Effort, answers_role, split_model_ref
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.store.models import BrowserMode, NotifyLevel
 from dotagent.web.ladder import SearchEngine
@@ -302,8 +303,8 @@ class ProvidersConfig(FrozenModel):
 
 # The kinds of task a model can be named for up front (item 1889, `[models] kinds`): ``security`` is security research
 # within a scope, a goal that names a host a scope covers and speaks of security work (dotagent.agent.refusal).
-type TaskKind = Literal["security"]
-TASK_KINDS: tuple[TaskKind, ...] = ("security",)
+type TaskKind = Literal["security", "quick", "deep", "writing", "code"]
+TASK_KINDS: tuple[TaskKind, ...] = ("security", "quick", "deep", "writing", "code")
 
 
 class ModelsConfig(FrozenModel):
@@ -322,6 +323,19 @@ class ModelsConfig(FrozenModel):
     context: dict[ModelReference, ContextSize]
     # The model a run of a kind starts on when none is chosen for it (item 1889); Settings › Models sets it.
     kinds: dict[TaskKind, ModelReference] = Field(default_factory=dict)
+    # A different family can independently check a run's goal or a helper's result.
+    check_other_family: Literal[""] | ModelReference = ""
+
+    @field_validator("check_other_family")
+    @classmethod
+    def _independent_checker(cls, value: str) -> str:
+        if value != "":
+            provider: str = value.partition(":")[0].strip()
+            if model_family(value) is None or not answers_role("review", provider):
+                raise ValueError(
+                    "check_other_family must name a model of a known family that can answer review questions"
+                )
+        return value
 
     @field_validator("search")
     @classmethod

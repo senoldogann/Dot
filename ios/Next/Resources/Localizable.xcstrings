@@ -512,6 +512,35 @@
         }
       }
     },
+    "%lld sources": {
+      "comment": "Under an answer: how many web links it names; tap unfolds them",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld source"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sources"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kaynak"
+          }
+        }
+      }
+    },
     "%lld steps": {
       "comment": "Activity: how many steps a task took",
       "localizations": {
@@ -1564,7 +1593,7 @@
       }
     },
     "Ask Dot for anything: a task, a lesson, an errand on the Mac.": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Dot's empty chat (and the component gallery): what to ask Dot",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -2149,6 +2178,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mac'inde değiştir."
+          }
+        }
+      }
+    },
+    "Changed": {
+      "comment": "File preview row: when the file last changed",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Değişti"
           }
         }
       }
@@ -2865,6 +2905,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Talimatı kopyala"
+          }
+        }
+      }
+    },
+    "Copy link": {
+      "comment": "Long press on a link under an answer: copies its address",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bağlantıyı kopyala"
           }
         }
       }
@@ -4362,17 +4413,6 @@
         }
       }
     },
-    "Effort %@": {
-      "comment": "VoiceOver: the model's reasoning level; the argument is the level",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Efor %@"
-          }
-        }
-      }
-    },
     "Email draft": {
       "comment": "Draft card eyebrow: an email Dot wrote",
       "localizations": {
@@ -4736,6 +4776,17 @@
         }
       }
     },
+    "File": {
+      "comment": "A file chip's second line while its size is being asked",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya"
+          }
+        }
+      }
+    },
     "Files": {
       "comment": "Composer + menu: picks image files",
       "localizations": {
@@ -4941,6 +4992,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un sorduklarını katla"
+          }
+        }
+      }
+    },
+    "Folded": {
+      "comment": "VoiceOver: the sources row shows only the count",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı"
           }
         }
       }
@@ -6107,6 +6169,17 @@
         }
       }
     },
+    "Loading the file": {
+      "comment": "VoiceOver: a file preview is being fetched",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya yükleniyor"
+          }
+        }
+      }
+    },
     "Looked %@": {
       "comment": "Watcher: when it last looked (relative, e.g. '5 min ago')",
       "localizations": {
@@ -6512,7 +6585,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nNew schedule: the model its runs use\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nInspector row: the model and reasoning level of this chat\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6529,17 +6602,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu sohbetin modeli"
-          }
-        }
-      }
-    },
-    "Model, %@": {
-      "comment": "VoiceOver: the new chat's model button; the argument is the model",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Model, %@"
           }
         }
       }
@@ -7215,6 +7277,17 @@
         }
       }
     },
+    "Not on your Mac": {
+      "comment": "File chip: the file the answer names is not on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde yok"
+          }
+        }
+      }
+    },
     "Not paired": {
       "comment": "Settings › Voice: no Mac is paired",
       "localizations": {
@@ -7354,6 +7427,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Henüz belirlenmedi: ilk oturum kaydeder."
+          }
+        }
+      }
+    },
+    "Not shown from this place": {
+      "comment": "File chip: the Mac does not show files of this folder",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu konumdan gösterilmiyor"
           }
         }
       }
@@ -7853,6 +7937,17 @@
         }
       }
     },
+    "Only the start of the file shows here; open it on the Mac for the rest.": {
+      "comment": "File preview: the text was cut",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç."
+          }
+        }
+      }
+    },
     "Open": {
       "comment": "VoiceOver: an open provider group",
       "localizations": {
@@ -7897,6 +7992,17 @@
         }
       }
     },
+    "Open in Safari": {
+      "comment": "Long press on a link under an answer: opens it in the Safari app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safari'de aç"
+          }
+        }
+      }
+    },
     "Open its chat": {
       "comment": "Draft: opens the chat of the run that wrote it",
       "localizations": {
@@ -7904,6 +8010,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sohbetini aç"
+          }
+        }
+      }
+    },
+    "Open on Mac": {
+      "comment": "File preview: opens the file in its application on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'te aç"
           }
         }
       }
@@ -7926,6 +8043,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Son değerlendirmeyi aç"
+          }
+        }
+      }
+    },
+    "Opened on your Mac.": {
+      "comment": "File preview: the file opened in its application on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inde açıldı."
           }
         }
       }
@@ -8025,6 +8153,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yardımcının sohbetini açar"
+          }
+        }
+      }
+    },
+    "Opens the page": {
+      "comment": "VoiceOver hint of a link under an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sayfayı açar"
           }
         }
       }
@@ -8598,6 +8737,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Önerici"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "comment": "Inspector row: who serves the model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlayıcı"
           }
         }
       }
@@ -9559,6 +9709,17 @@
         }
       }
     },
+    "Save to Files": {
+      "comment": "File preview: saves a copy in the Files app",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyalar'a kaydet"
+          }
+        }
+      }
+    },
     "Saved securely": {
       "comment": "Transcript anchor: a secret given (§20: stays one line)",
       "localizations": {
@@ -10373,6 +10534,17 @@
         }
       }
     },
+    "Share": {
+      "comment": "Long press on a link or a file preview: the share sheet",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paylaş"
+          }
+        }
+      }
+    },
     "Share as template…": {
       "comment": "Bot chat menu: shares the agent as a file others can import",
       "localizations": {
@@ -10556,6 +10728,17 @@
         }
       }
     },
+    "Shows the file": {
+      "comment": "VoiceOver hint of a file chip under an answer",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosyayı gösterir"
+          }
+        }
+      }
+    },
     "Shows the steps": {
       "comment": "VoiceOver hint of a closed work-log group",
       "localizations": {
@@ -10607,6 +10790,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Giriş kodu"
+          }
+        }
+      }
+    },
+    "Size": {
+      "comment": "File preview row: the file's size",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boyut"
           }
         }
       }
@@ -10706,17 +10900,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Standart"
-          }
-        }
-      }
-    },
-    "Start a chat": {
-      "comment": "A bot with no chat yet: starts one",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sohbet başlat"
           }
         }
       }
@@ -11657,6 +11840,17 @@
         }
       }
     },
+    "The file cannot be shown": {
+      "comment": "File preview: the Mac did not give the file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya gösterilemiyor"
+          }
+        }
+      }
+    },
     "The file goes back to how it was before the task changed it.": {
       "comment": "Inspector: what the undo of a changed file does",
       "localizations": {
@@ -11664,6 +11858,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dosya, görev değiştirmeden önceki haline döner."
+          }
+        }
+      }
+    },
+    "The file is too large for the phone; open it on the Mac.": {
+      "comment": "File preview: an image or a PDF too large to show",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dosya telefon için çok büyük; Mac'te aç."
           }
         }
       }
@@ -11730,6 +11935,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Döngü kurulamadı: %@"
+          }
+        }
+      }
+    },
+    "The message could not be saved on this phone. Try again.": {
+      "comment": "New chat: the outbox could not keep the first message",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mesaj bu telefona kaydedilemedi. Tekrar dene."
           }
         }
       }
@@ -11840,6 +12056,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfa açılmadı"
+          }
+        }
+      }
+    },
+    "The phone cannot draw this image.": {
+      "comment": "File preview: an image of a kind iOS does not draw",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon bu görseli çizemiyor."
+          }
+        }
+      }
+    },
+    "The phone shows this kind of file by its facts; open it on the Mac to read it.": {
+      "comment": "File preview: a table or an Office file",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Telefon bu tür dosyanın yalnızca bilgilerini gösterir; okumak için Mac'te aç."
           }
         }
       }
@@ -12621,6 +12859,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geri alındı"
+          }
+        }
+      }
+    },
+    "Unfolded": {
+      "comment": "VoiceOver: the sources row shows each link",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açık"
           }
         }
       }
@@ -13409,6 +13658,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bir görevin modeli yanıt veremediğinde (kotası dolduğunda, çok yoğun olduğunda, anahtarı reddedildiğinde, güvenlik filtresi yanıtı durdurduğunda) görev bunlardan yanıt verebilen ilkiyle, her biri en fazla bir kez olmak üzere sürer."
+          }
+        }
+      }
+    },
+    "Where": {
+      "comment": "File preview row: the file's folder on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konum"
           }
         }
       }
@@ -14712,6 +14972,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "web'deki sohbet"
+          }
+        }
+      }
+    },
+    "the chat's file panel": {
+      "comment": "Where on the Mac a file of an answer is shown",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sohbetin dosya paneli"
           }
         }
       }

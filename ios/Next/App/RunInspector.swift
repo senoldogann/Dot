@@ -2,11 +2,12 @@ import DotEngine
 import QuickLook
 import SwiftUI
 
-/// The run inspector, "This chat" (plan §4.1, the owner's shot `dotnext-inspector-problem.png`): grouped sections on the
-/// sheet's ground as every Settings page is drawn, one text style for every label (body, ink) and every value (body,
-/// secondary, tabular), rows of the 44 pt floor and no taller. What it holds, each on the web's own route (§26):
-/// - the run: state, started, took, approval mode; the model as the owner reads it (the model's name, its provider
-///   under it, the effort as a small badge);
+/// The run inspector, "This chat" (plan §4.1, the owner's shots `dotnext-inspector-problem.png` and of 2026-11-26): plain
+/// sections on the sheet's own ground (no card, a hairline between rows, a small header close above them), one text style
+/// for every label (body, ink) and every value (body, secondary, tabular), rows of the 44 pt floor and no taller. What it
+/// holds, each on the web's own route (§26):
+/// - the run: state, started, took, approval mode; the model as the owner reads it (its name and
+///   level on one row, "Opus 5.5 · Medium", its provider on a row of its own);
 /// - the recap (`/runs/{id}/recap`) with Write a new one;
 /// - the cost (`/runs/{id}/stats`): time, where it went, tokens in (with the cached share) and out, steps, against the
 ///   cap and what like tasks spend; Dot holds no price per model, so there is no money (the footer says so);
@@ -36,7 +37,7 @@ struct RunInspector: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.xl) {
+            VStack(alignment: .leading, spacing: Space.xs) {
                 if let failure { Notice(tone: .failure, message: failure, dismiss: { self.failure = nil }) }
                 if let run {
                     runSection(run)
@@ -49,8 +50,8 @@ struct RunInspector: View {
                         detail: String(localized: "What a run did and cost shows here once one started.", comment: "Inspector empty state detail"), actionTitle: nil, action: {})
                 }
                 if let plan = planSteps, !plan.isEmpty {
-                    GroupedSection(header: String(localized: "Plan", comment: "Inspector section: the run's plan"), footer: nil) {
-                        PlanCard(steps: plan).padding(Space.groupedGutter)
+                    InspectorSection(header: String(localized: "Plan", comment: "Inspector section: the run's plan"), footer: nil) {
+                        PlanSteps(steps: plan).padding(.vertical, Space.s)
                     }
                 }
                 helpersSection
@@ -58,8 +59,7 @@ struct RunInspector: View {
                 backgroundSection
             }
             .padding(.horizontal, Space.gutter)
-            .padding(.top, Space.s)
-            .padding(.bottom, Space.xxl)
+            .padding(.bottom, Space.m)
             .readableColumn()
         }
         .refreshable { await load() }
@@ -82,7 +82,7 @@ struct RunInspector: View {
     // MARK: Sections
 
     private func runSection(_ run: RunRecord) -> some View {
-        GroupedSection(header: String(localized: "Run", comment: "Inspector section: the newest run"), footer: nil) {
+        InspectorSection(header: String(localized: "Run", comment: "Inspector section: the newest run"), footer: nil) {
             FactRow(title: String(localized: "State", comment: "Inspector row: the run's status"), value: statusWords(run.status))
             FactRow(
                 title: String(localized: "Started", comment: "Inspector row: when the run started"),
@@ -103,19 +103,14 @@ struct RunInspector: View {
         let parts: ModelParts = modelParts(ref)
         let label: String = model.models.flatMap(\.models).first { $0.ref == ref }?.label ?? parts.model
         let effort: String? = choices.map(\.effort) ?? run.effort
-        return GroupedSection(header: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), footer: nil) {
-            HStack(spacing: Space.s) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label).textRole(.body).foregroundStyle(Tone.text).lineLimit(1).truncationMode(.middle)
-                    if let provider = parts.provider {
-                        Text(providerTitle(provider)).textRole(.footnote).foregroundStyle(Tone.secondary)
-                    }
-                }
-                Spacer(minLength: Space.s)
-                if let effort, !effort.isEmpty { EffortBadge(effort: effort) }
+        return InspectorSection(header: String(localized: "Model for this chat", comment: "Inspector section: the chat's model"), footer: nil) {
+            // "DeepSeek V4.1 Flash · Max", and who serves it on a row of its own.
+            FactRow(
+                title: String(localized: "Model", comment: "Inspector row: the model and reasoning level of this chat"),
+                value: [label, effort.flatMap { $0.isEmpty ? nil : effortTitle($0) }].compactMap { $0 }.joined(separator: " · "))
+            if let provider = parts.provider {
+                FactRow(title: String(localized: "Provider", comment: "Inspector row: who serves the model"), value: providerTitle(provider))
             }
-            .rowInsets()
-            .accessibilityElement(children: .combine)
             if let meter = contextMeter {
                 FactRow(title: String(localized: "Context used", comment: "Inspector row: how full the model's context is"), value: meter.formatted(.percent.precision(.fractionLength(0))))
             }
@@ -124,11 +119,11 @@ struct RunInspector: View {
 
     @ViewBuilder private func recapSection(_ run: RunRecord) -> some View {
         if case .loaded(let read) = recap, read.enabled {
-            GroupedSection(header: String(localized: "Recap", comment: "Inspector section: the run's recap"), footer: recapFooter(read)) {
+            InspectorSection(header: String(localized: "Recap", comment: "Inspector section: the run's recap"), footer: recapFooter(read)) {
                 if let written = read.recap {
                     Text(written.text).textRole(.body).foregroundStyle(Tone.text).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, Space.groupedGutter).padding(.vertical, Space.s)
+                        .padding(.vertical, Space.s)
                 } else {
                     Text(String(localized: "No recap yet.", comment: "Inspector: the run has no recap"))
                         .textRole(.body).foregroundStyle(Tone.secondary).rowInsets()
@@ -158,7 +153,7 @@ struct RunInspector: View {
         case .failed:
             EmptyView()
         case .loaded(let cost):
-            GroupedSection(
+            InspectorSection(
                 header: String(localized: "Cost", comment: "Inspector section: what the run cost"),
                 footer: String(localized: "Dot keeps no prices, so a task's cost is its time and tokens.", comment: "Inspector: why the cost shows no money")
             ) {
@@ -185,7 +180,7 @@ struct RunInspector: View {
     @ViewBuilder private var helpersSection: some View {
         let helpers: [HelperView] = view?.helpers ?? []
         if !helpers.isEmpty {
-            GroupedSection(header: String(localized: "Helpers", comment: "Inspector section: the chat's helpers"), footer: nil) {
+            InspectorSection(header: String(localized: "Helpers", comment: "Inspector section: the chat's helpers"), footer: nil) {
                 ForEach(helpers, id: \.runId) { helper in
                     NavigationLink {
                         ChatScreen(thread: helper.threadId, initialPanel: nil, editsFirstQueued: false)
@@ -208,7 +203,7 @@ struct RunInspector: View {
 
     @ViewBuilder private var changesSection: some View {
         let files: [FileChange] = changes?.files ?? []
-        GroupedSection(header: String(localized: "Changes", comment: "Inspector section: what the runs changed"), footer: unrecoverableWords) {
+        InspectorSection(header: String(localized: "Changes", comment: "Inspector section: what the runs changed"), footer: unrecoverableWords) {
             if files.isEmpty {
                 Text(String(localized: "No file changed yet.", comment: "Inspector: no changes")).textRole(.body).foregroundStyle(Tone.secondary).rowInsets()
             }
@@ -245,7 +240,7 @@ struct RunInspector: View {
         let commands: [TerminalView] = terminals.filter { $0.background && !$0.ended && !stopped.contains($0.id) }
         let others: [DotEngine.BackgroundWork] = (view?.background ?? []).filter { $0.kind != "command" }
         if !commands.isEmpty || !others.isEmpty {
-            GroupedSection(header: String(localized: "Working in the background", comment: "Inspector section: the chat's background commands, helpers and loops"), footer: nil) {
+            InspectorSection(header: String(localized: "Working in the background", comment: "Inspector section: the chat's background commands, helpers and loops"), footer: nil) {
                 ForEach(commands) { command in
                     HStack(spacing: Space.s) {
                         VStack(alignment: .leading, spacing: 2) {
@@ -455,24 +450,41 @@ struct RowButton: View {
     }
 }
 
-/// The reasoning level as a small quiet badge ("High").
-struct EffortBadge: View {
-    let effort: String
-
-    var body: some View {
-        Text(effort.prefix(1).uppercased() + effort.dropFirst())
-            .textRole(.label).fontWeight(.medium).foregroundStyle(Tone.secondary)
-            .padding(.horizontal, Space.xs).padding(.vertical, 2)
-            .background(Tone.nested, in: Capsule())
-            .accessibilityLabel(String(localized: "Effort \(effort)", comment: "VoiceOver: the model's reasoning level; the argument is the level"))
+extension View {
+    /// A row of a plain section: the page's own side margin (the section adds none), 7 pt above and below, the 44 pt floor.
+    func rowInsets() -> some View {
+        padding(.vertical, Space.xs)
+            .frame(maxWidth: .infinity, minHeight: Metric.hit, alignment: .leading)
     }
 }
 
-extension View {
-    /// A row's insets in a grouped section: the section's gutter at the sides, 7 pt above and below, the 44 pt floor.
-    func rowInsets() -> some View {
-        padding(.horizontal, Space.groupedGutter)
-            .padding(.vertical, Space.xs)
-            .frame(maxWidth: .infinity, minHeight: Metric.hit, alignment: .leading)
+/// A section of the inspector: a small header in the quiet ink close above its rows, the rows on the sheet's ground with a
+/// hairline between them, an optional footer in the faint ink. No card: the sheet's chrome is the only raised thing.
+struct InspectorSection<Content: View>: View {
+    let header: String?
+    let footer: String?
+    @ViewBuilder let content: () -> Content
+    @Environment(\.displayScale) private var displayScale: CGFloat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let header {
+                Text(header).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .bottomLeading)
+                    .padding(.bottom, Space.xxs)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            Group(subviews: content()) { subviews in
+                ForEach(subviews) { subview in
+                    subview
+                    if subview.id != subviews.last?.id {
+                        Rectangle().fill(Tone.separator).frame(height: 1 / displayScale)
+                    }
+                }
+            }
+            if let footer {
+                Text(footer).textRole(.footnote).foregroundStyle(Tone.tertiary).padding(.top, Space.xs)
+            }
+        }
     }
 }

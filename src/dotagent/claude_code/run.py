@@ -61,7 +61,7 @@ from dotagent.agent.attachments import (
 )
 from dotagent.agent.continuity import RunLedger, new_ledger, with_actions
 from dotagent.agent.executor import ToolOutcome
-from dotagent.agent.goal_chain import goal_checker_with_standby
+from dotagent.agent.goal_chain import goal_checker_for_run
 from dotagent.agent.handover import (
     ChatSession,
     agent_tools,
@@ -1279,10 +1279,10 @@ def _checker_of(agent: AgentRun) -> GoalChecker | None:
     run: RunRecord = agent.run
     if not run.goal_mode:
         return None
-    return goal_checker_with_standby(
+    return goal_checker_for_run(
         runtime.router,
-        runtime.roles.review(),
-        runtime.roles.standby(),
+        runtime.roles,
+        lambda: run.model,
         runtime.config.agent.model_call_timeout_s,
         f"{run.thread_id}:goal",
         run.id,

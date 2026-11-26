@@ -10,6 +10,8 @@ struct BotProfile: View {
     let open: (String) -> Void
     @Environment(AppModel.self) private var model: AppModel
     @Environment(\.locale) private var locale: Locale
+    /// The bot's header, handed on to the pages pushed from here (a destination does not inherit it).
+    @Environment(\.botChat) private var botChat: BotChat?
     @State private var schedules: Loadable<[ScheduleView]> = .loading
     @State private var problem: SettingsFailure?
     @State private var deletingChat: ThreadRow?
@@ -68,16 +70,7 @@ struct BotProfile: View {
         .sheet(item: Binding(get: { library.map(LibraryChat.init) }, set: { library = $0?.id })) { chat in
             RunInspector(thread: chat.id, close: { library = nil })
         }
-        .sheet(isPresented: $composing) {
-            if let bot {
-                NewChatSheet(
-                    agent: bot.isDot ? nil : bot.record, close: { composing = false },
-                    opened: { key in
-                        composing = false
-                        open(key)
-                    })
-            }
-        }
+        .navigationDestination(isPresented: $composing) { PushedNewChat(botId: botId, header: botChat) }
         .confirmationDialog(
             String(localized: "Delete this chat with everything it holds?", comment: "Confirmation of deleting a chat"),
             isPresented: Binding(get: { deletingChat != nil }, set: { if !$0 { deletingChat = nil } }), titleVisibility: .visible
@@ -137,7 +130,7 @@ struct BotProfile: View {
                 NavigationRow(
                     systemImage: "bubble.left.and.bubble.right", title: String(localized: "All chats", comment: "Bot profile: opens every chat of the bot"),
                     description: nil, detail: nil
-                ) { BotChatsPage(scope: .chats(of: Set(bot.chats.map(\.summary.id)), agent: bot.isDot ? nil : bot.id), open: open) }
+                ) { BotChatsPage(scope: .chats(of: Set(bot.chats.map(\.summary.id)), agent: bot.isDot ? nil : bot.id), open: open).environment(\.botChat, botChat) }
             }
         }
     }

@@ -22,6 +22,27 @@ final class ChatListTests: XCTestCase {
         XCTAssertNotEqual(AppModel.newChatDraft(agent: "agt_scout"), AppModel.newChatDraft(agent: "agt_writer"))
     }
 
+    /// Item 1923: Dot's own work (a code review, a schedule's chat) stands last, apart from the owner's chats; one that
+    /// waits on the owner stands under Needs you.
+    func testDotsOwnWorkStandsApartFromTheOwnersChats() throws {
+        func chat(_ id: String, source: String, status: String, asks: Int) throws -> ThreadRow {
+            let json: String = """
+                {"summary":{"id":"\(id)","title":"\(id)","source":"\(source)","created_at":1,"updated_at":1,"pinned_at":null,
+                "run_count":1,"latest_run_id":"run_\(id)","latest_status":"\(status)","latest_created_at":1,"unread":true,
+                "actor_id":null,"last_message":"","last_role":"assistant"},"revision":1,"asks":\(asks)}
+                """
+            return try JSONDecoder().decode(ThreadRow.self, from: Data(json.utf8))
+        }
+        let sections: ChatListSections = chatListSections([
+            try chat("review", source: "review", status: "running", asks: 0), try chat("talk", source: "phone", status: "done", asks: 0),
+            try chat("daily", source: "schedule", status: "done", asks: 0), try chat("asks", source: "schedule", status: "blocked", asks: 1),
+        ])
+        XCTAssertEqual(sections.recent.map(\.summary.id), ["talk"])
+        XCTAssertEqual(sections.working.map(\.summary.id), [], "a code review at work is not the owner's work in progress")
+        XCTAssertEqual(sections.dotsWork.map(\.summary.id), ["review", "daily"])
+        XCTAssertEqual(sections.needsYou.map(\.summary.id), ["asks"])
+    }
+
     func testAPinnedChatStaysUnderPinnedWhateverItsState() throws {
         let waiting: ThreadRow = try row("a", status: "blocked", asks: 1, pinned: true, actor: nil)
         let working: ThreadRow = try row("b", status: "running", asks: 0, pinned: false, actor: nil)

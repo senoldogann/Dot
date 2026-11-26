@@ -31,7 +31,10 @@ struct HomeShell: View {
             HomeList(
                 selection: $selection, openSettings: { showsSettings = true }, newBot: { showsNewBot = true }, openApps: { showsApps = true })
         } detail: { route in
+            // One screen per route, as the phone's push makes it: a bot's held and chosen chats never carry to another
+            // bot on the iPad's detail column (item 1923's review).
             BotChatScreen(route: route, drawsBack: sizeClass != .regular, back: { selection = nil })
+                .id(route)
         } placeholder: {
             EmptyState(
                 title: String(localized: "No chat open", comment: "iPad detail column when no chat is selected"), systemImage: "bubble.left.and.bubble.right",

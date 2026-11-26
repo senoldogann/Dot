@@ -344,7 +344,6 @@ TR: dict[str, str] = {
     "Looked at the screen": "Ekrana baktı",
     "Memory": "Bellek",
     "Message Dot": "Dot'a yaz",
-    "Model, %@": "Model, %@",
     "Models": "Modeller",
     "Mon": "Pzt",
     "Needs you": "Seni bekliyor",
@@ -1477,3 +1476,39 @@ EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
 
 # The composer's model chip as the provider's mark (item 1924).
 TR.update({"Model: %@": "Model: %@"})
+
+# New chat as a pushed chat (item 1916).
+TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})
+
+# Links and files under an answer (backlog LF1).
+TR.update(
+    {
+        "%lld sources": "%lld kaynak",
+        "Unfolded": "Açık",
+        "Opens the page": "Sayfayı açar",
+        "Copy link": "Bağlantıyı kopyala",
+        "Open in Safari": "Safari'de aç",
+        "Share": "Paylaş",
+        "Shows the file": "Dosyayı gösterir",
+        "File": "Dosya",
+        "Loading the file": "Dosya yükleniyor",
+        "The file cannot be shown": "Dosya gösterilemiyor",
+        "Only the start of the file shows here; open it on the Mac for the rest.": "Burada dosyanın yalnızca başı görünüyor; gerisi için Mac'te aç.",
+        "Size": "Boyut",
+        "Changed": "Değişti",
+        "Where": "Konum",
+        "Open on Mac": "Mac'te aç",
+        "Save to Files": "Dosyalar'a kaydet",
+        "Opened on your Mac.": "Mac'inde açıldı.",
+        "The phone cannot draw this image.": "Telefon bu görseli çizemiyor.",
+        "The phone shows this kind of file by its facts; open it on the Mac to read it.": "Telefon bu tür dosyanın yalnızca bilgilerini gösterir; okumak için Mac'te aç.",
+        "The file is too large for the phone; open it on the Mac.": "Dosya telefon için çok büyük; Mac'te aç.",
+        "Not on your Mac": "Mac'inde yok",
+        "Not shown from this place": "Bu konumdan gösterilmiyor",
+        "the chat's file panel": "sohbetin dosya paneli",
+    }
+)
+EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
+
+# "This chat" sheet, plain (item 1922)
+TR.update({"Provider": "Sağlayıcı"})

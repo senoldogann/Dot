@@ -1172,12 +1172,14 @@ function modelTable(provider, mainModel, remember) {
   );
 }
 
-/** The providers the configured models (main, vision and review) run on: a key missing for one of them stops runs. */
+/** The providers the configured models run on: a provider problem can affect a run or its check. */
 function providersInUse(status) {
   if (status === null) {
     return [];
   }
-  return MODEL_ROLES.map((role) => providerOf(status.models[role]));
+  const { models } = status;
+  const refs = [...MODEL_ROLES.map((role) => models[role]), ...Object.values(models.kinds ?? {}), models.check_other_family ?? ""];
+  return [...new Set(refs.filter((ref) => ref !== "").map(providerOf))];
 }
 
 // The problems that are the usual state of a provider the owner does not use: no key, or no program to run it on.
@@ -1545,7 +1547,7 @@ function buildModels(isDisposed, asked, head) {
   const list = el("div", { class: "models-providers" }, inlineLoading());
   const main = modelSetting({
     label: "Default model",
-    hint: "New chats start on it, and so does any task that names no model. A chat keeps the model it has; Default in its message box follows this one.",
+    hint: "New chats use it when no model is chosen for the message or its task kind.",
     className: "models-default",
     can: (model) => model.tools,
     takes: () => true,
@@ -1556,19 +1558,39 @@ function buildModels(isDisposed, asked, head) {
       toast("ok", `New chats start on ${modelName(ref)}.`);
     },
   });
-  // The model a task of security research within a scope starts on when no model is chosen for it (item 1889): kept as
-  // [models.kinds] security, "" for the default model.
-  const security = modelSetting({
-    label: "Security research model",
-    hint: "A task that names a host of a bug bounty scope or of your own hosts, and asks for security work, starts on it when no model is chosen, so the model that takes that work is the one you chose before any refusal.",
+  const kinds = [
+    { kind: "security", label: "Security research model", hint: "Security work that names a host covered by a scope." },
+    { kind: "quick", label: "Quick task model", hint: "A short, single lookup or list." },
+    { kind: "deep", label: "Deep task model", hint: "An explicit investigation, analysis or design task." },
+    { kind: "writing", label: "Writing model", hint: "Drafting or editing copy, documents or messages." },
+    { kind: "code", label: "Coding model", hint: "Implementing changes to a repository." },
+  ].map(({ kind, label, hint }) => ({
+    kind,
+    control: modelSetting({
+      label,
+      hint,
+      className: "models-role",
+      can: (model) => model.tools,
+      takes: () => true,
+      refused: "A task needs a model that can use actions.",
+      none: kind === "security" ? "Default model" : "Usual model",
+      choose: async (ref) => {
+        await api.put("/models/kinds", { kind, model: ref });
+        toast("ok", ref === "" ? "Task model cleared." : `${label} set to ${modelName(ref)}.`);
+      },
+    }),
+  }));
+  const alternateCheck = modelSetting({
+    label: "Other-family check model",
+    hint: "Checks task goals and completed helper results when the worker belongs to a different model family.",
     className: "models-role",
-    can: (model) => model.tools,
-    takes: () => true,
-    refused: "A task's model takes its steps in Dot's own loop.",
-    none: "Default model",
+    can: (model) => model.tools && model.family != null,
+    takes: (provider) => answersRole("review", provider),
+    refused: "This service’s models cannot answer review questions.",
+    none: "Off",
     choose: async (ref) => {
-      await api.put("/models/kinds", { kind: "security", model: ref });
-      toast("ok", ref === "" ? "Security research starts on the default model." : `Security research starts on ${modelName(ref)}.`);
+      await api.put("/models/check-other-family", { model: ref });
+      toast("ok", ref === "" ? "Other-family checks turned off." : `Other-family checks use ${modelName(ref)}.`);
     },
   });
   const roles = ROLE_SETTINGS.map((setting) => ({
@@ -1768,7 +1790,8 @@ function buildModels(isDisposed, asked, head) {
   const element = el(
     "div",
     { class: "set-sections" },
-    setSection({ title: "Roles", body: setCard(planRow, main.element, security.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, usage) }),
+    setSection({ title: "Roles", body: setCard(planRow, main.element, ...roles.map(({ control }) => control.element), look.element, lookFailed, alternateCheck.element, usage) }),
+    setSection({ title: "Task models", lead: "Used when you haven’t chosen a model for the task. Helpers otherwise use their parent’s model.", body: setCard(...kinds.map(({ control }) => control.element)) }),
     setSection({ title: "Night's learning and self-repair", body: setCard(...learning.map(({ control }) => control.element), learningFailed, repairRow) }),
     standby.element,
     setSection({ title: "Code review", body: setCard(reviewModel.element, smallModel.element, ...reviewRows, reviewFailed) }),
@@ -1793,8 +1816,9 @@ function buildModels(isDisposed, asked, head) {
     }
     const status = getSnapshot().status;
     const mainModel = status === null ? "" : status.models.main;
-    const securityModel = status === null ? "" : (status.models.kinds?.security ?? "");
-    const chosen = [...roles.map(({ role }) => (status === null ? "" : status.models[role])), securityModel].join(" ");
+    const kindModels = kinds.map(({ kind }) => status?.models.kinds?.[kind] ?? "");
+    const checkModel = status?.models.check_other_family ?? "";
+    const chosen = JSON.stringify([...roles.map(({ role }) => status?.models[role] ?? ""), ...kindModels, checkModel]);
     const standbyModels = status === null ? [] : status.models.standby;
     const standbyKey = standbyModels.join(" ");
     const inUse = providersInUse(status);
@@ -1813,7 +1837,10 @@ function buildModels(isDisposed, asked, head) {
     head.setMeta(...modelsSummary(providers, inUse));
     search.placeholder = `Search ${plural(providers.reduce((count, provider) => count + provider.models.length, 0), "model", "models")}`;
     main.paint(providers, mainModel, null);
-    security.paint(providers, securityModel, mainModel === "" ? null : mainModel);
+    alternateCheck.paint(providers, checkModel, null);
+    for (const [index, { control }] of kinds.entries()) {
+      control.paint(providers, kindModels[index], null);
+    }
     for (const { role, control } of roles) {
       control.paint(providers, status === null ? "" : status.models[role], null);
     }

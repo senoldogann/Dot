@@ -54,6 +54,7 @@ from dotagent.config_edit import (
     set_learning_model,
     set_resume,
     set_role_model,
+    set_setting,
     set_shell_sandbox,
     set_standby_models,
 )
@@ -111,6 +112,7 @@ from dotagent.help.elsewhere import (
 )
 from dotagent.launchd import JobState, inspect_job, service_runs
 from dotagent.llm.claude_code import CLAUDE_CODE_PROVIDER
+from dotagent.llm.families import model_family
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.roles import ModelRoles
@@ -131,6 +133,7 @@ from dotagent.server.phones import PairedPhones
 from dotagent.server.routes_mcp import service_of
 from dotagent.server.skills_left_out import left_out_view
 from dotagent.server.views import (
+    AlternateCheckRequest,
     AwakeState,
     ContextChoice,
     ContextEvidenceQuery,
@@ -221,6 +224,7 @@ def _option(
 ) -> ModelOption:
     ref: ModelRef = ModelRef(provider=provider, model=info.id)
     return ModelOption(
+        family=model_family(ref.label),
         ref=ref.label,
         label=labels.get(info.id, info.id),
         vision=info.vision,
@@ -561,6 +565,22 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
                 raise ConfigError("a task needs a model that can use actions", {"model": request.model})
         await asyncio.to_thread(set_kind_model, config_path(), request.kind, request.model)
         ctx.runtime.roles.choose_kind(request.kind, request.model)
+        return models_now()
+
+    @router.put("/models/check-other-family")
+    async def choose_alternate_check(request: AlternateCheckRequest) -> ModelsConfig:
+        """Save a model able to answer goal checks and with an identifiable family, or clear the choice."""
+        if request.model != "":
+            ref: ModelRef = parse_model_ref(request.model)
+            if model_family(ref.label) is None:
+                raise ConfigError("the check model's family is not recognized", {"model": ref.label})
+            if not answers_role("review", ref.provider):
+                raise ConfigError("the check model must answer review questions", {"model": ref.label})
+            info: ModelInfo = await ctx.runtime.router.model_info(ref)
+            if not info.tools:
+                raise ConfigError("the check model must be one that can use actions", {"model": ref.label})
+        await asyncio.to_thread(set_setting, config_path(), "models", "check_other_family", request.model)
+        ctx.runtime.roles.choose_alternate_check(request.model)
         return models_now()
 
     def learning_now() -> LearningModels:
