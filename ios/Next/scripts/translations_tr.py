@@ -1474,3 +1474,6 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
+
+# The composer's model chip as the provider's mark (item 1924).
+TR.update({"Model: %@": "Model: %@"})

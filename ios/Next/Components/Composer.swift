@@ -5,7 +5,7 @@ import UIKit
 import VisionKit
 
 /// The composer's two shapes (review S4): one capsule row at rest and while the owner types a short line (focus alone
-/// does not change it, item 1918), split into the field and a toolbar once the owner writes more than a line, adds a
+/// does not change it, item 1924), split into the field and a toolbar once the owner writes more than a line, adds a
 /// file or edits a queued message.
 enum ComposerLayout: Equatable, Sendable {
     case compact
