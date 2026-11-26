@@ -66,7 +66,7 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
 func deliveryWords(_ delivery: Delivery) -> String {
     switch delivery {
     case .offline: String(localized: "Waiting for the link", comment: "Under an owner's message: it is kept and goes when the phone is online")
-    case .sending: String(localized: "Sending…", comment: "Under an owner's message: it is going to the Mac")
+    case .sending: String(localized: "Pending", comment: "Under an owner's message: it is going to the Mac and not taken yet (item 1927)")
     case .queued(let position):
         String(localized: "Queued · \(position) · starts after this run", comment: "Under an owner's message: its place in the chat's queue")
     case .held(let position): String(localized: "Queued · \(position) · the queue is held", comment: "Under an owner's message: its place in a held queue")

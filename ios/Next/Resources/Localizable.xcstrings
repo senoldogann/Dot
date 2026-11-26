@@ -8283,6 +8283,17 @@
         }
       }
     },
+    "Pending": {
+      "comment": "Under an owner's message: it is going to the Mac and not taken yet (item 1927)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekliyor"
+          }
+        }
+      }
+    },
     "Permissions": {
       "comment": "Settings row: the approval mode and the rules",
       "localizations": {
@@ -10066,7 +10077,7 @@
       }
     },
     "Sending…": {
-      "comment": "Draft card state: on its way\nUnder an owner's message: it is going to the Mac",
+      "comment": "Draft card state: on its way",
       "localizations": {
         "tr": {
           "stringUnit": {

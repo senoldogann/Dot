@@ -299,7 +299,8 @@ struct ChatScreen: View {
         case .owner(let id, let text, let delivery):
             VStack(alignment: .trailing, spacing: Space.xxs) {
                 OwnerMessage(text: text).modifier(OwnerMessageActions(item: id, text: text, thread: thread, toComposer: toComposer, tell: { toast = $0 }))
-                if let delivery { deliveryLine(id: id, delivery: delivery) }
+                // "Pending" (or why it was refused) until the Mac took the message; nothing once it did (item 1927).
+                if let delivery, delivery != .delivered { deliveryLine(id: id, delivery: delivery) }
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         case .note(_, let text):

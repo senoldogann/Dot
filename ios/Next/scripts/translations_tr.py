@@ -1174,6 +1174,9 @@ TR: dict[str, str] = {
     "For this chat; Settings › Chat sets it for every chat.": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar.",
     "Messages": "Mesajlar",
 
+    # D2: an owner's message not yet taken by the Mac (item 1927).
+    "Pending": "Bekliyor",
+
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).

@@ -88,6 +88,21 @@ final class StreamingLiveUITests: XCTestCase {
         add(shot)
     }
 
+    /// Item 1927: a message the Mac has not taken yet says "Pending" under its bubble, and the word goes once the Mac
+    /// took it (the scripted daemon holds "hold:" for 3 s).
+    func testAMessageIsPendingUntilTheMacTakesIt() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "hold: wait for it")
+        let pending: XCUIElement = app.staticTexts["Pending"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 3), "pending under the bubble while the Mac holds it")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "pending"
+        shot.lifetime = .keepAlways
+        add(shot)
+        let gone: XCTNSPredicateExpectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: pending)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 20), .completed, "the word goes once the Mac took it")
+    }
+
     func testAStreamingRunIsMeasured() throws {
         let app: XCUIApplication = try launch(scene: "live-chat")
         type(app, "stream: where do we stand")
