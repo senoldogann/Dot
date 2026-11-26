@@ -113,7 +113,7 @@ def drawn_page(svg: str | None, html: str | None, width: int, height: int) -> st
         raise ToolInputError("give the drawing as svg or as html, one of the two", {})
     body: str = _svg_page(svg, width, height) if svg is not None else (html or "")
     return (
-        f'<meta http-equiv="Content-Security-Policy" content="{_POLICY}">'
+        f'<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="{_POLICY}">'
         f"<style>html,body{{margin:0;padding:0;background:#fff}}"
         f"body{{width:{width}px;height:{height}px;overflow:hidden}}img{{display:block}}</style>"
         f"{body}"
@@ -188,7 +188,8 @@ def _generate_image_tool() -> RegisteredTool:
             return fail(_no_key_words(str(error.context.get("name", "GOOGLE_API_KEY"))))
         written: int = await asyncio.to_thread(atomic_write_bytes, path, png, journal_for(ctx, GENERATE_IMAGE_TOOL))
         text: str = f"Saved {path} ({written:,} bytes): {how} It is shown in the conversation."
-        return ok_with_images(text, (_model_view(png),), (_png_image(png),))
+        view, whole = await asyncio.to_thread(lambda: (_model_view(png), _png_image(png)))
+        return ok_with_images(text, (view,), (whole,))
 
     return make_path_tool(
         name=GENERATE_IMAGE_TOOL,

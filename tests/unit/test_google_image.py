@@ -94,7 +94,7 @@ def test_a_drawing_is_given_as_one_of_svg_html_or_photo_and_a_photo_takes_no_siz
 
 def test_the_page_of_a_drawing_bars_scripts_and_requests_before_anything_the_run_wrote() -> None:
     page: str = drawn_page(None, "<h1>Hi</h1><script>fetch('/x')</script>", 600, 300)
-    assert page.startswith('<meta http-equiv="Content-Security-Policy"')
+    assert page.startswith('<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy"')
     policy: str = page.split('content="', 1)[1].split('"', 1)[0]
     assert "script-src 'none'" in policy and "default-src 'none'" in policy and "connect-src 'none'" in policy
     assert "img-src data:" in policy
