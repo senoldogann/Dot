@@ -624,7 +624,7 @@ final class FakeDaemon: @unchecked Sendable {
             ThreadsView(
                 revision: revisionCounter,
                 threads: chats.values.map {
-                    ThreadRow(summary: summary($0), revision: $0.revision, asks: $0.asks.count)
+                    ThreadRow(summary: summary($0), revision: $0.revision, asks: $0.asks.count, helpers: 0, background: [])
                 })
         }
     }

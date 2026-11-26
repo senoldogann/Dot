@@ -29,6 +29,7 @@ struct RunInspector: View {
     @State private var undone: Set<String> = []
     @State private var stopped: Set<String> = []
     @State private var writingRecap: Bool = false
+    @AppStorage(PrefKey.showSteps) private var showStepsEverywhere: Bool = true
     @State private var failure: String?
 
     private var view: ThreadView? { model.chats[thread]?.view }
@@ -39,6 +40,13 @@ struct RunInspector: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.xs) {
                 if let failure { Notice(tone: .failure, message: failure, dismiss: { self.failure = nil }) }
+                GroupedSection(header: String(localized: "Messages", comment: "Chat settings section: what a chat shows"), footer: nil) {
+                    ToggleRow(
+                        systemImage: "list.bullet.indent", title: String(localized: "Show steps", comment: "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)"),
+                        description: String(localized: "For this chat; Settings › Chat sets it for every chat.", comment: "This chat sheet: the Show steps switch is this chat's own (item 1915)"),
+                        isOn: Binding(get: { model.stepsOverrides[thread] ?? showStepsEverywhere }, set: { model.stepsOverrides[thread] = $0 }))
+                    .accessibilityIdentifier("inspector.showSteps")
+                }
                 if let run {
                     runSection(run)
                     modelSection(run)

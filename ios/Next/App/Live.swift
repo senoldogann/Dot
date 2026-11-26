@@ -66,7 +66,7 @@ func freshnessLine(freshness: Freshness, transport: Transport, savedAt: Double?,
 func deliveryWords(_ delivery: Delivery) -> String {
     switch delivery {
     case .offline: String(localized: "Waiting for the link", comment: "Under an owner's message: it is kept and goes when the phone is online")
-    case .sending: String(localized: "Sending…", comment: "Under an owner's message: it is going to the Mac")
+    case .sending: String(localized: "Pending", comment: "Under an owner's message: it is going to the Mac and not taken yet (item 1927)")
     case .queued(let position):
         String(localized: "Queued · \(position) · starts after this run", comment: "Under an owner's message: its place in the chat's queue")
     case .held(let position): String(localized: "Queued · \(position) · the queue is held", comment: "Under an owner's message: its place in a held queue")
@@ -474,6 +474,8 @@ struct ChatRowModel: Equatable {
     let time: String
     let status: ChatStatus?
     let agent: String?
+    /// Where it stands (item 1920).
+    let state: RowState
 
     init(row: ThreadRow, now: Date) {
         title = row.summary.title
@@ -481,15 +483,12 @@ struct ChatRowModel: Equatable {
         time = rowTime(row.summary.latestCreatedAt, now: now)
         status = chatStatus(of: row)
         agent = row.summary.actorId
+        state = rowState(row)
     }
 
-    init(title: String, preview: String, time: String, status: ChatStatus?, agent: String?) {
-        self.title = title
-        self.preview = preview
-        self.time = time
-        self.status = status
-        self.agent = agent
-    }
+    /// The outcome word of a chat at rest whose run ended unseen ("Done", "Failed"); the states say the rest.
+    var outcome: ChatStatus? { state == .rest && (status == .done || status == .failed) ? status : nil }
+
 }
 
 /// A chat in the list: the agent's face, the title (two lines at most), one status word by priority, the last line and
@@ -507,23 +506,20 @@ struct ChatRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                     Text(chat.title).textRole(.body).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(2)
                     Spacer(minLength: Space.xs)
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(chat.time).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
-                    }
+                    if !dynamicTypeSize.isAccessibilitySize { RowTrailing(state: chat.state, time: chat.time) }
                 }
-                if let status = chat.status { StatusWord(status: status) }
-                if !chat.preview.isEmpty {
-                    Text(chat.preview).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(2)
+                if let outcome = chat.outcome { StatusWord(status: outcome) }
+                if chat.state != .rest || !chat.preview.isEmpty {
+                    RowStateLine(state: chat.state, preview: chat.preview, lineLimit: 2)
                 }
-                if dynamicTypeSize.isAccessibilitySize {
-                    Text(chat.time).textRole(.label).foregroundStyle(Tone.tertiary).tabularNumbers()
-                }
+                if dynamicTypeSize.isAccessibilitySize { RowTrailing(state: chat.state, time: chat.time) }
             }
         }
         .frame(minHeight: Metric.rowWithDescription)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([chat.title, chat.status?.word, chat.preview, chat.time].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityLabel(
+            [chat.title, rowStateWords(chat.state) ?? chat.outcome?.word, chat.preview, chat.time].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
     }
 }
 

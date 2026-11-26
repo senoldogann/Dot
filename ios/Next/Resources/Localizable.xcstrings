@@ -4325,6 +4325,17 @@
         }
       }
     },
+    "Each chat's This chat sheet can show or hide them for that chat alone.": {
+      "comment": "Chat settings: footer of Show steps (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Her sohbetin Bu sohbet sayfası bunları yalnızca o sohbet için gösterebilir ya da gizleyebilir."
+          }
+        }
+      }
+    },
     "Each role plays on the review model unless one is chosen for it.": {
       "comment": "Models: the night's learning roles",
       "localizations": {
@@ -5131,6 +5142,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot çalışırken yazılan mesaj"
+          }
+        }
+      }
+    },
+    "For this chat; Settings › Chat sets it for every chat.": {
+      "comment": "This chat sheet: the Show steps switch is this chat's own (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu sohbet için; Ayarlar › Sohbet bunu tüm sohbetler için ayarlar."
           }
         }
       }
@@ -6618,7 +6640,7 @@
       }
     },
     "Messages": {
-      "comment": "Home search: finds in what the chats say",
+      "comment": "Chat settings section: what a chat shows\nHome search: finds in what the chats say",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7816,6 +7838,17 @@
         }
       }
     },
+    "Off: only the messages, and one line that says what Dot is doing. A finished run's steps open from its Worked for line.": {
+      "comment": "Description of the Show steps switch (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapalı: yalnızca mesajlar ve Dot'un ne yaptığını söyleyen tek bir satır. Biten bir işin adımları süresini söyleyen satırdan açılır."
+          }
+        }
+      }
+    },
     "Off: what got done, what waits for you and the next step": {
       "comment": "Evening check-in: what it writes, while it is off",
       "localizations": {
@@ -8517,6 +8550,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kliniğin sayfasında 20 € kapora ödensin mi?"
+          }
+        }
+      }
+    },
+    "Pending": {
+      "comment": "Under an owner's message: it is going to the Mac and not taken yet (item 1927)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekliyor"
           }
         }
       }
@@ -10315,7 +10359,7 @@
       }
     },
     "Sending…": {
-      "comment": "Draft card state: on its way\nUnder an owner's message: it is going to the Mac",
+      "comment": "Draft card state: on its way",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -10790,6 +10834,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sayfa göster"
+          }
+        }
+      }
+    },
+    "Show steps": {
+      "comment": "Settings switch: a chat shows its runs' tool calls and thoughts (item 1915)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adımları göster"
           }
         }
       }

@@ -19,6 +19,8 @@ enum PrefKey {
     static let codeFontSize: String = "codeFontSize"
     /// Whether a long line of code wraps instead of scrolling sideways (item 1769).
     static let codeWordBreak: String = "codeWordBreak"
+    /// Whether a chat shows a run's steps (on, the default) or only the messages with one live line (item 1915).
+    static let showSteps: String = "showSteps"
 }
 
 /// Light, dark, or as the iPhone is.
