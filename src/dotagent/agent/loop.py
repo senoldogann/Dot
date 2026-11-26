@@ -2120,8 +2120,8 @@ async def _consult(
 ) -> StallAnswer | RunOutcome:
     """The consult rung: the review model looks at the run and its advice is given to the model as a note.
 
-    A review model that cannot answer ends the run as stalled, with the problem stated: the run is not told that a
-    second opinion was taken when none was.
+    A review model that cannot answer, or cannot be called (its key is missing, item 1939), ends the run as stalled,
+    with the problem stated: the run is not told that a second opinion was taken when none was.
     """
     run: RunRecord = agent.run
     request: ProgressRequest = ProgressRequest(
@@ -2132,7 +2132,9 @@ async def _consult(
     )
     try:
         advice: ProgressAdvice = await consultant(request)
-    except ProviderError as error:
+    except (ProviderError, ConfigError) as error:
+        # A review model that could not answer, or that cannot be called: its key is missing (MissingSecretError, item
+        # 1939) or it is not a model Dot can call.
         log.error("progress_consult_failed", run_id=run.id, error=error.message, context=error.context)
         await agent.runtime.bus.emit(
             run.id, "stall", _stall_data(alert, {"error": shorten_reason(error.message)}), True
@@ -2168,8 +2170,9 @@ async def _checkpoint(
     agent: AgentRun, judge: CheckpointJudge, history: Sequence[Message], goal: Message
 ) -> _Drift | bool:
     """Ask the review model at a checkpoint whether the run is on track (item 909): what it said of a run off track,
-    True for one on track, False when the model could not answer, which changes nothing: a checkpoint is a second look,
-    and a run is never stopped, misled or let off for a judge that failed."""
+    True for one on track, False when the model could not answer or be called (its key is missing, item 1939), which
+    changes nothing: a checkpoint is a second look, and a run is never stopped, misled or let off for a judge that
+    failed."""
     request: CheckpointRequest = CheckpointRequest(
         goal=agent.run.goal,
         owner_words=agent.gate.instructions,
@@ -2178,7 +2181,8 @@ async def _checkpoint(
     )
     try:
         verdict: CheckpointVerdict = await judge(request)
-    except ProviderError as error:
+    except (ProviderError, ConfigError) as error:
+        # A review model whose key is missing (MissingSecretError, item 1939) is a judge that failed too.
         log.warning("checkpoint_failed", run_id=agent.run.id, error=error.message, context=error.context)
         return False
     log.info("checkpoint", run_id=agent.run.id, on_track=verdict.on_track)
