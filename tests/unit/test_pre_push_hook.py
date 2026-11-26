@@ -91,6 +91,17 @@ def _run_hook_on(
         encoding="utf-8",
     )
     stand_in.chmod(0o755)
+    # `uv run python scripts/prompt_surface.py --check` (item 1971): records that it ran, and fails with what `uv_says`
+    # holds when that file is there.
+    uv: Path = bin_dir / "uv"
+    uv.write_text(
+        "#!/bin/sh\n"
+        f'echo "$@" >> "{tmp_path / "uv_called"}"\n'
+        f'if [ -f "{tmp_path / "uv_says"}" ]; then cat "{tmp_path / "uv_says"}" >&2; exit 1; fi\n'
+        'echo "prompt surface: up to date"\n',
+        encoding="utf-8",
+    )
+    uv.chmod(0o755)
     env = {key: value for key, value in os.environ.items() if key != "ANTHROPIC_API_KEY"}
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env.pop("DOTX", None)
@@ -390,3 +401,45 @@ def test_a_block_that_counts_no_important_finding_is_not_taken_as_read(repo: Pat
     assert done.returncode == 0, done.stdout + done.stderr
     diff: str = (_review_dir(repo) / f"{tip}.diff").read_text(encoding="utf-8")
     assert "later.txt" in diff and "unread.txt" in diff
+
+
+def _with_surface_script(repo: Path) -> str:
+    """Puts the script the hook looks for into the branch, and returns the tip before the branch's next commit."""
+    (repo / "scripts").mkdir(exist_ok=True)
+    _commit(repo, "scripts/prompt_surface.py", "# stand-in\n", "the script")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_a_change_under_src_dotagent_is_checked_against_the_prompt_surface_before_the_review(
+    repo: Path, tmp_path: Path
+) -> None:
+    """Item 1971: the prompt surface's test runs on macOS only, so a pull request never saw a stale fixture and main
+    went red twice in a day. A fresh fixture lets the review go on."""
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert (tmp_path / "uv_called").read_text().strip() == "run python scripts/prompt_surface.py --check"
+
+
+def test_a_stale_prompt_surface_stops_the_push_with_the_command_that_fixes_it_and_no_model_is_asked(
+    repo: Path, tmp_path: Path
+) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    (repo / "src" / "dotagent").mkdir(parents=True)
+    tip: str = _commit(repo, "src/dotagent/tools.py", "a tool\n", "a tool's description")
+    (tmp_path / "uv_says").write_text("prompt surface: stale (tools.json)\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (1, 0), done.stdout + done.stderr
+    assert "the prompt surface is stale" in done.stderr
+    assert "uv run python scripts/prompt_surface.py" in done.stderr and "tests/fixtures/prompt_surface" in done.stderr
+
+
+def test_a_change_outside_src_dotagent_does_not_run_the_prompt_surface_check(repo: Path, tmp_path: Path) -> None:
+    remote_tip: str = _with_surface_script(repo)
+    tip: str = _commit(repo, "docs.md", "words\n", "docs")
+    (tmp_path / "uv_says").write_text("stale\n", encoding="utf-8")
+    done, asked = _run_hook(repo, tmp_path, tip, remote_tip)
+    assert (done.returncode, asked) == (0, 1), done.stdout + done.stderr
+    assert not (tmp_path / "uv_called").exists()

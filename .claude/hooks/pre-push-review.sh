@@ -98,6 +98,23 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     fi
   fi
 
+  # A change under src/dotagent can alter what the model is told (a tool's description, a prompt), and then the checked-in
+  # prompt surface must be written again with it (item 1971). Its test runs on macOS only, so a pull request's Linux jobs
+  # never see a stale one and main went red twice in a day: it is checked here, in seconds, before the model review. The
+  # check reads the working tree, so it is made for the branch that is checked out.
+  if [[ -f "$repo_root/scripts/prompt_surface.py" ]] && git diff --name-only "$base..$local_sha" | grep -q '^src/dotagent/'; then
+    if [[ "$(git rev-parse HEAD)" == "$local_sha" ]]; then
+      if ! surface=$(uv run python scripts/prompt_surface.py --check 2>&1); then
+        echo "claude-review: push stopped; the prompt surface is stale: $surface" >&2
+        echo "claude-review: run \`uv run python scripts/prompt_surface.py\`, commit tests/fixtures/prompt_surface and push" \
+          "again" >&2
+        exit 1
+      fi
+    else
+      echo "claude-review: $local_ref is not checked out, so its prompt surface is not checked here" >&2
+    fi
+  fi
+
   blocked=0
   for earlier in "$review_dir"/*.md; do
     [[ -e "$earlier" ]] || continue

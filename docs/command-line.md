@@ -129,4 +129,8 @@ the change or ran out of its budget). The reviewer is told to read only the file
 Important finding in it is fixed by the new diff or still stands. A model that is not on the Claude plan is also told
 its budget, 40 tool calls and four fifths of the time left in minutes, and to write its findings and the `VERDICT` line
 at three quarters of either: DeepSeek reads the repository at about ten seconds a step and stopped at the time limit with
-no verdict in 21 of its 61 reviews. A hook change applies to the owner only once their own checkout has pulled it.
+no verdict in 21 of its 61 reviews. A change under `src/dotagent` is also checked against the checked-in prompt surface (item 1971): the hook runs `uv run
+python scripts/prompt_surface.py --check` on the checked-out branch before any model is asked, and stops the push with
+`uv run python scripts/prompt_surface.py` as the fix when a fixture of `tests/fixtures/prompt_surface` is stale, since
+that test runs on macOS only and a pull request's Linux jobs never see a stale one (main went red twice in a day). A hook
+change applies to the owner only once their own checkout has pulled it.
