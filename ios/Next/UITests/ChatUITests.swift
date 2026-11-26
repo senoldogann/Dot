@@ -156,16 +156,16 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, "a second tap folds them back")
     }
 
-    /// Item 1904: a failed run ends in one plain row, "The run failed · <reason>" with Try again as a text button on
-    /// it; the finished run's fold says how long it worked, no counts.
+    /// Item 1904: a failed run ends in one plain row, "The run failed · <reason>" with Retry as a text button on it;
+    /// the finished run's fold says how long it worked, no counts.
     func testAFailedRunIsOnePlainRowAndTheFoldSaysOnlyHowLong() {
         let app: XCUIApplication = launch("n2-failed")
         let failed: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "The run failed · The model answered HTTP 529")).firstMatch
         XCTAssertTrue(failed.waitForExistence(timeout: 10))
-        let retry: XCUIElement = app.buttons["runEnded.retry"]
+        let retry: XCUIElement = app.buttons["end.retry"]
         XCTAssertTrue(retry.exists)
         // On the row's first line (the row aligns on its first baseline; a long reason wraps below it).
-        XCTAssertTrue(retry.frame.midY >= failed.frame.minY && retry.frame.midY <= failed.frame.minY + 20, "Try again on the first line: \(retry.frame) \(failed.frame)")
+        XCTAssertTrue(retry.frame.midY >= failed.frame.minY && retry.frame.midY <= failed.frame.minY + 20, "Retry on the first line: \(retry.frame) \(failed.frame)")
         XCTAssertGreaterThan(retry.frame.minX, failed.frame.maxX - 1, "after the words")
         XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
         let fold: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).firstMatch

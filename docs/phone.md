@@ -1022,7 +1022,7 @@ a command", and `at`), `blocking` (whether the run that started it still waits f
 background) and `stop`, the path to `POST` to stop it), `background` (what works for the chat with no run of it waiting:
 `kind` `helper` (let go to the background), `command` (a terminal session's background command) or `loop` (its
 switched-on loop), with `id`, `title` and `started_at`), `schedules` (as the chat's Automations), `reactions`, `drafts`
-(waiting, its helpers' among them) and `terminals`. The stream keeps the helpers live: their events come on it, and
+(those that wait and those whose send failed, which still take Send or Discard; its helpers' among them) and `terminals`. The stream keeps the helpers live: their events come on it, and
 each change of their status moves the chat's revision. 404 for no chat. A cold
 open is this one call, made beside the stream's.
 

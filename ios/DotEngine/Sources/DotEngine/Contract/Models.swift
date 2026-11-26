@@ -107,6 +107,13 @@ public struct RunRecord: Codable, Sendable, Hashable {
     public let approvals: String?
     /// The owner's reaction the run follows up (item 844): the transcript draws no owner's message for it.
     public let followsReaction: String?
+    /// Whether the chat can be rewound to before this run's message (Edit from here and Retry, item 282); `nil` from a
+    /// daemon or a fixture that does not say.
+    public var rewindable: Bool? = nil
+    /// The agent the run belongs to (item 86), `nil` for Dot.
+    public var agentId: String? = nil
+    /// Why the run ended (`model_refused` when its model declined the task, item 1889), `nil` while it works.
+    public var endReason: String? = nil
 
     public init(
         id: String, threadId: String, goal: String, mode: String, model: String, status: String, createdAt: Double, finishedAt: Double?,
@@ -140,6 +147,9 @@ public struct RunRecord: Codable, Sendable, Hashable {
         case inputTokens = "input_tokens"
         case outputTokens = "output_tokens"
         case followsReaction = "follows_reaction"
+        case rewindable
+        case agentId = "agent_id"
+        case endReason = "end_reason"
     }
 
     /// Whether the run still goes (it can be stopped, a steer reaches it).
@@ -195,6 +205,16 @@ public struct RunDetail: Codable, Sendable, Hashable {
     public let active: Bool
     public let held: Bool
     public let choices: ChatChoices?
+    /// Whether the run was cut off, blocked or failed and a new run can go on from where it stopped (`POST
+    /// /runs/{id}/resume`); `nil` from a daemon or a fixture that does not say.
+    public var resumable: Bool? = nil
+    /// How the run was cut off (`daemon_restarted`, `daemon_shutdown`, `process_ended`, `process_died`), else `nil`.
+    public var cutOff: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case run, title, active, held, choices, resumable
+        case cutOff = "cut_off"
+    }
 }
 
 public struct QueuedMessageView: Codable, Sendable, Hashable {
