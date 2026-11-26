@@ -6,10 +6,13 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1899](1899.md) | done | 2026-11-26 | A red main on macOS opens an issue, and the owner's Dot is updated only from a green commit |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
+| [1892](1892.md) | done | 2026-11-25 | The nightly browser run's stale tests follow today's screens, and four small bugs they found are fixed |
 | [1891](1891.md) | done | 2026-11-25 | Item numbers are reserved, and every place that holds one is read |
 | [1888](1888.md) | done | 2026-11-23 | A scope is one command, not a toml block: `dotx scope add`, `list`, `remove`, `check` over a store every call reads |
 | [1887](1887.md) | done | 2026-11-23 | Authorised security testing is a scope, not a refusal: a bug bounty program's hosts are written down and tested |
+| [1886](1886.md) | done | 2026-11-26 | A pull request runs the Linux checks alone; the macOS suites run on the push to main |
 | [1885](1885.md) | done | 2026-11-25 | One settings sheet from the owner's initials, grouped as the owner's reference |
 | [1884](1884.md) | done | 2026-11-25 | A bot's profile: its chats, routines, library, model, activity, instructions and mute; Dot's holds the Mac |
 | [1883](1883.md) | done | 2026-11-25 | A bot's chat: the other bots' unread beside the back, the bot's pill, the "⋯" menu, Find in chat, "Ask <name>", a new chat with the bot |

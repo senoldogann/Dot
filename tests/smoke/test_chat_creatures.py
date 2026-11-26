@@ -1,12 +1,13 @@
-"""Every chat wears a creature (item 277): in the sidebar, wide and on a phone, light and dark, each chat shows a face,
-a chat with Dot the look its id gives and a chat with an agent the agent's; its name over its last line (the answer in
-plain words, or the owner's message after "You:" while the run works); its age at its right, over the accent dot of a
-chat that is unread; the creature of a chat at work wears the working state, that of a failed run the failed one.
+"""Every chat's row says whose it is (items 277 and 1327): in the sidebar, wide and on a phone, light and dark, each
+chat shows its agent's badge and name (Dot's "DO" for a chat with Dot, the agent's own for a chat with an agent),
+the run's age or Working at its right, its title, and its last line (the answer in plain words, or the owner's message
+after "You:" while the run works) ending on the accent dot of a chat that is unread; a failed chat says so in its name.
 
 The chats are written to the store, but for the one at work: its run sleeps in a shell command while the page looks.
 """
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -146,12 +147,12 @@ async def _box(locator: Locator) -> FloatRect:
     return box
 
 
-async def test_every_chat_wears_a_creature_over_its_last_line_and_its_unread_dot(
+async def test_every_chat_wears_its_agents_badge_over_its_last_line_and_its_unread_dot(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     manager, address = served
     port: int = int(address.rpartition(":")[2])
-    trip: ThreadRecord = await _ended_chat(
+    await _ended_chat(
         runtime,
         TRIP,
         "Plan the trip to Izmir",
@@ -160,7 +161,7 @@ async def test_every_chat_wears_a_creature_over_its_last_line_and_its_unread_dot
         None,
         True,
     )
-    invoice: ThreadRecord = await _ended_chat(
+    await _ended_chat(
         runtime, INVOICE, "Check the inbox for the invoice", "Found the March invoice.", "done", None, False
     )
     await _ended_chat(runtime, FORM, "Fix the contact form", "The host refused the deploy key.", "failed", None, True)
@@ -185,24 +186,23 @@ async def test_every_chat_wears_a_creature_over_its_last_line_and_its_unread_dot
                     await page.get_by_role("button", name="Show sidebar").first.click()
                     # The boxes are read once the drawer has slid in, not on its way.
                     await expect(page.locator("#sidebar")).to_have_css("transform", "none")
-                # One creature for every chat, the one at work among them.
+                # One row for every chat, the one at work among them, each with its agent's badge and name.
                 await expect(page.locator("#sidebar .side-chat")).to_have_count(5)
-                await expect(page.locator("#sidebar .side-chat .avatar")).to_have_count(5)
-                # A chat with Dot wears the look its id gives; a chat with an agent wears the agent's.
-                for thread in (trip, invoice):
-                    look: dict[str, str] = await page.evaluate(
-                        "async (id) => (await import('/js/hues.js')).chatLook(id)", thread.id
-                    )
-                    face: Locator = _row(page, thread.title).locator(".avatar")
-                    await expect(face).to_have_attribute("data-shape", look["shape"])
-                    await expect(face).to_have_attribute("data-colour", look["colour"])
-                    await expect(face).to_have_attribute("data-state", "idle")
-                flights_face: Locator = _row(page, FLIGHTS).locator(".avatar")
-                await expect(flights_face).to_have_attribute("data-shape", _SCOUT_LOOK.shape)
-                await expect(flights_face).to_have_attribute("data-colour", _SCOUT_LOOK.colour)
-                # The creature works while its chat's run works, and looks as a run that failed ended.
-                await expect(_row(page, TIDY).locator(".avatar")).to_have_attribute("data-state", "working")
-                await expect(_row(page, FORM).locator(".avatar")).to_have_attribute("data-state", "failed")
+                await expect(page.locator("#sidebar .side-chat .side-badge")).to_have_count(5)
+                for title in (TRIP, INVOICE, FORM, TIDY):
+                    await expect(_row(page, title).locator(".side-badge")).to_have_attribute("data-code", "DO")
+                    await expect(_row(page, title).locator(".side-agent")).to_have_text("Dot")
+                await expect(_row(page, FLIGHTS).locator(".side-badge")).to_have_attribute("data-code", "SC")
+                await expect(_row(page, FLIGHTS).locator(".side-agent")).to_have_text("Scout")
+                # The chat at work says Working at its right, in place of its age; a failed chat says so in its name.
+                await expect(_row(page, TIDY).locator(".side-working")).to_contain_text("Working")
+                await expect(_row(page, TIDY).locator(".side-age")).to_have_count(0)
+                await expect(_row(page, FORM).locator("a.side-run")).to_have_attribute(
+                    "aria-label", re.compile(r"\bfailed\b")
+                )
+                await expect(_row(page, TRIP).locator("a.side-run")).not_to_have_attribute(
+                    "aria-label", re.compile(r"\bfailed\b")
+                )
                 # The name over the last line: the answer in plain words, the owner's own message after "You:".
                 await expect(_row(page, TRIP).locator(".side-run-goal")).to_have_text(TRIP)
                 await expect(_row(page, TRIP).locator(".side-chat-last")).to_have_text(
@@ -215,15 +215,15 @@ async def test_every_chat_wears_a_creature_over_its_last_line_and_its_unread_dot
                 title_box: FloatRect = await _box(_row(page, TRIP).locator(".side-run-goal"))
                 last_box: FloatRect = await _box(_row(page, TRIP).locator(".side-chat-last"))
                 assert last_box["y"] >= title_box["y"] + title_box["height"] - 1, (title_box, last_box)
-                # The unread chat's accent dot at its right, under its age; a chat that was seen has none.
+                # The unread chat's accent dot ends its last line, under its age; a chat that was seen has none.
                 dot: Locator = _row(page, INVOICE).locator(".side-unread")
                 await expect(dot).to_have_count(1)
                 await expect(dot).not_to_have_css("background-color", "rgba(0, 0, 0, 0)")
                 await expect(_row(page, TRIP).locator(".side-unread")).to_have_count(0)
                 dot_box: FloatRect = await _box(dot)
                 age_box: FloatRect = await _box(_row(page, INVOICE).locator(".side-age"))
-                invoice_title: FloatRect = await _box(_row(page, INVOICE).locator(".side-run-goal"))
-                assert dot_box["x"] >= invoice_title["x"] + invoice_title["width"], (invoice_title, dot_box)
+                words_box: FloatRect = await _box(_row(page, INVOICE).locator(".side-chat-words"))
+                assert dot_box["x"] >= words_box["x"] + words_box["width"], (words_box, dot_box)
                 assert dot_box["y"] >= age_box["y"] + age_box["height"] - 1, (age_box, dot_box)
                 await page.locator("#sidebar").screenshot(path=str(tmp_path / f"creatures-{width}-{scheme}.png"))
                 await page.close()

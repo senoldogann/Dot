@@ -141,16 +141,19 @@ A browser test that waits for something only an async function of the page can t
 polls it with `page.evaluate`: Playwright's `wait_for_function` takes the promise such a function returns for true at
 once, and waits for nothing (item 359).
 
-The gate runs on every pull request and every push to `main` that changes more than prose, and, called by the release,
-on the tagged commit (`.github/workflows/gate.yml`; a change to the Markdown at the root, `docs/` or the issue and pull
-request templates alone skips it, but `docs/freedom.md`, which `tests/unit/test_freedom_contract.py` reads). The format check, the lint, mypy, the checks of the interface (`npm run check`)
+The gate runs on every pull request and every push to `main` that changes more than prose, and, called by the
+release, on the tagged commit (`.github/workflows/gate.yml`; a change to the Markdown at the root, `docs/` or the issue
+and pull request templates alone skips it, but `docs/freedom.md`, which `tests/unit/test_freedom_contract.py` reads).
+A pull request runs its Linux jobs alone (item 1886): the account's five macOS runners were what pull requests waited
+on, one to two hours, so its `ci` is the Linux checks, in about five minutes. The macOS jobs run on the push to `main`
+that merges it (below). The format check, the lint, mypy, the checks of the interface (`npm run check`)
 and the unit tests but those that need macOS (item 1270, above) run on Linux. PyObjC is a dependency on macOS only
 (`sys_platform == 'darwin'` in `pyproject.toml`), so `uv sync` installs the rest on Linux; the package still runs on
 macOS alone, where the unit tests Linux leaves out run (`--macos-only`, item 1872: the files `tests/unit/conftest.py`
 lists and the tests marked `macos`, so each unit test runs once, on one of the two), and `dotx eval check` and the
-smoke tests stay there. A pull request whose every file is one nothing of the macOS jobs reads (`ios/`, `roadmap/`,
-`changes/`, prose, the iOS and desktop workflows: `scripts/python_ci.py`, item 1871) skips `gate` and `gate (part 2)`;
-`checks` still runs, a file the script does not know runs them, and a push to `main` and the release run them always.
+smoke tests stay there. A push to `main` whose every file is one nothing of the macOS jobs reads (`ios/`,
+`roadmap/`, `changes/`, prose, the iOS and desktop workflows: `scripts/python_ci.py`, item 1871) skips `gate` and
+`gate (part 2)`; `checks` still runs, and a file the script does not know runs them.
 A failed run of the smoke tests' second part or of a browser part runs only its failed tests once more (pytest's
 `--last-failed`, item 1874), and each browser part keeps its tests' times as a JUnit artifact, `browser-times-<n>`,
 for the next sharing out of the parts. Those tests are every smoke test that needs no service, chosen by its
@@ -163,12 +166,31 @@ worker drives a Chrome and a daemon; at two or three workers pages ran out of th
 part spent twelve minutes in the tests. The attach mode and the secret fields run with the second phone part; the
 settings stayed with the pages after run 42926928204, where the first phone part (the walk through every page, plus
 the settings) took 9m51s and the pages part 6m40s. A new file whose name starts `test_browser_` joins the pages part,
-and a new `test_phone_` the second phone part. A pull request runs the browser parts only when a
-changed file can affect them (the web UI, the daemon and the browser code the tests start, their tests and helpers,
-the locks, the workflows: `scripts/browser_ci.py`). The daemon imports almost all of the package, so a change under
-`src/dotagent` still runs them, except the command line and a few modules the tests never import. A unit test, a smoke
-test that is not one of theirs, or the desktop shell does not, and the macOS runners stay free for that pull request.
-A push to `main` and the release run every part. The macOS runners are five at most, the most a free account runs
+and a new `test_phone_` the second phone part. A push to `main` (item 1886) runs each macOS job only when the files
+changed since main's last green gate run can affect it, read against that run's commit, as runs of main that wait
+replace one another and the push before may never have run: `gate` and `gate (part 2)` by `scripts/python_ci.py`,
+the browser parts by `scripts/browser_ci.py` (the web UI, the daemon and the browser code the tests start, their
+tests and helpers, the locks, the workflows; the daemon imports almost all of the package, so a change under
+`src/dotagent` runs them, but for the command line and a few modules the tests never import). A decision that cannot
+be made runs them. The release and a run started by hand run every part, and `browser.yml` every browser test each
+night.
+
+What that costs, and how it is seen (item 1899): a break only macOS shows, or one two pull requests make together,
+reaches `main` before a macOS job sees it. Runs of `main` are never stopped halfway, and pushes that come meanwhile wait
+as one run, the newest, which tests what they changed since main was last green. The last job of each macOS
+workflow on `main`, `main-health`, runs `scripts/main_macos_green.py report`: it opens the issue "main is red on
+macOS" with the runs and jobs that failed, adds a comment while it stays red, and closes it once a commit passes. A
+red `main` is fixed before anything else is merged. The owner's Dot is updated only from a green commit:
+
+```bash
+uv run python scripts/main_macos_green.py check   # 0: main's newest commit passed on macOS; 1: it failed; 2: not yet
+```
+
+It reads that commit's newest runs of `gate.yml` and `ios.yml` (ios.yml only when the push changed `ios/`); a commit
+with no gate run yet is not green. To see a branch's macOS run before its pull request merges, start it by hand:
+`gh workflow run gate.yml --ref <branch>` (every job) or `gh workflow run ios.yml --ref <branch>`.
+
+The macOS runners are five at most, the most a free account runs
 together, and the Linux jobs do not take one. The job `ci` always runs and passes when every other job passed or was
 skipped: that is the status check `main`'s protection should require (`ci`), in place of `gate`, `gate (part 2)`,
 `browser (pages)`, `browser (phone 1)` and `browser (phone 2)`. A skipped part reports no check of its own, and a
@@ -245,13 +267,13 @@ first, on your Mac).
 (item 1850): `engine` (`swift test`), `build` (XcodeGen, one `build-for-testing`, the String Catalog check), the unit
 and UI tests from that build in three parts (`tests (chat)`, `tests (controls)`, `tests (rows)`), `e2e` (Settings
 against a throwaway daemon of the same commit, `ios/Next/scripts/e2e_settings.sh`), and `ios`, which passes only when
-all of them did. A pull request that changes `ios/` runs `engine`, `build` and `tests (chat)`, about 20 minutes; the
-whole run, about an hour, runs on a push to `main` that changes `ios/`, every night, when asked (`gh workflow run
-ios.yml --ref <branch>`) and on a pull request with the label `ios-full`. A run holds two macOS runners at most
+all of them did. A pull request runs none of it (item 1886); a push to `main` that changes `ios/` runs `engine`,
+`build` and `tests (chat)`, about 20 minutes; the whole run, about an hour, runs every night and when asked (`gh
+workflow run ios.yml --ref <branch>`). A run holds two macOS runners at most
 (`engine` beside `build`, the test parts two at a time, then `e2e` alone), so three of the five stay free for the
 gate's macOS jobs. A test that fails runs once more, as a fresh runner's simulator sometimes fails to launch the app;
-one that passed only on its retry is named in the job's summary ("passed on retry: <test>"). The `ios` check is not one
-`main`'s protection can require: a pull request outside `ios/` never runs the workflow, so it never reports it.
+one that passed only on its retry is named in the job's summary ("passed on retry: <test>"). The `ios` check is not
+one `main`'s protection can require: a pull request never runs the workflow.
 ios/Next/README.md "CI" says how to read a run and download its results and screenshots.
 
 A Dependabot pull request that raises versions by a patch or a minor step merges by itself

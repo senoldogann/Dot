@@ -33,13 +33,23 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert set(publish["needs"]) == {"tag", "gate"}
     assert publish["environment"] == "pypi"
     assert jobs["gate"] == {"needs": "tag", "uses": "./.github/workflows/gate.yml"}
-    # The gate the release calls runs the core of the browser tests, in its parts. A release is a workflow_call, not a
-    # pull request, so the condition that skips a part for a pull request is true there and the parts run.
+    # The gate the release calls runs the core of the browser tests, in its parts. The release starts from the push of
+    # its tag, and the called gate sees that push as its own event: only main's ref is read by the `changes` job (item
+    # 1886), so a release's decision is not made and every part runs. A pull request runs no macOS job at all.
     gate_jobs = _workflow("gate.yml")["jobs"]
     assert isinstance(gate_jobs, dict)
     browser_if = str(gate_jobs["browser"].get("if", ""))
-    assert "github.event_name != 'pull_request'" in browser_if
+    assert "needs.changes.result != 'success'" in browser_if
     assert "needs.changes.outputs.browser == 'true'" in browser_if
+    assert "github.event_name != 'pull_request'" in browser_if
+    changes_if = str(gate_jobs["changes"].get("if", ""))
+    assert (
+        "(github.event_name == 'pull_request' || github.event_name == 'push' && github.ref == 'refs/heads/main')"
+        in changes_if
+    )
+    release_triggers = _workflow("release.yml")[True]
+    assert isinstance(release_triggers, dict)
+    assert release_triggers["push"] == {"tags": ["v*"]}
     assert [part["name"] for part in gate_jobs["browser"]["strategy"]["matrix"]["part"]] == [
         "pages",
         "phone 1",
@@ -55,17 +65,17 @@ def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_pass
     assert not any("ruff " in str(step.get("run", "")) for step in gate_jobs["gate"]["steps"])
     assert any("ruff format" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
     assert any("npm run check" in str(step.get("run", "")) for step in gate_jobs["checks"]["steps"])
-    # And both halves of the smoke tests (item 944), each on its own runner, with nothing that skips them there but a
-    # pull request that changes prose alone (the `prose` job tells the heavy jobs to skip, and a required check that a
-    # path filter skips would never be reported at all) or one whose files nothing of them reads (`changes`, its
-    # python answer, scripts/python_ci.py); a decision that failed runs them. Every other run, a release among them,
-    # runs them.
+    # And both halves of the smoke tests (item 944), each on its own runner: never on a pull request (item 1886), and
+    # on a push to main only when its files can affect them (`changes`, its python answer, scripts/python_ci.py); a
+    # decision that failed or was not made runs them, so a release runs them. `checks` (Linux) still skips a pull
+    # request that changes prose alone: the `prose` job tells it, and a required check that a path filter skips would
+    # never be reported at all.
     prose_skip = (
         "${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true') }}"
     )
     python_skip = (
-        "${{ !cancelled() && (github.event_name != 'pull_request' || needs.prose.outputs.prose_only != 'true' && "
-        "(needs.changes.result != 'success' || needs.changes.outputs.python == 'true')) }}"
+        "${{ !cancelled() && github.event_name != 'pull_request' && "
+        "(needs.changes.result != 'success' || needs.changes.outputs.python == 'true') }}"
     )
     assert gate_jobs["smoke"]["if"] == python_skip
     assert gate_jobs["checks"]["if"] == prose_skip
