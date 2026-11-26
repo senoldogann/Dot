@@ -47,6 +47,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1849](1849.md) | done | 2026-11-25 | DotNext opens a new chat as soon as its first message is sent |
 | [1848](1848.md) | done | 2026-11-25 | DotNext streams a run smoothly: the end is followed after layout and only at the end, a word redraws the open chat alone, the live thinking no longer reflows |
 | [1847](1847.md) | done | 2026-11-25 | DotNext drops the "Dot · <Mac> · <date>" line at the top of a chat |
+| [1840](1840.md) | done | 2026-11-25 | Take a run's page over from the iPhone, and hand it back |
+| [1839](1839.md) | done | 2026-11-25 | Follow a run live inside its chat |
+| [1838](1838.md) | done | 2026-11-25 | Watch the Mac on the iPhone, natively |
+| [1837](1837.md) | done | 2026-11-25 | The Mac's screen in a light quality, for a phone on a weak link |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
 | [1826](1826.md) | done | 2026-11-25 | DotNext's Activity tab, native: while you were away, Ready drafts, Dot's proposals, what is in motion, and the ways Dot comes to you |

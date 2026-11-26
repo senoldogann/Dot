@@ -42,8 +42,6 @@ _PIXEL_FORMAT_420V: int = 875704438  # '420v', what the hardware encoder takes w
 _ANSWER_S: float = 5.0
 # Frames a viewer may have waiting before it is behind: half a second at 60 frames a second.
 _BACKLOG: int = 30
-# A key frame at least this often, so that a frame lost on the way heals by itself.
-_KEY_EVERY_S: int = 4
 
 # PyObjC knows the session only as an opaque pointer, which VideoToolbox's property calls refuse (kVTParameterErr):
 # registered as the Core Foundation type it is, the session is passed as one.
@@ -54,12 +52,14 @@ objc.registerCFSignature(
 
 @dataclass(frozen=True)
 class LiveSettings:
-    """What the capture delivers: the longest side of a frame in pixels, frames a second and the encoder's average
-    bit rate."""
+    """What the capture delivers: the longest side of a frame in pixels, frames a second, the encoder's average bit rate
+    and the longest time between two key frames, so that a frame lost on the way, or dropped for a viewer that fell
+    behind, heals by itself within it."""
 
     max_edge: int
     fps: int
     bitrate: int
+    key_every_s: int
 
 
 def frame_size(points: tuple[float, float], pixels: tuple[int, int], max_edge: int) -> tuple[int, int]:
@@ -309,7 +309,7 @@ def _encoder(width: int, height: int, settings: LiveSettings) -> object:
         VT.kVTCompressionPropertyKey_ProfileLevel: VT.kVTProfileLevel_H264_High_AutoLevel,
         # A frame is sent as soon as it is encoded: none waits for a later one.
         VT.kVTCompressionPropertyKey_AllowFrameReordering: False,
-        VT.kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration: _KEY_EVERY_S,
+        VT.kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration: settings.key_every_s,
         VT.kVTCompressionPropertyKey_AverageBitRate: settings.bitrate,
         VT.kVTCompressionPropertyKey_ExpectedFrameRate: settings.fps,
     }

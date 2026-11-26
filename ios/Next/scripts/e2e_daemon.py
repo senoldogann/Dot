@@ -17,6 +17,9 @@ choose the script:
 - "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
+- "browse: ...": the run opens a local page in its (headless) browser, then waits 8 min with the tab open, so the phone
+  can follow the browser live and take its page over (items 1839-1840); the page counts its clicks and shows what is
+  typed in its field, and a clock on it ticks so the cast keeps sending frames;
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
@@ -42,8 +45,11 @@ import asyncio
 import json
 import os
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import SplitResult, parse_qs, urlsplit
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -99,11 +105,64 @@ ANSWER: str = "\n\n".join(
 )
 
 
+# The page "browse:" opens: a button that counts its clicks, a field, and a clock that ticks so the cast sends frames.
+# What the page received (its clicks, its field's text) it reports to its own server at /state, which keeps it in
+# $DOT_HOME/play-page.json: the end-to-end check reads the page's own state, not Dot's count of what was sent.
+PLAY_PAGE: bytes = b"""<!doctype html><html><head><title>DotNext play</title>
+<meta name="viewport" content="width=device-width"><style>
+body { font: 20px -apple-system, sans-serif; margin: 40px; background: #f4f4f2; color: #222; }
+button { font-size: 28px; padding: 24px 48px; border-radius: 16px; border: 0; background: #222; color: #fff; }
+input { font-size: 24px; padding: 12px; width: 60%; margin-top: 24px; }
+#clock { font-size: 64px; font-variant-numeric: tabular-nums; margin: 24px 0; }
+.tall { height: 1600px; background: linear-gradient(#f4f4f2, #c9d3dd); }
+</style></head><body>
+<h1>Play page</h1><div id="clock">0.0</div>
+<button id="press" type="button">Press me</button> <span id="count">0 clicks</span><br>
+<input id="field" placeholder="Type here" autocomplete="off"><p id="echo"></p><div class="tall"></div>
+<script>
+let clicks = 0; const t0 = Date.now();
+setInterval(() => { document.getElementById("clock").textContent = ((Date.now() - t0) / 1000).toFixed(1); }, 100);
+const count = document.getElementById("count");
+const field = document.getElementById("field");
+const report = () => fetch("/state?clicks=" + clicks + "&text=" + encodeURIComponent(field.value));
+document.getElementById("press").onclick = () => { clicks += 1; count.textContent = clicks + " clicks"; report(); };
+field.oninput = () => { document.getElementById("echo").textContent = field.value; report(); };
+</script></body></html>"""
+
+
+class _PlayPage(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        parts: SplitResult = urlsplit(self.path)
+        if parts.path == "/state":
+            asked: dict[str, list[str]] = parse_qs(parts.query, keep_blank_values=True)
+            state: dict[str, int | str] = {"clicks": int(asked["clicks"][0]), "text": asked["text"][0]}
+            (Path(os.environ["DOT_HOME"]) / "play-page.json").write_text(json.dumps(state), encoding="utf-8")
+            self.send_response(204)
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(PLAY_PAGE)))
+        self.end_headers()
+        self.wfile.write(PLAY_PAGE)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+def serve_play_page() -> str:
+    """The play page on a free port of this Mac, served on a thread for the life of the script; its address."""
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _PlayPage)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return f"http://127.0.0.1:{server.server_address[1]}/"
+
+
 class ScriptProvider:
     """Replies by the owner's last words (module docstring); a tool's result is answered with a closing text."""
 
-    def __init__(self) -> None:
+    def __init__(self, play_page: str) -> None:
         self._calls: int = 0
+        self._play_page: str = play_page
 
     @property
     def name(self) -> str:
@@ -119,8 +178,9 @@ class ScriptProvider:
         latest: str = request.messages[at].content.strip() if at >= 0 else ""
         owner: str = latest
         # A tool already answered since the owner's words: the step is over, the run ends with a text.
-        answered: bool = any(m.role == "tool" for m in request.messages[at + 1 :])
         steps: int = sum(1 for m in request.messages[at + 1 :] if m.role == "tool")
+        tools_since: list[str] = [m.tool_name or "" for m in request.messages[at + 1 :] if m.role == "tool"]
+        answered: bool = bool(tools_since)
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
         if any(tool.name == "goal_verdict" for tool in request.tools):
@@ -134,6 +194,14 @@ class ScriptProvider:
             )
         elif latest.startswith("stream:"):
             return await self._stream(request, sink, steps)
+        elif latest.startswith("browse:") and tools_since == ["browser_new_tab"]:
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="wait_until",
+                    arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 8},
+                ),
+            )
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -152,6 +220,8 @@ class ScriptProvider:
                     arguments={"command": "test -f /nonexistent-dotnext", "every_s": 5, "within_minutes": 1.5},
                 ),
             )
+        elif latest.startswith("browse:"):
+            calls = (ToolCall(id=f"call_{self._calls}", name="browser_new_tab", arguments={"url": self._play_page}),)
         elif latest.startswith("wait:"):
             calls = (
                 ToolCall(
@@ -411,8 +481,10 @@ async def seed_activity(runtime: Runtime) -> None:
 async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
+    play_page: str = serve_play_page()
+    print(f"PLAY {play_page}", flush=True)
     if scripted:
-        await runtime.router.register("ollama", ScriptProvider())
+        await runtime.router.register("ollama", ScriptProvider(play_page))
     if seeded:
         await seed(runtime)
     if activity:

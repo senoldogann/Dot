@@ -320,12 +320,7 @@ struct ActivityHome: View {
 
     private var watchSection: some View {
         GroupedSection(header: nil, footer: String(localized: "Opens the Mac's live screen; nothing plays until you open it.", comment: "Activity tab: footer under Watch the Mac")) {
-            NavigationLink {
-                WebSettingsPage(target: WebSettingsPage.Target(tab: "/watch", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen")))
-            } label: {
-                ListRow(systemImage: "desktopcomputer", title: String(localized: "Watch the Mac", comment: "Activity tab row: opens the Mac's live screen"), description: nil, accessory: .web)
-            }
-            .buttonStyle(RowPressStyle())
+            WatchMacRow()
         }
     }
 
