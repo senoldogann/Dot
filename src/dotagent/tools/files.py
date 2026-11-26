@@ -343,7 +343,11 @@ def atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
 
 class WriteFileArgs(ToolArgs):
     path: str = Field(description="File to create or overwrite. Parent directories are created.")
-    content: str = Field(description="Complete new content of the file.")
+    # Read by the name Anthropic's text editor tool gives it too (item 1902): Claude models sent ``file_text`` five
+    # times in two days on the owner's Mac, each call refused and sent again.
+    content: str = Field(
+        validation_alias=AliasChoices("content", "file_text"), description="Complete new content of the file."
+    )
 
 
 def _write_file_tool() -> RegisteredTool:
