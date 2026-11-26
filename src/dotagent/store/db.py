@@ -20,7 +20,7 @@ import sqlite3
 import struct
 import tempfile
 import time
-from collections.abc import Awaitable, Callable, Coroutine, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Collection, Coroutine, Iterable, Sequence
 from pathlib import Path
 from typing import Concatenate, Literal, cast, get_args
 
@@ -7686,6 +7686,17 @@ class Store:
             (schedule_id, source, limit),
         )
         return [_run(row) for row in rows]
+
+    async def chat_has_run_after(self, thread_id: str, after: float, sources: Collection[str]) -> bool:
+        """Whether a run of one of ``sources`` began in the chat ``thread_id`` after ``after`` (item 1952: the owner
+        wrote in the chat of the run that waits on them, however many firings came after their message)."""
+        marks: str = ",".join("?" * len(sources))
+        row = await self._one(
+            f"SELECT 1 FROM runs WHERE thread_id = ? AND created_at > ? AND rewound_at IS NULL AND source IN ({marks})"
+            " LIMIT 1",
+            (thread_id, after, *sources),
+        )
+        return row is not None
 
     async def schedule_run_marked(self, schedule_id: str, source: str, since: float, mark: str) -> RunRecord | None:
         """The newest run of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id`` that ended done

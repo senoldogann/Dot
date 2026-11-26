@@ -182,3 +182,28 @@ async def test_the_wait_holds_for_seven_days_however_many_firings_come_after_it(
         assert found is not None and found.run_id == blocked.id
     finally:
         await store.close()
+
+
+async def test_the_owners_answer_ends_the_wait_for_good_not_for_one_firing(tmp_path: Path) -> None:
+    """The review of item 1952: only the newest run of the chat was asked, so the firing after the owner's message
+    started without the note and the next one met the wait again, though the owner had answered after it."""
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        schedule: ScheduleRecord = await store.add_schedule(
+            "Fiverr", "0 */2 * * *", None, "Check Fiverr.", "task", 100.0, UNSET_OPTIONS, None, True
+        )
+        thread: ThreadRecord = await store.create_thread("Fiverr", SCHEDULE_SOURCE)
+        blocked: RunRecord = await _blocked_run(store, schedule, thread)
+        for source, goal in (
+            ("ui", "I logged in."),
+            (SCHEDULE_SOURCE, "Check Fiverr."),
+            (SCHEDULE_SOURCE, "Check Fiverr."),
+        ):
+            run: RunRecord = await store.create_run(
+                thread.id, goal, "task", "ollama:a", None, source, "medium", "standard", None, "ask", True,
+                None, None, None,
+            )  # fmt: skip
+            await store.finish_run(run.id, "done", "Done.")
+        assert await owner_wait_of(store, schedule.id, (blocked.finished_at or blocked.created_at) + 3600.0) is None
+    finally:
+        await store.close()

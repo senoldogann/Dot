@@ -29,14 +29,13 @@ def waits_on_owner(run: RunRecord) -> bool:
 async def owner_wait_of(store: Store, schedule_id: str, now: float) -> OwnerWait | None:
     """The newest run of the schedule that waits on the owner and began in the last :data:`OWNER_WAIT_HOLDS_S`, while it
     still does: ``None`` when there is none, or when the owner answered (a run of theirs, one of :data:`_THE_OWNERS`,
-    came in the chat of that run after it)."""
+    began in the chat of that run after it, whenever, however many firings came since)."""
     run: RunRecord | None = await store.schedule_run_marked(
         schedule_id, SCHEDULE_SOURCE, now - OWNER_WAIT_HOLDS_S, _MARK
     )
     if run is None:
         return None
-    newest: list[RunRecord] = await store.list_runs(1, run.thread_id)
-    if newest and newest[0].id != run.id and newest[0].source in _THE_OWNERS:
+    if await store.chat_has_run_after(run.thread_id, run.created_at, sorted(_THE_OWNERS)):
         return None
     ended: float = run.created_at if run.finished_at is None else run.finished_at
     finished: EventRecord | None = await store.last_event(run.id, "run_finished")

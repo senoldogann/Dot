@@ -154,8 +154,8 @@ facts and the answer disagree, the checker goes by the facts. Its verdict is one
   to try it again or look for a way round it): they do the rest of the task, and when nothing else is left end at once
   with a line, no second ask and `nothing_new`, so that a login wall you have to clear (Fiverr, TikTok: 17 failed runs and
   some 148 M tokens in a week) is not met again by every run. A firing begun under the note whose check says `blocked`
-  ends done too. The note stands until you write in the chat of that run (a run of yours, not the schedule's, after it),
-  or for seven days, after which the part is tried again, as you may have cleared it without saying so; a firing you
+  ends done too. The note stands until you write in the chat of that run (a run of yours, not the schedule's, after it,
+  however many firings came since), or for seven days from when that run began, after which the part is tried again, as you may have cleared it without saying so; a firing you
   start by hand has none. It is read from the schedule's runs, nothing is stored for it, it makes no question to you, and
   a run of any other kind, or a firing that asked nothing of you, fails as before.
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
