@@ -107,7 +107,8 @@ helper_cooldown_s = 600
 context = {}
 # The model a run of a kind starts on when no model is chosen for it (item 1889), so that the right model takes the work
 # before any refusal: "security" is security research within a scope (a goal that names a host of [recon] owned_hosts or
-# of a scope, and speaks of security work). Settings › Models sets it: kinds = { security = "anthropic:claude-opus-5-5" }.
+# of a scope, and speaks of security work), quick lookups, deep investigations, writing and repository changes.
+# Settings › Models sets it: kinds = { code = "anthropic:claude-opus-5-5" }.
 kinds = {}
 
 [providers.ollama]

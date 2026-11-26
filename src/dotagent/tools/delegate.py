@@ -91,7 +91,7 @@ class DelegateArgs(ToolArgs):
         default=None,
         description=(
             "One of the helper models named in your instructions, for a part that suits a stronger or a cheaper model; "
-            "leave it out to use your own model."
+            "leave it out to use the owner's task-kind mapping or your own model."
         ),
     )
     step: int | None = Field(
@@ -120,12 +120,11 @@ def default_child_mode(parent: RunMode) -> RunMode:
 
 
 async def _model_for(asked: str | None, ctx: ToolContext) -> str | None:
-    """The model the delegated run starts on: ``None`` (the parent's own) unless ``asked`` names a helper model that can
-    answer now. A blank name is the parent's own too: a model's slip, like a step the plan does not have."""
+    """Return an explicitly named parent or helper model. A missing or blank name leaves the choice to Dot."""
     if asked is None or not asked.strip():
         return None
     if asked.strip() == (await ctx.runtime.store.get_run(ctx.run_id)).model.strip():
-        return None
+        return asked.strip()
     roster: Roster = await current_roster(
         ctx.runtime.router, ctx.runtime.config.providers, ctx.runtime.config.models.helpers
     )
@@ -133,7 +132,7 @@ async def _model_for(asked: str | None, ctx: ToolContext) -> str | None:
         return asked.strip()
     raise ToolExecutionError(
         f"{asked} is not a helper model that can take the work now ({roster_text(roster, time.time())}); leave model "
-        "out to use your own model",
+        "out to use the configured task model",
         {"run_id": ctx.run_id, "model": asked},
     )
 
@@ -345,7 +344,7 @@ def _delegate_tool() -> RegisteredTool:
             "and the failures you hit or fixed, so it does not read the same files again; the goal carries the rest. "
             "Use it to keep your own context small when a part is bulky (reading many pages or files, a "
             "deep research question) and to do independent parts at the same time: call it several times in one "
-            "turn, on your model and tools (the Delegation section says the rest). A part an agent's role fits is "
+            "turn, with your tools (the Delegation section says the rest). A part an agent's role fits is "
             "that agent's. Do not delegate what one or two tool calls can do. Name the plan step the part is (step) "
             "and its report closes that step, unless the part goes on in the background; a step the plan does not have "
             "runs all the same and closes nothing. Ask for a final `Verification:` section with the command or "

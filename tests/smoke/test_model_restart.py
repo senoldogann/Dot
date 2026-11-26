@@ -52,16 +52,16 @@ def _config() -> AppConfig:
 
 
 @asynccontextmanager
-async def _daemon() -> AsyncIterator[tuple[Runtime, RunManager, httpx.AsyncClient]]:
+async def _daemon(
+    ollama: list[ScriptedTurn], anthropic: list[ScriptedTurn]
+) -> AsyncIterator[tuple[Runtime, RunManager, httpx.AsyncClient]]:
     config: AppConfig = _config()
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {config.providers.anthropic.api_key_env: _STAND_IN_KEY}):
         runtime: Runtime = await open_runtime(config, login_env)
         manager: RunManager = RunManager(runtime)
-        await runtime.router.register(
-            "ollama", ScriptedProvider("ollama", [_finish("Found one; the report is ready.")])
-        )
-        await runtime.router.register("anthropic", ScriptedProvider("anthropic", [_finish("Done on the default.")]))
+        await runtime.router.register("ollama", ScriptedProvider("ollama", ollama))
+        await runtime.router.register("anthropic", ScriptedProvider("anthropic", anthropic))
         context: ServerContext = ServerContext(
             runtime=runtime,
             manager=manager,
@@ -85,7 +85,11 @@ async def _daemon() -> AsyncIterator[tuple[Runtime, RunManager, httpx.AsyncClien
 
 
 async def test_a_refused_run_restarts_in_its_chat_on_the_model_the_owner_picked() -> None:
-    async with _daemon() as (runtime, manager, client):
+    async with _daemon([_finish("Found one; the report is ready.")], [_finish("Done on the default.")]) as (
+        runtime,
+        manager,
+        client,
+    ):
         thread = await runtime.store.create_thread("XSS", "ui")
         # A yolo run: it starts again yolo, so it asks nothing new.
         old: RunRecord = await runtime.store.create_run(
@@ -117,7 +121,11 @@ async def test_a_refused_run_restarts_in_its_chat_on_the_model_the_owner_picked(
 
 
 async def test_a_model_named_for_security_research_takes_such_a_run_and_no_other() -> None:
-    async with _daemon() as (_runtime, manager, client):
+    async with _daemon([_finish("Found one; the report is ready.")], [_finish("Done on the default.")]) as (
+        _runtime,
+        manager,
+        client,
+    ):
         chosen: httpx.Response = await client.put(
             "/api/models/kinds", json={"kind": "security", "model": SCRIPTED_MODEL}
         )
@@ -148,3 +156,28 @@ async def test_a_model_named_for_security_research_takes_such_a_run_and_no_other
     assert kept["models"] == {"kinds": {"security": SCRIPTED_MODEL}}
     assert (security.model, other.model) == (SCRIPTED_MODEL, MAIN)
     assert cleared.json()["kinds"] == {}
+
+
+async def test_kind_model_validation_and_explicit_model_precedence() -> None:
+    async with _daemon([_finish("Found one; the report is ready.")], [_finish("Done on the default.")]) as (
+        _runtime,
+        manager,
+        client,
+    ):
+        for invalid in (
+            {"kind": "unknown", "model": SCRIPTED_MODEL},
+            {"kind": "writing", "model": "not-a-reference"},
+        ):
+            response: httpx.Response = await client.put("/api/models/kinds", json=invalid)
+            assert response.status_code == 422, response.text
+        response = await client.put("/api/models/kinds", json={"kind": "writing", "model": SCRIPTED_MODEL})
+        assert response.json()["kinds"] == {"writing": SCRIPTED_MODEL}
+        for model, expected in ((None, SCRIPTED_MODEL), (MAIN, MAIN)):
+            started: httpx.Response = await client.post(
+                "/api/runs",
+                json={"goal": "Draft an email for the launch.", "mode": "task", "model": model, "goal_mode": False},
+            )
+            assert started.status_code == 201, started.text
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                ended: RunRecord = await manager.wait(started.json()["id"])
+            assert (ended.model, ended.status) == (expected, "done"), ended

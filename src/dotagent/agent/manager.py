@@ -122,12 +122,13 @@ from dotagent.agent.resume import (
     stopped_line,
 )
 from dotagent.agent.review import reviewer_for, shorten_reason
+from dotagent.agent.task_kind import task_kind
 from dotagent.agent.welcome import WELCOME_SOURCE
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputResult, InputTally, MouseButton, ScreenHold
 from dotagent.browser.session import BrowserSession
 from dotagent.claude_code.run import run_in_claude_code
-from dotagent.config import ReconConfig, ResumeMode
+from dotagent.config import ReconConfig, ResumeMode, TaskKind
 from dotagent.core.errors import (
     BrowserError,
     ClaudeCodeMissing,
@@ -183,7 +184,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
 from dotagent.scopes import authorising_if_readable
 from dotagent.secrets import known_secrets
-from dotagent.server import UI_SOURCE
+from dotagent.server import REVIEW_SOURCE, UI_SOURCE
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.db import Store
@@ -1058,8 +1059,10 @@ class RunManager:
         of the run it goes on from; ``proof`` are the checks the owner holds its finish to (item 1853), refused for a
         run that cannot carry them (:func:`~dotagent.agent.proof.proof_refused`). A run that names no model starts on
         the model ``[models] kinds`` names for its kind of task, when one is named (item 1889)."""
+        if model is None and thread_id is not None:
+            model = await self._chat_agent_model(thread_id)
         if model is None:
-            model = self._kind_model(goal)
+            model = self._security_model(goal) or self.task_model(goal, source)
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_proof(proof, mode, ref, self._runtime.config.shell.max_timeout_s)
         await self.check_model_answers(ref)
@@ -1092,10 +1095,16 @@ class RunManager:
         )
         return run
 
-    def _kind_model(self, goal: str) -> str | None:
-        """The model ``[models] kinds`` names for the kind of task ``goal`` is (item 1889), ``None`` when it names none
-        or the goal is of no kind it knows. Security research within a scope is the one kind: the scopes are read only
-        when a model is named for it."""
+    async def _chat_agent_model(self, thread_id: str) -> str | None:
+        """Return the chosen model of the agent that owns this chat, when it has one."""
+        thread: ThreadRecord = await self._runtime.store.get_thread(thread_id)
+        if thread.agent_id is None:
+            return None
+        agent: AgentRecord = await self._runtime.store.get_agent(thread.agent_id)
+        return agent.model or None
+
+    def _security_model(self, goal: str) -> str | None:
+        """The existing scoped security mapping, read only when a model is named for it (item 1889)."""
         security: str = self._runtime.roles.kind_model("security")
         if security == "":
             return None
@@ -1104,6 +1113,13 @@ class RunManager:
             return None
         log.info("run_routed_by_kind", kind="security", model=security)
         return security
+
+    def task_model(self, goal: str, source: str) -> str | None:
+        """Return the owner's general task mapping, if the workflow and opening request match one."""
+        if source == REVIEW_SOURCE:
+            return None
+        kind: TaskKind | None = task_kind(goal)
+        return None if kind is None else self._runtime.roles.kind_model(kind) or None
 
     async def start_firing(
         self,
@@ -1200,6 +1216,12 @@ class RunManager:
         """The run of a schedule's firing, of Dot (``agent_id`` None) or of one of the owner's agents, with the skills
         of the schedule picked for it."""
         picks: RunPicks = NO_PICKS if not skills else RunPicks(plugins=(), skills=skills, plan_first=False)
+        if model is None and agent_id is None:
+            model = await self._chat_agent_model(thread_id)
+        if model is None:
+            model = self.task_model(goal, SCHEDULE_SOURCE)
+            if model is not None:
+                await self.check_model_answers(parse_model_ref(model))
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         if effort is not None:
@@ -1426,7 +1448,8 @@ class RunManager:
         the agent's id and the loop adds its instructions to the prompt and keeps its tools. Goal mode, ``once`` and
         ``picks`` are as for :meth:`start_picked`: a server the agent's bounds leave out is refused."""
         bounds: AgentBounds = agent_bounds(agent, model, effort, approvals)
-        agent_ref: ModelRef = parse_model_ref(bounds.model if bounds.model is not None else self._main_model)
+        chosen_model: str | None = bounds.model if bounds.model is not None else self.task_model(goal, source)
+        agent_ref: ModelRef = parse_model_ref(chosen_model if chosen_model is not None else self._main_model)
         await self.check_model_answers(agent_ref)
         _check_speed(agent_ref, speed)
         if bounds.effort is not None:
@@ -1435,7 +1458,7 @@ class RunManager:
         run, _ = await self._launch(
             goal,
             mode,
-            bounds.model,
+            chosen_model,
             thread_id,
             source,
             None,
@@ -1482,6 +1505,8 @@ class RunManager:
             raise InvalidValueError(
                 "the team has no agent now: add one to it before you message it", {"team_id": team.id}
             )
+        if model is None:
+            model = self.task_model(goal, source)
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         await self.check_model_answers(ref)
         _check_speed(ref, speed)
@@ -1541,6 +1566,8 @@ class RunManager:
                 "goal mode does not apply to a campaign: campaign_achieved checks its outcome", {"goal_mode": goal_mode}
             )
         runtime: Runtime = self._runtime
+        if model is None:
+            model = self.task_model(goal, source)
         model_ref: str = model if model is not None else self._main_model
         _check_proof(proof, mode, parse_model_ref(model_ref), runtime.config.shell.max_timeout_s)
         await self.check_model_answers(parse_model_ref(model_ref))
@@ -1755,8 +1782,8 @@ class RunManager:
         wait: bool = True,
         plan_step: int | None = None,
     ) -> DelegateOutcome:
-        """Run ``goal`` as a run of its own on ``model``, or on the parent's model as it is stored now when that is
-        ``None`` (after a switch to a standby model, the standby), and wait until it ends.
+        """Run ``goal`` as a run of its own. Unless a model is chosen for the part, use its task-kind mapping or the
+        parent's current model, including a standby it switched to. Wait until the part ends.
 
         With ``detachable`` (item 1351, the delegate tool) the wait ends early when a message reaches the parent's
         inbox, which asks its run to give way as a model call does (:meth:`RunInbox.asks`): the helper is not stopped,
@@ -1772,7 +1799,8 @@ class RunManager:
         so that the end of a run is stored after the ends of the runs it delegated (item 197). A run of one of the
         owner's agents delegates helpers that carry its id and are bound as it is (item 553). With ``agent_id`` (item
         87, a message to an agent) the run is the agent's: its source is ``team``, it carries the agent's id, the
-        agent's own model and effort bound it where the agent names them, the parent's where it does not, and it
+        agent's own model and effort bound it where the agent names them. Otherwise the helper's rules choose its
+        model and it inherits the parent's effort. It
         answers the policy's questions the stricter way of the agent's and the parent's (item 135). A delegated run
         whose end the store could not record is a ``StoreError``, not an outcome: what the store holds of it is how it
         was while it worked. ``tainted`` starts it untrusted whatever its parent is: its goal quotes words that came of
@@ -1786,7 +1814,6 @@ class RunManager:
             )
         if parent.mode == "research" and mode != "research":
             raise RunConflict("a research run can only delegate research", {"run_id": parent.id, "mode": mode})
-        own_model: str = parent.model if model is None else model
         # The helper of an agent's run is bound as the agent is (item 553): it carries the agent's id, so its tools are
         # the ones the agent is bound to and its prompt holds the agent's instructions, though its source, its model
         # and its approvals stay a delegation's. With ``agent_id`` (a message to an agent) the run is that agent's.
@@ -1804,7 +1831,7 @@ class RunManager:
             )
             try:
                 _, handle = await self._launch_helper(
-                    goal, mode, own_model, parent, agent, helper_of, work_chat, opening, tainted, carried
+                    goal, mode, model, parent, agent, helper_of, work_chat, opening, tainted, carried
                 )
             except BaseException:
                 # A chat made for this work and left without a run is no chat of the agent's.
@@ -2330,7 +2357,7 @@ class RunManager:
         self,
         goal: str,
         mode: RunMode,
-        own_model: str,
+        model: str | None,
         parent: RunRecord,
         agent: AgentRecord | None,
         helper_of: str | None,
@@ -2342,12 +2369,19 @@ class RunManager:
         """Launch the delegated run of :meth:`delegate`: a helper in a chat of its own (``thread_id`` ``None``), or
         the agent's run in its chat, going on from that chat's last run (``carried``: it reads its words, so it
         starts as tainted as that run ended, item 952)."""
+        source: str = DELEGATE_SOURCE if agent is None else TEAM_SOURCE
+        if agent is not None and agent.model != "":
+            model = agent.model
+        if model is None:
+            model = self.task_model(goal, source)
+            if model is not None:
+                await self.check_model_answers(parse_model_ref(model))
         return await self._launch(
             goal,
             mode,
-            own_model if agent is None or agent.model == "" else agent.model,
+            parent.model if model is None else model,
             thread_id,
-            DELEGATE_SOURCE if agent is None else TEAM_SOURCE,
+            source,
             parent.id,
             parent.effort if agent is None or agent.effort is None else agent.effort,
             parent.speed,
@@ -2552,21 +2586,23 @@ class RunManager:
         (``follow_up``, item 586) carries what it follows up through the queue to its run. A message that comes while
         the run at work is held by a ✋ lets it go on: the owner has written, and their message waits in the queue as
         any does."""
-        ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
-        _check_speed(ref, speed)
-        await self._check_once(ref, once)
         store: Store = self._runtime.store
-        agent: AgentRecord | None = None if agent_id is None else await store.get_agent(agent_id)
+        thread: ThreadRecord = await store.get_thread(thread_id)
+        chosen_agent: str | None = thread.agent_id if agent_id is None else agent_id
+        agent: AgentRecord | None = None if chosen_agent is None else await store.get_agent(chosen_agent)
         asked: ApprovalMode | None = approvals if approvals is not None or agent is None else agent.approvals
-        # The model the message's run will work on: its agent's own when none is chosen (as start_for_agent takes it).
-        runs_on: ModelRef = (
-            parse_model_ref(agent.model) if model is None and agent is not None and agent.model != "" else ref
-        )
+        chosen_model: str | None = model
+        if chosen_model is None and agent is not None:
+            chosen_model = agent.model or None
+        if chosen_model is None:
+            chosen_model = self.task_model(text, source)
+        runs_on: ModelRef = parse_model_ref(self._main_model if chosen_model is None else chosen_model)
+        _check_speed(runs_on, speed)
+        await self._check_once(runs_on, once)
         await self.check_model_answers(runs_on)
         await self._check_picks(
             picks, mode, runs_on, agent_id, self._runtime.config.policy.approvals if asked is None else asked, source
         )
-        await store.get_thread(thread_id)
         newest: list[RunRecord] = await store.list_runs(1, thread_id)
         if not newest:
             raise RunConflict("a chat takes a queue once a run has started there", {"thread_id": thread_id})
@@ -3773,6 +3809,7 @@ class RunManager:
         ``campaign_id`` makes it a session of that campaign; ``team_id`` makes the new chat it opens (``thread_id``
         ``None``) a chat with that team (item 610)."""
         runtime: Runtime = self._runtime
+        implicit_agent: bool = False
         if agent_id is None and thread_id is not None and campaign_id is None:
             # A chat that is an agent's own answers as that agent to every message that reaches it, whichever path it
             # came by: the pages, the chat list, the phone, a reaction, a queue that drains, a background command that
@@ -3783,9 +3820,12 @@ class RunManager:
             if agent_id is not None:
                 bounds: AgentBounds = agent_bounds(await runtime.store.get_agent(agent_id), model, effort, approvals)
                 model, effort, approvals = bounds.model, bounds.effort, bounds.approvals
-                await self.check_model_answers(parse_model_ref(model if model is not None else self._main_model))
-        model_ref: str = model if model is not None else self._main_model
+                implicit_agent = True
+        routed: str | None = self.task_model(goal, source) if model is None else None
+        model_ref: str = model if model is not None else routed or self._main_model
         runs_on: ModelRef = parse_model_ref(model_ref)
+        if implicit_agent or routed is not None:
+            await self.check_model_answers(runs_on)
         level: Effort = runtime.config.models.effort if effort is None else effort
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
         if approval_mode == "yolo" or await self._hands_off_unasked(opening):
@@ -4883,7 +4923,8 @@ class RunManager:
             if agent is None
             else agent_bounds(agent, model, effort, approvals)
         )
-        ref: ModelRef = parse_model_ref(bounds.model if bounds.model is not None else self._main_model)
+        chosen_model: str | None = bounds.model if bounds.model is not None else self.task_model(goal, source)
+        ref: ModelRef = parse_model_ref(chosen_model if chosen_model is not None else self._main_model)
         _check_speed(ref, speed)
         if bounds.effort is not None:
             await self._check_effort(ref, bounds.effort)
@@ -4905,7 +4946,7 @@ class RunManager:
         run, _ = await self._launch(
             goal,
             mode,
-            bounds.model,
+            chosen_model,
             thread_id,
             source,
             None,
