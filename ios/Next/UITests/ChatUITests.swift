@@ -212,7 +212,7 @@ final class ChatUITests: XCTestCase {
         let line: XCUIElement = app.buttons["work.line"]
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label, "Waiting for you")
-        XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the line is a button: a 44 pt tap target (the design bar)")
+        XCTAssertGreaterThanOrEqual(line.frame.height, 44 - 0.01, "the line is a button: a 44 pt tap target (the design bar; a frame comes out as 43.99999 on this simulator)")
         // The run's calls, one line in plain words since item 1909 ("Started 1 helper and opened 1 page").
         let step: XCUIElement = app.buttons["tools.group"].firstMatch
         XCTAssertFalse(step.exists, "the steps are hidden")
@@ -259,8 +259,10 @@ final class ChatUITests: XCTestCase {
     /// is its own row (title, what it does, its time, a chevron), and while the run waits one quiet line says on what,
     /// with Details and no Stop of its own (the pill has it).
     func testTheWorkLogGroupsToolsShowsHelpersAndSaysWhatItWaitsOn() {
-        // The queue's fixture: its run waits in `wait_until` and writes nothing meanwhile.
+        // The queue's fixture: its run waits in `wait_until` and writes nothing meanwhile. It opens its queue's sheet:
+        // closed first, so the taps reach the chat.
         let app: XCUIApplication = launch("n2-queue")
+        if app.navigationBars["Queued"].waitForExistence(timeout: 5) { app.buttons["Close"].firstMatch.tap() }
         let helper: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "helper.row", "Check the dentist")).firstMatch
         XCTAssertTrue(helper.waitForExistence(timeout: 10), "a helper is its own row")
         XCTAssertGreaterThanOrEqual(helper.frame.height, 44)
@@ -284,6 +286,35 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(group.label, "Read 2 files and ran 2 commands")
         let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
         shot.name = "work-log"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
+    /// Item 1915: "Show steps" off in the chat's This chat sheet leaves only the messages: the step rows go, and one live
+    /// line under the last text says what the run does.
+    func testShowStepsOffLeavesTheMessagesAndOneLiveLine() {
+        let app: XCUIApplication = XCUIApplication()
+        // The queue's fixture (its run waits in `wait_until`); its queue's sheet is closed first.
+        app.launchArguments = ["-DotNextScene", "n2-queue", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-toolCallMode", "showAll", "-showSteps", "YES", "-stepsOverrides", "{}"]
+        app.launch()
+        if app.navigationBars["Queued"].waitForExistence(timeout: 5) { app.buttons["Close"].firstMatch.tap() }
+        let thought: XCUIElement = app.buttons["thought.row"]
+        for _ in 0..<4 where !thought.exists { app.swipeUp() }
+        XCTAssertTrue(thought.waitForExistence(timeout: 10), "the steps show first")
+        app.buttons["Changes and files"].tap()
+        let toggle: XCUIElement = app.switches["inspector.showSteps"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "1")
+        toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "0")
+        app.buttons["Close"].firstMatch.tap()
+        // The run waits in `wait_until`: its one line is the waiting line (item 1909), the live line's place.
+        let line: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "identifier IN %@", ["work.line", "waiting.line"])).firstMatch
+        for _ in 0..<4 where !line.exists { app.swipeUp() }
+        XCTAssertTrue(line.waitForExistence(timeout: 5), "one live line says the work")
+        XCTAssertFalse(app.buttons["thought.row"].exists, "no step rows")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "messages-only"
         shot.lifetime = .keepAlways
         add(shot)
     }

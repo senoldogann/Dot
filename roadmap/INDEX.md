@@ -17,6 +17,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1930](1930.md) | done | 2026-11-26 | DotNext attaches videos and files from the composer |
 | [1929](1929.md) | done | 2026-11-26 | Check goals and helper results on a model of another family |
 | [1928](1928.md) | done | 2026-11-26 | Route new runs and helpers by task kind |
+| [1927](1927.md) | done | 2026-11-26 | DotNext says "Pending" under the owner's message until the Mac took it |
 | [1923](1923.md) | done | 2026-11-26 | DotNext's open chat never changes by itself when a newer chat of the bot comes |
 | [1922](1922.md) | done | 2026-11-26 | DotNext's "This chat" sheet is plain and compact |
 | [1921](1921.md) | done | 2026-11-26 | DotNext opens and closes a work-log row without a hitch |
@@ -25,6 +26,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1918](1918.md) | done | 2026-11-26 | A run reads what it starts with at once, before its first model call |
 | [1917](1917.md) | done | 2026-11-26 | A pull request that changes ios/ builds the iPhone app once, on macOS |
 | [1916](1916.md) | done | 2026-11-26 | DotNext's New chat with a bot opens as a chat, with the bot's face centred |
+| [1915](1915.md) | done | 2026-11-26 | DotNext's chats can show only the messages: "Show steps" in Settings › Chat and in a chat's This chat sheet |
 | [1914](1914.md) | done | 2026-11-26 | DotNext keeps a new chat's half-written words per bot |
 | [1913](1913.md) | done | 2026-11-26 | Several chats under Dot or one agent: the audit, and a chat shown twice stays open |
 | [1912](1912.md) | done | 2026-11-26 | DotNext's Dot no longer wears an unread mark for its own work |
