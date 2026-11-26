@@ -12,6 +12,17 @@
         }
       }
     },
+    "%@ and %@": {
+      "comment": "Work log: the last part of a group of tool calls joined to the others; the arguments are the parts",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ve %@"
+          }
+        }
+      }
+    },
     "%@ at %@": {
       "comment": "Schedule rhythm; short weekday names, then clock times",
       "localizations": {
@@ -3279,6 +3290,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tasarım"
+          }
+        }
+      }
+    },
+    "Details": {
+      "comment": "Waiting line: opens the run inspector",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayrıntılar"
           }
         }
       }
@@ -8701,35 +8723,6 @@
         }
       }
     },
-    "Ran %lld commands": {
-      "comment": "Work log: consecutive commands said as one line; the argument is how many",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Ran %lld command"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "Ran %lld commands"
-                }
-              }
-            }
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld komut çalıştırdı"
-          }
-        }
-      }
-    },
     "Reaching your Mac…": {
       "comment": "Chat list while the first list read is under way",
       "localizations": {
@@ -13090,6 +13083,17 @@
         }
       }
     },
+    "Waiting · %@": {
+      "comment": "Waiting line: the run waits on something; the argument says on what",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bekliyor · %@"
+          }
+        }
+      }
+    },
     "Waits for your answer": {
       "comment": "Activity: a question a task waits for",
       "localizations": {
@@ -14267,6 +14271,35 @@
         }
       }
     },
+    "edited %lld files": {
+      "comment": "Work log group: files edited; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "edited %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "edited %lld files"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dosya düzenledi"
+          }
+        }
+      }
+    },
     "failed": {
       "comment": "VoiceOver: a plan step's state",
       "localizations": {
@@ -14421,6 +14454,35 @@
         }
       }
     },
+    "opened %lld pages": {
+      "comment": "Work log group: pages opened; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "opened %lld page"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "opened %lld pages"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sayfa açtı"
+          }
+        }
+      }
+    },
     "permissions approvals policy ask safety": {
       "comment": "Settings search synonyms of Rules (space separated)",
       "localizations": {
@@ -14443,6 +14505,64 @@
         }
       }
     },
+    "ran %lld commands": {
+      "comment": "Work log group: commands run; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ran %lld command"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ran %lld commands"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld komut çalıştırdı"
+          }
+        }
+      }
+    },
+    "read %lld files": {
+      "comment": "Work log group: files read; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "read %lld file"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "read %lld files"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld dosya okudu"
+          }
+        }
+      }
+    },
     "schedules repeat morning brief": {
       "comment": "Settings search synonyms of Scheduled tasks (space separated)",
       "localizations": {
@@ -14450,6 +14570,64 @@
           "stringUnit": {
             "state": "translated",
             "value": "zamanlamalar tekrar sabah özeti"
+          }
+        }
+      }
+    },
+    "searched %lld times": {
+      "comment": "Work log group: searches; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "searched %lld time"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "searched %lld times"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kez aradı"
+          }
+        }
+      }
+    },
+    "searched the web %lld times": {
+      "comment": "Work log group: web searches; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "searched the web %lld time"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "searched the web %lld times"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "web'de %lld kez aradı"
           }
         }
       }
@@ -14472,6 +14650,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "atlandı"
+          }
+        }
+      }
+    },
+    "started %lld helpers": {
+      "comment": "Work log group: helpers started; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "started %lld helper"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "started %lld helpers"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcı başlattı"
           }
         }
       }
@@ -14531,6 +14738,35 @@
         }
       }
     },
+    "took %lld steps on the Mac": {
+      "comment": "Work log group: steps on the Mac's screen; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "took %lld step on the Mac"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "took %lld steps on the Mac"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'te %lld adım attı"
+          }
+        }
+      }
+    },
     "updates versions resume restart continue": {
       "comment": "Settings search synonyms of Maintenance (space separated)",
       "localizations": {
@@ -14549,6 +14785,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "kullanım token günler"
+          }
+        }
+      }
+    },
+    "used %lld tools": {
+      "comment": "Work log group: other tools; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "used %lld tool"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "used %lld tools"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld araç kullandı"
           }
         }
       }
@@ -14582,6 +14847,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "ses dikte mikrofon yazıya dökme konuşma"
+          }
+        }
+      }
+    },
+    "waited %lld times": {
+      "comment": "Work log group: waits; the argument is how many",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "waited %lld time"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "waited %lld times"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kez bekledi"
           }
         }
       }

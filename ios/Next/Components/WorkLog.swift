@@ -43,30 +43,30 @@ enum TranscriptBlock: Identifiable {
     }
 }
 
-/// One line of a stretch of steps: a step, or consecutive commands said as one "Ran 3 commands" (item 1769, after
-/// another coding agent's work log).
+/// One line of a stretch of steps: a step, or consecutive tool calls said as one "Ran 3 commands and read 2 files" (items
+/// 1769 and 1909, after another coding agent's work log).
 enum StepGroup: Identifiable, Equatable {
     case row(TranscriptItem)
-    case commands([ToolEntry])
+    case tools([ToolEntry])
 
     var id: String {
         switch self {
         case .row(let item): item.id
-        case .commands(let entries): "commands:" + (entries.first?.id ?? "")
+        case .tools(let entries): "tools:" + (entries.first?.id ?? "")
         }
     }
 
-    /// The lines of `rows`: two or more consecutive commands that all ended well become one line; a command at work or
+    /// The lines of `rows`: two or more consecutive tool calls that all ended well become one line; a call at work or
     /// one that failed stands alone, so neither is hidden in a fold. Pure.
     static func of(_ rows: [TranscriptItem]) -> [StepGroup] {
         var groups: [StepGroup] = []
         var run: [ToolEntry] = []
         func flush() {
-            if run.count >= 2 { groups.append(.commands(run)) } else { groups.append(contentsOf: run.map { .row(.tool($0)) }) }
+            if run.count >= 2 { groups.append(.tools(run)) } else { groups.append(contentsOf: run.map { .row(.tool($0)) }) }
             run = []
         }
         for row in rows {
-            if case .tool(let entry) = row, entry.kind == .command, entry.state == .done {
+            if case .tool(let entry) = row, entry.state == .done {
                 run.append(entry)
             } else {
                 flush()
@@ -86,7 +86,7 @@ struct StepRun: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(StepGroup.of(rows)) { group in
                 switch group {
-                case .commands(let entries): CommandGroupRow(entries: entries).id(group.id)
+                case .tools(let entries): ToolGroupRow(entries: entries).id(group.id)
                 case .row(.tool(let entry)): WorkToolRow(entry: entry).id(entry.id)
                 case .row(.thought(let id, let text, let live)): ThoughtRow(text: text, live: live).id(id)
                 case .row: EmptyView()
@@ -96,20 +96,22 @@ struct StepRun: View {
     }
 }
 
-/// Consecutive commands that ended well as one quiet line, "Ran 3 commands", with the terminal's symbol; a tap opens
-/// each of them as its own row (item 1769).
-struct CommandGroupRow: View {
+/// Consecutive tool calls that ended well as one quiet line in plain words, "Ran 3 commands and read 2 files", with the
+/// terminal's symbol when all are commands and a hammer otherwise; a tap opens each of them as its own row (item 1909).
+struct ToolGroupRow: View {
     let entries: [ToolEntry]
     @State private var open: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
+    @Environment(\.locale) private var locale: Locale
 
     var body: some View {
+        let words: String = toolGroupWords(entries, locale: locale)
         VStack(alignment: .leading, spacing: 0) {
             Button { open.toggle() } label: {
                 HStack(spacing: Space.xs) {
-                    Symbol(name: toolSymbol(.command), context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
-                    Text(String(localized: "Ran \(entries.count) commands", comment: "Work log: consecutive commands said as one line; the argument is how many"))
-                        .textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(1)
+                    Symbol(name: entries.allSatisfy { $0.kind == .command } ? toolSymbol(.command) : "hammer", context: .tool)
+                        .foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
+                    Text(words).textRole(.footnote).foregroundStyle(Tone.secondary).lineLimit(1)
                     Spacer(minLength: Space.xs)
                     Symbol(name: "chevron.down", context: .status).foregroundStyle(Tone.glyph).rotationEffect(.degrees(open ? 180 : 0))
                 }
@@ -118,6 +120,8 @@ struct CommandGroupRow: View {
             }
             .buttonStyle(.plain)
             .haptic(.selection, trigger: open)
+            .accessibilityLabel(words)
+            .accessibilityIdentifier("tools.group")
             .accessibilityValue(open ? String(localized: "Expanded", comment: "VoiceOver value of an open disclosure") : String(localized: "Collapsed", comment: "VoiceOver value of a closed disclosure"))
             .accessibilityHint(open ? String(localized: "Hides the steps", comment: "VoiceOver hint of an open work-log group") : String(localized: "Shows the steps", comment: "VoiceOver hint of a closed work-log group"))
             if open {
@@ -537,5 +541,57 @@ struct DotMark: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+}
+
+/// A helper the run started, as its own row of the stream (item 1909, after another coding agent's work log): its face
+/// with a dot while it works, its title, one quiet line of what it does now or said last, its time at the right, and a
+/// chevron; a tap opens the helper's own chat.
+struct HelperStreamRow: View {
+    let helper: HelperView
+    let open: () -> Void
+
+    var body: some View {
+        let state: HelperState = helperState(helper.status)
+        let started: Date = Date(timeIntervalSince1970: helper.startedAt)
+        let ended: Date? = helper.finishedAt.map { Date(timeIntervalSince1970: $0) }
+        Button(action: open) {
+            HStack(spacing: Space.xs) {
+                AgentAvatar(size: 24)
+                    .overlay(alignment: .bottomTrailing) {
+                        if state.isLive {
+                            Circle().fill(state.tone.color).frame(width: 8, height: 8)
+                                .overlay(Circle().stroke(Tone.ground, lineWidth: 1.5))
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .frame(width: Metric.iconSlot)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(helper.shortTitle).textRole(.footnote).foregroundStyle(Tone.text).lineLimit(1)
+                    Text(latest(state)).textRole(.label).foregroundStyle(Tone.secondary).lineLimit(1)
+                }
+                Spacer(minLength: Space.xs)
+                TimelineView(.periodic(from: started, by: 1)) { context in
+                    Text(elapsedWords(from: started, to: ended ?? context.date)).textRole(.label).foregroundStyle(Tone.tertiary)
+                        .tabularNumbers().lineLimit(1).fixedSize()
+                }
+                Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
+            }
+            .frame(minHeight: Metric.hit)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([helper.shortTitle, state.word, latest(state)].joined(separator: ", "))
+        .accessibilityHint(String(localized: "Opens the helper's chat", comment: "VoiceOver hint of a helper row"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("helper.row")
+    }
+
+    /// What it does now while it works, else the last line it said, else its state.
+    private func latest(_ state: HelperState) -> String {
+        if state.isLive, let step = helper.step { return callPhrase(step) }
+        let line: String = helper.step?.line.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return line.isEmpty ? state.word : line
     }
 }

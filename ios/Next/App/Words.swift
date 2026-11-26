@@ -260,3 +260,57 @@ func composerCommands() -> [PickerItem] {
         PickerItem(kind: .command, token: "/stop", name: "/stop", detail: String(localized: "Stop the run at work", comment: "Composer command: what /stop does")),
     ]
 }
+
+/// A stretch of tool calls that ended well, said as one line in plain words (item 1909, after another coding agent's work
+/// log): "Ran 3 commands and read 2 files", "Used 1 tool and searched the web 1 time". The kinds in the order they
+/// first came, each with its count. Pure.
+func toolGroupWords(_ entries: [ToolEntry], locale: Locale) -> String {
+    var order: [String] = []
+    var counts: [String: Int] = [:]
+    for entry in entries {
+        let kind: String = groupKind(entry)
+        if counts[kind] == nil { order.append(kind) }
+        counts[kind, default: 0] += 1
+    }
+    let bundle: Bundle = wordsBundle(locale)
+    let parts: [String] = order.map { kindPhrase($0, counts[$0] ?? 0, bundle: bundle, locale: locale) }
+    let sentence: String
+    if parts.count <= 1 {
+        sentence = parts.first ?? ""
+    } else {
+        let head: String = parts.dropLast().joined(separator: ", ")
+        sentence = String(localized: "\(head) and \(parts[parts.count - 1])", bundle: bundle, locale: locale, comment: "Work log: the last part of a group of tool calls joined to the others; the arguments are the parts")
+    }
+    return sentence.prefix(1).uppercased(with: locale) + sentence.dropFirst()
+}
+
+/// The kind a tool call counts under in a group's line.
+private func groupKind(_ entry: ToolEntry) -> String {
+    if entry.tool == "web_search" { return "web_search" }
+    switch entry.kind {
+    case .command: return "command"
+    case .read: return "read"
+    case .edit: return "edit"
+    case .search: return "search"
+    case .web: return "web"
+    case .screen: return "screen"
+    case .wait: return "wait"
+    case .helper: return "helper"
+    case .other: return "other"
+    }
+}
+
+private func kindPhrase(_ kind: String, _ count: Int, bundle: Bundle, locale: Locale) -> String {
+    switch kind {
+    case "command": String(localized: "ran \(count) commands", bundle: bundle, locale: locale, comment: "Work log group: commands run; the argument is how many")
+    case "read": String(localized: "read \(count) files", bundle: bundle, locale: locale, comment: "Work log group: files read; the argument is how many")
+    case "edit": String(localized: "edited \(count) files", bundle: bundle, locale: locale, comment: "Work log group: files edited; the argument is how many")
+    case "web_search": String(localized: "searched the web \(count) times", bundle: bundle, locale: locale, comment: "Work log group: web searches; the argument is how many")
+    case "search": String(localized: "searched \(count) times", bundle: bundle, locale: locale, comment: "Work log group: searches; the argument is how many")
+    case "web": String(localized: "opened \(count) pages", bundle: bundle, locale: locale, comment: "Work log group: pages opened; the argument is how many")
+    case "screen": String(localized: "took \(count) steps on the Mac", bundle: bundle, locale: locale, comment: "Work log group: steps on the Mac's screen; the argument is how many")
+    case "wait": String(localized: "waited \(count) times", bundle: bundle, locale: locale, comment: "Work log group: waits; the argument is how many")
+    case "helper": String(localized: "started \(count) helpers", bundle: bundle, locale: locale, comment: "Work log group: helpers started; the argument is how many")
+    default: String(localized: "used \(count) tools", bundle: bundle, locale: locale, comment: "Work log group: other tools; the argument is how many")
+    }
+}

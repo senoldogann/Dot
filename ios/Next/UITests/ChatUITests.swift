@@ -184,6 +184,39 @@ final class ChatUITests: XCTestCase {
         add(shot)
     }
 
+    /// Item 1909, after another coding agent's work log: consecutive tool calls are one line in plain words, each helper
+    /// is its own row (title, what it does, its time, a chevron), and while the run waits one quiet line says on what,
+    /// with Details and no Stop of its own (the pill has it).
+    func testTheWorkLogGroupsToolsShowsHelpersAndSaysWhatItWaitsOn() {
+        // The queue's fixture: its run waits in `wait_until` and writes nothing meanwhile.
+        let app: XCUIApplication = launch("n2-queue")
+        let helper: XCUIElement = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "helper.row", "Check the dentist")).firstMatch
+        XCTAssertTrue(helper.waitForExistence(timeout: 10), "a helper is its own row")
+        XCTAssertGreaterThanOrEqual(helper.frame.height, 44)
+        // The line stands at the end of the stream: scroll to it (the stream draws only what is near the screen).
+        let waiting: XCUIElement = app.staticTexts["waiting.line"]
+        for _ in 0..<4 where !waiting.exists { app.swipeUp() }
+        XCTAssertTrue(waiting.waitForExistence(timeout: 5))
+        XCTAssertTrue(waiting.label.hasPrefix("Waiting · "), waiting.label)
+        XCTAssertTrue(app.buttons["waiting.details"].exists)
+        let shotWaiting: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shotWaiting.name = "work-log-waiting"
+        shotWaiting.lifetime = .keepAlways
+        add(shotWaiting)
+        for _ in 0..<4 { app.swipeDown() }
+        // The finished run is folded: open its fold.
+        let fold: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Worked for")).firstMatch
+        XCTAssertTrue(fold.waitForExistence(timeout: 5))
+        fold.tap()
+        let group: XCUIElement = app.buttons["tools.group"].firstMatch
+        XCTAssertTrue(group.waitForExistence(timeout: 5), "the finished run's calls as one line")
+        XCTAssertEqual(group.label, "Read 2 files and ran 2 commands")
+        let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "work-log"
+        shot.lifetime = .keepAlways
+        add(shot)
+    }
+
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
         let app: XCUIApplication = launch("n2-asks")
         XCTAssertTrue(app.staticTexts["Your answer is needed"].waitForExistence(timeout: 10))
