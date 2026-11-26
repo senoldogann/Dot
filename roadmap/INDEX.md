@@ -6,8 +6,12 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1968](1968.md) | done | 2026-11-26 | A voice call with a bot is designed, and its first slice, a local speech prototype with measurements, is in |
 | [1963](1963.md) | done | 2026-11-26 | DotNext's bot profile is Grok's: avatar, name and Edit, Library and Computer, Configure the bot, Notifications |
 | [1962](1962.md) | done | 2026-11-26 | A new bot opens its first chat with a message of its own, within seconds |
+| [1960](1960.md) | done | 2026-11-26 | Fewer turns on the desktop path: a batch's result is the look, and Safari's pages go to the Safari tools |
+| [1959](1959.md) | done | 2026-11-26 | The owner's own Safari, driven like Dot's Chrome: a page's elements with refs, batches of steps, the same policy |
+| [1958](1958.md) | done | 2026-11-26 | A login refused on another host says the one step the owner takes for it to fill there |
 | [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
 | [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
 | [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |

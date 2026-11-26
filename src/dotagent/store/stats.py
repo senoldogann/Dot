@@ -35,7 +35,7 @@ _ENDING_ORDER: dict[Ending, int] = {ending: index for index, ending in enumerate
 _SLOW_SHARE: float = 0.9
 
 # The tools whose calls carry a list of steps: a call with one step is a single-action turn.
-ACT_TOOLS: frozenset[str] = frozenset({"browser_act", "desktop_act"})
+ACT_TOOLS: frozenset[str] = frozenset({"browser_act", "desktop_act", "safari_act"})
 # The step bands of the slowdown curve: the first step of each; the last band is open.
 _BAND_STARTS: tuple[int, ...] = (1, 6, 11, 21, 41)
 # The web tools whose failures are told apart by cause.

@@ -22,6 +22,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.toolcalls import (
     EXTRA_TURNS,
     CaseResult,
+    PriorStep,
     ToolCase,
     case_request,
     first_work,
@@ -41,11 +42,14 @@ from dotagent.llm.types import (
     ModelReply,
     StreamDelta,
     ToolCall,
+    ToolSpec,
 )
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.secrets import parse_env_file
 from dotagent.store.models import RunRecord
+from dotagent.tools.groups import group_of, used_groups
 from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.registry import specs_for_mode
 
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _FINISH: ScriptedTurn = ScriptedTurn(
@@ -116,6 +120,21 @@ def _none(_name: str) -> None:
     return None
 
 
+def with_used_groups(base: ChatRequest, offered: Sequence[ToolSpec], prior: Sequence[PriorStep]) -> ChatRequest:
+    """``base`` with the tools of every group a step before the case's moment called, as the loop turns a group on
+    for the steps after one of its tools was called (:func:`dotagent.tools.groups.used_groups`): a case whose steps
+    used the desktop's tools is asked with them, as the run it comes from was."""
+    used: frozenset[str] = used_groups(prior_messages(prior))
+    named: set[str] = {spec.name for spec in base.tools}
+    more: list[ToolSpec] = [spec for spec in offered if group_of(spec.name) in used and spec.name not in named]
+    return base.model_copy(update={"tools": (*base.tools, *more)}) if more else base
+
+
+def _with_desktop(config: AppConfig, desktop: bool) -> AppConfig:
+    """``config`` with the desktop's tools on or off, as a case's capture needs them."""
+    return config.model_copy(update={"desktop": config.desktop.model_copy(update={"enabled": desktop})})
+
+
 async def _quiet(_delta: StreamDelta) -> None:
     return None
 
@@ -176,18 +195,28 @@ async def play_cases(
     results: list[CaseResult] = []
     # The requests are captured first, in a runtime of their own: the scripted model that plays them is Ollama's
     # provider (``ollama:scripted``), which would answer for an Ollama model under test in the same runtime.
-    bases: list[ChatRequest] = []
-    with no_keychain(), scratch_home() as home, eval_environment(home, {}):
-        capturing: Runtime = await open_runtime(config, login_env)
-        manager: RunManager = RunManager(capturing)
-        keeping: _Keeping = _Keeping()
-        try:
-            await capturing.router.register(_PROVIDER, keeping)
-            for case in cases:
-                bases.append(await _captured(capturing, manager, keeping, case.goal))
-        finally:
-            await manager.shutdown()
-            await close_runtime(capturing)
+    captured: dict[str, ChatRequest] = {}
+    # A case of the Mac's applications (item 1960) is captured with the desktop's tools on, which an eval otherwise
+    # leaves off: the capture runs no tool, its scripted model finishes at once.
+    for desktop in (False, True):
+        mine: list[ToolCase] = [case for case in cases if case.desktop == desktop]
+        if not mine:
+            continue
+        with no_keychain(), scratch_home() as home, eval_environment(home, {}):
+            capturing: Runtime = await open_runtime(_with_desktop(config, desktop), login_env)
+            manager: RunManager = RunManager(capturing)
+            keeping: _Keeping = _Keeping()
+            try:
+                await capturing.router.register(_PROVIDER, keeping)
+                offered: tuple[ToolSpec, ...] = specs_for_mode(capturing.registry, "task")
+                for case in mine:
+                    captured[case.id] = with_used_groups(
+                        await _captured(capturing, manager, keeping, case.goal), offered, case.prior
+                    )
+            finally:
+                await manager.shutdown()
+                await close_runtime(capturing)
+    bases: list[ChatRequest] = [captured[case.id] for case in cases]
     with no_keychain(), scratch_home() as home, eval_environment(home, keys):
         runtime: Runtime = await open_runtime(config, login_env)
         try:
