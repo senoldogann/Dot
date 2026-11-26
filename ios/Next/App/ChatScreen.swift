@@ -57,6 +57,7 @@ struct ChatScreen: View {
     @AppStorage(PrefKey.readingWidth) private var readingWidthRaw: String = ReadingWidth.standard.rawValue
     @State private var draft: String = ""
     @State private var attachments: [ComposerAttachment] = []
+    @State private var keepingMessage: Bool = false
     @State private var panel: ChatPanel?
     @State private var edit: QueueEdit?
     @State private var dockFolded: Bool = false
@@ -393,10 +394,18 @@ struct ChatScreen: View {
     }
 
     @ViewBuilder private func deliveryLine(id: String, delivery: Delivery) -> some View {
+        let key: String = String(id.dropFirst(2))
+        if let progress = model.outbox.first(where: { $0.id == key })?.attachmentUpload {
+            AttachmentTransferLine(key: key, progress: progress)
+        } else {
+            deliveryStatus(key: key, delivery: delivery)
+        }
+    }
+
+    private func deliveryStatus(key: String, delivery: Delivery) -> some View {
         HStack(spacing: Space.xs) {
             Text(deliveryWords(delivery)).textRole(.label).foregroundStyle(isRejected(delivery) ? Tone.failure : Tone.tertiary)
             if case .rejected(let failure) = delivery {
-                let key: String = String(id.dropFirst(2))
                 if case .runEnded = failure {
                     Button(String(localized: "Send as a new message", comment: "Under a steer refused because its run ended")) { model.sendAsMessage(key) }.textRole(.label)
                 } else {
@@ -459,7 +468,7 @@ struct ChatScreen: View {
                     suggestions: ComposerSuggestions(sections: { trigger in
                         pickerSections(trigger, commands: composerCommands(), catalog: catalog, limit: 8)
                     }))
-                .disabled(chat?.freshness == .deleted)
+                .disabled(chat?.freshness == .deleted || keepingMessage)
             }
         }
         .frame(maxWidth: proseWidth)
@@ -500,8 +509,8 @@ struct ChatScreen: View {
             confirmEdit()
         case .send, .queue, .steer:
             let typed: String = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-            let photos: [Data] = attachments.map(\.jpeg)
-            guard !typed.isEmpty || !photos.isEmpty else { return }
+            let files: [OutgoingAttachment] = attachments.compactMap(\.outgoing)
+            guard !keepingMessage, files.count == attachments.count, !typed.isEmpty || !files.isEmpty else { return }
             // A command the composer does itself (PLAN §22) leaves the draft only once it is done or understood.
             switch composerCommand(typed) {
             case .stop:
@@ -529,7 +538,7 @@ struct ChatScreen: View {
                         draft = typed
                         return
                     }
-                    await model.send(text, thread: thread, steerInto: nil, photos: photos, picks: .none)
+                    await model.send(text, thread: thread, steerInto: nil, files: files, picks: .none)
                 }
                 attachments = []
                 return
@@ -538,14 +547,22 @@ struct ChatScreen: View {
             }
             let (words, typedPicks): (String, MessagePicks) = messagePicks(typed, catalog: catalog)
             let picks: MessagePicks = MessagePicks(skills: typedPicks.skills, accounts: typedPicks.accounts, planFirst: typedPicks.planFirst || planFirst)
-            // A steer carries no picks: plan first waits for the next message that does (a steer with no run at work
-            // goes as a message, and spends it).
-            if activeRun == nil || action != .steer { planFirst = false }
-            draft = ""
-            attachments = []
-            model.keep(draft: "", of: thread)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            Task { await model.send(words, thread: thread, steerInto: action == .steer ? activeRun?.id : nil, photos: photos, picks: picks) }
+            let run: String? = action == .steer ? activeRun?.id : nil
+            keepingMessage = true
+            Task {
+                defer { keepingMessage = false }
+                let text: String = words.isEmpty && !files.isEmpty ? attachmentMessage() : words
+                guard await model.send(text, thread: thread, steerInto: run, files: files, picks: picks) != nil else {
+                    toast = ToastMessage(id: UUID(), text: messageStorageFailure(), systemImage: "exclamationmark.triangle", actionTitle: nil)
+                    return
+                }
+                // A steer carries no picks, so plan first waits for a subsequent message.
+                if run == nil { planFirst = false }
+                draft = ""
+                attachments = []
+                model.keep(draft: "", of: thread)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
         }
     }
 
