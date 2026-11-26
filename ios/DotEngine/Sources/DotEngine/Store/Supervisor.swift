@@ -47,6 +47,9 @@ public actor Supervisor {
     private var watchers: [Task<Void, Never>] = []
     /// The revision of each open chat's row it was last marked seen at (item 1905).
     private var seenSent: [String: Int] = [:]
+    /// How many screens hold each chat open (item 1913): a chat shown twice (a switch back to it before the old screen
+    /// went, a chat and its helper's) stays open until the last one leaves, whichever order their calls arrive in.
+    private var openCounts: [String: Int] = [:]
     private let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "supervisor")
 
     public init(api: DaemonAPI, store: SyncStore, outbox: Outbox, link: LinkWatcher, clock: any EngineClock, jitter: @escaping @Sendable () -> Double) {
@@ -89,14 +92,18 @@ public actor Supervisor {
 
     /// Opens a chat: its picture from the cache, its stream and its view.
     public func openChat(_ thread: String) async {
+        openCounts[thread, default: 0] += 1
         await store.chatOpened(thread)
         await seeOpenChats()
         guard loops[.chat(thread)] == nil else { return }
         run(.chat(thread))
     }
 
-    /// Leaves a chat: its stream ends, its picture is saved.
+    /// Leaves a chat: once no screen holds it, its stream ends and its picture is saved.
     public func closeChat(_ thread: String) async {
+        let left: Int = (openCounts[thread] ?? 0) - 1
+        openCounts[thread] = left > 0 ? left : nil
+        guard left <= 0 else { return }
         end(.chat(thread))
         await store.chatClosed(thread)
     }
