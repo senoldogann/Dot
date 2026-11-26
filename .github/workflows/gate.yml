@@ -445,7 +445,8 @@ jobs:
 
   # After every other job of a run on main (item 1899): the issue "main is red on macOS" is opened, or told again, when
   # this commit failed, and closed when it passed (scripts/main_macos_green.py reads this run, from its other jobs, and
-  # ios.yml's last run of a push). Not for a pull request, which runs no macOS job, nor for a release.
+  # ios.yml's last run of a push and browser.yml's last finished run on main). Not for a pull request, which runs no
+  # macOS job, nor for a release.
   main-health:
     needs: [prose, checks, changes, gate, smoke, browser, desktop, zizmor, ci]
     if: ${{ always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
