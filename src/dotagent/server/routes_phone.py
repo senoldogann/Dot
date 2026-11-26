@@ -27,6 +27,7 @@ from dotagent.notify.settings import PushSettings, forget_push_settings, keep_pu
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import PHONE_STATE, refuse_from_a_phone
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
+from dotagent.server.phone_metrics import forget_reports
 from dotagent.server.phones import MAX_PHONES, PairedPhones, is_phone_id
 from dotagent.server.views import (
     ActivityLeaseView,
@@ -202,7 +203,8 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
     @router.delete("/phone/phones/{phone_id}", status_code=204)
     async def remove_phone(phone_id: str) -> Response:
         """Remove a phone: its key is refused from now on, and its streams that are open end (item 670), and its APNs
-        device and the web push subscriptions its key registered go (item 1311)."""
+        device and the web push subscriptions its key registered go (item 1311), and its performance record (item
+        1926)."""
         if not is_phone_id(phone_id) or not await phones.remove(phone_id):
             raise NotFoundError("that phone is not paired", {})
         await ctx.runtime.store.delete_apns_device(phone_id)
@@ -210,6 +212,7 @@ def phone_router(ctx: ServerContext, phones: PairedPhones) -> APIRouter:
         ctx.leases.forget(phone_id)
         await forget_push_settings(ctx.runtime.store, phone_id)
         await forget_live_start_token(ctx.runtime.store, phone_id)
+        await forget_reports(ctx.runtime.store, phone_id)
         return Response(status_code=204)
 
     @router.post("/phone/apns", status_code=204)

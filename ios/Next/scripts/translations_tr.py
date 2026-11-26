@@ -838,7 +838,7 @@ TR: dict[str, str] = {
     "Recent": "Son",
     "Search chats": "Sohbetlerde ara",
     "Start one with the pencil above.": "Yukarıdaki kalemle bir tane başlat.",
-    "updates versions resume restart continue": "güncellemeler sürümler sürdür yeniden başlat devam",
+    "updates versions resume restart continue performance battery hangs crashes": "güncellemeler sürümler sürdür yeniden başlat devam performans pil donma çökme",
     # G1: the home of bots, a bot's chat and profile, the settings sheet (PLAN §27, items 1881-1885).
     '%lld unread': '%lld okunmamış',
     'A bot needs a name.': 'Bir botun adı olmalı.',
@@ -1321,5 +1321,29 @@ EN_PLURALS.update(
         "%lld minutes before an event": ("%lld minute before an event", "%lld minutes before an event"),
         "%lld decisions made for you (%@)": ("%lld decision made for you (%@)", "%lld decisions made for you (%@)"),
         "%lld actions": ("%lld action", "%lld actions"),
+    }
+)
+# Item N: the phone's own performance record in Settings › Maintenance.
+TR.update(
+    {
+        "This phone's performance": "Bu telefonun performansı",
+        "Nothing measured yet. iOS hands its measures about once a day; they go to your Mac only.": "Henüz ölçüm yok. iOS ölçümlerini günde bir kez kadar verir; yalnızca Mac'ine gider.",
+        "The last %lld days, measured by iOS and by Dot on this phone. Kept on your Mac only.": "Son %lld gün; iOS ve bu telefondaki Dot ölçtü. Yalnızca Mac'inde saklanır.",
+        "Processor": "İşlemci",
+        "%@ s in %@ min open": "%2$@ dk açıkken %1$@ sn",
+        "Hangs": "Donmalar",
+        "None": "Yok",
+        "%lld reported · %@ s": "%lld rapor · %@ sn",
+        "Crashes": "Çökmeler",
+        "Launch": "Açılış",
+        "%@ ms": "%@ ms",
+        "Memory at most": "En yüksek bellek",
+        "%@ MB": "%@ MB",
+        "Data with your Mac": "Mac'inle veri",
+        "%@ MB in · %@ MB out": "%1$@ MB gelen · %2$@ MB giden",
+        "Reconnects": "Yeniden bağlanmalar",
+        "%lld in %@ min": "%2$@ dk'da %1$lld",
+        "Redraws": "Yeniden çizimler",
+        "%@ a minute": "dakikada %@",
     }
 )

@@ -225,7 +225,7 @@ private struct ComposerPickers: ViewModifier {
         .onChange(of: photoItems) { _, items in
             Task {
                 for item in items {
-                    if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) { add(image) }
+                    if let data = try? await item.loadTransferable(type: Data.self), let image = ImageSizing.decoded(data, longest: ImageSizing.upload) { add(image) }
                 }
                 photoItems = []
             }
@@ -235,7 +235,7 @@ private struct ComposerPickers: ViewModifier {
             for url in urls {
                 let opened: Bool = url.startAccessingSecurityScopedResource()
                 defer { if opened { url.stopAccessingSecurityScopedResource() } }
-                if let data = try? Data(contentsOf: url), let image = UIImage(data: data) { add(image) }
+                if let data = try? Data(contentsOf: url), let image = ImageSizing.decoded(data, longest: ImageSizing.upload) { add(image) }
             }
         }
         .fullScreenCover(item: Binding(get: { picking == .camera || picking == .scan ? picking : nil }, set: { picking = $0 })) { which in
@@ -257,9 +257,12 @@ private struct ComposerPickers: ViewModifier {
 }
 
 extension ComposerView {
+    /// Keeps a picture for the message at the upload size (a camera's 12 MP photo goes as about 1,600 px, not as itself),
+    /// with a preview of the composer's size.
     fileprivate func add(_ image: UIImage) {
-        guard let jpeg: Data = image.jpegData(compressionQuality: 0.8) else { return }
-        attachments.append(ComposerAttachment(id: UUID(), jpeg: jpeg, preview: image))
+        let sized: UIImage = ImageSizing.fitted(image, longest: ImageSizing.upload)
+        guard let jpeg: Data = sized.jpegData(compressionQuality: ImageSizing.quality) else { return }
+        attachments.append(ComposerAttachment(id: UUID(), jpeg: jpeg, preview: ImageSizing.fitted(sized, longest: ImageSizing.preview)))
     }
 
     private var plusMenu: some View {

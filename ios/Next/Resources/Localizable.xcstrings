@@ -12,6 +12,39 @@
         }
       }
     },
+    "%@ MB": {
+      "comment": "Maintenance › Performance: megabytes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ MB"
+          }
+        }
+      }
+    },
+    "%@ MB in · %@ MB out": {
+      "comment": "Maintenance › Performance: megabytes read and sent",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ MB gelen · %2$@ MB giden"
+          }
+        }
+      }
+    },
+    "%@ a minute": {
+      "comment": "Maintenance › Performance: redraws per minute",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dakikada %@"
+          }
+        }
+      }
+    },
     "%@ at %@": {
       "comment": "Schedule rhythm; short weekday names, then clock times",
       "localizations": {
@@ -56,6 +89,17 @@
         }
       }
     },
+    "%@ ms": {
+      "comment": "Maintenance › Performance: milliseconds",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ ms"
+          }
+        }
+      }
+    },
     "%@ of %@": {
       "comment": "Inspector cost row: tokens spent against the cap",
       "localizations": {
@@ -74,6 +118,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ açık"
+          }
+        }
+      }
+    },
+    "%@ s in %@ min open": {
+      "comment": "Maintenance › Performance: CPU seconds used over minutes on screen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ dk açıkken %1$@ sn"
           }
         }
       }
@@ -344,6 +399,17 @@
         }
       }
     },
+    "%lld in %@ min": {
+      "comment": "Maintenance › Performance: stream breaks over minutes open",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@ dk'da %1$lld"
+          }
+        }
+      }
+    },
     "%lld minutes before an event": {
       "comment": "Watcher: how long before an event a calendar watcher tells",
       "localizations": {
@@ -435,6 +501,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld sırada"
+          }
+        }
+      }
+    },
+    "%lld reported · %@ s": {
+      "comment": "Maintenance › Performance: hang reports and their total time",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld rapor · %@ sn"
           }
         }
       }
@@ -2741,6 +2818,17 @@
         }
       }
     },
+    "Crashes": {
+      "comment": "Maintenance › Performance: crash reports row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çökmeler"
+          }
+        }
+      }
+    },
     "Create": {
       "comment": "New bot: makes it",
       "localizations": {
@@ -2781,6 +2869,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Veri"
+          }
+        }
+      }
+    },
+    "Data with your Mac": {
+      "comment": "Maintenance › Performance: bytes read from and sent to the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'inle veri"
           }
         }
       }
@@ -4824,6 +4923,17 @@
         }
       }
     },
+    "Hangs": {
+      "comment": "Maintenance › Performance: the app froze",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Donmalar"
+          }
+        }
+      }
+    },
     "Haptics": {
       "comment": "Chat settings: touch feedback",
       "localizations": {
@@ -5473,6 +5583,17 @@
         }
       }
     },
+    "Launch": {
+      "comment": "Maintenance › Performance: time to the first frame",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Açılış"
+          }
+        }
+      }
+    },
     "Leads every task": {
       "comment": "Agents: Dot's line",
       "localizations": {
@@ -5844,6 +5965,17 @@
         }
       }
     },
+    "Memory at most": {
+      "comment": "Maintenance › Performance: peak memory row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En yüksek bellek"
+          }
+        }
+      }
+    },
     "Message": {
       "comment": "Draft: an iMessage",
       "localizations": {
@@ -5944,7 +6076,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nInspector cost row: the seconds the model took\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6494,7 +6626,7 @@
       }
     },
     "None": {
-      "comment": "Find in chat: no block holds the words",
+      "comment": "Find in chat: no block holds the words\nMaintenance › Performance: no hang, no crash",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6764,6 +6896,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bugün hareket eden bir şey yok"
+          }
+        }
+      }
+    },
+    "Nothing measured yet. iOS hands its measures about once a day; they go to your Mac only.": {
+      "comment": "Maintenance › Performance: before the first report",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz ölçüm yok. iOS ölçümlerini günde bir kez kadar verir; yalnızca Mac'ine gider."
           }
         }
       }
@@ -7726,6 +7869,17 @@
         }
       }
     },
+    "Processor": {
+      "comment": "Maintenance › Performance: CPU time row",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İşlemci"
+          }
+        }
+      }
+    },
     "Productivity": {
       "comment": "Connect apps: a section of services",
       "localizations": {
@@ -8217,6 +8371,17 @@
         }
       }
     },
+    "Reconnects": {
+      "comment": "Maintenance › Performance: live streams that broke",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden bağlanmalar"
+          }
+        }
+      }
+    },
     "Recording stopped when Dot left the screen; what was heard is in the box.": {
       "comment": "Composer: voice stopped as the app went to the background",
       "localizations": {
@@ -8246,6 +8411,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kayıt, %lld saniye"
+          }
+        }
+      }
+    },
+    "Redraws": {
+      "comment": "Maintenance › Performance: how often a chat was drawn again",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeniden çizimler"
           }
         }
       }
@@ -10590,6 +10766,17 @@
         }
       }
     },
+    "The last %lld days, measured by iOS and by Dot on this phone. Kept on your Mac only.": {
+      "comment": "Maintenance › Performance: what the numbers are and where they stay",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Son %lld gün; iOS ve bu telefondaki Dot ölçtü. Yalnızca Mac'inde saklanır."
+          }
+        }
+      }
+    },
     "The live screen comes in a later version.": {
       "comment": "Mac screen panel placeholder",
       "localizations": {
@@ -11037,6 +11224,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bu telefonun anahtarı reddedildi"
+          }
+        }
+      }
+    },
+    "This phone's performance": {
+      "comment": "Maintenance section: the app's own measures",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu telefonun performansı"
           }
         }
       }
@@ -13259,13 +13457,13 @@
         }
       }
     },
-    "updates versions resume restart continue": {
+    "updates versions resume restart continue performance battery hangs crashes": {
       "comment": "Settings search synonyms of Maintenance (space separated)",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "güncellemeler sürümler sürdür yeniden başlat devam"
+            "value": "güncellemeler sürümler sürdür yeniden başlat devam performans pil donma çökme"
           }
         }
       }

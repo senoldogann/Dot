@@ -321,9 +321,10 @@ async def test_a_chats_stream_carries_new_runs_and_helpers_and_goes_on_from_the_
 
 
 async def test_a_steps_thinking_and_words_reach_the_chats_stream_as_they_are_written(served: Served) -> None:
-    """The owner's report of 2026-11-25 (the iPhone app's words came late): each live delta of a run, its thinking and
-    its words (id 0, never stored), comes on the chat's stream one by one, in order, about as soon as it is said
-    (the median under 100 ms)."""
+    """The owner's report of 2026-11-25 (the iPhone app's words came late): every live delta of a run, its thinking and
+    its words (id 0, never stored), comes on the chat's stream in order, about as soon as it is said; the tokens said
+    within DELTA_BATCH_S of each other come joined in one frame of their kind (item 1926), so a phone wakes about twelve
+    times a second, not once a token."""
     store: Store = served.runtime.store
     bus = served.runtime.bus
     chat: ThreadRecord = await store.create_thread("Chat", "ui")
@@ -341,9 +342,9 @@ async def test_a_steps_thinking_and_words_reach_the_chats_stream_as_they_are_wri
             async def say() -> None:
                 for n in range(40):
                     kind: str = "thinking" if n < 20 else "text"
-                    said.append((f"piece {n}", time.monotonic()))
+                    said.append((f"piece {n};", time.monotonic()))
                     await bus.emit(
-                        run.id, "delta", {"kind": kind, "text": f"piece {n}", "step": 1, "says": "either"}, False
+                        run.id, "delta", {"kind": kind, "text": f"piece {n};", "step": 1, "says": "either"}, False
                     )
                     await asyncio.sleep(0.02)
 
@@ -352,15 +353,59 @@ async def test_a_steps_thinking_and_words_reach_the_chats_stream_as_they_are_wri
                 async for frame in frames:
                     if frame.kind == "delta":
                         came.append((str(frame.event.data["kind"]), str(frame.event.data["text"]), time.monotonic()))
-                        if len(came) == 40:
+                        if "".join(text for _, text, _ in came).endswith("piece 39;"):
                             break
             await saying
-    assert [text for _, text, _ in came] == [text for text, _ in said], "every delta came, in order"
-    assert [kind for kind, _, _ in came] == ["thinking"] * 20 + ["text"] * 20, "the thinking comes too"
-    late: list[float] = [at - when for (_, _, at), (_, when) in zip(came, said, strict=True)]
+    thinking: str = "".join(text for kind, text, _ in came if kind == "thinking")
+    words: str = "".join(text for kind, text, _ in came if kind == "text")
+    assert thinking == "".join(f"piece {n};" for n in range(20)), "every piece of the thinking came, in order"
+    assert words == "".join(f"piece {n};" for n in range(20, 40)), "every word came, in order, never with the thinking"
+    assert len(came) < 30, f"tokens 20 ms apart come joined: {len(came)} frames for 40 tokens"
+    # When each piece came: the frame that carried it.
+    arrived: dict[str, float] = {}
+    for _, text, at in came:
+        for piece in text.split(";")[:-1]:
+            arrived[f"{piece};"] = at
+    late: list[float] = [arrived[text] - when for text, when in said]
     # Order and completeness are the contract; the time is checked on the median, with a ceiling a loaded runner keeps.
-    assert sorted(late)[len(late) // 2] < 0.1, f"half the deltas came later than 100 ms: {sorted(late)}"
+    assert sorted(late)[len(late) // 2] < 0.15, f"half the deltas came later than 150 ms: {sorted(late)}"
     assert max(late) < 1.0, f"a delta came {max(late):.3f} s after it was said"
+
+
+async def test_words_held_go_out_before_the_next_event_and_another_chats_words_never_come(served: Served) -> None:
+    """Item N: the words held for joining go out before any event that follows them (a step's stored reply, a tool
+    call), in the order they were said; another chat's words neither come nor send the held ones early; a new step's
+    words are not joined to the last step's."""
+    store: Store = served.runtime.store
+    bus = served.runtime.bus
+    chat: ThreadRecord = await store.create_thread("Chat", "ui")
+    other: ThreadRecord = await store.create_thread("Other", "ui")
+    run: RunRecord = await _run(store, chat.id, None)
+    stranger: RunRecord = await _run(store, other.id, None)
+    opened: EventRecord = await bus.emit(run.id, "run_started", {}, True)
+    came: list[tuple[str, str]] = []
+    async with served.http.stream(
+        "GET", f"/api/threads/{chat.id}/stream", params={"cursors": f"{run.id}:{opened.id}"}
+    ) as s:
+        frames: AsyncIterator[Frame] = _frames(s)
+        async with aclosing(frames):
+            await _until_synchronized(frames, [])
+            for text in ("Hel", "lo "):
+                await bus.emit(run.id, "delta", {"kind": "text", "text": text, "step": 1, "says": "either"}, False)
+            await bus.emit(
+                stranger.id, "delta", {"kind": "text", "text": "not ours", "step": 1, "says": "either"}, False
+            )
+            await bus.emit(run.id, "delta", {"kind": "text", "text": "there", "step": 1, "says": "either"}, False)
+            await bus.emit(run.id, "tool_call", {"call_id": "c1", "tool": "shell"}, True)
+            await bus.emit(run.id, "delta", {"kind": "text", "text": "Next", "step": 2, "says": "either"}, False)
+            await bus.emit(run.id, "delta", {"kind": "text", "text": " step", "step": 3, "says": "either"}, False)
+            async with asyncio.timeout(_WAIT_S):
+                async for frame in frames:
+                    if frame.kind in ("delta", "tool_call"):
+                        came.append((frame.kind, str(frame.event.data.get("text", ""))))
+                        if len(came) == 4:
+                            break
+    assert came == [("delta", "Hello there"), ("tool_call", ""), ("delta", "Next"), ("delta", " step")]
 
 
 async def test_a_view_of_no_chat_and_a_cursor_of_another_chats_run_are_refused(served: Served) -> None:

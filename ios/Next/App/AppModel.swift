@@ -36,6 +36,8 @@ final class AppModel {
     private(set) var refusedDeletes: [String: String] = [:]
     /// The Mac's Dot was reset and the owner has not closed the notice yet.
     private(set) var reset: DaemonReset?
+    /// How many lifecycle events the list's stream told (`EngineSnapshot.heard`): what Activity reads again on.
+    private(set) var heard: Int = 0
     private(set) var host: DaemonHost?
     @ObservationIgnored private(set) var engine: Engine?
     @ObservationIgnored private var watching: Task<Void, Never>?
@@ -74,6 +76,7 @@ final class AppModel {
 
     /// Takes the store's newest snapshot: each part is set only when it changed, so its readers alone are drawn again.
     private func show(_ next: EngineSnapshot) {
+        if next.list != list || next.chats != chats { PerfCounters.shared.published() }
         if next.list != list { list = next.list }
         if next.chats != chats { chats = next.chats }
         if next.outbox != outbox { outbox = next.outbox }
@@ -85,6 +88,7 @@ final class AppModel {
         if next.startedChats != startedChats { startedChats = next.startedChats }
         if next.refusedDeletes != refusedDeletes { refusedDeletes = next.refusedDeletes }
         if next.reset != reset { reset = next.reset }
+        if next.heard != heard { heard = next.heard }
         if let fresh: DaemonReset = next.reset, !fresh.taken, UserDefaults.standard.double(forKey: Self.rescuedKey) != fresh.at { rescue(fresh) }
     }
 
@@ -173,6 +177,8 @@ final class AppModel {
         didSet { UserDefaults.standard.set(Array(answeredHere.suffix(300)), forKey: "answeredHere") }
     }
     @ObservationIgnored let images: NSCache<NSString, UIImage> = NSCache()
+    /// The app's own performance record, sent to the paired Mac (item 1926).
+    @ObservationIgnored let perf: PerfReporter = PerfReporter(file: PerfReporter.defaultFile)
     /// Debug builds only: the time each probe message was sent, by its client key (`LatencyProbe`).
     @ObservationIgnored var probeSent: [String: Date] = [:]
     @ObservationIgnored let logger: Logger = Logger(subsystem: "dev.dotagent.phone.next", category: "app")
@@ -226,12 +232,15 @@ final class AppModel {
             for await next in await engine.store.updates() {
                 guard let self else { return }
                 self.show(next)
-                // At most one picture a display frame at 30 Hz: the store's stream keeps only the newest, so the words
-                // that came meanwhile are drawn together, never dropped (item 1848).
-                try? await Task.sleep(for: .milliseconds(33))
+                // At most 15 pictures a second: the store's stream keeps only the newest, so the words that came
+                // meanwhile are drawn together, never dropped (item 1848); the answer's reveal paces them on screen.
+                try? await Task.sleep(for: .milliseconds(66))
             }
         }
         Task { await engine.supervisor.start() }
+        perf.start()
+        perf.appeared()
+        Task { await perf.send(with: api) }
     }
 
     /// A pairing the owner opened from a `dotnext://pair` link or a scanned code, waiting for their one tap.
@@ -299,8 +308,18 @@ final class AppModel {
     func scene(_ phase: ScenePhase) {
         guard let engine else { return }
         switch phase {
-        case .active: Task { await engine.supervisor.enterForeground() }
-        case .background: Task { await engine.supervisor.enterBackground() }
+        case .active:
+            PhaseMeter.resume()
+            perf.appeared()
+            Task {
+                await engine.supervisor.enterForeground()
+                // The record of the times away goes now, with the app open: nothing is sent from the background.
+                await perf.send(with: engine.api)
+            }
+        case .background:
+            PhaseMeter.enter("background")
+            perf.disappeared()
+            Task { await engine.supervisor.enterBackground() }
         default: break
         }
     }
@@ -476,7 +495,7 @@ extension AppModel {
         guard let engine else { return nil }
         do {
             let data: Data = try await engine.api.image(named: name)
-            guard let image: UIImage = UIImage(data: data) else { return nil }
+            guard let image: UIImage = ImageSizing.decoded(data, longest: ImageSizing.display) else { return nil }
             images.setObject(image, forKey: name as NSString)
             return image
         } catch {

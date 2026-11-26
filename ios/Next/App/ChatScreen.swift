@@ -120,6 +120,7 @@ struct ChatScreen: View {
             .sheet(item: $panel) { panel in sheet(panel) }
             .toastHost($toast, seconds: 4) { _ in }
             .onAppear {
+                PhaseMeter.enter("chat")
                 model.open(thread)
                 draft = model.draft(of: thread)
                 if let initialPanel { panel = initialPanel }
@@ -129,6 +130,7 @@ struct ChatScreen: View {
                 }
             }
             .onDisappear {
+                PhaseMeter.enter("list")
                 model.close(thread)
                 if edit == nil { model.keep(draft: draft, of: thread) }
                 if let topVisible = reading.topVisible { ChatScrollMemory.anchors[thread] = topVisible }

@@ -17,6 +17,7 @@ choose the script:
 - "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
+  "stream long: ..." the same with ten steps, a file of its own each;
 - anything else: an answer at once, after a few words streamed.
 
 The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
@@ -78,6 +79,18 @@ MODEL: str = "ollama:scripted"
 # The first line of the config this script writes: a home that holds it is this script's own, and may be used again.
 CONFIG_MARK: str = "# A throwaway home of ios/Next/scripts/e2e_daemon.py"
 
+# The files the "stream long:" script reads, one a step, all on every Mac.
+LONG_READS: tuple[str, ...] = (
+    "/etc/shells",
+    "/etc/protocols",
+    "/etc/services",
+    "/etc/group",
+    "/etc/networks",
+    "/etc/paths",
+    "/etc/manpaths",
+    "/etc/zshrc",
+)
+
 # The "stream:" script's words: a thought of about 40 words said four times a step, and an answer of about 300 words.
 THOUGHT: str = (
     "Enough for a status summary, but the money line schedule at 06:40 failed last night. Let me check why quickly, "
@@ -133,7 +146,9 @@ class ScriptProvider:
                 ),
             )
         elif latest.startswith("stream:"):
-            return await self._stream(request, sink, steps)
+            return await self._stream(request, sink, steps, 4)
+        elif latest.startswith("stream long:"):
+            return await self._stream(request, sink, steps, 10)
         elif answered:
             text = f"Done: {owner[:60]}"
         elif latest.startswith("helper:"):
@@ -256,16 +271,20 @@ class ScriptProvider:
             raw=(),
         )
 
-    async def _stream(self, request: ChatRequest, sink: DeltaSink, steps: int) -> ModelReply:
-        """One step of the "stream:" script: thinking and a file read for the first four, then the long answer."""
+    async def _stream(self, request: ChatRequest, sink: DeltaSink, steps: int, reads: int) -> ModelReply:
+        """One step of the "stream:" script: thinking and a file read for the first ``reads`` steps (4, or 12 for
+        "stream long:", about 45 s, which outlasts the app's time away in the check of what an unseen run costs),
+        then the long answer."""
         thinking: str = " ".join(THOUGHT for _ in range(4))
         for word in thinking.split(" "):
             await sink(StreamDelta(kind="thinking", text=word + " "))
             await asyncio.sleep(0.025)
         calls: tuple[ToolCall, ...] = ()
         text: str = ""
-        if steps < 4:
-            calls = (ToolCall(id=f"call_{self._calls}", name="read_file", arguments={"path": "/etc/hosts"}),)
+        if steps < reads:
+            # A file of its own each step past the fourth: the loop stops a step repeated four times as no progress.
+            path: str = "/etc/hosts" if steps < 4 else LONG_READS[steps % len(LONG_READS)]
+            calls = (ToolCall(id=f"call_{self._calls}", name="read_file", arguments={"path": path}),)
         else:
             text = ANSWER
             for word in text.split(" "):

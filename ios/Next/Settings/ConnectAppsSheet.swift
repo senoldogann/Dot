@@ -48,7 +48,8 @@ struct ConnectAppsSheet: View {
         .presentationBackground(Tone.sheet)
         .tint(Tone.text)
         .task { await load() }
-        .task { await keepReading() }
+        // The timer runs only while something waits on the Mac: an idle sheet wakes nothing.
+        .task(id: waitsOnTheMac) { if waitsOnTheMac { await keepReading() } }
         .sheet(item: $shown) { app in
             ConnectAppDetail(
                 app: current(app), finishing: finishing.contains(app.id), problem: stepProblem,
@@ -373,7 +374,7 @@ struct ConnectAppsSheet: View {
             } catch {
                 return
             }
-            if waitsOnTheMac { await load() }
+            await load()
         }
     }
 }

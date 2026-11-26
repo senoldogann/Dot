@@ -76,7 +76,33 @@ final class StreamingLiveUITests: XCTestCase {
         XCTAssertTrue(end.waitForExistence(timeout: 120), "the long answer streamed to its end")
         let done: XCUIElement = app.descendants(matching: .any).matching(NSPredicate(format: "placeholderValue == %@ OR value == %@", "Message Dot", "Message Dot")).firstMatch
         _ = done.waitForExistence(timeout: 30)
-        sleep(2)
         shot(app, "streamed")
+        // Leaving the chat closes the meter's "chat" stretch: the whole run, as the owner reading it sees it.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(1)
+    }
+
+    /// What a run costs while the owner does not look: once the run is at work, the chat open for 4 s, then the home
+    /// for 6 s, then the app in the background for 8 s (the long run, about 45 s, still at work), then the chat again to the
+    /// run's end, which it catches up with (the phase meter writes one line per stretch).
+    func testAStreamingRunCostsLittleUnseen() throws {
+        let app: XCUIApplication = try launch(scene: "live-chat")
+        type(app, "stream long: what costs when nobody looks")
+        let working: XCUIElement = app.descendants(matching: .any).matching(identifier: "work.line").firstMatch
+        XCTAssertTrue(working.waitForExistence(timeout: 30), "the run is at work")
+        sleep(4)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(6)
+        XCUIDevice.shared.press(.home)
+        sleep(8)
+        app.activate()
+        // Dot's row on the home opens its latest chat, the one at work.
+        let dot: XCUIElement = app.descendants(matching: .any).matching(identifier: "home.bot.dot").firstMatch
+        XCTAssertTrue(dot.waitForExistence(timeout: 10), "Dot's row on the home")
+        dot.tap()
+        let end: XCUIElement = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "the queue is empty")).firstMatch
+        XCTAssertTrue(end.waitForExistence(timeout: 120), "the chat caught up with the answer written while away")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(1)
     }
 }

@@ -117,7 +117,14 @@ extension Loadable {
 private let draftsRead: Int = 50
 private let versionsRead: Int = 100
 /// How often the tab reads again while it is on screen, as the web's panels do.
-private let refreshSeconds: Double = 30
+/// How long Activity waits after a lifecycle event for the next before it reads, in milliseconds.
+private let wakeSettle: Int = 400
+
+/// What makes Activity read again: a lifecycle event heard, or the list's stream up again.
+private struct ActivityWake: Equatable {
+    let heard: Int
+    let live: Bool
+}
 
 struct ActivityHome: View {
     /// `nil`: all of Dot's; an agent's id: only its own work.
@@ -152,7 +159,9 @@ struct ActivityHome: View {
         .navigationTitle(String(localized: "Activity", comment: "Title of the activity tab"))
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
-        .task { await keepReading() }
+        // Read when the screen opens, again when the list's stream tells a run, an ask, a draft or a queue moved (no
+        // timer: the stream pushes them), and when the stream is up again after a break.
+        .task(id: ActivityWake(heard: model.heard, live: model.transport == .up)) { await readOnWake() }
         .sheet(item: $draft) { shown in
             DraftSheet(draft: shown, actions: actions) { settled in
                 picture.drafts = picture.drafts.value.map { all in .loaded(all.filter { $0.id != settled }) } ?? picture.drafts
@@ -331,18 +340,18 @@ struct ActivityHome: View {
 
     // MARK: Reads and writes
 
-    /// Reads everything again while the tab is on screen (the web's panels read every 30 s or on a lifecycle event).
-    private func keepReading() async {
-        while !Task.isCancelled {
-            await load()
+    /// Reads everything again; a burst of events (a run's start, its queue, its asks) is read once, after it settles.
+    private func readOnWake() async {
+        if !picture.cold {
             do {
-                try await Task.sleep(for: .seconds(refreshSeconds))
+                try await Task.sleep(for: .milliseconds(wakeSettle))
             } catch is CancellationError {
                 return
             } catch {
                 preconditionFailure("Task.sleep throws only CancellationError: \(error)")
             }
         }
+        await load()
     }
 
     private func load() async {

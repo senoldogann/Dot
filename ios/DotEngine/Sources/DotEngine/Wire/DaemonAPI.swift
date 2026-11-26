@@ -57,6 +57,7 @@ public struct DaemonAPI: Sendable {
     func data(_ request: URLRequest, path: String) async throws(DaemonRequestError) -> Data {
         let data: Data
         let response: URLResponse
+        Traffic.shared.requested(sending: request.httpBody?.count ?? 0)
         do {
             (data, response) = try await session.data(for: request)
         } catch let error as URLError {
@@ -67,6 +68,7 @@ public struct DaemonAPI: Sendable {
         guard let http: HTTPURLResponse = response as? HTTPURLResponse else {
             throw .transport(path: path, underlying: URLError(.badServerResponse))
         }
+        Traffic.shared.received(data.count)
         guard (200..<300).contains(http.statusCode) else {
             throw .status(path: path, code: http.statusCode, body: String(decoding: data, as: UTF8.self))
         }

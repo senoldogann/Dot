@@ -23,7 +23,17 @@ read as words with Dot's mark. A new chat opens as soon as its first message is 
 key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
 once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
-(the app's model publishes the store's snapshot by part, at most 30 times a second; item 1848). A step's thinking is
+(the app's model publishes the store's snapshot by part, at most 15 times a second; items 1848 and 1926).
+
+What a run costs the phone (item 1926): the daemon sends a model's words joined, about twelve frames a second; the app
+draws at most 15 pictures a second; a running tool's shimmer draws 30 frames a second while its band moves and none while
+it rests; in the background nothing streams (the supervisor ends every stream and the outbox's sending) and back in front
+each stream opens again from its cursors, a chat catching up with one read of its view; Activity reads again when the
+list's stream tells a run, an ask or a draft moved, not on a timer, and Connect apps reads every five seconds only while
+a service waits on the Mac. A photo goes at most 1,600 px on its long side and a screenshot is decoded to that size
+(`Data/ImageSizing.swift`). The app's own performance record (`Data/PerfReporter.swift`: MetricKit's daily measures and
+diagnostics' counts, and the app's counters of each time it was open, `App/PerfCounters.swift`) goes to the paired Mac
+alone (`POST /api/phone/metrics`, sent when the app opens) and Settings › Maintenance shows its last seven days. A step's thinking is
 one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
 helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
 no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
@@ -199,7 +209,10 @@ to `Library/Caches/dotnext-latency.txt`. `ios/Next/scripts/e2e_streaming.sh <udi
 runs `StreamingLiveUITests` on such a daemon: a new chat stays open when its first message is sent, and the
 `stream:` script (four steps that think aloud and read a file, then a long answer, about 40 words a second) is measured
 by the debug frame meter (`-DotNextFrameMeter 1`: frames, hitches, frames over 16.7 ms, hitch time per second, one line
-per run in `Library/Caches/dotnext-frames.txt`).
+per run in `Library/Caches/dotnext-frames.txt`), and by the phase meter (`App/PerfCounters.swift`): one line per stretch
+of the chat open, the home and the background (`StreamingLiveUITests.testAStreamingRunCostsLittleUnseen`) with the
+process's CPU milliseconds and wakeups a second (the kernel's `TASK_POWER_INFO`), the pictures published and the reveal's
+steps a second and the bytes read and sent a minute, in `Library/Caches/dotnext-phases.txt`.
 
 ## A chat's message actions and the inspector, end to end
 
