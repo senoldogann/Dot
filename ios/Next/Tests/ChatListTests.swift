@@ -15,6 +15,13 @@ final class ChatListTests: XCTestCase {
         return try JSONDecoder().decode(ThreadRow.self, from: Data(json.utf8))
     }
 
+    /// Item 1914: words half-written to a new chat with one bot never open in a new chat with another.
+    @MainActor func testEachBotKeepsItsOwnNewChatDraft() {
+        XCTAssertEqual(AppModel.newChatDraft(agent: nil), AppModel.newChatDraft, "Dot's is the draft a reset fills")
+        XCTAssertNotEqual(AppModel.newChatDraft(agent: "agt_scout"), AppModel.newChatDraft(agent: nil))
+        XCTAssertNotEqual(AppModel.newChatDraft(agent: "agt_scout"), AppModel.newChatDraft(agent: "agt_writer"))
+    }
+
     func testAPinnedChatStaysUnderPinnedWhateverItsState() throws {
         let waiting: ThreadRow = try row("a", status: "blocked", asks: 1, pinned: true, actor: nil)
         let working: ThreadRow = try row("b", status: "running", asks: 0, pinned: false, actor: nil)
