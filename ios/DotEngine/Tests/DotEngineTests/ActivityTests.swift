@@ -88,7 +88,16 @@ final class ActivityTests: XCTestCase {
         ActivityDaemon.answer("PATCH /api/watchers/\(landlord.id)", 200, watcher)
         _ = try await api().changeWatcher(landlord.id, landlord.request(enabled: false))
         let sent: WatcherRequest = try JSONDecoder().decode(WatcherRequest.self, from: XCTUnwrap(ActivityDaemon.seen.last?.body))
-        XCTAssertEqual(sent, WatcherRequest(name: "Landlord", kind: "mail", enabled: false, account: "me@example.com", words: "my landlord", minutes: 5, action: "tell", goal: ""))
+        XCTAssertEqual(sent, WatcherRequest(name: "Landlord", kind: "mail", enabled: false, account: "me@example.com", words: "my landlord", minutes: 5, action: "tell", goal: "", check: ""))
+    }
+
+    func testACheckWatcherKeepsItsCheckWhenItIsSwitched() throws {
+        let json: String = #"{"id":"w_c","name":"Disk","kind":"check","enabled":true,"account":"","words":"","minutes":15,"action":"tell","goal":"","check":"disk.sh","looked_at":null,"next_look_at":null,"error":null,"last":"","told":0}"#
+        let watcher: WatcherView = try JSONDecoder().decode(WatcherView.self, from: Data(json.utf8))
+        XCTAssertEqual(watcher.request(enabled: false).check, "disk.sh", "the route refuses a check watcher without its check")
+        let older: String = #"{"id":"w_m","name":"Mail","kind":"mail","enabled":true,"account":"a@b.c","words":"x","minutes":5,"action":"tell","goal":"","looked_at":null,"next_look_at":null,"error":null,"last":"","told":0}"#
+        let mail: WatcherView = try JSONDecoder().decode(WatcherView.self, from: Data(older.utf8))
+        XCTAssertEqual(mail.request(enabled: true).check, "", "a view without the field (an older daemon) sends none")
     }
 
     func testTheSelfImprovementProposalsAreTheNewAndTriedVersions() async throws {

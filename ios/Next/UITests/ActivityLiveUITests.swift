@@ -149,7 +149,7 @@ final class ActivityLiveUITests: XCTestCase {
         row(app, "Re: The March invoice").tap()
         let discard: XCUIElement = app.buttons["Discard"]
         XCTAssertTrue(discard.waitForExistence(timeout: 10))
-        // On a small phone the sheet opens at its middle height with Discard under the fold: drawn up first.
+        // The sheet opens large, but on a small phone Discard can still sit under the fold: drawn up first.
         reveal(app, discard)
         discard.tap()
         app.sheets["Discard this draft?"].buttons["Discard"].tap()
