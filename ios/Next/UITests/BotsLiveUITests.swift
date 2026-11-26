@@ -115,6 +115,36 @@ final class BotsLiveUITests: XCTestCase {
         sleep(3)
         shot(app, "bot-chat")
 
+        // New chat in the menu opens like a chat (item 1916): pushed under the same header with a back button and no ✕, the
+        // bot's face and name centred above the composer; its first message goes to the bot, in the same screen.
+        app.buttons["More"].tap()
+        app.buttons["New chat"].tap()
+        let greeting: XCUIElement = app.descendants(matching: .any)["newChat.greeting"]
+        XCTAssertTrue(greeting.waitForExistence(timeout: 10), "the bot's face and name in its empty chat")
+        XCTAssertFalse(app.buttons["Close"].exists, "a pushed chat, not a sheet with a ✕")
+        let bar: XCUIElement = app.navigationBars.firstMatch
+        XCTAssertTrue(app.buttons["Scout"].exists, "the bot's pill stays in the header")
+        XCTAssertTrue(app.buttons["More"].isHittable, "and its ⋯ menu")
+        let newField: XCUIElement = app.descendants(matching: .any)["composer.field"]
+        XCTAssertTrue(newField.waitForExistence(timeout: 10))
+        XCTAssertEqual(greeting.frame.midX, app.windows.firstMatch.frame.midX, accuracy: 1, "centred across")
+        let above: CGFloat = greeting.frame.minY - bar.frame.maxY
+        let below: CGFloat = newField.frame.minY - greeting.frame.maxY
+        XCTAssertGreaterThan(above, 0)
+        XCTAssertGreaterThan(below, 0)
+        // The composer's own padding lies between the field and the space the greeting is centred in.
+        XCTAssertEqual(above, below, accuracy: 60, "centred down: \(above) above, \(below) below")
+        shot(app, "bot-new-chat")
+        // The push may still be settling: tap once it can take the tap, again if the keyboard did not come.
+        XCTAssertTrue(NSPredicate(format: "isHittable == true").evaluate(with: newField) || newField.waitForExistence(timeout: 5))
+        newField.tap()
+        if !app.keyboards.firstMatch.waitForExistence(timeout: 5) { newField.tap() }
+        newField.typeText("Hello from a new chat")
+        app.buttons["composer.send"].tap()
+        XCTAssertTrue(app.staticTexts["Hello from a new chat"].waitForExistence(timeout: 20), "the first message opens the chat in place")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(pill.waitForExistence(timeout: 10), "back to the bot's earlier chat")
+
         app.buttons["More"].tap()
         XCTAssertTrue(app.buttons["Find in chat"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Share as template…"].exists)

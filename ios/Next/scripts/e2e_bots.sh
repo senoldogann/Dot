@@ -46,4 +46,7 @@ curl -fsS -H "$main" "$base/api/agents" | check "the bot Scout was made with its
     'any(a["record"]["name"] == "Scout" and a["record"]["role"].startswith("Watch the market") for a in d)'
 curl -fsS -H "$main" "$base/api/threads?limit=20" | check "Scout's first meeting has a chat" \
     'any(t["title"] == "Scout" for t in d)'
+# The new chat of the bot's menu carries the bot: its first message is a run of Scout's own.
+curl -fsS -H "$main" "$base/api/runs?limit=20" | check "the new chat's first message went to Scout" \
+    'any(r["goal"] == "Hello from a new chat" and r["agent_id"] is not None for r in d)'
 exit $fail

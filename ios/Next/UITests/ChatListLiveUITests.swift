@@ -33,7 +33,7 @@ final class ChatListLiveUITests: XCTestCase {
         let label: String = ProcessInfo.processInfo.environment["DOTNEXT_E2E_MODEL"] ?? ""
         XCTAssertTrue(app.buttons["chats.new"].waitForExistence(timeout: 20))
         app.buttons["chats.new"].tap()
-        let chip: XCUIElement = app.buttons["newChat.model"]
+        let chip: XCUIElement = app.buttons["composer.model"]
         XCTAssertTrue(chip.waitForExistence(timeout: 10))
         chip.tap()
         XCTAssertTrue(app.navigationBars["Chat settings"].waitForExistence(timeout: 10))
