@@ -86,7 +86,9 @@ struct LiveFollowModifier: ViewModifier {
     @State private var drag: CGSize = .zero
 
     func body(content: Content) -> some View {
-        let current: LiveRunFacts? = liveRunFacts(model.chats[thread])
+        // Only with a daemon to read the picture from: a chat drawn from a fixture (no daemon) shows no player that would
+        // wait forever.
+        let current: LiveRunFacts? = model.settingsAPI == nil ? nil : liveRunFacts(model.chats[thread])
         return content
             .overlay(alignment: leading ? .topLeading : .topTrailing) {
                 if let follow, current != nil, !fullScreen {
@@ -194,6 +196,8 @@ struct PictureHost: UIViewRepresentable {
         host.backgroundColor = .black
         host.clipsToBounds = true
         host.isUserInteractionEnabled = false
+        // The picture changes with every frame: kept out of the accessibility tree, which the player's own label names.
+        host.accessibilityElementsHidden = true
         return host
     }
 

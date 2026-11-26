@@ -73,19 +73,15 @@ func actionSymbol(_ kind: LiveAction.Kind) -> String {
 
 // MARK: Pieces
 
-/// The pulsing dot of a live picture (ink on the dark chrome; never red, which is a failure's, D5).
+/// The dot of a live picture: full ink while frames come, faint otherwise (never red, which is a failure's, D5). It does
+/// not pulse: an animation that never ends keeps the app from ever being idle, for VoiceOver's focus and for UI tests.
 struct LiveDot: View {
     let live: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion: Bool
-    @State private var pulse: Bool = false
 
     var body: some View {
         Circle()
             .fill(live ? Color.white : Color.white.opacity(0.4))
             .frame(width: 7, height: 7)
-            .opacity(live && pulse && !reduceMotion ? 0.35 : 1)
-            .animation(live && !reduceMotion ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : nil, value: pulse)
-            .onAppear { pulse = true }
             .accessibilityHidden(true)
     }
 }
