@@ -255,6 +255,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import agent_folder
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, truncate_middle
+from dotagent.core.together import await_together
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.harness.components import GivenText
 from dotagent.harness.seat import TRIAL_EVENT, text_for_run
@@ -334,7 +335,7 @@ from dotagent.store.models import (
     TeamRecord,
     ThreadRecord,
 )
-from dotagent.store.stats import ACT_TOOLS
+from dotagent.store.stats import ACT_TOOLS, ModelProfile
 from dotagent.terminal.session import TerminalSession, ended_notices
 from dotagent.tools.browser import withheld_vault_tools
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
@@ -2662,6 +2663,76 @@ async def _to_standby(
 
 
 @dataclass(frozen=True)
+class StartReads:
+    """What a run reads as it starts that does not depend on the rest (item 1918): the model's profile, its agent and
+    the other agents, the accounts signed in, the skills offered, the query its notes are chosen by and the notes
+    recalled by it, when a model last answered in its chat, the secrets Dot holds and the harness's texts."""
+
+    profile: ModelProfile
+    agent_record: AgentRecord | None
+    agents: tuple[AgentRecord, ...]
+    signed_in: tuple[Account, ...]
+    skills: SkillCatalog
+    query: str
+    recalled: Remembered
+    last_called: float | None
+    held: tuple[str, ...]
+    harness: GivenText
+
+
+async def _query_and_notes(runtime: Runtime, run: RunRecord, budget: int) -> tuple[str, Remembered]:
+    """The query ``run``'s notes are chosen by (:func:`goal_query`) and the notes it starts with
+    (:func:`start_notes`)."""
+    query: str = await goal_query(runtime, run)
+    return query, await start_notes(runtime, run, query, budget)
+
+
+async def _held_and_harness(runtime: Runtime, run: RunRecord) -> tuple[tuple[str, ...], GivenText]:
+    """The secrets Dot holds as ``run`` starts (``filled`` false, item 621) and the harness's texts masked by them."""
+    held: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
+    return held, await run_harness_text(runtime, run, held)
+
+
+async def start_reads(runtime: Runtime, run: RunRecord, model: str, notes_budget: int) -> StartReads:
+    """The :class:`StartReads` of ``run`` on ``model`` (a label), read at once (item 1918): one after the other they
+    took seconds before the run's first model call (the model's profile over its newest runs' events, the skills'
+    files, the notes' recall with its embedding), and none of them needs another. The first that fails stops the
+    others and is raised as it was."""
+    profile: asyncio.Task[ModelProfile] = asyncio.ensure_future(runtime.store.model_profile(model, PROFILE_RUNS))
+    agent_record: asyncio.Task[AgentRecord | None] = asyncio.ensure_future(
+        _no_agent() if run.agent_id is None else runtime.store.get_agent(run.agent_id)
+    )
+    agents: asyncio.Task[list[AgentRecord]] = asyncio.ensure_future(runtime.store.list_agents())
+    signed_in: asyncio.Task[list[Account]] = asyncio.ensure_future(runtime.accounts.accounts())
+    skills: asyncio.Task[SkillCatalog] = asyncio.ensure_future(run_skills(runtime, run))
+    notes: asyncio.Task[tuple[str, Remembered]] = asyncio.ensure_future(_query_and_notes(runtime, run, notes_budget))
+    last_called: asyncio.Task[float | None] = asyncio.ensure_future(
+        runtime.store.thread_last_call_at(run.thread_id, run.id)
+    )
+    harness: asyncio.Task[tuple[tuple[str, ...], GivenText]] = asyncio.ensure_future(_held_and_harness(runtime, run))
+    await await_together([profile, agent_record, agents, signed_in, skills, notes, last_called, harness])
+    query, recalled = notes.result()
+    held, harness_text = harness.result()
+    return StartReads(
+        profile=profile.result(),
+        agent_record=agent_record.result(),
+        agents=tuple(agents.result()),
+        signed_in=tuple(signed_in.result()),
+        skills=skills.result(),
+        query=query,
+        recalled=recalled,
+        last_called=last_called.result(),
+        held=held,
+        harness=harness_text,
+    )
+
+
+async def _no_agent() -> AgentRecord | None:
+    """The agent record of a run of Dot's own: none."""
+    return None
+
+
+@dataclass(frozen=True)
 class _HeldTools:
     """The tools of a run that a model's window holds, when it holds only some of them (items 1211 and 1282), and what
     is built from them: the groups, whether they are offered by group, the registry the run calls, whether it may
@@ -2860,9 +2931,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     info: ModelInfo = await runtime.router.model_info(ref)
     if not info.tools and run.mode != "chat":
         raise ConfigError("the selected model cannot call tools", {"model": ref.label, "mode": run.mode})
-    scaffold: Scaffold = scaffold_for(
-        config, info, await runtime.store.model_profile(ref.label, PROFILE_RUNS), runtime.context_sizes.of(ref.label)
-    )
+    notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
+    # When the run's notes were read: a note changed after it comes to the run while it works.
+    memory_seen_at: float = time.time()
+    # What the start reads that needs nothing else, read at once (item 1918).
+    reads: StartReads = await start_reads(runtime, run, ref.label, notes_budget)
+    scaffold: Scaffold = scaffold_for(config, info, reads.profile, runtime.context_sizes.of(ref.label))
     surface, surface_reason = surface_for(config, scaffold)
     specs: tuple[ToolSpec, ...] = specs_for_mode(runtime.registry, run.mode) if info.tools else ()
     if run.parent_run_id is not None:
@@ -2874,11 +2948,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = chatless_specs(specs)
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, the core tools in any case, and the
     # MCP servers the owner opened to it (item 415): the ones picked for its message or an earlier one of its chat.
-    agent_record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
+    agent_record: AgentRecord | None = reads.agent_record
     # The team (item 87): the other agents, whom the run may message.
-    team: tuple[AgentRecord, ...] = tuple(
-        member for member in await runtime.store.list_agents() if member.id != run.agent_id
-    )
+    team: tuple[AgentRecord, ...] = tuple(member for member in reads.agents if member.id != run.agent_id)
     if agent_record is not None and agent_record.tools:
         agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
         picked_before: frozenset[str] = await runtime.store.picked_servers(run.thread_id, PICKS_EVENT)
@@ -2889,8 +2961,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # (item 664): its 👍 would stand on words they never wrote.
     if run.parent_run_id is not None or run.source in _UNASKED_SOURCES:
         specs = tuple(spec for spec in specs if spec.name != REACT_TOOL)
-    signed_in: list[Account] = await runtime.accounts.accounts()
-    skills: SkillCatalog = await run_skills(runtime, run)
+    signed_in: list[Account] = list(reads.signed_in)
+    skills: SkillCatalog = reads.skills
     # The helpers that can answer as the run starts, besides its own model; only for a run with a tool that uses them.
     uses_helpers: bool = any(spec.name in (CONSULT_TOOL, DELEGATE_TOOL) for spec in specs)
     helpers: tuple[str, ...] = await run_helpers(runtime, ref.label) if uses_helpers else ()
@@ -2908,24 +2980,22 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if not grouped:
         specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
     callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
-    memory_seen_at: float = time.time()
     # The tags of the sites the run reached so far (item 308): the first time it reaches one, it is handed what was
     # learned there.
     sites_seen: set[str] = set()
     # The last note about the other runs at work (item 301); empty while there were none.
     peers_said: str = ""
-    notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
-    query: str = await goal_query(runtime, run)
+    query: str = reads.query
     # How long the run's cache is written for (item 1742): an hour for a chat that comes back at the pace of a schedule
     # or a watcher, which the provider's five minutes lose.
-    last_called: float | None = await runtime.store.thread_last_call_at(run.thread_id, run.id)
+    last_called: float | None = reads.last_called
     cache_ttl: CacheTtl = cache_ttl_for(None if last_called is None else time.time() - last_called)
-    recalled: Remembered = await start_notes(runtime, run, query, notes_budget)
+    recalled: Remembered = reads.recalled
     # The secrets Dot holds, which the texts a prompt takes from what Dot learned are asked for again, as when they
     # were written (item 587). A gate refuses by a value, so the values filled into a page are not among them (item
     # 621); a text that holds one reaches the prompt with it masked (``given_text``, ``owner_prompt_lines``).
-    held_at_start: tuple[str, ...] = await asyncio.to_thread(known_secrets, filled=False)
-    harness_text: GivenText = await run_harness_text(runtime, run, held_at_start)
+    held_at_start: tuple[str, ...] = reads.held
+    harness_text: GivenText = reads.harness
     remembered: tuple[MemoryRecord, ...] = recalled.records
     await count_start_notes(runtime, run, recalled, memory_seen_at)
     prompt_facts: PromptFacts = await gather_prompt_facts(

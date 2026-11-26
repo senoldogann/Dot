@@ -538,6 +538,9 @@ struct BotNewChat: View {
 
     private var bot: Bot? { model.bots.first { $0.id == botId } }
 
+    /// The agent the chat is with (`nil`: Dot), which also keys the draft.
+    private var agent: String? { botId == dotAgentId ? nil : botId }
+
     private var chip: ModelChoice? {
         guard let ref = effectiveModel(settings.choices, defaultRef: model.chatDefaults?.model) else { return nil }
         return ModelChoice(ref: ref, label: model.modelLabel(ref), effort: settings.choices.effort)
@@ -578,8 +581,8 @@ struct BotNewChat: View {
         .toolbar { if let botChat { BotHeader(chat: botChat, subtitle: nil, find: nil, library: nil) } }
         .task { await model.loadModels() }
         // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
-        .onAppear { text = model.draft(of: AppModel.newChatDraft) }
-        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft) }
+        .onAppear { text = model.draft(of: AppModel.newChatDraft(agent: agent)) }
+        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft(agent: agent)) }
         .sheet(isPresented: $choosing) {
             ChatSettingsSheet(
                 initial: settings, providers: model.models, defaults: model.chatDefaults, problem: model.modelsProblem,
@@ -614,11 +617,10 @@ struct BotNewChat: View {
         guard !words.isEmpty else { return }
         let photos: [Data] = attachments.map(\.jpeg)
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
-        let agent: String? = botId == dotAgentId ? nil : botId
         Task {
             if let key = await model.startChat(words, photos: photos, start: start, agent: agent) {
                 notKept = false
-                model.keep(draft: "", of: AppModel.newChatDraft)
+                model.keep(draft: "", of: AppModel.newChatDraft(agent: agent))
                 opened(key)
             } else {
                 notKept = true

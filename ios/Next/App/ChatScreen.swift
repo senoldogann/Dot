@@ -198,12 +198,19 @@ struct ChatScreen: View {
                     // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
                     .onAppear { reading.topVisible = block.id }
                 }
+                if startingSince != nil {
+                    // The message went out and no run has started yet: motion at once, replaced in place by the run's
+                    // own line (item 1919). Nothing more is claimed than that it starts.
+                    StartingLine()
+                }
                 if let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
                     if !stopping, case .tool(let step)? = activity(of: chat, run: run.id), let waiting = waitingWords(step) {
                         // While the run waits on something, one quiet line says on what in every mode (item 1909); Stop
                         // is the pill's, so the line offers only Details.
                         WaitingLine(words: waiting, details: { panel = .inspector })
-                    } else if linesTheWork {
+                    } else if linesTheWork || now == .queued || now == .typing {
+                        // With the steps shown too, while the run has no row to show yet (it waits to start, or its model
+                        // has not answered), the line moves so the chat never stands still (item 1919).
                         WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                     }
                 }
@@ -357,7 +364,7 @@ struct ChatScreen: View {
             FloatingWorkingControl(
                 summary: WorkingSummary(
                     status: capsuleStatus, activity: activityWords,
-                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } : nil, queued: view?.queue.messages.count ?? 0,
+                    since: activityWords == nil ? activeRun.map { Date(timeIntervalSince1970: $0.createdAt) } ?? startingSince : nil, queued: view?.queue.messages.count ?? 0,
                     helpersDone: newestRunHelpers.filter { !helperState($0.status).isLive }.count, helpersTotal: newestRunHelpers.count,
                     plan: newestPlan(items).map(PlanProgress.init(steps:)), canStop: activeRun != nil && !stopping),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector },
@@ -406,7 +413,19 @@ struct ChatScreen: View {
         .padding(.bottom, Space.xs)
     }
 
+    /// When the owner's newest message went out, while it has not started a run yet (item 1919): the stream and the pill
+    /// move at once instead of waiting 10-15 s for the run's first event. `nil` once a run works, while the message only
+    /// waits for the link or behind a held queue, and when it was refused (its bubble says why).
+    private var startingSince: Date? {
+        guard activeRun == nil, let newest = model.pending(in: thread).last else { return nil }
+        switch newest.delivery {
+        case .sending, .delivered, .queued: return Date(timeIntervalSince1970: newest.at)
+        default: return nil
+        }
+    }
+
     private var capsuleStatus: ChatStatus? {
+        if startingSince != nil { return .working }
         if stopping, activeRun != nil { return nil }
         switch phase {
         case .working: return .working
