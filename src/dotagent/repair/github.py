@@ -674,8 +674,9 @@ async def review_on_main(repo: Path, env: Mapping[str, str]) -> str:
 
 async def next_item(repo: Path, python: str, env: Mapping[str, str]) -> int:
     """The next free item number of the repository at ``repo``, by its own ``scripts/next_item.py`` run with Dot's
-    sign-in to GitHub (it reads the open pull requests and pushed branches): a session has no way to GitHub, so it is
-    given its number (the eleventh review of item 921). Raises :class:`RepairError` when none can be told."""
+    sign-in to GitHub (it reads pull requests, branches and worktrees, and reserves what it gives, so each call spends a
+    number: item 1891): a session has no way to GitHub, so it is given its number (the eleventh review of item 921).
+    Raises :class:`RepairError` when none can be told."""
     return (await next_items(repo, python, 1, env))[0]
 
 
