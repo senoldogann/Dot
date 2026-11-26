@@ -122,7 +122,9 @@ final class ChatUITests: XCTestCase {
         XCTAssertEqual(people.label, "Helpers, 1 of 2 done")
         people.tap()
         XCTAssertTrue(app.navigationBars["Agents"].waitForExistence(timeout: 5))
-        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Check the dentist")).firstMatch
+        // The sheet's row (it names the helper's model), not the helper's row in the work log under the sheet (item
+        // 1909), which no tap reaches.
+        let row: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "Check the dentist", "Opus")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertTrue(row.label.contains("Working"), row.label)
         XCTAssertFalse(row.label.contains("browser_open"), "no raw tool name: \(row.label)")
@@ -143,7 +145,8 @@ final class ChatUITests: XCTestCase {
         XCTAssertTrue(line.waitForExistence(timeout: 10))
         XCTAssertEqual(line.label, "Waiting for you")
         XCTAssertGreaterThanOrEqual(line.frame.height, 44, "the line is a button: a 44 pt tap target (the design bar)")
-        let step: XCUIElement = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Browsed")).firstMatch
+        // The run's calls, one line in plain words since item 1909 ("Started 1 helper and opened 1 page").
+        let step: XCUIElement = app.buttons["tools.group"].firstMatch
         XCTAssertFalse(step.exists, "the steps are hidden")
         line.tap()
         XCTAssertTrue(step.waitForExistence(timeout: 3), "a tap shows the steps")
@@ -215,6 +218,20 @@ final class ChatUITests: XCTestCase {
         shot.name = "work-log"
         shot.lifetime = .keepAlways
         add(shot)
+    }
+
+    /// Item 1932: the asks scene settles: once it stood still for a few seconds, the screen is not drawn again (its
+    /// scroll followed the lazy stack's own height estimates in a loop, at 100 % CPU).
+    func testTheAsksSceneSettles() {
+        let app: XCUIApplication = XCUIApplication()
+        app.launchArguments = ["-DotNextScene", "n2-asks", "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-DotNextRenderMeter", "1"]
+        app.launch()
+        let meter: XCUIElement = app.staticTexts["debug.renders"]
+        XCTAssertTrue(meter.waitForExistence(timeout: 15))
+        sleep(4)
+        let settled: String = meter.label
+        sleep(4)
+        XCTAssertEqual(meter.label, settled, "drawn again with nothing changing: \(settled) -> \(meter.label)")
     }
 
     func testTheDockShowsEachAskInTurnAndFoldsBackToTheComposer() {
