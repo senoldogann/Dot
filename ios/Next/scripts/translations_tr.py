@@ -1562,3 +1562,37 @@ EN_PLURALS.update({"%lld sources": ("%lld source", "%lld sources")})
 
 # "This chat" sheet, plain (item 1922)
 TR.update({"Provider": "Sağlayıcı"})
+
+# Bot profile like Grok's and its edit pages (item 1963).
+TR.update(
+    {
+        "%lld on": "%lld açık",
+        "Amber": "Amber",
+        "Avatar": "Avatar",
+        "Blue": "Mavi",
+        "Brown": "Kahverengi",
+        "Capsule": "Kapsül",
+        "Circle": "Daire",
+        "Cloud": "Bulut",
+        "Colour": "Renk",
+        "Computer": "Bilgisayar",
+        "Configure the bot": "Botu yapılandır",
+        "Count this bot's unread chats and what waits for you on the home. Push alerts follow Settings › Notifications.": "Bu botun okunmamış sohbetleri ve seni bekleyenler ana ekranda sayılır. Anlık bildirimler Ayarlar › Bildirimler'e uyar.",
+        "Cream": "Krem",
+        "Droplet": "Damla",
+        "Edit bot": "Botu düzenle",
+        "Green": "Yeşil",
+        "Grey": "Gri",
+        "Hexagon": "Altıgen",
+        "Idle": "Boşta",
+        "Orange": "Turuncu",
+        "Pebble": "Çakıl",
+        "Pink": "Pembe",
+        "Red": "Kırmızı",
+        "Shape": "Şekil",
+        "Squircle": "Yuvarlak kare",
+        "Teal": "Camgöbeği",
+        "Triangle": "Üçgen",
+        "Violet": "Mor",
+    }
+)
