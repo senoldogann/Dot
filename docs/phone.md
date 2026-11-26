@@ -111,6 +111,12 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
    item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
    the end, item 1923; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
+   item 1912; a new chat's half-written words are kept per bot, item 1914; each row, a bot's and a chat's, says where it
+   stands, strongest first: Needs you in the accent while an approval, a question or a secret waits, Working… shimmering
+   and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
+   what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
+   dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
+   `helpers` and `background` and are read again when a chat's revision moves, item 1920) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in (a file an answer names is a chip of its name and size that opens a
    preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open on Mac, Share and Save

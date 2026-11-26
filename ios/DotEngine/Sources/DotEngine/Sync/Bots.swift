@@ -56,7 +56,7 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
         var held: [ThreadRow] = byBot[record.id] ?? []
         if let home = homes[record.id], !held.contains(where: { $0.summary.id == home.id }) {
             // `GET /api/agents` counts no asks: a home whose run is blocked waits on the owner, as the list says of it.
-            held.append(ThreadRow(summary: home, revision: 0, asks: home.latestStatus == "blocked" ? 1 : 0))
+            held.append(ThreadRow(summary: home, revision: 0, asks: home.latestStatus == "blocked" ? 1 : 0, helpers: nil, background: nil))
         }
         let chats: [ThreadRow] = held.sorted { $0.summary.updatedAt > $1.summary.updatedAt }
         return Bot(record: record, chats: chats, unread: chats.filter { $0.summary.unread && isConversation($0.summary) }.count, asks: chats.reduce(0) { $0 + $1.asks })

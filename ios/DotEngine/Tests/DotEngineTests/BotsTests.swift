@@ -17,7 +17,7 @@ final class BotsTests: XCTestCase {
             summary: ThreadSummary(
                 id: id, title: title, source: "ui", createdAt: updated, updatedAt: updated, pinnedAt: nil, runCount: 1, latestRunId: "r-\(id)",
                 latestStatus: "done", latestCreatedAt: updated, unread: unread, actorId: actor, lastMessage: last, lastRole: "assistant"),
-            revision: 1, asks: asks)
+            revision: 1, asks: asks, helpers: 0, background: [])
     }
 
     private var agents: [AgentSummary] {
@@ -81,7 +81,7 @@ final class BotsTests: XCTestCase {
                 summary: ThreadSummary(
                     id: id, title: id, source: source, createdAt: updated, updatedAt: updated, pinnedAt: nil, runCount: 1, latestRunId: "r-\(id)",
                     latestStatus: "done", latestCreatedAt: updated, unread: unread, actorId: nil, lastMessage: "", lastRole: "assistant"),
-                revision: 1, asks: asks)
+                revision: 1, asks: asks, helpers: 0, background: [])
         }
         let work: [ThreadRow] = [
             chat("review", source: "review", updated: 900, unread: true, asks: 0),

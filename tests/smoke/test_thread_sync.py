@@ -172,6 +172,8 @@ async def test_a_chats_view_holds_its_state_at_a_revision_that_every_writer_move
     listed: dict[str, object] = (await http.get("/api/threads/view")).json()
     (row,) = [one for one in listed["threads"] if one["summary"]["id"] == chat.id]  # type: ignore[attr-defined]
     assert (row["revision"], row["asks"]) == (first, 1)
+    # Its run ended: no run of it waits on the helper, and nothing works in the background yet (item 1920).
+    assert (row["helpers"], row["background"]) == (0, [])
 
     gone: ThreadRecord = await store.create_thread("To delete", "ui")
     async with http.stream("GET", "/api/threads/stream") as stream:
@@ -200,6 +202,10 @@ async def test_a_chats_view_holds_its_state_at_a_revision_that_every_writer_move
             assert view["revision"] == released["revision"]
             assert view["helpers"][0]["blocking"] is False  # type: ignore[index, call-overload]
             assert [(one["kind"], one["id"]) for one in view["background"]] == [("helper", helper.id)]  # type: ignore[attr-defined]
+            listed = (await http.get("/api/threads/view")).json()
+            (row,) = [one for one in listed["threads"] if one["summary"]["id"] == chat.id]  # type: ignore[attr-defined]
+            assert row["helpers"] == 0, "a helper let go is waited on by no run"
+            assert [(one["kind"], one["id"]) for one in row["background"]] == [("helper", helper.id)]
             # The helper's end, in its own chat, moves the parent's chat too.
             await store.finish_run(helper.id, "done", "tests pass")
             ended: dict[str, object] = await _changed(frames, chat.id)
@@ -213,6 +219,24 @@ async def test_a_chats_view_holds_its_state_at_a_revision_that_every_writer_move
             told: dict[str, object] = await _changed(frames, gone.id)
             assert told["deleted"] is True
     assert (await http.get(f"/api/threads/{gone.id}/view")).status_code == 404
+
+
+async def test_a_row_says_how_many_helpers_its_run_waits_on(served: Served) -> None:
+    """Item 1920: a chat whose run works and waits on two helpers says so in the list, a chat at rest reads none."""
+    store: Store = served.runtime.store
+    chat: ThreadRecord = await store.create_thread("Waits", "ui")
+    root: RunRecord = await _run(store, chat.id, None)
+    await store.set_run_status(root.id, "running")
+    for name in ("first", "second"):
+        elsewhere: ThreadRecord = await store.create_thread(f"Helper {name}", "delegate")
+        helper: RunRecord = await _run(store, elsewhere.id, root.id, f"Check the {name} thing.")
+        await store.set_run_status(helper.id, "running")
+    rest: ThreadRecord = await store.create_thread("At rest", "ui")
+    await store.finish_run((await _run(store, rest.id, None)).id, "done", "ok")
+    listed: dict[str, object] = (await served.http.get("/api/threads/view")).json()
+    rows: dict[str, dict[str, object]] = {one["summary"]["id"]: one for one in listed["threads"]}  # type: ignore[attr-defined, index]
+    assert (rows[chat.id]["helpers"], rows[chat.id]["background"]) == (2, [])
+    assert (rows[rest.id]["helpers"], rows[rest.id]["background"]) == (0, [])
 
 
 async def test_a_chats_view_holds_the_drafts_that_still_take_an_answer(served: Served) -> None:
