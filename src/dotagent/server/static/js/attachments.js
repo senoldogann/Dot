@@ -5,6 +5,7 @@ import { api, blobUrl } from "./api.js";
 import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
+import { splitQuote } from "./quotebutton.js";
 import { smallerPicture } from "./shrink.js";
 import { toast } from "./ui.js";
 
@@ -519,7 +520,9 @@ function wordsForFiles(attachments) {
 /** The words a message goes with (item 445): what is in the box, else the line its files are worth, else nothing — an
  * empty send with nothing in it is no message at all. */
 export function messageText(text, attachments) {
-  const words = text.trim();
+  // A quote alone (item 1972) is no message: the words after it decide.
+  const typed = splitQuote(text).words.trim();
+  const words = typed === "" ? "" : text.trim();
   return words === "" && attachments.count() > 0 ? wordsForFiles(attachments) : words;
 }
 

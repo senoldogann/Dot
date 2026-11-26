@@ -38,6 +38,27 @@ export function quoteInto(draft, words) {
   return `${block}\n\n${rest.join("\n")}`;
 }
 
+/**
+ * `text` split into the quote it begins with (its lines without their "> ", `null` when there is none) and the words
+ * after it. A command ("/btw", "/loop") and "is anything typed" are read from the words, not from the quote.
+ * @param {string} text
+ * @returns {{ quote: string | null, words: string }}
+ */
+export function splitQuote(text) {
+  const lines = text.split("\n");
+  const quoted = [];
+  while (lines.length > 0 && lines[0].startsWith(">")) {
+    quoted.push(lines.shift().replace(/^> ?/, ""));
+  }
+  if (quoted.length === 0) {
+    return { quote: null, words: text };
+  }
+  if (lines.length > 0 && lines[0] === "") {
+    lines.shift();
+  }
+  return { quote: quoted.join("\n"), words: lines.join("\n") };
+}
+
 /** The Quote button of a message whose words are `text` (a string, or a function that makes it when pressed). */
 export function quoteButton(text) {
   return el(
