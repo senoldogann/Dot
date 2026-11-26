@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1956](1956.md) | ** done | 2026-11-26 | `search_files` and `find_files` read ripgrep's output up to a cap, as it comes |
 | [1954](1954.md) | ** done | 2026-11-26 | The pre-push review leaves the Claude plan when it is spent or the diff is a security one, reads only what is new, and gives DeepSeek a budget |
 | [1953](1953.md) | ** done | 2026-11-26 | A helper ends at its open pull request, and the checks are watched in the background |
 | [1952](1952.md) | ** done | 2026-11-26 | A schedule's run that only the owner can unblock ends done and waiting, and its next firings skip that part |

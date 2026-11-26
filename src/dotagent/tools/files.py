@@ -22,6 +22,7 @@ from dotagent.core.held import held_folder, open_regular
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.photos import MACOS_IMAGE_SUFFIXES, drawn_by_macos
 from dotagent.core.text import truncate_middle
+from dotagent.core.types import FrozenModel
 from dotagent.office import OfficeKind, names_office_file, office_kind, office_text, unreadable_office_file
 from dotagent.policy.paths import CHANGES_DOT, CHANGES_GIT_CODE, PathClass, classify_path, expand_path, runs_as_git_code
 from dotagent.policy.types import ActionInfo, Flag, Risk
@@ -601,11 +602,43 @@ def _list_dir_tool() -> RegisteredTool:
     )
 
 
-async def run_rg(
-    arguments: list[str], confinement: tuple[str, ...], workspace: Path, env: dict[str, str]
-) -> tuple[int | None, str, str]:
-    """Run ripgrep in ``workspace``, started by ``confinement`` (the words of the run's sandbox, or none); returns
-    ``(exit code, stdout, stderr)``."""
+class RgOutput(FrozenModel):
+    """What ripgrep answered: its exit code, what it printed and what it said of the paths it did not read. ``capped``
+    when it printed more than :data:`_RG_STDOUT_BYTES` and was ended: ``stdout`` then holds whole lines only, the first
+    ones, and ``code`` is 0, as for a search that found matches."""
+
+    code: int | None
+    stdout: str
+    stderr: str
+    capped: bool
+
+
+# The most of ripgrep's output kept (item 1956): a search for a word in a tree that holds it everywhere printed 397 MB
+# to the call, which the tool then decoded and split into 1.8 M lines to show 300 of them: 1.8 GB of the daemon's
+# memory. At about 70 bytes a line this is some 30 000 matches, a hundred times what is shown.
+_RG_STDOUT_BYTES: int = 2 * 1024 * 1024
+# What it says of the paths it did not read is a line each, and only the first few are listed.
+_RG_STDERR_BYTES: int = 256 * 1024
+_RG_CHUNK_BYTES: int = 64 * 1024
+
+
+async def _read_up_to(stream: asyncio.StreamReader, limit: int) -> tuple[bytes, bool]:
+    """What ``stream`` gives, up to ``limit`` bytes, and whether it gave more: the rest is not read."""
+    chunks: list[bytes] = []
+    size: int = 0
+    while True:
+        chunk: bytes = await stream.read(_RG_CHUNK_BYTES)
+        if chunk == b"":
+            return b"".join(chunks), False
+        chunks.append(chunk)
+        size += len(chunk)
+        if size > limit:
+            return b"".join(chunks)[:limit], True
+
+
+async def run_rg(arguments: list[str], confinement: tuple[str, ...], workspace: Path, env: dict[str, str]) -> RgOutput:
+    """Run ripgrep in ``workspace``, started by ``confinement`` (the words of the run's sandbox, or none), and read its
+    output as it comes, no more than :data:`_RG_STDOUT_BYTES` of it: a search that prints more is ended, and says so."""
     executable: str | None = shutil.which("rg", path=env.get("PATH"))
     if executable is None:
         raise ToolExecutionError("ripgrep (rg) is not installed or not on PATH", {"hint": "brew install ripgrep"})
@@ -619,14 +652,41 @@ async def run_rg(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+    if process.stdout is None or process.stderr is None:
+        raise ToolExecutionError("ripgrep was started without its output pipes", {"arguments": " ".join(arguments)})
+    errors: asyncio.Task[tuple[bytes, bool]] = asyncio.create_task(_read_up_to(process.stderr, _RG_STDERR_BYTES))
     try:
-        stdout, stderr = await process.communicate()
+        out, capped = await _read_up_to(process.stdout, _RG_STDOUT_BYTES)
+        if capped:
+            # Enough was read: ripgrep is ended before it finishes walking and printing, which it could not, its
+            # output no longer read.
+            with contextlib.suppress(ProcessLookupError):
+                process.kill()
+        err, _ = await errors
+        await process.wait()
     finally:
+        errors.cancel()
         # A tool timeout or a stopped run cancels the wait, not the search: end it so it stops walking the disk.
         if process.returncode is None:
             with contextlib.suppress(ProcessLookupError):
                 process.kill()
-    return process.returncode, stdout.decode("utf-8", errors="replace"), stderr.decode("utf-8", errors="replace")
+    text: str = out.decode("utf-8", errors="replace")
+    if capped:
+        # Whole lines only: the last one was cut where the cap fell.
+        text = text[: text.rfind("\n") + 1]
+    return RgOutput(
+        code=0 if capped else process.returncode,
+        stdout=text,
+        stderr=err.decode("utf-8", errors="replace"),
+        capped=capped,
+    )
+
+
+def _cut_note(noun: str) -> str:
+    """The line that says a search was ended at the cap of its output (:data:`_RG_STDOUT_BYTES`), so that how many more
+    ``noun`` there are is not known."""
+    mib: int = _RG_STDOUT_BYTES // (1024 * 1024)
+    return f"\n[the search was ended at {mib} MiB of output: more {noun} are not shown, narrow it]"
 
 
 def _capped(lines: list[str], noun: str) -> str:
@@ -687,25 +747,27 @@ def _search_files_tool() -> RegisteredTool:
             options.append("-i")
         if args.glob:
             options.extend(["-g", args.glob])
-        code, stdout, stderr = await run_rg(
+        searched: RgOutput = await run_rg(
             [*options, "-e", args.pattern, "--", str(target_of(args, ctx))],
             run_sandbox(ctx).search,
             ctx.workspace,
             ctx.runtime.shell_env,
         )
+        code, stdout, stderr = searched.code, searched.stdout, searched.stderr
         if code == 1:
             return ok("No matches.")
         lines: list[str] = stdout.splitlines()
+        cut: str = _cut_note("matches") if searched.capped else ""
         unread: list[str] | None = _unread(stderr) if code == _RG_ERROR else None
         found: ToolResult
         if unread is not None:
-            found = ok(_with_unread(_capped(lines, "matches") if stdout.strip() != "" else "No matches.", unread))
+            found = ok(_with_unread(_capped(lines, "matches") + cut if stdout.strip() != "" else "No matches.", unread))
         elif code == _RG_ERROR and _missing(stderr, target_of(args, ctx)):
             raise ToolExecutionError("path does not exist", {"path": str(target_of(args, ctx))})
         elif code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
         else:
-            found = ok(_capped(lines, "matches"))
+            found = ok(_capped(lines, "matches") + cut)
         # A match in a page a crawl kept or an MCP answer kept whole was written by third parties (item 494).
         return mark_untrusted(found) if matches_third_party(lines, target_of(args, ctx), ctx.workspace) else found
 
@@ -734,23 +796,27 @@ def _find_files_tool() -> RegisteredTool:
         return _read_action("find_files", target_of(args, ctx), ctx, "Find files in")
 
     async def run(args: FindFilesArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
-        code, stdout, stderr = await run_rg(
+        searched: RgOutput = await run_rg(
             ["--files", "--hidden", "-g", args.glob, "--", str(target_of(args, ctx))],
             run_sandbox(ctx).search,
             ctx.workspace,
             ctx.runtime.shell_env,
         )
+        code, stdout, stderr = searched.code, searched.stdout, searched.stderr
         if code == 1:
             return ok("No files matched.")
+        cut: str = _cut_note("files") if searched.capped else ""
         unread: list[str] | None = _unread(stderr) if code == _RG_ERROR else None
         if unread is not None:
-            found: str = _capped(sorted(stdout.splitlines()), "files") if stdout.strip() != "" else "No files matched."
+            found: str = (
+                _capped(sorted(stdout.splitlines()), "files") + cut if stdout.strip() != "" else "No files matched."
+            )
             return ok(_with_unread(found, unread))
         if code == _RG_ERROR and _missing(stderr, target_of(args, ctx)):
             raise ToolExecutionError("path does not exist", {"path": str(target_of(args, ctx))})
         if code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "glob": args.glob})
-        return ok(_capped(sorted(stdout.splitlines()), "files"))
+        return ok(_capped(sorted(stdout.splitlines()), "files") + cut)
 
     return make_path_tool(
         name="find_files",

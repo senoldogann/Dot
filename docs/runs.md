@@ -689,7 +689,9 @@ a model on the owner's Mac sent them 17 times in two days, each call refused), `
 `file_text` too (item 1902: Claude models sent that name, the one Anthropic's text editor tool gives it), `search_files` reads its `pattern` as
 `query` too (item 1176: a run on the Claude plan sent that name four times), `search_files` and `find_files` of a
 path that is not there fail with "path does not exist", as `list_dir` and `read_file` do, not as a failure of
-ripgrep's own (item 1283), and a wait or a count asked past its
+ripgrep's own (item 1283), `search_files` and `find_files` show 300 lines and read at most 2 MiB of ripgrep's output as it
+comes, ending the search at that and saying so, so that a word a tree holds everywhere no longer costs the daemon
+the 1.8 GB that 397 MB of matches did (item 1956), and a wait or a count asked past its
 bound is read as the bound (`terminal_send` and `terminal_read`'s `wait_s`, 60 s; `browser_wait_text`'s `timeout_s`,
 60 s; `memory_search`'s `limit`, 20), never a bound that keeps an action safe. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
