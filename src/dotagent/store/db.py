@@ -7687,6 +7687,18 @@ class Store:
         )
         return [_run(row) for row in rows]
 
+    async def schedule_run_marked(self, schedule_id: str, source: str, since: float, mark: str) -> RunRecord | None:
+        """The newest run of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id`` that ended done
+        and began at or after ``since``, whose result holds ``mark``; ``None`` when there is none. One row is read,
+        whatever the schedule fired since (item 1952: the run that waits on the owner)."""
+        rows = await self._all(
+            "SELECT r.* FROM runs r JOIN threads t ON t.id = r.thread_id"
+            " WHERE t.schedule_id = ? AND r.source = ? AND r.parent_run_id IS NULL AND r.status = 'done'"
+            " AND r.created_at >= ? AND instr(r.result, ?) > 0 ORDER BY r.created_at DESC LIMIT 1",
+            (schedule_id, source, since, mark),
+        )
+        return _run(rows[0]) if rows else None
+
     @_writing
     async def keep_schedule_due(self, schedule_id: str, next_run_at: float, fired_at: float) -> None:
         """A one-time firing at ``fired_at`` whose run did not start: due again at ``next_run_at`` and switched on, as

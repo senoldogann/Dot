@@ -123,7 +123,8 @@ A push is reviewed from the newest commit of the branch that was reviewed here, 
 `BLOCK`ed with findings, not from where the branch leaves main (item 1954; a first push that `BLOCK`s never reaches the
 remote, so each round read the whole change again: in a week 319 of 593 reviews, 702 of 1 608 M tokens, were a later one
 in a chat that had one). It does so only while main has not moved under the branch since that commit, and a review that
-gave no verdict counts as read by nobody. The reviewer is told to read only the files the change touches (listed in
+gave no verdict counts as read by nobody, nor does a `BLOCK` that counts no Important finding (the review could not read
+the change or ran out of its budget). The reviewer is told to read only the files the change touches (listed in
 `.git/claude-review/<commit>.paths`) and REVIEW.md, and, after a `BLOCK`, is given that review's file to check that each
 Important finding in it is fixed by the new diff or still stands. A model that is not on the Claude plan is also told
 its budget, 40 tool calls and four fifths of the time left in minutes, and to write its findings and the `VERDICT` line

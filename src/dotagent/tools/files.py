@@ -689,6 +689,9 @@ async def run_rg(arguments: list[str], confinement: tuple[str, ...], workspace: 
     if capped:
         # Whole lines only: the last one was cut where the cap fell.
         text = text[: text.rfind("\n") + 1]
+    if len(err) >= _RG_STDERR_BYTES:
+        # Whole lines only: the last one was cut where the cap fell, and a line `_unread` cannot read fails the search.
+        err = err[: err.rfind(b"\n") + 1]
     said: str = err.decode("utf-8", errors="replace")
     # A search ended at the cap has the exit code of one that found matches, 0, or 2 when it had said something of its
     # paths by then (the ones it did not read), as ripgrep's own would be.

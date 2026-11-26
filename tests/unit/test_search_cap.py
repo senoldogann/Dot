@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.tools import files
-from dotagent.tools.files import RgOutput, _drain_keeping, run_rg
+from dotagent.tools.files import RgOutput, _drain_keeping, _unread, run_rg
 
 pytestmark = pytest.mark.skipif(shutil.which("rg") is None, reason="needs ripgrep")
 
@@ -57,3 +57,31 @@ async def test_what_ripgrep_says_past_the_cap_is_read_and_let_go_so_that_it_neve
     kept: bytes = await asyncio.wait_for(_drain_keeping(stream, 1000), timeout=5)
     assert len(kept) == 1000 and kept.startswith(b"rg: a path")
     assert stream.at_eof() and len(stream._buffer) == 0  # type: ignore[attr-defined]  # whole stream was consumed
+
+
+def _fake_rg(tmp_path: Path) -> Path:
+    """A folder with an `rg` that finds one match and says 9 000 paths were not readable, past the stderr cap."""
+    bin_dir: Path = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake: Path = bin_dir / "rg"
+    fake.write_text(
+        "#!/bin/sh\n"
+        'echo "a.txt:1:needle"\n'
+        'i=0; while [ $i -lt 9000 ]; do echo "rg: /Users/x/Library/path$i: Operation not permitted (os error 1)" >&2; '
+        "i=$((i+1)); done\n"
+        "exit 2\n",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    return bin_dir
+
+
+async def test_a_search_with_more_unreadable_paths_than_the_stderr_cap_still_reports_them_whole(tmp_path: Path) -> None:
+    """The review of item 1956: stderr cut at a byte left a last line `_unread` could not read, and the search failed
+    with "ripgrep failed", dropping its matches."""
+    bin_dir: Path = _fake_rg(tmp_path)
+    found: RgOutput = await run_rg(
+        ["-e", "needle"], (), tmp_path, {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    )
+    assert found.code == 2 and found.stdout.startswith("a.txt")
+    assert _unread(found.stderr) is not None, "a cut line made the unreadable paths unreadable"
