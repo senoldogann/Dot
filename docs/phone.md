@@ -1051,6 +1051,17 @@ broken (the older streams keep 15 s). A client is live once it read the view aft
 daemon tells a moved revision within half a second of the write (it reads the moved revisions every 0.5 s, as it relays
 `dotx` runs). A daemon from before these calls answers them 404: the app says to update Dot on the Mac.
 
+**Which daemon.** A client keeps its copies with the daemon they came from: `GET /api/status` says `version` and
+`store_id`, the id the daemon's database was given the first time it was asked, which a restart and an update keep and
+a reset of Dot (a new, empty home) changes. Revisions are the database's, so a reset one starts them again below what a
+kept copy holds: a client that hears another `store_id` drops its copies, and what it had not sent yet for the old
+chats can reach nothing. DotNext then keeps the unsent messages for the owner, drops its outbox's doings for those chats
+(their photos too), keeps a new chat's first message to send to the new daemon, puts the unsent words (and the old
+chats' drafts) into the new chat's draft, and says once, on the chat list, "Your Mac's Dot was reset; the old chats are
+gone from this phone.", with where the words wait and whether photos were let go. Its outbox sends nothing before it has
+heard the daemon's status in the session, whatever starts the sending; a reset while the app runs is found at the next
+connection, and what was sent to the new daemon meanwhile is refused there, its words kept the same way.
+
 ### What the daemon pushes to the app
 
 Pushes go through APNs to every phone that registered a device (`POST /api/phone/apns`), signed with the key of `[apns]`,

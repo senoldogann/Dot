@@ -277,6 +277,13 @@ struct ChatListView: View {
     private var list: some View {
         // In select mode a tap checks a row and opens nothing.
         List(selection: selecting ? .constant(nil) : $selection) {
+            if model.reset != nil {
+                Notice(tone: .info, message: resetWords, dismiss: { model.resetSeen() })
+                    .listRowBackground(Tone.ground)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: Space.s, leading: Space.gutter, bottom: Space.s, trailing: Space.gutter))
+                    .accessibilityIdentifier("reset-notice")
+            }
             if let line = listLine {
                 Text(line).textRole(.footnote).foregroundStyle(Tone.secondary).listRowBackground(Tone.ground)
             }
@@ -354,6 +361,18 @@ struct ChatListView: View {
                     .accessibilityIdentifier("chats.new")
             }
         }
+    }
+
+    /// What the reset's notice says; where the unsent words went while the new chat's draft holds them.
+    private var resetWords: String {
+        var lines: [String] = [String(localized: "Your Mac's Dot was reset; the old chats are gone from this phone.", comment: "Chat list notice: the Mac's Dot was reset and its old chats left the phone")]
+        if !model.draft(of: AppModel.newChatDraft).isEmpty {
+            lines.append(String(localized: "Your unsent words wait in New chat.", comment: "Chat list notice after a reset: the words that were not sent are the new chat's draft"))
+        }
+        if model.reset?.photosLeft == true {
+            lines.append(String(localized: "Photos of unsent messages were not kept.", comment: "Chat list notice after a reset: the photos of the messages that were not sent are gone"))
+        }
+        return lines.joined(separator: " ")
     }
 
     /// A row, with its check in select mode (a tap checks it there and opens nothing).
@@ -586,6 +605,9 @@ struct NewChatSheet: View {
         .presentationBackground(Tone.ground)
         .tint(Tone.text)
         .task { await model.loadModels() }
+        // The new chat keeps its half-written words like a chat does (and holds those a reset left unsent).
+        .onAppear { text = model.draft(of: AppModel.newChatDraft) }
+        .onChange(of: text) { _, words in model.keep(draft: words, of: AppModel.newChatDraft) }
         .sheet(isPresented: $choosing) {
             ChatSettingsSheet(
                 initial: settings, providers: model.models, defaults: model.chatDefaults, problem: model.modelsProblem,
@@ -603,7 +625,12 @@ struct NewChatSheet: View {
         let photos: [Data] = attachments.map(\.jpeg)
         let start: ChatStart = ChatStart(choices: settings.choices, planFirst: settings.planFirst)
         Task {
-            if let key = await model.startChat(words, photos: photos, start: start) { opened(key) } else { close() }
+            if let key = await model.startChat(words, photos: photos, start: start) {
+                model.keep(draft: "", of: AppModel.newChatDraft)
+                opened(key)
+            } else {
+                close()
+            }
         }
     }
 }

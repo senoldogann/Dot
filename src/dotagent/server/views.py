@@ -2226,6 +2226,9 @@ class RestartPending(FrozenModel):
 
 class StatusView(FrozenModel):
     version: str
+    # The id of the daemon's database (:meth:`dotagent.store.db.Store.store_id`): the same across restarts and updates,
+    # another after a reset; a phone drops its copy of the chats when it changes.
+    store_id: str
     # What the pages the daemon serves are (a digest of their files at its start): a page loaded from other pages is out
     # of date, as after an update of Dot.
     pages: str

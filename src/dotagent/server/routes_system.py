@@ -390,6 +390,7 @@ def system_router(ctx: ServerContext, pages: str, phones: PairedPhones) -> APIRo
         now: float = time.time()
         return StatusView(
             version=__version__,
+            store_id=await ctx.runtime.store.store_id(),
             pages=pages,
             pid=os.getpid(),
             started_at=ctx.started_at,

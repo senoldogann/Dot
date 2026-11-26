@@ -6828,6 +6828,17 @@
         }
       }
     },
+    "Photos of unsent messages were not kept.": {
+      "comment": "Chat list notice after a reset: the photos of the messages that were not sent are gone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilemeyen mesajların fotoğrafları saklanmadı."
+          }
+        }
+      }
+    },
     "Pick a chat on the left, or start a new one.": {
       "comment": "iPad detail column when no chat is selected",
       "localizations": {
@@ -11382,6 +11393,17 @@
         }
       }
     },
+    "Your Mac's Dot was reset; the old chats are gone from this phone.": {
+      "comment": "Chat list notice: the Mac's Dot was reset and its old chats left the phone",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mac'indeki Dot sıfırlandı; eski sohbetler artık bu telefonda yok."
+          }
+        }
+      }
+    },
     "Your Mac's address": {
       "comment": "Pairing screen section: the Mac's address",
       "localizations": {
@@ -11477,6 +11499,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Günde senin görevlerin"
+          }
+        }
+      }
+    },
+    "Your unsent words wait in New chat.": {
+      "comment": "Chat list notice after a reset: the words that were not sent are the new chat's draft",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gönderilemeyen sözlerin Yeni sohbet'te seni bekliyor."
           }
         }
       }

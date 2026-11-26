@@ -13,7 +13,7 @@ public struct Engine: Sendable {
         let store: SyncStore = SyncStore(cache: SyncCache(folder: folder.appending(path: "cache", directoryHint: .isDirectory)), clock: clock)
         let outbox: Outbox = Outbox(
             directory: folder.appending(path: "outbox", directoryHint: .isDirectory), api: api, link: link, clock: clock,
-            policy: .delivery, jitter: jitter, mayStartChat: { await store.listIsLive })
+            policy: .delivery, jitter: jitter, maySend: { action in await store.maySend(action) })
         self.api = api
         self.store = store
         self.outbox = outbox
