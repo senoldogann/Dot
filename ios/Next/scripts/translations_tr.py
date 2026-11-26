@@ -1,7 +1,6 @@
 # ruff: noqa: E501  -- the keys are the English source strings, which cannot be wrapped.
 """Turkish translations of DotNext's String Catalog, merged by `apply_translations.py`.
 
-# W2: the Activity tab (item 1826).
 The owner reads Turkish only: every key of `Resources/Localizable.xcstrings` needs an entry here (the unit test
 `StringCatalogTests` and `check_strings.sh` fail otherwise). Keys are the English source strings, as the compiler
 extracts them (`%@` a text argument, `%lld` a count).
@@ -986,15 +985,6 @@ EN_PLURALS: dict[str, tuple[str, str]] = {
 # Helper S1 (items 1770-1774): Models' code review, Scheduled tasks, Rules, Memory and Agents, native (PLAN §26).
 TR.update(
     {
-        "Looks every %lld minutes": ("Looks every minute", "Looks every %lld minutes"),
-        "Show %lld more": ("Show %lld more", "Show %lld more"),
-        "%lld tasks: %@": ("%lld task: %@", "%lld tasks: %@"),
-        "%lld steps": ("%lld step", "%lld steps"),
-        "%lld tries": ("%lld try", "%lld tries"),
-        "%lld campaign sessions": ("%lld campaign session", "%lld campaign sessions"),
-        "%lld drafts wait for you": ("%lld draft waits for you", "%lld drafts wait for you"),
-        "%lld minutes before an event": ("%lld minute before an event", "%lld minutes before an event"),
-        "%lld decisions made for you (%@)": ("%lld decision made for you (%@)", "%lld decisions made for you (%@)"),
         "A helper of another task": "Başka bir işin yardımcısı",
         "A lesson": "Bir ders",
         "A line may come from content others can write: %@. Read it before you use it.": "Bir satır başkalarının yazabildiği içerikten gelmiş olabilir: %@. Kullanmadan önce oku.",
@@ -1178,6 +1168,7 @@ TR.update(
         "Model": "Model",
         "Default model": "Varsayılan model",
         "Role": "Rol",
+    "Your check": "Kontrolün",
         "All actions": "Tüm eylemler",
         "%lld actions": "%lld eylem",
         "Instructions": "Talimatlar",
@@ -1185,5 +1176,18 @@ TR.update(
         "agent agents helpers chat": "ajan ajanlar yardımcılar sohbet",
     }
 )
+# W2: the Activity tab (item 1826) and Agents: the English plural forms.
 EN_PLURALS.update(
-EN_PLURALS.update({"%lld actions": ("%lld action", "%lld actions")})
+    {
+        "Looks every %lld minutes": ("Looks every minute", "Looks every %lld minutes"),
+        "Show %lld more": ("Show %lld more", "Show %lld more"),
+        "%lld tasks: %@": ("%lld task: %@", "%lld tasks: %@"),
+        "%lld steps": ("%lld step", "%lld steps"),
+        "%lld tries": ("%lld try", "%lld tries"),
+        "%lld campaign sessions": ("%lld campaign session", "%lld campaign sessions"),
+        "%lld drafts wait for you": ("%lld draft waits for you", "%lld drafts wait for you"),
+        "%lld minutes before an event": ("%lld minute before an event", "%lld minutes before an event"),
+        "%lld decisions made for you (%@)": ("%lld decision made for you (%@)", "%lld decisions made for you (%@)"),
+        "%lld actions": ("%lld action", "%lld actions"),
+    }
+)

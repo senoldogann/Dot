@@ -8889,7 +8889,7 @@
       }
     },
     "Stop": {
-      "comment": "Composer and ask dock: stops the run at work",
+      "comment": "Chat toolbar: stops the run at work\nComposer and ask dock: stops the run at work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -11433,6 +11433,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Asistanın · her şeyi yürütür"
+          }
+        }
+      }
+    },
+    "Your check": {
+      "comment": "Watcher kind: a check file of the owner's, run without a model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kontrolün"
           }
         }
       }
