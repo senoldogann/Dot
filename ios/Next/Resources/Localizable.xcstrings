@@ -10381,6 +10381,17 @@
         }
       }
     },
+    "Thought": {
+      "comment": "Work log: a step's thinking, folded",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Düşünce"
+          }
+        }
+      }
+    },
     "Thursday at 15:30 is free at the clinic on Main Street. The clinic asks for a **20 € deposit**, so I stopped before paying; the slot is held for ten minutes on [the booking page](https://clinic.example.invalid/book).": {
       "comment": "Sample content of the placeholder screens and gallery (wave N0); stands for what the daemon will send",
       "localizations": {

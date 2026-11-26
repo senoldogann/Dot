@@ -1000,6 +1000,8 @@ TR: dict[str, str] = {
     'Steer now': 'Şimdi yönlendir',
     'Interrupt what the agent is doing': 'Ajanın yaptığı işin arasına gir',
     'Run after the current turn': 'Bu tur bitince çalışır',
+    # D2: a stored step's thinking, folded to its word (item 1904).
+    'Thought': 'Düşünce',
 }
 
 # English plural forms for keys whose count needs them (Turkish nouns stay singular after a number).
