@@ -7,6 +7,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
+| [1880](1880.md) | done | 2026-11-25 | DotNext puts the run's work in one pill: plain words, Stop, the plan and the helpers; the stream keeps no plan or helper card and folds its thinking |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
 | [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |
