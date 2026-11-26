@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1941](1941.md) | done | 2026-11-26 | A restart whose load launchd refuses tries again with waits that grow |
 | [1940](1940.md) | done | 2026-11-26 | An OpenCode run that hangs ends: a silence watch, and the time limit kept by the clock |
 | [1939](1939.md) | done | 2026-11-26 | A review model whose key is missing no longer crashes a long run |
 | [1938](1938.md) | done | 2026-11-26 | A floor of free space: the owner is told once, and large writes wait |
