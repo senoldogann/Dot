@@ -187,8 +187,10 @@ red `main` is fixed before anything else is merged. The owner's Dot is updated o
 uv run python scripts/main_macos_green.py check   # 0: main's newest commit passed on macOS; 1: it failed; 2: not yet
 ```
 
-It reads that commit's newest runs of `gate.yml` and `ios.yml` (ios.yml only when the push changed `ios/`); a commit
-with no gate run yet is not green. To see a branch's macOS run before its pull request merges, start it by hand:
+It reads that commit's newest runs of `gate.yml` and `ios.yml` (ios.yml only when the push changed `ios/`), and the
+newest finished run of `browser.yml` on main (item 1936: the night's run of the whole browser suite, or one by hand with
+`gh workflow run browser.yml --ref main`; a run still going or cancelled is passed over), so a red night keeps main red
+until a later run of the whole suite passes; a commit with no gate run yet is not green. To see a branch's macOS run before its pull request merges, start it by hand:
 `gh workflow run gate.yml --ref <branch>` (every job) or `gh workflow run ios.yml --ref <branch>`.
 
 The macOS runners are five at most, the most a free account runs
@@ -236,7 +238,8 @@ cached, so a job does not download them when a previous run already did. The bro
 `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the face, in
 Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of the
 gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
-browser.yml --ref <branch>`), on one worker, for hours; a red night is GitHub's to show, and blocks nothing. The phone's
+browser.yml --ref <branch>`), on one worker, for hours; a red night on main opens the issue "main is red on
+macOS" and keeps the owner's Dot from being updated until a later run on main passes (item 1936). The phone's
 test of a network that wakes after the page comes back measures seconds of grace against the runner's clock, which a
 slow runner does not keep, so the core leaves it to the night and to your Mac. A browser test that leans on another
 test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
