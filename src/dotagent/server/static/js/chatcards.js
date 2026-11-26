@@ -5,8 +5,6 @@ import { cardChart } from "./chatcardchart.js";
 import { PAGE_ANSWER_EVENT } from "./pageframe.js";
 import { attempt, toast } from "./ui.js";
 
-export const CHOICE_EVENT = "dot:card-choice";
-
 /** @typedef {{name: string, alt: string}} Media */
 /** @typedef {{kind: "post_draft", platform: string, account: string, text: string, media: Media[]}} PostDraft */
 /** @typedef {{kind: "image_gallery", title: string, images: Media[]}} Gallery */
@@ -119,8 +117,8 @@ function draft(card) {
 /** @param {Choice} card */
 function choice(card) {
   const options = card.options.map((text) => button(text, () => {
-    if (window.dispatchEvent(new CustomEvent(CHOICE_EVENT, { cancelable: true, detail: { text } }))) {
-      toast("error", "Open the chat to send this choice.");
+    if (window.dispatchEvent(new CustomEvent(PAGE_ANSWER_EVENT, { cancelable: true, detail: { text, preserveDraft: true } }))) {
+      toast("error", "Open the chat to use this choice.");
     }
   }));
   return el("section", { class: "chat-card" }, el("h3", null, card.prompt), el("div", { class: "chat-card-actions" }, options));

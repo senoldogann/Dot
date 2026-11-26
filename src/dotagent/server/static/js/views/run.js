@@ -18,7 +18,6 @@ import { createAsksDock } from "../asksdock.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
-import { CHOICE_EVENT } from "../chatcards.js";
 import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createMacScreen } from "../macscreen.js";
@@ -2213,7 +2212,8 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // A choice tapped in a page of the conversation (item 658) is written into the box, for the user to send.
+  // A choice tapped in a page or a card of the conversation (items 658 and 1967) is written into the box, for the user to
+  // send: what a run wrote never goes out as the owner's word on a tap.
   // A delegated run has no box (syncControls): the page is told so rather than filling one nobody sees.
   const onPageAnswer = (/** @type {Event} */ event) => {
     if (frame.element.hidden) {
@@ -2221,38 +2221,13 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     const { text, preserveDraft } = /** @type {CustomEvent<{ text: string, preserveDraft?: boolean }>} */ (event).detail;
     if (preserveDraft === true && input.value !== "") {
-      toast("error", "Finish the message in the composer before preparing a post.");
+      toast("error", "Finish the message in the composer first.");
     } else {
       frame.fill(text);
     }
     event.preventDefault();
   };
   window.addEventListener(PAGE_ANSWER_EVENT, onPageAnswer);
-  const onCardChoice = (/** @type {Event} */ event) => {
-    if (frame.element.hidden) {
-      return;
-    }
-    event.preventDefault();
-    if (sending || input.value !== "" || attachments.ids().length > 0 || queue.editing() !== null || frame.picks.count() > 0) {
-      toast("error", "Finish the message in the composer before sending a choice.");
-      return;
-    }
-    const text = /** @type {CustomEvent<{ text: string }>} */ (event).detail.text;
-    sending = true;
-    send.disabled = true;
-    attempt(async () => {
-      try {
-        const next = await deliver(text, [], false);
-        if (next !== null) {
-          goOn(`/runs/${next}`);
-        }
-      } finally {
-        sending = false;
-        send.disabled = false;
-      }
-    });
-  };
-  window.addEventListener(CHOICE_EVENT, onCardChoice);
   thread.addEventListener("scroll", onScroll, { passive: true });
   // On a phone the chat is one screen while the page is open (item 352, run.css); the frame stays while the chat goes on
   // at its next run, and goes with the page (main.js).
@@ -2476,7 +2451,6 @@ function showRun({ root, ctx, signal, detail, readNow, history, historyProblem, 
     }
     window.removeEventListener("scroll", onScroll);
     window.removeEventListener(PAGE_ANSWER_EVENT, onPageAnswer);
-    window.removeEventListener(CHOICE_EVENT, onCardChoice);
     thread.removeEventListener("scroll", onScroll);
     lessonCuts.disconnect();
     settling.disconnect();

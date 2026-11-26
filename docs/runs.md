@@ -25,8 +25,8 @@ command itself over its output (one that carries more than its command, a workin
 whole); a read wears an eye and a write a sheet of paper, and each says what it did ("Read notes.txt") without its
 tool's name, which a call keeps only where its words do not say what it is (item 506). A page
 the turn's run showed with `show_page` stands where it came, in its frame
-(item 426); the cards it showed with `show_cards` (item 1967) stand there too. That line opens and folds on a click while the run still works and after it ends,
-and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
+(item 426); the cards it showed with `show_cards` (item 1967) stand there too. That line opens and folds on a click while
+the run still works and after it ends, and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
 Appearance › *Fold steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). Settings › Interface › *Work in a chat* (item 663)
 chooses between **Every step** and **What it is doing**, the default since item 830 (a browser that had Dot open before
@@ -865,11 +865,11 @@ showed (item 601, [Browser](browser-and-computer-use.md)).
 `cards_shown` event that the web UI draws live and in history: a post draft (platform, account, text, up to four raster
 images; copy, edit and cancel), a chart (line, bar, area, pie or scatter, with its data table), a table, a choice and an
 image gallery. The call is a `meta` action of no risk, so it asks nothing in any mode. A card is data: it carries no
-markup and no approval, and nothing is sent or published by it. Images are workspace rasters read through a held path
-under the rules of `show_page`'s files and stored with the other images. A choice sends its words as your next message
-at one tap (the words are the run's own, so a run that read untrusted pages can word them; they go through the ordinary
-message path). The phone's app and the channels do not draw cards yet (the system prompt does not ask for them until
-they do); the run's answer must not depend on one.
+markup and no approval, and nothing is sent or published by it. Images are workspace rasters named by a relative path,
+read through a held path under the rules of `show_page`'s files and stored with the other images. A choice, like a
+page's, writes its words into your message box and sends nothing: the words are the run's own, which a run that read
+untrusted pages can word, so only your send makes them your message. The phone's app and the channels do not draw cards
+yet (the system prompt does not ask for them until they do); the run's answer must not depend on one.
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

@@ -131,7 +131,15 @@ async def test_the_daemon_shows_cards_at_desktop_and_phone_widths_and_replays_th
                         await page.reload(wait_until="commit")
                     await _check_cards(page, width, tmp_path)
 
+                # A tap on a choice writes its words into the composer and starts nothing: what a run wrote, a run that
+                # read a hostile page included, never goes out as the owner's word on a tap (item 1967's review).
+                started: list[str] = []
+                page.on("request", lambda request: started.append(request.url) if request.method == "POST" else None)
                 await page.get_by_role("button", name=CHOICE).click()
+                composer: Locator = page.locator('textarea[aria-label^="Message for"]').last
+                await expect(composer).to_have_value(CHOICE)
+                assert page.url.endswith(run_id) and not [url for url in started if url.endswith("/runs")], started
+                await composer.press("Enter")
                 await page.wait_for_url(lambda url: "#/runs/" in url and not url.endswith(run_id), wait_until="commit")
                 next_id: str = page.url.rpartition("/")[2]
                 assert (await _done(runtime, next_id)).goal == CHOICE
