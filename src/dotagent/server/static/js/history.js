@@ -9,7 +9,7 @@ import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
   needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
-import { chatCardRenderer } from "./chatcards.js";
+import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -266,7 +266,7 @@ function drawFlow(past, flow, asked, events, reactions) {
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
-    } else if (event.kind === "post_draft_settled") {
+    } else if (event.kind === POST_DRAFT_SETTLED) {
       richCards.settle(event);
     } else if (event.kind === "cards_shown") {
       batch = null;

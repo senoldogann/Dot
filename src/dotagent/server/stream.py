@@ -93,6 +93,7 @@ _KEEPALIVE_S: float = 15.0
 # and another run streaming its words must not put them off.
 FLUSH_S: float = 0.25
 _FINISHED: str = "run_finished"
+_POST_DRAFT_SETTLED: str = "post_draft_settled"
 _QUEUED: str = "run_queued"
 _PARENT_KEY: str = "parent_run_id"
 
@@ -257,7 +258,7 @@ async def follow_run(ctx: ServerContext, run_id: str, after: int, stored_only: b
             if ends and upto_end and stored_only:
                 # A later publication can settle a draft in a run that already ended. Its card needs that result
                 # when the conversation is reopened, while the live run stream still ends at run_finished.
-                told.extend(event for event in fresh[ends[0] + 1 :] if event.kind == "post_draft_settled")
+                told.extend(event for event in fresh[ends[0] + 1 :] if event.kind == _POST_DRAFT_SETTLED)
             for event in told:
                 sent.add(event)
             return b"".join(encode_event(event) for event in told), bool(ends)

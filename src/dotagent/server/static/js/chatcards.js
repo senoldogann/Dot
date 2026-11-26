@@ -5,6 +5,8 @@ import { cardChart } from "./chatcardchart.js";
 import { PAGE_ANSWER_EVENT } from "./pageframe.js";
 import { attempt, toast } from "./ui.js";
 
+export const POST_DRAFT_SETTLED = "post_draft_settled";
+
 /** @typedef {{name: string, alt: string}} Media */
 /** @typedef {{kind: "post_draft", platform: string, account: string, text: string, media: Media[]}} PostDraft */
 /** @typedef {{kind: "image_gallery", title: string, images: Media[]}} Gallery */
@@ -136,10 +138,18 @@ function draft(card) {
     if (outcome.status === "cancelled") {
       paintCancelled();
     } else {
-      if (platform.toLowerCase() !== "x" || !URL.canParse(outcome.url)) {
+      if (platform.toLowerCase() !== "x") {
         return;
       }
-      const url = new URL(outcome.url);
+      let url;
+      try {
+        url = new URL(outcome.url);
+      } catch (error) {
+        if (error instanceof TypeError) {
+          return;
+        }
+        throw error;
+      }
       if (url.origin !== "https://x.com" || url.username !== "" || url.password !== "" ||
           !/^\/[a-z0-9_]{1,15}\/status\/\d+$/i.test(url.pathname) || url.search !== "" || url.hash !== "") {
         return;

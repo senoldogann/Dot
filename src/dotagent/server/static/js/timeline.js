@@ -20,7 +20,7 @@ import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, besideLine, chatNoteLine, needsAside, outcomeOf, scheduleLine, userMessage } from "./messages.js";
-import { chatCardRenderer } from "./chatcards.js";
+import { chatCardRenderer, POST_DRAFT_SETTLED } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { readsPages } from "./sourcelist.js";
@@ -1546,7 +1546,7 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
       place(scope, sentPicks(record.data), record.ts);
     },
 
-    post_draft_settled(_scope, record) {
+    [POST_DRAFT_SETTLED](_scope, record) {
       richCards.settle(record);
     },
 
