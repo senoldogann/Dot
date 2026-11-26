@@ -483,7 +483,8 @@ the campaign goes on; one that cannot run refuses it and tells the session to wr
 `campaign_achieved` asks the goal checker (the review model) whether the targets
 are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
 evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with
-the checker's reason and the session goes on (one the checker finds out of reach asks you how to go on); accepted, the
+the checker's reason and the session goes on (one the checker finds out of reach asks you how to go on); accepted (the
+checker finds the targets reached, also when it sees a better result in reach, its `improve`, item 1946), the
 campaign is achieved and you are told (the notifications under the web UI and the phone's pushes), as you are when the
 emergency stop, `campaign_max_sessions` or `campaign_failed_sessions` (item 724) stops it.
 - **Only you stop it.** Campaigns, in the sidebar, lists them, and a row has buttons for what you can do to its campaign

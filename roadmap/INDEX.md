@@ -6,6 +6,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1947](1947.md) | done | 2026-11-26 | The review model reads the owner's instructions whole |
+| [1946](1946.md) | done | 2026-11-26 | A goal that is reached is never ended failed for a better result in reach |
+| [1945](1945.md) | done | 2026-11-26 | The shell guard reads a long line in time that grows with its length |
+| [1944](1944.md) | done | 2026-11-26 | The daemon no longer freezes on a path's classification or a log line |
 | [1941](1941.md) | done | 2026-11-26 | A restart whose load launchd refuses tries again with waits that grow |
 | [1940](1940.md) | done | 2026-11-26 | An OpenCode run that hangs ends: a silence watch, and the time limit kept by the clock |
 | [1939](1939.md) | done | 2026-11-26 | A review model whose key is missing no longer crashes a long run |

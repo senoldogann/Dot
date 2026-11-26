@@ -28,7 +28,13 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   question; the run waits for your answer to what the policy raises, on a card that shows what the action acts on whole
   (a long command wraps and scrolls within the box of code every command of a chat is in, whose copy takes it whole).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
-  message you sent to the run: the only authority it recognises), the action (what it acts on and what it runs, a
+  message you sent to the run: the only authority it recognises), whole or not at all (item 1947): the newest whatever
+  its length, then the first and the others, newest first, while together they fit in 60,000 characters. When one does
+  not fit, the step comes to you without asking the model, as what it did not read could forbid it: once your messages
+  to a run pass 60,000 characters together (a long pasted brief and a few more), every step the review model would have
+  answered comes to you for the rest of the run. Only yolo's check of a run that read outside content, which asks
+  nobody, is shown the rest too, the newest twelve of them cut to 1,500 characters from their middle, as every
+  instruction was before. It is given the action (what it acts on and what it runs, a
   page's script, the whole arguments of an MCP call and the whole goal of a schedule: up to 12,000 characters in one
   question, a longer one in overlapping parts of that size, each its own question, of which the strictest answer
   decides, and one longer than eight parts comes to you without asking the model; items 680, 985 and 1251), why
@@ -133,11 +139,13 @@ and addresses the answer names that the run never touched (paths that do not exi
 facts and the answer disagree, the checker goes by the facts. Its verdict is one of:
 
 - `achieved`: the run ends as done.
+- `improve` (item 1946): the goal is reached, and a clearly better result is in reach (a better price, a valuable
+  detail the answer lacks, research that would improve it, item 809). The run is sent back with how, and the same
+  `goal_patience` bounds it; a run whose rounds run out this way ends as done with its answer, since its goal is
+  reached. The checker's words are no instruction of yours: what the run does then is decided by the gate as every
+  step.
 - `continue`: the goal is not reached yet, so the run is sent back to work with the instruction of the checker. A run is
-  sent back at most `goal_patience` times; after that it ends as failed and keeps its answer. The checker also says
-  continue when the goal is reached but a clearly better result is in reach (a better price, a valuable detail the
-  answer lacks, research that would improve it), saying how (item 809); the same `goal_patience` bounds it, and its
-  words are no instruction of yours: what the run does then is decided by the gate as every step.
+  sent back at most `goal_patience` times; after that it ends as failed and keeps its answer.
 - `blocked`: the goal cannot be reached from here (it needs you, a credential or something that does not exist). The run
   ends as failed with its answer and the reason.
 - `scheduled` (item 675): all the run can do now is done, and what is left waits on something only time brings (a reply
@@ -426,7 +434,7 @@ restarted while this task worked.") and Continue.
 
 **Lessons.** With `lessons = "auto"` (the default) or `"propose"` in `[agent]`, a task or research run of its own that
 reached its goal after something went wrong on the way (a call failed, whether the run found its way around it or not;
-the progress watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist; or
+the progress watchdog raised an alert; the goal check sent it back as not reached, not to better a reached goal; its answer named paths that did not exist; or
 it is the follow-up of your 👎 or 🔁 on an earlier run of the chat, whose work you disliked, item 654: such a
 follow-up is asked for its lessons even when it is a chat) is
 followed, once it has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what

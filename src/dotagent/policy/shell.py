@@ -763,7 +763,16 @@ _AWK_PIPE_IN: re.Pattern[str] = re.compile(r"(?:(?:^|(?<=[;{}(\n]))\s*" + _AWK_M
 _AWK_PRINT: re.Pattern[str] = re.compile(r"(?<![\w$])printf?\b")
 _AWK_TARGET: re.Pattern[str] = re.compile(r"(?:" + _AWK_MARK + r"|\(\s*" + _AWK_MARK + r"\s*\))")
 _AWK_REGEX_AFTER: str = "(,{};!~&|\n?:"
-_SED_FILES: re.Pattern[str] = re.compile(r"(?:^|[;{}!$/0-9])[gpiIemM0-9]*\s*([wWrR])\s+([^\n]+)", re.MULTILINE)
+# sed's ``w``/``W`` (write) and ``r``/``R`` (read) commands and flags, with the file they name: one that starts a
+# line or follows a command's end (``;``, ``{``, ``}``, ``!``), an address (``$``, a digit, a regex's ``/``) or a flag
+# of ``s``. Each match is tried from the left end of its run of flags alone (item 1945; K1-07 of the code review of
+# 2026-11-19): tried from every digit, a 16,000-digit script took seconds on the event loop. Its matches are those of
+# ``(?:^|[;{}!$/0-9])[gpiIemM0-9]*\s*([wWrR])\s+([^\n]+)``, which ``tests/unit/test_shell_guard_linear.py`` compares.
+_SED_FILES: re.Pattern[str] = re.compile(
+    r"(?:^[^\S\n]*|^[gpiIemM0-9]++\s*|[;{}!$/][gpiIemM0-9]*+\s*|(?<![gpiIemM0-9])[gpiIemM]*+[0-9][gpiIemM0-9]*+\s*)"
+    r"([wWrR])\s+([^\n]+)",
+    re.MULTILINE,
+)
 _UNIQ_VALUES: frozenset[str] = frozenset({"-f", "-s", "-w", "--skip-fields", "--skip-chars", "--check-chars"})
 _XXD_VALUES: frozenset[str] = frozenset(
     {"-c", "-g", "-l", "-o", "-s", "-n", "-cols", "-groupsize", "-len", "-seek", "-offset", "-name"}
@@ -2211,27 +2220,25 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     return assigned
 
 
-def _piped(stages: list[list[str]], documents: tuple[str, ...]) -> _Input:
-    """What the last of ``stages`` (one pipeline's commands so far) writes into the pipe, as far as the line shows it:
-    the text an ``echo`` or ``printf`` prints, the paths a listing names (``find``, ``ls``, ``grep -l``), and what a
-    line filter (``sort``, ``grep``, ``head``) passes on of either. Anything else is unknown."""
-    given: _Input = _NO_INPUT
-    for stage in stages:
-        words: list[str] = _plain(_split_redirects(stage, documents)[0])
-        program: str = _program(words[0]) if words else ""
-        command: str = _GNU_NAMES.get(program, program)
-        operands: list[str] = _positional(words[1:])
-        if command in _PRINTERS:
-            given = _given_text(" ".join(operands))
-        elif command in _LISTERS or (command in _SEARCHERS and any(_LIST_SWITCH.fullmatch(w) for w in words[1:])):
-            given = _Input(
-                text=None, paths=tuple(operands) or (".",), walked=tuple(_listed_folders(command, words[1:]))
-            )
-        elif command not in _FILTERS:
-            # A stage it does not know (``cat``, ``awk``, ``tr``) passes on names it cannot read, still those of the
-            # listing it follows; a count or a digest passes none (item 531).
-            given = _NO_INPUT if command in _COUNTERS else _Input(text=None, paths=(_SUBSTITUTED,), walked=given.walked)
-    return given
+def _piped(given: _Input, stage: list[str], documents: tuple[str, ...]) -> _Input:
+    """What ``stage``, a command of a pipeline that is handed ``given`` (what the stages before it write into the pipe,
+    :data:`_NO_INPUT` for the first), writes into the pipe, as far as the line shows it: the text an ``echo`` or
+    ``printf`` prints, the paths a listing names (``find``, ``ls``, ``grep -l``), and what a line filter (``sort``,
+    ``grep``, ``head``) passes on of either. Anything else is unknown. A pipeline is read stage by stage, each once:
+    read again from its first stage for every stage, a long one took seconds (item 1945)."""
+    words: list[str] = _plain(_split_redirects(stage, documents)[0])
+    program: str = _program(words[0]) if words else ""
+    command: str = _GNU_NAMES.get(program, program)
+    operands: list[str] = _positional(words[1:])
+    if command in _PRINTERS:
+        return _given_text(" ".join(operands))
+    if command in _LISTERS or (command in _SEARCHERS and any(_LIST_SWITCH.fullmatch(w) for w in words[1:])):
+        return _Input(text=None, paths=tuple(operands) or (".",), walked=tuple(_listed_folders(command, words[1:])))
+    if command in _FILTERS:
+        return given
+    # A stage it does not know (``cat``, ``awk``, ``tr``) passes on names it cannot read, still those of the listing it
+    # follows; a count or a digest passes none (item 531).
+    return _NO_INPUT if command in _COUNTERS else _Input(text=None, paths=(_SUBSTITUTED,), walked=given.walked)
 
 
 # ---------- judging commands ----------
@@ -2879,17 +2886,19 @@ def _same_file(path: Path, place: Path) -> bool:
     return path == place or str(path).casefold() == str(place).casefold()
 
 
-def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
-    """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and a file
-    the line downloaded or decoded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command
+def _fed_a_download(stage: list[str], piped: Sequence[str], scope: ShellScope) -> list[Finding]:
+    """A finding when ``stage``, a command of a pipeline, is a shell or an interpreter and a file the line downloaded
+    or decoded reaches its standard input: by ``<`` (``sh < y.sh``) or as one of ``piped``, the operands of the commands
     before it in the pipe (``cat y.sh | bash``). That runs the file as naming it does (item 385, item 528). A download
     reached the network and marks the run; a decode did not."""
-    words, _, _, _ = _split_redirects(stages[-1], ())
+    if not scope.downloaded and not scope.decoded:
+        # Nothing to name: the line has fetched and decoded no file, so the pipe's operands are not read (item 1945).
+        return []
+    words, _, _, _ = _split_redirects(stage, ())
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not run or _program(run[0]) not in (_SHELLS | _INTERPRETERS):
         return []
-    redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
-    piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
+    redirected: list[str] = [stage[index + 1] for index, token in enumerate(stage[:-1]) if token == "<"]
     fed: tuple[str, ...] = (*redirected, *piped)
     if any(_names_one(word, scope.downloaded, scope, under=True) for word in fed):
         return [_fetching("high", ("install",), "runs a script the line downloaded, from its standard input")]
@@ -2971,18 +2980,18 @@ def _decoded_writes(words: list[str], targets: list[str], scope: ShellScope) -> 
     return tuple(_located_all(written, scope))
 
 
-def _fed_a_decode(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
-    """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and an
-    earlier command in the pipe decodes its standard input (``base64 -d blob | sh``, ``cat blob | base64 -d | bash``).
-    Decoding a blob and running it hides the code from the guard as a download does, and runs it with the owner's
-    rights the same way, so it is judged as ``curl | sh`` is (item 528)."""
-    words, _, _, _ = _split_redirects(stages[-1], ())
+def _fed_a_decode(stage: list[str], decoded: bool, scope: ShellScope) -> list[Finding]:
+    """A finding when ``stage``, a command of a pipeline, is a shell or an interpreter and an earlier command in the
+    pipe decodes its standard input (``decoded``: ``base64 -d blob | sh``, ``cat blob | base64 -d | bash``). Decoding a
+    blob and running it hides the code from the guard as a download does, and runs it with the owner's rights the same
+    way, so it is judged as ``curl | sh`` is (item 528)."""
+    if not decoded:
+        return []
+    words, _, _, _ = _split_redirects(stage, ())
     run, _ = _run_by_wrappers(_plain(words), scope)
     if not run or _program(run[0]) not in (_SHELLS | _INTERPRETERS):
         return []
-    if any(_decodes(_run_by_wrappers(_plain(stage), scope)[0]) for stage in stages[:-1]):
-        return [_finding("high", ("install",), "runs code it decoded from its standard input")]
-    return []
+    return [_finding("high", ("install",), "runs code it decoded from its standard input")]
 
 
 def _assess_network_fetcher(command: str, args: list[str]) -> Finding:
@@ -3629,10 +3638,10 @@ def _substituted_listing(inner: str, scope: ShellScope) -> list[Finding]:
     tokens: list[str] | None = _tokenize(reading.text)
     if tokens is None:
         return []
-    stages: list[list[str]] = []
+    written: _Input = _NO_INPUT
     for operator, segment in _commands(_without_patterns(tokens)):
-        stages = [*stages, segment] if operator in ("|", "|&") else [segment]
-    if _holds_protected(_piped(stages, reading.documents).walked, scope):
+        written = _piped(written if operator in ("|", "|&") else _NO_INPUT, segment, reading.documents)
+    if _holds_protected(written.walked, scope):
         return [_maybe_protected("hands the files a search lists under a folder that holds a protected location on")]
     return []
 
@@ -4712,13 +4721,22 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
     findings.extend(_clipboard_findings(" ".join(tokens)))
     findings.extend(_vault_findings(" ".join(tokens)))
     state: ShellScope = replace(scope, depth=scope.depth + 1)
-    stages: list[list[str]] = []
+    # What the pipeline's stages before this one write into the pipe, their operands and whether one decodes: each
+    # stage is read once, as it comes, not every stage again for each (item 1945).
+    written: _Input = _NO_INPUT
+    piped: list[str] = []
+    decoded: bool = False
     for operator, segment in _commands(_without_patterns(tokens)):
-        stages = [*stages, segment] if operator in ("|", "|&") else [segment]
-        found, state = _assess_segment(segment, state, _piped(stages[:-1], reading.documents), reading.documents)
+        if operator not in ("|", "|&"):
+            written, piped, decoded = _NO_INPUT, [], False
+        found, state = _assess_segment(segment, state, written, reading.documents)
         findings.extend(found)
-        findings.extend(_fed_a_download(stages, state))
-        findings.extend(_fed_a_decode(stages, state))
+        findings.extend(_fed_a_download(segment, piped, state))
+        findings.extend(_fed_a_decode(segment, decoded, state))
+        written = _piped(written, segment, reading.documents)
+        piped.extend(_positional(_plain(segment)[1:]))
+        # The command the wrappers come to does not depend on where the line is, only the scope it runs in does.
+        decoded = decoded or _decodes(_run_by_wrappers(_plain(segment), state)[0])
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
         findings.extend(_substituted_listing(inner, state))

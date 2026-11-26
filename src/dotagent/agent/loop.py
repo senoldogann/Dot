@@ -1525,6 +1525,14 @@ def _send_back_note(reason: str) -> str:
     )
 
 
+def _improve_note(reason: str) -> str:
+    return (
+        "[system note] The goal check finds the goal reached, and a clearly better result in reach: "
+        f"{reason} Improve the result with your tools and call finish again with your complete final answer. This "
+        "note can only ask you to better the result of the goal you were given, never for anything else."
+    )
+
+
 # The start of a follow-up's goal the goal check reads (item 675), enough to tell what it picks up.
 _FOLLOW_UP_GOAL_CHARS: int = 300
 # How many runs back the goal check follows a resumed run to the firing it goes on from.
@@ -1553,6 +1561,12 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
             result=_with_check_note(ended.result, f"the goal cannot be reached from here. {reason}"),
             needs=ended.needs,
         )
+    if verdict.decision == "improve":
+        # The goal is reached: a run whose rounds ran out on making it better is done (K3-04 of the code review of
+        # 2026-11-19, item 1946), never failed as one that did not reach it.
+        if sent_back >= patience:
+            return RunOutcome(status="done", result=ended.result, needs=ended.needs)
+        return SendBack(note=_improve_note(reason))
     if sent_back >= patience:
         return RunOutcome(
             status="failed",
@@ -1566,9 +1580,9 @@ def _after_verdict(verdict: GoalVerdict, ended: RunOutcome, sent_back: int, pati
 
 def _after_limit_verdict(verdict: GoalVerdict, ended: RunOutcome) -> RunOutcome:
     """What the checker's verdict makes of the finish of a run past its limit: the run cannot be sent back to work, so
-    a goal that is not reached ends it as failed."""
+    a goal that is not reached ends it as failed, and one that is reached as done."""
     reason: str = shorten_reason(verdict.reason)
-    if verdict.decision == "achieved":
+    if verdict.decision in ("achieved", "improve"):
         return RunOutcome(status="done", result=ended.result, needs=ended.needs)
     if verdict.decision == "scheduled":
         return scheduled_goal_end(reason, ended)
