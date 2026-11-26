@@ -4362,17 +4362,6 @@
         }
       }
     },
-    "Effort %@": {
-      "comment": "VoiceOver: the model's reasoning level; the argument is the level",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Efor %@"
-          }
-        }
-      }
-    },
     "Email draft": {
       "comment": "Draft card eyebrow: an email Dot wrote",
       "localizations": {
@@ -6512,7 +6501,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nNew schedule: the model its runs use\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nInspector row: the model and reasoning level of this chat\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -8587,6 +8576,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Önerici"
+          }
+        }
+      }
+    },
+    "Provider": {
+      "comment": "Inspector row: who serves the model",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sağlayıcı"
           }
         }
       }
