@@ -116,31 +116,3 @@ struct QueueSheet: View {
         toast = shown
     }
 }
-
-/// One line of the inspector: a glyph, the title, the value at the trailing edge (a chevron where it opens something).
-struct InspectorRow: View {
-    let title: String
-    let systemImage: String
-    let accessory: RowAccessory
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
-
-    var body: some View {
-        let layout: AnyLayout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xxs)) : AnyLayout(HStackLayout(spacing: Space.s))
-        layout {
-            Label { Text(title).textRole(.body).foregroundStyle(Tone.text) } icon: { Symbol(name: systemImage, context: .row).foregroundStyle(Tone.secondary) }
-            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Space.xs) }
-            switch accessory {
-            case .detail(let text), .detailAndChevron(let text):
-                Text(text).textRole(.body).foregroundStyle(Tone.secondary).tabularNumbers()
-            case .none, .chevron, .web:
-                EmptyView()
-            }
-            if accessory == .chevron || { if case .detailAndChevron = accessory { true } else { false } }() {
-                Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
-            }
-        }
-        .frame(minHeight: Metric.hit)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-    }
-}

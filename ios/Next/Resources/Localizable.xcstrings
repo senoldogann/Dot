@@ -11168,7 +11168,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Giden token"
+            "value": "Giriş token'ı"
           }
         }
       }
@@ -11179,7 +11179,7 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gelen token"
+            "value": "Çıkış token'ı"
           }
         }
       }
