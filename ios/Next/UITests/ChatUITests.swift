@@ -138,38 +138,25 @@ final class ChatUITests: XCTestCase {
         add(sheet)
     }
 
-    /// Backlog LF1: an answer's file is a chip of its name and size that opens a preview sheet with Open on Mac, and
-    /// its links gather in one "2 sources" chip that unfolds into a row per site, each with Copy link on a long press.
-    func testAnAnswersFilesAndLinksOpenInPlace() {
+    /// The owner, 2026-11-26: an answer's links and files show in its words, not listed under it. A GitHub pull
+    /// request reads `#1012` after the GitHub mark, a link keeps the words it was written with, a file is its name
+    /// after its kind's symbol; a tap on the file opens its preview sheet with Open on Mac.
+    func testAnAnswersLinksAndFilesShowInItsWordsAndOpenInPlace() {
         let app: XCUIApplication = launch("n2-chat")
-        let file: XCUIElement = app.buttons["answer.file"].firstMatch
-        let sources: XCUIElement = app.buttons["answer.sources"].firstMatch
-        for _ in 0..<8 where !(file.exists && file.isHittable && sources.exists && sources.isHittable) {
+        let file: XCUIElement = app.links["ci-notes.md"]
+        for _ in 0..<8 where !(file.exists && file.isHittable) {
             app.swipeDown()
         }
-        XCTAssertTrue(file.waitForExistence(timeout: 5) && sources.exists)
-        XCTAssertTrue(file.label.contains("ci-notes.md"), file.label)
-        XCTAssertTrue(file.label.contains("KB"), "the size the Mac said: \(file.label)")
-        XCTAssertTrue(sources.label.contains("2 sources"), sources.label)
-        let measured: String = "file \(file.frame); sources \(sources.frame)"
-        add(XCTAttachment(string: measured))
-        XCTAssertGreaterThanOrEqual(file.frame.height, 44, measured)
-        XCTAssertGreaterThanOrEqual(sources.frame.height, 44, measured)
-        XCTAssertEqual(file.frame.minX, sources.frame.minX, accuracy: 1, "one left edge: \(measured)")
-        sources.tap()
-        let rows: XCUIElementQuery = app.buttons.matching(identifier: "answer.source")
-        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertEqual(rows.count, 2)
-        XCTAssertEqual(rows.element(boundBy: 0).label, "github.com")
-        XCTAssertEqual(rows.element(boundBy: 1).label, "nodejs.org")
-        let unfolded: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
-        unfolded.name = "answer-sources"
-        unfolded.lifetime = .keepAlways
-        add(unfolded)
-        rows.element(boundBy: 1).press(forDuration: 1.0)
-        XCTAssertTrue(app.buttons["Copy link"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Open in Safari"].exists && app.buttons["Share"].exists)
-        app.buttons["Copy link"].tap()
+        XCTAssertTrue(file.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.links["#1012"].exists, "the pull request by its number")
+        XCTAssertTrue(app.links["Node's release notes"].exists, "a written link keeps its words")
+        XCTAssertFalse(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "https://github.com/example")).firstMatch.exists, "no bare address in the words")
+        XCTAssertFalse(app.buttons["answer.sources"].exists || app.buttons["answer.file"].exists, "nothing listed under the answer")
+        let words: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+        words.name = "answer-inline-references"
+        words.lifetime = .keepAlways
+        add(words)
         file.tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Node 22 is pinned on CI.")).firstMatch.waitForExistence(timeout: 5))
         let sheet: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
@@ -178,6 +165,36 @@ final class ChatUITests: XCTestCase {
         add(sheet)
         app.buttons["file.openOnMac"].tap()
         XCTAssertTrue(app.staticTexts["Opened on your Mac."].waitForExistence(timeout: 5))
+    }
+
+    /// The owner, 2026-11-26: a table's wrapped cells drew over the next row. Each row is as tall as its tallest
+    /// cell, the long column wraps so the table fits the reading column, and it does so at the largest text size too.
+    func testATablesLongCellsWrapInsideTheirRows() {
+        for size in ["UICTContentSizeCategoryL", "UICTContentSizeCategoryAccessibilityXXXL"] {
+            let app: XCUIApplication = launch("n2-chat", defaults: ["-UIPreferredContentSizeCategoryName", size])
+            let table: XCUIElement = app.descendants(matching: .any).matching(identifier: "answer.table").firstMatch
+            for _ in 0..<12 where !(table.exists && table.isHittable) {
+                app.swipeDown()
+            }
+            XCTAssertTrue(table.waitForExistence(timeout: 5), size)
+            let long: XCUIElement = table.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Checks a lost invention")).firstMatch
+            let next: XCUIElement = table.staticTexts["Story Scripter"]
+            let first: XCUIElement = table.staticTexts["Invention Scout"]
+            XCTAssertTrue(long.exists && next.exists && first.exists, size)
+            let measured: String = "\(size): table \(table.frame) long \(long.frame) first \(first.frame) next \(next.frame) window \(app.windows.firstMatch.frame)"
+            add(XCTAttachment(string: measured))
+            XCTAssertGreaterThan(long.frame.height, first.frame.height * 1.5, "the long cell wraps: \(measured)")
+            XCTAssertLessThanOrEqual(long.frame.maxY, next.frame.minY + 1, "no cell draws over the next row: \(measured)")
+            XCTAssertEqual(long.frame.minY, first.frame.minY, accuracy: 1, "a row's cells share its top: \(measured)")
+            if size == "UICTContentSizeCategoryL" {
+                XCTAssertLessThanOrEqual(table.frame.maxX, app.windows.firstMatch.frame.maxX - 15, "the table fits the column: \(measured)")
+            }
+            let shot: XCTAttachment = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "answer-table-\(size)"
+            shot.lifetime = .keepAlways
+            add(shot)
+            app.terminate()
+        }
     }
 
     /// Item 1880: the helpers are no card in the stream; the capsule's people segment opens the Agents sheet, where a

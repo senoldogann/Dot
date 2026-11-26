@@ -1,23 +1,9 @@
 import Foundation
 
-// The web links and the files an answer names (backlog LF1), for the rows under it: a link becomes a row of its site, a
-// file a chip that shows it. The files are found by the web's own rules (`static/js/prose.js`, items 195, 1077, 1088):
-// a path or a name in a code span, and a document's name in the words; nothing inside a fenced code block counts.
+// The web links and the files an answer's words name (backlog LF1, made inline 2026-11-26): a link shows inline as its
+// site's mark and a short form, a file as its kind's symbol and its name. The files are found by the web's own rules
+// (`static/js/prose.js`, items 195, 1077, 1088): a path or a name in a code span, and a document's name in the words.
 
-/// A web link an answer names: its address and its site without a leading `www.` (`senoldogan.com`).
-public struct AnswerLink: Sendable, Hashable {
-    public let url: URL
-    public let site: String
-
-    public init(url: URL, site: String) {
-        self.url = url
-        self.site = site
-    }
-}
-
-/// The most links and files an answer's rows show.
-public let answerLinksShown: Int = 12
-public let answerFilesShown: Int = 8
 /// The longest path taken for a file (the web's `FILE_PATH_CHARS`).
 let filePathCharacters: Int = 400
 
@@ -27,39 +13,52 @@ public func bareSite(_ url: URL) -> String? {
     return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
 }
 
-/// The http(s) links of `markdown` in the order they first appear, each once, at most `answerLinksShown`; a link in a
-/// fenced code block is code, not a link (pure).
-public func answerLinks(_ markdown: String) -> [AnswerLink] {
-    var links: [AnswerLink] = []
-    var seen: Set<URL> = []
-    let prose: String = outsideFences(markdown)
-    for match in matches(of: webAddress, in: prose) {
-        let written: String = trimmedAddress(match)
-        guard let url: URL = URL(string: written), let site: String = bareSite(url), !seen.contains(url) else { continue }
-        seen.insert(url)
-        links.append(AnswerLink(url: url, site: site))
-        if links.count == answerLinksShown { break }
+/// How a link shows inline in an answer's words: a GitHub pull request or issue as its number (`#1012`) with the
+/// GitHub mark, a GitHub repository as `owner/repo`, any other page as its bare site with the site's own icon.
+public struct InlineLinkLabel: Sendable, Equatable {
+    public enum Mark: Sendable, Equatable {
+        case github
+        case site(String)
     }
-    return links
+
+    public let text: String
+    public let mark: Mark
+
+    public init(text: String, mark: Mark) {
+        self.text = text
+        self.mark = mark
+    }
 }
 
-/// The files `markdown` names in the order they first appear, each once, at most `answerFilesShown`: a path under the
-/// home folder or a file's name in a code span, a document's name in the words; none inside a fenced code block or a
-/// web address (pure).
-public func answerFiles(_ markdown: String) -> [String] {
-    var files: [String] = []
-    func take(_ path: String) {
-        guard path.count <= filePathCharacters, !files.contains(path), files.count < answerFilesShown else { return }
-        files.append(path)
+/// The short form of `url` for an inline link, nil for an address with no host (pure).
+public func inlineLinkLabel(_ url: URL) -> InlineLinkLabel? {
+    guard let site: String = bareSite(url) else { return nil }
+    let parts: [String] = url.pathComponents.filter { $0 != "/" }
+    if site == "github.com" {
+        if parts.count >= 4, ["pull", "issues"].contains(parts[2]), Int(parts[3]) != nil { return InlineLinkLabel(text: "#" + parts[3], mark: .github) }
+        if parts.count == 2 { return InlineLinkLabel(text: parts[0] + "/" + parts[1], mark: .github) }
+        return InlineLinkLabel(text: site, mark: .github)
     }
-    let prose: String = outsideFences(markdown)
-    for span in matches(of: codeSpan, in: prose, group: 1) where wholeMatch(homeFilePath, span) || wholeMatch(namedFile, span) {
-        take(span)
+    return InlineLinkLabel(text: site, mark: .site(site))
+}
+
+/// Whether a code span names a file the way the web shows one (`~/Desktop/report.pdf`, `notes/plan.md`) (pure).
+public func codeNamesFile(_ span: String) -> Bool {
+    span.count <= filePathCharacters && (wholeMatch(homeFilePath, span) || wholeMatch(namedFile, span))
+}
+
+/// Where the words `text` name a document (`summary.docx`, `~/Desktop/brief.md`), by the web's rule for words (pure).
+public func fileWordRanges(_ text: String) -> [Range<String.Index>] {
+    ranges(of: fileWord, in: text, group: 1).filter { text[$0].count <= filePathCharacters }
+}
+
+/// Where the words `text` hold a bare web address, without the punctuation of the sentence it ends (pure).
+public func webAddressRanges(_ text: String) -> [Range<String.Index>] {
+    ranges(of: webAddress, in: text, group: 0).map { range in
+        let written: String = String(text[range])
+        let trimmed: String = trimmedAddress(written)
+        return range.lowerBound..<text.index(range.lowerBound, offsetBy: trimmed.count)
     }
-    // The words: with the code spans and the web addresses blanked out, so a name inside either is not taken twice.
-    let words: String = blanked(blanked(prose, codeSpan), webAddress)
-    for name in matches(of: fileWord, in: words, group: 1) { take(name) }
-    return files
 }
 
 /// What kind of file a name is, by its suffix, for its icon (pure).
@@ -100,14 +99,12 @@ private let wordSuffixes: String = "md|markdown|html?|pdf|txt|csv|docx|xlsx|pptx
 private let spacedFolder: String = #"[\w-][\w.-]*(?: [A-Z][\w.-]*)*/"#
 
 private let webAddress: NSRegularExpression = regex(#"https?://[^\s<>()\[\]{}"'`|]+"#, caseless: true)
-private let codeSpan: NSRegularExpression = regex(#"`([^`\n]+)`"#, caseless: false)
 private let homeFilePath: NSRegularExpression = regex(#"^(~|/Users/[^/\s]+)/[^\n*?\[\]{}$<>|]*[^/\s*?\[\]{}$<>|]\.[A-Za-z0-9]{1,8}$"#, caseless: false)
 private let namedFile: NSRegularExpression = regex(#"^(?:[\w-][\w.-]*/)*[\w-][\w.-]*\.(?:"# + codeSuffixes + ")$", caseless: true)
 private let fileWord: NSRegularExpression = regex(
     #"(?<![\w./~@:-])((?:~?/(?:"# + spacedFolder + #")*|(?:[\w-][\w.-]*/)*)[\w-][\w.-]*\.(?:"# + wordSuffixes + "|"
         + wordSuffixes.uppercased() + #"))(?![\w/-])"#,
     caseless: false)
-private let fence: NSRegularExpression = regex(#"^\s*(```|~~~)"#, caseless: false)
 
 private func regex(_ pattern: String, caseless: Bool) -> NSRegularExpression {
     do {
@@ -117,40 +114,13 @@ private func regex(_ pattern: String, caseless: Bool) -> NSRegularExpression {
     }
 }
 
-private func matches(of pattern: NSRegularExpression, in text: String) -> [String] {
-    matches(of: pattern, in: text, group: 0)
-}
-
-private func matches(of pattern: NSRegularExpression, in text: String, group: Int) -> [String] {
-    let whole: NSRange = NSRange(text.startIndex..., in: text)
-    return pattern.matches(in: text, range: whole).compactMap { match in
-        Range(match.range(at: group), in: text).map { String(text[$0]) }
-    }
+private func ranges(of pattern: NSRegularExpression, in text: String, group: Int) -> [Range<String.Index>] {
+    pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap { Range($0.range(at: group), in: text) }
 }
 
 /// Whether `pattern` matches in `text` (the patterns that must take the whole text are anchored).
 private func wholeMatch(_ pattern: NSRegularExpression, _ text: String) -> Bool {
     pattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
-}
-
-/// `text` with every match of `pattern` turned into spaces of its length, so what stands around it stays apart.
-private func blanked(_ text: String, _ pattern: NSRegularExpression) -> String {
-    let whole: NSRange = NSRange(text.startIndex..., in: text)
-    return pattern.stringByReplacingMatches(in: text, range: whole, withTemplate: " ")
-}
-
-/// The lines of `markdown` outside its fenced code blocks; a fence left open runs to the end.
-private func outsideFences(_ markdown: String) -> String {
-    var inside: Bool = false
-    var kept: [String] = []
-    for line in markdown.components(separatedBy: "\n") {
-        if wholeMatch(fence, line) {
-            inside.toggle()
-            continue
-        }
-        if !inside { kept.append(line) }
-    }
-    return kept.joined(separator: "\n")
 }
 
 /// An address as written, without the punctuation of the sentence it ends (`https://a.com.` → `https://a.com`).

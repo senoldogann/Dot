@@ -2,43 +2,8 @@ import XCTest
 
 @testable import DotEngine
 
-/// The links and files an answer names (backlog LF1): the web's rules for files (prose.js), each once in order, none
-/// from a fenced code block; and what the Mac's file preview reads as.
+/// The files an answer names (backlog LF1): their kinds, and what the Mac's file preview reads as.
 final class AnswerReferencesTests: XCTestCase {
-    func testLinksAreTheAnswersWebAddressesEachOnceWithTheirBareSite() {
-        let answer: String = """
-            Read [the post](https://www.senoldogan.com/blog/dot?x=1). The data is at https://example.com/a.csv, and again
-            https://www.senoldogan.com/blog/dot?x=1.
-            ```
-            curl https://code.example.com/not-a-link
-            ```
-            Mail me@example.com, see http://127.0.0.1:8765/page.
-            """
-        let links: [AnswerLink] = answerLinks(answer)
-        XCTAssertEqual(links.map(\.url.absoluteString), ["https://www.senoldogan.com/blog/dot?x=1", "https://example.com/a.csv", "http://127.0.0.1:8765/page"])
-        XCTAssertEqual(links.map(\.site), ["senoldogan.com", "example.com", "127.0.0.1"])
-    }
-
-    func testFilesAreTheWebsOwnPathsAndNamesNotCodeOrAddresses() {
-        let answer: String = """
-            I wrote `~/Desktop/report.pdf` and `notes/plan.md`; the chart is chart.png? No: `os.path` is code.
-            The summary is in summary.docx and ~/Library/Application Support/Dot/workspace/brief.md.
-            See https://example.com/files/guide.pdf for theirs.
-            ```
-            open draft.md
-            ```
-            """
-        XCTAssertEqual(
-            answerFiles(answer),
-            ["~/Desktop/report.pdf", "notes/plan.md", "summary.docx", "~/Library/Application Support/Dot/workspace/brief.md"])
-    }
-
-    func testAFileNamedTwiceIsOneChipAndTheChipsStopAtTheirMost() {
-        let names: String = (1...12).map { "`f\($0).md`" }.joined(separator: " ")
-        XCTAssertEqual(answerFiles("`a.md` and a.md " + names).count, answerFilesShown)
-        XCTAssertEqual(answerFiles("`a.md` and a.md").count, 1)
-    }
-
     func testAKindIsReadFromTheSuffix() {
         XCTAssertEqual(answerFileKind("Shot.PNG"), .image)
         XCTAssertEqual(answerFileKind("r.pdf"), .pdf)
@@ -63,5 +28,45 @@ final class AnswerReferencesTests: XCTestCase {
         ])
         XCTAssertEqual(phonePageWidth([600, 900, 1200, 1800]), 1200)
         XCTAssertEqual(phonePageWidth([1800]), 1800)
+    }
+}
+
+/// How a link and a file show inline in an answer's words (the owner's look of 2026-11-26: `#1012` with the GitHub mark).
+final class InlineReferenceTests: XCTestCase {
+    func testAGitHubPullRequestIsItsNumberAndOtherSitesTheirBareDomain() throws {
+        let label = { (address: String) in inlineLinkLabel(URL(string: address)!) }
+        XCTAssertEqual(label("https://github.com/senoldogann/Dot/pull/1012"), InlineLinkLabel(text: "#1012", mark: .github))
+        XCTAssertEqual(label("https://github.com/senoldogann/Dot/issues/7#c"), InlineLinkLabel(text: "#7", mark: .github))
+        XCTAssertEqual(label("https://github.com/senoldogann/Dot"), InlineLinkLabel(text: "senoldogann/Dot", mark: .github))
+        XCTAssertEqual(label("https://www.senoldogan.com/blog"), InlineLinkLabel(text: "senoldogan.com", mark: .site("senoldogan.com")))
+    }
+
+    func testFilesAndAddressesAreFoundInTheWords() {
+        XCTAssertTrue(codeNamesFile("~/Desktop/report.pdf"))
+        XCTAssertTrue(codeNamesFile("notes/plan.md"))
+        XCTAssertFalse(codeNamesFile("os.path"))
+        let words: String = "The summary is in summary.docx, see https://example.com/a."
+        XCTAssertEqual(fileWordRanges(words).map { String(words[$0]) }, ["summary.docx"])
+        XCTAssertEqual(webAddressRanges(words).map { String(words[$0]) }, ["https://example.com/a"])
+    }
+}
+
+/// An answer's table: its columns fit the reading width where they can, the long ones wrapping.
+final class TableColumnTests: XCTestCase {
+    func testATableThatFitsKeepsItsIdealWidths() {
+        XCTAssertEqual(tableColumnWidths(ideal: [80, 120], fit: 343, minimum: 96), [80, 120])
+    }
+
+    func testTheWidestColumnsWrapSoTheTableFits() {
+        let widths: [Double] = tableColumnWidths(ideal: [130, 600], fit: 343, minimum: 96)
+        XCTAssertEqual(widths, [130, 213])
+        XCTAssertEqual(widths.reduce(0, +), 343, accuracy: 0.001)
+        let three: [Double] = tableColumnWidths(ideal: [60, 400, 500], fit: 360, minimum: 96)
+        XCTAssertEqual(three, [60, 150, 150])
+    }
+
+    func testATableTooWideForItsMinimumsScrolls() {
+        let widths: [Double] = tableColumnWidths(ideal: [300, 300, 300, 300, 300], fit: 343, minimum: 96)
+        XCTAssertEqual(widths, [96, 96, 96, 96, 96], "wider than the column: it scrolls sideways")
     }
 }
