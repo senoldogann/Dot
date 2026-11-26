@@ -139,8 +139,9 @@ and start the daemon again (`dotx service install`).
 `[store] min_free_gb` GiB (5) it tells you once (*Your Mac's disk is nearly full*, logged as `disk_space_low`), and
 again only after the disk rose above it (`disk_space_recovered`). While it is low, a copy of the database that would
 leave less than that free is not begun (`backup_skipped_low_space`, tried again ten minutes later; `dotx backup now`
-ends with that error), and an uploaded file is refused (507, "the disk is nearly full"), rather than either failing half
-way on a full disk. Runs and the database's own small writes go on. `min_free_gb = 0` sets no floor.
+ends with that error), and an uploaded file (`POST /api/attachments`, and `PUT /api/attachments/stream` for the length
+it declares, else for the most its kind may be) is refused (507, "the disk is nearly full"), rather than either failing
+half way on a full disk. Runs and the database's own small writes go on. `min_free_gb = 0` sets no floor.
 
 **The database's version** (item 1268). The database keeps the version of its tables (SQLite's `user_version`). Every
 start makes the tables it lacks and adds the columns added since, each only where it is missing, as before versions; a

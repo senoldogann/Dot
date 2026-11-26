@@ -103,11 +103,63 @@ final class OutboxTests: XCTestCase {
         XCTAssertEqual(uploads.count, files.count)
         for (request, file) in zip(uploads, files) {
             let body: [String: String] = try JSONDecoder().decode([String: String].self, from: XCTUnwrap(request.body))
-            XCTAssertEqual(body, ["name": file.name, "media_type": file.mediaType, "data_b64": file.data.base64EncodedString()])
+            guard case .bytes(let data) = file.content else { return XCTFail("a document is held as bytes") }
+            XCTAssertEqual(body, ["name": file.name, "media_type": file.mediaType, "data_b64": data.base64EncodedString()])
         }
         let sent: FakeDaemon.Seen = try XCTUnwrap(daemon.requests.first { $0.path == "/api/threads/thr_1/queue" && $0.method == "POST" })
         let message: QueueMessage = try JSONDecoder().decode(QueueMessage.self, from: XCTUnwrap(sent.body))
         XCTAssertEqual(message.attachments, ["att_1", "att_2"])
+    }
+
+    func testAVideoFileIsKeptBesideItsRecordAndSentAsTheRawBodyOfTheStreamedUpload() async throws {
+        let link: LinkWatcher = LinkWatcher(initial: .down)
+        let first: Outbox = box(link, mayStartChat: { true })
+        let bytes: Data = Data((0..<300_000).map { UInt8($0 % 251) })
+        let source: URL = folder.appending(path: "source-movie.mp4")
+        try bytes.write(to: source)
+        let video: OutgoingAttachment = OutgoingAttachment(name: "Walk.mp4", mediaType: "video/mp4", file: source, byteCount: bytes.count)
+        let key: String = newMessageKey()
+        try await first.enqueue(message("A video"), id: key, attachments: [video])
+        // The composer's own file may go (its chip is removed, the system clears its temporary folder): the outbox kept a copy.
+        try FileManager.default.removeItem(at: source)
+        await first.suspend()
+        let kept: URL = folder.appending(path: "outbox-images/\(key)-0.media")
+        XCTAssertEqual(try Data(contentsOf: kept), bytes, "the video stays in the outbox's folder, not in its record")
+        let record: Data = try Data(contentsOf: folder.appending(path: "outbox-images/\(key)-0.attachment"))
+        XCTAssertLessThan(record.count, 2_000, "the record holds a name and no bytes")
+
+        let next: Outbox = box(link, mayStartChat: { true })
+        link.report(.up)
+        await next.start()
+        try await items(next, "message delivered") { $0.isEmpty }
+        let uploads: [FakeDaemon.Seen] = daemon.requests.filter { $0.path == "/api/attachments/stream" }
+        XCTAssertEqual(uploads.count, 1)
+        let upload: FakeDaemon.Seen = try XCTUnwrap(uploads.first)
+        XCTAssertEqual(upload.method, "PUT")
+        XCTAssertEqual(upload.query, ["name": "Walk.mp4", "media_type": "video/mp4"])
+        XCTAssertEqual(upload.body, bytes, "the file is the body as it is, not base64 in JSON")
+        XCTAssertTrue(daemon.requests.allSatisfy { $0.path != "/api/attachments" }, "nothing went as JSON")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: kept.path), "what was sent leaves the folder")
+    }
+
+    func testCancellingAVideoUploadKeepsItsFileForRetry() async throws {
+        daemon.holdUploads = true
+        let outbox: Outbox = box(LinkWatcher(initial: .up), mayStartChat: { true })
+        let source: URL = folder.appending(path: "movie.mp4")
+        try Data(repeating: 7, count: 50_000).write(to: source)
+        let key: String = newMessageKey()
+        try await outbox.enqueue(message("A video"), id: key, attachments: [OutgoingAttachment(name: "Walk.mp4", mediaType: "video/mp4", file: source, byteCount: 50_000)])
+        try await items(outbox, "uploading") { $0.first?.attachmentUpload?.count == 1 }
+        await outbox.cancelUpload(key)
+        try await items(outbox, "cancelled") { $0.first?.phase == .failed }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appending(path: "outbox-images/\(key)-0.media").path))
+
+        daemon.holdUploads = false
+        await outbox.retry(key)
+        try await items(outbox, "delivered on retry") { $0.isEmpty }
+        XCTAssertEqual(daemon.acceptedTexts, ["A video"])
+        XCTAssertTrue(daemon.requests.contains { $0.path == "/api/attachments/stream" && $0.body?.count == 50_000 }, "the retry sent the kept file whole")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appending(path: "outbox-images/\(key)-0.media").path))
     }
 
     func testCancellingAnAttachmentStopsTheMessageAndKeepsItForRetry() async throws {

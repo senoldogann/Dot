@@ -424,8 +424,7 @@ final class FakeDaemon: @unchecked Sendable {
             }
             return Reply(status: 204, body: Data(), stream: false, lost: false)
         }
-        if method == "POST", let found: [String] = Self.match(parts, ["api", "attachments"]) {
-            _ = found
+        if (method == "POST" && Self.match(parts, ["api", "attachments"]) != nil) || (method == "PUT" && Self.match(parts, ["api", "attachments", "stream"]) != nil) {
             let id: Int = lock.withLock {
                 uploads += 1
                 return uploads
@@ -743,7 +742,7 @@ final class FakeProtocol: URLProtocol, @unchecked Sendable {
         for item in URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? [] { asked[item.name] = item.value ?? "" }
         let query: [String: String] = asked
         let body: Data? = readBody()
-        if method == "POST", url.path == "/api/attachments", found.holdUploads { return }
+        if (method == "POST" && url.path == "/api/attachments") || (method == "PUT" && url.path == "/api/attachments/stream"), found.holdUploads { return }
         DispatchQueue.global().async { [self] in
             let reply: FakeDaemon.Reply =
                 found.fate(method: method, path: url.path, query: query, body: body)

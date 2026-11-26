@@ -27,6 +27,7 @@ from PIL import Image
 from playwright.async_api import Browser, FilePayload, Page, async_playwright, expect
 from structlog.testing import capture_logs
 
+from dotagent.agent import attachments
 from dotagent.agent.attachments import load_attachments, message_with_attachments
 from dotagent.agent.manager import RunManager
 from dotagent.browser.session import BrowserSession
@@ -39,7 +40,7 @@ from dotagent.desktop.perms import PANE_TITLES, check_permissions, responsible_p
 from dotagent.desktop.types import Permissions
 from dotagent.llm.types import ChatProvider, ImageData, Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.server import routes_system
+from dotagent.server import bodylimit, routes_runs, routes_system
 from dotagent.server.app import STATIC_DIR, create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
@@ -51,6 +52,7 @@ from dotagent.server.views import PermissionsView
 from dotagent.store.db import Store
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
 from dotagent.store.models import NO_PICKS, ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
+from dotagent.store.space import GIB, free_bytes
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -1709,3 +1711,61 @@ async def test_the_status_names_the_database_by_an_id_that_a_restart_keeps_and_a
         assert await reset.store_id() not in (kept, first)
     finally:
         await reset.close()
+
+
+async def _body_in_pieces(*pieces: bytes) -> AsyncIterator[bytes]:
+    for piece in pieces:
+        yield piece
+
+
+async def test_a_video_is_sent_as_the_raw_body_and_kept_where_the_json_upload_keeps_it(
+    live: httpx.AsyncClient, runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Chunked, with no length: the body comes in pieces and is never held whole (item 1933).
+    pieces: tuple[bytes, ...] = (b"\x00\x00\x00\x18ftypmp42" + b"\x01" * 70_000, b"\x02" * 70_000, b"\x03" * 10)
+    sent: httpx.Response = await live.put(
+        "/api/attachments/stream",
+        params={"name": "Walk.mp4", "media_type": "video/mp4"},
+        content=_body_in_pieces(*pieces),
+    )
+    assert sent.status_code == 201, sent.text
+    assert (sent.json()["kind"], sent.json()["size"]) == ("video", sum(len(piece) for piece in pieces))
+    assert await asyncio.to_thread(Path(sent.json()["path"]).read_bytes) == b"".join(pieces)
+    assert Path(sent.json()["path"]).parent.parent == runtime.workspace / "attachments"
+    # A file of the other kinds is read as the JSON upload reads it.
+    notes: httpx.Response = await live.put(
+        "/api/attachments/stream", params={"name": "notes.py"}, content=b"SECRET = 'streamed'\n"
+    )
+    assert (notes.status_code, notes.json()["kind"], notes.json()["chars"]) == (201, "text", 20), notes.text
+    # No name, no token: refused before a byte is kept.
+    assert (await live.put("/api/attachments/stream", content=b"x")).status_code == 422
+    assert (
+        await live.put("/api/attachments/stream", params={"name": "a.mp4"}, content=b"x", headers={"Authorization": ""})
+    ).status_code == 401
+
+    # A disk nearly full refuses the file before it is written, as the JSON route does (item 1938).
+    before_floor: set[str] = {path.name for path in (runtime.workspace / "attachments").iterdir()}
+    with monkeypatch.context() as short_of_space:
+        short_of_space.setattr(routes_runs, "floor_bytes", lambda _gb: free_bytes(runtime.workspace) + 10 * GIB)
+        full: httpx.Response = await live.put(
+            "/api/attachments/stream", params={"name": "Walk.mp4", "media_type": "video/mp4"}, content=b"\x01" * 100
+        )
+    assert (full.status_code, "nearly full" in full.text) == (507, True), full.text
+    assert {path.name for path in (runtime.workspace / "attachments").iterdir()} == before_floor
+
+    # Past the cap: a declared length is refused at once (413); a body of no length is cut at the cap (422), and
+    # either way nothing stays in the attachments' folder.
+    before: set[str] = {path.name for path in (runtime.workspace / "attachments").iterdir()}
+    monkeypatch.setattr(attachments, "MAX_MEDIA_BYTES", 1000)
+    monkeypatch.setattr(bodylimit, "STREAM_MOST", 1000)
+    declared: httpx.Response = await live.put(
+        "/api/attachments/stream", params={"name": "long.mp4", "media_type": "video/mp4"}, content=b"\x01" * 3000
+    )
+    assert (declared.status_code, declared.json()["context"]["most_bytes"]) == (413, 1000), declared.text
+    streamed: httpx.Response = await live.put(
+        "/api/attachments/stream",
+        params={"name": "long.mp4", "media_type": "video/mp4"},
+        content=_body_in_pieces(b"\x01" * 600, b"\x01" * 600),
+    )
+    assert (streamed.status_code, "too large" in streamed.text) == (422, True), streamed.text
+    assert {path.name for path in (runtime.workspace / "attachments").iterdir()} == before
