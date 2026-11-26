@@ -17,7 +17,8 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.retry import RetryPolicy
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
-from dotagent.llm.connector import get_json, retry_with_reset, stream_model_reply
+from dotagent.llm.connector import get_json, post_json, retry_with_reset, stream_model_reply
+from dotagent.llm.google_image import GeneratedImage, ImageRequest, image_body, image_from_answer
 from dotagent.llm.http import build_client, request_context
 from dotagent.llm.provider_errors import classify_openai
 from dotagent.llm.traits import ModelTraits, info_from_traits
@@ -139,6 +140,12 @@ class GoogleProvider:
             "Authorization": f"Bearer {api_key}",
             "User-Agent": f"dot-agent/{__version__}",
         }
+        # The native route takes the key in this header; the OpenAI-compatible route above takes it as a bearer token.
+        self._image_headers: dict[str, str] = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+            "User-Agent": f"dot-agent/{__version__}",
+        }
         self._slots: asyncio.Semaphore = asyncio.Semaphore(config.max_concurrent)
         self._policy: RetryPolicy = RetryPolicy(attempts=config.attempts, base_delay_s=1.0, max_delay_s=30.0)
 
@@ -192,6 +199,18 @@ class GoogleProvider:
         return reply.model_copy(
             update={"tool_calls": tuple(call.model_copy(update={"extra_origin": origin}) for call in reply.tool_calls)}
         )
+
+    async def generate_image(self, request: ImageRequest) -> GeneratedImage:
+        """One picture from the Gemini API's ``generateContent`` route on the same key (retried like every call of this
+        connector). The answer is read as :func:`~dotagent.llm.google_image.image_from_answer` does."""
+        url: str = f"{self._config.image_base_url.rstrip('/')}/models/{request.model}:generateContent"
+        body: JsonObject = image_body(request)
+        context: JsonObject = request_context(url, body)
+        async with self._slots:
+            answer: JsonObject = await post_json(
+                self._client, url, self._image_headers, body, classify_openai, self._policy, "google.image"
+            )
+        return image_from_answer(answer, context)
 
     async def aclose(self) -> None:
         await self._client.aclose()

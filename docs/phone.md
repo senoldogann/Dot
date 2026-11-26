@@ -106,7 +106,9 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
-   own header and menu, its profile, and one settings sheet from an avatar button; a bot's unread mark counts the
+   own header and menu, its profile (avatar, name and Edit for its name and avatar, Library, Computer with what it does on the Mac,
+   Routines, Model, Activity, and a Notifications switch that is the phone's own count of its unread chats and what waits
+   on the owner on the home: the Mac has no push setting per bot), and one settings sheet from an avatar button; a bot's unread mark counts the
    chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
    hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
    item 1912, and holds it: a newer chat of the bot shows only in the list, Dot's own work in a section of its own at
@@ -116,12 +118,17 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
    and a small live mark for its time while a run works, Waiting on N helpers while the run waits on them, Waiting ·
    what works in the background (a helper let go, a background command, its loop), else its last line, with the unread
    dot; Dot's face wears a ring while one of its chats works or waits on the owner; all from the list's rows, which carry
-   `helpers` and `background` and are read again when a chat's revision moves, item 1920) is a native SwiftUI app over the
+   `helpers` and `background` and are read again when a chat's revision moves, item 1920; chats selected together are deleted
+   in one request and leave every screen at once, coming back if the Mac refuses, and the list refills with older chats
+   after a deletion, item 1964-1965; Settings › General › Language chooses English or Türkçe whatever the iPhone's,
+   item 1966) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
-   after the last one, answers that stream in (a file an answer names is a chip of its name and size that opens a
-   preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open on Mac, Share and Save
-   to Files; its web links gather in one chip of their sites' own icons that opens each in Safari's in-app view, item
-   1935), the approvals and questions a run asks with Allow and Deny, one capsule
+   after the last one, answers that stream in (a file an answer's words name is its name after its kind's symbol, in
+   the words, and opens a preview sheet, an image zoomable, a PDF's pages, a text or code, or a file's facts, with Open
+   on Mac, Share and Save to Files; a link is its site's own icon before the words it was written with, a bare address
+   shortened to its site or, for a GitHub pull request, `#1012` after the GitHub mark, and opens in Safari's in-app
+   view, the icons asked of a site only once the answer is whole; nothing is listed under the answer, items 1935 and 1961; a
+   table's long cells wrap inside their rows, its columns fitting the screen, item 1961), the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,
    waiting on N helpers, or N helpers keep working in the background once a message of yours released the run from its wait, item 1351,
    or once the run ended done and left them at work: "5 helpers", the line under the chat's title "5 helpers working" instead of
@@ -1128,7 +1135,7 @@ daemon tells a moved revision within half a second of the write (it reads the mo
 Dot Next shows the Mac's screen and a run's browser live, and lets the owner take a run's page over, with the routes the
 web uses:
 
-- **Watch the Mac** (Activity, and Dot's profile): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
+- **Watch the Mac** (Activity, and the Computer row of a bot's profile, which opens a run's live picture with Take over when one of its chats follows one): `GET /api/screen/live?quality=` read as long as the viewer is open, in the format of
   `dotagent/desktop/live.py`, decoded by the phone's own H.264 decoder. `hd` is the page's (1920 pixels on the longest
   side, 60 frames a second, a key frame every 4 s); `light` (item 1837) is a capture of its own at 1280 pixels, 30
   frames a second, a fifth of the bit rate and a key frame every 2 s, for a weak link. The viewer's Automatic quality

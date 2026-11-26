@@ -1070,7 +1070,7 @@
     }
   },
   {
-    "description": "Operate a Mac application with real pointer and keyboard events, several steps per call. Prefer refs from the latest snapshot to coordinates. press activates a button, checkbox or menu item through accessibility without moving the pointer, and so does click on such a ref; a real click is click with the element's x and y (use it when press does nothing); focus puts the keyboard focus in a field; set_value replaces a field's whole value at once; type enters text key by key, a line break as Return and a tab as Tab (a long text without either is pasted, which is faster); paste is for long text; key sends a shortcut or key (cmd+s, return, escape, tab); menu chooses a menu bar item by its path; scroll moves an area (give it a ref); drag, double_click, right_click (its menu then appears in the snapshot), hover, wait, and activate (switch to another application). Batch the steps you can predict, such as filling a form and pressing its button. The result shows what each step did and how the window changed, and what Dot checked of it: the field read back after set_value, type and paste, and expect_text where you gave one. Done means the step was sent; verified means Dot saw its result; not checked means only that it was sent; uncertain means it was sent and its result was not seen, so look before sending it again. Passwords, codes and card numbers go into secure fields only as your instructions on secrets say: otherwise Dot refuses the step. While the owner is at the Mac, a step that moves the pointer or sends keys waits until they step away; press, focus, set_value and menu go at once, so prefer them. Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, and then you take a new snapshot.",
+    "description": "Operate a Mac application with real pointer and keyboard events, several steps per call. Prefer refs from the latest snapshot to coordinates. press activates a button, checkbox or menu item through accessibility without moving the pointer, and so does click on such a ref; a real click is click with the element's x and y (use it when press does nothing); focus puts the keyboard focus in a field; set_value replaces a field's whole value at once; type enters text key by key, a line break as Return and a tab as Tab (a long text without either is pasted, which is faster); paste is for long text; key sends a shortcut or key (cmd+s, return, escape, tab); menu chooses a menu bar item by its path; scroll moves an area (give it a ref); drag, double_click, right_click (its menu then appears in the snapshot), hover, wait, and activate (switch to another application). Batch the steps you can predict, such as filling a form and pressing its button. The result shows what each step did and the window after the steps, and what Dot checked of it: the field read back after set_value, type and paste, and expect_text where you gave one; it is the look you need, so take no desktop_snapshot or screenshot after it unless a step is uncertain or what you need is drawn rather than listed. Done means the step was sent; verified means Dot saw its result; not checked means only that it was sent; uncertain means it was sent and its result was not seen, so look before sending it again. Passwords, codes and card numbers go into secure fields only as your instructions on secrets say: otherwise Dot refuses the step. While the owner is at the Mac, a step that moves the pointer or sends keys waits until they step away; press, focus, set_value and menu go at once, so prefer them. Refs (a12, …) come from the latest snapshot of that application; they stay valid until the window is rebuilt, and then you take a new snapshot.",
     "name": "desktop_act",
     "parameters": {
       "additionalProperties": false,
@@ -1512,6 +1512,61 @@
       "required": [
         "answer",
         "success"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Make a PNG in the workspace; it shows in the chat. DRAW it by default: svg (with a viewBox) or html (static, no scripts, no web addresses) for a logo, diagram, card, cover, icon, illustration or chart; you see the result and can redraw. Give photo (words) only for a photo-like image: it needs the owner's GOOGLE_API_KEY on a billed project, fails without one and never draws instead. Give exactly one of svg, html, photo.",
+    "name": "generate_image",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "aspect_ratio": {
+          "description": "A photo's shape: 1:1, 16:9, 9:16, 4:3, 3:2.",
+          "pattern": "^\\d{1,2}:\\d{1,2}$",
+          "type": "string"
+        },
+        "height": {
+          "default": 1024,
+          "description": "Pixels, for svg or html.",
+          "maximum": 4096,
+          "minimum": 64,
+          "type": "integer"
+        },
+        "html": {
+          "description": "A static HTML page.",
+          "maxLength": 400000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "description": "Where to save it: a .png path.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "photo": {
+          "description": "The photo, described.",
+          "maxLength": 4000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "svg": {
+          "description": "An SVG document.",
+          "maxLength": 400000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "width": {
+          "default": 1024,
+          "description": "Pixels, for svg or html.",
+          "maximum": 4096,
+          "minimum": 64,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path"
       ],
       "type": "object"
     }
@@ -2474,6 +2529,102 @@
         "order",
         "verdict"
       ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Do several steps in the page of this chat's Safari tab in one call, on the refs of your latest safari_read: click, fill (a field's whole value), select, check, uncheck, press (Enter submits the field's form), scroll_into_view. They run inside the page, without the pointer or the keyboard, so they go at once while the owner works. Batch every step you can predict, such as a whole form and its submit. The result says per step what Dot verified (a field holds what was written, a box is ticked, the expect_text showed) and shows what changed on the page: no safari_read or screenshot is needed after it. Passwords, card numbers and one-time codes go in only as your instructions on secrets say. Safari's own windows (its AutoFill, a password sheet) are not in the page: use the desktop tools for them. Refs (s12) come from your latest safari_read of this chat's Safari tab and stay valid while the page shows the same document.",
+    "name": "safari_act",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "description": "Steps run in order on the refs of your latest safari_read: every step you can predict without a new look (a whole form and its submit), since each call costs a model round trip. The batch stops at the first failure or when the page moves to another address. Example: [{\"action\": \"fill\", \"ref\": \"s5\", \"text\": \"Ada\"}, {\"action\": \"click\", \"ref\": \"s9\", \"expect_text\": \"Registered\"}].",
+          "items": {
+            "additionalProperties": false,
+            "description": "One step in the page of the owner's Safari.",
+            "properties": {
+              "action": {
+                "description": "click | fill (replace a field's value; a dropdown takes the option's label) | select (a dropdown's option by label or value) | check | uncheck | press (Enter, Escape, Tab, an arrow key: sent to the ref, or to the focused element) | scroll_into_view.",
+                "enum": [
+                  "click",
+                  "fill",
+                  "select",
+                  "check",
+                  "uncheck",
+                  "press",
+                  "scroll_into_view"
+                ],
+                "type": "string"
+              },
+              "expect_text": {
+                "description": "Words only the result shows (the label that says Saved, the next page's heading): Dot waits for them after this step and reports verified or uncertain.",
+                "maxLength": 200,
+                "minLength": 4,
+                "type": "string"
+              },
+              "key": {
+                "description": "For press: Enter, Escape, Tab, ArrowDown, …",
+                "type": "string"
+              },
+              "ref": {
+                "description": "Element ref from your latest safari_read, for example s12.",
+                "type": "string"
+              },
+              "text": {
+                "description": "Text for fill; the option for select.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "action"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Open an address in the owner's own Safari, where they are signed in and Safari's AutoFill holds their passwords, and return the page as elements with refs and its text. The first open of a chat takes a new tab, which later opens load again; a tab of the owner's is never loaded over. Use Safari when the owner's session or Safari itself is needed; Dot's Chrome (browser_open) otherwise. Refs (s12) come from your latest safari_read of this chat's Safari tab and stay valid while the page shows the same document.",
+    "name": "safari_open",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "new_tab": {
+          "default": false,
+          "description": "Open it in another new tab even when this chat already has a tab Dot opened (a first open always takes a new tab: a tab of the owner's is never loaded over).",
+          "type": "boolean"
+        },
+        "url": {
+          "description": "Address to open. A bare host such as example.com gets https://.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "description": "Read the page of this chat's tab in the owner's Safari (the front tab, the first time): its elements with refs (s12) and its visible text, without the pointer and while the owner works on. Give a query to see only what mentions it. safari_act already returns what changed, so read again only after you lost track.",
+    "name": "safari_read",
+    "parameters": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "description": "Only the elements and lines of text that contain these words, letter case aside.",
+          "maxLength": 200,
+          "type": "string"
+        }
+      },
       "type": "object"
     }
   },

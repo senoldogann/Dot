@@ -241,9 +241,20 @@ def elsewhere_advice(url: str, websites: tuple[str, ...], source_name: str) -> s
             "browser_open and fill there."
         )
     sent: str = f" to {page}" if page else ""
+    there: str = page or "that page"
     return (
         f"Open the login's own site with browser_open {home} and call browser_fill_login on its sign-in page there. "
         f"If that site sends you back{sent} or to another site to sign in, do not fill there: tell the owner, in one "
-        f"line, that the site signs in on that page, which the login in {source_name} does not name, and go on with "
-        "what needs no sign-in."
+        f"line, that the site signs in on {there}, which the login in {source_name} does not name, and what they do "
+        f"once if they know {there} as the site's own: {_owner_adds(source_name)}. Then go on with what needs no "
+        "sign-in."
     )
+
+
+def _owner_adds(source_name: str) -> str:
+    """The one step the owner takes for a login to fill on a host it does not name (item 1958): Dot's vault keeps one
+    website a login, so the host is a login of its own there; 1Password keeps several, so it is one more of the item's.
+    Only the owner does it; a run never adds a host to a login."""
+    if source_name == "1Password":
+        return "add that host to the item's websites in 1Password"
+    return "add a login for that host in Settings › Vault, with the same user name and password"

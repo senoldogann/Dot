@@ -227,6 +227,7 @@ struct BotHeader: ToolbarContent {
             .buttonStyle(.plain)
             .accessibilityLabel(chat.record.name)
             .accessibilityHint(String(localized: "Opens the bot's profile", comment: "VoiceOver hint of the pill in a bot's chat header"))
+            .accessibilityIdentifier("botChat.pill")
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {

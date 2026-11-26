@@ -96,6 +96,7 @@ from dotagent.plugins.catalog import PluginShelf, load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox, hard_linked
+from dotagent.safari.desk import SafariDesk
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import env_lock_path, optional_secret
 from dotagent.store.backup import backup_folder, partial_folder
@@ -114,6 +115,7 @@ from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.drafts import build_draft_tool
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
+from dotagent.tools.images import build_image_tools
 from dotagent.tools.judge_items import build_judge_items_tool
 from dotagent.tools.mail_calendar import build_mail_calendar_tools
 from dotagent.tools.mcp import build_mcp_tools
@@ -220,6 +222,8 @@ class Runtime:
     browser: BrowserSession
     browsers: BrowserPool
     desktop: "DesktopSession"
+    # The owner's own Safari, driven in its pages through AppleScript (item 1959): each chat's tab and its last read.
+    safari: SafariDesk
     # The daemon's hold on the Mac's sleep while it charges (item 271); off until the daemon starts it.
     awake: KeepAwake
     # The daemon's hold on the Mac's idle sleep while Dot works (item 1671, ``[daemon] keep_awake``).
@@ -317,6 +321,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         (build_recon_tool(), build_security_tool()),
         build_meta_tools(),
         build_page_tools(),
+        build_image_tools(),
         build_appearance_tools(),
         (build_coding_work_tool(),),
         (build_skill_tool(), build_find_help_tool(), build_skill_save_tool()),
@@ -335,8 +340,9 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
     # frameworks are not, as on the Linux that runs a cloud agent's unit tests (item 1270).
     from dotagent.tools.apple import build_apple_tool
     from dotagent.tools.desktop import build_desktop_tools
+    from dotagent.tools.safari import build_safari_tools
 
-    return (*core, build_desktop_tools(), (build_apple_tool(),))
+    return (*core, build_desktop_tools(), (build_apple_tool(),), build_safari_tools())
 
 
 def _phone(config: AppConfig) -> PhoneDesk | None:
@@ -667,6 +673,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
                 PointerOverlay(config.desktop.show_pointer),
                 mac_presence(config.desktop.away_after_s),
             ),
+            safari=SafariDesk(),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             search_keys=search_keys,

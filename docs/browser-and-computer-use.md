@@ -493,7 +493,10 @@ Both modes share what follows.
   site and username alone. It fills only on the login's own site; on another page the refusal sends the run to the
   login's own site to fill there, and when that site sends it back to a page the login does not name
   (`account.apple.com`, where App Store Connect signs in), it does not fill and tells you so in one line; whether the
-  login should name that page too is yours to decide (item 1208); a field in a frame of another site (App Store
+  login should name that page too is yours to decide (item 1208), and the line says the one step that does it if you
+  know the page as the site's own (item 1958): in Dot's vault, which keeps one website a login, a login of its own
+  for that host with the same username and password (Settings › Vault); in 1Password, the host added to the item's
+  websites. A run never adds a host to a login; a field in a frame of another site (App Store
   Connect's own sign-in page holds its form in a frame of `idmsa.apple.com`) gets nothing either, and the refusal
   names the frame's host and has the run tell you so in one line, rather than try the fill another way (item 1342);
   never a password or a code in your own Chrome
@@ -654,6 +657,52 @@ Both modes share what follows.
 - Dot's Chrome is the same application as yours, only with another profile. To give it an application of its own, run
   `uv run playwright install chromium` and set `channel = "chromium"`.
 
+## The owner's own Safari
+
+Dot's Chrome is a profile of its own. When the work needs your own Safari, where you are signed in and Safari's
+AutoFill holds your passwords, three tools drive its pages the way the browser tools drive Chrome's (item 1959):
+`safari_open` (an address in a tab of its own: a new tab the first time, then that tab again while it still shows
+what Dot last saw there; a tab of yours is never loaded over), `safari_read` (the page's controls, each with a ref `s12`,
+and its visible text; a `query` keeps only what mentions it) and `safari_act` (a batch of `click`, `fill`, `select`,
+`check`, `uncheck`, `press` and `scroll_into_view` steps on those refs, with `expect_text` on the step whose result
+matters). They are in the desktop group, and exist where the desktop tools do.
+
+- They run inside the page, through Safari's `do JavaScript`: no pointer, no keyboard and no window brought forward,
+  so they go at once while you work at the Mac. A chat keeps the tab it started in (the tab `safari_open` opened,
+  or, for a chat that starts with `safari_read`, the front tab of Safari's front window), and a step goes there only
+  while the tab still shows the page it was read on; a tab you moved to another page, or closed, makes the run read
+  again instead of acting on refs of another page. An element
+  keeps its ref while it stays on the page, and a step whose element no longer shows the name it was read with is
+  refused before anything is done. A batch starts steps for 75 s at most; the steps left then are skipped and
+  reported, so a call never runs past its time with steps sent and none told; an error after a step went out (a
+  page Dot may not read, a closed tab) stops the batch with its report kept.
+- A page the browser tools may not open is not read nor acted on in Safari either: Dot's own interface (you may be
+  signed in to it in Safari, and a run there could answer its own questions), a host of `[browser] blocked_hosts`, and
+  one outside `allowed_hosts` when you set it. The tab's address is judged before any script is sent to it, and a
+  document's own address again before what it says is used.
+- What they reach: the page and the frames of its own site, and open shadow roots. A frame of another site, Safari's
+  own windows (its AutoFill list, the sheet that asks for your Mac's password, a download prompt) and a check that
+  wants a real key or click stay with `desktop_act` on Safari's window, whose results then say so.
+- A batch is judged as `browser_act`'s is, by the same function on the elements of the chat's latest read: the same
+  flags (a payment, a message sent, a public post, a credential), one payment and one paced public action a call, the
+  typed judge on a click whose label no pattern knows, and the payment's amount from its labels and the page's total.
+  `tests/unit/test_freedom_contract.py` has their rows: in yolo, in a chat you opened, a press of Send, Post or Pay now
+  asks you, as it does in Chrome, and nothing else does. A field the page marks secret (a password, a card number, a
+  one-time code) takes text in a yolo or free run with the step's flag on the record, and in any other mode only text
+  you wrote in the run; its value is shown to the run by its length alone, in every mode, since Safari's AutoFill puts
+  your own passwords there. Dot's vault is not filled into Safari; Safari's AutoFill is yours, through its own windows. The
+  page answers through a script that runs in its own world, so a page can misname its elements to it as it can to
+  Chrome's snapshot through its labels.
+- Two settings are yours to turn on once, and Dot never turns them on: macOS's Automation permission for Dot to send
+  Apple events to Safari (System Settings › Privacy & Security › Automation), and Safari's "Allow JavaScript from Apple
+  Events" (Safari › Settings… › Advanced › "Show features for web developers", then Settings… › Developer). While one
+  is off, the first call says which and where, and the run tells you in one line and goes on with the desktop tools or
+  Dot's Chrome.
+- Why not Safari's WebDriver (`safaridriver`): it drives a separate automation window that shares none of your
+  cookies, sign-ins or AutoFill, holds one session at a time and stops when you touch that window; its own setting
+  ("Allow remote automation") is off on a Mac by default, and asking for a session while it is off still starts Safari
+  (2.8 s, measured on 2026-11-26). Your session is the reason to use Safari at all.
+
 ## Teaching a task
 
 The composer's "+" offers **Teach a task** (item 423). The owner shows the task once in the chat's tab: the tab comes to
@@ -727,7 +776,9 @@ Launch Services may resolve to the other copy; an `activate` step brings forward
 remote debugging is the owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks is refused in
 every mode but `yolo` (item 433).
 - Work inside a web page goes through the browser tools, which act in the run's own tab whatever other Chromes run;
-  the desktop tools are for what lies outside the page: a native dialog, a file picker, an extension's window. A script
+  the desktop tools are for what lies outside the page: a native dialog, a file picker, an extension's window. A page
+  of the owner's own Safari goes through the Safari tools ([above](#the-owners-own-safari)); a snapshot, an opened
+  application or a batch whose application is Safari says so on its first line (item 1960). A script
   sent to Chrome with AppleScript reaches whichever Chrome window macOS picks; `browser_eval` runs in the run's tab.
 - `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a
   ref (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and
@@ -757,6 +808,10 @@ every mode but `yolo` (item 433).
   changed something, the window is read once the application has
   announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
   without announcing anything in between shows in the next view.
+- A batch's result ends with the window after its steps (what changed, or the whole window when much did), and its
+  line above says so: it is the look the run needs, with no `desktop_snapshot` or screenshot after it unless a step is
+  uncertain or failed, or one not checked left no change in it (item 1960: one run took a screenshot or a snapshot
+  after nearly every act, 22 of its 53 calls).
 - A step's line says whether it was sent and what Dot checked of it, as a browser step's does (item 1146): done says
   that it was sent, and verified, uncertain or not checked stands beside it. What `set_value` set is read back as
   before: uncertain when the field shows it, since a value set through accessibility reaches no key handler and the

@@ -102,6 +102,7 @@ def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_to
         "replies",
         "recon",
         "pages",
+        "images",
         "appearance",
         "worktree",
         "skills",
@@ -191,6 +192,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
         "memory_admin",
         "office",
         "pages",
+        "images",
         "appearance",
         "worktree",
         "pipeline",
@@ -283,6 +285,8 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "headers, technology, open ports, and a form's payload check (recon, security_scan)",
         "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "
         "(show_page)",
+        "- images: making a picture as a PNG: drawn from an SVG or HTML you write, or a photo from Google's picture "
+        "model (generate_image)",
         "- appearance: read or change Dot’s theme when the owner asks (theme_read, theme_apply, theme_undo)",
         "- worktree: link the coding run to its Git worktree and pull request (track_coding_work)",
         "- skills: saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way "
@@ -294,9 +298,9 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "(watch_video)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",
-        "- desktop: the Mac's applications, windows, clipboard and AppleScript (desktop_apps, desktop_open_app, "
-        "desktop_snapshot, desktop_screenshot, desktop_act, desktop_read, desktop_clipboard_read, "
-        "desktop_clipboard_write, apple_script)",
+        "- desktop: the Mac's applications, windows, clipboard and AppleScript, and the pages of the owner's own "
+        "Safari (desktop_apps, desktop_open_app, desktop_snapshot, desktop_screenshot, desktop_act, desktop_read, "
+        "desktop_clipboard_read, desktop_clipboard_write, apple_script, safari_open, safari_read, safari_act)",
     ]
 
 

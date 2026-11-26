@@ -177,6 +177,34 @@ final class SyncTests: XCTestCase {
         XCTAssertEqual(daemon.count("GET", "/api/threads/thr_1/stream"), opens, "a deleted chat's stream is not opened again")
     }
 
+    /// Item 1964: chats deleted together go in one request and leave the list at once, before the Mac answers.
+    func testChatsDeletedTogetherGoInOneRequestAndLeaveTheListAtOnce() async throws {
+        for number in 2...20 { daemon.addChat("thr_\(number)", title: "Chat \(number)") }
+        _ = try await openLive()
+        let all: [String] = (1...20).map { "thr_\($0)" }
+        rig.link.report(.down)
+        try await rig.engine.perform(.deleteChats(threads: all))
+        let hidden: EngineSnapshot = try await snapshot(of: rig.store, "hidden while the link is down") { $0.shownList.rows.isEmpty }
+        XCTAssertEqual(hidden.list.rows.count, 20, "nothing reached the Mac yet")
+        XCTAssertEqual(hidden.goneChats, Set(all))
+        rig.link.report(.up)
+        let daemon: FakeDaemon = daemon
+        _ = try await snapshot(of: rig.store, "the Mac deleted them") { $0.list.rows.isEmpty && $0.outbox.isEmpty && daemon.count("DELETE", "/api/threads") == 1 }
+        XCTAssertEqual(daemon.count("DELETE", "/api/threads"), 1, "one request for twenty chats")
+    }
+
+    /// Item 1964: a delete the Mac refuses shows every chat again, each with the Mac's words.
+    func testChatsWhoseDeleteTheMacRefusesShowAgain() async throws {
+        daemon.addChat("thr_2", title: "Chat 2")
+        _ = try await openLive()
+        daemon.failNext("/api/threads", status: 409, body: #"{"message":"a run of the chat is at work"}"#)
+        try await rig.engine.perform(.deleteChats(threads: ["thr_1", "thr_2"]))
+        let back: EngineSnapshot = try await snapshot(of: rig.store, "shown again") {
+            $0.refusedDeletes.count == 2 && $0.shownList.rows.count == 2
+        }
+        XCTAssertTrue(back.goneChats.isEmpty)
+    }
+
     /// R-e #1: the owner's message steered into a run whose tool is open shows as delivered, read after this step, until
     /// the step ends.
     func testASteerIntoARunWhoseToolIsOpenShowsDeliveredAndReadAfterThisStep() async throws {

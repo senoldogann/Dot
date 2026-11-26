@@ -538,6 +538,17 @@
         }
       }
     },
+    "%lld on": {
+      "comment": "Bot profile: how many of its routines are switched on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld açık"
+          }
+        }
+      }
+    },
     "%lld pt": {
       "comment": "Appearance: the body text's size in points",
       "localizations": {
@@ -607,35 +618,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld oturum"
-          }
-        }
-      }
-    },
-    "%lld sources": {
-      "comment": "Under an answer: how many web links it names; tap unfolds them",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld source"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld sources"
-                }
-              }
-            }
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld kaynak"
           }
         }
       }
@@ -1471,6 +1453,17 @@
         }
       }
     },
+    "Amber": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amber"
+          }
+        }
+      }
+    },
     "An approval or a question waits.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -1537,19 +1530,8 @@
         }
       }
     },
-    "App language": {
-      "comment": "General: the app's language row",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Uygulama dili"
-          }
-        }
-      }
-    },
     "Appearance": {
-      "comment": "Component gallery (debug builds): a heading or sample text\nSettings row",
+      "comment": "Bot edit page: the section of how the bot looks\nComponent gallery (debug builds): a heading or sample text\nSettings row",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -1757,17 +1739,6 @@
         }
       }
     },
-    "Ask it in a chat to do something on a rhythm.": {
-      "comment": "Bot profile: how a routine is made",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bir sohbette ondan bir işi belli aralıklarla yapmasını iste."
-          }
-        }
-      }
-    },
     "Ask only to pay or send": {
       "comment": "Approval mode yolo: asks only before a payment, a message or a public post",
       "localizations": {
@@ -1911,6 +1882,17 @@
         }
       }
     },
+    "Avatar": {
+      "comment": "Bot edit page: opens the bot's shape and colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avatar"
+          }
+        }
+      }
+    },
     "Back on the list.": {
       "comment": "Own initiative: a thing was put back",
       "localizations": {
@@ -2017,6 +1999,17 @@
         }
       }
     },
+    "Blue": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mavi"
+          }
+        }
+      }
+    },
     "Bluetooth": {
       "comment": "Settings › Voice: a named Bluetooth microphone",
       "localizations": {
@@ -2079,6 +2072,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Botlar"
+          }
+        }
+      }
+    },
+    "Brown": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kahverengi"
           }
         }
       }
@@ -2255,6 +2259,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sınırlar"
+          }
+        }
+      }
+    },
+    "Capsule": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kapsül"
           }
         }
       }
@@ -2490,6 +2505,17 @@
         }
       }
     },
+    "Circle": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daire"
+          }
+        }
+      }
+    },
     "Claude Code's own choice": {
       "comment": "Models: self-repair leaves the model to Claude Code",
       "localizations": {
@@ -2574,6 +2600,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kapat"
+          }
+        }
+      }
+    },
+    "Cloud": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bulut"
           }
         }
       }
@@ -2684,6 +2721,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Renk düzeni"
+          }
+        }
+      }
+    },
+    "Colour": {
+      "comment": "Bot avatar page: the section of body colours",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Renk"
           }
         }
       }
@@ -2805,6 +2853,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Genişlemiş yazma alanı"
+          }
+        }
+      }
+    },
+    "Computer": {
+      "comment": "Bot profile: what the bot does on the Mac",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilgisayar"
+          }
+        }
+      }
+    },
+    "Configure the bot": {
+      "comment": "Bot profile: the section of what the bot does and runs on",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botu yapılandır"
           }
         }
       }
@@ -3041,17 +3111,6 @@
         }
       }
     },
-    "Copy link": {
-      "comment": "Long press on a link under an answer: copies its address",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bağlantıyı kopyala"
-          }
-        }
-      }
-    },
     "Copy the answer": {
       "comment": "VoiceOver: copies Dot's answer",
       "localizations": {
@@ -3118,6 +3177,17 @@
         }
       }
     },
+    "Count this bot's unread chats and what waits for you on the home. Push alerts follow Settings › Notifications.": {
+      "comment": "Bot profile: what the Notifications switch does",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu botun okunmamış sohbetleri ve seni bekleyenler ana ekranda sayılır. Anlık bildirimler Ayarlar › Bildirimler'e uyar."
+          }
+        }
+      }
+    },
     "Crashes": {
       "comment": "Maintenance › Performance: crash reports row",
       "localizations": {
@@ -3125,6 +3195,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Çökmeler"
+          }
+        }
+      }
+    },
+    "Cream": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Krem"
           }
         }
       }
@@ -3862,13 +3943,24 @@
         }
       }
     },
-    "Dot Next speaks the language iOS Settings sets for it.": {
+    "Dot Next opens in it the next time it starts.": {
+      "comment": "General: footer once another language is chosen",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dot Next bir sonraki açılışta bu dille açılır."
+          }
+        }
+      }
+    },
+    "Dot Next speaks this language whatever the iPhone's, as the web's own choice does.": {
       "comment": "General: footer under the language",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Dot Next, iOS Ayarları'nın onun için seçtiği dili konuşur."
+            "value": "Dot Next, iPhone'un dili ne olursa olsun bu dili konuşur; web'deki kendi seçimi gibi."
           }
         }
       }
@@ -4293,7 +4385,7 @@
       }
     },
     "Dot's own work": {
-      "comment": "Models section: the model that decides Dot's own work",
+      "comment": "Chat list section: the chats of Dot's schedules, initiative and code reviews\nModels section: the model that decides Dot's own work",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -4424,6 +4516,17 @@
         }
       }
     },
+    "Droplet": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Damla"
+          }
+        }
+      }
+    },
     "Each chat's This chat sheet can show or hide them for that chat alone.": {
       "comment": "Chat settings: footer of Show steps (item 1915)",
       "localizations": {
@@ -4458,12 +4561,23 @@
       }
     },
     "Edit": {
-      "comment": "Draft card: opens the draft to change it before sending\nSchedule menu: edit\nUnder a refused message: puts its words back in the composer",
+      "comment": "Bot profile: opens the bot's edit page\nDraft card: opens the draft to change it before sending\nSchedule menu: edit\nUnder a refused message: puts its words back in the composer",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
             "value": "Düzenle"
+          }
+        }
+      }
+    },
+    "Edit bot": {
+      "comment": "Bot edit page title",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botu düzenle"
           }
         }
       }
@@ -4974,17 +5088,6 @@
         }
       }
     },
-    "File": {
-      "comment": "A file chip's second line while its size is being asked",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dosya"
-          }
-        }
-      }
-    },
     "Files": {
       "comment": "Composer + menu: picks documents or other files",
       "localizations": {
@@ -4992,17 +5095,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dosyalar"
-          }
-        }
-      }
-    },
-    "Files and pages of its latest chat": {
-      "comment": "Bot profile: what the Library row opens",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Son sohbetinin dosyaları ve sayfaları"
           }
         }
       }
@@ -5190,17 +5282,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot'un sorduklarını katla"
-          }
-        }
-      }
-    },
-    "Folded": {
-      "comment": "VoiceOver: the sources row shows only the count",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kapalı"
           }
         }
       }
@@ -5465,6 +5546,28 @@
         }
       }
     },
+    "Green": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeşil"
+          }
+        }
+      }
+    },
+    "Grey": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gri"
+          }
+        }
+      }
+    },
     "Ground · card and grouped · nested and pressed · sheet · opaque glass for Reduce Transparency.": {
       "comment": "Component gallery (debug builds): a heading or sample text",
       "localizations": {
@@ -5663,6 +5766,17 @@
         }
       }
     },
+    "Hexagon": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Altıgen"
+          }
+        }
+      }
+    },
     "Hide %@": {
       "comment": "VoiceOver: hides a model from the list; the argument is its name",
       "localizations": {
@@ -5784,6 +5898,17 @@
         }
       }
     },
+    "Idle": {
+      "comment": "Bot profile: the bot has no run at work",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Boşta"
+          }
+        }
+      }
+    },
     "In millions of tokens, as the Usage page counts them.": {
       "comment": "Cap edit: the unit",
       "localizations": {
@@ -5807,7 +5932,7 @@
       }
     },
     "Ink": {
-      "comment": "Component gallery (debug builds): a heading or sample text",
+      "comment": "Bot colour\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -6099,17 +6224,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "İşleri %@ onay kipinde başlar."
-          }
-        }
-      }
-    },
-    "Its unread chats are not counted on the home.": {
-      "comment": "Bot profile: what Mute does",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Okunmamış sohbetleri ana ekranda sayılmaz."
           }
         }
       }
@@ -6827,7 +6941,7 @@
       }
     },
     "Model": {
-      "comment": "Bot profile: the bot's model\nInspector cost row: the seconds the model took\nSchedule create: the model",
+      "comment": "Bot profile: the bot's model\nCampaign: the model its sessions use\nInspector cost row: the seconds the model took\nInspector row: the model and reasoning level of this chat\nNew schedule: the model its runs use\nSchedule create: the model",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7014,7 +7128,7 @@
       }
     },
     "Needs you": {
-      "comment": "Chat list section: chats that wait for the owner\nComponent gallery (debug builds): a heading or sample text",
+      "comment": "Chat list section: chats that wait for the owner\nChat row: an approval, a question or a secret waits for the owner\nComponent gallery (debug builds): a heading or sample text",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -7376,17 +7490,6 @@
         }
       }
     },
-    "No routine": {
-      "comment": "Bot profile: the bot has no scheduled task",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rutin yok"
-          }
-        }
-      }
-    },
     "No scheduled tasks": {
       "comment": "Schedules: empty",
       "localizations": {
@@ -7449,6 +7552,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yok"
+          }
+        }
+      }
+    },
+    "None of the %lld chats was deleted: %@": {
+      "comment": "Toast: the Mac refused to delete chats sent together; the arguments are how many and its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sohbetten hiçbiri silinmedi: %@"
           }
         }
       }
@@ -8278,17 +8392,6 @@
         }
       }
     },
-    "Open in Safari": {
-      "comment": "Long press on a link under an answer: opens it in the Safari app",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Safari'de aç"
-          }
-        }
-      }
-    },
     "Open its chat": {
       "comment": "Draft: opens the chat of the run that wrote it",
       "localizations": {
@@ -8443,17 +8546,6 @@
         }
       }
     },
-    "Opens the page": {
-      "comment": "VoiceOver hint of a link under an answer",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sayfayı açar"
-          }
-        }
-      }
-    },
     "Opens the web page": {
       "comment": "VoiceOver: the Web mark of a settings row",
       "localizations": {
@@ -8494,6 +8586,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ya da kendi yanıtını yaz"
+          }
+        }
+      }
+    },
+    "Orange": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turuncu"
           }
         }
       }
@@ -8697,6 +8800,17 @@
         }
       }
     },
+    "Pebble": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çakıl"
+          }
+        }
+      }
+    },
     "Pending": {
       "comment": "Under an owner's message: it is going to the Mac and not taken yet (item 1927)",
       "localizations": {
@@ -8770,6 +8884,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yakınlaştırmak için iki parmakla aç ya da iki kez dokun"
+          }
+        }
+      }
+    },
+    "Pink": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pembe"
           }
         }
       }
@@ -9544,6 +9669,17 @@
         }
       }
     },
+    "Red": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kırmızı"
+          }
+        }
+      }
+    },
     "Redraws": {
       "comment": "Maintenance › Performance: how often a chat was drawn again",
       "localizations": {
@@ -9980,6 +10116,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "/btw ile aynı"
+          }
+        }
+      }
+    },
+    "Same as the iPhone": {
+      "comment": "General › Language: follow the iPhone's language",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iPhone ile aynı"
           }
         }
       }
@@ -10864,6 +11011,17 @@
         }
       }
     },
+    "Shape": {
+      "comment": "Bot avatar page: the section of body shapes",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Şekil"
+          }
+        }
+      }
+    },
     "Share": {
       "comment": "Long press on a link or a file preview: the share sheet",
       "localizations": {
@@ -11069,17 +11227,6 @@
         }
       }
     },
-    "Shows the file": {
-      "comment": "VoiceOver hint of a file chip under an answer",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dosyayı gösterir"
-          }
-        }
-      }
-    },
     "Shows the steps": {
       "comment": "VoiceOver hint of a closed work-log group",
       "localizations": {
@@ -11201,17 +11348,6 @@
         }
       }
     },
-    "Some chats were not deleted: %@": {
-      "comment": "Toast: the Mac refused to delete chats; the argument is its words",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bazı sohbetler silinmedi: %@"
-          }
-        }
-      }
-    },
     "Something Dot can do for you on its own": {
       "comment": "Own initiative: the placeholder of a new thing",
       "localizations": {
@@ -11230,6 +11366,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dot için konuşma tanıma kapalı. Ayarlar › Dot Next › Konuşma Tanıma'dan aç."
+          }
+        }
+      }
+    },
+    "Squircle": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yuvarlak kare"
           }
         }
       }
@@ -11840,6 +11987,17 @@
         }
       }
     },
+    "Teal": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camgöbeği"
+          }
+        }
+      }
+    },
     "Teams": {
       "comment": "Composer picker header: the owner's teams",
       "localizations": {
@@ -12155,6 +12313,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Arabanın mikrofonu"
+          }
+        }
+      }
+    },
+    "The chat was not deleted: %@": {
+      "comment": "Toast: the Mac refused to delete a chat; the argument is its words",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sohbet silinmedi: %@"
           }
         }
       }
@@ -13050,6 +13219,17 @@
         }
       }
     },
+    "Triangle": {
+      "comment": "Bot shape",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Üçgen"
+          }
+        }
+      }
+    },
     "Tried": {
       "comment": "Self-improvement: a version the nightly loop tried",
       "localizations": {
@@ -13244,17 +13424,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Geri alındı"
-          }
-        }
-      }
-    },
-    "Unfolded": {
-      "comment": "VoiceOver: the sources row shows each link",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Açık"
           }
         }
       }
@@ -13545,6 +13714,17 @@
         }
       }
     },
+    "Violet": {
+      "comment": "Bot colour",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mor"
+          }
+        }
+      }
+    },
     "Vision model": {
       "comment": "Models: the role that reads images for a model that cannot",
       "localizations": {
@@ -13700,7 +13880,7 @@
       }
     },
     "Waiting on %lld helpers": {
-      "comment": "Capsule: the run waits for its helpers; the argument is how many still work",
+      "comment": "Capsule: the run waits for its helpers; the argument is how many still work\nChat row: the run waits on helpers; the argument is how many",
       "localizations": {
         "en": {
           "variations": {
@@ -13751,7 +13931,7 @@
       }
     },
     "Waiting · %@": {
-      "comment": "Waiting line: the run waits on something; the argument says on what",
+      "comment": "Chat row: something works for the chat in the background; the argument names it\nWaiting line: the run waits on something; the argument says on what",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14257,7 +14437,7 @@
       }
     },
     "Working": {
-      "comment": "Campaign session: at work\nChat list section: chats with a run at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
+      "comment": "Bot profile: the bot has a run at work\nCampaign session: at work\nChat list section: chats with a run at work\nChat row: a run of the chat is at work\nComponent gallery (debug builds): a heading or sample text\nStatus word: a run is at work\nSystem: a service works",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -14747,6 +14927,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtın gerekiyor"
+          }
+        }
+      }
+    },
+    "Your assistant": {
+      "comment": "Dot's built-in role, under its name on its profile",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asistanın"
           }
         }
       }

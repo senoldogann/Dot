@@ -480,8 +480,13 @@ def test_a_login_refused_on_another_page_sends_the_run_to_its_own_site_and_propo
     apple: str = elsewhere_advice("https://account.apple.com/sign-in", websites, "Dot's vault")
     assert "browser_open https://appstoreconnect.apple.com and" in apple
     assert "sends you back to account.apple.com" in apple and "tell the owner" in apple
+    # What the owner does once, by where the login is kept (item 1958): the run that met Apple's sign-in told them
+    # nothing they could act on.
+    assert "add a login for that host in Settings › Vault, with the same user name and password" in apple
+    assert "signs in on account.apple.com" in apple
     assert "apple.com (" not in apple and "should be" not in apple
     bank: str = elsewhere_advice("https://mybank-signin.co.uk/login", ("mybank.co.uk",), "1Password")
+    assert "add that host to the item's websites in 1Password" in bank
     assert "co.uk " not in bank.replace("mybank-signin.co.uk", "").replace("mybank.co.uk", "")
     plain: str = elsewhere_advice("http://appstoreconnect.apple.com/login", websites, "Dot's vault")
     assert plain.startswith("This page is on the login's own host but not over https")

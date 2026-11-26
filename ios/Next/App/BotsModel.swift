@@ -12,7 +12,7 @@ extension AppModel {
 
     /// The home's bots, Dot first, from the agents and the chat list as they stand.
     var bots: [Bot] {
-        DotEngine.bots(agents: agents, rows: list.rows, pinned: pinnedBots, fallbackDot: Self.fallbackDot)
+        DotEngine.bots(agents: agents, rows: list.rows, pinned: pinnedBots, fallbackDot: Self.fallbackDot, gone: goneChats)
     }
 
     /// The bot a chat belongs to.
@@ -28,6 +28,22 @@ extension AppModel {
             agentsProblem = nil
         case .failed(let failure): agentsProblem = failure
         case .loading: break
+        }
+    }
+
+    /// Reads the agents again after deletions: one read at a time, and one more after it when more were asked for
+    /// meanwhile, so twenty chats deleted at once are not twenty reads (the review of item 1965).
+    func rereadAgents() {
+        if agentsReread.running {
+            agentsReread.owed = true
+            return
+        }
+        agentsReread = (true, false)
+        Task {
+            await loadAgents()
+            let again: Bool = agentsReread.owed
+            agentsReread = (false, false)
+            if again { rereadAgents() }
         }
     }
 
@@ -119,4 +135,12 @@ func askPlaceholder(_ name: String) -> String {
 /// Where the same thing is done on the Mac, for a failure's continuation: the web app's Agents page.
 var agentsOnTheMac: String {
     String(localized: "the Agents page", comment: "Where on the Mac: the web app's page of agents (after 'Open on the Mac:')")
+}
+
+/// What a bot does, as its profile and the home say it: Dot's built-in role (the daemon's own English default,
+/// `store/models.py`) in the app's language, any other role as its owner wrote it (item 1966).
+func shownRole(_ record: AgentRecord) -> String {
+    record.id == dotAgentId && record.role == "Your assistant"
+        ? String(localized: "Your assistant", comment: "Dot's built-in role, under its name on its profile")
+        : record.role
 }

@@ -323,10 +323,14 @@ def replace_in(folder: int, name: str, data: bytes) -> None:
 def atomic_write(path: Path, content: str, journal: JournalTarget) -> int:
     """Replace ``path`` with ``content`` through a temporary file (:func:`replace_in`). The change is noted in
     ``journal`` first; when that fails, the file is not changed."""
+    return atomic_write_bytes(path, content.encode("utf-8"), journal)
+
+
+def atomic_write_bytes(path: Path, data: bytes, journal: JournalTarget) -> int:
+    """:func:`atomic_write` for bytes: a picture, which no text encoding makes."""
     with contextlib.suppress(FileNotFoundError, NotADirectoryError):
         if stat.S_ISDIR(os.lstat(path).st_mode):
             raise ToolExecutionError("path is a directory", {"path": str(path)})
-    data: bytes = content.encode("utf-8")
     note_change(journal, path, data)
     # Each folder opened in the one above, searched alone (a folder one may write in but not list is written too) and
     # never followed when it is a link: the path is the one checked, and a link a command put on it since is refused
