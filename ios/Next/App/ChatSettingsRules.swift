@@ -201,6 +201,13 @@ func providerTitle(_ provider: String) -> String {
     }
 }
 
+/// The provider a model reference belongs to: the group of the daemon's list that holds it, else the reference's own
+/// prefix ("claude_code:opus" → "claude_code"; a reference with none: empty, which wears the generic mark).
+func providerOfModel(_ ref: String, in options: [ProviderModels]) -> String {
+    if let group = options.first(where: { $0.models.contains { $0.ref == ref } }) { return group.provider }
+    return ref.contains(":") ? String(ref.split(separator: ":", maxSplits: 1)[0]) : ""
+}
+
 /// The asset of a provider's mark (`Resources/Assets.xcassets/provider-*`, the web's `static/icons/providers`): Zen's
 /// free models wear OpenCode Go's, the Claude plan Anthropic's, Antigravity Google's; the rest the generic one.
 func providerMarkAsset(_ provider: String) -> String {

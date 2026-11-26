@@ -358,7 +358,6 @@ TR: dict[str, str] = {
     "Looked at the screen": "Ekrana baktı",
     "Memory": "Bellek",
     "Message Dot": "Dot'a yaz",
-    "Model, %@": "Model, %@",
     "Models": "Modeller",
     "Mon": "Pzt",
     "Needs you": "Seni bekliyor",
@@ -1498,6 +1497,9 @@ TR.update(
     }
 )
 EN_PLURALS.update({"%lld sessions": ("%lld session", "%lld sessions")})
+
+# The composer's model chip as the provider's mark (item 1924).
+TR.update({"Model: %@": "Model: %@"})
 
 # New chat as a pushed chat (item 1916).
 TR.update({"The message could not be saved on this phone. Try again.": "Mesaj bu telefona kaydedilemedi. Tekrar dene."})

@@ -6705,13 +6705,13 @@
         }
       }
     },
-    "Model, %@": {
-      "comment": "VoiceOver: the composer's model menu; the argument is the model and effort",
+    "Model: %@": {
+      "comment": "VoiceOver: the composer's model button; the argument is the model and effort",
       "localizations": {
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Model, %@"
+            "value": "Model: %@"
           }
         }
       }
