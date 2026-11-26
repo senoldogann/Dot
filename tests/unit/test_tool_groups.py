@@ -281,8 +281,7 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "- replies: handing a reply to a mail Dot sent to the chat that sent it, where that work goes on (pass_reply)",
         "- recon: a site or host you own, or one a bug bounty scope lets you test (dotx scope): addresses, TLS, "
         "headers, technology, open ports, and a form's payload check (recon, security_scan)",
-        "- pages: showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views "
-        "(show_page)",
+        "- pages: showing structured cards or HTML in the conversation (show_page, show_cards)",
         "- appearance: read or change Dot’s theme when the owner asks (theme_read, theme_apply, theme_undo)",
         "- worktree: link the coding run to its Git worktree and pull request (track_coding_work)",
         "- skills: saving how the owner tells you to do a kind of work as a skill, so later runs do it the same way "

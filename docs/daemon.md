@@ -584,7 +584,15 @@ whose turn read pages on the web (`web_fetch`, `web_extract`) has a quiet line b
 1184): the first letter of a few of the sites and how many pages ("3 sources"); opened, each page's title over its site,
 a link that opens it in the browser. A page is counted from the address the run asked for (or the one a redirect ended
 at), never from what a page says; its title is the page's own, shown as text and cut at a line. A turn lists 12 pages
-at most and counts the rest; a fetch that failed and a search read none. A delegated run
+at most and counts the rest; a fetch that failed and a search read none.
+
+Dot can place cards in the conversation with `show_cards`. The web UI displays charts with a data table, ordinary
+tables, image galleries and choices that send the chosen words as a chat message. Post drafts show the platform,
+account and text together, and related drafts scroll sideways. You can copy, edit or cancel a draft in the current
+view. **Prepare to publish** puts a text-only draft in the composer for you to review and send as a request.
+The resulting run goes through the existing post policy. Mail and iMessage drafts are sent through their own cards.
+
+A delegated run
 is a row, drawn as a developer tool draws its subagents (item 1331): a small face with its state at the corner (turning
 while it works, amber while it waits for you, a check in the text's ink when it is done, item 839, red when it
 failed), the job as the title (an agent's run is named by the agent first, "Scout", any other is numbered "Subagent

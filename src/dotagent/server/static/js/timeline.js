@@ -20,6 +20,7 @@ import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, besideLine, chatNoteLine, needsAside, outcomeOf, scheduleLine, userMessage } from "./messages.js";
+import { chatCards } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { readsPages } from "./sourcelist.js";
@@ -1532,6 +1533,13 @@ export function createTimeline({ chat = null, rootRunId, actorId, startedAt, rev
         return;
       }
       place(scope, sentPicks(record.data), record.ts);
+    },
+
+    cards_shown(scope, record) {
+      const node = chatCards(record.data);
+      if (node !== null) {
+        place(scope, node, record.ts);
+      }
     },
 
     // A page the run showed (`show_page`, item 193), in its frame.

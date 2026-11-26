@@ -9,6 +9,7 @@ import { icon } from "./icons.js";
 import { foldSteps, PHONE } from "./layout.js";
 import { answerMessage, besideLine, chatNoteLine,
   needsAside, outcomeOf, scheduleLine, showDotReaction, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+import { chatCards } from "./chatcards.js";
 import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { sayFoot, stepMessage } from "./reactions.js";
@@ -264,6 +265,12 @@ function drawFlow(past, flow, asked, events, reactions) {
     } else if (event.kind === "dot_reaction") {
       reaction = event.data.reaction;
       reactedTo = [...blocks].reverse().find((block) => block.steer !== undefined) ?? null;
+    } else if (event.kind === "cards_shown") {
+      batch = null;
+      const node = chatCards(event.data);
+      if (node !== null) {
+        blocks.push({ cards: node });
+      }
     } else if (event.kind === "page_shown") {
       // A page the run showed (`show_page`, item 193) stands where it came, in its frame, as on the run's own page.
       batch = null;
@@ -299,6 +306,8 @@ function drawFlow(past, flow, asked, events, reactions) {
   const nodes = blocks.map((block) =>
     block.internal !== undefined
       ? internalRecord(block.internal)
+      : block.cards !== undefined
+      ? block.cards
       : block.page !== undefined
       ? pageCard(block.page.id, block.page.title)
       : block.schedule !== undefined

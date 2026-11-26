@@ -1,6 +1,6 @@
-system-task-ask: 32648 characters, ~10202 tokens
-system-task-yolo: 32817 characters, ~10255 tokens
-system-task-lean: 23533 characters, ~7354 tokens
-system-chat: 31104 characters, ~9720 tokens
-system-research: 29349 characters, ~9172 tokens
-tools: 131872 characters, ~41210 tokens
+system-task-ask: 32718 characters, ~10224 tokens
+system-task-yolo: 32887 characters, ~10277 tokens
+system-task-lean: 23603 characters, ~7376 tokens
+system-chat: 31174 characters, ~9742 tokens
+system-research: 29419 characters, ~9193 tokens
+tools: 141655 characters, ~44267 tokens

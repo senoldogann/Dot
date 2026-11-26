@@ -23,6 +23,7 @@ from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.browser import CREATE_LOGIN_TOOL, FILL_LOGIN_TOOL
+from dotagent.tools.cards import SHOW_CARDS_TOOL
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.contacts import CONTACTS_TOOL
 from dotagent.tools.context import AskMode
@@ -937,7 +938,11 @@ def _no_commands_section(tool_names: Sequence[str]) -> str:
 
 
 def _pages_section(tool_names: Sequence[str]) -> str:
-    return _PAGES_SECTION if SHOW_PAGE_TOOL in tool_names else ""
+    pages: str = _PAGES_SECTION if SHOW_PAGE_TOOL in tool_names else ""
+    if SHOW_CARDS_TOOL not in tool_names:
+        return pages
+    cards: str = "Prefer show_cards for charts, tables, quick choices, galleries and post drafts. Batch related cards."
+    return f"{pages}\n- {cards}" if pages else f"# Cards in the conversation\n- {cards}"
 
 
 def _help_section(tool_names: Sequence[str]) -> str:
