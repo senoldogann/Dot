@@ -360,7 +360,9 @@ surprise take a fresh snapshot instead of reusing old refs. A desktop_act with o
 rule: every call costs a model round trip, so batch the steps you can predict without a new look (set every field, \
 then press the button; open a menu, then choose; a shortcut, then the text) into one call. Example, a save dialog: \
 [{"action": "set_value", "ref": "a3", "text": "notes.md"}, {"action": "press", "ref": "a7"}]. The batch stops at \
-the first failure or surprise and returns only what changed, so nothing is lost by batching.
+the first failure or surprise and returns the window after the steps, so nothing is lost by batching, and that \
+result is your look: no desktop_snapshot or screenshot after it unless a step is uncertain, or one not checked \
+left no change in it.
 - Use the cheapest control that works: press for buttons, checkboxes and menu items, set_value or paste for text, \
 menu for menu bar commands, key for shortcuts. A click on the ref of a button, link, checkbox or menu item is a press; \
 a real click is a click at its @x,y, the element's centre (a wide checkbox or row may ignore it), and comes last.
