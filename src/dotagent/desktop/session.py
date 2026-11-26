@@ -892,6 +892,8 @@ class DesktopSession:
         # was reviewed for, not to whatever is there after the wait (item 555).
         if time.monotonic() - asked_at > _ANSWERED_AT_ONCE_S:
             env = replace(env, expected_pointer=None)
+        # The owner may have come back to answer the review at the Mac (item 1890): read again as the step goes.
+        env = replace(env, owner_here=self._owner_here())
         effect: Effect = await self._execute(env, step, inspection)
         self._lines = safety.lines_after(typed, step, inspection.context)
         return replace(effect, about=inspection.target)
@@ -908,9 +910,15 @@ class DesktopSession:
             return await self._call(partial(actions.execute_step, env, step, inspection))
         began: float = presence.now()
         try:
-            return await self._call(partial(actions.execute_step, env, step, inspection))
-        finally:
+            effect: Effect = await self._call(partial(actions.execute_step, env, step, inspection))
+        except BaseException:
+            # What a step that failed halfway posted is not known: it is taken as Dot's own.
             presence.note_own_input(began, presence.now())
+            raise
+        # A click done as a press through accessibility posted nothing, and leaves the owner's input as it was.
+        if actions.takes_input(step) or effect.pointer is not None:
+            presence.note_own_input(began, presence.now())
+        return effect
 
     async def until_away(self, cancel: asyncio.Event, limit_s: float) -> float | None:
         """Wait until the owner has stepped away (item 1890): the seconds it took, or ``None`` once ``limit_s`` went by

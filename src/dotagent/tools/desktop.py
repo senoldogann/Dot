@@ -107,6 +107,8 @@ class AwayWait:
 
 def _minutes(seconds: float) -> str:
     whole: int = round(seconds)
+    if whole >= 3600:
+        return f"{whole // 3600} h {whole % 3600 // 60} min"
     return f"{whole // 60} min {whole % 60} s" if whole >= 60 else f"{whole} s"
 
 

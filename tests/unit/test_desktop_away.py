@@ -254,6 +254,27 @@ async def test_the_owners_return_ends_dots_use_of_the_pointer_at_the_next_step(
         await held.close()
 
 
+async def test_a_step_the_owner_approves_at_the_mac_is_not_sent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner was away as the step began, came back to answer its review at the Mac: the step waits."""
+    mac: _Mac = _Mac()
+    held, sent = _batch_session(tmp_path, monkeypatch, mac, lambda step: None)
+
+    async def answered_at_the_mac(review: StepReview) -> None:
+        mac.now += 30
+        mac.touch()
+
+    try:
+        outcome: ActOutcome = await held.act(
+            "thread", None, [Step(action="key", key="return")], answered_at_the_mac, lambda i, w: None, 1000, "Dot", 1
+        )
+        assert [report.outcome for report in outcome.steps] == ["skipped"] and outcome.waits_from == 1
+        assert sent == []
+    finally:
+        await held.close()
+
+
 async def test_dots_own_steps_do_not_read_as_the_owner_coming_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
