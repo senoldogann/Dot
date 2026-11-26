@@ -6716,6 +6716,17 @@
         }
       }
     },
+    "Model: %@": {
+      "comment": "VoiceOver: the composer's model button; the argument is the model and effort",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model: %@"
+          }
+        }
+      }
+    },
     "Models": {
       "comment": "Settings row",
       "localizations": {
