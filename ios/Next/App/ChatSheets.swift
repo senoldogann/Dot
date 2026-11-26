@@ -130,7 +130,7 @@ struct RunInspector: View {
     @State private var preview: URL?
 
     private var view: ThreadView? { model.chats[thread]?.view }
-    private var run: RunRecord? { view?.runs.last { $0.parentRunId == nil } }
+    private var run: RunRecord? { view.flatMap { DotEngine.ownRuns(of: $0).last } }
 
     var body: some View {
         List {
@@ -146,7 +146,10 @@ struct RunInspector: View {
                     }
                 }
                 Section(String(localized: "Model for this chat", comment: "Inspector section: the chat's model")) {
-                    InspectorRow(title: [view?.newest?.choices?.model ?? run.model, view?.newest?.choices?.effort ?? run.effort].compactMap { $0 }.joined(separator: " · "), systemImage: "cpu", accessory: .none)
+                    // The chat's choices as the composer's chip and its settings read them; the run's own when none are kept.
+                    let choices: ChatChoices? = view?.newest?.choices
+                    let shown: [String?] = choices.map { [effectiveModel($0, defaultRef: model.chatDefaults?.model), $0.effort] } ?? [run.model, run.effort]
+                    InspectorRow(title: shown.compactMap { $0 }.joined(separator: " · "), systemImage: "cpu", accessory: .none)
                     if let tokensIn = run.inputTokens, let tokensOut = run.outputTokens {
                         InspectorRow(title: String(localized: "Tokens", comment: "Inspector row: tokens the run read and wrote"), systemImage: "number",
                             accessory: .detail(String(localized: "\(tokensIn) in · \(tokensOut) out", comment: "Inspector: tokens read and written")))

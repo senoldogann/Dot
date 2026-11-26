@@ -117,6 +117,30 @@ func toolLine(_ entry: ToolEntry) -> String {
     }
 }
 
+/// What a step does now, in plain words, for the working capsule and a helper's row (item 1880): never a raw tool name.
+/// A step that talks to helpers waits for them; a read, edit, command, search, page or wait says what it does; any
+/// other tool is "Working".
+func stepWords(tool: String, target: String) -> String {
+    let kind: ToolKind = ToolKind.of(tool)
+    if isHelperStep(tool) {
+        return String(localized: "Waiting for a helper", comment: "Capsule and helper row: the run's step talks to or waits for a helper")
+    }
+    switch kind {
+    case .read, .edit, .command, .search, .web, .wait:
+        let line: String = toolLine(
+            ToolEntry(id: "", tool: tool, kind: kind, target: target, args: "", output: "", state: .running, images: [], startedAt: 0, endedAt: nil))
+        return line == tool || line.hasPrefix(tool + " · ") ? String(localized: "Working", comment: "Status word: a run is at work") : line
+    default:
+        return String(localized: "Working", comment: "Status word: a run is at work")
+    }
+}
+
+/// Whether a step starts or talks to a helper: Dot's `delegate` and `message_agent`, a CLI harness's `Task` or `Agent`.
+/// Named exactly: a tool that only has "agent" in its name (`agent_status`, an MCP tool) is no wait on a helper.
+func isHelperStep(_ tool: String) -> Bool {
+    ["delegate", "message_agent", "task", "agent"].contains(tool.lowercased())
+}
+
 /// The glyph of a tool call by its kind.
 func toolSymbol(_ kind: ToolKind) -> String {
     switch kind {
@@ -229,8 +253,24 @@ func composerActionWords(_ action: ComposerAction) -> String {
     case .send: String(localized: "Send", comment: "VoiceOver: the composer's send button")
     case .queue: String(localized: "Queue: starts after this run", comment: "Composer: queues the message after the run at work")
     case .steer: String(localized: "Send now into the running task", comment: "Composer long-press: steer instead of queue")
-    case .stop: String(localized: "Stop", comment: "Chat toolbar: stops the run at work")
+    case .stop: String(localized: "Stop", comment: "Composer and ask dock: stops the run at work")
     case .confirmEdit: String(localized: "Save the queued message", comment: "Composer: confirms the edit of a queued message")
+    }
+}
+
+/// The title of a way to send a follow-up while a run works, in the composer's long-press menu.
+func followUpTitle(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Steer now", comment: "Composer long-press menu: sends the draft into the run at work")
+    case .queue: String(localized: "Queue", comment: "Follow-up setting: queued after the run")
+    }
+}
+
+/// What a way to send a follow-up does, under its title in the composer's long-press menu.
+func followUpDetail(_ way: FollowUp) -> String {
+    switch way {
+    case .steer: String(localized: "Interrupt what the agent is doing", comment: "Composer long-press menu: what Steer now does")
+    case .queue: String(localized: "Run after the current turn", comment: "Composer long-press menu: what Queue does")
     }
 }
 

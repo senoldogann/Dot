@@ -55,7 +55,7 @@ struct ModelsPage: View {
                         Button { pickReview(review, picture: picture) } label: {
                             ListRow(
                                 systemImage: nil, title: String(localized: "Code review model", comment: "Code review: the first model"), description: nil,
-                                accessory: .detailAndChevron("\(modelLabel(review.model, in: picture.options)) · \(effortWords(review.effort))"))
+                                accessory: .detailAndChevron("\(modelLabel(review.model, in: picture.options)) · \(effortTitle(review.effort))"))
                         }
                         .buttonStyle(RowPressStyle())
                     }

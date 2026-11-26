@@ -9,6 +9,7 @@ enum SettingsPage: Hashable, Sendable {
     case general
     case appearance
     case chat
+    case voice
     case models
     case caps
     case schedules

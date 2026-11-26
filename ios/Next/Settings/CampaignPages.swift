@@ -343,13 +343,13 @@ struct CampaignPage: View {
 // MARK: Search
 
 /// Campaigns as Settings' search finds it: the web's own words of the page (settingstabs.js) and the same in the app's
-/// language.
+/// language. "resume" is not among them: it finds Maintenance's Continue after restart (the search test pins it).
 func campaignsIndexEntry() -> (SettingsEntry, SettingsPage) {
     (
         SettingsEntry(
             id: "campaigns", title: String(localized: "Campaigns", comment: "Settings row: goals Dot keeps working on"),
             path: String(localized: "Agents", comment: "Settings section: models, schedules, rules, memory"),
-            synonyms: ["goals sessions long running keep going pause stop resume", String(localized: "goals sessions keep going stop resume", comment: "Settings search synonyms of Campaigns (space separated)")]),
+            synonyms: ["goals sessions long running keep going pause stop", String(localized: "goals sessions keep going stop", comment: "Settings search synonyms of Campaigns (space separated)")]),
         .campaigns
     )
 }

@@ -8,6 +8,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | ---- | ------ | ---- | ----- |
 | [1895](1895.md) | done | 2026-11-26 | DotNext: the owner's campaigns on the phone, native |
 | [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
+| [1891](1891.md) | done | 2026-11-25 | Item numbers are reserved, and every place that holds one is read |
+| [1880](1880.md) | done | 2026-11-25 | DotNext puts the run's work in one pill: plain words, Stop, the plan and the helpers; the stream keeps no plan or helper card and folds its thinking |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
 | [1872](1872.md) | done | 2026-11-25 | The gate's macOS job runs only the unit tests Linux leaves out |
@@ -32,12 +34,18 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1847](1847.md) | done | 2026-11-25 | DotNext drops the "Dot · <Mac> · <date>" line at the top of a chat |
 | [1836](1836.md) | done | 2026-11-25 | The daemon's routes that only the 3D office used are removed |
 | [1835](1835.md) | done | 2026-11-25 | The 3D office leaves the Agents page |
+| [1802](1802.md) | done | 2026-11-25 | DotNext's voice typing: the composer becomes a recorder; Settings › Voice |
+| [1801](1801.md) | done | 2026-11-25 | DotNext's chat settings: the model, its level, fast mode, approvals and plan first, also before a new chat |
+| [1800](1800.md) | done | 2026-11-25 | DotNext's chat list: select several, pin and delete them together, a Pinned section on top |
 | [1791](1791.md) | done | 2026-11-25 | DotNext's Settings open no web page: the Mac's setup pages have no row, and the list ends with "More settings are on your Mac." |
 | [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
 | [1771](1771.md) | done | 2026-11-25 | DotNext's Models, Scheduled tasks, Rules, Memory and Agents are native, as much of them as a phone is for |
 | [1770](1770.md) | done | 2026-11-25 | The code review's models and their reasoning are changed from the phone too |
 | [1769](1769.md) | done | 2026-11-25 | DotNext: the work told in one live line, thinking as rows of the work, Dot's own tools in words, softer motion |
 | [1768](1768.md) | done | 2026-11-25 | A run on the Claude plan passes on its model's thinking |
+| [1767](1767.md) | done | 2026-11-25 | DotNext: a long press on Send offers Steer now and Queue |
+| [1766](1766.md) | done | 2026-11-25 | DotNext: the phone does not engage the emergency stop |
+| [1765](1765.md) | done | 2026-11-25 | DotNext: no Stop in the chat's header |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
 | [1759](1759.md) | done | 2026-11-25 | DotNext's Settings, whole: every page of the web app reachable, the hop-by-hop diagnosis, and pairing as a first run |

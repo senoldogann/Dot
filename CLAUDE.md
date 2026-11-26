@@ -88,8 +88,9 @@ A change that takes days is many pushes, each waiting on the review and the gate
   reverted alone (a pull request of one item may be squashed: `squash`). Order the commits by item and say in the body which is which. Keep a part out of
   the batch when it needs the owner's look (a change under "Always needs a human" waiting on them must not hold the
   rest) or is a risk that should be reverted alone.
-- **The item numbers** come from `uv run python scripts/next_item.py [count]` right before the first push (main, open
-  pull requests and pushed branches all hold numbers), and the pull request is made from the entries (`gh pr create
+- **The item numbers** come from `uv run python scripts/next_item.py [count]`, run once (main, pull requests open and
+  closed, every branch, commit and worktree on this Mac hold numbers; each call reserves what it gives for three days in
+  the shared git directory, so a second call gives new ones, item 1891), and the pull request is made from the entries (`gh pr create
   --title "$(uv run python scripts/pr_body.py N M --title)" --body "$(uv run python scripts/pr_body.py N M)"`).
 - **`main` does not require a branch up to date (item 944).** `scripts/merge_pr.py` merges once the checks passed,
   and brings the branch up to `main` first only when `main` changed one of its files since they ran, Markdown no

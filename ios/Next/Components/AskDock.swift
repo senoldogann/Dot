@@ -68,7 +68,7 @@ struct AskDock: View {
             }
             if let stop = actions.stop, !folded {
                 Button(action: stop) {
-                    Label(String(localized: "Stop", comment: "Chat toolbar: stops the run at work"), systemImage: "stop.fill").frame(maxWidth: .infinity)
+                    Label(String(localized: "Stop", comment: "Composer and ask dock: stops the run at work"), systemImage: "stop.fill").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(DestructiveButtonStyle())
                     .accessibilityHint(String(localized: "Stops the run that waits for this answer", comment: "VoiceOver hint of Stop in the ask dock"))

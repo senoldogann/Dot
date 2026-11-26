@@ -50,7 +50,7 @@ struct WebSettingsPage: View {
                 }
             } else {
                 EmptyState(
-                    title: String(localized: "Not paired with a Mac", comment: "Emergency stop: no Mac to stop"), systemImage: "desktopcomputer",
+                    title: String(localized: "Not paired with a Mac", comment: "A call that needs the Mac when this phone is not paired"), systemImage: "desktopcomputer",
                     detail: String(localized: "Pair this phone first.", comment: "Web settings page: no Mac to open"), actionTitle: nil, action: {})
             }
         }

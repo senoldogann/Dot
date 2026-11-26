@@ -14,6 +14,7 @@
         case general = "settings-general"
         case appearance = "settings-appearance"
         case chat = "settings-chat"
+        case voice = "settings-voice"
         case models = "settings-models"
         case caps = "settings-caps"
         case capsRefused = "settings-caps-refused"
@@ -59,6 +60,7 @@
             case .general: .general
             case .appearance: .appearance
             case .chat: .chat
+            case .voice: .voice
             case .models: .models
             case .caps, .capsRefused, .oldDaemon: .caps
             case .schedules, .scheduleEdit: .schedules
@@ -148,7 +150,6 @@
             switch (method, path) {
             case ("GET", "/api/status"): return (200, status(engaged: behaviour == .stopped))
             case ("GET", "/api/failsafe"): return (200, #"{"engaged":\#(behaviour == .stopped),"cancelled_runs":[]}"#)
-            case ("POST", "/api/failsafe"): return (200, #"{"engaged":true,"cancelled_runs":["run_a"]}"#)
             case ("DELETE", "/api/failsafe"): return (200, #"{"engaged":false,"cancelled_runs":[]}"#)
             case ("GET", "/api/assistant"), ("PUT", "/api/assistant"):
                 return (200, #"{"name":"Dot","owner":"Şenol","mac_name":"MacBook Air","introduced":true}"#)
@@ -277,7 +278,7 @@
 
         private var models: String {
             let option: (String, String) -> String = { ref, label in
-                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium"}"#
+                #"{"ref":"\#(ref)","label":"\#(label)","vision":true,"tools":true,"thinking":true,"context_length":200000,"efforts":["low","medium","high"],"default_effort":"medium","fast_mode":\#(ref == "claude_code:opus"),"free":\#(ref.hasPrefix("ollama"))}"#
             }
             return "["
                 + #"{"provider":"claude_code","models":[\#(option("claude_code:sonnet", "Sonnet 5.5")),\#(option("claude_code:opus", "Opus 5.5"))],"error":null},"#

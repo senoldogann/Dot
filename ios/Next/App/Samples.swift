@@ -69,18 +69,19 @@ enum Samples {
         return [
             HelperRun(
                 id: "r1", title: String(localized: "Find a free afternoon slot", comment: "Sample helper title (wave N0)"),
-                state: .working, startedAt: now.addingTimeInterval(-2475), endedAt: nil, engine: engine),
+                state: .working, startedAt: now.addingTimeInterval(-2475), endedAt: nil, engine: engine,
+                doing: String(localized: "Browsed dentist.example/booking", comment: "Sample helper step (item 1880)")),
             HelperRun(
                 id: "r2", title: String(localized: "Check the deposit with Finance", comment: "Sample helper title (wave N0)"),
-                state: .waitingOnYou, startedAt: now.addingTimeInterval(-1412), endedAt: nil, engine: engine),
+                state: .waitingOnYou, startedAt: now.addingTimeInterval(-1412), endedAt: nil, engine: engine, doing: nil),
             HelperRun(
                 id: "r3", title: String(localized: "Compare three clinics", comment: "Sample helper title (wave N0)"),
                 state: .done, startedAt: now.addingTimeInterval(-3900), endedAt: now.addingTimeInterval(-3100),
-                engine: "DeepSeek · V4 · High"),
+                engine: "DeepSeek · V4 · High", doing: nil),
             HelperRun(
                 id: "r4", title: String(localized: "Read the insurance terms", comment: "Sample helper title (wave N0)"),
                 state: .failed, startedAt: now.addingTimeInterval(-5000), endedAt: now.addingTimeInterval(-4700),
-                engine: engine),
+                engine: engine, doing: nil),
         ]
     }
 
