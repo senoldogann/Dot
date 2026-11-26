@@ -1389,21 +1389,21 @@ dotx service uninstall   # stop the daemon and remove the job
   start that went well came after it. Without such a failure, read `daemon.err.log`.
 - `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout` sends
   the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
-  loaded again from its property list (a load launchd refuses is tried a second time, and then the job is started with
-  `launchctl kickstart -k`, item 1310), and the command waits up to 60 seconds for a new process to answer `GET
-  /api/health`, then prints its version. Another program that answers there meanwhile (one that listens on every
-  address of the port, such as `python3 -m http.server 8765`, takes the connections in the moment before the new
-  daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
+  loaded again from its property list (a load launchd refuses is tried again after 2, 5 and 10 s, item 1941, and then
+  the job is started with `launchctl kickstart -k`, item 1310), and the command waits up to 60 seconds for a new process
+  to answer `GET /api/health`, then prints its version. Another program that answers there meanwhile (one that listens
+  on every address of the port, such as `python3 -m http.server 8765`, takes the connections in the moment before the
+  new daemon binds its own) is waited past, and named in the error only when it still answers at the end (item 970);
   `service install` waits so too. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
   `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
   off, and the daemon's next start resumes them as `[agent] resume` says: with the default `safe`, a run of the pages
   goes on by itself, told to check what it left half done, unless what was cut may have paid, sent or posted for you
   (item 1854, [Autonomy](autonomy.md)). So a restart no longer loses a run's work, and an update need not wait for the
-  runs to end; `--when-idle` stays for a restart that should not cut a step in the middle. When launchd has no job of the service, the
-  command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
-  them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the daemon would stop
-  under the run, and the run's end would kill the command before it loads the daemon again (or, for the uninstall,
-  before it removes the job's file, which would bring the daemon back at the next login).
+  runs to end; `--when-idle` stays for a restart that should not cut a step in the middle. When launchd has no job of
+  the service, the command says so and names `service install`. In a command a run's tool started (the shell and
+  terminal tools mark them, `DOT_RUN_SHELL`), `service restart`, `service install` and `service uninstall` refuse: the
+  daemon would stop under the run, and the run's end would kill the command before it loads the daemon again (or, for
+  the uninstall, before it removes the job's file, which would bring the daemon back at the next login).
 - **The watchdog** (item 925), `dev.dotagent.watchdog`, is a launchd job of its own beside the daemon's (its property
   list in `~/Library/LaunchAgents`, `StartInterval` 60, `RunAtLoad`, no `KeepAlive`): `service install` loads it once
   the daemon answers, `service uninstall` removes it first, and `service status` says whether it is loaded. Each

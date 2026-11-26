@@ -310,7 +310,7 @@ def no_waits(monkeypatch: pytest.MonkeyPatch) -> None:
         return None
 
     monkeypatch.setattr(launchd, "_wait_until_unloaded", unloaded)
-    monkeypatch.setattr(launchd, "_BOOTSTRAP_RETRY_S", 0.0)
+    monkeypatch.setattr(launchd, "_BOOTSTRAP_RETRIES_S", (0.0, 0.0, 0.0))
 
 
 async def test_a_restart_loads_the_job_with_one_bootstrap_when_launchd_takes_it(
@@ -322,28 +322,40 @@ async def test_a_restart_loads_the_job_with_one_bootstrap_when_launchd_takes_it(
     assert ctl.calls == ["bootout", "bootstrap"]
 
 
-async def test_a_refused_load_is_tried_a_second_time_and_then_kickstarted(
+async def test_a_refused_load_is_tried_again_with_waits_that_grow_and_then_kickstarted(
     monkeypatch: pytest.MonkeyPatch, no_waits: None
 ) -> None:
+    """Items 1310 and 1941: launchd's busy label can last seconds after the unload, so the load is tried four times
+    (after 2, 5 and 10 s) before the job is kickstarted, and a restart leaves the daemon down only when all fail."""
     once: _Launchctl = _Launchctl("bootstrap")
     monkeypatch.setattr(launchd, "run_launchctl", once)
     await restart_job(Path("/p/dot.plist"), UID)
     assert once.calls == ["bootout", "bootstrap", "bootstrap"]
-    twice: _Launchctl = _Launchctl("bootstrap", "bootstrap")
-    monkeypatch.setattr(launchd, "run_launchctl", twice)
+    thrice: _Launchctl = _Launchctl("bootstrap", "bootstrap", "bootstrap")
+    monkeypatch.setattr(launchd, "run_launchctl", thrice)
     await restart_job(Path("/p/dot.plist"), UID)
-    assert twice.calls == ["bootout", "bootstrap", "bootstrap", "kickstart"]
+    assert thrice.calls == ["bootout", *["bootstrap"] * 4]
+    always: _Launchctl = _Launchctl(*["bootstrap"] * 4)
+    monkeypatch.setattr(launchd, "run_launchctl", always)
+    waits: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    monkeypatch.setattr(launchd, "_BOOTSTRAP_RETRIES_S", (2.0, 5.0, 10.0))
+    await load_job(Path("/p/dot.plist"), UID, sleep)
+    assert always.calls == [*["bootstrap"] * 4, "kickstart"] and waits == [2.0, 5.0, 10.0]
 
 
 async def test_a_load_that_nothing_starts_raises_what_each_step_said(
     monkeypatch: pytest.MonkeyPatch, no_waits: None
 ) -> None:
-    ctl: _Launchctl = _Launchctl("bootstrap", "bootstrap", "kickstart")
+    ctl: _Launchctl = _Launchctl(*["bootstrap"] * 4, "kickstart")
     monkeypatch.setattr(launchd, "run_launchctl", ctl)
     with pytest.raises(ServiceError, match="kickstart") as caught:
         await load_job(Path("/p/dot.plist"), UID)
     assert set(caught.value.context) == {"bootstrap", "kickstart"}
-    assert ctl.calls == ["bootstrap", "bootstrap", "kickstart"]
+    assert ctl.calls == [*["bootstrap"] * 4, "kickstart"]
 
 
 class _Watched:

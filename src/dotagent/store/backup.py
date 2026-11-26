@@ -19,10 +19,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dotagent.config import StoreConfig
-from dotagent.core.errors import StoreError
+from dotagent.core.errors import DiskSpaceError, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import dot_home
 from dotagent.core.types import FrozenModel
+from dotagent.store.space import ensure_space, floor_bytes
 
 log = get_logger(__name__)
 
@@ -187,6 +188,15 @@ def make_backup(database: Path, folder: Path, partial: Path, now: float) -> Back
     return Backup(path=str(final), made_at=float(int(now)), size=final.stat().st_size)
 
 
+def ensure_backup_space(database: Path, folder: Path, partial: Path, floor: int) -> None:
+    """Refuse a copy before it begins (:class:`~dotagent.core.errors.DiskSpaceError`, item 1938) when it would leave a
+    disk below ``floor`` free: the uncompressed copy (the database's size) in ``partial``, and the compressed one, at
+    most as large, in ``folder``. Both are counted on each disk, as the two are often one."""
+    size: int = database.stat().st_size if database.exists() else 0
+    ensure_space(partial, 2 * size, floor, "a copy of the database")
+    ensure_space(folder, 2 * size, floor, "a copy of the database")
+
+
 def thin_backups(folder: Path, keep_hourly: int, keep_days: int, now: float) -> list[Backup]:
     """Delete the copies past what is kept and return them: the newest ``keep_hourly``, and the newest copy of each of
     the last ``keep_days`` days (days of UTC) besides. Only files named as copies are ever looked at."""
@@ -211,7 +221,8 @@ def thin_backups(folder: Path, keep_hourly: int, keep_days: int, now: float) -> 
 async def keep_backups(config: StoreConfig, database: Path) -> None:
     """Make a copy every ``backup_every_hours`` hours while the daemon runs, at once when none is younger, whenever
     the database changed since the last one, and thin the folder after each (item 526). A copy that fails is logged
-    with what failed and tried again after ``_RETRY_S``; the loop ends with the daemon."""
+    with what failed and tried again after ``_RETRY_S``, as is one that would leave the disk below ``[store]
+    min_free_gb`` free, which is not begun (item 1938); the loop ends with the daemon."""
     every_s: float = config.backup_every_hours * 3600.0
     folder: Path = backup_folder(config)
     while True:
@@ -227,10 +238,18 @@ async def keep_backups(config: StoreConfig, database: Path) -> None:
                     # Nothing to copy: look again soon, so that a write after a quiet spell is copied soon too.
                     await asyncio.sleep(min(every_s, _QUIET_POLL_S))
                     continue
+            await asyncio.to_thread(
+                ensure_backup_space, database, folder, partial_folder(), floor_bytes(config.min_free_gb)
+            )
             made: Backup = await asyncio.to_thread(make_backup, database, folder, partial_folder(), time.time())
             gone: list[Backup] = await asyncio.to_thread(
                 thin_backups, folder, config.backup_keep_hourly, config.backup_keep_days, time.time()
             )
+        except DiskSpaceError as error:
+            # Not a fault of the copy: the disk watch has told the owner (item 1938); tried again once there is room.
+            log.warning("backup_skipped_low_space", folder=str(folder), error=error.message, context=error.context)
+            await asyncio.sleep(_RETRY_S)
+            continue
         except (StoreError, OSError, sqlite3.Error) as error:
             log.error("backup_failed", folder=str(folder), error_type=type(error).__name__, error=str(error))
             await asyncio.sleep(_RETRY_S)
