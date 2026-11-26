@@ -6,8 +6,10 @@ permission the agent asks for is decided as a tool of Dot's own is (:meth:`dotag
 the owner's rules and preset, the review model or the owner, as the run's approval mode says; a refusal tells the agent
 why, and it goes on. The owner's messages go to the agent while it works, and a stop of the run stops it. The run ends
 done with the agent's last answer once the agent has nothing left to do, and failed when its session fails, when its
-last reply was cut short (the model's output limit) and when it goes on past the run's limits (``run_max_minutes``,
-``run_max_tokens``), which it is told of once.
+last reply was cut short (the model's output limit), when its session says nothing for ``[providers.opencode]
+silence_s`` while no tool works for it and no permission waits on the owner (item 1940), and when it goes on past the
+run's limits (``run_max_minutes``, ``run_max_tokens``), which it is told of once; the time limit is kept by the clock
+too, so a session that hangs mid-step ends :data:`_LIMIT_GRACE_S` after it was told.
 
 The agent has Dot's own tools besides its own (item 284): every one a run on Claude Code gets but those of what
 OpenCode's own tools do (:data:`OPENCODE_OWN`, item 1720), served by Dot's bridge (:mod:`dotagent.opencode.bridge`) at
@@ -148,6 +150,9 @@ _CUT_SHORT: frozenset[str] = frozenset({"length", "other"})
 # The steps that end after the agent was told that the run's limit is reached before one that goes on ends the run:
 # the step that was under way when the note arrived has not read it.
 _LIMIT_GRACE_STEPS: int = 2
+# How long after it was told of the time limit an agent whose step never ends (a session that hangs) is stopped and the
+# run is over (item 1940): the step under way may be writing its answer, which a slow free model takes minutes over.
+_LIMIT_GRACE_S: float = 300.0
 # What the agent is told when the run's limit is reached: in a mode with finish (bridged since item 1695) to call it, as
 # Dot's own loop's note asks, else to write its answer.
 _LIMIT_NOTE: str = (
@@ -506,12 +511,16 @@ class _Follow:
     queue: asyncio.Queue[_Item]
     # What the names of Dot's own tools start with in the session (``dot_1a2b3c4d_``): their calls show as Dot's.
     door: str
+    # How long the session may say nothing while no tool works for it and no permission waits on the owner
+    # (``[providers.opencode] silence_s``, item 1940).
+    silence_s: float
     # When the run began (monotonic seconds) and its limits (``[agent] run_max_minutes`` and ``run_max_tokens``, which
     # the loop of Dot's own runs reads between its steps too, item 552), the limit the agent was told of and how many
     # steps ended since, and the limit once the agent went on regardless: the run ends failed then.
     started: float = field(default_factory=time.monotonic)
     limits: RunLimits | None = None
     told: LimitReached | None = None
+    told_at: float | None = None
     since_told: int = 0
     over: LimitReached | None = None
     # Dot's system prompt for the run (item 1695), sent with every prompt: OpenCode keeps a prompt's system to its turn;
@@ -536,6 +545,10 @@ class _Follow:
     added: int = 0
     asks: set[asyncio.Task[None]] = field(default_factory=set)
     idle: bool = False
+    # When the run last heard from the session or the owner (monotonic seconds), and the calls of tools at work, which
+    # a long command keeps silent (item 1940).
+    heard: float = field(default_factory=time.monotonic)
+    running: set[str] = field(default_factory=set)
     # What the agent writes and thinks, as it comes, masked as the step's stored message is (item 551).
     stream: StreamMask = field(init=False)
 
@@ -567,7 +580,11 @@ class _Follow:
     async def follow(self) -> str:
         """Read the session's events until the agent has nothing left to do; the agent's last answer."""
         while True:
-            item: _Item = await self.queue.get()
+            item: _Item | None = await self.next_item()
+            if item is None:
+                if await self.quiet():
+                    return self.answer
+                continue
             match item:
                 case _Stopped():
                     raise RunCancelled("the run was stopped", {"run_id": self.agent.run.id})
@@ -584,6 +601,64 @@ class _Follow:
                     event: SessionEvent | None = read_event(item, self.session_id)
                     if event is not None and await self.seen(event):
                         return self.answer
+
+    def working(self) -> bool:
+        """Whether a tool works for the agent or a permission it asked for waits on the owner: no silence then."""
+        return bool(self.running) or bool(self.asks)
+
+    def deadline(self) -> float | None:
+        """When the run's time limit is spent (monotonic seconds), ``None`` without one."""
+        if self.limits is None or self.limits.max_minutes <= 0:
+            return None
+        return self.started + self.limits.max_minutes * 60.0
+
+    def wake_in(self, now: float) -> float | None:
+        """How long the run may wait for the next item before it looks at the clock (item 1940): until the silence is
+        spent (not while :meth:`working`), and until the time limit is spent, or, once the agent was told of it, until
+        :data:`_LIMIT_GRACE_S` after; ``None``: as long as it takes."""
+        waits: list[float] = []
+        if not self.working():
+            waits.append(self.heard + self.silence_s - now)
+        deadline: float | None = self.deadline()
+        if deadline is not None:
+            waits.append((deadline if self.told_at is None else max(deadline, self.told_at + _LIMIT_GRACE_S)) - now)
+        return max(0.0, min(waits)) if waits else None
+
+    async def next_item(self) -> _Item | None:
+        """The next item of the run's queue, or ``None`` when :meth:`wake_in` passed without one."""
+        try:
+            async with asyncio.timeout(self.wake_in(time.monotonic())):
+                item: _Item = await self.queue.get()
+        except TimeoutError:
+            return None
+        self.heard = time.monotonic()
+        return item
+
+    async def quiet(self) -> bool:
+        """What the clock says when no item came (item 1940): past the time limit, the agent is told of it once, and
+        a run whose agent still has not ended :data:`_LIMIT_GRACE_S` later is over (True); a session silent for
+        ``silence_s`` while no tool works for it fails the run with :class:`OpenCodeError`."""
+        now: float = time.monotonic()
+        deadline: float | None = self.deadline()
+        if self.limits is not None and deadline is not None and now >= deadline:
+            if self.told is None:
+                tokens: int = await self.runtime.store.family_tokens(self.agent.run.id)
+                reached: LimitReached | None = limit_reached(self.limits, now - self.started, tokens)
+                if reached is not None:
+                    await self.tell_limit(reached)
+                return False
+            if self.told_at is not None and now >= self.told_at + _LIMIT_GRACE_S:
+                log.warning("opencode_limit_over", run_id=self.agent.run.id, spent=limit_spent(self.told))
+                self.over = self.told
+                return True
+        silent: float = now - self.heard
+        if not self.working() and silent >= self.silence_s:
+            log.warning("opencode_silent", run_id=self.agent.run.id, session=self.session_id, silence_s=silent)
+            raise OpenCodeError(
+                f"OpenCode's agent said nothing for {round(silent)} s while no tool worked for it, so Dot ended it",
+                {"run_id": self.agent.run.id, "session": self.session_id, "silence_s": round(silent, 1)},
+            )
+        return False
 
     async def seen(self, event: SessionEvent) -> bool:
         """Show ``event``; whether the agent has nothing left to do after it."""
@@ -640,6 +715,11 @@ class _Follow:
         if step is None:
             return
         call: _Call = self.calls.setdefault(event.call_id, _Call())
+        # A call at work keeps the session silent for as long as it takes (item 1940).
+        if event.status == "running":
+            self.running.add(event.call_id)
+        elif event.status != "pending":
+            self.running.discard(event.call_id)
         if event.input:
             call.arguments = event.input
         if event.status == "pending":
@@ -734,7 +814,12 @@ class _Follow:
         reached: LimitReached | None = limit_reached(self.limits, time.monotonic() - self.started, tokens)
         if reached is None:
             return
+        await self.tell_limit(reached)
+
+    async def tell_limit(self, reached: LimitReached) -> None:
+        """Tell the agent once that the run's limit is reached: stop now and answer."""
         self.told = reached
+        self.told_at = time.monotonic()
         log.info("opencode_limit_reached", run_id=self.agent.run.id, spent=limit_spent(reached))
         await self.emit(LIMIT_EVENT, limit_event_data(reached), True)
         ending: str = _LIMIT_FINISH if self.finishes else _LIMIT_REPLY
@@ -1011,6 +1096,7 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
             vision=info.vision,
             queue=queue,
             door=f"{door.name}_",
+            silence_s=runtime.config.providers.opencode.silence_s,
             started=started,
             limits=limits_of(runtime.config.agent, run.mode),
             system=system,

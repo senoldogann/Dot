@@ -15,6 +15,7 @@ import pytest_asyncio
 
 from dotagent.agent.limits import LIMIT_EVENT, RunLimits
 from dotagent.agent.loop import AgentRun, RunOutcome
+from dotagent.core.errors import OpenCodeError
 from dotagent.events import EventBus
 from dotagent.opencode.events import PartSeen, Piece, StepEnded, StepStarted, ToolSeen
 from dotagent.opencode.run import _Follow, _outcome, _Step
@@ -83,6 +84,7 @@ def _follow(room: Room, server: _Server, limits: RunLimits | None, worked_s: flo
         vision=False,
         queue=asyncio.Queue(),
         door="dot_1a2b3c4d_",
+        silence_s=600.0,
         started=time.monotonic() - worked_s,
         limits=limits,
     )
@@ -236,3 +238,50 @@ async def test_a_call_of_opencodes_own_tool_after_a_finish_drops_it(room: Room, 
         )
     )
     assert follow.finished_calls == []
+
+
+def _running(call_id: str, tool: str) -> ToolSeen:
+    return ToolSeen(
+        call_id=call_id, message_id="m1", tool=tool, status="running", input={}, output="", error="", title="",
+        started_ms=None, ended_ms=None,
+    )  # fmt: skip
+
+
+async def test_a_session_that_says_nothing_fails_the_run_unless_a_tool_works_for_it(room: Room, tmp_path: Path) -> None:
+    """Item 1940: a session that hangs mid-stream no longer leaves its run working forever."""
+    follow: _Follow = _follow(room, _Server(), None, 0.0, tmp_path)
+    follow.silence_s = 0.2
+    with pytest.raises(OpenCodeError) as raised:
+        async with asyncio.timeout(5.0):
+            await follow.follow()
+    assert "said nothing for" in raised.value.message and raised.value.context["session"] == "ses_1"
+    # A command at work (OpenCode's own or one of Dot's tools) is no silence, however long it takes.
+    working: _Follow = _follow(room, _Server(), None, 0.0, tmp_path)
+    working.silence_s = 0.2
+    await working.tool(_running("c1", "dot_1a2b3c4d_read_file"))
+    assert working.running == {"c1"} and working.wake_in(time.monotonic()) is None
+    working.heard -= 10.0
+    assert not await working.quiet()
+    # Its end starts the silence again.
+    await working.tool(_running("c1", "dot_1a2b3c4d_read_file").model_copy(update={"status": "completed"}))
+    assert working.running == set()
+    with pytest.raises(OpenCodeError):
+        await working.quiet()
+
+
+async def test_the_time_limit_is_kept_by_the_clock_when_no_step_ends(
+    room: Room, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 1940: past ``run_max_minutes`` with no step ending (a session that hangs), the agent is told once, and the
+    run is over a grace later, as it is when the agent goes on regardless."""
+    monkeypatch.setattr("dotagent.opencode.run._LIMIT_GRACE_S", 0.2)
+    server: _Server = _Server()
+    follow: _Follow = _follow(room, server, RunLimits(max_minutes=30, max_tokens=0), 3600.0, tmp_path)
+    follow.answer = "Half of the figures."
+    async with asyncio.timeout(5.0):
+        assert await follow.follow() == "Half of the figures."
+    (note,) = server.prompts
+    assert "limit of this run is reached" in note
+    assert follow.over is not None
+    ended: RunOutcome = _outcome(follow, follow.answer, GOAL)
+    assert ended.status == "failed" and classify_ending(ended.status, ended.result) == "limit"

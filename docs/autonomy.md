@@ -343,7 +343,10 @@ count toward its parent's, which sees them when the delegation returns. Delegate
 limits; an eval run is cut by its task's own (300 s, 600000 tokens), whatever yours are. A run on a Zen model of
 OpenCode (item 552) has them too, read between the agent's steps: the first step that ends past a limit while the agent
 goes on tells it to stop and answer, and an agent that still goes on two steps after that is stopped and the run ends
-failed, with the same words and the timeline's line.
+failed, with the same words and the timeline's line. The time limit is kept by the clock too (item 1940): a session
+that hangs mid-step is told when the limit passes and stopped five minutes later, the run failed the same way; and a
+session that says nothing for `[providers.opencode] silence_s` (600 s) while no tool works for it and no permission
+waits on you fails the run, as Claude Code's does.
 
 **The progress watchdog.** After every step in which a run used tools, Dot compares what it called and what came back
 (screenshots included) with the steps before. By default it looks for the same step `stall_limit` times in a row: the
