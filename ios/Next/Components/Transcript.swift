@@ -183,7 +183,8 @@ struct Shimmer: ViewModifier {
             content
                 .foregroundStyle(Tone.tertiary)
                 .overlay {
-                    TimelineView(.animation) { timeline in
+                    // At most 30 drawings a second: the band moves smoothly and the phone does half the work (item 1932).
+                    TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
                         GeometryReader { proxy in
                             let phase: Double = shimmerPhase(
                                 at: timeline.date.timeIntervalSinceReferenceDate, sweep: Self.sweep, pause: Self.pause)
