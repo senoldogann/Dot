@@ -158,35 +158,6 @@
         }
       }
     },
-    "%lld helpers working": {
-      "comment": "VoiceOver: the capsule segment of helpers at work; the argument is their count",
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld helper working"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld helpers working"
-                }
-              }
-            }
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld yardımcı çalışıyor"
-          }
-        }
-      }
-    },
     "%lld in · %lld out": {
       "comment": "Inspector: tokens read and written",
       "localizations": {
@@ -1312,6 +1283,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Açıldı: %@"
+          }
+        }
+      }
+    },
+    "Browsed dentist.example/booking": {
+      "comment": "Sample helper step (item 1880)",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dentist.example/booking sayfasına bakıldı"
           }
         }
       }
@@ -3917,6 +3899,17 @@
         }
       }
     },
+    "Helpers, %lld of %lld done": {
+      "comment": "VoiceOver: the capsule segment of the run's helpers; the arguments are the helpers that ended and all of them",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yardımcılar, %lld / %lld bitti"
+          }
+        }
+      }
+    },
     "Hide %@": {
       "comment": "VoiceOver: hides a model from the list; the argument is its name",
       "localizations": {
@@ -5524,17 +5517,6 @@
         }
       }
     },
-    "Opens the helpers": {
-      "comment": "VoiceOver hint of the helper group in a chat",
-      "localizations": {
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yardımcıları açar"
-          }
-        }
-      }
-    },
     "Opens the web page": {
       "comment": "VoiceOver: the Web mark of a settings row",
       "localizations": {
@@ -5833,6 +5815,17 @@
         }
       }
     },
+    "Plan %lld/%lld": {
+      "comment": "The plan chip beside the working capsule; the arguments are the steps done and all steps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan %lld/%lld"
+          }
+        }
+      }
+    },
     "Plan first": {
       "comment": "Chat settings row: the next message writes its plan and asks before it changes anything",
       "localizations": {
@@ -5862,6 +5855,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan · %lld / %lld bitti"
+          }
+        }
+      }
+    },
+    "Plan, %lld of %lld steps done": {
+      "comment": "VoiceOver: the plan chip beside the working capsule; the arguments are the steps done and all steps",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plan, %lld / %lld adım bitti"
           }
         }
       }
@@ -7524,7 +7528,7 @@
       }
     },
     "Starting": {
-      "comment": "Status word: a run is about to start\nStatus word: a run is starting",
+      "comment": "Status word: a run is starting",
       "localizations": {
         "tr": {
           "stringUnit": {
@@ -9185,6 +9189,17 @@
         }
       }
     },
+    "Waiting for a helper": {
+      "comment": "Capsule and helper row: the run's step talks to or waits for a helper",
+      "localizations": {
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir yardımcıyı bekliyor"
+          }
+        }
+      }
+    },
     "Waiting for the link": {
       "comment": "Under an owner's message: it is kept and goes when the phone is online",
       "localizations": {
@@ -9214,6 +9229,35 @@
           "stringUnit": {
             "state": "translated",
             "value": "Yanıtını bekliyor"
+          }
+        }
+      }
+    },
+    "Waiting on %lld helpers": {
+      "comment": "Capsule: the run waits for its helpers; the argument is how many still work",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Waiting on %lld helper"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Waiting on %lld helpers"
+                }
+              }
+            }
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld yardımcıyı bekliyor"
           }
         }
       }

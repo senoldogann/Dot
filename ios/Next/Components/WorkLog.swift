@@ -313,8 +313,36 @@ struct WorkFoldView: View {
     }
 }
 
-/// The run's plan as a checklist card.
+/// The run's plan as a checklist card (the run inspector).
 struct PlanCard: View {
+    let steps: [PlanStep]
+
+    var body: some View {
+        PlanSteps(steps: steps)
+            .padding(Space.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Tone.card, in: rounded(Radius.bubble))
+    }
+}
+
+/// How far a run's plan got, for the plan chip beside the working capsule (item 1880).
+struct PlanProgress: Equatable, Sendable {
+    let done: Int
+    let total: Int
+
+    init(steps: [PlanStep]) {
+        done = steps.filter { $0.status == "done" }.count
+        total = steps.count
+    }
+
+    init(done: Int, total: Int) {
+        self.done = done
+        self.total = total
+    }
+}
+
+/// The run's plan as a checklist: its header line and one row per step.
+struct PlanSteps: View {
     let steps: [PlanStep]
 
     var body: some View {
@@ -335,9 +363,7 @@ struct PlanCard: View {
                 .accessibilityLabel(Text(verbatim: "\(step.text), \(statusWords(step.status))"))
             }
         }
-        .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Tone.card, in: rounded(Radius.bubble))
     }
 
     private func glyph(_ status: String) -> String {
@@ -459,57 +485,6 @@ struct UsageLimitCard: View {
     }
 }
 
-/// The helpers a run started, each with its current step (plan §18, R-e #2): who, what it does now, its state.
-struct HelperGroupCard: View {
-    let helpers: [HelperView]
-    let open: () -> Void
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize: DynamicTypeSize
-
-    var body: some View {
-        let working: Int = helpers.filter { helperState($0.status).isLive }.count
-        Button(action: open) {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                HStack(spacing: Space.xs) {
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Symbol(name: "person.2", context: .tool).foregroundStyle(Tone.secondary).frame(width: Metric.iconSlot)
-                    }
-                    Text(String(localized: "\(helpers.count) helpers", comment: "Helper group header, first part; the argument is how many helpers the run started") + " · " + String(localized: "\(working) working", comment: "Helper group header, second part; the argument is how many still work"))
-                        .textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.secondary).tabularNumbers()
-                    Spacer(minLength: 0)
-                    Symbol(name: "chevron.right", context: .chevron).foregroundStyle(Tone.glyph)
-                }
-                ForEach(helpers, id: \.runId) { helper in
-                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
-                        Circle().fill(helperState(helper.status).tone.color).frame(width: 7, height: 7).frame(width: Metric.iconSlot)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(helper.shortTitle).textRole(.footnote).fontWeight(.medium).foregroundStyle(Tone.text).lineLimit(1)
-                            Text(stepWords(helper)).textRole(.label).foregroundStyle(Tone.tertiary).lineLimit(2)
-                        }
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel([helper.shortTitle, helperState(helper.status).word, stepWords(helper)].joined(separator: ", "))
-                }
-            }
-            .padding(Space.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Tone.card, in: rounded(Radius.bubble))
-            .contentShape(rounded(Radius.bubble))
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(String(localized: "Opens the helpers", comment: "VoiceOver hint of the helper group in a chat"))
-    }
-
-    private func stepWords(_ helper: HelperView) -> String {
-        guard helperState(helper.status).isLive else { return helperState(helper.status).word }
-        guard let step = helper.step else { return String(localized: "Starting", comment: "Status word: a run is about to start") }
-        let entry: ToolEntry = ToolEntry(
-            id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [],
-            startedAt: step.at, endedAt: nil)
-        return toolLine(entry)
-    }
-}
-
 /// The footer of a run's final answer (plan §24): copy, the reactions on it and the menu that adds one (docs/runs.md), and
 /// the time the answer came. Quiet ink glyphs of one weight, close together; drawn under the final answer alone.
 struct ReactionsBar: View {
@@ -554,10 +529,9 @@ struct ReactionsBar: View {
     }
 }
 
-/// The model's thinking of a step, a row of the stretch of work (item 1769): while it is written, "Thinking"
-/// shimmering with its newest lines growing under it; once stored, its first sentence in the quiet ink, one line, as
-/// another coding agent shows a thought. A tap opens the whole of it in a box that scrolls in itself past 210 pt, the transcript staying
-/// where it is.
+/// The model's thinking of a step, a row of the stretch of work (items 1769 and 1880): one folded line in every state,
+/// "Thinking" with its shimmer while it is written, its first sentence in the quiet ink once the step is stored; a tap
+/// opens the whole of it in a box that scrolls in itself past 210 pt, the transcript staying where it is.
 struct ThoughtRow: View {
     let text: String
     let live: Bool
@@ -600,22 +574,6 @@ struct ThoughtRow: View {
                 .padding(.leading, Metric.iconSlot + Space.xs)
                 .padding(.bottom, Space.xs)
                 .transition(.opacity)
-            } else if live {
-                // The last three lines, wrapped from the start and clipped from the top (item 1848): a new word never
-                // moves the words before it. Cut at the head, every word slid along its line on each new one.
-                Text(verbatim: "\n\n").textRole(.footnote).hidden()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(alignment: .bottomLeading) {
-                        Text(text)
-                            .textRole(.footnote)
-                            .foregroundStyle(Tone.tertiary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .clipped()
-                    .padding(.leading, Metric.iconSlot + Space.xs)
-                    .padding(.bottom, Space.xxs)
-                    .transition(.opacity)
             }
         }
         .animation(motionAnimation(.disclosure, reduceMotion: reduceMotion), value: open)

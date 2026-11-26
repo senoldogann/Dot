@@ -21,9 +21,10 @@ read as words with Dot's mark. A new chat opens as soon as its first message is 
 key, and turns into the real chat in place once the Mac names it (item 1849). The transcript follows new words only
 while the owner is at its end; their own scroll up stops it, a scroll back to the end starts it again, and it follows
 once the words are laid out, so they are never left under the composer; a streamed word redraws the open chat alone
-(the app's model publishes the store's snapshot by part, at most 30 times a second), and the live thinking's last
-three lines are clipped from the top rather than cut at the head, so a new word never moves the words before it
-(item 1848). The copy · reaction · time footer is on a run's final answer once it ended;
+(the app's model publishes the store's snapshot by part, at most 30 times a second; item 1848). A step's thinking is
+one folded line that a tap opens; the running work is one pill (plain words and clock | Stop | Plan 1/5 | queued |
+helpers done/total), whose plan and people segments open the plan's checklist and the Agents sheet; the stream keeps
+no plan or helper card (item 1880). The copy · reaction · time footer is on a run's final answer once it ended;
 what the policy allowed with nobody asked is not drawn (the inspector keeps it).
 
 Wave L1 (items 1800-1802): the chat list (`ChatListView`, `App/Live.swift`, self-contained so a bot's profile can show
@@ -44,7 +45,8 @@ daemon's proof that it holds this phone's key, `GET /api/proof`, checked here an
 iPhone network → Tailscale → the Mac → Dot → the key, with Copy diagnostics and a trace id; Tailscale on the Mac;
 Forget this phone's key), Notifications (the three kinds of `/api/phone/push-settings`), General (Dot's and the owner's
 names, the language, the clock, Queue or Steer, confirmations, dictation's language), Appearance (light, dark or
-system, the text size with a live preview, the tool calls in chat, response streaming, the reading width), Chat
+system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their own and word
+break, the tool calls in chat, response streaming, the reading width), Chat
 (haptics, reactions' follow-ups), Models (the main and fast models from the daemon's list, and the code review's
 model with its reasoning, changed from the phone too: item 1770, a §24 picker sheet), Usage limits and caps (the plan's
 windows, today's tokens, the caps of item 1731, lowered from the phone, raised on the Mac), Scheduled tasks (next or last
@@ -52,17 +54,8 @@ run, paused, failed; a switch on each row; edit, run now, delete), Rules (the ap
 in it; free mode, switched off from the phone), Memory (the runs' proposed rewrites with Use and Drop, search, every
 note to read, edit or forget), Agents (`Agents/`: the list, an agent's page, a chat with it, its model), Health and
 version, Usage, Maintenance (Dot's and the provider programs' versions, Continue after restart); what is set up at the
-computer stays on the Mac (PLAN §26), which the list's last line says, and no Settings row opens the web app. A search
-with synonyms finds any page in English or
-system, the text size with a live preview, Terminal and Code and diffs with a preview, a size of their own and word
-break, the tool calls in chat, response streaming, the reading width), Chat
-(haptics, reactions' follow-ups), Models (main and the roles from the daemon's list; the code review's models read
-only), Usage limits and caps (the plan's windows, today's tokens, the caps of item 1731, lowered from the phone, raised
-on the Mac), Scheduled tasks (next or last run, paused, failed; pause, resume, edit), Rules (read), Memory (search, the
-runs' proposed rewrites with Use and Drop), Health and version, Usage, Maintenance (Dot's and the provider programs'
-versions, Continue after restart); what is set up at the computer stays on the Mac (PLAN §26), which the list's last
-line says, but for Connect apps below (PLAN §27), and no Settings row opens the web app. A search with synonyms finds any page in English or
-line says, and no Settings row opens the web app. A search with synonyms finds any page in English or
+computer stays on the Mac (PLAN §26), which the list's last line says, but for Connect apps below (PLAN §27), and no
+Settings row opens the web app. A search with synonyms finds any page in English or
 Turkish. Every read and write says its failure the same way (`SettingsFailure`: unreachable with Diagnose, key refused
 with Pair again, refused to a phone with the Mac's place, Dot too old). Pairing is a first-run screen: scan the code
 Settings › Phone shows on the Mac (`dotnext://pair?host=…&code=…`, one tap pairs; the address code fills the address),
@@ -80,7 +73,9 @@ daemon's step: a Mac application's, a synced folder's and Dot's browser's sign-i
 started from the phone and finished on the Mac, where macOS asks or the page opens; adding a connected app, an official
 sign-in and 1Password's token are refused to a phone's key (item 678, `on_this_mac`), so their Connect says "Finish on
 your Mac" on the row and names the Mac's page in the detail. A Disconnect of a sign-in the provider did not end shows
-the daemon's notice of where to end it. While the daemon says a service waits, the sheet reads again every five seconds.
+the daemon's notice of where to end it. While the daemon says a service waits, or a step started from the phone is not finished on the Mac yet, the sheet
+reads again every five seconds, so "Finish on your Mac" turns into Connected with no pull to refresh; it stops with the
+sheet.
 No "For you" section: the daemon gives no suggestion for services.
 
 ## The engine: `ios/DotEngine`
