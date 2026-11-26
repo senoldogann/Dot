@@ -1,9 +1,8 @@
 """A throwaway Dot daemon for DotNext's end-to-end check from the simulator (wave N1-client).
 
 It serves the real app (routes, stores, streams, the revision watch) on 127.0.0.1 in a home of its own, with a model
-that replies by a script instead of a service, so no model is called and nothing leaves this Mac (unless
-``DOTNEXT_E2E_MODEL`` names a real model for a live check: then that model is called, in the yolo mode). The owner's
-words choose the script:
+that replies by a script instead of a service, so no model is called and nothing leaves this Mac. The owner's words
+choose the script:
 
 - "helper: ...": the run starts a helper (``delegate``, wait false) that waits 90 s, then ends;
 - "wait: ...": the run waits 2 min in ``wait_until`` (a steer meanwhile shows "read after this step", and ends it);
@@ -13,6 +12,9 @@ words choose the script:
 - "secret: ...": the run asks for a secret (``ask_secret``), which the phone types in a secure field;
 - "tools: ...": the run reads two files and keeps a plan, so a finished run folds its steps;
 - "fail: ...": the model fails, so the run fails with one line of cause;
+- "write: ...": the run writes a file of its workspace, a change the inspector can undo;
+- "draft: ...": the run drafts an email, a card with Send, Edit and Discard;
+- "bg: ...": the run opens a terminal command in the background (``sleep 600``), which the inspector can stop;
 - "stream: ...": four steps that each think aloud for about 4 s and read a file, then a long markdown answer, all
   streamed word by word at about 40 words a second, the pace of a hosted model (the chat's streaming is measured on it);
 - "browse: ...": the run opens a local page in its (headless) browser, then waits 8 min with the tab open, so the phone
@@ -20,13 +22,15 @@ words choose the script:
   typed in its field, and a clock on it ticks so the cast keeps sending frames;
 - anything else: an answer at once, after a few words streamed.
 
-The home's approval mode is ``supervised`` (``yolo`` with ``DOTNEXT_E2E_MODEL``), so every acting step asks (reads
-do not). With ``--seed`` the home also
+The home's approval mode is ``supervised``, so every acting step asks (reads do not). With ``--seed`` the home also
 holds a note the owner wrote and a run's proposed rewrite of it (item 1711), for Settings › Memory's Use and Drop. With
 ``--seed-activity`` it holds what the Activity tab shows (item 1826): runs two schedules did today (one done, one
 failed), the decisions made for the owner in them, drafts that wait (one whose send failed), a thing a run put on Dot's
 own list, and two versions of Dot's habits proposed by its learning (one written from a page others can write);
-``e2e_activity.sh`` marks "while you were away" read from before them.
+``e2e_activity.sh`` marks "while you were away" read from before them. With
+``--model <ref>`` (``claude_code:haiku``) the runs go to that real model instead of the script, for a real-model run of
+the phone's flows; the throwaway home has no key of its own, so only a provider that brings its own sign-in (the Claude
+plan's ``claude`` command) answers.
 
 Usage (the three folders are throwaway, ``mktemp -d``)::
 
@@ -273,6 +277,35 @@ class ScriptProvider:
                     id=f"call_{self._calls}c", name="read_file", arguments={"path": "/nonexistent/dotnext-e2e.txt"}
                 ),
             )
+        elif latest.startswith("write:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="write_file",
+                    arguments={"path": "dotnext-e2e-note.txt", "content": "Written by the e2e check.\n"},
+                ),
+            )
+        elif latest.startswith("draft:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="draft_message",
+                    arguments={
+                        "channel": "mail",
+                        "to": ["owner@example.com"],
+                        "subject": "E2E draft",
+                        "body": "Hello from the e2e check.",
+                    },
+                ),
+            )
+        elif latest.startswith("bg:"):
+            calls = (
+                ToolCall(
+                    id=f"call_{self._calls}",
+                    name="terminal_open",
+                    arguments={"command": "sleep 600", "background": True},
+                ),
+            )
         elif latest.startswith("fail:"):
             raise RuntimeError("the scripted model failed on purpose")
         elif latest.startswith("slow:"):
@@ -339,8 +372,8 @@ class ScriptProvider:
         return None
 
 
-def prepare_home() -> None:
-    """Refuses a home that may be the owner's, then writes the throwaway home's config (scripted model, supervised)."""
+def prepare_home(model: str) -> None:
+    """Refuses a home that may be the owner's, then writes the throwaway home's config (``model``, supervised)."""
     for name in ("DOT_HOME", "DOT_LOG_DIR", "DOT_CHROME_DIR"):
         if name not in os.environ:
             raise SystemExit(f"{name} must name a throwaway folder")
@@ -352,12 +385,9 @@ def prepare_home() -> None:
     if home.exists() and any(home.iterdir()) and not made_here:
         raise SystemExit(f"DOT_HOME={home} is not empty and was not made by this script: give it a mktemp -d folder")
     ensure_layout()
-    # DOTNEXT_E2E_MODEL runs a real model instead of the script (a live check, e.g. "claude_code:haiku" on the owner's
-    # Claude plan): in yolo, since nobody answers asks in it; the browser is still this home's own headless Chrome.
-    real: str | None = os.environ.get("DOTNEXT_E2E_MODEL")
     config.write_text(
-        f'{CONFIG_MARK}\n[models]\nmain = "{real or MODEL}"\n\n[browser]\nheadless = true\n\n'
-        f'[policy]\napprovals = "{"yolo" if real else "supervised"}"\n',
+        f'{CONFIG_MARK}\n[models]\nmain = "{model}"\n\n[browser]\nheadless = true\n\n'
+        '[policy]\napprovals = "supervised"\n',
         encoding="utf-8",
     )
 
@@ -448,12 +478,13 @@ async def seed_activity(runtime: Runtime) -> None:
     )
 
 
-async def serve(port: int, seeded: bool, activity: bool) -> None:
+async def serve(port: int, seeded: bool, activity: bool, scripted: bool) -> None:
     home: Path = Path(os.environ["DOT_HOME"])
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     play_page: str = serve_play_page()
     print(f"PLAY {play_page}", flush=True)
-    await runtime.router.register("ollama", ScriptProvider(play_page))
+    if scripted:
+        await runtime.router.register("ollama", ScriptProvider(play_page))
     if seeded:
         await seed(runtime)
     if activity:
@@ -486,6 +517,17 @@ async def serve(port: int, seeded: bool, activity: bool) -> None:
         await close_runtime(runtime)
 
 
+def model_argument(args: list[str]) -> str:
+    """The model ``--model <ref>`` names, else the script's own."""
+    if "--model" not in args:
+        return MODEL
+    at: int = args.index("--model")
+    if at + 1 >= len(args):
+        raise SystemExit("--model needs a model reference, such as claude_code:haiku")
+    return args[at + 1]
+
+
 if __name__ == "__main__":
-    prepare_home()
-    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:], "--seed-activity" in sys.argv[2:]))
+    chosen: str = model_argument(sys.argv[2:])
+    prepare_home(chosen)
+    asyncio.run(serve(int(sys.argv[1]), "--seed" in sys.argv[2:], "--seed-activity" in sys.argv[2:], chosen == MODEL))

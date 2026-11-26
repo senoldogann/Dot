@@ -215,6 +215,24 @@ async def test_a_chats_view_holds_its_state_at_a_revision_that_every_writer_move
     assert (await http.get(f"/api/threads/{gone.id}/view")).status_code == 404
 
 
+async def test_a_chats_view_holds_the_drafts_that_still_take_an_answer(served: Served) -> None:
+    """A draft of the chat's run that waits, and one whose send failed, are in the view; a discarded one is not (the
+    view once asked for a status no draft has, and held none)."""
+    store: Store = served.runtime.store
+    chat: ThreadRecord = await store.create_thread("Chat", "ui")
+    root: RunRecord = await _run(store, chat.id, None)
+    waiting = await store.add_draft(root.id, "mail", ["a@example.com"], [], "Waits", "Hello")
+    failed = await store.add_draft(root.id, "mail", ["b@example.com"], [], "Failed", "Hello")
+    await store.claim_draft(failed.id, ["b@example.com"], [], "Failed", "Hello")
+    await store.settle_draft(failed.id, "Mail is not set up")
+    dropped = await store.add_draft(root.id, "message", ["+358401234567"], [], "", "Hi")
+    await store.discard_draft(dropped.id)
+
+    view: dict[str, object] = (await served.http.get(f"/api/threads/{chat.id}/view")).json()
+    shown: list[tuple[str, str]] = [(one["id"], one["status"]) for one in view["drafts"]]  # type: ignore[attr-defined]
+    assert shown == [(waiting.id, "waiting"), (failed.id, "failed")]
+
+
 async def _until_synchronized(frames: AsyncIterator[Frame], got: list[EventRecord]) -> dict[str, object]:
     async with asyncio.timeout(_WAIT_S):
         async for frame in frames:

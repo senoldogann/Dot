@@ -33,7 +33,8 @@ struct UserBubble: View {
                 .lineLimit(lineLimit)
                 .textRole(.body)
                 .foregroundStyle(Tone.text)
-                .textSelection(.enabled)
+                // No selection on a hold: the hold opens the message's actions, Select text among them (web
+                // `messagesheet.js`: a touch screen's hold is the sheet's alone).
                 .padding(.horizontal, Space.m - 1.75)
                 .padding(.vertical, Space.s - 1.75)
                 .background(Tone.nested, in: rounded(Radius.bubble))
