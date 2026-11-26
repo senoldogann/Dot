@@ -42,8 +42,9 @@ the newest window of each kind that a step of the period recorded (`assistant.pl
 task that did not run on the plan records none), and `top_runs`, the five runs of the period that used the most tokens
 (each its own: a helper is a run of its own), which the page lists under **Tasks that used the most**, each opening its
 task. **Caps** under it sets the caps of what the runs spend, in millions of tokens, with today's tokens in all and by
-source (item 1731, [Limits](limits.md)). Dot keeps no price for a model, so the page shows time and tokens and
-the plan's window, never money. Each role's box opens the composer's
+source (item 1731, [Limits](limits.md)). Beside the tokens of each day, of the week and of each costliest task, and
+on a task's Cost card (its own tokens, and with its helpers beside its cap), stands **an estimate in dollars** (item
+1856): see [What a run costs in dollars](#what-a-run-costs-in-dollars). Each role's box opens the composer's
 model menu (item 1044): the favourites and every provider on a rail, a search, and the models of the provider pressed,
 starred as in the composer. A role's menu offers only the models that can do its work: the fast and the vision model
 offer no model of an agent program of its own (OpenCode's free models, the Claude plan), and the own work model none
@@ -469,8 +470,9 @@ answer keeps its words, Ollama's too.
   calls no tool is not a failed run, and a schedule's row says `failed`, not `done`, for one that ended so.
   The door's secret is in a file only you can read in a folder of the run's own, removed as the run ends, never in the
   program's arguments. The
-  timeline shows the model's text and thinking as they come and each step with its tools, its tokens and the plan's
-  window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
+  timeline shows the model's text and thinking as they come (the summary of its thinking, which Claude Code 2.1.331 and
+  later is asked for with `--thinking-display summarized`; an older version passes on none) and each step with its
+  tools, its tokens and the plan's window; your messages reach it while it works, and Stop ends the program. Skills and connected apps picked in the
   composer come with the message as on Dot's own models (item 1022): each picked skill's instructions in its first
   message, the apps' tools through the door, and so the accounts picked, whose mail and calendars the door gives (item
   1063); a message picked with Plan first is refused before it runs, as its plan and ask are Dot's own loop's. A chat keeps its Claude Code session from
@@ -634,3 +636,33 @@ provider that sits idle is dropped after 30 seconds, where a longer one met "bad
 sent the prompt again. The memory search (an OpenAI or ollama.com key) and the MCP servers
 read their keys when the daemon starts: after changing a key they use, restart the daemon (`dotx service restart`; a
 run in `yolo` asks for `dotx service restart --when-idle`, see [Daemon](daemon.md)).
+
+## What a run costs in dollars
+
+Dot estimates what tokens cost from the public price list of [models.dev](https://models.dev) (item 1856), never from
+a guess. The daemon fetches `https://models.dev/api.json` when it starts and once a day, keeps the prices of the
+providers below in `prices.json` in its home, and asks with the list's ETag, so an unchanged list is not downloaded
+again; a fetch is tried three times with a growing wait, each failure logged, and one that still fails is logged as
+`prices_not_fetched` and tried again an hour later, the prices Dot had kept meanwhile (their date is `prices_at` of each
+estimate). `DOT_PRICES_URL` sets another address, and an empty one fetches nothing (the tests do so).
+
+Each model call a run made is priced on its own model (its `model_call` event: the main model, a standby model, the
+summaries), at the list's dollars per million tokens of input, output, cache reads and cache writes; a cached or
+cache-written token the list gives no price for is billed as input, and a call whose input is above a dearer tier's
+context size is priced at that tier. Tokens a run counts beyond its calls (OpenCode's own agent records none, a deleted
+chat's run keeps only its totals) are its own model's, with no cache.
+
+How a model's tokens are paid for decides what is shown:
+
+- **priced**: Anthropic, OpenAI and Google with your own key, OpenRouter and OpenCode Zen, by the list's price of the
+  model; OpenCode Zen's free models cost `$0`;
+- **plan**: the Claude plan (`claude_code`), OpenCode Go, Antigravity and Ollama's cloud models are subscriptions, with
+  no price per token: they add no dollars, and the line says `+ plan` (`on a plan` when all of it was);
+- **local**: Ollama's models on this Mac cost no dollars;
+- **unknown**: a model of a priced provider that the list has no price for, a call whose model was not recorded, or any
+  priced model before a list was fetched. Then the whole estimate is **cost unknown**, never a smaller number.
+
+It is an estimate: a provider may bill otherwise (a discount, a batch price, OpenRouter's own provider routing), and
+the caps of what runs spend stay in tokens ([Limits](limits.md)). The API: `cost` of each day and of each of `top_runs`
+in `GET /api/usage`, `cost` (the run's own) and `budget.spent_cost` (with its helpers) in `GET /runs/{id}/stats`, each
+`{"usd", "priced_usd", "unknown_models", "plan_models", "prices_at"}` with `usd` `null` when unknown.

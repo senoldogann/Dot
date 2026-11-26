@@ -6,6 +6,7 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 
 | Item | Status | Date | Title |
 | ---- | ------ | ---- | ----- |
+| [1894](1894.md) | done | 2026-11-26 | Follow-ups left in the pull request bodies: the maturity check's exit code, the iOS README, Connect apps' polling |
 | [1890](1890.md) | done | 2026-11-25 | Dot takes the Mac's pointer and keyboard only while the owner is away |
 | [1874](1874.md) | done | 2026-11-25 | A failed browser part runs again only its failed tests |
 | [1873](1873.md) | done | 2026-11-25 | The slow tests that waited: a 35-second name lookup and pages looked at one by one |
@@ -17,6 +18,10 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1863](1863.md) | done | 2026-11-25 | A merge no longer sends the other pull requests back to main for Markdown no test names |
 | [1862](1862.md) | done | 2026-11-25 | Connect apps on the phone: one sheet over the Mac's catalogue |
 | [1861](1861.md) | done | 2026-11-25 | DotNext's engine reads the Connectors catalogue and says what a phone may start |
+| [1858](1858.md) | done | 2026-11-25 | The prompt surface Dot sends a model is checked in, and a change to it fails until the snapshot is updated |
+| [1857](1857.md) | done | 2026-11-25 | A maturity scorecard: when each feature was last proven on the real Mac, and a daily check of stale proofs |
+| [1856](1856.md) | done | 2026-11-25 | What a run and a task cost in dollars, estimated from a public price list, beside their tokens |
+| [1855](1855.md) | done | 2026-11-25 | A schedule or a watcher may run a check first, without a model, and wake one only when it says so |
 | [1854](1854.md) | done | 2026-11-25 | A run a restart cut off goes on by itself, unless what was cut may have paid, sent or posted |
 | [1853](1853.md) | done | 2026-11-25 | Proof before done: a task run or a campaign can carry checks that must pass before Dot marks it done |
 | [1852](1852.md) | done | 2026-11-25 | A refused key's line on a phone's sign-in is chosen by the style, not by the script |
@@ -31,6 +36,8 @@ a stale index, and the gate runs it). Items up to 458 are in [ROADMAP.md](../ROA
 | [1790](1790.md) | done | 2026-11-25 | DotNext's Settings › System › Maintenance: Dot's and the provider programs' versions, and Continue after restart |
 | [1771](1771.md) | done | 2026-11-25 | DotNext's Models, Scheduled tasks, Rules, Memory and Agents are native, as much of them as a phone is for |
 | [1770](1770.md) | done | 2026-11-25 | The code review's models and their reasoning are changed from the phone too |
+| [1769](1769.md) | done | 2026-11-25 | DotNext: the work told in one live line, thinking as rows of the work, Dot's own tools in words, softer motion |
+| [1768](1768.md) | done | 2026-11-25 | A run on the Claude plan passes on its model's thinking |
 | [1761](1761.md) | done | 2026-11-25 | A message the model's safeguards flagged is not tried again on the same model |
 | [1760](1760.md) | done | 2026-11-25 | A run no chat is told in is not offered a command in the background |
 | [1759](1759.md) | done | 2026-11-25 | DotNext's Settings, whole: every page of the web app reachable, the hop-by-hop diagnosis, and pairing as a first run |

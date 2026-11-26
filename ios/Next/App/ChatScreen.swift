@@ -23,7 +23,7 @@ struct ChatScreen: View {
     /// Begins the edit of the first queued message at once (the debug fixtures); `false` in the app.
     let editsFirstQueued: Bool
     @Environment(AppModel.self) private var model: AppModel
-    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.showAll.rawValue
+    @AppStorage("toolCallMode") private var toolModeRaw: String = DotEngine.ToolCallMode.hideAll.rawValue
     @AppStorage("responseStreaming") private var streaming: Bool = true
     @AppStorage("followUp") private var followUpRaw: String = FollowUp.queue.rawValue
     @AppStorage(PrefKey.confirmStop) private var confirmStop: Bool = true
@@ -44,6 +44,8 @@ struct ChatScreen: View {
     @State private var reading: ReadingMark = ReadingMark()
     @State private var toast: ToastMessage?
     @State private var stopping: Bool = false
+    /// The steps shown for this chat from the live line (item 1769), over a mode that hides them.
+    @State private var stepsShown: Bool = false
     @State private var confirmingStop: Bool = false
     /// The answer of a side question (`/btw`), shown in an alert.
     @State private var aside: SideAnswer?
@@ -57,7 +59,11 @@ struct ChatScreen: View {
     private var view: ThreadView? { chat?.view }
     private var activeRun: RunRecord? { view?.runs.last { $0.parentRunId == nil && $0.isActive } }
     private var helpers: [HelperView] { view?.helpers ?? [] }
-    private var mode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .showAll }
+    /// The tool mode the owner chose (Settings › Appearance); Hide all, the web's "What it is doing", until they choose.
+    private var chosenMode: DotEngine.ToolCallMode { DotEngine.ToolCallMode(rawValue: toolModeRaw) ?? .hideAll }
+    /// Whether the chosen mode hides the steps, so that the live line says the work (item 1769).
+    private var linesTheWork: Bool { chosenMode == .hideAll || chosenMode == .zen }
+    private var mode: DotEngine.ToolCallMode { stepsShown && linesTheWork ? .showAll : chosenMode }
     private var followUp: FollowUp { FollowUp(rawValue: followUpRaw) ?? .queue }
     private var phase: ChatPhase { chatPhase(of: view) }
 
@@ -170,12 +176,15 @@ struct ChatScreen: View {
                     Group {
                         switch block {
                         case .item(let item): row(item)
-                        case .tools(let entries): ToolRun(entries: entries)
+                        case .steps(let rows): StepRun(rows: rows)
                         }
                     }
                     .id(block.id)
                     // Kept outside the view's state: a row coming into sight must not draw the whole screen again.
                     .onAppear { reading.topVisible = block.id }
+                }
+                if linesTheWork, let run = activeRun, let chat, let now = workNow(of: chat, run: run.id, stopping: stopping) {
+                    WorkLineView(now: now, stepsShown: stepsShown) { stepsShown.toggle() }
                 }
             }
             .frame(maxWidth: proseWidth)
@@ -299,7 +308,7 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             FloatingWorkingControl(
                 summary: WorkingSummary(
-                    status: capsuleStatus, activity: activityWords,
+                    status: capsuleStatus,
                     since: activeRun.map { Date(timeIntervalSince1970: $0.createdAt) }, queued: view?.queue.messages.count ?? 0,
                     helpers: helpers.filter { helperState($0.status).isLive }.count),
                 showsScrollToBottom: showsJump, openStatus: { panel = .inspector }, openQueue: { panel = .queue }, openHelpers: { panel = .agents },
@@ -532,20 +541,6 @@ struct ChatScreen: View {
         default:
             let who: String = view?.thread.agentId ?? String(localized: "Dot", comment: "The assistant's name in a chat's subtitle")
             return [who, model.macName].compactMap { $0 }.joined(separator: " · ")
-        }
-    }
-
-    /// What the run at work does now, for the capsule (thinking, writing, the tool that runs); `nil` between steps.
-    private var activityWords: String? {
-        guard capsuleStatus == .working, let run = activeRun, let chat, let now = activity(of: chat, run: run.id) else { return nil }
-        switch now {
-        case .thinking: return String(localized: "Thinking", comment: "Capsule: the run's model is thinking")
-        case .writing: return String(localized: "Writing", comment: "Capsule: the run's model is writing its words")
-        case .tool(let step):
-            return toolLine(
-                ToolEntry(
-                    id: "", tool: step.tool, kind: ToolKind.of(step.tool), target: step.target, args: "", output: "", state: .running, images: [],
-                    startedAt: step.at, endedAt: nil))
         }
     }
 

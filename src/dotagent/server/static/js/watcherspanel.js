@@ -1,6 +1,6 @@
 // The Watchers panel of Schedules (item 571): what Dot keeps an eye on for you and tells you of when it happens. A
 // watcher is new mail in a Google or Microsoft account you signed in, an event about to start in its calendar, or your
-// GitHub notifications, with your own words for what you want to hear of; it looks every few minutes (the daemon
+// GitHub notifications, or your own check script (item 1855), with your own words for what you want to hear of; it looks every few minutes (the daemon
 // polls, nothing reaches it from outside), tells you on your phone and keeps a line in the chat Watchers, and, when
 // you ask, starts a run with your goal for what it found. Each row says how its last look went and, when it failed,
 // why. Everything is `GET`, `POST`, `PATCH` and `DELETE /api/watchers`, and `POST /api/watchers/<id>/try` (Check now).
@@ -18,6 +18,8 @@ const KINDS = [
   { id: "mail", label: "New mail", hint: "A new mail in a Google or Microsoft account you signed in", mark: "mail", what: "new mail" },
   { id: "calendar", label: "Calendar", hint: "An event about to start", mark: "calendar", what: "an event about to start" },
   { id: "github", label: "GitHub", hint: "Your GitHub notifications", mark: "branch", what: "a GitHub notification" },
+  // Item 1855: the owner's own script in Dot's checks folder, run without a model, is the look.
+  { id: "check", label: "Check", hint: "Your own script, run without a model, says when to wake", mark: "terminal", what: "what your check found" },
 ];
 const ACTIONS = [
   { id: "tell", label: "Tell me", hint: "A push to your phone, and a line kept in the chat Watchers" },
@@ -110,6 +112,7 @@ function watcherRow(view, handlers, looking, tells) {
         { class: "row-meta" },
         // An address longer than the row is cut with an ellipsis, so that it never runs past the row; the title has it whole.
         view.account === "" ? null : el("span", { class: "chip", title: `The account it looks in: ${view.account}` }, el("span", { class: "chip-text" }, view.account)),
+        view.check === "" ? null : el("span", { class: "chip mono", title: "The check it runs, in Dot's checks folder" }, el("span", { class: "chip-text" }, view.check)),
         el("span", { class: "chip", title: view.kind === "calendar" ? "How long before an event it tells you" : "How often it looks" }, minutesText(view)),
         el("span", { class: "chip", title: ACTIONS.find((action) => action.id === view.action)?.hint ?? "" }, view.action === "run" ? "Starts a task" : "Tells you"),
       ),
@@ -147,7 +150,7 @@ function watcherRow(view, handlers, looking, tells) {
 
 /** The body of a request that sets a watcher as `view` has it, with what `changes` says otherwise. */
 function bodyOf(view, changes) {
-  return { name: view.name, kind: view.kind, enabled: view.enabled, account: view.account, words: view.words, minutes: view.minutes, action: view.action, goal: view.goal, ...changes };
+  return { name: view.name, kind: view.kind, enabled: view.enabled, account: view.account, words: view.words, minutes: view.minutes, action: view.action, goal: view.goal, check: view.check, ...changes };
 }
 
 /**
@@ -161,6 +164,7 @@ function watcherForm({ view, options }) {
   const editing = view !== null;
   const name = el("input", { class: "input", type: "text", maxlength: "80", autocomplete: "off", placeholder: "Landlord", "aria-label": "Name" });
   const account = el("select", { class: "select", "aria-label": "Account" });
+  const check = el("input", { class: "input mono", type: "text", maxlength: "80", autocomplete: "off", spellcheck: "false", placeholder: "price-drop.sh", "aria-label": "Check" });
   const words = el("textarea", { class: "textarea", rows: "2", "aria-label": "What you want to hear of" });
   const minutes = el("input", { class: "input", type: "number", min: "1", max: "1440", step: "1", inputmode: "numeric", "aria-label": "Minutes" });
   const goal = el("textarea", { class: "textarea", rows: "3", placeholder: "Draft a reply in my voice and keep it as a draft.", "aria-label": "Goal of the task" });
@@ -170,6 +174,11 @@ function watcherForm({ view, options }) {
   kinds.element.setAttribute("aria-label", "Kind");
   actions.element.setAttribute("aria-label", "What it does");
   const accountField = field("Account", account, "");
+  const checkField = field(
+    "Check",
+    check,
+    'The file name of an executable script in Dot\'s "checks" folder. Its last line {"wake": true} tells you what it printed before it, {"wake": false} tells nothing, and anything else shows as a failed look.',
+  );
   // Their label and hint are the kind's, written by `paintKind`.
   const wordsField = field("What you want to hear of", words, "-");
   const minutesField = field("Minutes", minutes, "-");
@@ -184,20 +193,26 @@ function watcherForm({ view, options }) {
   );
   function paintKind() {
     const kind = kinds.value();
-    accountField.hidden = kind === "github";
-    noAccounts.hidden = kind === "github" || options.accounts.length > 0;
+    accountField.hidden = kind === "github" || kind === "check";
+    checkField.hidden = kind !== "check";
+    noAccounts.hidden = kind === "github" || kind === "check" || options.accounts.length > 0;
     noGithub.hidden = kind !== "github" || options.github;
     const labels = {
       mail: ["What you want to hear of", "In your own words: my bank, my landlord, anything about the visa. The fast model reads each new mail's sender, subject and first lines against it.", "my bank, my landlord, anything about the visa"],
       calendar: ["Only events with these words (optional)", "Leave it empty to be told of every timed event; the words are looked for in an event's title, place and notes.", "stand-up"],
       github: ["Only what you want to hear of (optional)", "Empty: a review asked of you, a mention, an assignment and a failing check of yours. With words, the fast model judges each new notification.", "anything about the visa repository"],
+      check: ["Only what you want to hear of (optional)", "Empty: every time the check says to wake, you are told. With words, the fast model judges what it printed.", "only a drop below 90"],
     }[kind];
     wordsField.querySelector(".field-label").textContent = labels[0];
     wordsField.querySelector(".hint").textContent = labels[1];
     words.placeholder = labels[2];
     minutesField.querySelector(".field-label").textContent = kind === "calendar" ? "Tell me this many minutes before an event" : "Look every this many minutes";
     minutesField.querySelector(".hint").textContent =
-      kind === "calendar" ? "It looks at least every five minutes, and again when an event comes inside this." : "From 1 to 1440. GitHub asks to be looked at no oftener than it says, a minute at least.";
+      kind === "calendar"
+        ? "It looks at least every five minutes, and again when an event comes inside this."
+        : kind === "github"
+          ? "From 1 to 1440. GitHub asks to be looked at no oftener than it says, a minute at least."
+          : "From 1 to 1440.";
     if (!touchedMinutes) {
       minutes.value = String(options.minutes[kind]);
     }
@@ -222,6 +237,7 @@ function watcherForm({ view, options }) {
   if (editing) {
     name.value = view.name;
     words.value = view.words;
+    check.value = view.check;
     minutes.value = String(view.minutes);
     goal.value = view.goal;
   }
@@ -241,6 +257,10 @@ function watcherForm({ view, options }) {
       // The dialog is over the page, and a toast would stand under it: the reason is shown in the dialog.
       throw new Error("Sign in a Google or Microsoft account first (Settings › Connectors).");
     }
+    if (kind === "check" && check.value.trim() === "") {
+      check.focus();
+      return false;
+    }
     if (kind === "mail" && words.value.trim() === "") {
       words.focus();
       return false;
@@ -258,7 +278,8 @@ function watcherForm({ view, options }) {
       name: nameText,
       kind,
       enabled: editing ? view.enabled : true,
-      account: kind === "github" ? "" : account.value,
+      account: kind === "github" || kind === "check" ? "" : account.value,
+      check: kind === "check" ? check.value.trim() : "",
       words: words.value.trim(),
       minutes: wanted,
       action: actions.value(),
@@ -269,7 +290,7 @@ function watcherForm({ view, options }) {
       toast("ok", "Watcher saved.");
     } else {
       await api.post("/watchers", body);
-      toast("ok", "Watcher added: its first look only notes what is there, and it tells what comes after.");
+      toast("ok", kind === "check" ? "Watcher added: it runs your check at its next look." : "Watcher added: its first look only notes what is there, and it tells what comes after.");
     }
     return true;
   }
@@ -283,6 +304,7 @@ function watcherForm({ view, options }) {
       field("Name", name, ""),
       el("div", { class: "field" }, el("span", { class: "field-label" }, "Kind"), kinds.element),
       accountField,
+      checkField,
       minutesField,
       wordsField,
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "What it does"), actions.element),
