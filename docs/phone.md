@@ -106,7 +106,10 @@ takes (a wired or Bluetooth one is named the first time it is used). The same by
 4. Dot's iPhone app (items 997 and 1353, `ios/`, installed from Xcode for now; what follows is the first app, `ios/Dot`.
    Its rewrite Dot Next, `ios/Next`, opens on the owner's bots instead (items 1881-1885): Dot large on top and one row
    per agent with its face and its latest line, "+" making a new agent that greets in its chat, a bot's chat under its
-   own header and menu, its profile, and one settings sheet from an avatar button) is a native SwiftUI app over the
+   own header and menu, its profile, and one settings sheet from an avatar button; a bot's unread mark counts the
+   chats held with it, not Dot's own work (its schedules', its initiative's, what it sends the agents, the pre-push
+   hook's code reviews), which marks it only while it waits on the owner, and a tap on a bot opens its latest such chat,
+   item 1912; a new chat's half-written words are kept per bot, item 1914) is a native SwiftUI app over the
    daemon's own API: the chat list with the agents strip, a chat that opens from what the phone holds and catches up by the events
    after the last one, answers that stream in, the approvals and questions a run asks with Allow and Deny, one capsule
    over the composer (item 1390) whose segments are the run's status (working with its clock, waiting on you,

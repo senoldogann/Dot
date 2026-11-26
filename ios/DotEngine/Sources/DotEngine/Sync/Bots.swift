@@ -7,15 +7,15 @@ public struct Bot: Sendable, Hashable, Identifiable {
     public let record: AgentRecord
     /// Its chats, the one that moved last first.
     public let chats: [ThreadRow]
-    /// How many of its chats the owner has not seen since they ended.
+    /// How many of its conversations (`isConversation`) the owner has not seen since they ended.
     public let unread: Int
     /// How many asks wait on the owner across its chats.
     public let asks: Int
 
     public var id: String { record.id }
     public var isDot: Bool { record.id == dotAgentId }
-    /// The chat a tap on the bot opens: the one that moved last.
-    public var latest: ThreadRow? { chats.first }
+    /// The chat a tap on the bot opens: the conversation that moved last, or its chat that moved last when it has none.
+    public var latest: ThreadRow? { chats.first { isConversation($0.summary) } ?? chats.first }
     /// When it last moved, for the home's order (its record's birth when it has no chat yet).
     public var movedAt: Double { latest?.summary.updatedAt ?? record.createdAt }
 
@@ -26,6 +26,15 @@ public struct Bot: Sendable, Hashable, Identifiable {
         self.asks = asks
     }
 }
+
+/// The sources of the chats Dot holds of its own work, which the web folds under sections of their own (`sidebar.js`
+/// `CHANNEL_SECTIONS`): its initiative's and its schedules', the work it sends the agents, the pre-push hook's code
+/// reviews (item 1912: the hook writes one on every push, so Dot's face always wore an unread mark and a tap on it
+/// opened the latest review).
+let workSources: Set<String> = ["initiative", "schedule", "team", "review"]
+
+/// Whether a chat is one the owner holds with the bot, not one of Dot's own work (pure).
+public func isConversation(_ chat: ThreadSummary) -> Bool { !workSources.contains(chat.source) }
 
 /// The bots of the home: Dot first, then the agents, pinned ones first (in the order `pinned` lists them), then the
 /// one that moved last. `agents` is `GET /api/agents` (Dot first); with no Dot among them (not read yet), Dot is drawn
@@ -50,7 +59,7 @@ public func bots(agents: [AgentSummary], rows: [ThreadRow], pinned: [String], fa
             held.append(ThreadRow(summary: home, revision: 0, asks: home.latestStatus == "blocked" ? 1 : 0))
         }
         let chats: [ThreadRow] = held.sorted { $0.summary.updatedAt > $1.summary.updatedAt }
-        return Bot(record: record, chats: chats, unread: chats.filter(\.summary.unread).count, asks: chats.reduce(0) { $0 + $1.asks })
+        return Bot(record: record, chats: chats, unread: chats.filter { $0.summary.unread && isConversation($0.summary) }.count, asks: chats.reduce(0) { $0 + $1.asks })
     }
     let rank: [String: Int] = Dictionary(pinned.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
     let agentBots: [Bot] = others.map(bot).sorted { left, right in
