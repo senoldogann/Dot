@@ -100,8 +100,8 @@ uvx zizmor@1.31.1 --min-severity low .
 
 - A pull request carries one change or a batch of related ones, each its own commit with its own roadmap and changes
   entry. Say what each does, why, and how you checked it; the template asks for each.
-- `uv run python scripts/next_item.py [count]` gives the numbers new items take (main, open pull requests and pushed
-  branches hold numbers); `uv run python scripts/pr_body.py <item>... [--title]` makes the pull request's title
+- `uv run python scripts/next_item.py [count]` gives and reserves the numbers new items take (main, pull requests,
+  branches, commits and worktrees hold numbers; run it once, as each call reserves new ones); `uv run python scripts/pr_body.py <item>... [--title]` makes the pull request's title
   and body from the roadmap entries of its items.
 - A change in what Dot does changes the page under [docs/](docs/) that describes it, in the same pull request.
 - `roadmap/INDEX.md` lists every item from 459 on; `uv run python scripts/roadmap_index.py` writes it again from the
